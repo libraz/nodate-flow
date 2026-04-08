@@ -85,7 +85,7 @@ func (p *openAIProvider) Complete(ctx context.Context, req Request) (*Response, 
 	httpReq.Header.Set("Authorization", "Bearer "+string(plain))
 	zero(plain)
 
-	resp, err := sharedClient.Do(httpReq)
+	resp, err := doLimited(ctx, DestOpenAI, httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("openai: do: %w", err)
 	}

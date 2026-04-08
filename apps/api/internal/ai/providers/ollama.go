@@ -62,7 +62,7 @@ func (p *ollamaProvider) Complete(ctx context.Context, req Request) (*Response, 
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	resp, err := sharedClient.Do(httpReq)
+	resp, err := doLimited(ctx, DestOllama, httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("ollama: do: %w", err)
 	}

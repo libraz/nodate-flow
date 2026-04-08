@@ -85,7 +85,7 @@ func (p *anthropicProvider) Complete(ctx context.Context, req Request) (*Respons
 	httpReq.Header.Set("x-api-key", string(plain))
 	zero(plain)
 
-	resp, err := sharedClient.Do(httpReq)
+	resp, err := doLimited(ctx, DestAnthropic, httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("anthropic: do: %w", err)
 	}

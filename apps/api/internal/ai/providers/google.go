@@ -82,7 +82,7 @@ func (p *googleProvider) Complete(ctx context.Context, req Request) (*Response, 
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	resp, err := sharedClient.Do(httpReq)
+	resp, err := doLimited(ctx, DestGoogle, httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("google: do: %w", err)
 	}

@@ -56,6 +56,15 @@ type Config struct {
 	// on localhost. Set to a single "*" to allow any origin (credentials
 	// will then be disabled by the CORS spec).
 	CorsAllowedOrigins []string `env:"NF_CORS_ALLOWED_ORIGINS" envSeparator:"," envDefault:"http://localhost:5173,http://127.0.0.1:5173"`
+
+	// OutboundLlmRps is the steady-state per-provider egress rate cap
+	// (requests per second) applied uniformly to every configured LLM
+	// destination. 0 disables the limiter (fail-open). The burst size
+	// defaults to max(1, rps).
+	OutboundLlmRps float64 `env:"NF_OUTBOUND_LLM_RPS" envDefault:"0"`
+	// OutboundLlmBurst overrides the burst size for the per-provider
+	// egress limiter. 0 → derived from OutboundLlmRps.
+	OutboundLlmBurst int `env:"NF_OUTBOUND_LLM_BURST" envDefault:"0"`
 }
 
 // Load parses NF_* environment variables into a Config.

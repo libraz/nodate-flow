@@ -13,8 +13,10 @@ import (
 	"github.com/go-chi/cors"
 	_ "github.com/go-sql-driver/mysql"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/providers"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/config"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/outbound"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/eventbus"
@@ -61,6 +63,30 @@ func main() {
 		cipher = c
 	} else {
 		logger.Warn("ai cipher disabled", "err", cerr)
+	}
+
+	// Per-provider egress rate limits (4.SEC-2). A zero rps leaves the
+	// registry empty and every provider call falls through to the
+	// underlying *http.Client untouched.
+	if cfg.OutboundLlmRps > 0 {
+		burst := cfg.OutboundLlmBurst
+		if burst <= 0 {
+			if b := int(cfg.OutboundLlmRps); b > 0 {
+				burst = b
+			} else {
+				burst = 1
+			}
+		}
+		for _, dest := range []string{
+			providers.DestAnthropic,
+			providers.DestOpenAI,
+			providers.DestGoogle,
+			providers.DestOllama,
+		} {
+			providers.ConfigureLimiter(dest, outbound.NewLimiter(cfg.OutboundLlmRps, burst))
+		}
+		logger.Info("outbound llm rate limit enabled",
+			"rps", cfg.OutboundLlmRps, "burst", burst)
 	}
 
 	jwtIssuer, err := auth.NewJWTIssuer(nil, "nodate-flow", "api", 15*time.Minute)
