@@ -53,7 +53,7 @@ func HandleSlackWebhook(deps Deps) http.HandlerFunc {
 
 		// Pull the inner event type from { "event": { "type": "..." } }
 		// if present; otherwise fall back to the top-level type.
-		kind := "event"
+		kind := "unknown"
 		var envelope struct {
 			Type  string `json:"type"`
 			Event struct {
@@ -62,12 +62,7 @@ func HandleSlackWebhook(deps Deps) http.HandlerFunc {
 		}
 		if json.Valid(body) {
 			_ = json.Unmarshal(body, &envelope)
-			switch {
-			case envelope.Event.Type != "":
-				kind = envelope.Event.Type
-			case envelope.Type != "":
-				kind = envelope.Type
-			}
+			kind = sl.NormalizeEventKind(envelope.Type, envelope.Event.Type)
 		}
 		payload := body
 		if !json.Valid(body) {
