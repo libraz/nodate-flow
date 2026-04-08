@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"database/sql"
+	"fmt"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -58,4 +59,32 @@ func StartTestServer(t *testing.T, db *sql.DB) *TestServer {
 	t.Cleanup(srv.Close)
 
 	return &TestServer{BaseURL: srv.URL, Server: srv, DB: db}
+}
+
+// NewTestServer is the same as StartTestServer but without a *testing.T
+// dependency. Callers must invoke the returned cleanup func when done.
+func NewTestServer(db *sql.DB) (*TestServer, func(), error) {
+	if db == nil {
+		return nil, nil, fmt.Errorf("NewTestServer requires a non-nil *sql.DB")
+	}
+	queries := generated.New(db)
+	jwtIssuer, err := auth.NewJWTIssuer(nil, "nodate-flow", "api", 15*time.Minute)
+	if err != nil {
+		return nil, nil, fmt.Errorf("init jwt issuer: %w", err)
+	}
+	cipher, err := crypto.New(testCipherKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("init test cipher: %w", err)
+	}
+	handler := router.Build(router.Deps{
+		DB:                 db,
+		Queries:            queries,
+		JWT:                jwtIssuer,
+		Cipher:             cipher,
+		GhWebhookSecret:    "",
+		SlackSigningSecret: "",
+		DefaultWorkspaceID: "",
+	})
+	srv := httptest.NewServer(handler)
+	return &TestServer{BaseURL: srv.URL, Server: srv, DB: db}, srv.Close, nil
 }

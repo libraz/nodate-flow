@@ -65,6 +65,16 @@ func StartShared(t *testing.T) *MySQLInstance {
 	return sharedInst
 }
 
+// EnsureShared is the same as StartShared but without a *testing.T
+// dependency, so it can be called from TestMain. The container is
+// leaked to the process and reaped by testcontainers-ryuk on exit.
+func EnsureShared() (*MySQLInstance, error) {
+	sharedOnce.Do(func() {
+		sharedInst, sharedErr = startMySQL(context.Background())
+	})
+	return sharedInst, sharedErr
+}
+
 // StartIsolated returns a brand new MySQL container, terminated when
 // the test ends. Use this only when a test must mutate global DB state
 // (e.g. schema reload) in a way that would break parallel tests.

@@ -74,15 +74,16 @@ func List(deps Deps) func(context.Context, *ListInboxInput) (*ListInboxOutput, e
 			}
 			for _, r := range rows {
 				out.Body.Items = append(out.Body.Items, InboxItem{
-					ID:         r.PublicID.String(),
-					TaskID:     nullStr(r.TaskPublicID),
-					TaskTitle:  nullStr(r.TaskTitle),
-					Source:     string(r.Source),
-					Kind:       r.Kind,
-					ExternalID: nullStr(r.ExternalID),
-					Payload:    r.PayloadJson,
-					ReceivedAt: r.ReceivedAt.Unix(),
-					CreatedAt:  r.CreatedAt.Unix(),
+					ID:          r.PublicID.String(),
+					WorkspaceID: r.WorkspacePublicID.String(),
+					TaskID:      nullStr(r.TaskPublicID),
+					TaskTitle:   nullStr(r.TaskTitle),
+					Source:      string(r.Source),
+					Kind:        r.Kind,
+					ExternalID:  nullStr(r.ExternalID),
+					Payload:     r.PayloadJson,
+					ReceivedAt:  r.ReceivedAt.Unix(),
+					CreatedAt:   r.CreatedAt.Unix(),
 				})
 			}
 			if len(rows) > 0 {
@@ -101,15 +102,16 @@ func List(deps Deps) func(context.Context, *ListInboxInput) (*ListInboxOutput, e
 		}
 		for _, r := range rows {
 			out.Body.Items = append(out.Body.Items, InboxItem{
-				ID:         r.PublicID.String(),
-				TaskID:     nullStr(r.TaskPublicID),
-				TaskTitle:  nullStr(r.TaskTitle),
-				Source:     string(r.Source),
-				Kind:       r.Kind,
-				ExternalID: nullStr(r.ExternalID),
-				Payload:    r.PayloadJson,
-				ReceivedAt: r.ReceivedAt.Unix(),
-				CreatedAt:  r.CreatedAt.Unix(),
+				ID:          r.PublicID.String(),
+				WorkspaceID: r.WorkspacePublicID.String(),
+				TaskID:      nullStr(r.TaskPublicID),
+				TaskTitle:   nullStr(r.TaskTitle),
+				Source:      string(r.Source),
+				Kind:        r.Kind,
+				ExternalID:  nullStr(r.ExternalID),
+				Payload:     r.PayloadJson,
+				ReceivedAt:  r.ReceivedAt.Unix(),
+				CreatedAt:   r.CreatedAt.Unix(),
 			})
 		}
 		if len(rows) > 0 {

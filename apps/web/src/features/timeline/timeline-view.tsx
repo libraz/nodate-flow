@@ -26,6 +26,12 @@ export type TimelineScopeArg =
 export interface TimelineViewProps {
   scope: TimelineScopeArg;
   initialFilters?: TimelineFilters;
+  /**
+   * Workspace id used to populate the actor filter picker. For workspace
+   * scope this is the scope id; for project / task scope it must be
+   * threaded from the parent route when available.
+   */
+  workspaceId?: string;
 }
 
 interface InnerProps {
@@ -33,9 +39,16 @@ interface InnerProps {
   total: number;
   filters: TimelineFilters;
   onChange: (next: TimelineFilters) => void;
+  workspaceId?: string;
 }
 
-function TimelineInner({ events, total, filters, onChange }: InnerProps): ReactElement {
+function TimelineInner({
+  events,
+  total,
+  filters,
+  onChange,
+  workspaceId,
+}: InnerProps): ReactElement {
   const { t } = useTranslation('timeline');
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -63,7 +76,11 @@ function TimelineInner({ events, total, filters, onChange }: InnerProps): ReactE
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', minBlockSize: 0 }}>
-      <EventFilterBar filters={filters} onChange={onChange} />
+      <EventFilterBar
+        filters={filters}
+        onChange={onChange}
+        {...(workspaceId !== undefined ? { workspaceId } : {})}
+      />
 
       {events.length === 0 ? (
         <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-muted)' }}>
@@ -119,61 +136,80 @@ function TimelineInner({ events, total, filters, onChange }: InnerProps): ReactE
   );
 }
 
-function TaskTimeline({
-  id,
-  filters,
-  onChange,
-}: {
+interface ScopedProps {
   id: string;
   filters: TimelineFilters;
   onChange: (next: TimelineFilters) => void;
-}): ReactElement {
+  workspaceId?: string;
+}
+
+function TaskTimeline({ id, filters, onChange, workspaceId }: ScopedProps): ReactElement {
   const { data } = useTaskTimelineQuery(id, filters);
   return (
-    <TimelineInner events={data.events} total={data.total} filters={filters} onChange={onChange} />
+    <TimelineInner
+      events={data.events}
+      total={data.total}
+      filters={filters}
+      onChange={onChange}
+      {...(workspaceId !== undefined ? { workspaceId } : {})}
+    />
   );
 }
 
-function ProjectTimeline({
-  id,
-  filters,
-  onChange,
-}: {
-  id: string;
-  filters: TimelineFilters;
-  onChange: (next: TimelineFilters) => void;
-}): ReactElement {
+function ProjectTimeline({ id, filters, onChange, workspaceId }: ScopedProps): ReactElement {
   const { data } = useProjectTimelineQuery(id, filters);
   return (
-    <TimelineInner events={data.events} total={data.total} filters={filters} onChange={onChange} />
+    <TimelineInner
+      events={data.events}
+      total={data.total}
+      filters={filters}
+      onChange={onChange}
+      {...(workspaceId !== undefined ? { workspaceId } : {})}
+    />
   );
 }
 
-function WorkspaceTimeline({
-  id,
-  filters,
-  onChange,
-}: {
-  id: string;
-  filters: TimelineFilters;
-  onChange: (next: TimelineFilters) => void;
-}): ReactElement {
+function WorkspaceTimeline({ id, filters, onChange }: ScopedProps): ReactElement {
   const { data } = useWorkspaceTimelineQuery(id, filters);
   return (
-    <TimelineInner events={data.events} total={data.total} filters={filters} onChange={onChange} />
+    <TimelineInner
+      events={data.events}
+      total={data.total}
+      filters={filters}
+      onChange={onChange}
+      workspaceId={id}
+    />
   );
 }
 
-export default function TimelineView({ scope, initialFilters }: TimelineViewProps): ReactElement {
+export default function TimelineView({
+  scope,
+  initialFilters,
+  workspaceId,
+}: TimelineViewProps): ReactElement {
   const [filters, setFilters] = useState<TimelineFilters>(
     initialFilters ?? { limit: 50, offset: 0 },
   );
 
   if (scope.kind === 'task') {
-    return <TaskTimeline id={scope.id} filters={filters} onChange={setFilters} />;
+    return (
+      <TaskTimeline
+        id={scope.id}
+        filters={filters}
+        onChange={setFilters}
+        {...(workspaceId !== undefined ? { workspaceId } : {})}
+      />
+    );
   }
   if (scope.kind === 'project') {
-    return <ProjectTimeline id={scope.id} filters={filters} onChange={setFilters} />;
+    return (
+      <ProjectTimeline
+        id={scope.id}
+        filters={filters}
+        onChange={setFilters}
+        {...(workspaceId !== undefined ? { workspaceId } : {})}
+      />
+    );
   }
   return <WorkspaceTimeline id={scope.id} filters={filters} onChange={setFilters} />;
 }

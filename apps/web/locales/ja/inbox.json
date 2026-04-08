@@ -19,6 +19,10 @@
     "email": "メール",
     "webhook": "Webhook"
   },
+  "filter": {
+    "workspace_label": "ワークスペース",
+    "workspace_all": "すべてのワークスペース"
+  },
   "toast": {
     "archived": "アーカイブしました",
     "snoozed": "スヌーズしました",

@@ -52,7 +52,8 @@ func totalAsInt64(v interface{}) int64 {
 
 // InboxItem is the public DTO for an inbox row (a signal projected through v_inbox).
 type InboxItem struct {
-	ID         string          `json:"id"`
+	ID          string          `json:"id"`
+	WorkspaceID string          `json:"workspaceId"`
 	TaskID     string          `json:"taskId,omitempty"`
 	TaskTitle  string          `json:"taskTitle,omitempty"`
 	Source     string          `json:"source"`

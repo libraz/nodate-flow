@@ -21,4 +21,22 @@ export default defineConfig({
     },
   },
   server: { port: 5173 },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom', 'scheduler'],
+          tanstack: [
+            '@tanstack/react-query',
+            '@tanstack/react-router',
+            '@tanstack/react-table',
+            '@tanstack/react-virtual',
+            '@tanstack/router-devtools',
+          ],
+          sdk: ['@nodate-flow/sdk', 'openapi-fetch'],
+          i18n: ['i18next', 'react-i18next', 'i18next-icu', 'intl-messageformat'],
+        },
+      },
+    },
+  },
 });

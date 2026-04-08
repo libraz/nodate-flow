@@ -172,6 +172,12 @@ func BuildResult(deps Deps) Result {
 			Summary:     "List members of a workspace",
 		}, workspaces.ListMembers(wsDeps))
 		huma.Register(subAPI, huma.Operation{
+			OperationID: "workspaces-users-list",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/users",
+			Summary:     "List workspace users (minimal summary for actor pickers)",
+		}, workspaces.ListUsers(wsDeps))
+		huma.Register(subAPI, huma.Operation{
 			OperationID: "projects-list",
 			Method:      http.MethodGet,
 			Path:        "/workspaces/{wsId}/projects",

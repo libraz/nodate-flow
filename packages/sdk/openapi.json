@@ -698,9 +698,12 @@
           },
           "taskTitle": {
             "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
           }
         },
-        "required": ["id", "source", "kind", "receivedAt", "createdAt"],
+        "required": ["id", "workspaceId", "source", "kind", "receivedAt", "createdAt"],
         "type": "object"
       },
       "ListInboxOutputBody": {
@@ -992,6 +995,26 @@
           }
         },
         "required": ["total", "members", "nextCursor"],
+        "type": "object"
+      },
+      "ListWorkspaceUsersOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListWorkspaceUsersOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "users": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceUserSummary"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["users"],
         "type": "object"
       },
       "ListWorkspacesOutputBody": {
@@ -2176,6 +2199,23 @@
           }
         },
         "required": ["id", "userId", "email", "displayName", "role", "createdAt"],
+        "type": "object"
+      },
+      "WorkspaceUserSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "avatarUrl": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "id": {
+            "description": "User public id (UUID v7)",
+            "type": "string"
+          }
+        },
+        "required": ["id", "displayName"],
         "type": "object"
       }
     }
@@ -5161,6 +5201,44 @@
           }
         },
         "summary": "List events in a workspace's timeline"
+      }
+    },
+    "/workspaces/{wsId}/users": {
+      "get": {
+        "operationId": "workspaces-users-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListWorkspaceUsersOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List workspace users (minimal summary for actor pickers)"
       }
     }
   }

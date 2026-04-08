@@ -8,10 +8,10 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -19,31 +19,38 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/tests/helpers"
 )
 
-// sharedOnce guards lazy initialization of the shared MySQL container
-// and TestServer. Tests call mustStartHarness(t) at the top of their
-// body to ensure the harness is up before they run.
 var (
-	sharedOnce sync.Once
-
 	testServerURL string
 	testDB        *sql.DB
 )
 
-// mustStartHarness lazily boots the shared MySQL testcontainer and
-// TestServer the first time it is called, and stores the resulting
-// base URL / DB handle in package vars so later tests can reuse them.
-//
-// It is called from each test body (after skipIfNoIntegration) rather
-// than from TestMain so that unit-only `go test -short` runs skip
-// cleanly without ever touching Docker.
+// TestMain bootstraps the shared MySQL testcontainer and HTTP server
+// once for the whole package so parallel tests all talk to the same
+// harness. When NF_TEST_INTEGRATION is unset, it simply runs m.Run()
+// and every test skips via skipIfNoIntegration.
+func TestMain(m *testing.M) {
+	if os.Getenv("NF_TEST_INTEGRATION") == "" {
+		os.Exit(m.Run())
+	}
+	inst, err := helpers.EnsureShared()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "e2e: start shared mysql:", err)
+		os.Exit(1)
+	}
+	srv, cleanup, err := helpers.NewTestServer(inst.DB)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "e2e: start test server:", err)
+		os.Exit(1)
+	}
+	testServerURL = srv.BaseURL
+	testDB = inst.DB
+	code := m.Run()
+	cleanup()
+	os.Exit(code)
+}
+
 func mustStartHarness(t *testing.T) {
 	t.Helper()
-	sharedOnce.Do(func() {
-		inst := helpers.StartShared(t)
-		srv := helpers.StartTestServer(t, inst.DB)
-		testServerURL = srv.BaseURL
-		testDB = inst.DB
-	})
 	require.NotEmpty(t, testServerURL, "shared test server failed to start")
 }
 

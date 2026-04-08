@@ -46,6 +46,13 @@ func Register(api huma.API, deps Deps) {
 	}, Disable(deps))
 
 	huma.Register(api, huma.Operation{
+		OperationID: "workspaces-users-list",
+		Method:      http.MethodGet,
+		Path:        "/workspaces/{wsId}/users",
+		Summary:     "List workspace users (minimal summary for actor pickers)",
+	}, ListUsers(deps))
+
+	huma.Register(api, huma.Operation{
 		OperationID: "workspaces-members-list",
 		Method:      http.MethodGet,
 		Path:        "/workspaces/{wsId}/members",

@@ -9,6 +9,7 @@
     "kind_all": "All event types",
     "kind_label": "Event type",
     "actor_all": "All actors",
+    "actor_label": "Actor",
     "reset": "Reset filters"
   },
   "actor": {

@@ -44,7 +44,12 @@ export type TimelineKind = (typeof TIMELINE_KINDS)[number];
 
 export interface TimelineFilters {
   kind?: readonly string[];
-  actor?: string;
+  /**
+   * Selected actor user public ids. The backend currently filters by a
+   * single actor; the first id wins. The array shape is kept so the UI
+   * can offer a multi-select picker without an API churn later.
+   */
+  actor?: readonly string[];
   limit?: number;
   offset?: number;
 }
@@ -93,7 +98,10 @@ function buildQuery(filters?: TimelineFilters): TimelineQuery {
   if (filters?.limit !== undefined) query.limit = filters.limit;
   if (filters?.offset !== undefined) query.offset = filters.offset;
   if (filters?.kind && filters.kind.length > 0) query.kind = [...filters.kind];
-  if (filters?.actor && filters.actor.length > 0) query.actor = filters.actor;
+  if (filters?.actor && filters.actor.length > 0) {
+    const first = filters.actor[0];
+    if (first !== undefined) query.actor = first;
+  }
   return query;
 }
 

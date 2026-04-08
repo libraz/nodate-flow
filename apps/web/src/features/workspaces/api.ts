@@ -18,6 +18,7 @@ import { sdk } from '../../lib/sdk';
 
 export type Workspace = components['schemas']['Workspace'];
 export type WorkspaceMember = components['schemas']['WorkspaceMember'];
+export type WorkspaceUserSummary = components['schemas']['WorkspaceUserSummary'];
 export type CreateWorkspaceInput = components['schemas']['CreateWorkspaceInputBody'];
 export type PatchWorkspaceInput = components['schemas']['PatchWorkspaceInputBody'];
 export type InviteMemberInput = components['schemas']['AddWorkspaceMemberInputBody'];
@@ -28,6 +29,7 @@ export const workspacesKeys = {
   list: () => [...workspacesKeys.all, 'list'] as const,
   detail: (id: string) => [...workspacesKeys.all, 'detail', id] as const,
   members: (id: string) => [...workspacesKeys.all, 'detail', id, 'members'] as const,
+  users: (id: string) => [...workspacesKeys.all, 'detail', id, 'users'] as const,
 };
 
 /** Lightweight error thrown when the SDK returns an error envelope. */
@@ -86,6 +88,26 @@ export function useWorkspaceMembersQuery(id: string): UseSuspenseQueryResult<Wor
       });
       if (error || !data) throw toError(error, 'Failed to load workspace members');
       return data.members ?? [];
+    },
+  });
+}
+
+/**
+ * Lists user summaries for actor pickers (timeline filter, assignee, etc.).
+ * Backed by GET /workspaces/{wsId}/users which is gated by the
+ * workspace-member ACL middleware on the API side.
+ */
+export function useWorkspaceUsersQuery(
+  workspaceId: string,
+): UseSuspenseQueryResult<WorkspaceUserSummary[]> {
+  return useSuspenseQuery({
+    queryKey: workspacesKeys.users(workspaceId),
+    queryFn: async (): Promise<WorkspaceUserSummary[]> => {
+      const { data, error } = await sdk.GET('/workspaces/{wsId}/users', {
+        params: { path: { wsId: workspaceId } },
+      });
+      if (error || !data) throw toError(error, 'Failed to load workspace users');
+      return data.users ?? [];
     },
   });
 }

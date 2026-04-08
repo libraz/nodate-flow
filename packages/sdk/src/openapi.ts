@@ -704,6 +704,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{wsId}/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List workspace users (minimal summary for actor pickers) */
+        get: operations["workspaces-users-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1019,6 +1036,7 @@ export interface components {
             source: string;
             taskId?: string;
             taskTitle?: string;
+            workspaceId: string;
         };
         ListInboxOutputBody: {
             /**
@@ -1138,6 +1156,14 @@ export interface components {
             nextCursor: string | null;
             /** Format: int64 */
             total: number;
+        };
+        ListWorkspaceUsersOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            users: components["schemas"]["WorkspaceUserSummary"][] | null;
         };
         ListWorkspacesOutputBody: {
             /**
@@ -1634,6 +1660,12 @@ export interface components {
             /** Format: date-time */
             updatedAt?: string;
             userId: string;
+        };
+        WorkspaceUserSummary: {
+            avatarUrl?: string;
+            displayName: string;
+            /** @description User public id (UUID v7) */
+            id: string;
         };
     };
     responses: never;
@@ -3653,6 +3685,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListTimelineOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "workspaces-users-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListWorkspaceUsersOutputBody"];
                 };
             };
             /** @description Error */

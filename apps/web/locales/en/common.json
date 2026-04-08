@@ -80,6 +80,12 @@
         "settings": "Settings"
       }
     },
+    "nav": {
+      "overview": "Overview",
+      "timeline": "Timeline",
+      "settings": "Settings",
+      "label": "Workspace sections"
+    },
     "members": {
       "title": "Members",
       "add": "Add member",

@@ -9,6 +9,7 @@
     "kind_all": "すべてのイベント種別",
     "kind_label": "イベント種別",
     "actor_all": "すべての実行者",
+    "actor_label": "実行者",
     "reset": "フィルターをリセット"
   },
   "actor": {

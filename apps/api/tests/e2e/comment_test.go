@@ -66,7 +66,7 @@ func TestCommentLifecycle(t *testing.T) {
 	var events int
 	err := testDB.QueryRow(
 		`SELECT COUNT(*) FROM events
-		 WHERE workspace_id = (SELECT id FROM workspaces WHERE public_id = UUID_TO_BIN(?, 1))`,
+		 WHERE workspace_id = (SELECT id FROM workspaces WHERE public_id = UUID_TO_BIN(?, 0))`,
 		tt.WorkspacePublicID).Scan(&events)
 	require.NoError(t, err)
 	require.Greater(t, events, 0, "comment lifecycle must emit events")

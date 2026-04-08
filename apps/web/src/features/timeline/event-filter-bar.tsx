@@ -1,20 +1,74 @@
 /**
- * EventFilterBar — kind multi-select + (placeholder) actor picker + reset.
+ * EventFilterBar — kind multi-select + workspace-scoped actor picker + reset.
+ *
+ * The actor picker is rendered only when a workspaceId is supplied; project
+ * timelines that don't yet thread their parent workspace fall back to the
+ * disabled placeholder used during F0.
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
 import Input from '@nodate-flow/ui/primitives/input';
-import type { ChangeEvent, ReactElement } from 'react';
+import { type ChangeEvent, type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useWorkspaceUsersQuery } from '../workspaces/api';
 import { TIMELINE_KINDS, type TimelineFilters } from './api';
 
 export interface EventFilterBarProps {
   filters: TimelineFilters;
   onChange: (next: TimelineFilters) => void;
+  /**
+   * Optional workspace id used to populate the actor multi-select. When
+   * undefined the picker falls back to a disabled placeholder.
+   */
+  workspaceId?: string;
 }
 
-export default function EventFilterBar({ filters, onChange }: EventFilterBarProps): ReactElement {
+interface ActorPickerProps {
+  workspaceId: string;
+  selected: readonly string[];
+  onSelect: (ids: string[]) => void;
+  label: string;
+}
+
+function ActorPicker({ workspaceId, selected, onSelect, label }: ActorPickerProps): ReactElement {
+  const { data: users } = useWorkspaceUsersQuery(workspaceId);
+
+  const handleChange = (e: ChangeEvent<HTMLSelectElement>): void => {
+    const ids = Array.from(e.target.selectedOptions, (o) => o.value);
+    onSelect(ids);
+  };
+
+  return (
+    <select
+      multiple
+      value={[...selected]}
+      onChange={handleChange}
+      aria-label={label}
+      style={{
+        minInlineSize: '14rem',
+        minBlockSize: '6rem',
+        padding: '0.25rem',
+        borderRadius: '0.25rem',
+        border: '1px solid var(--color-border)',
+        background: 'var(--color-bg)',
+        color: 'var(--color-fg)',
+      }}
+    >
+      {users.map((u) => (
+        <option key={u.id} value={u.id}>
+          {u.displayName}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+export default function EventFilterBar({
+  filters,
+  onChange,
+  workspaceId,
+}: EventFilterBarProps): ReactElement {
   const { t } = useTranslation('timeline');
 
   const handleKindChange = (e: ChangeEvent<HTMLSelectElement>): void => {
@@ -23,12 +77,19 @@ export default function EventFilterBar({ filters, onChange }: EventFilterBarProp
     onChange(selected.length > 0 ? { ...rest, kind: selected } : rest);
   };
 
+  const handleActorChange = (ids: string[]): void => {
+    const { actor: Omit, ...rest } = filters;
+    onChange(ids.length > 0 ? { ...rest, actor: ids } : rest);
+  };
+
   const handleReset = (): void => {
     const next: TimelineFilters = {};
     if (filters.limit !== undefined) next.limit = filters.limit;
     if (filters.offset !== undefined) next.offset = filters.offset;
     onChange(next);
   };
+
+  const actorLabel = t('filter.actor_label', { defaultValue: t('filter.actor_all') });
 
   return (
     <div
@@ -67,13 +128,28 @@ export default function EventFilterBar({ filters, onChange }: EventFilterBarProp
         </select>
       </label>
 
-      {/* TODO: replace with a workspace-scoped user picker once the
-          /workspaces/{wsId}/users endpoint exists. */}
       <div
         style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.75rem' }}
+        role="group"
+        aria-label={actorLabel}
       >
-        <span style={{ color: 'var(--color-muted)' }}>{t('filter.actor_all')}</span>
-        <Input disabled placeholder={t('filter.actor_all')} aria-label={t('filter.actor_all')} />
+        <span style={{ color: 'var(--color-muted)' }}>{actorLabel}</span>
+        {workspaceId !== undefined ? (
+          <Suspense
+            fallback={
+              <Input disabled placeholder={t('filter.actor_all')} aria-label={actorLabel} />
+            }
+          >
+            <ActorPicker
+              workspaceId={workspaceId}
+              selected={filters.actor ?? []}
+              onSelect={handleActorChange}
+              label={actorLabel}
+            />
+          </Suspense>
+        ) : (
+          <Input disabled placeholder={t('filter.actor_all')} aria-label={actorLabel} />
+        )}
       </div>
 
       <Button type="button" variant="ghost" onClick={handleReset}>

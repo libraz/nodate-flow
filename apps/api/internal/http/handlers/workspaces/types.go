@@ -149,6 +149,30 @@ type ListWorkspaceMembersOutputBody struct {
 	NextCursor *string           `json:"nextCursor"`
 }
 
+// WorkspaceUserSummary is a minimal user DTO returned by
+// GET /workspaces/{wsId}/users for actor-filter pickers.
+type WorkspaceUserSummary struct {
+	ID          string `json:"id" doc:"User public id (UUID v7)"`
+	DisplayName string `json:"displayName"`
+	AvatarURL   string `json:"avatarUrl,omitempty"`
+}
+
+// ListWorkspaceUsersInput is the path for GET /workspaces/{wsId}/users.
+type ListWorkspaceUsersInput struct {
+	WsID string `path:"wsId"`
+}
+
+// ListWorkspaceUsersOutput is the response for GET /workspaces/{wsId}/users.
+type ListWorkspaceUsersOutput struct {
+	Body ListWorkspaceUsersOutputBody
+}
+
+// ListWorkspaceUsersOutputBody is the response body envelope for
+// GET /workspaces/{wsId}/users.
+type ListWorkspaceUsersOutputBody struct {
+	Users []WorkspaceUserSummary `json:"users"`
+}
+
 // AddWorkspaceMemberInput is the body for POST /workspaces/{wsId}/members.
 type AddWorkspaceMemberInput struct {
 	WsID string `path:"wsId"`

@@ -2,6 +2,7 @@
 -- List a workspace's inbox via v_inbox.
 SELECT
   v.workspace_id,
+  v.workspace_public_id,
   v.public_id,
   v.task_public_id,
   v.task_title,
@@ -22,6 +23,7 @@ LIMIT ? OFFSET ?;
 -- List inbox items across every workspace the actor is an active member of.
 SELECT
   v.workspace_id,
+  v.workspace_public_id,
   v.public_id,
   v.task_public_id,
   v.task_title,

@@ -35,6 +35,10 @@ vendor/
 *.dylib
 *.test
 *.out
+# stray binaries from `go build ./cmd/<name>` run without -o
+/apps/api/api
+/apps/api/secrets-rotate
+/apps/api/dump-openapi
 go.sum.bak
 
 # ---- Python (scripts) ----

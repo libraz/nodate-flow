@@ -32,7 +32,7 @@ func TestMCPTokenAndJSONRPC(t *testing.T) {
 		testServerURL+"/workspaces/"+tt.WorkspacePublicID+"/me/mcp-tokens",
 		tt.AccessToken, map[string]any{
 			"name":   "test-token",
-			"scopes": []string{"tasks.read", "tasks.write"},
+			"scopes": []string{"read:workspace", "write:workspace"},
 		}, &tokenResp)
 	require.NotEmpty(t, tokenResp.Token, "plaintext token must be returned once")
 	require.True(t, strings.HasPrefix(tokenResp.Token, "mcp_"), "token must have mcp_ prefix")
@@ -54,7 +54,7 @@ func TestMCPTokenAndJSONRPC(t *testing.T) {
 	// tools/call get_task.
 	callResp := mcpCall(t, tokenResp.Token, "tools/call", map[string]any{
 		"name":      "get_task",
-		"arguments": map[string]any{"id": task.ID},
+		"arguments": map[string]any{"taskId": task.ID},
 	})
 	require.Contains(t, string(callResp), task.ID,
 		"get_task result must reference the task id, got=%s", string(callResp))
@@ -63,7 +63,7 @@ func TestMCPTokenAndJSONRPC(t *testing.T) {
 	var invocations int
 	err := testDB.QueryRow(
 		`SELECT COUNT(*) FROM mcp_invocations
-		 WHERE workspace_id = (SELECT id FROM workspaces WHERE public_id = UUID_TO_BIN(?, 1))`,
+		 WHERE workspace_id = (SELECT id FROM workspaces WHERE public_id = UUID_TO_BIN(?, 0))`,
 		tt.WorkspacePublicID).Scan(&invocations)
 	require.NoError(t, err)
 	require.Greater(t, invocations, 0, "tools/call must record mcp_invocations row")

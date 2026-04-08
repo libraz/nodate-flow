@@ -4,6 +4,7 @@
 CREATE OR REPLACE VIEW v_inbox AS
 SELECT
   s.workspace_id,
+  w.public_id AS workspace_public_id,
   s.public_id,
   t.public_id AS task_public_id,
   t.title AS task_title,

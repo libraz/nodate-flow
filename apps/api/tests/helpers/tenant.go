@@ -164,7 +164,7 @@ func PurgeWorkspace(t *testing.T, db *sql.DB, workspacePublicID string) {
 	// Lookup the internal id once.
 	var wsID uint32
 	err = tx.QueryRowContext(ctx,
-		`SELECT id FROM workspaces WHERE public_id = UUID_TO_BIN(?, 1) LIMIT 1`,
+		`SELECT id FROM workspaces WHERE public_id = UUID_TO_BIN(?, 0) LIMIT 1`,
 		workspacePublicID).Scan(&wsID)
 	if err == sql.ErrNoRows {
 		// Nothing to purge; restore checks and return.

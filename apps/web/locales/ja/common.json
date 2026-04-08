@@ -80,6 +80,12 @@
         "settings": "設定"
       }
     },
+    "nav": {
+      "overview": "概要",
+      "timeline": "タイムライン",
+      "settings": "設定",
+      "label": "ワークスペースセクション"
+    },
     "members": {
       "title": "メンバー",
       "add": "メンバーを追加",

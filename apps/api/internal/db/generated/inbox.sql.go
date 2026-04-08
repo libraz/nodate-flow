@@ -35,6 +35,7 @@ func (q *Queries) ArchiveInboxItem(ctx context.Context, arg ArchiveInboxItemPara
 const listInbox = `-- name: ListInbox :many
 SELECT
   v.workspace_id,
+  v.workspace_public_id,
   v.public_id,
   v.task_public_id,
   v.task_title,
@@ -59,8 +60,9 @@ type ListInboxParams struct {
 }
 
 type ListInboxRow struct {
-	WorkspaceID  uint32          `json:"-"`
-	PublicID     types.PublicID  `json:"publicId"`
+	WorkspaceID       uint32          `json:"-"`
+	WorkspacePublicID types.PublicID  `json:"workspacePublicId"`
+	PublicID          types.PublicID  `json:"publicId"`
 	TaskPublicID sql.NullString  `json:"taskPublicId"`
 	TaskTitle    sql.NullString  `json:"taskTitle"`
 	Source       SignalsSource   `json:"source"`
@@ -85,6 +87,7 @@ func (q *Queries) ListInbox(ctx context.Context, arg ListInboxParams) ([]ListInb
 		var i ListInboxRow
 		if err := rows.Scan(
 			&i.WorkspaceID,
+			&i.WorkspacePublicID,
 			&i.PublicID,
 			&i.TaskPublicID,
 			&i.TaskTitle,
@@ -113,6 +116,7 @@ func (q *Queries) ListInbox(ctx context.Context, arg ListInboxParams) ([]ListInb
 const listInboxForUser = `-- name: ListInboxForUser :many
 SELECT
   v.workspace_id,
+  v.workspace_public_id,
   v.public_id,
   v.task_public_id,
   v.task_title,
@@ -140,8 +144,9 @@ type ListInboxForUserParams struct {
 }
 
 type ListInboxForUserRow struct {
-	WorkspaceID  uint32          `json:"-"`
-	PublicID     types.PublicID  `json:"publicId"`
+	WorkspaceID       uint32          `json:"-"`
+	WorkspacePublicID types.PublicID  `json:"workspacePublicId"`
+	PublicID          types.PublicID  `json:"publicId"`
 	TaskPublicID sql.NullString  `json:"taskPublicId"`
 	TaskTitle    sql.NullString  `json:"taskTitle"`
 	Source       SignalsSource   `json:"source"`

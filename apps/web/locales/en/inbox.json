@@ -19,6 +19,10 @@
     "email": "Email",
     "webhook": "Webhook"
   },
+  "filter": {
+    "workspace_label": "Workspace",
+    "workspace_all": "All workspaces"
+  },
   "toast": {
     "archived": "Archived",
     "snoozed": "Snoozed",
