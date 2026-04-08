@@ -64,6 +64,7 @@ export function useConnectIntegration(): UseMutationResult<
   ConnectRequest
 > {
   return useMutation<ConnectResponse, SettingsApiError, ConnectRequest>({
+    throwOnError: false,
     mutationFn: async ({ provider, redirectTo }): Promise<ConnectResponse> => {
       const { data, error } = await sdk.POST('/me/integrations/{provider}/connect', {
         params: { path: { provider } },
@@ -79,6 +80,7 @@ export function useConnectIntegration(): UseMutationResult<
 export function useDisconnectIntegration(): UseMutationResult<void, SettingsApiError, string> {
   const qc = useQueryClient();
   return useMutation<void, SettingsApiError, string>({
+    throwOnError: false,
     mutationFn: async (id: string): Promise<void> => {
       const { error } = await sdk.DELETE('/me/integrations/{id}', {
         params: { path: { id } },

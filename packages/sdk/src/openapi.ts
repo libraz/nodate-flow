@@ -3064,7 +3064,9 @@ export interface operations {
     "auth-login": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "User-Agent"?: string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -3098,7 +3100,9 @@ export interface operations {
     "auth-login-totp": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "User-Agent"?: string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -3167,7 +3171,9 @@ export interface operations {
                 code?: string;
                 state?: string;
             };
-            header?: never;
+            header?: {
+                "User-Agent"?: string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -3226,7 +3232,9 @@ export interface operations {
     "auth-refresh": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "User-Agent"?: string;
+            };
             path?: never;
             cookie?: {
                 nf_rt?: string;
@@ -3258,7 +3266,9 @@ export interface operations {
     "auth-register": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "User-Agent"?: string;
+            };
             path?: never;
             cookie?: never;
         };

@@ -4033,6 +4033,15 @@
     "/auth/login": {
       "post": {
         "operationId": "auth-login",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "User-Agent",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -4078,6 +4087,15 @@
     "/auth/login/totp": {
       "post": {
         "operationId": "auth-login-totp",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "User-Agent",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -4169,6 +4187,13 @@
         "operationId": "auth-oidc-google-callback",
         "parameters": [
           {
+            "in": "header",
+            "name": "User-Agent",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "explode": false,
             "in": "query",
             "name": "code",
@@ -4250,6 +4275,13 @@
         "operationId": "auth-refresh",
         "parameters": [
           {
+            "in": "header",
+            "name": "User-Agent",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "in": "cookie",
             "name": "nf_rt",
             "schema": {
@@ -4292,6 +4324,15 @@
     "/auth/register": {
       "post": {
         "operationId": "auth-register",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "User-Agent",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {

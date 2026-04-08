@@ -15,10 +15,10 @@
     "description": "Connect your personal GitHub, Slack, and Google Calendar accounts so nodate-flow can act on your behalf. Tokens are encrypted at rest.",
     "connect": "Connect",
     "disconnect": "Disconnect",
-    "disconnect_confirm": "Disconnect {{provider}}? You will need to re-authorise to use it again.",
+    "disconnect_confirm": "Disconnect {provider}? You will need to re-authorise to use it again.",
     "disconnected": "Integration disconnected",
-    "connected_as": "Connected as {{account}} · {{time}}",
-    "connected_toast": "{{provider}} connected.",
+    "connected_as": "Connected as {account} · {time}",
+    "connected_toast": "{provider} connected.",
     "not_configured": "Not configured on this server. Ask the administrator to set the OAuth credentials.",
     "provider": {
       "github": {
@@ -37,14 +37,14 @@
     "errors": {
       "connect_failed": "Could not start the connect flow. Please try again.",
       "disconnect_failed": "Could not disconnect the integration. Please try again.",
-      "callback_failed": "Connect flow failed: {{reason}}"
+      "callback_failed": "Connect flow failed: {reason}"
     }
   },
   "ai_activity": {
     "title": "AI activity",
     "description": "A read-only audit of recent LLM calls made on behalf of this workspace. Prompts and responses are redacted at write time.",
     "empty": "No LLM calls recorded yet.",
-    "error_code": "Error: {{code}}"
+    "error_code": "Error: {code}"
   },
   "sections_label": "Workspace settings sections",
   "settings_sections_label": "Settings sections",
@@ -125,7 +125,7 @@
       "confirm": "Confirm new password",
       "save": "Change password",
       "saving": "Saving...",
-      "changed": "Password changed. {{count}} other session(s) were signed out.",
+      "changed": "Password changed. {count} other session(s) were signed out.",
       "validation": {
         "too_short": "New password must be at least 8 characters.",
         "mismatch": "New password and confirmation do not match."
@@ -168,8 +168,7 @@
       "recovery": {
         "title": "Recovery codes",
         "description": "Use these one-time codes to sign in if you lose access to your authenticator app. Save them somewhere safe — they will not be shown again.",
-        "remaining": "{{count}} recovery code remaining",
-        "remaining_plural": "{{count}} recovery codes remaining",
+        "remaining": "{count, plural, one {# recovery code remaining} other {# recovery codes remaining}}",
         "regenerate": "Regenerate recovery codes",
         "regenerate_confirm": "Generate a new set of recovery codes? Your previous codes will stop working.",
         "regenerate_password_label": "Current password",
@@ -191,12 +190,12 @@
       "revoke_all": "Sign out of all other devices",
       "revoke_all_confirm": "Sign out of all other devices? Other browsers and apps will stop working immediately.",
       "revoked": "Session revoked",
-      "revoked_all": "Revoked {{count}} other session(s)",
+      "revoked_all": "Revoked {count} other session(s)",
       "current_badge": "Current",
       "unknown_device": "Unknown device",
       "unknown_ip": "Unknown location",
-      "created_at": "Signed in {{time}}",
-      "last_used_at": "last active {{time}}",
+      "created_at": "Signed in {time}",
+      "last_used_at": "last active {time}",
       "errors": {
         "revoke_failed": "Could not revoke the session. Please try again.",
         "revoke_all_failed": "Could not revoke the other sessions. Please try again."

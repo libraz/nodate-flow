@@ -15,10 +15,10 @@
     "description": "個人の GitHub / Slack / Google カレンダー アカウントを接続すると、nodate-flow がユーザーとして操作できるようになります。トークンは暗号化して保存されます。",
     "connect": "接続",
     "disconnect": "切断",
-    "disconnect_confirm": "{{provider}} を切断しますか？再度利用するには認可し直す必要があります。",
+    "disconnect_confirm": "{provider} を切断しますか？再度利用するには認可し直す必要があります。",
     "disconnected": "連携を切断しました",
-    "connected_as": "{{account}} として接続中 · {{time}}",
-    "connected_toast": "{{provider}} を接続しました。",
+    "connected_as": "{account} として接続中 · {time}",
+    "connected_toast": "{provider} を接続しました。",
     "not_configured": "このサーバーでは設定されていません。管理者に OAuth 資格情報の設定を依頼してください。",
     "provider": {
       "github": {
@@ -37,14 +37,14 @@
     "errors": {
       "connect_failed": "接続フローを開始できませんでした。もう一度お試しください。",
       "disconnect_failed": "連携を切断できませんでした。もう一度お試しください。",
-      "callback_failed": "接続フローが失敗しました: {{reason}}"
+      "callback_failed": "接続フローが失敗しました: {reason}"
     }
   },
   "ai_activity": {
     "title": "AI アクティビティ",
     "description": "このワークスペースで最近実行された LLM 呼び出しの読み取り専用監査です。プロンプトとレスポンスは記録時にマスクされます。",
     "empty": "LLM 呼び出しの記録はまだありません。",
-    "error_code": "エラー: {{code}}"
+    "error_code": "エラー: {code}"
   },
   "sections_label": "ワークスペース設定セクション",
   "settings_sections_label": "設定セクション",
@@ -125,7 +125,7 @@
       "confirm": "新しいパスワード（確認）",
       "save": "パスワードを変更",
       "saving": "保存中…",
-      "changed": "パスワードを変更しました。他の {{count}} 件のセッションがサインアウトされました。",
+      "changed": "パスワードを変更しました。他の {count} 件のセッションがサインアウトされました。",
       "validation": {
         "too_short": "新しいパスワードは 8 文字以上で入力してください。",
         "mismatch": "新しいパスワードと確認用が一致しません。"
@@ -168,8 +168,7 @@
       "recovery": {
         "title": "リカバリーコード",
         "description": "認証アプリを使えなくなった場合に、これらのワンタイムコードでサインインできます。安全な場所に保存してください — 再表示はされません。",
-        "remaining": "残りリカバリーコード: {{count}}",
-        "remaining_plural": "残りリカバリーコード: {{count}}",
+        "remaining": "残りリカバリーコード: {count}",
         "regenerate": "リカバリーコードを再生成",
         "regenerate_confirm": "リカバリーコードを新しく生成しますか?以前のコードは使用できなくなります。",
         "regenerate_password_label": "現在のパスワード",
@@ -191,12 +190,12 @@
       "revoke_all": "他の端末からすべてサインアウト",
       "revoke_all_confirm": "他の端末からすべてサインアウトしますか？他のブラウザやアプリは直ちに動作しなくなります。",
       "revoked": "セッションを失効しました",
-      "revoked_all": "他の {{count}} 件のセッションを失効しました",
+      "revoked_all": "他の {count} 件のセッションを失効しました",
       "current_badge": "現在",
       "unknown_device": "不明なデバイス",
       "unknown_ip": "不明な場所",
-      "created_at": "サインイン: {{time}}",
-      "last_used_at": "最終利用: {{time}}",
+      "created_at": "サインイン: {time}",
+      "last_used_at": "最終利用: {time}",
       "errors": {
         "revoke_failed": "セッションを失効できませんでした。もう一度お試しください。",
         "revoke_all_failed": "他のセッションを失効できませんでした。もう一度お試しください。"
