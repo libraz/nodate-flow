@@ -67,3 +67,34 @@ export function useAddConstraint(): UseMutationResult<{ id: string }, Error, Add
     },
   });
 }
+
+/**
+ * useRemoveConstraint — manual intervention (4.WEB-3): drop a
+ * constraint that the operator deems no longer relevant. This is the
+ * "force satisfy" escape hatch — removing the row makes the engine
+ * stop blocking on it.
+ */
+export interface RemoveConstraintArgs {
+  taskId: string;
+  constraintId: string;
+}
+
+export function useRemoveConstraint(): UseMutationResult<
+  { ok: true },
+  Error,
+  RemoveConstraintArgs
+> {
+  const qc = useQueryClient();
+  return useMutation<{ ok: true }, Error, RemoveConstraintArgs>({
+    mutationFn: async ({ taskId, constraintId }) => {
+      const { error } = await sdk.DELETE('/tasks/{id}/constraints/{cid}', {
+        params: { path: { id: taskId, cid: constraintId } },
+      });
+      if (error) throw new Error('Failed to remove constraint');
+      return { ok: true };
+    },
+    onSuccess: (_res, { taskId }) => {
+      qc.invalidateQueries({ queryKey: ['tasks', taskId] });
+    },
+  });
+}

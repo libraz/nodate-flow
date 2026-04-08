@@ -665,6 +665,23 @@ export interface paths {
         patch: operations["workspaces-patch"];
         trace?: never;
     };
+    "/workspaces/{wsId}/ai/agents/{agentId}/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Toggle the kill switch on an AI agent (4.AGENT-3) */
+        post: operations["ai-agent-pause"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{wsId}/ai/auto-actions": {
         parameters: {
             query?: never;
@@ -1878,6 +1895,22 @@ export interface components {
             iconUrl?: string;
             name?: string;
             slug?: string;
+        };
+        PauseAgentInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            paused: boolean;
+        };
+        PauseAgentOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
         };
         Project: {
             color?: string;
@@ -4129,6 +4162,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Workspace"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-agent-pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                agentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PauseAgentInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PauseAgentOutputBody"];
                 };
             };
             /** @description Error */

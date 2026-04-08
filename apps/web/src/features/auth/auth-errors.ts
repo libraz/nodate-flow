@@ -33,8 +33,9 @@ export function extractErrorCode(problem: ProblemJson | null | undefined): strin
   const candidates: Array<string | undefined> = [problem.type, problem.detail, problem.title];
   for (const c of candidates) {
     if (!c) continue;
-    // Match the last URI segment, e.g. ".../errors/AUTH.LOGIN.X" -> "AUTH.LOGIN.X"
-    const lastSegment = c.split('/').pop();
+    // Match the last URI segment, e.g. ".../errors/AUTH.LOGIN.X" -> "AUTH.LOGIN.X".
+    // Then strip any trailing human-readable suffix like "CODE: Something went wrong".
+    const lastSegment = c.split('/').pop()?.split(':')[0]?.trim();
     if (lastSegment?.includes('.')) return lastSegment;
   }
   return null;
