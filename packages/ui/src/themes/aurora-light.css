@@ -1,0 +1,55 @@
+/*
+ * aurora-light — translucent, warm, generous radii, spring motion.
+ */
+
+[data-theme="aurora-light"] {
+  color-scheme: light;
+
+  --nf-color-bg: oklch(97% 0.012 80);
+  --nf-color-bg-elevated: oklch(99% 0.006 80);
+  --nf-color-bg-sunken: oklch(94% 0.014 80);
+  --nf-color-surface: oklch(98% 0.008 80 / 0.72);
+  --nf-color-surface-hover: oklch(96% 0.012 80 / 0.85);
+  --nf-color-overlay: oklch(20% 0.02 260 / 0.4);
+
+  --nf-color-fg: oklch(20% 0.02 260);
+  --nf-color-fg-muted: oklch(45% 0.018 260);
+  --nf-color-fg-subtle: oklch(60% 0.014 260);
+  --nf-color-fg-on-accent: oklch(99% 0.005 80);
+
+  --nf-color-border: oklch(88% 0.012 80);
+  --nf-color-border-strong: oklch(76% 0.014 80);
+  --nf-color-hairline: oklch(88% 0.012 80);
+
+  --nf-color-accent: oklch(72% 0.13 175);
+  --nf-color-accent-hover: oklch(66% 0.14 175);
+  --nf-color-accent-active: oklch(60% 0.15 175);
+  --nf-color-accent-subtle: oklch(92% 0.05 175);
+
+  --nf-color-success: oklch(68% 0.16 150);
+  --nf-color-warning: oklch(78% 0.15 75);
+  --nf-color-danger: oklch(60% 0.21 25);
+  --nf-color-info: oklch(70% 0.13 240);
+
+  --nf-color-focus-ring: oklch(66% 0.18 240);
+  --nf-focus-ring-width: 2px;
+  --nf-focus-ring-offset: 2px;
+
+  --nf-radius-xs: 0.375rem;
+  --nf-radius-sm: 0.5rem;
+  --nf-radius-md: 0.625rem;
+  --nf-radius-lg: 1.125rem;
+  --nf-radius-pill: 9999px;
+
+  --nf-shadow-sm: 0 1px 2px oklch(20% 0.02 260 / 0.06);
+  --nf-shadow-md: 0 6px 18px oklch(20% 0.02 260 / 0.08);
+  --nf-shadow-lg: 0 16px 40px oklch(20% 0.02 260 / 0.12);
+  --nf-shadow-focus: 0 0 0 var(--nf-focus-ring-offset) var(--nf-color-bg), 0 0 0
+    calc(var(--nf-focus-ring-offset) + var(--nf-focus-ring-width)) var(--nf-color-focus-ring);
+
+  --nf-surface-blur: 28px;
+  --nf-surface-saturation: 1.5;
+
+  --nf-motion-duration: var(--nf-duration-base);
+  --nf-motion-easing: var(--nf-ease-emphasized);
+}

@@ -1,0 +1,56 @@
+/*
+ * dotline-light — pure white, hairline borders, square corners, linear motion.
+ */
+
+[data-theme="dotline-light"] {
+  color-scheme: light;
+
+  --nf-color-bg: oklch(100% 0 0);
+  --nf-color-bg-elevated: oklch(100% 0 0);
+  --nf-color-bg-sunken: oklch(98% 0 0);
+  --nf-color-surface: oklch(100% 0 0);
+  --nf-color-surface-hover: oklch(96% 0 0);
+  --nf-color-overlay: oklch(0% 0 0 / 0.5);
+
+  --nf-color-fg: oklch(15% 0 0);
+  --nf-color-fg-muted: oklch(40% 0 0);
+  --nf-color-fg-subtle: oklch(55% 0 0);
+  --nf-color-fg-on-accent: oklch(100% 0 0);
+
+  /* dotline hairlines: 1px is a documented exception (see ui-ds agent rules) */
+  --nf-color-border: oklch(15% 0 0);
+  --nf-color-border-strong: oklch(0% 0 0);
+  --nf-color-hairline: oklch(15% 0 0);
+
+  --nf-color-accent: oklch(15% 0 0);
+  --nf-color-accent-hover: oklch(0% 0 0);
+  --nf-color-accent-active: oklch(0% 0 0);
+  --nf-color-accent-subtle: oklch(94% 0 0);
+
+  --nf-color-success: oklch(50% 0.16 150);
+  --nf-color-warning: oklch(58% 0.16 75);
+  --nf-color-danger: oklch(52% 0.22 25);
+  --nf-color-info: oklch(50% 0.16 240);
+
+  --nf-color-focus-ring: oklch(15% 0 0);
+  --nf-focus-ring-width: 2px;
+  --nf-focus-ring-offset: 1px;
+
+  --nf-radius-xs: 0;
+  --nf-radius-sm: 0;
+  --nf-radius-md: 0.25rem;
+  --nf-radius-lg: 0.25rem;
+  --nf-radius-pill: 0;
+
+  --nf-shadow-sm: none;
+  --nf-shadow-md: none;
+  --nf-shadow-lg: none;
+  --nf-shadow-focus: 0 0 0 var(--nf-focus-ring-offset) var(--nf-color-bg), 0 0 0
+    calc(var(--nf-focus-ring-offset) + var(--nf-focus-ring-width)) var(--nf-color-focus-ring);
+
+  --nf-surface-blur: 0px;
+  --nf-surface-saturation: 1;
+
+  --nf-motion-duration: var(--nf-duration-fast);
+  --nf-motion-easing: var(--nf-ease-linear);
+}

@@ -1,0 +1,78 @@
+/*
+ * nodate-flow primitive design tokens.
+ * Theme-agnostic scales: spacing, radii, motion, typography, z-index.
+ * Color primitives are intentionally NOT here — themes define semantic colors directly.
+ */
+
+:where(:root) {
+  /* spacing — 4px base, rem-only */
+  --nf-space-0: 0;
+  --nf-space-px: 0.0625rem;
+  --nf-space-1: 0.25rem;
+  --nf-space-2: 0.5rem;
+  --nf-space-3: 0.75rem;
+  --nf-space-4: 1rem;
+  --nf-space-5: 1.25rem;
+  --nf-space-6: 1.5rem;
+  --nf-space-8: 2rem;
+  --nf-space-10: 2.5rem;
+  --nf-space-12: 3rem;
+  --nf-space-16: 4rem;
+  --nf-space-20: 5rem;
+  --nf-space-24: 6rem;
+
+  /* font families */
+  --nf-font-sans: "Inter Variable", "Noto Sans JP", system-ui, sans-serif;
+  --nf-font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* font sizes */
+  --nf-text-xs: 0.75rem;
+  --nf-text-sm: 0.875rem;
+  --nf-text-base: 1rem;
+  --nf-text-lg: 1.125rem;
+  --nf-text-xl: 1.25rem;
+  --nf-text-2xl: 1.5rem;
+  --nf-text-3xl: 1.875rem;
+  --nf-text-4xl: 2.25rem;
+
+  /* line heights */
+  --nf-leading-tight: 1.2;
+  --nf-leading-normal: 1.5;
+  --nf-leading-relaxed: 1.7;
+
+  /* font weights */
+  --nf-weight-regular: 400;
+  --nf-weight-medium: 500;
+  --nf-weight-semibold: 600;
+  --nf-weight-bold: 700;
+
+  /* z-index */
+  --nf-z-base: 0;
+  --nf-z-dropdown: 1000;
+  --nf-z-sticky: 1100;
+  --nf-z-overlay: 1200;
+  --nf-z-modal: 1300;
+  --nf-z-popover: 1400;
+  --nf-z-toast: 1500;
+  --nf-z-tooltip: 1600;
+
+  /* motion durations */
+  --nf-duration-instant: 80ms;
+  --nf-duration-fast: 120ms;
+  --nf-duration-base: 180ms;
+  --nf-duration-slow: 240ms;
+
+  /* easing */
+  --nf-ease-linear: linear;
+  --nf-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --nf-ease-emphasized: cubic-bezier(0.3, 0, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(:root) {
+    --nf-duration-instant: 0ms;
+    --nf-duration-fast: 0ms;
+    --nf-duration-base: 0ms;
+    --nf-duration-slow: 0ms;
+  }
+}

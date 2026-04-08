@@ -1,0 +1,26 @@
+{
+  "landing": {
+    "wordmark": "nodate-flow",
+    "phase": "PHASE 01 - FOUNDATION",
+    "hello": "Hello, Phase 1.",
+    "tagline": "Work flows. You observe."
+  },
+  "nav": {
+    "theme": "Theme",
+    "language": "Language"
+  },
+  "theme": {
+    "aurora-light": "Aurora Light",
+    "aurora-dark": "Aurora Dark",
+    "dotline-light": "Dotline Light",
+    "dotline-dark": "Dotline Dark",
+    "system": "System"
+  },
+  "lang": {
+    "en": "English",
+    "ja": "Japanese"
+  },
+  "a11y": {
+    "skipToContent": "Skip to content"
+  }
+}

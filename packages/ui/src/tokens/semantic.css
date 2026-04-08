@@ -1,0 +1,77 @@
+/*
+ * nodate-flow semantic token contract.
+ *
+ * Every theme MUST define every variable declared here.
+ * scripts/check-theme-parity.ts parses this file and asserts parity across the 4 themes.
+ *
+ * This file ALSO provides safe defaults (matching aurora-light) so that an unthemed
+ * document still renders. Real apps must apply a [data-theme] attribute on <html>.
+ */
+
+:where(:root) {
+  /* surface */
+  --nf-color-bg: oklch(97% 0.01 80);
+  --nf-color-bg-elevated: oklch(99% 0.005 80);
+  --nf-color-bg-sunken: oklch(94% 0.012 80);
+  --nf-color-surface: oklch(98% 0.008 80 / 0.72);
+  --nf-color-surface-hover: oklch(96% 0.01 80 / 0.85);
+  --nf-color-overlay: oklch(20% 0.02 260 / 0.4);
+
+  /* foreground */
+  --nf-color-fg: oklch(20% 0.02 260);
+  --nf-color-fg-muted: oklch(45% 0.015 260);
+  --nf-color-fg-subtle: oklch(60% 0.012 260);
+  --nf-color-fg-on-accent: oklch(99% 0.005 80);
+
+  /* border */
+  --nf-color-border: oklch(88% 0.01 80);
+  --nf-color-border-strong: oklch(78% 0.012 80);
+  --nf-color-hairline: oklch(88% 0.01 80);
+
+  /* accent / brand */
+  --nf-color-accent: oklch(72% 0.13 175);
+  --nf-color-accent-hover: oklch(66% 0.14 175);
+  --nf-color-accent-active: oklch(60% 0.15 175);
+  --nf-color-accent-subtle: oklch(92% 0.05 175);
+
+  /* status */
+  --nf-color-success: oklch(70% 0.16 150);
+  --nf-color-warning: oklch(78% 0.15 75);
+  --nf-color-danger: oklch(62% 0.21 25);
+  --nf-color-info: oklch(70% 0.13 240);
+
+  /* focus ring */
+  --nf-color-focus-ring: oklch(66% 0.18 240);
+  --nf-focus-ring-width: 2px;
+  --nf-focus-ring-offset: 2px;
+
+  /* radii */
+  --nf-radius-xs: 0.25rem;
+  --nf-radius-sm: 0.375rem;
+  --nf-radius-md: 0.625rem;
+  --nf-radius-lg: 1.125rem;
+  --nf-radius-pill: 9999px;
+
+  /* shadows */
+  --nf-shadow-sm: 0 1px 2px oklch(20% 0.02 260 / 0.06);
+  --nf-shadow-md: 0 4px 12px oklch(20% 0.02 260 / 0.08);
+  --nf-shadow-lg: 0 12px 32px oklch(20% 0.02 260 / 0.12);
+  --nf-shadow-focus: 0 0 0 var(--nf-focus-ring-offset) var(--nf-color-bg), 0 0 0
+    calc(var(--nf-focus-ring-offset) + var(--nf-focus-ring-width)) var(--nf-color-focus-ring);
+
+  /* surface effects */
+  --nf-surface-blur: 24px;
+  --nf-surface-saturation: 1.4;
+
+  /* motion profile */
+  --nf-motion-duration: var(--nf-duration-base);
+  --nf-motion-easing: var(--nf-ease-emphasized);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(:root) {
+    --nf-surface-blur: 0px;
+    --nf-color-surface: var(--nf-color-bg-elevated);
+    --nf-color-surface-hover: var(--nf-color-bg-elevated);
+  }
+}

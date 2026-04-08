@@ -1,0 +1,106 @@
+import {
+  type ReactElement,
+  type ReactNode,
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
+
+/** Concrete theme names (no `system`). */
+export const concreteThemes = [
+  'aurora-light',
+  'aurora-dark',
+  'dotline-light',
+  'dotline-dark',
+] as const;
+
+/** Concrete theme name. */
+export type ConcreteTheme = (typeof concreteThemes)[number];
+
+/** User-selectable theme preference (concrete or `system`). */
+export type ThemePreference = ConcreteTheme | 'system';
+
+/** All preference values, for UI switchers. */
+export const themePreferences = [...concreteThemes, 'system'] as const;
+
+interface ThemeContextValue {
+  preference: ThemePreference;
+  resolved: ConcreteTheme;
+  setPreference: (p: ThemePreference) => void;
+}
+
+const ThemeContext = createContext<ThemeContextValue | null>(null);
+const storageKey = 'nf.theme';
+
+function readStored(): ThemePreference {
+  try {
+    const v = localStorage.getItem(storageKey);
+    if (v === 'system') return 'system';
+    if (v && (concreteThemes as readonly string[]).includes(v)) {
+      return v as ConcreteTheme;
+    }
+  } catch {
+    // ignore
+  }
+  return 'system';
+}
+
+function resolveSystem(): ConcreteTheme {
+  if (typeof window === 'undefined') return 'aurora-dark';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'aurora-dark' : 'aurora-light';
+}
+
+function resolve(pref: ThemePreference): ConcreteTheme {
+  return pref === 'system' ? resolveSystem() : pref;
+}
+
+/**
+ * ThemeProvider persists theme preference to localStorage and applies
+ * `data-theme` on `document.documentElement`. DB persistence is deferred
+ * to F4.
+ */
+export function ThemeProvider({ children }: { children: ReactNode }): ReactElement {
+  const [preference, setPreferenceState] = useState<ThemePreference>(() => readStored());
+  const [resolved, setResolved] = useState<ConcreteTheme>(() => resolve(readStored()));
+
+  useEffect(() => {
+    const next = resolve(preference);
+    setResolved(next);
+    document.documentElement.setAttribute('data-theme', next);
+    try {
+      localStorage.setItem(storageKey, preference);
+    } catch {
+      // ignore
+    }
+  }, [preference]);
+
+  useEffect(() => {
+    if (preference !== 'system') return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = (): void => {
+      const next = resolveSystem();
+      setResolved(next);
+      document.documentElement.setAttribute('data-theme', next);
+    };
+    mq.addEventListener('change', onChange);
+    return () => {
+      mq.removeEventListener('change', onChange);
+    };
+  }, [preference]);
+
+  const value: ThemeContextValue = {
+    preference,
+    resolved,
+    setPreference: setPreferenceState,
+  };
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+}
+
+/** Access the current theme preference and setter. */
+export function useTheme(): ThemeContextValue {
+  const ctx = useContext(ThemeContext);
+  if (!ctx) throw new Error('useTheme must be used within ThemeProvider');
+  return ctx;
+}

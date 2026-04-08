@@ -5,10 +5,47 @@
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tokens/base.css": "./src/tokens/base.css",
+    "./tokens/semantic.css": "./src/tokens/semantic.css",
+    "./themes/aurora-light.css": "./src/themes/aurora-light.css",
+    "./themes/aurora-dark.css": "./src/themes/aurora-dark.css",
+    "./themes/dotline-light.css": "./src/themes/dotline-light.css",
+    "./themes/dotline-dark.css": "./src/themes/dotline-dark.css",
+    "./hooks/use-theme": "./src/hooks/use-theme.ts",
+    "./hooks/use-controllable-state": "./src/hooks/use-controllable-state.ts",
+    "./hooks/use-focus-trap": "./src/hooks/use-focus-trap.ts",
+    "./a11y/skip-link": "./src/a11y/skip-link.tsx",
+    "./a11y/visually-hidden": "./src/a11y/visually-hidden.tsx",
+    "./a11y/live-region": "./src/a11y/live-region.tsx",
+    "./icon": "./src/icon.tsx",
+    "./lib/cx": "./src/lib/cx.ts"
+  },
   "scripts": {
-    "typecheck": "tsc -b"
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "check-themes": "tsx scripts/check-theme-parity.ts"
+  },
+  "dependencies": {
+    "clsx": "2.1.1",
+    "lucide-react": "0.453.0"
+  },
+  "peerDependencies": {
+    "react": "19.0.0",
+    "react-dom": "19.0.0"
   },
   "devDependencies": {
-    "typescript": "5.6.3"
+    "@testing-library/react": "16.0.1",
+    "@testing-library/user-event": "14.5.2",
+    "@types/react": "19.0.0",
+    "@types/react-dom": "19.0.0",
+    "happy-dom": "^20.8.9",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "tsx": "4.19.2",
+    "typescript": "5.6.3",
+    "vitest": "^4.1.3",
+    "vitest-axe": "0.1.0"
   }
 }

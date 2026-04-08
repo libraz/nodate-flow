@@ -2,8 +2,9 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": "src",
-    "composite": true
+    "rootDir": ".",
+    "composite": true,
+    "types": ["vitest/globals", "happy-dom"]
   },
-  "include": ["src"]
+  "include": ["src", "test", "scripts", "vitest.config.ts"]
 }

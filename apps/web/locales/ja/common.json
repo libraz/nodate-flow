@@ -1,0 +1,26 @@
+{
+  "landing": {
+    "wordmark": "nodate-flow",
+    "phase": "PHASE 01 - FOUNDATION",
+    "hello": "こんにちは、Phase 1。",
+    "tagline": "仕事は流れる。あなたは見守る。"
+  },
+  "nav": {
+    "theme": "テーマ",
+    "language": "言語"
+  },
+  "theme": {
+    "aurora-light": "オーロラ ライト",
+    "aurora-dark": "オーロラ ダーク",
+    "dotline-light": "ドットライン ライト",
+    "dotline-dark": "ドットライン ダーク",
+    "system": "システム"
+  },
+  "lang": {
+    "en": "英語",
+    "ja": "日本語"
+  },
+  "a11y": {
+    "skipToContent": "本文へスキップ"
+  }
+}
