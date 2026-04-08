@@ -58,9 +58,19 @@ func queryTimeline(
 	// This mirrors the per-task ACL enforced by RequireTaskAccess so the
 	// workspace timeline cannot leak task titles/payloads for projects
 	// the caller cannot otherwise access.
+	// Workspace owner/admin see everything in their workspace (escape
+	// hatch); other members only see events for projects they belong to
+	// or workspace-root / non-task events.
 	where = append(where, `(
   v.task_public_id IS NULL
   OR v.project_public_id IS NULL
+  OR EXISTS (
+    SELECT 1 FROM workspace_members wm
+    WHERE wm.user_id = ?
+      AND wm.workspace_id = v.workspace_id
+      AND wm.role IN ('owner','admin')
+      AND wm.enabled = TRUE
+  )
   OR v.project_public_id IN (
     SELECT p.public_id
     FROM project_members pm
@@ -68,7 +78,7 @@ func queryTimeline(
     WHERE pm.user_id = ? AND pm.enabled = TRUE
   )
 )`)
-	args = append(args, callerUserID)
+	args = append(args, callerUserID, callerUserID)
 
 	if len(kinds) > 0 {
 		placeholders := make([]string, 0, len(kinds))
