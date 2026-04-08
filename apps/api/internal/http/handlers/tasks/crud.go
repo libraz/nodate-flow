@@ -249,6 +249,12 @@ WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 				"title":     in.Body.Title,
 			},
 		})
+		if deps.Embedder != nil {
+			// Write-time embedding upsert (ADR 0003). Failures are swallowed
+			// so the task write still succeeds; the weekly reindex cron
+			// picks up any rows that missed.
+			_ = deps.Embedder.EmbedTask(ctx, uint32(taskID), in.Body.Title, in.Body.Description)
+		}
 
 		row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
 			WorkspaceID: prj.WorkspaceID,
@@ -474,6 +480,9 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			PublicID:    types.FromUUID(task.PublicID),
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if deps.Embedder != nil && (in.Body.Title != nil || in.Body.Description != nil) {
+			_ = deps.Embedder.EmbedTask(ctx, task.ID, newTitle, nullStr(newDesc))
 		}
 		taskInternal := int64(task.ID)
 		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{

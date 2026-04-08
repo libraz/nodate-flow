@@ -186,7 +186,7 @@ func PurgeWorkspace(t *testing.T, db *sql.DB, workspacePublicID string) {
 		`DELETE FROM ai_agents        WHERE workspace_id = ?`,
 		`DELETE FROM ai_models        WHERE workspace_id = ?`,
 		`DELETE FROM ai_providers     WHERE workspace_id = ?`,
-		`DELETE FROM embeddings       WHERE workspace_id = ?`,
+		`DELETE FROM ai_settings      WHERE workspace_id = ?`,
 		`DELETE FROM attachments      WHERE workspace_id = ?`,
 		`DELETE FROM comments         WHERE workspace_id = ?`,
 		`DELETE FROM task_constraints WHERE workspace_id = ?`,

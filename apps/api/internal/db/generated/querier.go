@@ -246,6 +246,20 @@ type Querier interface {
 	UpdateWorkspace(ctx context.Context, arg UpdateWorkspaceParams) error
 	// Update workspace name and slug by public_id.
 	UpdateWorkspaceFull(ctx context.Context, arg UpdateWorkspaceFullParams) error
+	// Fetch the ai_settings row for a workspace.
+	GetAiSettings(ctx context.Context, workspaceID uint32) (AiSetting, error)
+	// Create or update the ai_settings row for a workspace.
+	UpsertAiSettings(ctx context.Context, arg UpsertAiSettingsParams) error
+	// Insert or replace the embedding row for (task_id, model).
+	UpsertTaskEmbedding(ctx context.Context, arg UpsertTaskEmbeddingParams) error
+	// Fetch the embedding row for a single (task_id, model) pair.
+	GetTaskEmbedding(ctx context.Context, arg GetTaskEmbeddingParams) (TaskEmbedding, error)
+	// List tasks whose embedding is missing or older than tasks.updated_at.
+	ListStaleTaskEmbeddings(ctx context.Context, arg ListStaleTaskEmbeddingsParams) ([]ListStaleTaskEmbeddingsRow, error)
+	// Return candidate embeddings for in-Go cosine ranking.
+	ListCandidateTaskEmbeddings(ctx context.Context, arg ListCandidateTaskEmbeddingsParams) ([]ListCandidateTaskEmbeddingsRow, error)
+	// Remove every embedding row for a task across all models.
+	DeleteTaskEmbeddingsForTask(ctx context.Context, taskID uint32) error
 }
 
 var _ Querier = (*Queries)(nil)

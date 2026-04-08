@@ -34,9 +34,10 @@ type MySQLInstance struct {
 }
 
 const (
-	// MySQL 9 Community is used in tests because the schema relies on
-	// the VECTOR column type, which is not available in MySQL 8.4
-	// Community (it ships only in HeatWave / MySQL 9+).
+	// MySQL 9 Community is used in tests to match the production target
+	// (see docs/requirements.md §3.5). Phase 1 stores embeddings as
+	// LONGBLOB of float32[]; native VECTOR columns are deferred to
+	// Wave 2 per ADR 0003.
 	mysqlImage    = "mysql:9.1"
 	mysqlDatabase = "nodate_flow_test"
 	mysqlUser     = "nodate"

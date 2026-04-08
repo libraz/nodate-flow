@@ -102,51 +102,6 @@ func (ns NullAiProvidersKind) Value() (driver.Value, error) {
 	return string(ns.AiProvidersKind), nil
 }
 
-type EmbeddingsEntityType string
-
-const (
-	EmbeddingsEntityTypeTask       EmbeddingsEntityType = "task"
-	EmbeddingsEntityTypeComment    EmbeddingsEntityType = "comment"
-	EmbeddingsEntityTypeAttachment EmbeddingsEntityType = "attachment"
-	EmbeddingsEntityTypeProject    EmbeddingsEntityType = "project"
-	EmbeddingsEntityTypePage       EmbeddingsEntityType = "page"
-)
-
-func (e *EmbeddingsEntityType) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = EmbeddingsEntityType(s)
-	case string:
-		*e = EmbeddingsEntityType(s)
-	default:
-		return fmt.Errorf("unsupported scan type for EmbeddingsEntityType: %T", src)
-	}
-	return nil
-}
-
-type NullEmbeddingsEntityType struct {
-	EmbeddingsEntityType EmbeddingsEntityType `json:"embeddingsEntityType"`
-	Valid                bool                 `json:"valid"` // Valid is true if EmbeddingsEntityType is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullEmbeddingsEntityType) Scan(value interface{}) error {
-	if value == nil {
-		ns.EmbeddingsEntityType, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.EmbeddingsEntityType.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullEmbeddingsEntityType) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.EmbeddingsEntityType), nil
-}
-
 type IdentitiesProvider string
 
 const (
@@ -827,36 +782,6 @@ type Comment struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
-// Vector embeddings over workspace entities
-type Embedding struct {
-	// Internal PK, never exposed
-	ID uint32 `json:"-"`
-	// UUID v7, the only externally visible ID
-	PublicID types.PublicID `json:"publicId"`
-	// Internal FK to workspaces.id
-	WorkspaceID uint32 `json:"-"`
-	// Internal FK to ai_models.id (embedding model)
-	ModelID uint32 `json:"modelId"`
-	// Referenced entity kind
-	EntityType EmbeddingsEntityType `json:"entityType"`
-	// Internal id of the referenced entity row
-	EntityID uint32 `json:"entityId"`
-	// SHA-256 hex of the embedded text (cache key)
-	ContentHash string `json:"contentHash"`
-	// Vector dimensionality
-	Dimensions uint16 `json:"dimensions"`
-	// Serialized float32[1536]; vector index deferred to MySQL 9 / pgvector
-	Embedding []byte `json:"embedding"`
-	// Display order
-	SortWeight int32 `json:"sortWeight"`
-	// Admin notes
-	Notes sql.NullString `json:"notes"`
-	// Enabled flag
-	Enabled   bool         `json:"enabled"`
-	UpdatedAt sql.NullTime `json:"updatedAt"`
-	CreatedAt time.Time    `json:"createdAt"`
-}
-
 // Append-only event log
 type Event struct {
 	// Internal PK, never exposed
@@ -1513,6 +1438,42 @@ type Workspace struct {
 	Enabled   bool         `json:"enabled"`
 	UpdatedAt sql.NullTime `json:"updatedAt"`
 	CreatedAt time.Time    `json:"createdAt"`
+}
+
+// Per-workspace AI configuration (ADR 0003)
+type AiSetting struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Embedding model key (resolved by ai/embed registry)
+	EmbedModel string `json:"embedModel"`
+	// Daily embed cost cap in cents (separate bucket from chat budget)
+	EmbedBudgetCentsDay uint32 `json:"embedBudgetCentsDay"`
+	// Cosine sim >= this -> duplicate candidate (DECIMAL(4,3) as string)
+	DuplicateThresholdHigh string `json:"duplicateThresholdHigh"`
+	// Cosine sim in [low, high) -> related task (DECIMAL(4,3) as string)
+	DuplicateThresholdLow string       `json:"duplicateThresholdLow"`
+	UpdatedAt             sql.NullTime `json:"updatedAt"`
+	CreatedAt             time.Time    `json:"createdAt"`
+}
+
+// Task embedding vectors for duplicate detection (ADR 0003).
+// VECTOR(768) is read/written as []byte; the Go embedding client
+// L2-normalizes before insert and cosine similarity is computed in Go.
+type TaskEmbedding struct {
+	// Internal FK to tasks.id
+	TaskID uint32 `json:"-"`
+	// Embedding model key, e.g. mock-768
+	Model string `json:"model"`
+	// Vector dimensionality (redundant with type today)
+	Dim uint16 `json:"dim"`
+	// L2-normalized embedding vector (MySQL VECTOR serialized bytes)
+	Vector []byte `json:"vector"`
+	// SHA-256 hex of embedded text
+	ContentHash string `json:"contentHash"`
+	// Last embed time
+	EmbeddedAt time.Time `json:"embeddedAt"`
 }
 
 // Workspace membership

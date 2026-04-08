@@ -20,6 +20,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/embed"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/providers"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/crypto"
@@ -135,7 +136,13 @@ func BuildResult(deps Deps) Result {
 	aclDB := passthroughDB{deps.DB}
 	wsDeps := workspaces.Deps{DB: deps.DB, Queries: deps.Queries}
 	prjDeps := projects.Deps{DB: deps.DB, Queries: deps.Queries}
-	taskDeps := tasks.Deps{DB: deps.DB, Queries: deps.Queries}
+	// Write-time embedding client (ADR 0003). Wave 2 only ships the mock
+	// provider; the real provider integration is a separate follow-up.
+	var embedClient *embed.Client
+	if deps.AiMock {
+		embedClient = embed.New(embed.NewMockProvider(), deps.Queries)
+	}
+	taskDeps := tasks.Deps{DB: deps.DB, Queries: deps.Queries, Embedder: embedClient}
 	tlDeps := timeline.Deps{DB: deps.DB, Queries: deps.Queries}
 	inboxDeps := inbox.Deps{DB: deps.DB, Queries: deps.Queries}
 	aiDeps := aihandlers.Deps{DB: deps.DB, Queries: deps.Queries, Cipher: deps.Cipher}
