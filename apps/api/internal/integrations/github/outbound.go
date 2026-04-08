@@ -20,7 +20,7 @@ type OutboundClient struct {
 	Token    string
 	BaseURL  string // defaults to https://api.github.com
 	HTTP     *http.Client
-	Limiter  *outbound.Limiter
+	Limiter  outbound.RateLimiter
 	UserAgent string
 }
 

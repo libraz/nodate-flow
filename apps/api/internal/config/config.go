@@ -68,6 +68,22 @@ type Config struct {
 	// OutboundLlmBurst overrides the burst size for the per-provider
 	// egress limiter. 0 → derived from OutboundLlmRps.
 	OutboundLlmBurst int `env:"NF_OUTBOUND_LLM_BURST" envDefault:"0"`
+
+	// SessionStore selects the refresh-token session driver.
+	//   mysql (default) — wraps sqlc queries against the sessions table.
+	//   redis           — requires -tags redis and NF_REDIS_ADDR.
+	// Other subsystems (stream notifier, outbound rate limiter) follow
+	// the same env-switch pattern once their Redis drivers are wired.
+	SessionStore string `env:"NF_SESSION_STORE" envDefault:"mysql"`
+	// RedisAddr is the host:port for the Redis client shared by the
+	// redis-tagged drivers (sessionstore, stream, outbound).
+	RedisAddr string `env:"NF_REDIS_ADDR" envDefault:""`
+	// StreamBackend selects the SSE fan-out driver: "memory" (default)
+	// or "redis" (requires -tags redis).
+	StreamBackend string `env:"NF_STREAM_BACKEND" envDefault:"memory"`
+	// OutboundBackend selects the egress rate limiter driver: "memory"
+	// (default) or "redis" (requires -tags redis).
+	OutboundBackend string `env:"NF_OUTBOUND_BACKEND" envDefault:"memory"`
 }
 
 // Load parses NF_* environment variables into a Config.

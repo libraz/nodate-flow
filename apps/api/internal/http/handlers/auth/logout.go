@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
-	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 )
 
 // Logout handles POST /auth/logout. It revokes the session matching the
@@ -22,14 +21,11 @@ func Logout(deps Deps) func(context.Context, *LogoutInput) (*LogoutOutput, error
 			return out, nil
 		}
 		hash := auth.HashOpaque(plain)
-		row, err := deps.Queries.FindSessionByRefreshHash(ctx, hash)
+		sess, err := deps.Sessions.FindByRefreshHash(ctx, hash)
 		if err != nil {
 			return out, nil
 		}
-		_ = deps.Queries.RevokeSession(ctx, generated.RevokeSessionParams{
-			UserID:   row.UserID,
-			PublicID: row.PublicID,
-		})
+		_ = deps.Sessions.Revoke(ctx, sess.UserID, sess.PublicID)
 		return out, nil
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth/sessionstore"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
@@ -85,7 +86,7 @@ func issueTokens(ctx context.Context, deps Deps, userID uint32, userPub types.Pu
 		return AuthTokens{}, "", httpErr(apierrors.InternalUnexpected)
 	}
 	sessPub := types.New()
-	if _, err := deps.Queries.CreateSession(ctx, generated.CreateSessionParams{
+	if _, err := deps.Sessions.Create(ctx, sessionstore.CreateParams{
 		PublicID:    sessPub,
 		UserID:      userID,
 		RefreshHash: refreshHash,

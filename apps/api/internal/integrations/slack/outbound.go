@@ -18,7 +18,7 @@ type OutboundClient struct {
 	Token   string
 	BaseURL string // defaults to https://slack.com/api
 	HTTP    *http.Client
-	Limiter *outbound.Limiter
+	Limiter outbound.RateLimiter
 }
 
 // ErrOutboundUnauthorized is returned when slack rejects the token.

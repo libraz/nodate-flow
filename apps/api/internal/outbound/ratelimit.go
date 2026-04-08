@@ -16,6 +16,16 @@ import (
 // deadline fires before a token becomes available.
 var ErrLimitExceeded = errors.New("outbound: rate limit exceeded")
 
+// RateLimiter is the driver interface satisfied by [Limiter] (the
+// in-process token bucket) and by the `redis` build-tagged
+// RedisLimiter. Call sites should take this interface so a Redis
+// backend can replace the default without code changes.
+type RateLimiter interface {
+	Allow() bool
+	Wait(ctx context.Context) error
+	Stats() LimiterStats
+}
+
 // Limiter is a per-destination token-bucket limiter. It is safe for
 // concurrent use. The zero value is not usable; construct with
 // [NewLimiter].
@@ -141,16 +151,16 @@ func (l *Limiter) advance() {
 // configured independently.
 type Registry struct {
 	mu       sync.RWMutex
-	limiters map[string]*Limiter
+	limiters map[string]RateLimiter
 }
 
 // NewRegistry returns an empty destination → limiter registry.
 func NewRegistry() *Registry {
-	return &Registry{limiters: make(map[string]*Limiter)}
+	return &Registry{limiters: make(map[string]RateLimiter)}
 }
 
 // Set registers or replaces the limiter for destination.
-func (r *Registry) Set(destination string, l *Limiter) {
+func (r *Registry) Set(destination string, l RateLimiter) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.limiters[destination] = l

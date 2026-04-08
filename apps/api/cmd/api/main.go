@@ -4,9 +4,12 @@ package main
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -16,6 +19,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/agentruntime"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/providers"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth/sessionstore"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/config"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/outbound"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/crypto"
@@ -114,9 +118,35 @@ func main() {
 		aiInvocationPublisher = tap.PublishAiInvocation
 	}
 
+	// Session store driver. MySQL is the default; NF_SESSION_STORE=redis
+	// selects the redis-tagged driver (requires building with -tags redis).
+	// Unknown values fall back to MySQL with a warning so misconfiguration
+	// never locks users out.
+	var sessions sessionstore.Store = sessionstore.NewMySQLStore(queries)
+	switch cfg.SessionStore {
+	case "", "mysql":
+		// default
+	case "redis":
+		logger.Warn("NF_SESSION_STORE=redis requires the -tags redis build; falling back to MySQL")
+	default:
+		logger.Warn("unknown NF_SESSION_STORE value; falling back to MySQL", "value", cfg.SessionStore)
+	}
+
+	// Stream / outbound backend selectors. The in-process (memory) drivers
+	// are the default; "redis" is only honored when the binary is compiled
+	// with `-tags redis` so mis-set env values degrade gracefully to the
+	// in-process behavior instead of panicking at startup.
+	if cfg.StreamBackend == "redis" {
+		logger.Warn("NF_STREAM_BACKEND=redis requires the -tags redis build; using in-process notifier")
+	}
+	if cfg.OutboundBackend == "redis" {
+		logger.Warn("NF_OUTBOUND_BACKEND=redis requires the -tags redis build; using in-process limiter")
+	}
+
 	inner := router.Build(router.Deps{
 		DB:                 db,
 		Queries:            queries,
+		Sessions:           sessions,
 		JWT:                jwtIssuer,
 		Cipher:             cipher,
 		GhWebhookSecret:    cfg.GhWebhookSecret,
@@ -155,11 +185,47 @@ func main() {
 	}
 
 	addr := ":" + cfg.Port
-	logger.Info("listening", "addr", addr)
-	if err := http.ListenAndServe(addr, outer); err != nil { //nolint:gosec // dev scaffold
-		logger.Error("server exited", "err", err)
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           outer,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
+	// Graceful shutdown: on SIGINT / SIGTERM stop the scheduler, drain
+	// in-flight HTTP requests, then exit. A 20s hard deadline prevents
+	// a stuck handler from blocking the pod forever.
+	stopCtx, stopCancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stopCancel()
+
+	serverErr := make(chan error, 1)
+	go func() {
+		logger.Info("listening", "addr", addr)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serverErr <- err
+		}
+		close(serverErr)
+	}()
+
+	select {
+	case err := <-serverErr:
+		if err != nil {
+			logger.Error("server exited", "err", err)
+			os.Exit(1)
+		}
+	case <-stopCtx.Done():
+		logger.Info("shutdown signal received")
+	}
+
+	scheduler.Stop()
+	schedulerCancel()
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer shutdownCancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		logger.Error("graceful shutdown failed", "err", err)
 		os.Exit(1)
 	}
+	logger.Info("shutdown complete")
 }
 
 // buildCORS returns a chi CORS middleware configured from the runtime

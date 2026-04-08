@@ -2,12 +2,11 @@ package auth
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
-	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth/sessionstore"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
 )
@@ -23,14 +22,14 @@ func Refresh(deps Deps) func(context.Context, *RefreshInput) (*RefreshOutput, er
 			return nil, httpErr(apierrors.AuthTokenRefreshInvalid)
 		}
 		hash := auth.HashOpaque(plain)
-		row, err := deps.Queries.FindSessionByRefreshHash(ctx, hash)
+		sess, err := deps.Sessions.FindByRefreshHash(ctx, hash)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
+			if errors.Is(err, sessionstore.ErrNotFound) {
 				return nil, httpErr(apierrors.AuthTokenRefreshInvalid)
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		if row.ExpiresAt.Before(time.Now()) {
+		if sess.ExpiresAt.Before(time.Now()) {
 			return nil, httpErr(apierrors.AuthTokenRefreshExpired)
 		}
 		newPlain, newHash, err := auth.GenerateRefresh()
@@ -38,15 +37,11 @@ func Refresh(deps Deps) func(context.Context, *RefreshInput) (*RefreshOutput, er
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		newExp := time.Now().Add(refreshCookieTTL)
-		if err := deps.Queries.RotateSessionRefreshHash(ctx, generated.RotateSessionRefreshHashParams{
-			RefreshHash: newHash,
-			ExpiresAt:   newExp,
-			ID:          row.ID,
-		}); err != nil {
+		if err := deps.Sessions.RotateRefreshHash(ctx, hash, newHash, newExp); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		var pub types.PublicID
-		if err := deps.DB.QueryRowContext(ctx, `SELECT public_id FROM users WHERE id = ?`, row.UserID).Scan(&pub); err != nil {
+		if err := deps.DB.QueryRowContext(ctx, `SELECT public_id FROM users WHERE id = ?`, sess.UserID).Scan(&pub); err != nil {
 			return nil, httpErr(apierrors.AuthSessionRevoked)
 		}
 		access, exp, err := deps.JWT.Sign(pub)

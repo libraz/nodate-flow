@@ -35,7 +35,7 @@ var outboundRegistry = outbound.NewRegistry()
 // ConfigureLimiter attaches a token-bucket limiter to the given
 // destination key. Call from main at startup to enforce per-provider
 // egress caps. Passing nil clears the slot.
-func ConfigureLimiter(destination string, l *outbound.Limiter) {
+func ConfigureLimiter(destination string, l outbound.RateLimiter) {
 	outboundRegistry.Set(destination, l)
 }
 

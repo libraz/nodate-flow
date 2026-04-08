@@ -7,15 +7,17 @@ import (
 	"net/http"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth/sessionstore"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 )
 
 // Deps is the dependency bundle passed to each handler.
 type Deps struct {
-	DB      *sql.DB
-	Queries *generated.Queries
-	JWT     *auth.JWTIssuer
-	OIDC    *auth.OIDCClient
+	DB       *sql.DB
+	Queries  *generated.Queries
+	Sessions sessionstore.Store
+	JWT      *auth.JWTIssuer
+	OIDC     *auth.OIDCClient
 	// CookieSecure toggles the Secure flag on the refresh cookie. It
 	// defaults to true in production; local http dev can disable it via
 	// NF_COOKIE_SECURE=false.

@@ -25,6 +25,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/nlquery"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/providers"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth/sessionstore"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
@@ -53,6 +54,10 @@ type Deps struct {
 	// JWT is the access-token issuer used by RequireAuth and by the auth
 	// handlers themselves.
 	JWT *auth.JWTIssuer
+	// Sessions is the refresh-token session store driver. When nil,
+	// [Build] falls back to [sessionstore.NewMySQLStore] over the
+	// sqlc query handle so tests do not need to wire it explicitly.
+	Sessions sessionstore.Store
 	// Cipher is optional: when nil, the AI provider endpoints return
 	// AI.PROVIDER.NOT_CONFIGURED and the MCP propose_* tools are degraded,
 	// but the rest of the API still boots. Tests typically pass a fixed
@@ -145,7 +150,11 @@ func BuildResult(deps Deps) Result {
 		return out, nil
 	})
 
-	authDeps := authhandlers.Deps{DB: deps.DB, Queries: deps.Queries, JWT: deps.JWT, CookieSecure: deps.CookieSecure}
+	sessionStore := deps.Sessions
+	if sessionStore == nil {
+		sessionStore = sessionstore.NewMySQLStore(deps.Queries)
+	}
+	authDeps := authhandlers.Deps{DB: deps.DB, Queries: deps.Queries, Sessions: sessionStore, JWT: deps.JWT, CookieSecure: deps.CookieSecure}
 	registerPublicAuthRoutes(api, authDeps)
 
 	authMW := middleware.RequireAuth(middleware.AuthDeps{
