@@ -31,23 +31,23 @@ type Workspace struct {
 	Name        string    `json:"name"`
 	Description string    `json:"description,omitempty"`
 	IconURL     string    `json:"iconUrl,omitempty"`
-	Role        string    `json:"role,omitempty" doc:"Caller's role in this workspace"`
-	UpdatedAt   time.Time `json:"updatedAt,omitempty"`
-	CreatedAt   time.Time `json:"createdAt"`
+	Role        string     `json:"role,omitempty" doc:"Caller's role in this workspace"`
+	UpdatedAt   *time.Time `json:"updatedAt,omitempty"`
+	CreatedAt   time.Time  `json:"createdAt"`
 }
 
 // WorkspaceMember is the public DTO for a workspace_members row.
 type WorkspaceMember struct {
-	ID          string    `json:"id"`
-	UserID      string    `json:"userId"`
-	Email       string    `json:"email"`
-	DisplayName string    `json:"displayName"`
-	AvatarURL   string    `json:"avatarUrl,omitempty"`
-	Role        string    `json:"role"`
-	InvitedAt   time.Time `json:"invitedAt,omitempty"`
-	JoinedAt    time.Time `json:"joinedAt,omitempty"`
-	UpdatedAt   time.Time `json:"updatedAt,omitempty"`
-	CreatedAt   time.Time `json:"createdAt"`
+	ID          string     `json:"id"`
+	UserID      string     `json:"userId"`
+	Email       string     `json:"email"`
+	DisplayName string     `json:"displayName"`
+	AvatarURL   string     `json:"avatarUrl,omitempty"`
+	Role        string     `json:"role"`
+	InvitedAt   *time.Time `json:"invitedAt,omitempty"`
+	JoinedAt    *time.Time `json:"joinedAt,omitempty"`
+	UpdatedAt   *time.Time `json:"updatedAt,omitempty"`
+	CreatedAt   time.Time  `json:"createdAt"`
 }
 
 // CreateWorkspaceInput is the body for POST /workspaces.
@@ -231,10 +231,19 @@ func nullStr(s sql.NullString) string {
 	return ""
 }
 
-// nullTime converts a sql.NullTime to a plain time (zero when NULL).
-func nullTime(t sql.NullTime) time.Time {
+// nullTime converts a sql.NullTime to a *time.Time, returning nil when
+// the column is NULL so the field is omitted from JSON instead of being
+// serialised as Go zero-time ("0001-01-01T00:00:00Z").
+func nullTime(t sql.NullTime) *time.Time {
 	if t.Valid {
-		return t.Time
+		v := t.Time
+		return &v
 	}
-	return time.Time{}
+	return nil
+}
+
+// timePtr wraps a non-null time.Time so it can be assigned to a
+// *time.Time DTO field.
+func timePtr(t time.Time) *time.Time {
+	return &t
 }

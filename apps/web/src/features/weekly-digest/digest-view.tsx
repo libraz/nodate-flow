@@ -89,7 +89,7 @@ export default function DigestView({ workspaceId }: { workspaceId: string }): Re
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <header style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-        <h2 style={{ margin: 0, fontSize: '1.125rem' }}>{t('weekly_digest.title')}</h2>
+        <h1 style={{ margin: 0, fontSize: '1.5rem' }}>{t('weekly_digest.title')}</h1>
         <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.8125rem' }}>
           {t('weekly_digest.description')}
         </p>
@@ -98,19 +98,19 @@ export default function DigestView({ workspaceId }: { workspaceId: string }): Re
       <CountsRow counts={data.counts} />
 
       <section style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <h3 style={{ margin: 0, fontSize: '0.9375rem' }}>
+        <h2 style={{ margin: 0, fontSize: '0.9375rem' }}>
           {t('weekly_digest.completed_this_week')}
-        </h3>
+        </h2>
         <TaskList tasks={completed} emptyLabel={t('weekly_digest.empty_completed')} />
       </section>
 
       <section style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <h3 style={{ margin: 0, fontSize: '0.9375rem' }}>{t('weekly_digest.overdue_open')}</h3>
+        <h2 style={{ margin: 0, fontSize: '0.9375rem' }}>{t('weekly_digest.overdue_open')}</h2>
         <TaskList tasks={overdue} emptyLabel={t('weekly_digest.empty_overdue')} />
       </section>
 
       <section style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <h3 style={{ margin: 0, fontSize: '0.9375rem' }}>{t('weekly_digest.markdown')}</h3>
+        <h2 style={{ margin: 0, fontSize: '0.9375rem' }}>{t('weekly_digest.markdown')}</h2>
         <Card style={{ padding: '0.875rem 1rem' }}>
           <pre
             style={{

@@ -9,7 +9,7 @@ import Input from '@nodate-flow/ui/primitives/input';
 import Tabs, { type TabItem } from '@nodate-flow/ui/primitives/tabs';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { Link, useNavigate } from '@tanstack/react-router';
-import { type FormEvent, type ReactElement, Suspense, useState } from 'react';
+import { type FormEvent, type ReactElement, Suspense, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useDisableWorkspace, useUpdateWorkspace, useWorkspaceQuery } from './api';
@@ -96,11 +96,13 @@ function SettingsPanel({ id }: { id: string }): ReactElement {
   );
 }
 
-function OverviewPanel({ id }: { id: string }): ReactElement {
-  const { data: workspace } = useWorkspaceQuery(id);
+function OverviewPanel(): ReactElement {
+  const { t } = useTranslation('common');
   return (
     <Card style={{ padding: '1.5rem' }}>
-      <p style={{ margin: 0, color: 'var(--color-muted)' }}>{workspace.description ?? ''}</p>
+      <p style={{ margin: 0, color: 'var(--color-muted)' }}>
+        {t('workspaces.detail.overview_empty')}
+      </p>
     </Card>
   );
 }
@@ -115,7 +117,7 @@ export default function WorkspaceDetail({ id }: WorkspaceDetailProps): ReactElem
       label: t('workspaces.detail.tabs.overview'),
       content: (
         <Suspense fallback={null}>
-          <OverviewPanel id={id} />
+          <OverviewPanel />
         </Suspense>
       ),
     },
@@ -139,8 +141,11 @@ export default function WorkspaceDetail({ id }: WorkspaceDetailProps): ReactElem
     },
   ];
 
+  const headingId = useId();
+
   return (
-    <section
+    <article
+      aria-labelledby={headingId}
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -150,6 +155,7 @@ export default function WorkspaceDetail({ id }: WorkspaceDetailProps): ReactElem
     >
       <header style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         <h1
+          id={headingId}
           style={{
             fontFamily: 'var(--font-display)',
             fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
@@ -161,7 +167,10 @@ export default function WorkspaceDetail({ id }: WorkspaceDetailProps): ReactElem
         {workspace.description ? (
           <p style={{ margin: 0, color: 'var(--color-muted)' }}>{workspace.description}</p>
         ) : null}
-        <nav style={{ display: 'flex', gap: '1rem' }}>
+        <nav
+          aria-label={t('workspaces.detail.projects_nav_label')}
+          style={{ display: 'flex', gap: '1rem' }}
+        >
           <Link
             to="/workspaces/$id/projects"
             params={{ id }}
@@ -172,11 +181,7 @@ export default function WorkspaceDetail({ id }: WorkspaceDetailProps): ReactElem
         </nav>
       </header>
 
-      <Tabs
-        items={items}
-        defaultValue="overview"
-        aria-label={t('workspaces.detail.tabs.overview')}
-      />
-    </section>
+      <Tabs items={items} defaultValue="overview" aria-label={t('workspaces.detail.tabs.label')} />
+    </article>
   );
 }

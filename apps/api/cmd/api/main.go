@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log/slog"
 	"net/http"
@@ -73,9 +74,18 @@ func main() {
 	// multi-replica. eventbus.Append calls the tap after every
 	// successful insert so SSE subscribers see task.* and
 	// ai.suggestion.* changes without polling.
-	notifier := stream.NewInProcessNotifier()
-	tap := stream.NewEventbusTap(notifier)
-	eventbus.SetNotifyHook(tap.Publish)
+	var notifier stream.Notifier
+	var tap *stream.EventbusTap
+	var streamRemember stream.RememberWorkspaceFunc
+	var aiInvocationPublisher func(context.Context, uint32)
+	if cfg.StreamEnabled {
+		in := stream.NewInProcessNotifier()
+		notifier = in
+		tap = stream.NewEventbusTap(in)
+		eventbus.SetNotifyHook(tap.Publish)
+		streamRemember = tap.RememberWorkspace
+		aiInvocationPublisher = tap.PublishAiInvocation
+	}
 
 	inner := router.Build(router.Deps{
 		DB:                 db,
@@ -87,8 +97,9 @@ func main() {
 		DefaultWorkspaceID: cfg.DefaultWorkspaceID,
 		CookieSecure:       cfg.CookieSecure,
 		AiMock:             cfg.AiMock,
-		StreamNotifier:     notifier,
-		StreamRemember:     tap.RememberWorkspace,
+		StreamNotifier:        notifier,
+		StreamRemember:        streamRemember,
+		AiInvocationPublisher: aiInvocationPublisher,
 	})
 
 	// Wrap the router with the request logger so the prod binary keeps

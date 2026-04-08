@@ -13,6 +13,11 @@ type Store = Map<string, TaskFilters>;
 
 const store: Store = new Map();
 const listeners = new Set<() => void>();
+const EMPTY: TaskFilters = Object.freeze({
+  search: '',
+  states: Object.freeze([]) as readonly TaskDerivedState[],
+  assigneeId: '',
+}) as TaskFilters;
 
 function emit(): void {
   for (const l of listeners) l();
@@ -26,11 +31,11 @@ function subscribe(listener: () => void): () => void {
 }
 
 function emptyFilters(): TaskFilters {
-  return { search: '', states: [], assigneeId: '' };
+  return EMPTY;
 }
 
 export function getTaskFilters(projectId: string): TaskFilters {
-  return store.get(projectId) ?? emptyFilters();
+  return store.get(projectId) ?? EMPTY;
 }
 
 export function setTaskFilters(projectId: string, next: TaskFilters): void {

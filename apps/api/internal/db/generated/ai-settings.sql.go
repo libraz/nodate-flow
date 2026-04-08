@@ -10,6 +10,7 @@ import (
 )
 
 const getAiSettings = `-- name: GetAiSettings :one
+
 SELECT
   id,
   workspace_id,
@@ -24,6 +25,11 @@ WHERE workspace_id = ?
 LIMIT 1
 `
 
+// ============================================================================
+// ai_settings queries (ADR 0003)
+// Per-workspace AI knobs: embed model, daily embed budget, and the
+// duplicate-detection similarity thresholds.
+// ============================================================================
 // Fetch the ai_settings row for a workspace. Returns sql.ErrNoRows when the
 // workspace has never written a row; the caller should fall back to the
 // column defaults (mock-768 / 100 cents/day / 0.870 / 0.750).
@@ -66,7 +72,8 @@ type UpsertAiSettingsParams struct {
 	DuplicateThresholdLow  string `json:"duplicateThresholdLow"`
 }
 
-// Create or update the ai_settings row for a workspace.
+// Create or update the ai_settings row for a workspace. The UNIQUE KEY on
+// workspace_id makes this idempotent.
 func (q *Queries) UpsertAiSettings(ctx context.Context, arg UpsertAiSettingsParams) error {
 	_, err := q.db.ExecContext(ctx, upsertAiSettings,
 		arg.WorkspaceID,

@@ -19,18 +19,20 @@ INSERT INTO mcp_tokens (
   public_id,
   workspace_id,
   user_id,
+  agent_id,
   name,
   token_hash,
   token_prefix,
   scopes_json,
   expires_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateMcpTokenParams struct {
 	PublicID    types.PublicID  `json:"publicId"`
 	WorkspaceID uint32          `json:"-"`
 	UserID      uint32          `json:"-"`
+	AgentID     sql.NullInt32   `json:"agentId"`
 	Name        string          `json:"name"`
 	TokenHash   string          `json:"tokenHash"`
 	TokenPrefix string          `json:"tokenPrefix"`
@@ -44,6 +46,7 @@ func (q *Queries) CreateMcpToken(ctx context.Context, arg CreateMcpTokenParams) 
 		arg.PublicID,
 		arg.WorkspaceID,
 		arg.UserID,
+		arg.AgentID,
 		arg.Name,
 		arg.TokenHash,
 		arg.TokenPrefix,
@@ -54,6 +57,25 @@ func (q *Queries) CreateMcpToken(ctx context.Context, arg CreateMcpTokenParams) 
 		return 0, err
 	}
 	return result.LastInsertId()
+}
+
+const findAgentInternalIDByPublicID = `-- name: FindAgentInternalIDByPublicID :one
+SELECT id FROM ai_agents
+WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE
+LIMIT 1
+`
+
+type FindAgentInternalIDByPublicIDParams struct {
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+// Resolve an ai_agents row's internal id by public_id, workspace-scoped.
+func (q *Queries) FindAgentInternalIDByPublicID(ctx context.Context, arg FindAgentInternalIDByPublicIDParams) (uint32, error) {
+	row := q.db.QueryRowContext(ctx, findAgentInternalIDByPublicID, arg.WorkspaceID, arg.PublicID)
+	var id uint32
+	err := row.Scan(&id)
+	return id, err
 }
 
 const findMcpTokenByHash = `-- name: FindMcpTokenByHash :one
@@ -118,21 +140,23 @@ func (q *Queries) FindMcpTokenByHash(ctx context.Context, tokenHash string) (Fin
 
 const listMcpTokensForUser = `-- name: ListMcpTokensForUser :many
 SELECT
-  public_id,
-  name,
-  token_prefix,
-  scopes_json,
-  expires_at,
-  last_used_at,
-  updated_at,
-  created_at,
+  m.public_id,
+  m.name,
+  m.token_prefix,
+  m.scopes_json,
+  a.public_id AS agent_public_id,
+  m.expires_at,
+  m.last_used_at,
+  m.updated_at,
+  m.created_at,
   COUNT(*) OVER() AS total
-FROM mcp_tokens
-WHERE workspace_id = ?
-  AND user_id = ?
-  AND enabled = TRUE
-  AND revoked_at IS NULL
-ORDER BY created_at DESC, public_id DESC
+FROM mcp_tokens m
+LEFT JOIN ai_agents a ON a.id = m.agent_id
+WHERE m.workspace_id = ?
+  AND m.user_id = ?
+  AND m.enabled = TRUE
+  AND m.revoked_at IS NULL
+ORDER BY m.created_at DESC, m.public_id DESC
 LIMIT ? OFFSET ?
 `
 
@@ -144,15 +168,16 @@ type ListMcpTokensForUserParams struct {
 }
 
 type ListMcpTokensForUserRow struct {
-	PublicID    types.PublicID  `json:"publicId"`
-	Name        string          `json:"name"`
-	TokenPrefix string          `json:"tokenPrefix"`
-	ScopesJson  json.RawMessage `json:"scopesJson"`
-	ExpiresAt   sql.NullTime    `json:"expiresAt"`
-	LastUsedAt  sql.NullTime    `json:"lastUsedAt"`
-	UpdatedAt   sql.NullTime    `json:"updatedAt"`
-	CreatedAt   time.Time       `json:"createdAt"`
-	Total       interface{}     `json:"total"`
+	PublicID      types.PublicID  `json:"publicId"`
+	Name          string          `json:"name"`
+	TokenPrefix   string          `json:"tokenPrefix"`
+	ScopesJson    json.RawMessage `json:"scopesJson"`
+	AgentPublicID types.PublicID  `json:"agentPublicId"`
+	ExpiresAt     sql.NullTime    `json:"expiresAt"`
+	LastUsedAt    sql.NullTime    `json:"lastUsedAt"`
+	UpdatedAt     sql.NullTime    `json:"updatedAt"`
+	CreatedAt     time.Time       `json:"createdAt"`
+	Total         interface{}     `json:"total"`
 }
 
 // List a user's MCP tokens in a workspace, masked.
@@ -175,6 +200,7 @@ func (q *Queries) ListMcpTokensForUser(ctx context.Context, arg ListMcpTokensFor
 			&i.Name,
 			&i.TokenPrefix,
 			&i.ScopesJson,
+			&i.AgentPublicID,
 			&i.ExpiresAt,
 			&i.LastUsedAt,
 			&i.UpdatedAt,

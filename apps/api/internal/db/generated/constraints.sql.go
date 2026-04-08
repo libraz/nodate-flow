@@ -64,6 +64,27 @@ func (q *Queries) DeleteConstraint(ctx context.Context, arg DeleteConstraintPara
 	return err
 }
 
+const failConstraint = `-- name: FailConstraint :exec
+UPDATE task_constraints
+SET failed_at = CURRENT_TIMESTAMP,
+    satisfied_at = NULL
+WHERE workspace_id = ?
+  AND public_id = ?
+  AND enabled = TRUE
+`
+
+type FailConstraintParams struct {
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+// Mark a constraint as currently failing. Clears satisfied_at so the
+// transition is visible in v_task_constraint_satisfaction.
+func (q *Queries) FailConstraint(ctx context.Context, arg FailConstraintParams) error {
+	_, err := q.db.ExecContext(ctx, failConstraint, arg.WorkspaceID, arg.PublicID)
+	return err
+}
+
 const listConstraintsForTask = `-- name: ListConstraintsForTask :many
 SELECT
   tc.public_id,

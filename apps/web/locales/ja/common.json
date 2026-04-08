@@ -89,10 +89,13 @@
     },
     "detail": {
       "tabs": {
+        "label": "ワークスペース詳細タブ",
         "overview": "概要",
         "members": "メンバー",
         "settings": "設定"
-      }
+      },
+      "projects_nav_label": "ワークスペースサブセクション",
+      "overview_empty": "このワークスペースにはまだプロジェクトがありません。"
     },
     "nav": {
       "overview": "概要",
@@ -105,7 +108,8 @@
       "add": "メンバーを追加",
       "email": "メールアドレス",
       "role": "ロール",
-      "added_at": "追加日"
+      "added_at": "追加日",
+      "pending": "保留中"
     },
     "roles": {
       "owner": "オーナー",
@@ -138,7 +142,7 @@
     "empty": "プロジェクトがまだありません。最初のプロジェクトを作成しましょう。",
     "columns": {
       "name": "名前",
-      "key": "キー",
+      "key": "スラッグ",
       "visibility": "ステータス",
       "created": "作成日",
       "actions": "操作"
@@ -149,7 +153,7 @@
     },
     "form": {
       "name": "名前",
-      "key": "キー",
+      "key": "スラッグ",
       "description": "説明",
       "visibility": "公開範囲",
       "submit": "保存",
@@ -188,8 +192,8 @@
     },
     "validation": {
       "name_required": "名前を入力してください。",
-      "slug_required": "キーを入力してください。",
-      "slug_format": "キーには小文字・数字・ハイフンのみ使用できます。",
+      "slug_required": "スラッグを入力してください。",
+      "slug_format": "スラッグには小文字・数字・ハイフンのみ使用できます。",
       "user_id_required": "ユーザー ID を入力してください。"
     },
     "errors": {

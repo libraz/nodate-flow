@@ -43,6 +43,14 @@ type Config struct {
 	// apps/api/testdata/ai/. Used by development and tests.
 	AiMock bool `env:"NF_AI_MOCK" envDefault:"false"`
 
+	// StreamEnabled toggles the realtime SSE fan-out (ADR 0005). When
+	// false the /workspaces/{wsId}/stream route still mounts but uses
+	// a [stream.NopNotifier] so eventbus.Append becomes a no-op for
+	// subscribers. Defaults to true so dev + prod get realtime out of
+	// the box; set NF_STREAM=false to disable (useful for load tests
+	// or when running without the SSE-aware web client).
+	StreamEnabled bool `env:"NF_STREAM" envDefault:"true"`
+
 	// CorsAllowedOrigins is the comma-separated list of origins allowed to
 	// call the API with credentials. Defaults cover the Vite dev server
 	// on localhost. Set to a single "*" to allow any origin (credentials

@@ -1,29 +1,29 @@
 /**
- * /projects/$projectId — project detail view.
+ * /projects/$projectId — project layout. Renders nested child routes
+ * (e.g. `/tasks`, `/timeline`) via <Outlet />. The detail view itself
+ * lives in the sibling `_authenticated.projects.$projectId.index.tsx`.
+ *
+ * The loader probes the project so deep-link 404s land on the branded
+ * NotFound rendered inside the authenticated AppShell instead of
+ * crashing the route into the root ErrorBoundary.
  */
 
-import Skeleton from '@nodate-flow/ui/primitives/skeleton';
-import { createFileRoute } from '@tanstack/react-router';
-import { type ReactElement, Suspense } from 'react';
+import { Outlet, createFileRoute, notFound } from '@tanstack/react-router';
+import type { ReactElement } from 'react';
 
-import ProjectDetail from '../features/projects/project-detail';
+import { sdk } from '../lib/sdk';
 
-function ProjectDetailRoute(): ReactElement {
-  const { projectId } = Route.useParams();
-  return (
-    <Suspense
-      fallback={
-        <div style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <Skeleton style={{ blockSize: '2rem', inlineSize: '16rem' }} />
-          <Skeleton style={{ blockSize: '12rem', inlineSize: '100%' }} />
-        </div>
-      }
-    >
-      <ProjectDetail id={projectId} />
-    </Suspense>
-  );
+function ProjectLayout(): ReactElement {
+  return <Outlet />;
 }
 
 export const Route = createFileRoute('/_authenticated/projects/$projectId')({
-  component: ProjectDetailRoute,
+  component: ProjectLayout,
+  loader: async ({ params }) => {
+    const { response } = await sdk.GET('/projects/{prjId}', {
+      params: { path: { prjId: params.projectId } },
+    });
+    if (response.status === 404) throw notFound();
+    return null;
+  },
 });

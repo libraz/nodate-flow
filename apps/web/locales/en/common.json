@@ -89,10 +89,13 @@
     },
     "detail": {
       "tabs": {
+        "label": "Workspace detail tabs",
         "overview": "Overview",
         "members": "Members",
         "settings": "Settings"
-      }
+      },
+      "projects_nav_label": "Workspace sub-sections",
+      "overview_empty": "No projects yet in this workspace."
     },
     "nav": {
       "overview": "Overview",
@@ -105,7 +108,8 @@
       "add": "Add member",
       "email": "Email",
       "role": "Role",
-      "added_at": "Added"
+      "added_at": "Added",
+      "pending": "Pending"
     },
     "roles": {
       "owner": "Owner",
@@ -138,7 +142,7 @@
     "empty": "No projects yet. Create your first one to get started.",
     "columns": {
       "name": "Name",
-      "key": "Key",
+      "key": "Slug",
       "visibility": "Status",
       "created": "Created",
       "actions": "Actions"
@@ -149,7 +153,7 @@
     },
     "form": {
       "name": "Name",
-      "key": "Key",
+      "key": "Slug",
       "description": "Description",
       "visibility": "Visibility",
       "submit": "Save",
@@ -188,8 +192,8 @@
     },
     "validation": {
       "name_required": "Name is required.",
-      "slug_required": "Key is required.",
-      "slug_format": "Key may only contain lowercase letters, numbers, and hyphens.",
+      "slug_required": "Slug is required.",
+      "slug_format": "Slug may only contain lowercase letters, numbers, and hyphens.",
       "user_id_required": "User ID is required."
     },
     "errors": {

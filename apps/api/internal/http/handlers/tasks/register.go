@@ -88,6 +88,13 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 	}, AddConstraint(deps))
 
 	huma.Register(api, huma.Operation{
+		OperationID: "tasks-constraints-evaluate",
+		Method:      http.MethodPost,
+		Path:        "/tasks/{id}/constraints/evaluate",
+		Summary:     "Run the Phase 3 constraint engine for a task and persist satisfied/failed markers",
+	}, EvaluateConstraints(deps))
+
+	huma.Register(api, huma.Operation{
 		OperationID: "tasks-constraints-remove",
 		Method:      http.MethodDelete,
 		Path:        "/tasks/{id}/constraints/{cid}",

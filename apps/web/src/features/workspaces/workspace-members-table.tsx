@@ -15,12 +15,18 @@ export interface WorkspaceMembersTableProps {
   workspaceId: string;
 }
 
-function formatDate(iso: string | undefined, locale: string): string {
-  if (!iso) return '';
+function isZeroTime(iso: string): boolean {
+  if (iso === '0001-01-01T00:00:00Z') return true;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) || d.getFullYear() < 2000;
+}
+
+function formatDate(iso: string | null | undefined, locale: string): string | null {
+  if (!iso || isZeroTime(iso)) return null;
   try {
     return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(iso));
   } catch {
-    return iso;
+    return null;
   }
 }
 
@@ -48,9 +54,11 @@ export default function WorkspaceMembersTable({
     {
       id: 'added_at',
       header: () => t('workspaces.members.added_at'),
-      cell: ({ row }) => (
-        <span>{formatDate(row.original.joinedAt ?? row.original.createdAt, locale)}</span>
-      ),
+      cell: ({ row }) => {
+        const formatted =
+          formatDate(row.original.joinedAt, locale) ?? formatDate(row.original.createdAt, locale);
+        return <span>{formatted ?? t('workspaces.members.pending')}</span>;
+      },
     },
   ];
 

@@ -7,11 +7,12 @@
  */
 
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
-import { Link, Outlet, createFileRoute, useChildMatches } from '@tanstack/react-router';
+import { Link, Outlet, createFileRoute, notFound, useChildMatches } from '@tanstack/react-router';
 import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import WorkspaceDetail from '../features/workspaces/workspace-detail';
+import { sdk } from '../lib/sdk';
 
 type SubNavKey = 'overview' | 'timeline' | 'settings';
 
@@ -69,7 +70,15 @@ function WorkspaceDetailRoute(): ReactElement {
             to={item.to}
             params={{ id }}
             activeOptions={{ exact: item.key === 'overview' }}
-            activeProps={{ 'aria-current': 'page', 'data-active': 'true' }}
+            activeProps={{
+              'aria-current': 'page',
+              'data-active': 'true',
+              style: {
+                background: 'var(--color-surface)',
+                color: 'var(--color-fg)',
+                fontWeight: 600,
+              },
+            }}
             style={{
               display: 'inline-block',
               padding: '0.5rem 0.875rem',
@@ -99,4 +108,11 @@ function WorkspaceDetailRoute(): ReactElement {
 
 export const Route = createFileRoute('/_authenticated/workspaces/$id')({
   component: WorkspaceDetailRoute,
+  loader: async ({ params }) => {
+    const { response } = await sdk.GET('/workspaces/{wsId}', {
+      params: { path: { wsId: params.id } },
+    });
+    if (response.status === 404) throw notFound();
+    return null;
+  },
 });

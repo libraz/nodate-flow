@@ -37,6 +37,16 @@ WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
 
+-- name: FailConstraint :exec
+-- Mark a constraint as currently failing. Clears satisfied_at so the
+-- transition is visible in v_task_constraint_satisfaction.
+UPDATE task_constraints
+SET failed_at = CURRENT_TIMESTAMP,
+    satisfied_at = NULL
+WHERE workspace_id = ?
+  AND public_id = ?
+  AND enabled = TRUE;
+
 -- name: DeleteConstraint :exec
 -- Soft-delete a constraint.
 UPDATE task_constraints

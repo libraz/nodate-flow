@@ -134,7 +134,7 @@ func InviteMember(deps Deps) func(context.Context, *AddWorkspaceMemberInput) (*A
 			Email:       email,
 			DisplayName: displayName,
 			Role:        string(role),
-			InvitedAt:   now,
+			InvitedAt:   timePtr(now),
 			CreatedAt:   now,
 		}}, nil
 	}

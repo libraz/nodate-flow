@@ -124,6 +124,7 @@ type McpTokenSummary struct {
 	Name        string   `json:"name"`
 	TokenPrefix string   `json:"tokenPrefix"`
 	Scopes      []string `json:"scopes"`
+	AgentID     *string  `json:"agentId,omitempty"`
 	ExpiresAt   *int64   `json:"expiresAt,omitempty"`
 	LastUsedAt  *int64   `json:"lastUsedAt,omitempty"`
 	RevokedAt   *int64   `json:"revokedAt,omitempty"`
@@ -134,8 +135,9 @@ type McpTokenSummary struct {
 type CreateMcpTokenInput struct {
 	WsID string `path:"wsId"`
 	Body struct {
-		Name   string   `json:"name" minLength:"1" maxLength:"255"`
-		Scopes []string `json:"scopes"`
+		Name    string   `json:"name" minLength:"1" maxLength:"255"`
+		Scopes  []string `json:"scopes"`
+		AgentID *string  `json:"agentId,omitempty" doc:"Optional ai_agents public_id to bind this token to; tool calls will be attributed to the agent and subject to its cost cap"`
 	}
 }
 
@@ -149,6 +151,7 @@ type CreateMcpTokenOutput struct {
 		Token       string   `json:"token" doc:"Plaintext bearer token, shown only once"`
 		TokenPrefix string   `json:"tokenPrefix"`
 		Scopes      []string `json:"scopes"`
+		AgentID     *string  `json:"agentId,omitempty"`
 		CreatedAt   int64    `json:"createdAt"`
 	}
 }

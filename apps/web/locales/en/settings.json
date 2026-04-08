@@ -8,9 +8,12 @@
     "weekly_digest": "Weekly digest"
   },
   "ai_activity": {
+    "title": "AI activity",
+    "description": "A read-only audit of recent LLM calls made on behalf of this workspace. Prompts and responses are redacted at write time.",
     "empty": "No LLM calls recorded yet.",
     "error_code": "Error: {{code}}"
   },
+  "sections_label": "Workspace settings sections",
   "weekly_digest": {
     "title": "Weekly digest",
     "description": "A deterministic snapshot of this workspace: state counts, what was completed in the last seven days, and what is overdue.",

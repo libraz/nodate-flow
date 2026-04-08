@@ -59,6 +59,7 @@ func AddDependency(deps Deps) func(context.Context, *AddTaskDependencyInput) (*A
 				"kind":         in.Body.Kind,
 			},
 		})
+		autoEvaluateConstraints(ctx, deps, ws.ID, task.ID)
 		return &AddTaskDependencyOutput{Body: TaskDependency{
 			ID:         pub.String(),
 			Kind:       in.Body.Kind,
@@ -100,6 +101,7 @@ func RemoveDependency(deps Deps) func(context.Context, *RemoveTaskDependencyInpu
 				"dependencyId": depID.String(),
 			},
 		})
+		autoEvaluateConstraints(ctx, deps, ws.ID, task.ID)
 		out := &RemoveTaskDependencyOutput{}
 		out.Body.Ok = true
 		return out, nil

@@ -65,6 +65,38 @@ type subscriber struct {
 type InProcessNotifier struct {
 	mu          sync.RWMutex
 	subscribers map[string]map[*subscriber]struct{}
+
+	// Lightweight counters used by /metrics scrapers and tests.
+	// Bumped under Publish with atomic operations so metric reads
+	// never block the hot path.
+	eventsPublished atomic.Uint64
+	eventsDropped   atomic.Uint64
+}
+
+// MetricsSnapshot is a point-in-time view of notifier counters.
+type MetricsSnapshot struct {
+	EventsPublished    uint64
+	EventsDropped      uint64
+	ActiveWorkspaces   int
+	ActiveSubscribers  int
+}
+
+// Snapshot returns a consistent read of the notifier's counters
+// plus current subscriber totals. Intended for Prometheus wiring
+// (obs package) and for tests that need to assert fan-out counts.
+func (n *InProcessNotifier) Snapshot() MetricsSnapshot {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	total := 0
+	for _, bucket := range n.subscribers {
+		total += len(bucket)
+	}
+	return MetricsSnapshot{
+		EventsPublished:   n.eventsPublished.Load(),
+		EventsDropped:     n.eventsDropped.Load(),
+		ActiveWorkspaces:  len(n.subscribers),
+		ActiveSubscribers: total,
+	}
 }
 
 // NewInProcessNotifier returns an empty notifier ready for use.
@@ -96,7 +128,9 @@ func (n *InProcessNotifier) Publish(_ context.Context, evt Event) {
 		}
 		select {
 		case s.ch <- evt:
+			n.eventsPublished.Add(1)
 		default:
+			n.eventsDropped.Add(1)
 			// Inbox full. Try to queue a resync marker exactly once.
 			// The channel is still full, so drop one pending event
 			// to make room: the resync marker is a superset of any

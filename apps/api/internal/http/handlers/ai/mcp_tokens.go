@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"time"
 
@@ -49,12 +50,29 @@ func CreateMcpToken(deps Deps) func(context.Context, *CreateMcpTokenInput) (*Cre
 			displayPrefix = displayPrefix[:mcpTokenDisplayPrefixLen]
 		}
 
+		var agentID sql.NullInt32
+		if in.Body.AgentID != nil && *in.Body.AgentID != "" {
+			agentPub, perr := types.Parse(*in.Body.AgentID)
+			if perr != nil {
+				return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+			}
+			id, qerr := deps.Queries.FindAgentInternalIDByPublicID(ctx, generated.FindAgentInternalIDByPublicIDParams{
+				WorkspaceID: ws.ID,
+				PublicID:    agentPub,
+			})
+			if qerr != nil {
+				return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+			}
+			agentID = sql.NullInt32{Int32: int32(id), Valid: true}
+		}
+
 		pub := types.New()
 		now := time.Now()
 		if _, err := deps.Queries.CreateMcpToken(ctx, generated.CreateMcpTokenParams{
 			PublicID:    pub,
 			WorkspaceID: ws.ID,
 			UserID:      userID,
+			AgentID:     agentID,
 			Name:        in.Body.Name,
 			TokenHash:   hash,
 			TokenPrefix: displayPrefix,
@@ -69,6 +87,10 @@ func CreateMcpToken(deps Deps) func(context.Context, *CreateMcpTokenInput) (*Cre
 		out.Body.Token = plain
 		out.Body.TokenPrefix = displayPrefix
 		out.Body.Scopes = in.Body.Scopes
+		if in.Body.AgentID != nil && *in.Body.AgentID != "" {
+			v := *in.Body.AgentID
+			out.Body.AgentID = &v
+		}
 		out.Body.CreatedAt = now.Unix()
 		// Drop the plaintext from the local variable as soon as it has
 		// been copied into the response struct.
@@ -107,11 +129,17 @@ func ListMcpTokens(deps Deps) func(context.Context, *ListMcpTokensInput) (*ListM
 		for _, r := range rows {
 			scopes := []string{}
 			_ = json.Unmarshal(r.ScopesJson, &scopes)
+			var agentIDStr *string
+			if r.AgentPublicID != (types.PublicID{}) {
+				s := r.AgentPublicID.String()
+				agentIDStr = &s
+			}
 			out.Body.Tokens = append(out.Body.Tokens, McpTokenSummary{
 				ID:          r.PublicID.String(),
 				Name:        r.Name,
 				TokenPrefix: r.TokenPrefix,
 				Scopes:      scopes,
+				AgentID:     agentIDStr,
 				ExpiresAt:   nullTimeUnix(r.ExpiresAt),
 				LastUsedAt:  nullTimeUnix(r.LastUsedAt),
 				CreatedAt:   r.CreatedAt.Unix(),

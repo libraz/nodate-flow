@@ -66,7 +66,7 @@ function WorkspaceSettingsLayout(): ReactElement {
       }}
     >
       <nav
-        aria-label={t('nav.general')}
+        aria-label={t('sections_label')}
         style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}
       >
         {SUB_NAV.map((item) => (
@@ -75,7 +75,13 @@ function WorkspaceSettingsLayout(): ReactElement {
             to={item.to}
             params={{ id }}
             className={cx('settings-subnav-link')}
-            activeProps={{ 'aria-current': 'page' }}
+            activeProps={{
+              'aria-current': 'page',
+              style: {
+                background: 'var(--color-surface)',
+                fontWeight: 600,
+              },
+            }}
             style={{
               display: 'block',
               padding: '0.5rem 0.75rem',

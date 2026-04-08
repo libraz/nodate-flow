@@ -139,6 +139,7 @@ func Transition(deps Deps) func(context.Context, *TransitionTaskInput) (*Transit
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
+		autoEvaluateConstraints(ctx, deps, ws.ID, task.ID)
 		row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
 			WorkspaceID: ws.ID,
 			PublicID:    types.FromUUID(task.PublicID),

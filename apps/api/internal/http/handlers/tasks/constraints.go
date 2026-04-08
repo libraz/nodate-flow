@@ -45,6 +45,7 @@ func AddConstraint(deps Deps) func(context.Context, *AddTaskConstraintInput) (*A
 				"kind":         in.Body.Kind,
 			},
 		})
+		autoEvaluateConstraints(ctx, deps, ws.ID, task.ID)
 		return &AddTaskConstraintOutput{Body: TaskConstraint{
 			ID:         pub.String(),
 			Kind:       in.Body.Kind,
@@ -88,6 +89,7 @@ func RemoveConstraint(deps Deps) func(context.Context, *RemoveTaskConstraintInpu
 				"constraintId": cid.String(),
 			},
 		})
+		autoEvaluateConstraints(ctx, deps, ws.ID, task.ID)
 		out := &RemoveTaskConstraintOutput{}
 		out.Body.Ok = true
 		return out, nil

@@ -85,27 +85,34 @@ export default function InvocationsList({
 }): ReactElement {
   const { t } = useTranslation('settings');
   const { data } = useAiInvocationsQuery(workspaceId);
-  if (data.length === 0) {
-    return (
-      <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.875rem' }}>
-        {t('ai_activity.empty')}
-      </p>
-    );
-  }
   return (
-    <ul
-      style={{
-        listStyle: 'none',
-        padding: 0,
-        margin: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.5rem',
-      }}
-    >
-      {data.map((row) => (
-        <InvocationRow key={row.id} row={row} />
-      ))}
-    </ul>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <header style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+        <h1 style={{ margin: 0, fontSize: '1.5rem' }}>{t('ai_activity.title')}</h1>
+        <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+          {t('ai_activity.description')}
+        </p>
+      </header>
+      {data.length === 0 ? (
+        <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+          {t('ai_activity.empty')}
+        </p>
+      ) : (
+        <ul
+          style={{
+            listStyle: 'none',
+            padding: 0,
+            margin: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.5rem',
+          }}
+        >
+          {data.map((row) => (
+            <InvocationRow key={row.id} row={row} />
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

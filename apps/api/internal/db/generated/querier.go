@@ -6,6 +6,7 @@ package generated
 
 import (
 	"context"
+	"database/sql"
 
 	types "github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 )
@@ -92,9 +93,14 @@ type Querier interface {
 	DisableWorkspace(ctx context.Context, publicID types.PublicID) error
 	// Edit a comment body and stamp edited_at.
 	EditComment(ctx context.Context, arg EditCommentParams) error
+	// Mark a constraint as currently failing. Clears satisfied_at so the
+	// transition is visible in v_task_constraint_satisfaction.
+	FailConstraint(ctx context.Context, arg FailConstraintParams) error
 	// Resolve an ai_agents public id to its internal id, scoped to the
 	// workspace. Used by task actor handlers to bind by public id.
 	FindAgentIDByPublicIDForWorkspace(ctx context.Context, arg FindAgentIDByPublicIDForWorkspaceParams) (uint32, error)
+	// Resolve an ai_agents row's internal id by public_id, workspace-scoped.
+	FindAgentInternalIDByPublicID(ctx context.Context, arg FindAgentInternalIDByPublicIDParams) (uint32, error)
 	// Return the internal id of the most recently created enabled provider
 	// for a workspace. Used by the ai_invocations logger (2.MCP-2) when the
 	// orchestrator does not track which provider handled the call.
@@ -153,6 +159,11 @@ type Querier interface {
 	// workspace has never written a row; the caller should fall back to the
 	// column defaults (mock-768 / 100 cents/day / 0.870 / 0.750).
 	GetAiSettings(ctx context.Context, workspaceID uint32) (AiSetting, error)
+	// Queries dedicated to the constraint engine (Phase 3, 3.ENG-2).
+	// Keyed off the internal task_id so the engine never has to know
+	// about public_id resolution. All workspace scoping is enforced by
+	// the caller before it lands here.
+	GetTaskDueOnForEngine(ctx context.Context, id uint32) (sql.NullTime, error)
 	// Fetch the embedding row for a single (task_id, model) pair. Returns
 	// sql.ErrNoRows if the task has never been embedded with the given model.
 	GetTaskEmbedding(ctx context.Context, arg GetTaskEmbeddingParams) (GetTaskEmbeddingRow, error)
@@ -186,6 +197,10 @@ type Querier interface {
 	ListConstraintsForTask(ctx context.Context, arg ListConstraintsForTaskParams) ([]ListConstraintsForTaskRow, error)
 	// List outgoing dependencies of a task. Returns the target task public_id.
 	ListDependenciesForTask(ctx context.Context, arg ListDependenciesForTaskParams) ([]ListDependenciesForTaskRow, error)
+	// Outgoing dependencies of a task with the referenced task's
+	// public_id + current derived_state. The engine builds a
+	// map[public_id]state from this rowset.
+	ListDependencyStatesForEngine(ctx context.Context, fromTaskID uint32) ([]ListDependencyStatesForEngineRow, error)
 	// List a project's timeline via v_task_timeline. Filters events whose
 	// owning task lives in the given project (events with no task_id are
 	// excluded by virtue of project_public_id being NULL).
@@ -227,6 +242,11 @@ type Querier interface {
 	// the given (workspace_id, model). Used by the background re-embed worker.
 	// LEFT JOIN so tasks with no row at all are returned as "stale".
 	ListStaleTaskEmbeddings(ctx context.Context, arg ListStaleTaskEmbeddingsParams) ([]ListStaleTaskEmbeddingsRow, error)
+	// Distinct role names currently attached to the task via
+	// task_actors. Used to populate Facts.ActorRoles.
+	ListTaskActorRolesForEngine(ctx context.Context, taskID uint32) ([]TaskActorsRole, error)
+	// Enabled constraint rows for a task in evaluation order.
+	ListTaskConstraintsForEngine(ctx context.Context, taskID uint32) ([]ListTaskConstraintsForEngineRow, error)
 	// List tasks in a project via v_task_list with window-function pagination.
 	ListTasksForProject(ctx context.Context, arg ListTasksForProjectParams) ([]ListTasksForProjectRow, error)
 	// List tasks across an entire workspace via v_task_list.

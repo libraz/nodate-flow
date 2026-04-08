@@ -66,9 +66,9 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
           gap: '1rem',
         }}
       >
-        <h2 style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: '1.5rem' }}>
+        <h1 style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: '1.5rem' }}>
           {t('providers.title')}
-        </h2>
+        </h1>
         <Button
           variant="primary"
           onClick={() => {

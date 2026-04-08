@@ -9,6 +9,7 @@ import { Outlet, createFileRoute, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useEffect } from 'react';
 
 import AppShell from '../components/layout/app-shell';
+import NotFound from '../components/not-found';
 import { selectIsAuthenticated, useAuth } from '../features/auth/auth-store';
 import { useAuthBootstrap } from '../features/auth/use-auth-bootstrap';
 import AiSuggestionsDock from '../features/glass-dock/glass-dock';
@@ -35,6 +36,16 @@ function AuthenticatedLayout(): ReactElement | null {
   );
 }
 
+function AuthenticatedNotFound(): ReactElement {
+  return (
+    <AppShell>
+      <NotFound />
+      <AiSuggestionsDock />
+    </AppShell>
+  );
+}
+
 export const Route = createFileRoute('/_authenticated')({
   component: AuthenticatedLayout,
+  notFoundComponent: AuthenticatedNotFound,
 });

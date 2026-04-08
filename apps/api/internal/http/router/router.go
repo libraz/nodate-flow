@@ -86,6 +86,11 @@ type Deps struct {
 	// the eventbus tap the internal→public workspace id mapping.
 	// May be nil when StreamNotifier is nil.
 	StreamRemember stream.RememberWorkspaceFunc
+	// AiInvocationPublisher is called after every successful
+	// ai_invocations write so SSE subscribers see the
+	// ai.invocation.written marker without depending on eventbus.
+	// Nil means the hook is skipped. Tests typically leave this nil.
+	AiInvocationPublisher func(context.Context, uint32)
 }
 
 // Result is what BuildResult returns: the composed chi router plus the
@@ -191,7 +196,7 @@ func BuildResult(deps Deps) Result {
 			Guard:     ai.NewCostGuard(budget, 0),
 			DB:        deps.DB,
 			Queries:   deps.Queries,
-			LogInvoke: newDBInvocationLogger(deps.Queries),
+			LogInvoke: newDBInvocationLogger(deps.Queries, deps.AiInvocationPublisher),
 		}
 	}
 
@@ -521,7 +526,7 @@ func registerProtectedAuthRoutes(api huma.API, deps authhandlers.Deps) {
 // enabled provider the record is dropped silently — LogInvoke is a
 // best-effort audit path and must never break a user-visible AI
 // response.
-func newDBInvocationLogger(q *generated.Queries) ai.InvocationLogger {
+func newDBInvocationLogger(q *generated.Queries, publish func(context.Context, uint32)) ai.InvocationLogger {
 	return func(ctx context.Context, rec ai.InvocationRecord) {
 		if q == nil || rec.WorkspaceID == 0 {
 			return
@@ -560,7 +565,7 @@ func newDBInvocationLogger(q *generated.Queries) ai.InvocationLogger {
 		if rec.ErrorCode != "" {
 			ec = sql.NullString{String: rec.ErrorCode, Valid: true}
 		}
-		_, _ = q.LogAiInvocation(ctx, generated.LogAiInvocationParams{
+		if _, err := q.LogAiInvocation(ctx, generated.LogAiInvocationParams{
 			PublicID:         types.New(),
 			WorkspaceID:      rec.WorkspaceID,
 			ProviderID:       providerID,
@@ -577,7 +582,9 @@ func newDBInvocationLogger(q *generated.Queries) ai.InvocationLogger {
 			Status:           status,
 			ErrorCode:        ec,
 			InvokedAt:        time.Now().UTC(),
-		})
+		}); err == nil && publish != nil {
+			publish(ctx, rec.WorkspaceID)
+		}
 	}
 }
 

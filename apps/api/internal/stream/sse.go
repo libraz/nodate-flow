@@ -48,11 +48,14 @@ func SSEHandler(notifier Notifier, remember RememberWorkspaceFunc) http.HandlerF
 		if remember != nil {
 			remember(ws.ID, ws.PublicID.String())
 		}
-		flusher, ok := w.(http.Flusher)
-		if !ok {
-			http.Error(w, "streaming unsupported", http.StatusInternalServerError)
-			return
-		}
+		// http.NewResponseController transparently unwraps any
+		// middleware ResponseWriter wrappers (e.g. the request-logger's
+		// statusRecorder) to find an underlying Flusher. A bare
+		// `w.(http.Flusher)` type assertion fails the moment any
+		// middleware in the chain embeds http.ResponseWriter without
+		// also forwarding Flush, which is what was happening here.
+		rc := http.NewResponseController(w)
+		flush := func() { _ = rc.Flush() }
 
 		h := w.Header()
 		h.Set("Content-Type", "text/event-stream")
@@ -75,7 +78,7 @@ func SSEHandler(notifier Notifier, remember RememberWorkspaceFunc) http.HandlerF
 			WorkspaceID: ws.PublicID.String(),
 			At:          time.Now().Unix(),
 		})
-		flusher.Flush()
+		flush()
 
 		ctx := r.Context()
 		ch := notifier.Subscribe(ctx, ws.PublicID.String())
@@ -91,12 +94,12 @@ func SSEHandler(notifier Notifier, remember RememberWorkspaceFunc) http.HandlerF
 					return
 				}
 				writeEvent(w, evt)
-				flusher.Flush()
+				flush()
 			case <-ticker.C:
 				if _, err := fmt.Fprint(w, ": ping\n\n"); err != nil {
 					return
 				}
-				flusher.Flush()
+				flush()
 			}
 		}
 	}
