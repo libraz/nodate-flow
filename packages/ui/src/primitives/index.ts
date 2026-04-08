@@ -68,3 +68,6 @@ export type { ScrollAreaProps } from './scroll-area/scroll-area';
 
 export { ToastProvider, useToaster, toaster } from './toast/toast';
 export type { Toast, ToastOptions, ToastTone, ToastProviderProps } from './toast/toast';
+
+export { default as DataGrid } from './data-grid/data-grid';
+export type { DataGridProps } from './data-grid/data-grid';

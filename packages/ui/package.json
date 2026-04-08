@@ -43,7 +43,8 @@
     "./primitives/drawer": "./src/primitives/drawer/drawer.tsx",
     "./primitives/toast": "./src/primitives/toast/toast.tsx",
     "./primitives/tabs": "./src/primitives/tabs/tabs.tsx",
-    "./primitives/scroll-area": "./src/primitives/scroll-area/scroll-area.tsx"
+    "./primitives/scroll-area": "./src/primitives/scroll-area/scroll-area.tsx",
+    "./primitives/data-grid": "./src/primitives/data-grid/data-grid.tsx"
   },
   "scripts": {
     "typecheck": "tsc -b",
@@ -52,6 +53,8 @@
   },
   "dependencies": {
     "@floating-ui/react": "0.27.0",
+    "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-virtual": "^3.13.23",
     "clsx": "2.1.1",
     "lucide-react": "0.453.0"
   },

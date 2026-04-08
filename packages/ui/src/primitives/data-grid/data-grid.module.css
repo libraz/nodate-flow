@@ -1,0 +1,103 @@
+.root {
+  position: relative;
+  display: block;
+  inline-size: 100%;
+  overflow: auto;
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-bg-elevated);
+  color: var(--nf-color-fg);
+  font-family: var(--nf-font-sans);
+}
+
+.root:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.table {
+  display: block;
+  inline-size: 100%;
+  position: relative;
+}
+
+.headerRow {
+  display: flex;
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+  background: var(--nf-color-bg-sunken);
+  border-block-end: var(--nf-space-px) solid var(--nf-color-border-strong);
+}
+
+.headerCell {
+  flex: 1 1 0;
+  min-inline-size: 0;
+  padding-block: var(--nf-space-2);
+  padding-inline: var(--nf-space-3);
+  text-align: start;
+  font-weight: 600;
+  color: var(--nf-color-fg);
+  cursor: default;
+  user-select: none;
+  border-inline-end: var(--nf-space-px) solid var(--nf-color-border);
+}
+
+.headerCell:last-child {
+  border-inline-end: none;
+}
+
+.headerCell[aria-sort] {
+  cursor: pointer;
+}
+
+.headerCell:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.body {
+  position: relative;
+  display: block;
+}
+
+.row {
+  display: flex;
+  border-block-end: var(--nf-space-px) solid var(--nf-color-hairline);
+}
+
+.row:hover {
+  background: var(--nf-color-surface-hover);
+}
+
+.cell {
+  flex: 1 1 0;
+  min-inline-size: 0;
+  padding-block: var(--nf-space-2);
+  padding-inline: var(--nf-space-3);
+  color: var(--nf-color-fg);
+  border-inline-end: var(--nf-space-px) solid var(--nf-color-hairline);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cell:last-child {
+  border-inline-end: none;
+}
+
+.cell:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.empty {
+  padding: var(--nf-space-6);
+  text-align: center;
+  color: var(--nf-color-fg-muted);
+}
+
+.sortIndicator {
+  margin-inline-start: var(--nf-space-1);
+  color: var(--nf-color-fg-subtle);
+}

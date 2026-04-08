@@ -81,7 +81,8 @@
         "rules": {
           "a11y": {
             "useSemanticElements": "off",
-            "noNoninteractiveElementToInteractiveRole": "off"
+            "noNoninteractiveElementToInteractiveRole": "off",
+            "useFocusableInteractive": "off"
           }
         }
       }

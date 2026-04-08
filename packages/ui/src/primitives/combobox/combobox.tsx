@@ -228,9 +228,6 @@ function ComboboxImpl(
               const active = idx === activeIndex;
               const isSelected = option.value === selected;
               return (
-                // biome-ignore lint/a11y/useFocusableInteractive: listbox options use aria-activedescendant, not roving focus
-                // biome-ignore lint/a11y/useSemanticElements: WAI-ARIA combobox pattern uses ul/li with role=listbox/option
-                // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: intentional ARIA combobox pattern
                 <li
                   key={option.value}
                   ref={(node) => {
