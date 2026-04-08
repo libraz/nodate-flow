@@ -48,12 +48,26 @@ type Provider interface {
 	// Exchange swaps the ?code=... returned by the callback handler
 	// for an access token + account profile.
 	Exchange(ctx context.Context, code, redirectURI string) (*TokenSet, *Account, error)
+	// Refresh exchanges a stored refresh token for a fresh access
+	// token. Providers that do not issue refresh tokens (GitHub OAuth
+	// Apps) or whose user tokens are long-lived (Slack) return
+	// ErrRefreshNotSupported and the refresher skips them.
+	Refresh(ctx context.Context, refreshToken string) (*TokenSet, error)
+	// Revoke asks the provider to invalidate the given tokens. It is
+	// best-effort: "already gone" responses are treated as success.
+	// Called on user-initiated disconnect.
+	Revoke(ctx context.Context, tokens TokenSet) error
 }
 
 // ErrNotConfigured is returned by a Provider constructor when the
 // required client id or secret is empty. The handler layer maps it
 // to INTEGRATION.OAUTH.PROVIDER_NOT_CONFIGURED.
 var ErrNotConfigured = errors.New("integrations: provider not configured")
+
+// ErrRefreshNotSupported is returned by Provider.Refresh for
+// providers that do not support (or do not need) a refresh token
+// flow. Callers treat this as a soft skip rather than an error.
+var ErrRefreshNotSupported = errors.New("integrations: refresh not supported")
 
 // Registry owns the concrete Provider instances and resolves them
 // by name. Providers that are not configured (missing env vars)

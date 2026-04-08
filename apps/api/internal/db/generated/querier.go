@@ -7,6 +7,7 @@ package generated
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	types "github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 )
@@ -413,6 +414,8 @@ type Querier interface {
 	FindUserIntegrationByUserProvider(ctx context.Context, arg FindUserIntegrationByUserProviderParams) (FindUserIntegrationByUserProviderRow, error)
 	UpsertUserIntegration(ctx context.Context, arg UpsertUserIntegrationParams) (int64, error)
 	DeleteUserIntegration(ctx context.Context, arg DeleteUserIntegrationParams) error
+	ListConnectionsExpiringBefore(ctx context.Context, cutoff time.Time) ([]ListConnectionsExpiringBeforeRow, error)
+	UpdateConnectionTokens(ctx context.Context, arg UpdateConnectionTokensParams) error
 	CreateOauthState(ctx context.Context, arg CreateOauthStateParams) error
 	ConsumeOauthState(ctx context.Context, state string) (ConsumeOauthStateRow, error)
 	DeleteOauthState(ctx context.Context, state string) error

@@ -143,3 +143,93 @@ func (p *GoogleCalendarProvider) Exchange(ctx context.Context, code, redirectURI
 			Label:      label,
 		}, nil
 }
+
+// Refresh implements [Provider]. Google's refresh endpoint reuses
+// the same token URL; the refresh_token is NOT rotated in the
+// response unless it was revoked, so we preserve the stored value
+// when the response omits it.
+func (p *GoogleCalendarProvider) Refresh(ctx context.Context, refreshToken string) (*TokenSet, error) {
+	if refreshToken == "" {
+		return nil, ErrRefreshNotSupported
+	}
+	form := url.Values{}
+	form.Set("client_id", p.clientID)
+	form.Set("client_secret", p.clientSecret)
+	form.Set("refresh_token", refreshToken)
+	form.Set("grant_type", "refresh_token")
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, googleTokenURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return nil, wrapExchange(err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := p.hc.Do(req)
+	if err != nil {
+		return nil, wrapExchange(err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode/100 != 2 {
+		return nil, wrapExchange(fmt.Errorf("status %d: %s", resp.StatusCode, body))
+	}
+	var tok struct {
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
+		ExpiresIn    int    `json:"expires_in"`
+		Scope        string `json:"scope"`
+		Error        string `json:"error"`
+	}
+	if err := json.Unmarshal(body, &tok); err != nil {
+		return nil, wrapExchange(err)
+	}
+	if tok.AccessToken == "" {
+		return nil, wrapExchange(fmt.Errorf("google: %s", tok.Error))
+	}
+	rt := tok.RefreshToken
+	if rt == "" {
+		rt = refreshToken
+	}
+	return &TokenSet{
+		AccessToken:  tok.AccessToken,
+		RefreshToken: rt,
+		ExpiresAt:    time.Now().Add(time.Duration(tok.ExpiresIn) * time.Second),
+		Scopes:       strings.Split(tok.Scope, " "),
+	}, nil
+}
+
+// Revoke implements [Provider]. Prefers the refresh token since
+// revoking it also invalidates any derived access tokens.
+func (p *GoogleCalendarProvider) Revoke(ctx context.Context, tokens TokenSet) error {
+	token := tokens.RefreshToken
+	if token == "" {
+		token = tokens.AccessToken
+	}
+	if token == "" {
+		return nil
+	}
+	form := url.Values{}
+	form.Set("token", token)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://oauth2.googleapis.com/revoke", strings.NewReader(form.Encode()))
+	if err != nil {
+		return fmt.Errorf("integrations/google: revoke: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := p.hc.Do(req)
+	if err != nil {
+		return fmt.Errorf("integrations/google: revoke: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode == http.StatusOK {
+		return nil
+	}
+	if resp.StatusCode == http.StatusBadRequest {
+		var r struct {
+			Error string `json:"error"`
+		}
+		if err := json.Unmarshal(body, &r); err == nil && r.Error == "invalid_token" {
+			return nil
+		}
+	}
+	return fmt.Errorf("integrations/google: revoke status %d: %s", resp.StatusCode, body)
+}

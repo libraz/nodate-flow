@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/middleware"
+	integrationspkg "github.com/nodate-flow/nodate-flow/apps/api/internal/integrations"
 )
 
 // oauthStateTTL is how long a state row remains valid. Short enough
@@ -183,9 +185,10 @@ func Callback(deps Deps) func(context.Context, *OAuthCallbackInput) (*OAuthCallb
 	}
 }
 
-// Disconnect handles DELETE /me/integrations/{id}. It only removes
-// the row locally; calling the provider's revoke API is deferred
-// until a follow-up pass.
+// Disconnect handles DELETE /me/integrations/{id}. It best-effort
+// revokes the tokens at the provider, then removes the local row.
+// A provider revoke failure is logged but does not block deletion:
+// a user-initiated disconnect must always succeed locally.
 func Disconnect(deps Deps) func(context.Context, *DisconnectInput) (*DisconnectOutput, error) {
 	return func(ctx context.Context, in *DisconnectInput) (*DisconnectOutput, error) {
 		uid, ok := middleware.ActorFromContext(ctx)
@@ -206,6 +209,10 @@ func Disconnect(deps Deps) func(context.Context, *DisconnectInput) (*DisconnectO
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+
+		// Best-effort provider-side revoke before local deletion.
+		revokeAtProvider(ctx, deps, uid, row.PublicID, row.Provider)
+
 		if err := deps.Queries.DeleteUserIntegration(ctx, generated.DeleteUserIntegrationParams{
 			ID:     row.ID,
 			UserID: uid,
@@ -267,6 +274,54 @@ func redirectWithError(deps Deps, reason string) *OAuthCallbackOutput {
 	return &OAuthCallbackOutput{
 		Status:   http.StatusFound,
 		Location: strings.TrimRight(deps.WebBaseURL, "/") + "/settings/security?" + q.Encode(),
+	}
+}
+
+// revokeAtProvider best-effort invalidates the stored tokens at the
+// remote provider. All failures are logged at WARN and swallowed so
+// the caller can proceed with local row deletion.
+func revokeAtProvider(ctx context.Context, deps Deps, uid uint32, pubID types.PublicID, provider generated.UserIntegrationsProvider) {
+	providerName := string(provider)
+	p, err := deps.Registry.Get(providerName)
+	if err != nil {
+		// Provider not configured on this server: nothing to revoke.
+		if errors.Is(err, integrationspkg.ErrNotConfigured) {
+			return
+		}
+		slog.WarnContext(ctx, "integrations: revoke provider lookup failed", "provider", providerName, "connection", pubID.String(), "error", err)
+		return
+	}
+	if deps.Cipher == nil {
+		slog.WarnContext(ctx, "integrations: revoke skipped: cipher unavailable", "provider", providerName, "connection", pubID.String())
+		return
+	}
+	tokRow, err := deps.Queries.FindUserIntegrationByUserProvider(ctx, generated.FindUserIntegrationByUserProviderParams{
+		UserID:   uid,
+		Provider: provider,
+	})
+	if err != nil {
+		slog.WarnContext(ctx, "integrations: revoke token lookup failed", "provider", providerName, "connection", pubID.String(), "error", err)
+		return
+	}
+	var tokens integrationspkg.TokenSet
+	if len(tokRow.AccessTokenCiphertext) > 0 {
+		plain, err := deps.Cipher.Decrypt(tokRow.AccessTokenCiphertext)
+		if err != nil {
+			slog.WarnContext(ctx, "integrations: revoke access-token decrypt failed", "provider", providerName, "connection", pubID.String(), "error", err)
+			return
+		}
+		tokens.AccessToken = string(plain)
+	}
+	if len(tokRow.RefreshTokenCiphertext) > 0 {
+		plain, err := deps.Cipher.Decrypt(tokRow.RefreshTokenCiphertext)
+		if err != nil {
+			slog.WarnContext(ctx, "integrations: revoke refresh-token decrypt failed", "provider", providerName, "connection", pubID.String(), "error", err)
+			return
+		}
+		tokens.RefreshToken = string(plain)
+	}
+	if err := p.Revoke(ctx, tokens); err != nil {
+		slog.WarnContext(ctx, "integrations: provider revoke failed", "provider", providerName, "connection", pubID.String(), "error", err)
 	}
 }
 

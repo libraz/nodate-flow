@@ -130,3 +130,39 @@ func (p *GithubProvider) Exchange(ctx context.Context, code, redirectURI string)
 			Label:      label,
 		}, nil
 }
+
+// Refresh implements [Provider]. GitHub OAuth Apps do not issue
+// refresh tokens; access tokens are long-lived until revoked.
+func (p *GithubProvider) Refresh(ctx context.Context, refreshToken string) (*TokenSet, error) {
+	return nil, ErrRefreshNotSupported
+}
+
+// Revoke implements [Provider]. Uses the OAuth App token revocation
+// endpoint which requires HTTP Basic auth with client credentials.
+func (p *GithubProvider) Revoke(ctx context.Context, tokens TokenSet) error {
+	if tokens.AccessToken == "" {
+		return nil
+	}
+	payload, err := json.Marshal(map[string]string{"access_token": tokens.AccessToken})
+	if err != nil {
+		return fmt.Errorf("integrations/github: revoke marshal: %w", err)
+	}
+	url := "https://api.github.com/applications/" + p.clientID + "/token"
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, strings.NewReader(string(payload)))
+	if err != nil {
+		return fmt.Errorf("integrations/github: revoke: %w", err)
+	}
+	req.SetBasicAuth(p.clientID, p.clientSecret)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := p.hc.Do(req)
+	if err != nil {
+		return fmt.Errorf("integrations/github: revoke: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusNotFound {
+		return nil
+	}
+	body, _ := io.ReadAll(resp.Body)
+	return fmt.Errorf("integrations/github: revoke status %d: %s", resp.StatusCode, body)
+}

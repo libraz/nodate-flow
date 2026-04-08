@@ -200,6 +200,21 @@ func main() {
 		},
 	)
 
+	// Background OAuth token refresher: keeps Google Calendar
+	// access tokens fresh so foreground MCP / ingest handlers
+	// never race a 401. Other providers (GitHub, Slack) return
+	// ErrRefreshNotSupported and are silently skipped.
+	integrationsRefresher := &integrations.Refresher{
+		Queries:  queries,
+		Cipher:   cipher,
+		Registry: integrationsRegistry,
+		Logger:   logger,
+	}
+	refresherCtx, refresherCancel := context.WithCancel(context.Background())
+	defer refresherCancel()
+	go integrationsRefresher.Run(refresherCtx)
+	logger.Info("integrations refresher goroutine launched")
+
 	inner := router.Build(router.Deps{
 		DB:                 db,
 		Queries:            queries,
@@ -312,6 +327,7 @@ func main() {
 
 	scheduler.Stop()
 	schedulerCancel()
+	refresherCancel()
 	if workerCancel != nil {
 		workerCancel()
 	}

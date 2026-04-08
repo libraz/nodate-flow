@@ -223,6 +223,89 @@ func (q *Queries) DeleteUserIntegration(ctx context.Context, arg DeleteUserInteg
 	return err
 }
 
+const listConnectionsExpiringBefore = `-- name: ListConnectionsExpiringBefore :many
+SELECT
+  id,
+  user_id,
+  provider,
+  access_token_ciphertext,
+  refresh_token_ciphertext,
+  access_token_expires_at
+FROM user_integrations
+WHERE enabled = TRUE
+  AND access_token_expires_at IS NOT NULL
+  AND access_token_expires_at < ?
+  AND refresh_token_ciphertext IS NOT NULL
+  AND LENGTH(refresh_token_ciphertext) > 0
+ORDER BY access_token_expires_at ASC
+LIMIT 200
+`
+
+type ListConnectionsExpiringBeforeRow struct {
+	ID                     uint32                   `json:"-"`
+	UserID                 uint32                   `json:"-"`
+	Provider               UserIntegrationsProvider `json:"provider"`
+	AccessTokenCiphertext  []byte                   `json:"-"`
+	RefreshTokenCiphertext []byte                   `json:"-"`
+	AccessTokenExpiresAt   sql.NullTime             `json:"accessTokenExpiresAt"`
+}
+
+// List enabled integrations whose access token expires before the cutoff.
+func (q *Queries) ListConnectionsExpiringBefore(ctx context.Context, cutoff time.Time) ([]ListConnectionsExpiringBeforeRow, error) {
+	rows, err := q.db.QueryContext(ctx, listConnectionsExpiringBefore, cutoff)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListConnectionsExpiringBeforeRow{}
+	for rows.Next() {
+		var i ListConnectionsExpiringBeforeRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Provider,
+			&i.AccessTokenCiphertext,
+			&i.RefreshTokenCiphertext,
+			&i.AccessTokenExpiresAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	return items, rows.Err()
+}
+
+const updateConnectionTokens = `-- name: UpdateConnectionTokens :exec
+UPDATE user_integrations
+SET access_token_ciphertext = ?,
+    refresh_token_ciphertext = ?,
+    access_token_expires_at = ?,
+    last_refreshed_at = NOW(),
+    updated_at = NOW()
+WHERE id = ?
+`
+
+type UpdateConnectionTokensParams struct {
+	AccessTokenCiphertext  []byte       `json:"-"`
+	RefreshTokenCiphertext []byte       `json:"-"`
+	AccessTokenExpiresAt   sql.NullTime `json:"accessTokenExpiresAt"`
+	ID                     uint32       `json:"-"`
+}
+
+// Replace stored tokens after a successful refresh.
+func (q *Queries) UpdateConnectionTokens(ctx context.Context, arg UpdateConnectionTokensParams) error {
+	_, err := q.db.ExecContext(ctx, updateConnectionTokens,
+		arg.AccessTokenCiphertext,
+		arg.RefreshTokenCiphertext,
+		arg.AccessTokenExpiresAt,
+		arg.ID,
+	)
+	return err
+}
+
 const createOauthState = `-- name: CreateOauthState :exec
 INSERT INTO oauth_states (
   state,

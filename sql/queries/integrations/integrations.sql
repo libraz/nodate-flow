@@ -76,6 +76,36 @@ DELETE FROM user_integrations
 WHERE id = ?
   AND user_id = ?;
 
+-- name: ListConnectionsExpiringBefore :many
+-- List enabled integrations whose access token will expire before
+-- the given cutoff AND still have a stored refresh token. Used by
+-- the background token refresher.
+SELECT
+  id,
+  user_id,
+  provider,
+  access_token_ciphertext,
+  refresh_token_ciphertext,
+  access_token_expires_at
+FROM user_integrations
+WHERE enabled = TRUE
+  AND access_token_expires_at IS NOT NULL
+  AND access_token_expires_at < ?
+  AND refresh_token_ciphertext IS NOT NULL
+  AND LENGTH(refresh_token_ciphertext) > 0
+ORDER BY access_token_expires_at ASC
+LIMIT 200;
+
+-- name: UpdateConnectionTokens :exec
+-- Replace stored tokens after a successful refresh.
+UPDATE user_integrations
+SET access_token_ciphertext = ?,
+    refresh_token_ciphertext = ?,
+    access_token_expires_at = ?,
+    last_refreshed_at = NOW(),
+    updated_at = NOW()
+WHERE id = ?;
+
 -- name: CreateOauthState :exec
 -- Insert a short-lived CSRF state row for the personal OAuth flow.
 INSERT INTO oauth_states (

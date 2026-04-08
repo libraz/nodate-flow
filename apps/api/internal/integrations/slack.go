@@ -112,3 +112,48 @@ func (p *SlackProvider) Exchange(ctx context.Context, code, redirectURI string) 
 			Label:      label,
 		}, nil
 }
+
+// Refresh implements [Provider]. Slack user tokens (xoxp-) do not
+// expire by default; token rotation is opt-in per-app and we do
+// not enable it, so there is nothing to refresh.
+func (p *SlackProvider) Refresh(ctx context.Context, refreshToken string) (*TokenSet, error) {
+	return nil, ErrRefreshNotSupported
+}
+
+// Revoke implements [Provider]. Calls auth.revoke with the user
+// token as bearer. Slack responds 200 even on failure and signals
+// success through the JSON body.
+func (p *SlackProvider) Revoke(ctx context.Context, tokens TokenSet) error {
+	if tokens.AccessToken == "" {
+		return nil
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://slack.com/api/auth.revoke", nil)
+	if err != nil {
+		return fmt.Errorf("integrations/slack: revoke: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+tokens.AccessToken)
+	resp, err := p.hc.Do(req)
+	if err != nil {
+		return fmt.Errorf("integrations/slack: revoke: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode/100 != 2 {
+		return fmt.Errorf("integrations/slack: revoke status %d: %s", resp.StatusCode, body)
+	}
+	var r struct {
+		OK    bool   `json:"ok"`
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(body, &r); err != nil {
+		return fmt.Errorf("integrations/slack: revoke decode: %w", err)
+	}
+	if r.OK {
+		return nil
+	}
+	switch r.Error {
+	case "not_authed", "token_revoked", "invalid_auth":
+		return nil
+	}
+	return fmt.Errorf("integrations/slack: revoke: %s", r.Error)
+}
