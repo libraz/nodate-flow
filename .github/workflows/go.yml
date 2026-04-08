@@ -1,0 +1,29 @@
+name: go
+
+on:
+  pull_request:
+    paths:
+      - 'apps/api/**'
+      - 'sql/**'
+      - 'go.work'
+      - '.github/workflows/go.yml'
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+      - name: go build (default)
+        run: go build ./apps/api/...
+      - name: go build (-tags redis)
+        run: go build -tags redis ./apps/api/...
+      - name: go vet
+        run: go vet ./apps/api/...
+      - name: go test (unit)
+        run: go test -short ./apps/api/...
