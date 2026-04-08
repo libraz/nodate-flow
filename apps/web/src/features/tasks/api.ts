@@ -15,6 +15,7 @@ import {
 } from '@tanstack/react-query';
 
 import { sdk } from '../../lib/sdk';
+import { timelineKeys } from '../timeline/api';
 
 export type Task = components['schemas']['Task'];
 export type TaskListItem = components['schemas']['TaskListItem'];
@@ -108,11 +109,13 @@ function toError(err: unknown, fallback: string): TaskApiError {
  * the (from, to) column pair.
  */
 export const TRANSITIONS_BY_STATE: Record<TaskDerivedState, readonly TransitionName[]> = {
-  open: ['start', 'cancel'],
-  waiting: ['submit', 'block', 'complete', 'cancel'],
-  review: ['complete', 'cancel'],
-  done: ['reopen', 'cancel'],
-  cancelled: ['reopen'],
+  // Must stay in lockstep with apps/api/internal/constraint/engine/replay.go
+  // (ADR 0001 v1 state machine).
+  open: ['start', 'complete', 'cancel'],
+  waiting: ['submit', 'block', 'cancel'],
+  review: ['complete', 'reopen', 'cancel'],
+  done: ['reopen'],
+  cancelled: [],
 };
 
 /**
@@ -270,6 +273,7 @@ export function useAddTaskActor(): UseMutationResult<TaskActor, TaskApiError, Ad
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: tasksKeys.actors(vars.taskId) });
       void qc.invalidateQueries({ queryKey: tasksKeys.detail(vars.taskId) });
+      void qc.invalidateQueries({ queryKey: [...timelineKeys.all, 'task', vars.taskId] });
     },
   });
 }
@@ -291,6 +295,7 @@ export function useRemoveTaskActor(): UseMutationResult<void, TaskApiError, Remo
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: tasksKeys.actors(vars.taskId) });
       void qc.invalidateQueries({ queryKey: tasksKeys.detail(vars.taskId) });
+      void qc.invalidateQueries({ queryKey: [...timelineKeys.all, 'task', vars.taskId] });
     },
   });
 }
@@ -341,6 +346,7 @@ export function useUpdateTask(): UseMutationResult<Task, TaskApiError, UpdateTas
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: tasksKeys.detail(vars.id) });
       void qc.invalidateQueries({ queryKey: tasksKeys.all });
+      void qc.invalidateQueries({ queryKey: [...timelineKeys.all, 'task', vars.id] });
     },
   });
 }
@@ -378,6 +384,7 @@ export function useAddTaskComment(): UseMutationResult<TaskComment, TaskApiError
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: tasksKeys.comments(vars.taskId) });
+      void qc.invalidateQueries({ queryKey: [...timelineKeys.all, 'task', vars.taskId] });
     },
   });
 }
@@ -453,6 +460,7 @@ export function useTransitionTask(): UseMutationResult<Task, TaskApiError, Trans
     },
     onSettled: (_data, _err, vars) => {
       void qc.invalidateQueries({ queryKey: tasksKeys.detail(vars.id) });
+      void qc.invalidateQueries({ queryKey: [...timelineKeys.all, 'task', vars.id] });
       if (vars.projectId) {
         void qc.invalidateQueries({
           queryKey: [...tasksKeys.all, 'list', vars.projectId],
