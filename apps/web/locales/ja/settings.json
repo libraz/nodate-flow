@@ -1,0 +1,97 @@
+{
+  "nav": {
+    "profile": "プロフィール",
+    "general": "一般",
+    "mcp_tokens": "MCP トークン",
+    "ai_providers": "AI プロバイダ"
+  },
+  "profile": {
+    "title": "プロフィール",
+    "display_name": "表示名",
+    "locale": "言語",
+    "locale_en": "English",
+    "locale_ja": "日本語",
+    "theme": "テーマ",
+    "theme_system": "システム",
+    "theme_aurora_light": "オーロラ ライト",
+    "theme_aurora_dark": "オーロラ ダーク",
+    "theme_dotline_light": "ドットライン ライト",
+    "theme_dotline_dark": "ドットライン ダーク",
+    "save": "保存",
+    "saving": "保存中…",
+    "saved": "保存しました",
+    "validation": {
+      "display_name_required": "表示名は必須です。"
+    },
+    "errors": {
+      "update_failed": "プロフィールを更新できませんでした。もう一度お試しください。"
+    }
+  },
+  "workspace": {
+    "general": {
+      "title": "一般",
+      "description": "ワークスペースの名前、スラッグ、説明、アイコンを更新します。",
+      "field": {
+        "name": "名前",
+        "slug": "スラッグ",
+        "slug_help": "小文字の英字、数字、ハイフンが使用できます。",
+        "description": "説明",
+        "icon_url": "アイコン URL"
+      },
+      "save": "変更を保存",
+      "saving": "保存中…",
+      "saved": "ワークスペースを更新しました",
+      "validation": {
+        "name_required": "名前は必須です。",
+        "slug_required": "スラッグは必須です。",
+        "slug_format": "スラッグには小文字の英字、数字、ハイフンのみ使用できます。",
+        "icon_url_format": "アイコン URL は有効な URL を入力してください。"
+      },
+      "errors": {
+        "update_failed": "ワークスペースを更新できませんでした。もう一度お試しください。"
+      }
+    },
+    "mcp_tokens": {
+      "title": "MCP トークン",
+      "description": "このワークスペースに対して MCP クライアントを認証するためのパーソナルアクセストークンです。",
+      "create": "トークンを作成",
+      "empty": "トークンはまだありません。MCP クライアントを接続するには作成してください。",
+      "table": {
+        "name": "名前",
+        "prefix": "プレフィックス",
+        "scopes": "スコープ",
+        "created_at": "作成日時",
+        "last_used_at": "最終使用",
+        "actions": "操作"
+      },
+      "never_used": "未使用",
+      "revoke": "失効",
+      "revoke_confirm": "このトークンを失効しますか？使用中の MCP クライアントは直ちに動作しなくなります。",
+      "revoked": "トークンを失効しました",
+      "dialog": {
+        "create_title": "MCP トークンを作成",
+        "reveal_title": "トークンを作成しました",
+        "field": {
+          "name": "名前",
+          "name_placeholder": "例: ローカル開発用ノート PC",
+          "scopes": "スコープ",
+          "scopes_help": "スペース区切りでスコープを指定します。空欄の場合はデフォルトスコープを使用します。"
+        },
+        "reveal_warning": "このトークンを今すぐコピーしてください。再表示はできません。",
+        "token_label": "トークン",
+        "copy": "コピー",
+        "copied": "コピーしました",
+        "done": "完了",
+        "cancel": "キャンセル",
+        "submit": "作成"
+      },
+      "validation": {
+        "name_required": "名前は必須です。"
+      },
+      "errors": {
+        "create_failed": "トークンを作成できませんでした。もう一度お試しください。",
+        "revoke_failed": "トークンを失効できませんでした。もう一度お試しください。"
+      }
+    }
+  }
+}

@@ -22,8 +22,8 @@ func resolveUserInternalID(ctx context.Context, q *generated.Queries, pub types.
 }
 
 // ListMembers handles GET /workspaces/{wsId}/members.
-func ListMembers(deps Deps) func(context.Context, *ListMembersInput) (*ListMembersOutput, error) {
-	return func(ctx context.Context, in *ListMembersInput) (*ListMembersOutput, error) {
+func ListMembers(deps Deps) func(context.Context, *ListWorkspaceMembersInput) (*ListWorkspaceMembersOutput, error) {
+	return func(ctx context.Context, in *ListWorkspaceMembersInput) (*ListWorkspaceMembersOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
@@ -40,7 +40,7 @@ func ListMembers(deps Deps) func(context.Context, *ListMembersInput) (*ListMembe
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		out := &ListMembersOutput{}
+		out := &ListWorkspaceMembersOutput{}
 		out.Body.Members = make([]WorkspaceMember, 0, len(rows))
 		for _, r := range rows {
 			out.Body.Members = append(out.Body.Members, rowToMember(r))
@@ -54,8 +54,8 @@ func ListMembers(deps Deps) func(context.Context, *ListMembersInput) (*ListMembe
 
 // InviteMember handles POST /workspaces/{wsId}/members. If the email is
 // not yet registered, a stub user is created so the invite can land.
-func InviteMember(deps Deps) func(context.Context, *InviteMemberInput) (*InviteMemberOutput, error) {
-	return func(ctx context.Context, in *InviteMemberInput) (*InviteMemberOutput, error) {
+func InviteMember(deps Deps) func(context.Context, *AddWorkspaceMemberInput) (*AddWorkspaceMemberOutput, error) {
+	return func(ctx context.Context, in *AddWorkspaceMemberInput) (*AddWorkspaceMemberOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
@@ -101,7 +101,7 @@ func InviteMember(deps Deps) func(context.Context, *InviteMemberInput) (*InviteM
 			WorkspaceID: ws.ID,
 			UserID:      userID,
 		}); merr == nil {
-			return &InviteMemberOutput{Body: WorkspaceMember{
+			return &AddWorkspaceMemberOutput{Body: WorkspaceMember{
 				ID:          existingMem.PublicID.String(),
 				UserID:      userPub.String(),
 				Email:       email,
@@ -128,7 +128,7 @@ func InviteMember(deps Deps) func(context.Context, *InviteMemberInput) (*InviteM
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		return &InviteMemberOutput{Body: WorkspaceMember{
+		return &AddWorkspaceMemberOutput{Body: WorkspaceMember{
 			ID:          memPub.String(),
 			UserID:      userPub.String(),
 			Email:       email,
@@ -141,8 +141,8 @@ func InviteMember(deps Deps) func(context.Context, *InviteMemberInput) (*InviteM
 }
 
 // UpdateMemberRole handles PATCH /workspaces/{wsId}/members/{userId}.
-func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (*UpdateMemberRoleOutput, error) {
-	return func(ctx context.Context, in *UpdateMemberRoleInput) (*UpdateMemberRoleOutput, error) {
+func UpdateMemberRole(deps Deps) func(context.Context, *UpdateWorkspaceMemberRoleInput) (*UpdateWorkspaceMemberRoleOutput, error) {
+	return func(ctx context.Context, in *UpdateWorkspaceMemberRoleInput) (*UpdateWorkspaceMemberRoleOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
@@ -176,7 +176,7 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		return &UpdateMemberRoleOutput{Body: WorkspaceMember{
+		return &UpdateWorkspaceMemberRoleOutput{Body: WorkspaceMember{
 			ID:        mem.PublicID.String(),
 			UserID:    userPub.String(),
 			Role:      string(role),
@@ -188,8 +188,8 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 }
 
 // RemoveMember handles DELETE /workspaces/{wsId}/members/{userId}.
-func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveMemberOutput, error) {
-	return func(ctx context.Context, in *RemoveMemberInput) (*RemoveMemberOutput, error) {
+func RemoveMember(deps Deps) func(context.Context, *RemoveWorkspaceMemberInput) (*RemoveWorkspaceMemberOutput, error) {
+	return func(ctx context.Context, in *RemoveWorkspaceMemberInput) (*RemoveWorkspaceMemberOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
@@ -211,7 +211,7 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		out := &RemoveMemberOutput{}
+		out := &RemoveWorkspaceMemberOutput{}
 		out.Body.Ok = true
 		return out, nil
 	}

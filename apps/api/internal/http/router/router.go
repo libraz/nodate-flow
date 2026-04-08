@@ -366,6 +366,12 @@ func registerProtectedAuthRoutes(api huma.API, deps authhandlers.Deps) {
 		Path:        "/me",
 		Summary:     "Return the authenticated user's profile",
 	}, authhandlers.Me(deps))
+	huma.Register(api, huma.Operation{
+		OperationID: "me-patch",
+		Method:      http.MethodPatch,
+		Path:        "/me",
+		Summary:     "Patch the authenticated user's profile",
+	}, authhandlers.PatchMe(deps))
 }
 
 // passthroughDB adapts *sql.DB to middleware.ACLDB.

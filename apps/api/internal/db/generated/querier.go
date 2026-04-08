@@ -187,6 +187,10 @@ type Querier interface {
 	// Append a redacted MCP tool invocation record. arguments_redacted_json and
 	// result_redacted_json MUST already be filtered through the redaction layer.
 	LogMcpInvocation(ctx context.Context, arg LogMcpInvocationParams) (int64, error)
+	// Patch the authenticated user's profile. NULL params leave the column untouched.
+	PatchMe(ctx context.Context, arg PatchMeParams) error
+	// Patch a workspace via COALESCE; NULL params leave existing columns untouched.
+	PatchWorkspace(ctx context.Context, arg PatchWorkspaceParams) error
 	// Insert a new global user account. The caller supplies a UUID v7 public_id.
 	RegisterUser(ctx context.Context, arg RegisterUserParams) (int64, error)
 	// Soft-remove an actor from a task.

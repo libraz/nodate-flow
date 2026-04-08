@@ -18,9 +18,9 @@ import { sdk } from '../../lib/sdk';
 
 export type Workspace = components['schemas']['Workspace'];
 export type WorkspaceMember = components['schemas']['WorkspaceMember'];
-export type CreateWorkspaceInput = components['schemas']['CreateInputBody'];
-export type PatchWorkspaceInput = components['schemas']['PatchInputBody'];
-export type InviteMemberInput = components['schemas']['InviteMemberInputBody'];
+export type CreateWorkspaceInput = components['schemas']['CreateWorkspaceInputBody'];
+export type PatchWorkspaceInput = components['schemas']['PatchWorkspaceInputBody'];
+export type InviteMemberInput = components['schemas']['AddWorkspaceMemberInputBody'];
 
 /** Query key factory for the workspaces feature. */
 export const workspacesKeys = {

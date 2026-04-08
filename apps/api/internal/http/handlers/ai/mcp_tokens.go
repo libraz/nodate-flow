@@ -69,7 +69,7 @@ func CreateMcpToken(deps Deps) func(context.Context, *CreateMcpTokenInput) (*Cre
 		out.Body.Token = plain
 		out.Body.TokenPrefix = displayPrefix
 		out.Body.Scopes = in.Body.Scopes
-		out.Body.CreatedAt = now
+		out.Body.CreatedAt = now.Unix()
 		// Drop the plaintext from the local variable as soon as it has
 		// been copied into the response struct.
 		plain = ""
@@ -112,8 +112,9 @@ func ListMcpTokens(deps Deps) func(context.Context, *ListMcpTokensInput) (*ListM
 				Name:        r.Name,
 				TokenPrefix: r.TokenPrefix,
 				Scopes:      scopes,
-				LastUsedAt:  nullTime(r.LastUsedAt),
-				CreatedAt:   r.CreatedAt,
+				ExpiresAt:   nullTimeUnix(r.ExpiresAt),
+				LastUsedAt:  nullTimeUnix(r.LastUsedAt),
+				CreatedAt:   r.CreatedAt.Unix(),
 			})
 		}
 		if len(rows) > 0 {

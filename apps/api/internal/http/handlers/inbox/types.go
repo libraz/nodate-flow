@@ -5,7 +5,6 @@ package inbox
 import (
 	"database/sql"
 	"encoding/json"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -51,8 +50,8 @@ func totalAsInt64(v interface{}) int64 {
 	return 0
 }
 
-// Item is the public DTO for an inbox row (a signal projected through v_inbox).
-type Item struct {
+// InboxItem is the public DTO for an inbox row (a signal projected through v_inbox).
+type InboxItem struct {
 	ID         string          `json:"id"`
 	TaskID     string          `json:"taskId,omitempty"`
 	TaskTitle  string          `json:"taskTitle,omitempty"`
@@ -60,51 +59,63 @@ type Item struct {
 	Kind       string          `json:"kind"`
 	ExternalID string          `json:"externalId,omitempty"`
 	Payload    json.RawMessage `json:"payload,omitempty"`
-	ReceivedAt time.Time       `json:"receivedAt"`
-	CreatedAt  time.Time       `json:"createdAt"`
+	ReceivedAt int64           `json:"receivedAt"`
+	CreatedAt  int64           `json:"createdAt"`
 }
 
-// ListInput is the query for GET /inbox.
-type ListInput struct {
+// ListInboxInput is the query for GET /inbox.
+type ListInboxInput struct {
 	WorkspaceID string `query:"workspaceId" doc:"Workspace public id (UUID v7)"`
 	Limit       int32  `query:"limit" minimum:"1" maximum:"200" default:"50"`
 	Offset      int32  `query:"offset" minimum:"0" default:"0"`
 }
 
-// ListOutput is the response for GET /inbox.
-type ListOutput struct {
-	Body struct {
-		Total      int64   `json:"total"`
-		Items      []Item  `json:"items"`
-		NextCursor *string `json:"nextCursor"`
-	}
+// ListInboxOutputBody is the response body for GET /inbox.
+type ListInboxOutputBody struct {
+	Total      int64       `json:"total"`
+	Items      []InboxItem `json:"items"`
+	NextCursor *string     `json:"nextCursor"`
 }
 
-// ArchiveInput is the path for POST /inbox/{id}/archive.
-type ArchiveInput struct {
+// ListInboxOutput is the response for GET /inbox.
+type ListInboxOutput struct {
+	Body ListInboxOutputBody
+}
+
+// ArchiveInboxInput is the path for POST /inbox/{id}/archive.
+type ArchiveInboxInput struct {
 	ID          string `path:"id"`
 	WorkspaceID string `query:"workspaceId" doc:"Workspace public id (UUID v7)"`
 }
 
-// ArchiveOutput is the response for POST /inbox/{id}/archive.
-type ArchiveOutput struct {
-	Body struct {
-		Ok bool `json:"ok"`
-	}
+// ArchiveInboxOutputBody is the response body for POST /inbox/{id}/archive.
+type ArchiveInboxOutputBody struct {
+	Ok bool `json:"ok"`
 }
 
-// SnoozeInput is the body for POST /inbox/{id}/snooze.
-type SnoozeInput struct {
+// ArchiveInboxOutput is the response for POST /inbox/{id}/archive.
+type ArchiveInboxOutput struct {
+	Body ArchiveInboxOutputBody
+}
+
+// SnoozeInboxInputBody is the JSON body for POST /inbox/{id}/snooze.
+type SnoozeInboxInputBody struct {
+	SnoozeUntil int64 `json:"snoozeUntil" doc:"Unix seconds at which to resurface the item"`
+}
+
+// SnoozeInboxInput is the request for POST /inbox/{id}/snooze.
+type SnoozeInboxInput struct {
 	ID          string `path:"id"`
 	WorkspaceID string `query:"workspaceId" doc:"Workspace public id (UUID v7)"`
-	Body        struct {
-		SnoozeUntil int64 `json:"snoozeUntil" doc:"Unix seconds at which to resurface the item"`
-	}
+	Body        SnoozeInboxInputBody
 }
 
-// SnoozeOutput is the response for POST /inbox/{id}/snooze.
-type SnoozeOutput struct {
-	Body struct {
-		Ok bool `json:"ok"`
-	}
+// SnoozeInboxOutputBody is the response body for POST /inbox/{id}/snooze.
+type SnoozeInboxOutputBody struct {
+	Ok bool `json:"ok"`
+}
+
+// SnoozeInboxOutput is the response for POST /inbox/{id}/snooze.
+type SnoozeInboxOutput struct {
+	Body SnoozeInboxOutputBody
 }

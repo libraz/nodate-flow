@@ -1,0 +1,27 @@
+{
+  "view": {
+    "title": "受信トレイ",
+    "empty": "受信トレイは空です"
+  },
+  "action": {
+    "archive": "アーカイブ",
+    "snooze": "スヌーズ"
+  },
+  "snooze": {
+    "one_hour": "1時間後",
+    "tomorrow": "明日",
+    "next_week": "来週"
+  },
+  "source": {
+    "manual": "手動",
+    "github": "GitHub",
+    "slack": "Slack",
+    "email": "メール",
+    "webhook": "Webhook"
+  },
+  "toast": {
+    "archived": "アーカイブしました",
+    "snoozed": "スヌーズしました",
+    "error": "操作に失敗しました"
+  }
+}

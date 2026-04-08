@@ -15,8 +15,8 @@ import (
 
 // Create handles POST /workspaces. The authenticated actor becomes the
 // owner of the new workspace.
-func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error) {
-	return func(ctx context.Context, in *CreateInput) (*CreateOutput, error) {
+func Create(deps Deps) func(context.Context, *CreateWorkspaceInput) (*CreateWorkspaceOutput, error) {
+	return func(ctx context.Context, in *CreateWorkspaceInput) (*CreateWorkspaceOutput, error) {
 		uid, ok := middleware.ActorFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.AuthSessionRevoked)
@@ -58,7 +58,7 @@ func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		out := &CreateOutput{Body: Workspace{
+		out := &CreateWorkspaceOutput{Body: Workspace{
 			ID:          pub.String(),
 			Slug:        slug,
 			Name:        in.Body.Name,

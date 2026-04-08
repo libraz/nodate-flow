@@ -22,17 +22,17 @@ interface NavItem {
   key: 'inbox' | 'today' | 'projects' | 'workspaces' | 'settings';
   icon: LucideIcon;
   /** Destination route (TanStack Router path). */
-  to: '/' | '/workspaces';
+  to: '/' | '/workspaces' | '/inbox' | '/settings/profile';
   /** Whether the destination route exists yet. */
   enabled: boolean;
 }
 
 const NAV_ITEMS: readonly NavItem[] = [
-  { key: 'inbox', icon: Inbox, to: '/', enabled: true },
+  { key: 'inbox', icon: Inbox, to: '/inbox', enabled: true },
   { key: 'today', icon: CalendarDays, to: '/', enabled: false },
   { key: 'projects', icon: FolderKanban, to: '/', enabled: false },
   { key: 'workspaces', icon: Briefcase, to: '/workspaces', enabled: true },
-  { key: 'settings', icon: Settings, to: '/', enabled: false },
+  { key: 'settings', icon: Settings, to: '/settings/profile', enabled: true },
 ];
 
 function readInitialCollapsed(): boolean {

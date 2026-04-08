@@ -270,3 +270,33 @@ func (q *Queries) UpdateWorkspaceFull(ctx context.Context, arg UpdateWorkspaceFu
 	_, err := q.db.ExecContext(ctx, updateWorkspaceFull, arg.Name, arg.Slug, arg.PublicID)
 	return err
 }
+
+const patchWorkspace = `-- name: PatchWorkspace :exec
+UPDATE workspaces
+SET name        = COALESCE(?, name),
+    slug        = COALESCE(?, slug),
+    description = COALESCE(?, description),
+    icon_url    = COALESCE(?, icon_url)
+WHERE public_id = ?
+  AND enabled = TRUE
+`
+
+type PatchWorkspaceParams struct {
+	Name        sql.NullString `json:"name"`
+	Slug        sql.NullString `json:"slug"`
+	Description sql.NullString `json:"description"`
+	IconUrl     sql.NullString `json:"iconUrl"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+// Patch a workspace via COALESCE; NULL params leave existing columns untouched.
+func (q *Queries) PatchWorkspace(ctx context.Context, arg PatchWorkspaceParams) error {
+	_, err := q.db.ExecContext(ctx, patchWorkspace,
+		arg.Name,
+		arg.Slug,
+		arg.Description,
+		arg.IconUrl,
+		arg.PublicID,
+	)
+	return err
+}

@@ -44,7 +44,12 @@ func Create(deps Deps) func(context.Context, *CreateProjectInput) (*CreateProjec
 		}); err != nil {
 			var mysqlErr *mysql.MySQLError
 			if errors.As(err, &mysqlErr) && mysqlErr.Number == mysqlErrDuplicateEntry {
-				return nil, httpErr(apierrors.WsProjectSlugAlreadyTaken)
+				// Only the (workspace_id, slug) unique key should map to
+				// SLUG_ALREADY_TAKEN. Other unique violations (e.g. a
+				// public_id collision) must surface as INTERNAL.
+				if strings.Contains(mysqlErr.Message, "uniq_projects_workspace_id_slug") {
+					return nil, httpErr(apierrors.WsProjectSlugAlreadyTaken)
+				}
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}

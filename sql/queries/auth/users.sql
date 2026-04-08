@@ -128,11 +128,21 @@ LIMIT 1;
 
 -- name: FindUserProfileById :one
 -- Fetch the minimal profile for the /me endpoint by internal id.
-SELECT public_id, email, display_name, locale
+SELECT public_id, email, display_name, locale, theme_preference, avatar_url
 FROM users
 WHERE id = ?
   AND enabled = TRUE
 LIMIT 1;
+
+-- name: PatchMe :exec
+-- Patch the authenticated user's profile. NULL params leave the column untouched.
+UPDATE users
+SET display_name     = COALESCE(sqlc.narg('display_name'), display_name),
+    locale           = COALESCE(sqlc.narg('locale'), locale),
+    theme_preference = COALESCE(sqlc.narg('theme_preference'), theme_preference),
+    avatar_url       = COALESCE(sqlc.narg('avatar_url'), avatar_url)
+WHERE id = ?
+  AND enabled = TRUE;
 
 -- name: UpdateUserLastLoginAt :exec
 -- Stamp last successful login time on a user account.

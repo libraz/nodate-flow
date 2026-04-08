@@ -10,8 +10,8 @@ import (
 
 // Disable handles DELETE /workspaces/{wsId}, soft-disabling the workspace.
 // Only workspace owners may call this; enforced via RequireWorkspaceRole.
-func Disable(deps Deps) func(context.Context, *DisableInput) (*DisableOutput, error) {
-	return func(ctx context.Context, in *DisableInput) (*DisableOutput, error) {
+func Disable(deps Deps) func(context.Context, *DisableWorkspaceInput) (*DisableWorkspaceOutput, error) {
+	return func(ctx context.Context, in *DisableWorkspaceInput) (*DisableWorkspaceOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
@@ -19,7 +19,7 @@ func Disable(deps Deps) func(context.Context, *DisableInput) (*DisableOutput, er
 		if err := deps.Queries.DisableWorkspace(ctx, types.FromUUID(ws.PublicID)); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		out := &DisableOutput{}
+		out := &DisableWorkspaceOutput{}
 		out.Body.Ok = true
 		return out, nil
 	}

@@ -79,6 +79,16 @@ SET name = ?,
 WHERE public_id = ?
   AND enabled = TRUE;
 
+-- name: PatchWorkspace :exec
+-- Patch a workspace via COALESCE; NULL params leave existing columns untouched.
+UPDATE workspaces
+SET name        = COALESCE(sqlc.narg('name'), name),
+    slug        = COALESCE(sqlc.narg('slug'), slug),
+    description = COALESCE(sqlc.narg('description'), description),
+    icon_url    = COALESCE(sqlc.narg('icon_url'), icon_url)
+WHERE public_id = ?
+  AND enabled = TRUE;
+
 -- name: DisableWorkspace :exec
 -- Soft-disable a workspace. Cascade is handled by FK ON DELETE for hard purges.
 UPDATE workspaces

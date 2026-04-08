@@ -188,7 +188,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Patch the authenticated user's profile */
+        patch: operations["me-patch"];
         trace?: never;
     };
     "/projects/{prjId}": {
@@ -770,7 +771,18 @@ export interface components {
             /** @description Target task public id (UUID v7) */
             toTaskId: string;
         };
-        ArchiveOutputBody: {
+        AddWorkspaceMemberInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: email */
+            email: string;
+            /** @enum {string} */
+            role: "owner" | "admin" | "member" | "guest";
+        };
+        ArchiveInboxOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
@@ -799,10 +811,15 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            description?: string;
-            iconUrl?: string;
-            name: string;
-            slug: string;
+            externalId?: string;
+            kind: string;
+            payload?: unknown;
+            /** @enum {string} */
+            source: "manual" | "github" | "slack" | "email" | "webhook";
+            /** @description Optional task public id to attach to */
+            taskId?: string;
+            /** @description Workspace public id (UUID v7) */
+            workspaceId: string;
         };
         CreateMcpTokenInputBody: {
             /**
@@ -819,8 +836,8 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            /** Format: date-time */
-            createdAt: string;
+            /** Format: int64 */
+            createdAt: number;
             id: string;
             name: string;
             scopes: string[] | null;
@@ -870,6 +887,17 @@ export interface components {
             startOn?: string;
             title: string;
         };
+        CreateWorkspaceInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            description?: string;
+            iconUrl?: string;
+            name: string;
+            slug: string;
+        };
         DeleteMcpTokenOutputBody: {
             /**
              * Format: uri
@@ -902,14 +930,6 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
-        DisableOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            ok: boolean;
-        };
         DisableProjectBody: {
             /**
              * Format: uri
@@ -919,6 +939,14 @@ export interface components {
             ok: boolean;
         };
         DisableTaskBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        DisableWorkspaceOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
@@ -979,29 +1007,29 @@ export interface components {
             readonly $schema?: string;
             status: string;
         };
-        InviteMemberInputBody: {
+        InboxItem: {
+            /** Format: int64 */
+            createdAt: number;
+            externalId?: string;
+            id: string;
+            kind: string;
+            payload?: unknown;
+            /** Format: int64 */
+            receivedAt: number;
+            source: string;
+            taskId?: string;
+            taskTitle?: string;
+        };
+        ListInboxOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            /** Format: email */
-            email: string;
-            /** @enum {string} */
-            role: "owner" | "admin" | "member" | "guest";
-        };
-        Item: {
-            /** Format: date-time */
-            createdAt: string;
-            externalId?: string;
-            id: string;
-            kind: string;
-            payload?: unknown;
-            /** Format: date-time */
-            receivedAt: string;
-            source: string;
-            taskId?: string;
-            taskTitle?: string;
+            items: components["schemas"]["InboxItem"][] | null;
+            nextCursor: string | null;
+            /** Format: int64 */
+            total: number;
         };
         ListMcpTokensOutputBody: {
             /**
@@ -1012,28 +1040,6 @@ export interface components {
             tokens: components["schemas"]["McpTokenSummary"][] | null;
             /** Format: int64 */
             total: number;
-        };
-        ListMembersOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            members: components["schemas"]["WorkspaceMember"][] | null;
-            nextCursor: string | null;
-            /** Format: int64 */
-            total: number;
-        };
-        ListOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            nextCursor: string | null;
-            /** Format: int64 */
-            total: number;
-            workspaces: components["schemas"]["Workspace"][] | null;
         };
         ListProjectMembersBody: {
             /**
@@ -1122,6 +1128,28 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ListWorkspaceMembersOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            members: components["schemas"]["WorkspaceMember"][] | null;
+            nextCursor: string | null;
+            /** Format: int64 */
+            total: number;
+        };
+        ListWorkspacesOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            nextCursor: string | null;
+            /** Format: int64 */
+            total: number;
+            workspaces: components["schemas"]["Workspace"][] | null;
+        };
         LoginInputBody: {
             /**
              * Format: uri
@@ -1141,25 +1169,32 @@ export interface components {
             ok: boolean;
         };
         McpTokenSummary: {
-            /** Format: date-time */
-            createdAt: string;
+            /** Format: int64 */
+            createdAt: number;
+            /** Format: int64 */
+            expiresAt?: number;
             id: string;
-            /** Format: date-time */
-            lastUsedAt?: string;
+            /** Format: int64 */
+            lastUsedAt?: number;
             name: string;
+            /** Format: int64 */
+            revokedAt?: number;
             scopes: string[] | null;
             tokenPrefix: string;
         };
-        MeOutputBody: {
+        MeBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
+            avatarUrl?: string;
             displayName: string;
             email: string;
             id: string;
             locale: string;
+            /** @enum {string} */
+            themePreference: "aurora-light" | "aurora-dark" | "dotline-light" | "dotline-dark" | "system";
         };
         OIDCStartOutputBody: {
             /**
@@ -1171,14 +1206,17 @@ export interface components {
             nonce: string;
             state: string;
         };
-        PatchInputBody: {
+        PatchMeInputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            name?: string;
-            slug?: string;
+            avatarUrl?: string;
+            displayName?: string;
+            locale?: string;
+            /** @enum {string} */
+            themePreference?: "aurora-light" | "aurora-dark" | "dotline-light" | "dotline-dark" | "system";
         };
         PatchProjectBody: {
             /**
@@ -1221,6 +1259,17 @@ export interface components {
             /** @description YYYY-MM-DD or empty string to clear */
             startOn?: string;
             title?: string;
+        };
+        PatchWorkspaceInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            description?: string;
+            iconUrl?: string;
+            name?: string;
+            slug?: string;
         };
         Project: {
             color?: string;
@@ -1284,14 +1333,6 @@ export interface components {
             locale?: string;
             password: string;
         };
-        RemoveMemberOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            ok: boolean;
-        };
         RemoveProjectMemberBody: {
             /**
              * Format: uri
@@ -1324,6 +1365,14 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        RemoveWorkspaceMemberOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
         Signal: {
             /**
              * Format: uri
@@ -1341,7 +1390,7 @@ export interface components {
             source: string;
             taskId?: string;
         };
-        SnoozeInputBody: {
+        SnoozeInboxInputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
@@ -1353,7 +1402,7 @@ export interface components {
              */
             snoozeUntil: number;
         };
-        SnoozeOutputBody: {
+        SnoozeInboxOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
@@ -1542,7 +1591,7 @@ export interface components {
              */
             transition: "start" | "block" | "unblock" | "submit" | "complete" | "reopen" | "cancel";
         };
-        UpdateMemberRoleInputBody: {
+        UpdateWorkspaceMemberRoleInputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
@@ -1838,7 +1887,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListOutputBody"];
+                    "application/json": components["schemas"]["ListInboxOutputBody"];
                 };
             };
             /** @description Error */
@@ -1872,7 +1921,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ArchiveOutputBody"];
+                    "application/json": components["schemas"]["ArchiveInboxOutputBody"];
                 };
             };
             /** @description Error */
@@ -1900,7 +1949,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SnoozeInputBody"];
+                "application/json": components["schemas"]["SnoozeInboxInputBody"];
             };
         };
         responses: {
@@ -1910,7 +1959,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SnoozeOutputBody"];
+                    "application/json": components["schemas"]["SnoozeInboxOutputBody"];
                 };
             };
             /** @description Error */
@@ -1939,7 +1988,40 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MeOutputBody"];
+                    "application/json": components["schemas"]["MeBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "me-patch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchMeInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeBody"];
                 };
             };
             /** @description Error */
@@ -2958,7 +3040,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListOutputBody"];
+                    "application/json": components["schemas"]["ListWorkspacesOutputBody"];
                 };
             };
             /** @description Error */
@@ -2981,7 +3063,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateInputBody"];
+                "application/json": components["schemas"]["CreateWorkspaceInputBody"];
             };
         };
         responses: {
@@ -3053,7 +3135,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DisableOutputBody"];
+                    "application/json": components["schemas"]["DisableWorkspaceOutputBody"];
                 };
             };
             /** @description Error */
@@ -3078,7 +3160,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PatchInputBody"];
+                "application/json": components["schemas"]["PatchWorkspaceInputBody"];
             };
         };
         responses: {
@@ -3360,7 +3442,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListMembersOutputBody"];
+                    "application/json": components["schemas"]["ListWorkspaceMembersOutputBody"];
                 };
             };
             /** @description Error */
@@ -3385,7 +3467,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["InviteMemberInputBody"];
+                "application/json": components["schemas"]["AddWorkspaceMemberInputBody"];
             };
         };
         responses: {
@@ -3427,7 +3509,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RemoveMemberOutputBody"];
+                    "application/json": components["schemas"]["RemoveWorkspaceMemberOutputBody"];
                 };
             };
             /** @description Error */
@@ -3453,7 +3535,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["UpdateMemberRoleInputBody"];
+                "application/json": components["schemas"]["UpdateWorkspaceMemberRoleInputBody"];
             };
         };
         responses: {

@@ -50,127 +50,153 @@ type WorkspaceMember struct {
 	CreatedAt   time.Time `json:"createdAt"`
 }
 
-// CreateInput is the body for POST /workspaces.
-type CreateInput struct {
-	Body struct {
-		Slug        string `json:"slug" minLength:"1" maxLength:"64"`
-		Name        string `json:"name" minLength:"1" maxLength:"100"`
-		Description string `json:"description,omitempty" maxLength:"500"`
-		IconURL     string `json:"iconUrl,omitempty" maxLength:"500"`
-	}
+// CreateWorkspaceInput is the body for POST /workspaces.
+type CreateWorkspaceInput struct {
+	Body CreateWorkspaceInputBody
 }
 
-// CreateOutput is the response for POST /workspaces.
-type CreateOutput struct {
+// CreateWorkspaceInputBody is the JSON body for POST /workspaces.
+type CreateWorkspaceInputBody struct {
+	Slug        string `json:"slug" minLength:"1" maxLength:"64"`
+	Name        string `json:"name" minLength:"1" maxLength:"100"`
+	Description string `json:"description,omitempty" maxLength:"500"`
+	IconURL     string `json:"iconUrl,omitempty" maxLength:"500"`
+}
+
+// CreateWorkspaceOutput is the response for POST /workspaces.
+type CreateWorkspaceOutput struct {
 	Body Workspace
 }
 
-// ListInput is the query for GET /workspaces.
-type ListInput struct {
+// ListWorkspacesInput is the query for GET /workspaces.
+type ListWorkspacesInput struct {
 	Limit  int32 `query:"limit" minimum:"1" maximum:"200" default:"50"`
 	Offset int32 `query:"offset" minimum:"0" default:"0"`
 }
 
-// ListOutput is the response for GET /workspaces.
-type ListOutput struct {
-	Body struct {
-		Total      int64       `json:"total"`
-		Workspaces []Workspace `json:"workspaces"`
-		NextCursor *string     `json:"nextCursor"`
-	}
+// ListWorkspacesOutput is the response for GET /workspaces.
+type ListWorkspacesOutput struct {
+	Body ListWorkspacesOutputBody
 }
 
-// GetInput is the path for GET /workspaces/{wsId}.
-type GetInput struct {
+// ListWorkspacesOutputBody is the response body envelope for GET /workspaces.
+type ListWorkspacesOutputBody struct {
+	Total      int64       `json:"total"`
+	Workspaces []Workspace `json:"workspaces"`
+	NextCursor *string     `json:"nextCursor"`
+}
+
+// GetWorkspaceInput is the path for GET /workspaces/{wsId}.
+type GetWorkspaceInput struct {
 	WsID string `path:"wsId"`
 }
 
-// GetOutput is the response for GET /workspaces/{wsId}.
-type GetOutput struct {
+// GetWorkspaceOutput is the response for GET /workspaces/{wsId}.
+type GetWorkspaceOutput struct {
 	Body Workspace
 }
 
-// PatchInput is the body for PATCH /workspaces/{wsId}.
-type PatchInput struct {
+// PatchWorkspaceInput is the body for PATCH /workspaces/{wsId}.
+type PatchWorkspaceInput struct {
 	WsID string `path:"wsId"`
-	Body struct {
-		Slug *string `json:"slug,omitempty" minLength:"1" maxLength:"64"`
-		Name *string `json:"name,omitempty" minLength:"1" maxLength:"100"`
-	}
+	Body PatchWorkspaceInputBody
 }
 
-// PatchOutput is the response for PATCH /workspaces/{wsId}.
-type PatchOutput struct {
+// PatchWorkspaceInputBody is the JSON body for PATCH /workspaces/{wsId}.
+type PatchWorkspaceInputBody struct {
+	Slug        *string `json:"slug,omitempty" minLength:"1" maxLength:"64"`
+	Name        *string `json:"name,omitempty" minLength:"1" maxLength:"100"`
+	Description *string `json:"description,omitempty" maxLength:"500"`
+	IconURL     *string `json:"iconUrl,omitempty" maxLength:"500"`
+}
+
+// PatchWorkspaceOutput is the response for PATCH /workspaces/{wsId}.
+type PatchWorkspaceOutput struct {
 	Body Workspace
 }
 
-// DisableInput is the path for DELETE /workspaces/{wsId}.
-type DisableInput struct {
+// DisableWorkspaceInput is the path for DELETE /workspaces/{wsId}.
+type DisableWorkspaceInput struct {
 	WsID string `path:"wsId"`
 }
 
-// DisableOutput is the response for DELETE /workspaces/{wsId}.
-type DisableOutput struct {
-	Body struct {
-		Ok bool `json:"ok"`
-	}
+// DisableWorkspaceOutput is the response for DELETE /workspaces/{wsId}.
+type DisableWorkspaceOutput struct {
+	Body DisableWorkspaceOutputBody
 }
 
-// ListMembersInput is the query for GET /workspaces/{wsId}/members.
-type ListMembersInput struct {
+// DisableWorkspaceOutputBody is the response body envelope for DELETE /workspaces/{wsId}.
+type DisableWorkspaceOutputBody struct {
+	Ok bool `json:"ok"`
+}
+
+// ListWorkspaceMembersInput is the query for GET /workspaces/{wsId}/members.
+type ListWorkspaceMembersInput struct {
 	WsID   string `path:"wsId"`
 	Limit  int32  `query:"limit" minimum:"1" maximum:"200" default:"50"`
 	Offset int32  `query:"offset" minimum:"0" default:"0"`
 }
 
-// ListMembersOutput is the response for GET /workspaces/{wsId}/members.
-type ListMembersOutput struct {
-	Body struct {
-		Total      int64             `json:"total"`
-		Members    []WorkspaceMember `json:"members"`
-		NextCursor *string           `json:"nextCursor"`
-	}
+// ListWorkspaceMembersOutput is the response for GET /workspaces/{wsId}/members.
+type ListWorkspaceMembersOutput struct {
+	Body ListWorkspaceMembersOutputBody
 }
 
-// InviteMemberInput is the body for POST /workspaces/{wsId}/members.
-type InviteMemberInput struct {
+// ListWorkspaceMembersOutputBody is the response body envelope for GET /workspaces/{wsId}/members.
+type ListWorkspaceMembersOutputBody struct {
+	Total      int64             `json:"total"`
+	Members    []WorkspaceMember `json:"members"`
+	NextCursor *string           `json:"nextCursor"`
+}
+
+// AddWorkspaceMemberInput is the body for POST /workspaces/{wsId}/members.
+type AddWorkspaceMemberInput struct {
 	WsID string `path:"wsId"`
-	Body struct {
-		Email string `json:"email" format:"email"`
-		Role  string `json:"role" enum:"owner,admin,member,guest"`
-	}
+	Body AddWorkspaceMemberInputBody
 }
 
-// InviteMemberOutput is the response for POST /workspaces/{wsId}/members.
-type InviteMemberOutput struct {
+// AddWorkspaceMemberInputBody is the JSON body for POST /workspaces/{wsId}/members.
+type AddWorkspaceMemberInputBody struct {
+	Email string `json:"email" format:"email"`
+	Role  string `json:"role" enum:"owner,admin,member,guest"`
+}
+
+// AddWorkspaceMemberOutput is the response for POST /workspaces/{wsId}/members.
+type AddWorkspaceMemberOutput struct {
 	Body WorkspaceMember
 }
 
-// UpdateMemberRoleInput is the body for PATCH /workspaces/{wsId}/members/{userId}.
-type UpdateMemberRoleInput struct {
+// UpdateWorkspaceMemberRoleInput is the body for PATCH /workspaces/{wsId}/members/{userId}.
+type UpdateWorkspaceMemberRoleInput struct {
 	WsID   string `path:"wsId"`
 	UserID string `path:"userId"`
-	Body   struct {
-		Role string `json:"role" enum:"owner,admin,member,guest"`
-	}
+	Body   UpdateWorkspaceMemberRoleInputBody
 }
 
-// UpdateMemberRoleOutput is the response for PATCH /workspaces/{wsId}/members/{userId}.
-type UpdateMemberRoleOutput struct {
+// UpdateWorkspaceMemberRoleInputBody is the JSON body for PATCH /workspaces/{wsId}/members/{userId}.
+type UpdateWorkspaceMemberRoleInputBody struct {
+	Role string `json:"role" enum:"owner,admin,member,guest"`
+}
+
+// UpdateWorkspaceMemberRoleOutput is the response for PATCH /workspaces/{wsId}/members/{userId}.
+type UpdateWorkspaceMemberRoleOutput struct {
 	Body WorkspaceMember
 }
 
-// RemoveMemberInput is the path for DELETE /workspaces/{wsId}/members/{userId}.
-type RemoveMemberInput struct {
+// RemoveWorkspaceMemberInput is the path for DELETE /workspaces/{wsId}/members/{userId}.
+type RemoveWorkspaceMemberInput struct {
 	WsID   string `path:"wsId"`
 	UserID string `path:"userId"`
 }
 
-// RemoveMemberOutput is the response for DELETE /workspaces/{wsId}/members/{userId}.
-type RemoveMemberOutput struct {
-	Body struct {
-		Ok bool `json:"ok"`
-	}
+// RemoveWorkspaceMemberOutput is the response for DELETE /workspaces/{wsId}/members/{userId}.
+type RemoveWorkspaceMemberOutput struct {
+	Body RemoveWorkspaceMemberOutputBody
+}
+
+// RemoveWorkspaceMemberOutputBody is the response body envelope for DELETE /workspaces/{wsId}/members/{userId}.
+type RemoveWorkspaceMemberOutputBody struct {
+	Ok bool `json:"ok"`
 }
 
 // nullStr converts a sql.NullString to a plain string (empty when NULL).

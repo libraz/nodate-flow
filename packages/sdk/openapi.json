@@ -143,12 +143,34 @@
         "required": ["toTaskId", "kind"],
         "type": "object"
       },
-      "ArchiveOutputBody": {
+      "AddWorkspaceMemberInputBody": {
         "additionalProperties": false,
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/ArchiveOutputBody.json"],
+            "examples": ["https://example.com/schemas/AddWorkspaceMemberInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "email": {
+            "format": "email",
+            "type": "string"
+          },
+          "role": {
+            "enum": ["owner", "admin", "member", "guest"],
+            "type": "string"
+          }
+        },
+        "required": ["email", "role"],
+        "type": "object"
+      },
+      "ArchiveInboxOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ArchiveInboxOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -196,26 +218,30 @@
             "readOnly": true,
             "type": "string"
           },
-          "description": {
-            "maxLength": 500,
+          "externalId": {
+            "maxLength": 255,
             "type": "string"
           },
-          "iconUrl": {
-            "maxLength": 500,
-            "type": "string"
-          },
-          "name": {
-            "maxLength": 100,
+          "kind": {
+            "maxLength": 255,
             "minLength": 1,
             "type": "string"
           },
-          "slug": {
-            "maxLength": 64,
-            "minLength": 1,
+          "payload": {},
+          "source": {
+            "enum": ["manual", "github", "slack", "email", "webhook"],
+            "type": "string"
+          },
+          "taskId": {
+            "description": "Optional task public id to attach to",
+            "type": "string"
+          },
+          "workspaceId": {
+            "description": "Workspace public id (UUID v7)",
             "type": "string"
           }
         },
-        "required": ["slug", "name"],
+        "required": ["workspaceId", "source", "kind"],
         "type": "object"
       },
       "CreateMcpTokenInputBody": {
@@ -254,8 +280,8 @@
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "id": {
             "type": "string"
@@ -390,6 +416,38 @@
         "required": ["projectId", "title"],
         "type": "object"
       },
+      "CreateWorkspaceInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateWorkspaceInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "iconUrl": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "slug": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["slug", "name"],
+        "type": "object"
+      },
       "DeleteMcpTokenOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -458,23 +516,6 @@
         "required": ["ok"],
         "type": "object"
       },
-      "DisableOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/DisableOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "ok": {
-            "type": "boolean"
-          }
-        },
-        "required": ["ok"],
-        "type": "object"
-      },
       "DisableProjectBody": {
         "additionalProperties": false,
         "properties": {
@@ -498,6 +539,23 @@
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
             "examples": ["https://example.com/schemas/DisableTaskBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
+      "DisableWorkspaceOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/DisableWorkspaceOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -611,34 +669,12 @@
         "required": ["status"],
         "type": "object"
       },
-      "InviteMemberInputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/InviteMemberInputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "email": {
-            "format": "email",
-            "type": "string"
-          },
-          "role": {
-            "enum": ["owner", "admin", "member", "guest"],
-            "type": "string"
-          }
-        },
-        "required": ["email", "role"],
-        "type": "object"
-      },
-      "Item": {
+      "InboxItem": {
         "additionalProperties": false,
         "properties": {
           "createdAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "externalId": {
             "type": "string"
@@ -651,8 +687,8 @@
           },
           "payload": {},
           "receivedAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "source": {
             "type": "string"
@@ -665,6 +701,33 @@
           }
         },
         "required": ["id", "source", "kind", "receivedAt", "createdAt"],
+        "type": "object"
+      },
+      "ListInboxOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListInboxOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InboxItem"
+            },
+            "type": ["array", "null"]
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "items", "nextCursor"],
         "type": "object"
       },
       "ListMcpTokensOutputBody": {
@@ -689,60 +752,6 @@
           }
         },
         "required": ["total", "tokens"],
-        "type": "object"
-      },
-      "ListMembersOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/ListMembersOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "members": {
-            "items": {
-              "$ref": "#/components/schemas/WorkspaceMember"
-            },
-            "type": ["array", "null"]
-          },
-          "nextCursor": {
-            "type": ["string", "null"]
-          },
-          "total": {
-            "format": "int64",
-            "type": "integer"
-          }
-        },
-        "required": ["total", "members", "nextCursor"],
-        "type": "object"
-      },
-      "ListOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/ListOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "nextCursor": {
-            "type": ["string", "null"]
-          },
-          "total": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "workspaces": {
-            "items": {
-              "$ref": "#/components/schemas/Workspace"
-            },
-            "type": ["array", "null"]
-          }
-        },
-        "required": ["total", "workspaces", "nextCursor"],
         "type": "object"
       },
       "ListProjectMembersBody": {
@@ -958,6 +967,60 @@
         "required": ["total", "events", "nextCursor"],
         "type": "object"
       },
+      "ListWorkspaceMembersOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListWorkspaceMembersOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceMember"
+            },
+            "type": ["array", "null"]
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "members", "nextCursor"],
+        "type": "object"
+      },
+      "ListWorkspacesOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListWorkspacesOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "workspaces": {
+            "items": {
+              "$ref": "#/components/schemas/Workspace"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["total", "workspaces", "nextCursor"],
+        "type": "object"
+      },
       "LoginInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -1000,18 +1063,26 @@
         "additionalProperties": false,
         "properties": {
           "createdAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
+          },
+          "expiresAt": {
+            "format": "int64",
+            "type": "integer"
           },
           "id": {
             "type": "string"
           },
           "lastUsedAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "name": {
             "type": "string"
+          },
+          "revokedAt": {
+            "format": "int64",
+            "type": "integer"
           },
           "scopes": {
             "items": {
@@ -1026,14 +1097,17 @@
         "required": ["id", "name", "tokenPrefix", "scopes", "createdAt"],
         "type": "object"
       },
-      "MeOutputBody": {
+      "MeBody": {
         "additionalProperties": false,
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/MeOutputBody.json"],
+            "examples": ["https://example.com/schemas/MeBody.json"],
             "format": "uri",
             "readOnly": true,
+            "type": "string"
+          },
+          "avatarUrl": {
             "type": "string"
           },
           "displayName": {
@@ -1047,9 +1121,13 @@
           },
           "locale": {
             "type": "string"
+          },
+          "themePreference": {
+            "enum": ["aurora-light", "aurora-dark", "dotline-light", "dotline-dark", "system"],
+            "type": "string"
           }
         },
-        "required": ["id", "email", "displayName", "locale"],
+        "required": ["id", "email", "displayName", "locale", "themePreference"],
         "type": "object"
       },
       "OIDCStartOutputBody": {
@@ -1075,24 +1153,31 @@
         "required": ["authorizationUrl", "state", "nonce"],
         "type": "object"
       },
-      "PatchInputBody": {
+      "PatchMeInputBody": {
         "additionalProperties": false,
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/PatchInputBody.json"],
+            "examples": ["https://example.com/schemas/PatchMeInputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
           },
-          "name": {
+          "avatarUrl": {
+            "maxLength": 1024,
+            "type": "string"
+          },
+          "displayName": {
             "maxLength": 100,
             "minLength": 1,
             "type": "string"
           },
-          "slug": {
-            "maxLength": 64,
-            "minLength": 1,
+          "locale": {
+            "maxLength": 10,
+            "type": "string"
+          },
+          "themePreference": {
+            "enum": ["aurora-light", "aurora-dark", "dotline-light", "dotline-dark", "system"],
             "type": "string"
           }
         },
@@ -1192,6 +1277,37 @@
           },
           "title": {
             "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PatchWorkspaceInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PatchWorkspaceInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "iconUrl": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "slug": {
+            "maxLength": 64,
             "minLength": 1,
             "type": "string"
           }
@@ -1352,23 +1468,6 @@
         "required": ["email", "password", "displayName"],
         "type": "object"
       },
-      "RemoveMemberOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/RemoveMemberOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "ok": {
-            "type": "boolean"
-          }
-        },
-        "required": ["ok"],
-        "type": "object"
-      },
       "RemoveProjectMemberBody": {
         "additionalProperties": false,
         "properties": {
@@ -1437,6 +1536,23 @@
         "required": ["ok"],
         "type": "object"
       },
+      "RemoveWorkspaceMemberOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/RemoveWorkspaceMemberOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
       "Signal": {
         "additionalProperties": false,
         "properties": {
@@ -1475,12 +1591,12 @@
         "required": ["id", "source", "kind", "receivedAt", "createdAt"],
         "type": "object"
       },
-      "SnoozeInputBody": {
+      "SnoozeInboxInputBody": {
         "additionalProperties": false,
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/SnoozeInputBody.json"],
+            "examples": ["https://example.com/schemas/SnoozeInboxInputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -1494,12 +1610,12 @@
         "required": ["snoozeUntil"],
         "type": "object"
       },
-      "SnoozeOutputBody": {
+      "SnoozeInboxOutputBody": {
         "additionalProperties": false,
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/SnoozeOutputBody.json"],
+            "examples": ["https://example.com/schemas/SnoozeInboxOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -1961,12 +2077,12 @@
         "required": ["transition"],
         "type": "object"
       },
-      "UpdateMemberRoleInputBody": {
+      "UpdateWorkspaceMemberRoleInputBody": {
         "additionalProperties": false,
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/UpdateMemberRoleInputBody.json"],
+            "examples": ["https://example.com/schemas/UpdateWorkspaceMemberRoleInputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -2400,7 +2516,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListOutputBody"
+                  "$ref": "#/components/schemas/ListInboxOutputBody"
                 }
               }
             },
@@ -2448,7 +2564,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ArchiveOutputBody"
+                  "$ref": "#/components/schemas/ArchiveInboxOutputBody"
                 }
               }
             },
@@ -2495,7 +2611,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SnoozeInputBody"
+                "$ref": "#/components/schemas/SnoozeInboxInputBody"
               }
             }
           },
@@ -2506,7 +2622,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SnoozeOutputBody"
+                  "$ref": "#/components/schemas/SnoozeInboxOutputBody"
                 }
               }
             },
@@ -2534,7 +2650,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MeOutputBody"
+                  "$ref": "#/components/schemas/MeBody"
                 }
               }
             },
@@ -2552,6 +2668,42 @@
           }
         },
         "summary": "Return the authenticated user's profile"
+      },
+      "patch": {
+        "operationId": "me-patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchMeInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Patch the authenticated user's profile"
       }
     },
     "/projects/{prjId}": {
@@ -4077,7 +4229,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListOutputBody"
+                  "$ref": "#/components/schemas/ListWorkspacesOutputBody"
                 }
               }
             },
@@ -4102,7 +4254,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateInputBody"
+                "$ref": "#/components/schemas/CreateWorkspaceInputBody"
               }
             }
           },
@@ -4151,7 +4303,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DisableOutputBody"
+                  "$ref": "#/components/schemas/DisableWorkspaceOutputBody"
                 }
               }
             },
@@ -4222,7 +4374,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PatchInputBody"
+                "$ref": "#/components/schemas/PatchWorkspaceInputBody"
               }
             }
           },
@@ -4654,7 +4806,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListMembersOutputBody"
+                  "$ref": "#/components/schemas/ListWorkspaceMembersOutputBody"
                 }
               }
             },
@@ -4689,7 +4841,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/InviteMemberInputBody"
+                "$ref": "#/components/schemas/AddWorkspaceMemberInputBody"
               }
             }
           },
@@ -4746,7 +4898,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RemoveMemberOutputBody"
+                  "$ref": "#/components/schemas/RemoveWorkspaceMemberOutputBody"
                 }
               }
             },
@@ -4789,7 +4941,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateMemberRoleInputBody"
+                "$ref": "#/components/schemas/UpdateWorkspaceMemberRoleInputBody"
               }
             }
           },

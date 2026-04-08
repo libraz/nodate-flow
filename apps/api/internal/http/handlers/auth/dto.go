@@ -108,12 +108,38 @@ type OIDCCallbackOutput struct {
 	Body      AuthTokens
 }
 
+// MeBody is the public DTO for the authenticated user profile, shared
+// by GET /me and PATCH /me.
+type MeBody struct {
+	ID              string  `json:"id"`
+	Email           string  `json:"email"`
+	DisplayName     string  `json:"displayName"`
+	Locale          string  `json:"locale"`
+	ThemePreference string  `json:"themePreference" enum:"aurora-light,aurora-dark,dotline-light,dotline-dark,system"`
+	AvatarURL       *string `json:"avatarUrl,omitempty"`
+}
+
 // MeOutput is the response for GET /me.
 type MeOutput struct {
-	Body struct {
-		ID          string `json:"id"`
-		Email       string `json:"email"`
-		DisplayName string `json:"displayName"`
-		Locale      string `json:"locale"`
-	}
+	Body MeBody
+}
+
+// PatchMeInput is the body for PATCH /me. All fields are optional;
+// only non-nil fields are applied.
+type PatchMeInput struct {
+	Body PatchMeInputBody
+}
+
+// PatchMeInputBody carries the optional fields for PATCH /me.
+type PatchMeInputBody struct {
+	DisplayName     *string `json:"displayName,omitempty" minLength:"1" maxLength:"100"`
+	Locale          *string `json:"locale,omitempty" maxLength:"10"`
+	ThemePreference *string `json:"themePreference,omitempty" enum:"aurora-light,aurora-dark,dotline-light,dotline-dark,system"`
+	AvatarURL       *string `json:"avatarUrl,omitempty" maxLength:"1024"`
+}
+
+// PatchMeOutput is the response for PATCH /me. It returns the updated
+// profile in the same shape as GET /me.
+type PatchMeOutput struct {
+	Body MeBody
 }

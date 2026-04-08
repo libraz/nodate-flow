@@ -10,8 +10,8 @@ import (
 
 // List handles GET /workspaces and returns the workspaces the actor belongs
 // to.
-func List(deps Deps) func(context.Context, *ListInput) (*ListOutput, error) {
-	return func(ctx context.Context, in *ListInput) (*ListOutput, error) {
+func List(deps Deps) func(context.Context, *ListWorkspacesInput) (*ListWorkspacesOutput, error) {
+	return func(ctx context.Context, in *ListWorkspacesInput) (*ListWorkspacesOutput, error) {
 		uid, ok := middleware.ActorFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.AuthSessionRevoked)
@@ -28,7 +28,7 @@ func List(deps Deps) func(context.Context, *ListInput) (*ListOutput, error) {
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		out := &ListOutput{}
+		out := &ListWorkspacesOutput{}
 		out.Body.Workspaces = make([]Workspace, 0, len(rows))
 		for _, r := range rows {
 			out.Body.Workspaces = append(out.Body.Workspaces, rowToWorkspaceFromList(r))

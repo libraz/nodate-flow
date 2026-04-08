@@ -114,13 +114,18 @@ type DeleteProviderOutput struct {
 
 // McpTokenSummary is the masked DTO for an mcp_tokens row. It NEVER
 // carries the plaintext token nor its hash.
+//
+// Per docs/conventions/api-types.md §17 all `*_at` fields are emitted
+// as int64 unix seconds. Nullable timestamps use *int64 (nil → null).
 type McpTokenSummary struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	TokenPrefix string    `json:"tokenPrefix"`
-	Scopes      []string  `json:"scopes"`
-	LastUsedAt  time.Time `json:"lastUsedAt,omitempty"`
-	CreatedAt   time.Time `json:"createdAt"`
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	TokenPrefix string   `json:"tokenPrefix"`
+	Scopes      []string `json:"scopes"`
+	ExpiresAt   *int64   `json:"expiresAt,omitempty"`
+	LastUsedAt  *int64   `json:"lastUsedAt,omitempty"`
+	RevokedAt   *int64   `json:"revokedAt,omitempty"`
+	CreatedAt   int64    `json:"createdAt"`
 }
 
 // CreateMcpTokenInput is the body for POST /workspaces/{wsId}/me/mcp-tokens.
@@ -137,12 +142,12 @@ type CreateMcpTokenInput struct {
 // returned, and only on this single response.
 type CreateMcpTokenOutput struct {
 	Body struct {
-		ID          string    `json:"id"`
-		Name        string    `json:"name"`
-		Token       string    `json:"token" doc:"Plaintext bearer token, shown only once"`
-		TokenPrefix string    `json:"tokenPrefix"`
-		Scopes      []string  `json:"scopes"`
-		CreatedAt   time.Time `json:"createdAt"`
+		ID          string   `json:"id"`
+		Name        string   `json:"name"`
+		Token       string   `json:"token" doc:"Plaintext bearer token, shown only once"`
+		TokenPrefix string   `json:"tokenPrefix"`
+		Scopes      []string `json:"scopes"`
+		CreatedAt   int64    `json:"createdAt"`
 	}
 }
 
@@ -186,4 +191,13 @@ func nullTime(t sql.NullTime) time.Time {
 		return t.Time
 	}
 	return time.Time{}
+}
+
+// nullTimeUnix converts a sql.NullTime to *int64 unix seconds. NULL → nil.
+func nullTimeUnix(t sql.NullTime) *int64 {
+	if !t.Valid {
+		return nil
+	}
+	u := t.Time.Unix()
+	return &u
 }

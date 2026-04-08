@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import {
   type ReactElement,
   type ReactNode,
@@ -6,6 +7,10 @@ import {
   useEffect,
   useState,
 } from 'react';
+
+import { authStore } from '../features/auth/auth-store';
+import type { Me } from '../features/settings/api';
+import { sdk } from '../lib/sdk';
 
 /** Concrete theme names (no `system`). */
 export const concreteThemes = [
@@ -61,8 +66,41 @@ function resolve(pref: ThemePreference): ConcreteTheme {
  * to F4.
  */
 export function ThemeProvider({ children }: { children: ReactNode }): ReactElement {
+  const qc = useQueryClient();
   const [preference, setPreferenceState] = useState<ThemePreference>(() => readStored());
   const [resolved, setResolved] = useState<ConcreteTheme>(() => resolve(readStored()));
+  const [hydratedFromMe, setHydratedFromMe] = useState(false);
+
+  // After auth bootstrap populates the `me` cache, adopt the server-side
+  // preference (one-shot). We deliberately use a non-Suspense cache read so
+  // ThemeProvider can mount before the user is signed in.
+  useEffect(() => {
+    if (hydratedFromMe) return;
+    const tryHydrate = (): void => {
+      if (hydratedFromMe) return;
+      const token = authStore.getState().accessToken;
+      if (!token) return;
+      const me = qc.getQueryData<Me>(['me']);
+      if (!me) return;
+      setHydratedFromMe(true);
+      setPreferenceState((prev) => (prev === me.themePreference ? prev : me.themePreference));
+    };
+    tryHydrate();
+    const unsubAuth = authStore.subscribe(tryHydrate);
+    const unsubCache = qc.getQueryCache().subscribe((event) => {
+      if (
+        event.type === 'updated' &&
+        Array.isArray(event.query.queryKey) &&
+        event.query.queryKey[0] === 'me'
+      ) {
+        tryHydrate();
+      }
+    });
+    return () => {
+      unsubAuth();
+      unsubCache();
+    };
+  }, [hydratedFromMe, qc]);
 
   useEffect(() => {
     const next = resolve(preference);
@@ -73,7 +111,20 @@ export function ThemeProvider({ children }: { children: ReactNode }): ReactEleme
     } catch {
       // ignore
     }
-  }, [preference]);
+    // Background-sync to the server when authenticated. Fire-and-forget;
+    // the form-driven path uses the typed mutation hook and is the source
+    // of truth for explicit saves.
+    if (hydratedFromMe && authStore.getState().accessToken) {
+      void sdk
+        .PATCH('/me', { body: { themePreference: preference } })
+        .then(({ data }) => {
+          if (data) qc.setQueryData<Me>(['me'], data);
+        })
+        .catch(() => {
+          // ignore — local state is the fast path
+        });
+    }
+  }, [preference, hydratedFromMe, qc]);
 
   useEffect(() => {
     if (preference !== 'system') return;

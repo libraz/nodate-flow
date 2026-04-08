@@ -1,0 +1,97 @@
+{
+  "nav": {
+    "profile": "Profile",
+    "general": "General",
+    "mcp_tokens": "MCP tokens",
+    "ai_providers": "AI providers"
+  },
+  "profile": {
+    "title": "Profile",
+    "display_name": "Display name",
+    "locale": "Language",
+    "locale_en": "English",
+    "locale_ja": "日本語",
+    "theme": "Theme",
+    "theme_system": "System",
+    "theme_aurora_light": "Aurora Light",
+    "theme_aurora_dark": "Aurora Dark",
+    "theme_dotline_light": "Dotline Light",
+    "theme_dotline_dark": "Dotline Dark",
+    "save": "Save",
+    "saving": "Saving...",
+    "saved": "Saved",
+    "validation": {
+      "display_name_required": "Display name is required."
+    },
+    "errors": {
+      "update_failed": "Could not update your profile. Please try again."
+    }
+  },
+  "workspace": {
+    "general": {
+      "title": "General",
+      "description": "Update the workspace name, slug, description, and icon.",
+      "field": {
+        "name": "Name",
+        "slug": "Slug",
+        "slug_help": "Lowercase letters, numbers, and hyphens.",
+        "description": "Description",
+        "icon_url": "Icon URL"
+      },
+      "save": "Save changes",
+      "saving": "Saving...",
+      "saved": "Workspace updated",
+      "validation": {
+        "name_required": "Name is required.",
+        "slug_required": "Slug is required.",
+        "slug_format": "Slug may only contain lowercase letters, numbers, and hyphens.",
+        "icon_url_format": "Icon URL must be a valid URL."
+      },
+      "errors": {
+        "update_failed": "Could not update the workspace. Please try again."
+      }
+    },
+    "mcp_tokens": {
+      "title": "MCP tokens",
+      "description": "Personal access tokens used to authenticate MCP clients against this workspace.",
+      "create": "Create token",
+      "empty": "No tokens yet. Create one to connect an MCP client.",
+      "table": {
+        "name": "Name",
+        "prefix": "Prefix",
+        "scopes": "Scopes",
+        "created_at": "Created",
+        "last_used_at": "Last used",
+        "actions": "Actions"
+      },
+      "never_used": "Never",
+      "revoke": "Revoke",
+      "revoke_confirm": "Revoke this token? MCP clients using it will stop working immediately.",
+      "revoked": "Token revoked",
+      "dialog": {
+        "create_title": "Create MCP token",
+        "reveal_title": "Token created",
+        "field": {
+          "name": "Name",
+          "name_placeholder": "e.g. Local dev laptop",
+          "scopes": "Scopes",
+          "scopes_help": "Space-separated list of scopes. Leave empty for default scopes."
+        },
+        "reveal_warning": "Copy this token now. You will not be able to see it again.",
+        "token_label": "Token",
+        "copy": "Copy",
+        "copied": "Copied",
+        "done": "Done",
+        "cancel": "Cancel",
+        "submit": "Create"
+      },
+      "validation": {
+        "name_required": "Name is required."
+      },
+      "errors": {
+        "create_failed": "Could not create the token. Please try again.",
+        "revoke_failed": "Could not revoke the token. Please try again."
+      }
+    }
+  }
+}

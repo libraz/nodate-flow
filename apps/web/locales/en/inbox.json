@@ -1,0 +1,27 @@
+{
+  "view": {
+    "title": "Inbox",
+    "empty": "Your inbox is empty"
+  },
+  "action": {
+    "archive": "Archive",
+    "snooze": "Snooze"
+  },
+  "snooze": {
+    "one_hour": "1 hour",
+    "tomorrow": "Tomorrow",
+    "next_week": "Next week"
+  },
+  "source": {
+    "manual": "Manual",
+    "github": "GitHub",
+    "slack": "Slack",
+    "email": "Email",
+    "webhook": "Webhook"
+  },
+  "toast": {
+    "archived": "Archived",
+    "snoozed": "Snoozed",
+    "error": "Action failed"
+  }
+}

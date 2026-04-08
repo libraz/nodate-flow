@@ -3,7 +3,9 @@ import ICU from 'i18next-icu';
 import { initReactI18next } from 'react-i18next';
 
 import enCommon from '../../locales/en/common.json';
+import enSettings from '../../locales/en/settings.json';
 import jaCommon from '../../locales/ja/common.json';
+import jaSettings from '../../locales/ja/settings.json';
 import { defaultNamespace } from './namespaces';
 
 /** Supported UI languages for Phase 1. */
@@ -39,10 +41,10 @@ export function initI18n(): typeof i18n {
       fallbackLng: 'en',
       supportedLngs: supportedLanguages as unknown as string[],
       defaultNS: defaultNamespace,
-      ns: [defaultNamespace],
+      ns: [defaultNamespace, 'settings'],
       resources: {
-        en: { common: enCommon },
-        ja: { common: jaCommon },
+        en: { common: enCommon, settings: enSettings },
+        ja: { common: jaCommon, settings: jaSettings },
       },
       interpolation: { escapeValue: false },
       react: { useSuspense: true },

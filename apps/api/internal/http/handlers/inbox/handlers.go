@@ -46,8 +46,8 @@ WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 // result to that workspace (after verifying membership). When omitted it
 // lists inbox items across every workspace the actor is an active member
 // of.
-func List(deps Deps) func(context.Context, *ListInput) (*ListOutput, error) {
-	return func(ctx context.Context, in *ListInput) (*ListOutput, error) {
+func List(deps Deps) func(context.Context, *ListInboxInput) (*ListInboxOutput, error) {
+	return func(ctx context.Context, in *ListInboxInput) (*ListInboxOutput, error) {
 		actorID, ok := middleware.ActorFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
@@ -56,8 +56,8 @@ func List(deps Deps) func(context.Context, *ListInput) (*ListOutput, error) {
 		if limit <= 0 {
 			limit = 50
 		}
-		out := &ListOutput{}
-		out.Body.Items = []Item{}
+		out := &ListInboxOutput{}
+		out.Body.Items = []InboxItem{}
 
 		if in.WorkspaceID != "" {
 			wsID, err := resolveWorkspace(ctx, deps.DB, in.WorkspaceID, actorID)
@@ -73,7 +73,7 @@ func List(deps Deps) func(context.Context, *ListInput) (*ListOutput, error) {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
 			for _, r := range rows {
-				out.Body.Items = append(out.Body.Items, Item{
+				out.Body.Items = append(out.Body.Items, InboxItem{
 					ID:         r.PublicID.String(),
 					TaskID:     nullStr(r.TaskPublicID),
 					TaskTitle:  nullStr(r.TaskTitle),
@@ -81,8 +81,8 @@ func List(deps Deps) func(context.Context, *ListInput) (*ListOutput, error) {
 					Kind:       r.Kind,
 					ExternalID: nullStr(r.ExternalID),
 					Payload:    r.PayloadJson,
-					ReceivedAt: r.ReceivedAt,
-					CreatedAt:  r.CreatedAt,
+					ReceivedAt: r.ReceivedAt.Unix(),
+					CreatedAt:  r.CreatedAt.Unix(),
 				})
 			}
 			if len(rows) > 0 {
@@ -100,7 +100,7 @@ func List(deps Deps) func(context.Context, *ListInput) (*ListOutput, error) {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		for _, r := range rows {
-			out.Body.Items = append(out.Body.Items, Item{
+			out.Body.Items = append(out.Body.Items, InboxItem{
 				ID:         r.PublicID.String(),
 				TaskID:     nullStr(r.TaskPublicID),
 				TaskTitle:  nullStr(r.TaskTitle),
@@ -108,8 +108,8 @@ func List(deps Deps) func(context.Context, *ListInput) (*ListOutput, error) {
 				Kind:       r.Kind,
 				ExternalID: nullStr(r.ExternalID),
 				Payload:    r.PayloadJson,
-				ReceivedAt: r.ReceivedAt,
-				CreatedAt:  r.CreatedAt,
+				ReceivedAt: r.ReceivedAt.Unix(),
+				CreatedAt:  r.CreatedAt.Unix(),
 			})
 		}
 		if len(rows) > 0 {
@@ -120,8 +120,8 @@ func List(deps Deps) func(context.Context, *ListInput) (*ListOutput, error) {
 }
 
 // Archive handles POST /inbox/{id}/archive.
-func Archive(deps Deps) func(context.Context, *ArchiveInput) (*ArchiveOutput, error) {
-	return func(ctx context.Context, in *ArchiveInput) (*ArchiveOutput, error) {
+func Archive(deps Deps) func(context.Context, *ArchiveInboxInput) (*ArchiveInboxOutput, error) {
+	return func(ctx context.Context, in *ArchiveInboxInput) (*ArchiveInboxOutput, error) {
 		actorID, ok := middleware.ActorFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
@@ -140,15 +140,15 @@ func Archive(deps Deps) func(context.Context, *ArchiveInput) (*ArchiveOutput, er
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		out := &ArchiveOutput{}
+		out := &ArchiveInboxOutput{}
 		out.Body.Ok = true
 		return out, nil
 	}
 }
 
 // Snooze handles POST /inbox/{id}/snooze.
-func Snooze(deps Deps) func(context.Context, *SnoozeInput) (*SnoozeOutput, error) {
-	return func(ctx context.Context, in *SnoozeInput) (*SnoozeOutput, error) {
+func Snooze(deps Deps) func(context.Context, *SnoozeInboxInput) (*SnoozeInboxOutput, error) {
+	return func(ctx context.Context, in *SnoozeInboxInput) (*SnoozeInboxOutput, error) {
 		actorID, ok := middleware.ActorFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
@@ -172,7 +172,7 @@ func Snooze(deps Deps) func(context.Context, *SnoozeInput) (*SnoozeOutput, error
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		out := &SnoozeOutput{}
+		out := &SnoozeInboxOutput{}
 		out.Body.Ok = true
 		return out, nil
 	}
