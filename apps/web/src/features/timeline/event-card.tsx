@@ -21,20 +21,23 @@ export interface EventCardProps {
  * so every event source lives in the same feed but stays
  * distinguishable at a glance.
  */
-export function eventSourceTag(type: string): {
+export function eventSourceTag(
+  type: string,
+  payload?: unknown,
+): {
   label: string;
   color: string;
 } {
-  if (type.startsWith('signal.github') || type.includes('github')) {
-    return { label: 'github', color: '#6e5494' };
-  }
-  if (type.startsWith('signal.slack') || type.includes('slack')) {
-    return { label: 'slack', color: '#4a154b' };
-  }
-  if (type.startsWith('signal.google') || type.includes('google')) {
-    return { label: 'google', color: '#4285f4' };
-  }
+  // signal.attached carries the external origin inside payload.source;
+  // the event type itself is namespace-only ("signal.attached").
   if (type.startsWith('signal.')) {
+    const src =
+      payload && typeof payload === 'object' && 'source' in payload
+        ? String((payload as { source?: unknown }).source ?? '')
+        : '';
+    if (src === 'github') return { label: 'github', color: '#6e5494' };
+    if (src === 'slack') return { label: 'slack', color: '#4a154b' };
+    if (src === 'google' || src === 'webhook') return { label: 'google', color: '#4285f4' };
     return { label: 'signal', color: '#0ea5e9' };
   }
   if (type.startsWith('ai.') || type.startsWith('mcp.')) {
@@ -90,6 +93,7 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
   const translated = t(messageKey, { actor: actorLabel, defaultValue: event.type });
 
   const payloadVisible = hasPayload(event.payload);
+  const tag = eventSourceTag(event.type, event.payload);
 
   return (
     <Card
@@ -105,7 +109,7 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
         style={{
           inlineSize: '0.25rem',
           alignSelf: 'stretch',
-          background: eventSourceTag(event.type).color,
+          background: tag.color,
           borderRadius: '0.125rem',
         }}
       />
@@ -135,14 +139,14 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
             style={{
               padding: '0 0.375rem',
               borderRadius: '0.25rem',
-              border: `1px solid ${eventSourceTag(event.type).color}`,
-              color: eventSourceTag(event.type).color,
+              border: `1px solid ${tag.color}`,
+              color: tag.color,
               fontSize: '0.65rem',
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
             }}
           >
-            {eventSourceTag(event.type).label}
+            {tag.label}
           </span>
           {formatRelative(event.occurredAt, locale)}
         </div>
