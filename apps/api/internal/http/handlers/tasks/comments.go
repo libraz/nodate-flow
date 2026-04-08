@@ -40,7 +40,7 @@ func AddComment(deps Deps) func(context.Context, *AddTaskCommentInput) (*AddTask
 		}
 		taskInternal := int64(task.ID)
 		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
-			Type:        "task.comment.added",
+			Type:        eventbus.TaskCommentAdded,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			TaskID:      &taskInternal,
@@ -142,7 +142,7 @@ func EditComment(deps Deps) func(context.Context, *EditTaskCommentInput) (*EditT
 		}
 		taskInternal := int64(task.ID)
 		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
-			Type:        "task.comment.edited",
+			Type:        eventbus.TaskCommentEdited,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			TaskID:      &taskInternal,
@@ -197,7 +197,7 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteTaskCommentInput) (*D
 		}
 		taskInternal := int64(task.ID)
 		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
-			Type:        "task.comment.removed",
+			Type:        eventbus.TaskCommentRemoved,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			TaskID:      &taskInternal,

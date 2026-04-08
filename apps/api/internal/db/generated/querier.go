@@ -141,6 +141,8 @@ type Querier interface {
 	ListConstraintsForTask(ctx context.Context, arg ListConstraintsForTaskParams) ([]ListConstraintsForTaskRow, error)
 	// List outgoing dependencies of a task. Returns the target task public_id.
 	ListDependenciesForTask(ctx context.Context, arg ListDependenciesForTaskParams) ([]ListDependenciesForTaskRow, error)
+	// List a project's timeline via v_task_timeline.
+	ListEventsForProject(ctx context.Context, arg ListEventsForProjectParams) ([]ListEventsForProjectRow, error)
 	// List a task's timeline via v_task_timeline.
 	ListEventsForTask(ctx context.Context, arg ListEventsForTaskParams) ([]ListEventsForTaskRow, error)
 	// List the workspace-wide event timeline via v_task_timeline.

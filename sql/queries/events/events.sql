@@ -28,6 +28,26 @@ WHERE v.workspace_id = ?
 ORDER BY v.occurred_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
 
+-- name: ListEventsForProject :many
+-- List a project's timeline via v_task_timeline. Filters events whose
+-- owning task lives in the given project (events with no task_id are
+-- excluded by virtue of project_public_id being NULL).
+SELECT
+  v.public_id,
+  v.task_public_id,
+  v.project_public_id,
+  v.actor_user_public_id,
+  v.actor_display_name,
+  v.type,
+  v.payload_json,
+  v.occurred_at,
+  COUNT(*) OVER() AS total
+FROM v_task_timeline v
+WHERE v.workspace_id = ?
+  AND v.project_public_id = ?
+ORDER BY v.occurred_at DESC, v.event_id DESC
+LIMIT ? OFFSET ?;
+
 -- name: ListEventsForWorkspace :many
 -- List the workspace-wide event timeline via v_task_timeline.
 SELECT

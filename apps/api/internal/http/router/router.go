@@ -246,6 +246,7 @@ func BuildResult(deps Deps) Result {
 		sub.Use(middleware.RequireProjectMemberByGlobalId(aclDB))
 		subAPI := newSubAPI(sub)
 		projects.RegisterGlobal(subAPI, prjDeps)
+		timeline.RegisterProjectScoped(subAPI, tlDeps)
 	})
 
 	// Task collection routes.

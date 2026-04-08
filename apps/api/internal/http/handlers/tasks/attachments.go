@@ -44,7 +44,7 @@ func AddAttachment(deps Deps) func(context.Context, *AddTaskAttachmentInput) (*A
 		}
 		taskInternal := int64(task.ID)
 		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
-			Type:        "task.attachment.added",
+			Type:        eventbus.TaskAttachmentAdded,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			TaskID:      &taskInternal,
@@ -124,7 +124,7 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteTaskAttachmentInpu
 		}
 		taskInternal := int64(task.ID)
 		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
-			Type:        "task.attachment.removed",
+			Type:        eventbus.TaskAttachmentRemoved,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			TaskID:      &taskInternal,

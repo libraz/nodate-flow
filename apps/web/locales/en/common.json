@@ -1,4 +1,7 @@
 {
+  "common": {
+    "loading": "Loading…"
+  },
   "landing": {
     "wordmark": "nodate-flow",
     "phase": "PHASE 01 - FOUNDATION",
@@ -255,6 +258,9 @@
         "remove": "Remove {name}",
         "empty": "No assignees yet.",
         "none": "No members available."
+      },
+      "activity": {
+        "title": "Activity"
       },
       "transitions": {
         "title": "Transitions",

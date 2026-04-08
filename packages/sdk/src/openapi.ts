@@ -245,6 +245,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{prjId}/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List events in a project's timeline */
+        get: operations["projects-timeline-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/signals": {
         parameters: {
             query?: never;
@@ -954,16 +971,6 @@ export interface components {
              */
             type: string;
         };
-        Event: {
-            actorDisplayName?: string;
-            actorUserId?: string;
-            id: string;
-            /** Format: date-time */
-            occurredAt: string;
-            payload?: unknown;
-            taskId?: string;
-            type: string;
-        };
         HealthOutputBody: {
             /**
              * Format: uri
@@ -1101,6 +1108,17 @@ export interface components {
             readonly $schema?: string;
             nextCursor: string | null;
             tasks: components["schemas"]["TaskListItem"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
+        ListTimelineOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            events: components["schemas"]["TimelineEvent"][] | null;
+            nextCursor: string | null;
             /** Format: int64 */
             total: number;
         };
@@ -1494,6 +1512,16 @@ export interface components {
             title: string;
             /** Format: date-time */
             updatedAt?: string;
+        };
+        TimelineEvent: {
+            actorDisplayName?: string;
+            actorUserId?: string;
+            id: string;
+            /** Format: int64 */
+            occurredAt: number;
+            payload?: unknown;
+            taskId?: string;
+            type: string;
         };
         TransitionTaskBody: {
             /**
@@ -2110,6 +2138,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RemoveProjectMemberBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "projects-timeline-list": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Filter by event kind. Repeat to OR multiple kinds. */
+                kind?: string[] | null;
+                /** @description Filter by actor user public_id (UUID v7). */
+                actor?: string;
+            };
+            header?: never;
+            path: {
+                prjId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListTimelineOutputBody"];
                 };
             };
             /** @description Error */
@@ -2806,6 +2872,10 @@ export interface operations {
             query?: {
                 limit?: number;
                 offset?: number;
+                /** @description Filter by event kind. Repeat to OR multiple kinds. */
+                kind?: string[] | null;
+                /** @description Filter by actor user public_id (UUID v7). */
+                actor?: string;
             };
             header?: never;
             path: {
@@ -2821,7 +2891,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListOutputBody"];
+                    "application/json": components["schemas"]["ListTimelineOutputBody"];
                 };
             };
             /** @description Error */
@@ -3481,6 +3551,10 @@ export interface operations {
             query?: {
                 limit?: number;
                 offset?: number;
+                /** @description Filter by event kind. Repeat to OR multiple kinds. */
+                kind?: string[] | null;
+                /** @description Filter by actor user public_id (UUID v7). */
+                actor?: string;
             };
             header?: never;
             path: {
@@ -3496,7 +3570,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListOutputBody"];
+                    "application/json": components["schemas"]["ListTimelineOutputBody"];
                 };
             };
             /** @description Error */

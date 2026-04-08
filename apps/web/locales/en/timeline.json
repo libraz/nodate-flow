@@ -1,0 +1,43 @@
+{
+  "view": {
+    "title": "Timeline",
+    "empty": "No events yet.",
+    "loading": "Loading timeline…",
+    "load_more": "Load more"
+  },
+  "filter": {
+    "kind_all": "All event types",
+    "kind_label": "Event type",
+    "actor_all": "All actors",
+    "reset": "Reset filters"
+  },
+  "actor": {
+    "system": "System",
+    "unknown": "Unknown"
+  },
+  "event": {
+    "task_created": "{actor} created this task",
+    "task_updated": "{actor} updated this task",
+    "task_disabled": "{actor} archived this task",
+    "task_comment_added": "{actor} commented",
+    "task_comment_edited": "{actor} edited a comment",
+    "task_comment_removed": "{actor} removed a comment",
+    "task_attachment_added": "{actor} attached a file",
+    "task_attachment_removed": "{actor} removed an attachment",
+    "task_actor_added": "{actor} added a member",
+    "task_actor_removed": "{actor} removed a member",
+    "task_dependency_added": "{actor} added a dependency",
+    "task_dependency_removed": "{actor} removed a dependency",
+    "task_constraint_added": "{actor} added a constraint",
+    "task_constraint_removed": "{actor} removed a constraint",
+    "task_transition_start": "{actor} started this task",
+    "task_transition_block": "{actor} blocked this task",
+    "task_transition_unblock": "{actor} unblocked this task",
+    "task_transition_submit": "{actor} submitted this task",
+    "task_transition_complete": "{actor} completed this task",
+    "task_transition_reopen": "{actor} reopened this task",
+    "task_transition_cancel": "{actor} cancelled this task",
+    "signal_attached": "{actor} attached a signal",
+    "comment_added": "{actor} commented"
+  }
+}

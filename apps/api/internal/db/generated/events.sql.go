@@ -54,6 +54,82 @@ func (q *Queries) AppendEvent(ctx context.Context, arg AppendEventParams) (int64
 	return result.LastInsertId()
 }
 
+const listEventsForProject = `-- name: ListEventsForProject :many
+SELECT
+  v.public_id,
+  v.task_public_id,
+  v.project_public_id,
+  v.actor_user_public_id,
+  v.actor_display_name,
+  v.type,
+  v.payload_json,
+  v.occurred_at,
+  COUNT(*) OVER() AS total
+FROM v_task_timeline v
+WHERE v.workspace_id = ?
+  AND v.project_public_id = ?
+ORDER BY v.occurred_at DESC, v.event_id DESC
+LIMIT ? OFFSET ?
+`
+
+type ListEventsForProjectParams struct {
+	WorkspaceID     uint32         `json:"-"`
+	ProjectPublicID sql.NullString `json:"projectPublicId"`
+	Limit           int32          `json:"limit"`
+	Offset          int32          `json:"offset"`
+}
+
+type ListEventsForProjectRow struct {
+	PublicID          types.PublicID  `json:"publicId"`
+	TaskPublicID      sql.NullString  `json:"taskPublicId"`
+	ProjectPublicID   sql.NullString  `json:"projectPublicId"`
+	ActorUserPublicID sql.NullString  `json:"actorUserPublicId"`
+	ActorDisplayName  sql.NullString  `json:"actorDisplayName"`
+	Type              string          `json:"type"`
+	PayloadJson       json.RawMessage `json:"payloadJson"`
+	OccurredAt        time.Time       `json:"occurredAt"`
+	Total             interface{}     `json:"total"`
+}
+
+// List a project's timeline via v_task_timeline.
+func (q *Queries) ListEventsForProject(ctx context.Context, arg ListEventsForProjectParams) ([]ListEventsForProjectRow, error) {
+	rows, err := q.db.QueryContext(ctx, listEventsForProject,
+		arg.WorkspaceID,
+		arg.ProjectPublicID,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListEventsForProjectRow{}
+	for rows.Next() {
+		var i ListEventsForProjectRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.TaskPublicID,
+			&i.ProjectPublicID,
+			&i.ActorUserPublicID,
+			&i.ActorDisplayName,
+			&i.Type,
+			&i.PayloadJson,
+			&i.OccurredAt,
+			&i.Total,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listEventsForTask = `-- name: ListEventsForTask :many
 SELECT
   v.public_id,

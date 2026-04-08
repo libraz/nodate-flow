@@ -17,6 +17,17 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 	}, ListForTask(deps))
 }
 
+// RegisterProjectScoped wires GET /projects/{prjId}/timeline. The caller
+// must attach RequireProjectMemberByGlobalId to the underlying chi router.
+func RegisterProjectScoped(api huma.API, deps Deps) {
+	huma.Register(api, huma.Operation{
+		OperationID: "projects-timeline-list",
+		Method:      http.MethodGet,
+		Path:        "/projects/{prjId}/timeline",
+		Summary:     "List events in a project's timeline",
+	}, ListForProject(deps))
+}
+
 // RegisterWorkspaceScoped wires GET /workspaces/{wsId}/timeline. The caller
 // must attach RequireWorkspaceMember to the underlying chi router.
 func RegisterWorkspaceScoped(api huma.API, deps Deps) {

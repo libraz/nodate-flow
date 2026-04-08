@@ -239,7 +239,7 @@ WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
-			Type:        "task.created",
+			Type:        eventbus.TaskCreated,
 			WorkspaceID: prj.WorkspaceID,
 			ActorUserID: actorPtr(ctx),
 			TaskID:      &taskID,
@@ -477,7 +477,7 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 		}
 		taskInternal := int64(task.ID)
 		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
-			Type:        "task.updated",
+			Type:        eventbus.TaskUpdated,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			TaskID:      &taskInternal,
@@ -516,7 +516,7 @@ func Disable(deps Deps) func(context.Context, *DisableTaskInput) (*DisableTaskOu
 		}
 		taskInternal := int64(task.ID)
 		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
-			Type:        "task.disabled",
+			Type:        eventbus.TaskDisabled,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			TaskID:      &taskInternal,

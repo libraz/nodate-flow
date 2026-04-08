@@ -369,7 +369,7 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	}
 	actor := int64(s.userID)
 	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
-		Type:        "task.created",
+		Type:        eventbus.TaskCreated,
 		WorkspaceID: s.workspaceID,
 		ActorUserID: &actor,
 		TaskID:      &taskID,
@@ -450,7 +450,7 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	taskID64 := int64(taskInternal)
 	actor := int64(s.userID)
 	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
-		Type:        "task.updated",
+		Type:        eventbus.TaskUpdated,
 		WorkspaceID: s.workspaceID,
 		ActorUserID: &actor,
 		TaskID:      &taskID64,
@@ -490,7 +490,7 @@ func runAddComment(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	taskID64 := int64(taskInternal)
 	actor := int64(s.userID)
 	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
-		Type:        "comment.added",
+		Type:        eventbus.CommentAddedLegacy,
 		WorkspaceID: s.workspaceID,
 		ActorUserID: &actor,
 		TaskID:      &taskID64,

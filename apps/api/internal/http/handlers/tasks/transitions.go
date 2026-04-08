@@ -119,7 +119,7 @@ func Transition(deps Deps) func(context.Context, *TransitionTaskInput) (*Transit
 
 		taskInternal := int64(task.ID)
 		if err := eventbus.Append(ctx, tx, eventbus.Event{
-			Type:        "task.transition." + in.Body.Transition,
+			Type:        eventbus.TaskTransition(in.Body.Transition),
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			TaskID:      &taskInternal,

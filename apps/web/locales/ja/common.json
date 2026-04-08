@@ -1,4 +1,7 @@
 {
+  "common": {
+    "loading": "読み込み中…"
+  },
   "landing": {
     "wordmark": "nodate-flow",
     "phase": "PHASE 01 - FOUNDATION",
@@ -255,6 +258,9 @@
         "remove": "{name} を外す",
         "empty": "担当者はまだいません。",
         "none": "追加できるメンバーがいません。"
+      },
+      "activity": {
+        "title": "アクティビティ"
       },
       "transitions": {
         "title": "遷移",

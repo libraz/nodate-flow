@@ -48,7 +48,7 @@ func AddDependency(deps Deps) func(context.Context, *AddTaskDependencyInput) (*A
 		}
 		taskInternal := int64(task.ID)
 		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
-			Type:        "task.dependency.added",
+			Type:        eventbus.TaskDependencyAdded,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			TaskID:      &taskInternal,
@@ -91,7 +91,7 @@ func RemoveDependency(deps Deps) func(context.Context, *RemoveTaskDependencyInpu
 		}
 		taskInternal := int64(task.ID)
 		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
-			Type:        "task.dependency.removed",
+			Type:        eventbus.TaskDependencyRemoved,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			TaskID:      &taskInternal,

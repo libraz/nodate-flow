@@ -35,7 +35,7 @@ func AddConstraint(deps Deps) func(context.Context, *AddTaskConstraintInput) (*A
 		}
 		taskInternal := int64(task.ID)
 		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
-			Type:        "task.constraint.added",
+			Type:        eventbus.TaskConstraintAdded,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			TaskID:      &taskInternal,
@@ -79,7 +79,7 @@ func RemoveConstraint(deps Deps) func(context.Context, *RemoveTaskConstraintInpu
 		}
 		taskInternal := int64(task.ID)
 		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
-			Type:        "task.constraint.removed",
+			Type:        eventbus.TaskConstraintRemoved,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			TaskID:      &taskInternal,

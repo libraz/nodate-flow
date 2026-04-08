@@ -126,7 +126,7 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 
 		if taskLinked {
 			_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
-				Type:        "signal.attached",
+				Type:        eventbus.SignalAttached,
 				WorkspaceID: wsID,
 				TaskID:      &taskInternal,
 				Payload: map[string]any{

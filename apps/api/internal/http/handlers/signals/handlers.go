@@ -113,7 +113,7 @@ func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error
 		if taskLinked {
 			actor := int64(actorID)
 			_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
-				Type:        "signal.attached",
+				Type:        eventbus.SignalAttached,
 				WorkspaceID: wsID,
 				ActorUserID: &actor,
 				TaskID:      &taskInternal,

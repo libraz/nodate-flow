@@ -1,0 +1,43 @@
+{
+  "view": {
+    "title": "タイムライン",
+    "empty": "イベントはまだありません。",
+    "loading": "タイムラインを読み込み中…",
+    "load_more": "さらに読み込む"
+  },
+  "filter": {
+    "kind_all": "すべてのイベント種別",
+    "kind_label": "イベント種別",
+    "actor_all": "すべての実行者",
+    "reset": "フィルターをリセット"
+  },
+  "actor": {
+    "system": "システム",
+    "unknown": "不明"
+  },
+  "event": {
+    "task_created": "{actor} がこのタスクを作成しました",
+    "task_updated": "{actor} がこのタスクを更新しました",
+    "task_disabled": "{actor} がこのタスクをアーカイブしました",
+    "task_comment_added": "{actor} がコメントしました",
+    "task_comment_edited": "{actor} がコメントを編集しました",
+    "task_comment_removed": "{actor} がコメントを削除しました",
+    "task_attachment_added": "{actor} がファイルを添付しました",
+    "task_attachment_removed": "{actor} が添付ファイルを削除しました",
+    "task_actor_added": "{actor} がメンバーを追加しました",
+    "task_actor_removed": "{actor} がメンバーを削除しました",
+    "task_dependency_added": "{actor} が依存関係を追加しました",
+    "task_dependency_removed": "{actor} が依存関係を削除しました",
+    "task_constraint_added": "{actor} が制約を追加しました",
+    "task_constraint_removed": "{actor} が制約を削除しました",
+    "task_transition_start": "{actor} がこのタスクを開始しました",
+    "task_transition_block": "{actor} がこのタスクをブロックしました",
+    "task_transition_unblock": "{actor} がこのタスクのブロックを解除しました",
+    "task_transition_submit": "{actor} がこのタスクを提出しました",
+    "task_transition_complete": "{actor} がこのタスクを完了しました",
+    "task_transition_reopen": "{actor} がこのタスクを再オープンしました",
+    "task_transition_cancel": "{actor} がこのタスクをキャンセルしました",
+    "signal_attached": "{actor} がシグナルを添付しました",
+    "comment_added": "{actor} がコメントしました"
+  }
+}

@@ -43,6 +43,7 @@ import {
   useTransitionTask,
   useUpdateTask,
 } from '../features/tasks/api';
+import TaskMiniTimeline from '../features/timeline/task-mini-timeline';
 import { useWorkspaceMembersQuery } from '../features/workspaces/api';
 
 const PRIORITY_KEY: Record<TaskPriority, string> = {
@@ -569,6 +570,19 @@ function Sidebar({
           }
         >
           <AssigneesSection taskId={id} workspaceId={workspaceId} />
+        </Suspense>
+      </Card>
+
+      <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <h2 style={{ margin: 0, fontSize: '1rem' }}>{t('tasks.detail.activity.title')}</h2>
+        <Suspense
+          fallback={
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem' }}>
+              <Spinner label={t('common.loading')} />
+            </div>
+          }
+        >
+          <TaskMiniTimeline taskId={id} />
         </Suspense>
       </Card>
     </aside>
