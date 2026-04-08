@@ -14,6 +14,94 @@ import (
 	types "github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 )
 
+type AgentRunsStatus string
+
+const (
+	AgentRunsStatusPending   AgentRunsStatus = "pending"
+	AgentRunsStatusClaimed   AgentRunsStatus = "claimed"
+	AgentRunsStatusSucceeded AgentRunsStatus = "succeeded"
+	AgentRunsStatusFailed    AgentRunsStatus = "failed"
+)
+
+func (e *AgentRunsStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AgentRunsStatus(s)
+	case string:
+		*e = AgentRunsStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AgentRunsStatus: %T", src)
+	}
+	return nil
+}
+
+type NullAgentRunsStatus struct {
+	AgentRunsStatus AgentRunsStatus `json:"agentRunsStatus"`
+	Valid           bool            `json:"valid"` // Valid is true if AgentRunsStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAgentRunsStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.AgentRunsStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AgentRunsStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAgentRunsStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AgentRunsStatus), nil
+}
+
+type AiAgentsScheduleKind string
+
+const (
+	AiAgentsScheduleKindDisabled AiAgentsScheduleKind = "disabled"
+	AiAgentsScheduleKindInterval AiAgentsScheduleKind = "interval"
+	AiAgentsScheduleKindOnEvent  AiAgentsScheduleKind = "on_event"
+	AiAgentsScheduleKindManual   AiAgentsScheduleKind = "manual"
+)
+
+func (e *AiAgentsScheduleKind) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AiAgentsScheduleKind(s)
+	case string:
+		*e = AiAgentsScheduleKind(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AiAgentsScheduleKind: %T", src)
+	}
+	return nil
+}
+
+type NullAiAgentsScheduleKind struct {
+	AiAgentsScheduleKind AiAgentsScheduleKind `json:"aiAgentsScheduleKind"`
+	Valid                bool                 `json:"valid"` // Valid is true if AiAgentsScheduleKind is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAiAgentsScheduleKind) Scan(value interface{}) error {
+	if value == nil {
+		ns.AiAgentsScheduleKind, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AiAgentsScheduleKind.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAiAgentsScheduleKind) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AiAgentsScheduleKind), nil
+}
+
 type AiInvocationsStatus string
 
 const (
@@ -241,6 +329,7 @@ const (
 	SignalsSourceGithub  SignalsSource = "github"
 	SignalsSourceSlack   SignalsSource = "slack"
 	SignalsSourceEmail   SignalsSource = "email"
+	SignalsSourceGoogle  SignalsSource = "google"
 	SignalsSourceWebhook SignalsSource = "webhook"
 )
 
@@ -588,6 +677,40 @@ func (ns NullWorkspaceMembersRole) Value() (driver.Value, error) {
 	return string(ns.WorkspaceMembersRole), nil
 }
 
+// Agent execution queue + history
+type AgentRun struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Internal FK to ai_agents.id
+	AgentID uint32 `json:"agentId"`
+	// Unique key shaped as <agent_id>:<unix_minute> to prevent double enqueue across scheduler replicas
+	DedupeKey string `json:"dedupeKey"`
+	// Lifecycle state
+	Status AgentRunsStatus `json:"status"`
+	// Number of claim attempts (for retry budget)
+	Attempts uint8 `json:"attempts"`
+	// Tick time the scheduler enqueued the run for
+	ScheduledAt time.Time `json:"scheduledAt"`
+	// When a worker claimed the row
+	ClaimedAt sql.NullTime `json:"claimedAt"`
+	// When the worker ack/nacked the row
+	FinishedAt sql.NullTime `json:"finishedAt"`
+	// Last failure message for operator visibility
+	ErrorMessage sql.NullString `json:"errorMessage"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
 // Reusable LLM agent configurations
 type AiAgent struct {
 	// Internal PK, never exposed
@@ -614,8 +737,8 @@ type AiAgent struct {
 	AllowedScopesJson json.RawMessage `json:"allowedScopesJson"`
 	// Monthly spend cap in USD cents (null = no cap)
 	MonthlyCostCapCents sql.NullInt32 `json:"monthlyCostCapCents"`
-	// Optional cron expression for scheduled runs
-	CronExpr sql.NullString `json:"cronExpr"`
+	// Trigger mode: interval = fires every NF_AGENT_TICK_INTERVAL; on_event = fires from eventbus; manual = only via /agents/{id}/trigger
+	ScheduleKind AiAgentsScheduleKind `json:"scheduleKind"`
 	// Manually or automatically paused (e.g., cost cap exceeded)
 	Paused bool `json:"paused"`
 	// Display order

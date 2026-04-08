@@ -12,6 +12,8 @@ import (
 )
 
 type Querier interface {
+	// Worker finished successfully.
+	AckAgentRun(ctx context.Context, arg AckAgentRunParams) error
 	// Attach a user to a task in the given role.
 	AddActor(ctx context.Context, arg AddActorParams) (int64, error)
 	// Attach an AI agent to a task in the given role (2.MCP-2).
@@ -37,6 +39,10 @@ type Querier interface {
 	ArchiveInboxItem(ctx context.Context, arg ArchiveInboxItemParams) error
 	// Link an existing signal to a task by public_id.
 	AttachSignalToTask(ctx context.Context, arg AttachSignalToTaskParams) error
+	// Pick the oldest pending run and mark it claimed in the same tx.
+	// Callers wrap this in BEGIN / COMMIT; SELECT ... FOR UPDATE SKIP LOCKED
+	// lets multiple workers race for rows without contention.
+	ClaimNextAgentRun(ctx context.Context) (ClaimNextAgentRunRow, error)
 	// Count ai.suggestion.{proposed,applied,dismissed} events for a workspace
 	// within the given time window. Used by the AI metrics endpoint
 	// (2.OBS-1) to compute acceptance rate.
@@ -93,6 +99,10 @@ type Querier interface {
 	DisableWorkspace(ctx context.Context, publicID types.PublicID) error
 	// Edit a comment body and stamp edited_at.
 	EditComment(ctx context.Context, arg EditCommentParams) error
+	// Atomically enqueue a new run. The UNIQUE constraint on dedupe_key
+	// causes a second scheduler replica to get a duplicate-entry error,
+	// which callers translate to ErrDuplicate. No row is inserted on conflict.
+	EnqueueAgentRun(ctx context.Context, arg EnqueueAgentRunParams) (int64, error)
 	// Mark a constraint as currently failing. Clears satisfied_at so the
 	// transition is visible in v_task_constraint_satisfaction.
 	FailConstraint(ctx context.Context, arg FailConstraintParams) error
@@ -228,6 +238,11 @@ type Querier interface {
 	ListPendingAiSuggestions(ctx context.Context, workspaceID uint32) ([]ListPendingAiSuggestionsRow, error)
 	// List members of a project joined with user display fields.
 	ListProjectMembers(ctx context.Context, arg ListProjectMembersParams) ([]ListProjectMembersRow, error)
+	// List the public_ids of every enabled project in a workspace for which
+	// the given user has an enabled project_members row. Used by the
+	// per-project ACL filter on GET /workspaces/{wsId}/projects so non-member
+	// workspace members do not enumerate projects they cannot open.
+	ListProjectPublicIdsForUserInWorkspace(ctx context.Context, arg ListProjectPublicIdsForUserInWorkspaceParams) ([]types.PublicID, error)
 	// List projects in a workspace via v_projects.
 	ListProjectsForWorkspace(ctx context.Context, arg ListProjectsForWorkspaceParams) ([]ListProjectsForWorkspaceRow, error)
 	// Workspace provider list. NEVER selects api_key_ciphertext.
@@ -267,10 +282,19 @@ type Querier interface {
 	// Append a redacted MCP tool invocation record. arguments_redacted_json and
 	// result_redacted_json MUST already be filtered through the redaction layer.
 	LogMcpInvocation(ctx context.Context, arg LogMcpInvocationParams) (int64, error)
+	// Flip the row to claimed after ClaimNextAgentRun returns it.
+	MarkAgentRunClaimed(ctx context.Context, arg MarkAgentRunClaimedParams) error
+	// Worker failed; park the row with the error message. Retry policy
+	// lives in the application layer so different agents can have
+	// different budgets.
+	NackAgentRun(ctx context.Context, arg NackAgentRunParams) error
 	// Patch the authenticated user's profile. NULL params leave the column untouched.
 	PatchMe(ctx context.Context, arg PatchMeParams) error
 	// Patch a workspace via COALESCE; NULL params leave existing columns untouched.
 	PatchWorkspace(ctx context.Context, arg PatchWorkspaceParams) error
+	// Housekeeping: drop succeeded / failed rows older than the cutoff so
+	// the table does not grow unbounded. Run from a cron or a startup task.
+	PurgeFinishedAgentRuns(ctx context.Context, finishedAt sql.NullTime) error
 	// Insert a new global user account. The caller supplies a UUID v7 public_id.
 	RegisterUser(ctx context.Context, arg RegisterUserParams) (int64, error)
 	// Soft-remove an actor from a task.

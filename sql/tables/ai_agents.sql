@@ -17,7 +17,7 @@ CREATE TABLE ai_agents (
   tools_json JSON NULL COMMENT 'Allowed tool list as JSON array',
   allowed_scopes_json JSON NULL COMMENT 'Allowed MCP scope list as JSON array (null = inherit from token)',
   monthly_cost_cap_cents INT UNSIGNED NULL COMMENT 'Monthly spend cap in USD cents (null = no cap)',
-  cron_expr VARCHAR(128) NULL COMMENT 'Optional cron expression for scheduled runs',
+  schedule_kind ENUM('disabled','interval','on_event','manual') NOT NULL DEFAULT 'disabled' COMMENT 'Trigger mode: interval = fires every NF_AGENT_TICK_INTERVAL; on_event = fires from eventbus; manual = only via /agents/{id}/trigger',
   paused BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Manually or automatically paused (e.g., cost cap exceeded)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',

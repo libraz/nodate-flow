@@ -9,7 +9,7 @@ CREATE TABLE signals (
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id, if resolved',
 
-  source ENUM('manual','github','slack','email','webhook') NOT NULL COMMENT 'Originating channel',
+  source ENUM('manual','github','slack','email','google','webhook') NOT NULL COMMENT 'Originating channel',
   kind VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Source-specific event kind (e.g., pull_request.opened)',
   external_id VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'External identifier (delivery id, message ts, ...)',
   payload_json JSON NOT NULL COMMENT 'Raw normalized payload',
