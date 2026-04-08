@@ -25,6 +25,8 @@ import {
 } from '../ai-suggestions/api';
 import SuggestionActions from '../ai-suggestions/suggestion-actions';
 import { type CompileLensResult, NlQueryError, useCompileLens } from '../nl-query/api';
+import { type StateSuggestion, useStateSuggestionsQuery } from '../nl-query/state-suggestions';
+import { type TaskReminder, useRemindersQuery } from '../reminders/api';
 
 const NL_UNPARSEABLE = 'AI.NL_QUERY.UNPARSEABLE';
 
@@ -203,6 +205,140 @@ function GlassDockSuggestionRow({
   );
 }
 
+function StateSuggestionsPanel({
+  workspaceId,
+}: {
+  workspaceId: string | undefined;
+}): ReactElement | null {
+  const { t } = useTranslation('ai-suggestions');
+  const { data } = useStateSuggestionsQuery(workspaceId);
+  const items: StateSuggestion[] = data ?? [];
+  if (items.length === 0) return null;
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.375rem',
+        padding: '0.75rem',
+        borderBlockEnd: '1px solid var(--color-border)',
+      }}
+    >
+      <strong style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}>
+        {t('state_suggestions.title')}
+      </strong>
+      <ul
+        style={{
+          listStyle: 'none',
+          padding: 0,
+          margin: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.375rem',
+        }}
+      >
+        {items.slice(0, 5).map((s) => (
+          <li key={s.taskId}>
+            <a
+              href={`/tasks/${s.taskId}`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                color: 'var(--color-fg)',
+                textDecoration: 'none',
+                fontSize: '0.75rem',
+              }}
+            >
+              <Badge tone="accent">{s.transition}</Badge>
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {s.title}
+              </span>
+              <span
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  color: 'var(--color-muted)',
+                }}
+              >
+                {s.confidence.toFixed(2)}
+              </span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function RemindersPanel({
+  workspaceId,
+}: {
+  workspaceId: string | undefined;
+}): ReactElement | null {
+  const { t } = useTranslation('ai-suggestions');
+  const { data } = useRemindersQuery(workspaceId);
+  const items: TaskReminder[] = data ?? [];
+  if (items.length === 0) return null;
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.375rem',
+        padding: '0.75rem',
+        borderBlockEnd: '1px solid var(--color-border)',
+      }}
+    >
+      <strong style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}>
+        {t('reminders.title')}
+      </strong>
+      <ul
+        style={{
+          listStyle: 'none',
+          padding: 0,
+          margin: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.375rem',
+        }}
+      >
+        {items.slice(0, 5).map((r) => {
+          const tone =
+            r.kind === 'overdue' ? 'danger' : r.kind === 'due_today' ? 'warning' : 'accent';
+          return (
+            <li key={r.taskId}>
+              <a
+                href={`/tasks/${r.taskId}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  color: 'var(--color-fg)',
+                  textDecoration: 'none',
+                  fontSize: '0.75rem',
+                }}
+              >
+                <Badge tone={tone}>{t(`reminders.kind.${r.kind}`)}</Badge>
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {r.title}
+                </span>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    color: 'var(--color-muted)',
+                  }}
+                >
+                  {r.dueOn}
+                </span>
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 export default function GlassDock(): ReactElement {
   const { t } = useTranslation('ai-suggestions');
   const [open, setOpen] = useState(false);
@@ -317,6 +453,8 @@ export default function GlassDock(): ReactElement {
         </button>
       </div>
       <NlQueryPanel workspaceId={workspaceId} />
+      <RemindersPanel workspaceId={workspaceId} />
+      <StateSuggestionsPanel workspaceId={workspaceId} />
       <div
         style={{
           overflow: 'auto',

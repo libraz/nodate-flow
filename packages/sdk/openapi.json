@@ -191,6 +191,49 @@
         "required": ["costUsd", "date"],
         "type": "object"
       },
+      "AiInvocation": {
+        "additionalProperties": false,
+        "properties": {
+          "costEstimate": {
+            "type": "string"
+          },
+          "errorCode": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "invokedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "model": {
+            "type": "string"
+          },
+          "promptRedacted": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "responseRedacted": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "tokensInput": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "tokensOutput": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": ["id", "purpose", "model", "promptRedacted", "status", "invokedAt"],
+        "type": "object"
+      },
       "AiSuggestionListBody": {
         "additionalProperties": false,
         "properties": {
@@ -905,6 +948,46 @@
         "required": ["inboxItemId", "score", "recommendedAction", "reasoning"],
         "type": "object"
       },
+      "InferStateOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/InferStateOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "proposal": {
+            "$ref": "#/components/schemas/InferStateProposal"
+          },
+          "state": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": "string"
+          }
+        },
+        "required": ["taskId", "state"],
+        "type": "object"
+      },
+      "InferStateProposal": {
+        "additionalProperties": false,
+        "properties": {
+          "confidence": {
+            "format": "float",
+            "type": "number"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "transition": {
+            "type": "string"
+          }
+        },
+        "required": ["transition", "confidence", "reason"],
+        "type": "object"
+      },
       "Lens": {
         "additionalProperties": false,
         "properties": {
@@ -979,6 +1062,26 @@
           }
         },
         "required": ["total", "items", "nextCursor"],
+        "type": "object"
+      },
+      "ListInvocationsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListInvocationsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "invocations": {
+            "items": {
+              "$ref": "#/components/schemas/AiInvocation"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["invocations"],
         "type": "object"
       },
       "ListMcpTokensOutputBody": {
@@ -1081,6 +1184,54 @@
           }
         },
         "required": ["total", "providers"],
+        "type": "object"
+      },
+      "ListRemindersOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListRemindersOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "reminders": {
+            "items": {
+              "$ref": "#/components/schemas/TaskReminder"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "reminders"],
+        "type": "object"
+      },
+      "ListStateSuggestionsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListStateSuggestionsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/StateSuggestion"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "suggestions"],
         "type": "object"
       },
       "ListTaskActorsBody": {
@@ -1911,6 +2062,32 @@
         "required": ["field", "dir"],
         "type": "object"
       },
+      "StateSuggestion": {
+        "additionalProperties": false,
+        "properties": {
+          "confidence": {
+            "format": "float",
+            "type": "number"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "transition": {
+            "type": "string"
+          }
+        },
+        "required": ["taskId", "title", "state", "transition", "confidence", "reason"],
+        "type": "object"
+      },
       "Task": {
         "additionalProperties": false,
         "properties": {
@@ -2305,6 +2482,35 @@
         ],
         "type": "object"
       },
+      "TaskReminder": {
+        "additionalProperties": false,
+        "properties": {
+          "daysUntilDue": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "dueOn": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": ["taskId", "title", "state", "dueOn", "kind", "daysUntilDue", "message"],
+        "type": "object"
+      },
       "TimelineEvent": {
         "additionalProperties": false,
         "properties": {
@@ -2377,6 +2583,81 @@
           }
         },
         "required": ["role"],
+        "type": "object"
+      },
+      "WeeklyDigestCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "cancelled": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "done": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "open": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "review": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "waiting": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["open", "waiting", "review", "done", "cancelled"],
+        "type": "object"
+      },
+      "WeeklyDigestOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/WeeklyDigestOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "completedThisWeek": {
+            "items": {
+              "$ref": "#/components/schemas/WeeklyDigestTask"
+            },
+            "type": ["array", "null"]
+          },
+          "counts": {
+            "$ref": "#/components/schemas/WeeklyDigestCounts"
+          },
+          "markdown": {
+            "type": "string"
+          },
+          "overdueOpen": {
+            "items": {
+              "$ref": "#/components/schemas/WeeklyDigestTask"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["counts", "completedThisWeek", "overdueOpen", "markdown"],
+        "type": "object"
+      },
+      "WeeklyDigestTask": {
+        "additionalProperties": false,
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": ["taskId", "title", "date"],
         "type": "object"
       },
       "Workspace": {
@@ -4403,6 +4684,44 @@
         "summary": "List likely-duplicate tasks by embedding similarity"
       }
     },
+    "/tasks/{id}/infer-state": {
+      "get": {
+        "operationId": "tasks-infer-state",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InferStateOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Propose the next likely state transition for a task"
+      }
+    },
     "/tasks/{id}/timeline": {
       "get": {
         "operationId": "tasks-timeline-list",
@@ -4830,6 +5149,67 @@
         "summary": "Today's accumulated LLM spend (USD) for a workspace"
       }
     },
+    "/workspaces/{wsId}/ai/invocations": {
+      "get": {
+        "operationId": "ai-invocations-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListInvocationsOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List redacted LLM call audit rows for the AI reasoning panel"
+      }
+    },
     "/workspaces/{wsId}/ai/providers": {
       "get": {
         "operationId": "ai-providers-list",
@@ -5037,6 +5417,82 @@
         "summary": "Rotate an LLM provider API key"
       }
     },
+    "/workspaces/{wsId}/ai/reminders": {
+      "get": {
+        "operationId": "ai-reminders",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListRemindersOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Workspace-wide deterministic reminder engine proposals (2.AI-4)"
+      }
+    },
+    "/workspaces/{wsId}/ai/state-suggestions": {
+      "get": {
+        "operationId": "ai-state-suggestions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListStateSuggestionsOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Workspace-wide deterministic state inference proposals (2.AI-1)"
+      }
+    },
     "/workspaces/{wsId}/ai/suggestions": {
       "get": {
         "operationId": "ai-suggestions-list",
@@ -5151,6 +5607,44 @@
           }
         },
         "summary": "Dismiss an AI suggestion"
+      }
+    },
+    "/workspaces/{wsId}/ai/weekly-digest": {
+      "get": {
+        "operationId": "ai-weekly-digest",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklyDigestOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Deterministic weekly digest markdown for a workspace (2.AI-9)"
       }
     },
     "/workspaces/{wsId}/inbox/triage": {

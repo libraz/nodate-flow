@@ -131,6 +131,8 @@ type Querier interface {
 	InsertSignal(ctx context.Context, arg InsertSignalParams) (int64, error)
 	// List actors on a task joined with user display fields.
 	ListActorsForTask(ctx context.Context, arg ListActorsForTaskParams) ([]ListActorsForTaskRow, error)
+	// Recent redacted LLM call records for a workspace, newest first.
+	ListAiInvocationsForWorkspace(ctx context.Context, arg ListAiInvocationsForWorkspaceParams) ([]ListAiInvocationsForWorkspaceRow, error)
 	// List a workspace's agents joined with the underlying model.
 	ListAgentsForWorkspace(ctx context.Context, arg ListAgentsForWorkspaceParams) ([]ListAgentsForWorkspaceRow, error)
 	// List attachments on a task with uploader display fields.

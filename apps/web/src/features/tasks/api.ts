@@ -57,7 +57,15 @@ export const tasksKeys = {
   comments: (id: string) => [...tasksKeys.all, 'detail', id, 'comments'] as const,
   actors: (id: string) => [...tasksKeys.all, 'detail', id, 'actors'] as const,
   duplicates: (id: string) => [...tasksKeys.all, 'detail', id, 'duplicates'] as const,
+  inferState: (id: string) => [...tasksKeys.all, 'detail', id, 'infer-state'] as const,
 };
+
+export type InferStateProposal = components['schemas']['InferStateProposal'];
+export interface InferStateResult {
+  taskId: string;
+  state: TaskDerivedState;
+  proposal?: InferStateProposal;
+}
 
 export type DuplicateCandidate = components['schemas']['DuplicateCandidate'];
 export interface DuplicatesResult {
@@ -190,6 +198,24 @@ export function useTaskDuplicatesQuery(taskId: string): UseSuspenseQueryResult<D
       });
       if (error || !data) throw toError(error, 'Failed to load duplicates');
       return { model: data.model, candidates: data.candidates ?? [] };
+    },
+  });
+}
+
+export function useTaskInferStateQuery(taskId: string): UseSuspenseQueryResult<InferStateResult> {
+  return useSuspenseQuery({
+    queryKey: tasksKeys.inferState(taskId),
+    queryFn: async (): Promise<InferStateResult> => {
+      const { data, error } = await sdk.GET('/tasks/{id}/infer-state', {
+        params: { path: { id: taskId } },
+      });
+      if (error || !data) throw toError(error, 'Failed to infer state');
+      const result: InferStateResult = {
+        taskId: data.taskId,
+        state: data.state as TaskDerivedState,
+      };
+      if (data.proposal) result.proposal = data.proposal;
+      return result;
     },
   });
 }

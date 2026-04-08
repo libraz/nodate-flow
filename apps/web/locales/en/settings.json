@@ -3,7 +3,12 @@
     "profile": "Profile",
     "general": "General",
     "mcp_tokens": "MCP tokens",
-    "ai_providers": "AI providers"
+    "ai_providers": "AI providers",
+    "ai_activity": "AI activity"
+  },
+  "ai_activity": {
+    "empty": "No LLM calls recorded yet.",
+    "error_code": "Error: {{code}}"
   },
   "profile": {
     "title": "Profile",

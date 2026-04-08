@@ -508,6 +508,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/{id}/infer-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Propose the next likely state transition for a task */
+        get: operations["tasks-infer-state"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{id}/timeline": {
         parameters: {
             query?: never;
@@ -613,6 +630,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{wsId}/ai/invocations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List redacted LLM call audit rows for the AI reasoning panel */
+        get: operations["ai-invocations-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{wsId}/ai/providers": {
         parameters: {
             query?: never;
@@ -647,6 +681,40 @@ export interface paths {
         head?: never;
         /** Rotate an LLM provider API key */
         patch: operations["ai-providers-patch"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/ai/reminders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Workspace-wide deterministic reminder engine proposals (2.AI-4) */
+        get: operations["ai-reminders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/ai/state-suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Workspace-wide deterministic state inference proposals (2.AI-1) */
+        get: operations["ai-state-suggestions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/workspaces/{wsId}/ai/suggestions": {
@@ -694,6 +762,23 @@ export interface paths {
         put?: never;
         /** Dismiss an AI suggestion */
         post: operations["ai-suggestions-dismiss"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/ai/weekly-digest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Deterministic weekly digest markdown for a workspace (2.AI-9) */
+        get: operations["ai-weekly-digest"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -930,6 +1015,22 @@ export interface components {
             date: string;
             /** Format: double */
             monthlyCapUsd?: number;
+        };
+        AiInvocation: {
+            costEstimate?: string;
+            errorCode?: string;
+            id: string;
+            /** Format: int64 */
+            invokedAt: number;
+            model: string;
+            promptRedacted: string;
+            purpose: string;
+            responseRedacted?: string;
+            status: string;
+            /** Format: int32 */
+            tokensInput?: number;
+            /** Format: int32 */
+            tokensOutput?: number;
         };
         AiSuggestionListBody: {
             /**
@@ -1239,6 +1340,22 @@ export interface components {
             /** Format: float */
             score: number;
         };
+        InferStateOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            proposal?: components["schemas"]["InferStateProposal"];
+            state: string;
+            taskId: string;
+        };
+        InferStateProposal: {
+            /** Format: float */
+            confidence: number;
+            reason: string;
+            transition: string;
+        };
         Lens: {
             filter: {
                 [key: string]: {
@@ -1268,6 +1385,14 @@ export interface components {
             nextCursor: string | null;
             /** Format: int64 */
             total: number;
+        };
+        ListInvocationsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            invocations: components["schemas"]["AiInvocation"][] | null;
         };
         ListMcpTokensOutputBody: {
             /**
@@ -1308,6 +1433,26 @@ export interface components {
              */
             readonly $schema?: string;
             providers: components["schemas"]["Provider"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
+        ListRemindersOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            reminders: components["schemas"]["TaskReminder"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
+        ListStateSuggestionsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            suggestions: components["schemas"]["StateSuggestion"][] | null;
             /** Format: int64 */
             total: number;
         };
@@ -1660,6 +1805,15 @@ export interface components {
             dir: string;
             field: string;
         };
+        StateSuggestion: {
+            /** Format: float */
+            confidence: number;
+            reason: string;
+            state: string;
+            taskId: string;
+            title: string;
+            transition: string;
+        };
         Task: {
             /**
              * Format: uri
@@ -1812,6 +1966,16 @@ export interface components {
             /** Format: date-time */
             updatedAt?: string;
         };
+        TaskReminder: {
+            /** Format: int64 */
+            daysUntilDue: number;
+            dueOn: string;
+            kind: string;
+            message: string;
+            state: string;
+            taskId: string;
+            title: string;
+        };
         TimelineEvent: {
             actorDisplayName?: string;
             actorUserId?: string;
@@ -1849,6 +2013,34 @@ export interface components {
             readonly $schema?: string;
             /** @enum {string} */
             role: "owner" | "admin" | "member" | "guest";
+        };
+        WeeklyDigestCounts: {
+            /** Format: int64 */
+            cancelled: number;
+            /** Format: int64 */
+            done: number;
+            /** Format: int64 */
+            open: number;
+            /** Format: int64 */
+            review: number;
+            /** Format: int64 */
+            waiting: number;
+        };
+        WeeklyDigestOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            completedThisWeek: components["schemas"]["WeeklyDigestTask"][] | null;
+            counts: components["schemas"]["WeeklyDigestCounts"];
+            markdown: string;
+            overdueOpen: components["schemas"]["WeeklyDigestTask"][] | null;
+        };
+        WeeklyDigestTask: {
+            date: string;
+            taskId: string;
+            title: string;
         };
         Workspace: {
             /**
@@ -3236,6 +3428,37 @@ export interface operations {
             };
         };
     };
+    "tasks-infer-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InferStateOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "tasks-timeline-list": {
         parameters: {
             query?: {
@@ -3537,6 +3760,40 @@ export interface operations {
             };
         };
     };
+    "ai-invocations-list": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListInvocationsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "ai-providers-list": {
         parameters: {
             query?: {
@@ -3674,6 +3931,68 @@ export interface operations {
             };
         };
     };
+    "ai-reminders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListRemindersOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-state-suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListStateSuggestionsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "ai-suggestions-list": {
         parameters: {
             query?: never;
@@ -3753,6 +4072,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-weekly-digest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeeklyDigestOutputBody"];
+                };
             };
             /** @description Error */
             default: {

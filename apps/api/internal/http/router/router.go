@@ -241,6 +241,30 @@ func BuildResult(deps Deps) Result {
 			Path:        "/workspaces/{wsId}/ai/compile-lens",
 			Summary:     "Compile natural-language prose into a validated Lens JSON (ADR 0004)",
 		}, aihandlers.CompileLens(aiDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "ai-state-suggestions",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/ai/state-suggestions",
+			Summary:     "Workspace-wide deterministic state inference proposals (2.AI-1)",
+		}, aihandlers.ListStateSuggestions(aiDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "ai-reminders",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/ai/reminders",
+			Summary:     "Workspace-wide deterministic reminder engine proposals (2.AI-4)",
+		}, aihandlers.ListReminders(aiDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "ai-weekly-digest",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/ai/weekly-digest",
+			Summary:     "Deterministic weekly digest markdown for a workspace (2.AI-9)",
+		}, aihandlers.WeeklyDigest(aiDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "ai-invocations-list",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/ai/invocations",
+			Summary:     "List redacted LLM call audit rows for the AI reasoning panel",
+		}, aihandlers.ListInvocations(aiDeps))
 	})
 
 	// Per-user MCP tokens (workspace member, not admin).

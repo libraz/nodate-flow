@@ -280,6 +280,10 @@
         "duplicate": "重複の可能性",
         "related": "関連"
       },
+      "infer_state": {
+        "title": "次の推奨アクション",
+        "empty": "現時点で推奨はありません。"
+      },
       "transitions": {
         "title": "遷移",
         "start": "開始",

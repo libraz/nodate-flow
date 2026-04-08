@@ -12,23 +12,27 @@ import { useTranslation } from 'react-i18next';
 
 const routeApi = getRouteApi('/_authenticated/workspaces/$id/settings');
 
-type SubNavKey = 'general' | 'mcp_tokens' | 'ai_providers';
+type SubNavKey = 'general' | 'mcp_tokens' | 'ai_providers' | 'ai_activity';
 
 interface SubNavItem {
   key: SubNavKey;
   to:
     | '/workspaces/$id/settings/general'
     | '/workspaces/$id/settings/mcp-tokens'
-    | '/workspaces/$id/settings/ai-providers';
+    | '/workspaces/$id/settings/ai-providers'
+    | '/workspaces/$id/settings/ai-activity';
 }
 
 const SUB_NAV: readonly SubNavItem[] = [
   { key: 'general', to: '/workspaces/$id/settings/general' },
   { key: 'mcp_tokens', to: '/workspaces/$id/settings/mcp-tokens' },
   { key: 'ai_providers', to: '/workspaces/$id/settings/ai-providers' },
+  { key: 'ai_activity', to: '/workspaces/$id/settings/ai-activity' },
 ];
 
-function labelKeyFor(key: SubNavKey): 'nav.general' | 'nav.mcp_tokens' | 'nav.ai_providers' {
+function labelKeyFor(
+  key: SubNavKey,
+): 'nav.general' | 'nav.mcp_tokens' | 'nav.ai_providers' | 'nav.ai_activity' {
   switch (key) {
     case 'general':
       return 'nav.general';
@@ -36,6 +40,8 @@ function labelKeyFor(key: SubNavKey): 'nav.general' | 'nav.mcp_tokens' | 'nav.ai
       return 'nav.mcp_tokens';
     case 'ai_providers':
       return 'nav.ai_providers';
+    case 'ai_activity':
+      return 'nav.ai_activity';
   }
 }
 

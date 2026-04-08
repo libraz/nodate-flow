@@ -3,7 +3,12 @@
     "profile": "プロフィール",
     "general": "一般",
     "mcp_tokens": "MCP トークン",
-    "ai_providers": "AI プロバイダ"
+    "ai_providers": "AI プロバイダ",
+    "ai_activity": "AI アクティビティ"
+  },
+  "ai_activity": {
+    "empty": "LLM 呼び出しの記録はまだありません。",
+    "error_code": "エラー: {{code}}"
   },
   "profile": {
     "title": "プロフィール",

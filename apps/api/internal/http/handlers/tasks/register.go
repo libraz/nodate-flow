@@ -60,6 +60,13 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 	}, ListDuplicates(deps))
 
 	huma.Register(api, huma.Operation{
+		OperationID: "tasks-infer-state",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/infer-state",
+		Summary:     "Propose the next likely state transition for a task",
+	}, InferState(deps))
+
+	huma.Register(api, huma.Operation{
 		OperationID: "tasks-transitions-apply",
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/transitions",

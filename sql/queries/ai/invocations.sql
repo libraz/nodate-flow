@@ -19,6 +19,27 @@ INSERT INTO ai_invocations (
   invoked_at
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
+-- name: ListAiInvocationsForWorkspace :many
+-- Recent redacted LLM call records for a workspace, newest first. Used
+-- by the AI activity panel. All columns here are already redacted at
+-- write time by the orchestrator; safe to surface at the API boundary.
+SELECT
+  public_id,
+  purpose,
+  model,
+  prompt_redacted,
+  response_redacted,
+  tokens_input,
+  tokens_output,
+  cost_estimate,
+  status,
+  error_code,
+  invoked_at
+FROM ai_invocations
+WHERE workspace_id = ?
+ORDER BY invoked_at DESC, id DESC
+LIMIT ? OFFSET ?;
+
 -- name: SumAiCostTodayForWorkspace :one
 -- Sum the estimated cost (in whole cents) of LLM calls made today for a
 -- workspace. cost_estimate is stored as DECIMAL(10,6) USD; multiply by 100

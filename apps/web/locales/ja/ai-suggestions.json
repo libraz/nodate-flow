@@ -35,6 +35,17 @@
     "expand": "提案パネルを展開",
     "collapse": "提案パネルを折りたたむ"
   },
+  "state_suggestions": {
+    "title": "次の推奨アクション"
+  },
+  "reminders": {
+    "title": "リマインダー",
+    "kind": {
+      "overdue": "期限超過",
+      "due_today": "本日期限",
+      "due_soon": "期限間近"
+    }
+  },
   "nl_query": {
     "label": "自然言語で問い合わせ",
     "placeholder": "今週ブロックされているものを見せて",

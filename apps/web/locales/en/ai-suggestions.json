@@ -35,6 +35,17 @@
     "expand": "Expand suggestions panel",
     "collapse": "Collapse suggestions panel"
   },
+  "state_suggestions": {
+    "title": "Suggested next steps"
+  },
+  "reminders": {
+    "title": "Reminders",
+    "kind": {
+      "overdue": "Overdue",
+      "due_today": "Due today",
+      "due_soon": "Due soon"
+    }
+  },
   "nl_query": {
     "label": "Ask in plain language",
     "placeholder": "show me everything blocked this week",

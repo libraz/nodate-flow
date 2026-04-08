@@ -34,6 +34,7 @@ import {
   useTaskActorsQuery,
   useTaskCommentsQuery,
   useTaskDuplicatesQuery,
+  useTaskInferStateQuery,
   useTaskQuery,
   useTransitionTask,
   useUpdateTask,
@@ -571,6 +572,19 @@ function Sidebar({
       </Card>
 
       <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <h2 style={{ margin: 0, fontSize: '1rem' }}>{t('tasks.detail.infer_state.title')}</h2>
+        <Suspense
+          fallback={
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem' }}>
+              <Spinner label={t('common.loading')} />
+            </div>
+          }
+        >
+          <InferStateSection taskId={id} />
+        </Suspense>
+      </Card>
+
+      <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         <h2 style={{ margin: 0, fontSize: '1rem' }}>{t('tasks.detail.duplicates.title')}</h2>
         <Suspense
           fallback={
@@ -654,6 +668,36 @@ function RelatedTasksSection({ taskId }: { taskId: string }): ReactElement {
         );
       })}
     </ul>
+  );
+}
+
+function InferStateSection({ taskId }: { taskId: string }): ReactElement {
+  const { t } = useTranslation('common');
+  const { data } = useTaskInferStateQuery(taskId);
+  if (!data.proposal) {
+    return (
+      <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+        {t('tasks.detail.infer_state.empty')}
+      </p>
+    );
+  }
+  const { transition, confidence, reason } = data.proposal;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <Badge tone="accent">{transition}</Badge>
+        <span
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: '0.75rem',
+            color: 'var(--color-muted)',
+          }}
+        >
+          {confidence.toFixed(2)}
+        </span>
+      </div>
+      <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--color-fg)' }}>{reason}</p>
+    </div>
   );
 }
 
