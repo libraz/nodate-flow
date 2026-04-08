@@ -41,5 +41,30 @@
     "task_transition_cancel": "{actor} がこのタスクをキャンセルしました",
     "signal_attached": "{actor} がシグナルを添付しました",
     "comment_added": "{actor} がコメントしました"
+  },
+  "event_kind": {
+    "task_created": "タスク作成",
+    "task_updated": "タスク更新",
+    "task_disabled": "タスクアーカイブ",
+    "task_comment_added": "コメント追加",
+    "task_comment_edited": "コメント編集",
+    "task_comment_removed": "コメント削除",
+    "task_attachment_added": "添付追加",
+    "task_attachment_removed": "添付削除",
+    "task_actor_added": "メンバー追加",
+    "task_actor_removed": "メンバー削除",
+    "task_dependency_added": "依存関係追加",
+    "task_dependency_removed": "依存関係削除",
+    "task_constraint_added": "制約追加",
+    "task_constraint_removed": "制約削除",
+    "task_transition_start": "開始",
+    "task_transition_block": "ブロック",
+    "task_transition_unblock": "ブロック解除",
+    "task_transition_submit": "提出",
+    "task_transition_complete": "完了",
+    "task_transition_reopen": "再オープン",
+    "task_transition_cancel": "キャンセル",
+    "signal_attached": "シグナル添付",
+    "comment_added": "コメント追加"
   }
 }

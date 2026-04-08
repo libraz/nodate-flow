@@ -173,6 +173,7 @@
     },
     "detail": {
       "description_empty": "No description for this project yet.",
+      "overview_empty": "No activity to show for this project yet.",
       "tabs": {
         "overview": "Overview",
         "members": "Members",
@@ -253,7 +254,7 @@
     "filters": {
       "search_placeholder": "Search tasks…",
       "status": "Status",
-      "assignee": "Assignee ID"
+      "assignee": "Assignee"
     },
     "validation": {
       "title_required": "Title is required.",

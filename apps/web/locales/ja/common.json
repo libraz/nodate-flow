@@ -173,6 +173,7 @@
     },
     "detail": {
       "description_empty": "このプロジェクトにはまだ説明がありません。",
+      "overview_empty": "このプロジェクトにはまだ表示できるアクティビティがありません。",
       "tabs": {
         "overview": "概要",
         "members": "メンバー",
@@ -253,7 +254,7 @@
     "filters": {
       "search_placeholder": "タスクを検索…",
       "status": "ステータス",
-      "assignee": "担当者 ID"
+      "assignee": "担当者"
     },
     "validation": {
       "title_required": "タイトルを入力してください。",

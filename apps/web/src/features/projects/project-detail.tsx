@@ -96,16 +96,12 @@ function SettingsPanel({ id }: { id: string }): ReactElement {
   );
 }
 
-function OverviewPanel({ id }: { id: string }): ReactElement {
+function OverviewPanel(_props: { id: string }): ReactElement {
   const { t } = useTranslation('common');
-  const { data: project } = useProjectQuery(id);
-  const description = project.description?.trim();
   return (
     <Card style={{ padding: '1.5rem' }}>
-      <p style={{ margin: 0, color: description ? 'var(--color-fg)' : 'var(--color-muted)' }}>
-        {description && description.length > 0
-          ? description
-          : t('projects.detail.description_empty')}
+      <p style={{ margin: 0, color: 'var(--color-muted)' }}>
+        {t('projects.detail.overview_empty')}
       </p>
     </Card>
   );

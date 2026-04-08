@@ -124,12 +124,9 @@ export default function EventFilterBar({
             const seen = new Set<string>();
             const options: { kind: string; label: string }[] = [];
             for (const kind of TIMELINE_KINDS) {
-              const label = t(`event.${kind.replace(/\./g, '_')}`, {
-                actor: '',
+              const label = t(`event_kind.${kind.replace(/\./g, '_')}`, {
                 defaultValue: kind,
-              })
-                .trim()
-                .replace(/\s+/g, ' ');
+              });
               if (seen.has(label)) continue;
               seen.add(label);
               options.push({ kind, label });

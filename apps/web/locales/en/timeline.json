@@ -41,5 +41,30 @@
     "task_transition_cancel": "{actor} cancelled this task",
     "signal_attached": "{actor} attached a signal",
     "comment_added": "{actor} commented"
+  },
+  "event_kind": {
+    "task_created": "Task created",
+    "task_updated": "Task updated",
+    "task_disabled": "Task archived",
+    "task_comment_added": "Comment added",
+    "task_comment_edited": "Comment edited",
+    "task_comment_removed": "Comment removed",
+    "task_attachment_added": "Attachment added",
+    "task_attachment_removed": "Attachment removed",
+    "task_actor_added": "Member added",
+    "task_actor_removed": "Member removed",
+    "task_dependency_added": "Dependency added",
+    "task_dependency_removed": "Dependency removed",
+    "task_constraint_added": "Constraint added",
+    "task_constraint_removed": "Constraint removed",
+    "task_transition_start": "Started",
+    "task_transition_block": "Blocked",
+    "task_transition_unblock": "Unblocked",
+    "task_transition_submit": "Submitted",
+    "task_transition_complete": "Completed",
+    "task_transition_reopen": "Reopened",
+    "task_transition_cancel": "Cancelled",
+    "signal_attached": "Signal attached",
+    "comment_added": "Comment added"
   }
 }
