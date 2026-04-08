@@ -1,6 +1,7 @@
 import Icon from '@nodate-flow/ui/icon';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
 import Tooltip from '@nodate-flow/ui/primitives/tooltip';
+import { useNavigate } from '@tanstack/react-router';
 import { type LucideIcon, Plus, Sparkles, Zap } from 'lucide-react';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,12 +11,15 @@ import styles from './glass-dock.module.css';
 interface DockAction {
   key: 'new_task' | 'quick_capture' | 'ai_assist';
   icon: LucideIcon;
+  href: string;
 }
 
+// Until the command palette ships, the dock deep-links to the most
+// relevant existing surface for each action. See docs/plan.
 const ACTIONS: readonly DockAction[] = [
-  { key: 'new_task', icon: Plus },
-  { key: 'quick_capture', icon: Zap },
-  { key: 'ai_assist', icon: Sparkles },
+  { key: 'new_task', icon: Plus, href: '/workspaces' },
+  { key: 'quick_capture', icon: Zap, href: '/inbox' },
+  { key: 'ai_assist', icon: Sparkles, href: '/inbox' },
 ];
 
 function actionLabelKey(
@@ -33,6 +37,7 @@ function actionLabelKey(
 
 export default function GlassDock(): ReactElement {
   const { t } = useTranslation('common');
+  const navigate = useNavigate();
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   useEffect(() => {
@@ -58,7 +63,7 @@ export default function GlassDock(): ReactElement {
         {ACTIONS.map((action) => {
           const label = t(actionLabelKey(action.key));
           const handleClick = (): void => {
-            setPaletteOpen(true);
+            void navigate({ to: action.href });
           };
           return (
             <Tooltip key={action.key} content={label}>
