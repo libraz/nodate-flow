@@ -117,6 +117,10 @@ type Querier interface {
 	// Resolve the owning user + workspace for an MCP bearer token by hash.
 	// Returns internal ids for the auth middleware.
 	FindUserForMcpToken(ctx context.Context, tokenHash string) (FindUserForMcpTokenRow, error)
+	// Resolve the internal users.id for a public UUID, excluding disabled rows.
+	FindUserInternalIdByPublicId(ctx context.Context, publicID types.PublicID) (uint32, error)
+	// Fetch the minimal profile for the /me endpoint by internal id.
+	FindUserProfileById(ctx context.Context, id uint32) (FindUserProfileByIdRow, error)
 	// Resolve a workspace by its UUID v7. Returns internal id for ACL.
 	FindWorkspaceByPublicId(ctx context.Context, publicID types.PublicID) (FindWorkspaceByPublicIdRow, error)
 	// Resolve a workspace by slug. Returns internal id for ACL.
@@ -143,6 +147,8 @@ type Querier interface {
 	ListEventsForWorkspace(ctx context.Context, arg ListEventsForWorkspaceParams) ([]ListEventsForWorkspaceRow, error)
 	// List a workspace's inbox via v_inbox.
 	ListInbox(ctx context.Context, arg ListInboxParams) ([]ListInboxRow, error)
+	// List inbox items across every workspace the actor is an active member of.
+	ListInboxForUser(ctx context.Context, arg ListInboxForUserParams) ([]ListInboxForUserRow, error)
 	// List a user's MCP tokens in a workspace, masked.
 	ListMcpTokensForUser(ctx context.Context, arg ListMcpTokensForUserParams) ([]ListMcpTokensForUserRow, error)
 	// List models registered under a provider. Workspace-scoped.
@@ -206,6 +212,10 @@ type Querier interface {
 	// Snooze a signal by pushing its received_at forward. Phase 1 minimal impl;
 	// a dedicated snoozed_until_at column may be added in a later phase.
 	SnoozeInboxItem(ctx context.Context, arg SnoozeInboxItemParams) error
+	// Sum the estimated cost (in whole cents) of LLM calls made today for a
+	// workspace. cost_estimate is stored as DECIMAL(10,6) USD; multiply by 100
+	// and round to produce a cent-scale integer suitable for CostGuard.
+	SumAiCostTodayForWorkspace(ctx context.Context, arg SumAiCostTodayForWorkspaceParams) (int64, error)
 	// Bump failed login counter and optionally apply a lockout deadline.
 	UpdateIdentityFailedAttempts(ctx context.Context, arg UpdateIdentityFailedAttemptsParams) error
 	// Change a member's role.

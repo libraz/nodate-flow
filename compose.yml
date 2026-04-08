@@ -1,0 +1,49 @@
+# Local development compose stack for nodate-flow.
+# Minimal Phase 0 set: mysql + api. No web/prometheus/grafana yet.
+services:
+  mysql:
+    image: mysql:9.1
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${NF_DB_ROOT_PASSWORD:-rootpw}
+      MYSQL_DATABASE: ${NF_DB_NAME:-nodate_flow}
+      MYSQL_USER: ${NF_DB_USER:-nodate}
+      MYSQL_PASSWORD: ${NF_DB_PASSWORD:-nodatepw}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max-connections=256
+    ports:
+      - "${NF_DB_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${NF_DB_ROOT_PASSWORD:-rootpw}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      NF_PORT: "8080"
+      NF_LOG_LEVEL: ${NF_LOG_LEVEL:-info}
+      NF_DB_DSN: ${NF_DB_DSN:-nodate:nodatepw@tcp(mysql:3306)/nodate_flow?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci}
+      NF_SECRET_KEY: ${NF_SECRET_KEY:-}
+      NF_DEFAULT_WORKSPACE_ID: ${NF_DEFAULT_WORKSPACE_ID:-}
+      NF_GH_WEBHOOK_SECRET: ${NF_GH_WEBHOOK_SECRET:-}
+      NF_SLACK_SIGNING_SECRET: ${NF_SLACK_SIGNING_SECRET:-}
+      NF_AI_DAILY_BUDGET_CENTS: ${NF_AI_DAILY_BUDGET_CENTS:-}
+      NF_VERSION: ${NF_VERSION:-dev}
+    ports:
+      - "${NF_API_PORT:-8080}:8080"
+
+volumes:
+  mysql_data:

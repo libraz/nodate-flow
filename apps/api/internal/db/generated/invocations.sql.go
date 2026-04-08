@@ -129,3 +129,25 @@ func (q *Queries) LogMcpInvocation(ctx context.Context, arg LogMcpInvocationPara
 	}
 	return result.LastInsertId()
 }
+
+const sumAiCostTodayForWorkspace = `-- name: SumAiCostTodayForWorkspace :one
+SELECT CAST(COALESCE(ROUND(SUM(cost_estimate) * 100), 0) AS SIGNED) AS total_cents
+FROM ai_invocations
+WHERE workspace_id = ?
+  AND invoked_at >= ?
+`
+
+type SumAiCostTodayForWorkspaceParams struct {
+	WorkspaceID uint32    `json:"-"`
+	InvokedAt   time.Time `json:"invokedAt"`
+}
+
+// Sum the estimated cost (in whole cents) of LLM calls made today for a
+// workspace. cost_estimate is stored as DECIMAL(10,6) USD; multiply by 100
+// and round to produce a cent-scale integer suitable for CostGuard.
+func (q *Queries) SumAiCostTodayForWorkspace(ctx context.Context, arg SumAiCostTodayForWorkspaceParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, sumAiCostTodayForWorkspace, arg.WorkspaceID, arg.InvokedAt)
+	var total_cents int64
+	err := row.Scan(&total_cents)
+	return total_cents, err
+}

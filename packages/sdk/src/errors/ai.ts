@@ -26,6 +26,11 @@ export const AiErrors = {
     status: 500,
     message: "Sensitive data redaction failed",
   },
+  AI_RESPONSE_PARSE_FAILED: {
+    code: "AI.RESPONSE.PARSE_FAILED",
+    status: 502,
+    message: "AI provider response could not be parsed",
+  },
   AI_SAFETY_BLOCKED: {
     code: "AI.SAFETY.BLOCKED",
     status: 422,

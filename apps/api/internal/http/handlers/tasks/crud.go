@@ -66,11 +66,11 @@ WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 
 		due, err := parseDateOrNullTime(in.Body.DueOn)
 		if err != nil {
-			return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+			return nil, httpErr(apierrors.ValidationBodyDateFormatInvalid)
 		}
 		start, err := parseDateOrNullTime(in.Body.StartOn)
 		if err != nil {
-			return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+			return nil, httpErr(apierrors.ValidationBodyDateFormatInvalid)
 		}
 
 		pub := types.New()
@@ -273,7 +273,7 @@ func Patch(deps Deps) func(context.Context, *PatchInput) (*PatchOutput, error) {
 		if in.Body.DueOn != nil {
 			parsed, err := parseDateOrNullTime(*in.Body.DueOn)
 			if err != nil {
-				return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+				return nil, httpErr(apierrors.ValidationBodyDateFormatInvalid)
 			}
 			newDue = parsed
 		}
@@ -281,7 +281,7 @@ func Patch(deps Deps) func(context.Context, *PatchInput) (*PatchOutput, error) {
 		if in.Body.StartOn != nil {
 			parsed, err := parseDateOrNullTime(*in.Body.StartOn)
 			if err != nil {
-				return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+				return nil, httpErr(apierrors.ValidationBodyDateFormatInvalid)
 			}
 			newStart = parsed
 		}

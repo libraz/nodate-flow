@@ -34,6 +34,7 @@ func (q *Queries) ArchiveInboxItem(ctx context.Context, arg ArchiveInboxItemPara
 
 const listInbox = `-- name: ListInbox :many
 SELECT
+  v.workspace_id,
   v.public_id,
   v.task_public_id,
   v.task_title,
@@ -58,6 +59,7 @@ type ListInboxParams struct {
 }
 
 type ListInboxRow struct {
+	WorkspaceID  uint32          `json:"-"`
 	PublicID     types.PublicID  `json:"publicId"`
 	TaskPublicID sql.NullString  `json:"taskPublicId"`
 	TaskTitle    sql.NullString  `json:"taskTitle"`
@@ -82,6 +84,88 @@ func (q *Queries) ListInbox(ctx context.Context, arg ListInboxParams) ([]ListInb
 	for rows.Next() {
 		var i ListInboxRow
 		if err := rows.Scan(
+			&i.WorkspaceID,
+			&i.PublicID,
+			&i.TaskPublicID,
+			&i.TaskTitle,
+			&i.Source,
+			&i.Kind,
+			&i.ExternalID,
+			&i.PayloadJson,
+			&i.ReceivedAt,
+			&i.UpdatedAt,
+			&i.CreatedAt,
+			&i.Total,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listInboxForUser = `-- name: ListInboxForUser :many
+SELECT
+  v.workspace_id,
+  v.public_id,
+  v.task_public_id,
+  v.task_title,
+  v.source,
+  v.kind,
+  v.external_id,
+  v.payload_json,
+  v.received_at,
+  v.updated_at,
+  v.created_at,
+  COUNT(*) OVER() AS total
+FROM v_inbox v
+INNER JOIN workspace_members wm
+  ON wm.workspace_id = v.workspace_id
+  AND wm.user_id = ?
+  AND wm.enabled = TRUE
+ORDER BY v.received_at DESC, v.public_id DESC
+LIMIT ? OFFSET ?
+`
+
+type ListInboxForUserParams struct {
+	UserID uint32 `json:"-"`
+	Limit  int32  `json:"limit"`
+	Offset int32  `json:"offset"`
+}
+
+type ListInboxForUserRow struct {
+	WorkspaceID  uint32          `json:"-"`
+	PublicID     types.PublicID  `json:"publicId"`
+	TaskPublicID sql.NullString  `json:"taskPublicId"`
+	TaskTitle    sql.NullString  `json:"taskTitle"`
+	Source       SignalsSource   `json:"source"`
+	Kind         string          `json:"kind"`
+	ExternalID   sql.NullString  `json:"externalId"`
+	PayloadJson  json.RawMessage `json:"payloadJson"`
+	ReceivedAt   time.Time       `json:"receivedAt"`
+	UpdatedAt    sql.NullTime    `json:"updatedAt"`
+	CreatedAt    time.Time       `json:"createdAt"`
+	Total        interface{}     `json:"total"`
+}
+
+// List inbox items across every workspace the actor is an active member of.
+func (q *Queries) ListInboxForUser(ctx context.Context, arg ListInboxForUserParams) ([]ListInboxForUserRow, error) {
+	rows, err := q.db.QueryContext(ctx, listInboxForUser, arg.UserID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListInboxForUserRow{}
+	for rows.Next() {
+		var i ListInboxForUserRow
+		if err := rows.Scan(
+			&i.WorkspaceID,
 			&i.PublicID,
 			&i.TaskPublicID,
 			&i.TaskTitle,

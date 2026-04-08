@@ -21,9 +21,10 @@ import (
 // helper test creates its own TestTenant so that parallel tests cannot
 // observe each other's state.
 //
-// WorkspacePublicID is intentionally left blank for now: workspace
-// creation is not yet exposed by the API. It will be populated once
-// 1.API-2 lands.
+// Every tenant owns a dedicated workspace (where the tenant user is the
+// owner) and a single default project inside it. Tests that need
+// additional projects or cross-tenant scenarios can create them via the
+// API using the AccessToken.
 type TestTenant struct {
 	BaseURL           string
 	Email             string
@@ -31,6 +32,9 @@ type TestTenant struct {
 	DisplayName       string
 	UserPublicID      string
 	WorkspacePublicID string
+	WorkspaceSlug     string
+	ProjectPublicID   string
+	ProjectSlug       string
 	AccessToken       string
 	RefreshToken      string
 }
@@ -70,6 +74,37 @@ func CreateTestTenant(t *testing.T, baseURL string) *TestTenant {
 	tt.AccessToken = resp.AccessToken
 	tt.RefreshToken = resp.RefreshToken
 	tt.UserPublicID = resp.UserID
+
+	// Create a workspace owned by this tenant.
+	tt.WorkspaceSlug = "ws-" + suffix
+	wsBody := map[string]any{
+		"slug": tt.WorkspaceSlug,
+		"name": "Test Workspace " + suffix,
+	}
+	var wsResp struct {
+		ID   string `json:"id"`
+		Slug string `json:"slug"`
+	}
+	doJSON(t, http.MethodPost, baseURL+"/workspaces", tt.AccessToken, wsBody, &wsResp)
+	require.NotEmpty(t, wsResp.ID, "workspace create did not return id")
+	tt.WorkspacePublicID = wsResp.ID
+
+	// Create a default project inside that workspace.
+	tt.ProjectSlug = "prj-" + suffix
+	prjBody := map[string]any{
+		"slug": tt.ProjectSlug,
+		"name": "Test Project " + suffix,
+	}
+	var prjResp struct {
+		ID   string `json:"id"`
+		Slug string `json:"slug"`
+	}
+	doJSON(t, http.MethodPost,
+		baseURL+"/workspaces/"+tt.WorkspacePublicID+"/projects",
+		tt.AccessToken, prjBody, &prjResp)
+	require.NotEmpty(t, prjResp.ID, "project create did not return id")
+	tt.ProjectPublicID = prjResp.ID
+
 	return tt
 }
 

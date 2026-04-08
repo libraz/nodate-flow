@@ -1,0 +1,22 @@
+# This file applies when building with context = repo root.
+.git
+.github
+.vscode
+.idea
+node_modules
+**/node_modules
+*.md
+docs
+apps/web
+apps/cli
+packages
+sql/build
+infra
+scripts
+.env
+.env.*
+!.env.example
+apps/api/tests
+**/*_test.go
+coverage
+dist

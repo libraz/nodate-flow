@@ -3,14 +3,21 @@ package projects
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"strings"
 	"time"
+
+	"github.com/go-sql-driver/mysql"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/middleware"
 )
+
+// mysqlErrDuplicateEntry is the MySQL error number for a unique-constraint
+// violation (ER_DUP_ENTRY). See https://dev.mysql.com/doc/mysql-errors/8.4/en/
+const mysqlErrDuplicateEntry = 1062
 
 // Create handles POST /workspaces/{wsId}/projects.
 func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error) {
@@ -35,10 +42,11 @@ func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error
 			Description: desc,
 			Color:       color,
 		}); err != nil {
-			// MySQL duplicate key check would map to slug-taken; for the
-			// scaffold we collapse all errors to the unexpected bucket
-			// except where the surface is obviously wrong.
-			return nil, httpErr(apierrors.WsProjectSlugAlreadyTaken)
+			var mysqlErr *mysql.MySQLError
+			if errors.As(err, &mysqlErr) && mysqlErr.Number == mysqlErrDuplicateEntry {
+				return nil, httpErr(apierrors.WsProjectSlugAlreadyTaken)
+			}
+			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
 		return &CreateOutput{Body: Project{

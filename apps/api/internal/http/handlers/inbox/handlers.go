@@ -42,31 +42,63 @@ WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 	return wsID, nil
 }
 
-// List handles GET /inbox.
+// List handles GET /inbox. When workspaceId is provided it scopes the
+// result to that workspace (after verifying membership). When omitted it
+// lists inbox items across every workspace the actor is an active member
+// of.
 func List(deps Deps) func(context.Context, *ListInput) (*ListOutput, error) {
 	return func(ctx context.Context, in *ListInput) (*ListOutput, error) {
 		actorID, ok := middleware.ActorFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
 		}
-		wsID, err := resolveWorkspace(ctx, deps.DB, in.WorkspaceID, actorID)
-		if err != nil {
-			return nil, err
-		}
 		limit := in.Limit
 		if limit <= 0 {
 			limit = 50
 		}
-		rows, err := deps.Queries.ListInbox(ctx, generated.ListInboxParams{
-			WorkspaceID: wsID,
-			Limit:       limit,
-			Offset:      in.Offset,
+		out := &ListOutput{}
+		out.Body.Items = []Item{}
+
+		if in.WorkspaceID != "" {
+			wsID, err := resolveWorkspace(ctx, deps.DB, in.WorkspaceID, actorID)
+			if err != nil {
+				return nil, err
+			}
+			rows, err := deps.Queries.ListInbox(ctx, generated.ListInboxParams{
+				WorkspaceID: wsID,
+				Limit:       limit,
+				Offset:      in.Offset,
+			})
+			if err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			for _, r := range rows {
+				out.Body.Items = append(out.Body.Items, Item{
+					ID:         r.PublicID.String(),
+					TaskID:     nullStr(r.TaskPublicID),
+					TaskTitle:  nullStr(r.TaskTitle),
+					Source:     string(r.Source),
+					Kind:       r.Kind,
+					ExternalID: nullStr(r.ExternalID),
+					Payload:    r.PayloadJson,
+					ReceivedAt: r.ReceivedAt,
+					CreatedAt:  r.CreatedAt,
+				})
+			}
+			if len(rows) > 0 {
+				out.Body.Total = totalAsInt64(rows[0].Total)
+			}
+			return out, nil
+		}
+
+		rows, err := deps.Queries.ListInboxForUser(ctx, generated.ListInboxForUserParams{
+			UserID: actorID,
+			Limit:  limit,
+			Offset: in.Offset,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		out := &ListOutput{}
-		out.Body.Items = []Item{}
 		for _, r := range rows {
 			out.Body.Items = append(out.Body.Items, Item{
 				ID:         r.PublicID.String(),

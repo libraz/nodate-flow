@@ -1,0 +1,254 @@
+package ai
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/providers"
+)
+
+// ErrNoProvider is returned by ProposeTasksFrom / ProposePriority when the
+// workspace has no enabled AI provider configured. Map to
+// AI.PROVIDER.NOT_CONFIGURED at the HTTP boundary.
+var ErrNoProvider = errors.New("ai: no provider configured for workspace")
+
+// ErrParse is returned when the LLM response could not be parsed into the
+// expected JSON shape.
+var ErrParse = errors.New("ai: failed to parse provider response")
+
+// ProposedTask is the LLM-generated task suggestion.
+type ProposedTask struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Priority    string `json:"priority"`
+}
+
+// ProviderResolver is the narrow contract for picking the workspace's
+// default Provider. Production code wires this to a function that calls
+// ListProvidersForWorkspace + FindProviderForDecrypt + providers.New, all
+// inside the providers/ package family. Tests inject a fake.
+type ProviderResolver interface {
+	Default(ctx context.Context, workspaceID uint32) (providers.Provider, error)
+}
+
+// ProviderResolverFunc adapts a plain function to ProviderResolver.
+type ProviderResolverFunc func(ctx context.Context, workspaceID uint32) (providers.Provider, error)
+
+// Default implements ProviderResolver.
+func (f ProviderResolverFunc) Default(ctx context.Context, workspaceID uint32) (providers.Provider, error) {
+	return f(ctx, workspaceID)
+}
+
+// Orchestrator wires a Provider source, the cost guard, and an invocation
+// logger. The HTTP and MCP layers depend on this struct rather than calling
+// providers.New directly so that depguard can keep crypto access fenced
+// inside internal/ai/providers.
+type Orchestrator struct {
+	Resolver  ProviderResolver
+	Guard     *CostGuard
+	LogInvoke InvocationLogger
+}
+
+// InvocationLogger persists a redacted record of the LLM call. The
+// orchestrator already runs Redact on prompt and response before calling
+// this hook.
+type InvocationLogger func(ctx context.Context, rec InvocationRecord)
+
+// InvocationRecord is the redacted ai_invocations payload. ai_invocations
+// rows are append-only; status is one of "ok", "error".
+type InvocationRecord struct {
+	WorkspaceID      uint32
+	Purpose          string
+	Model            string
+	PromptRedacted   string
+	ResponseRedacted string
+	TokensInput      int
+	TokensOutput     int
+	CostCents        int64
+	Status           string
+	ErrorCode        string
+}
+
+const proposeTasksSystem = `You are a task-planning assistant for the nodate-flow workspace. ` +
+	`Reply ONLY with a JSON array of objects with keys "title", "description", "priority". ` +
+	`priority is one of "low", "medium", "high".`
+
+const proposePrioritySystem = `You are a task-priority assistant. ` +
+	`Reply ONLY with a JSON object {"priority": "low" | "medium" | "high", "reason": "..."}.`
+
+// ProposeTasksFrom asks the workspace's default LLM provider to convert a
+// free-text signal into a list of proposed tasks. Both the prompt and the
+// response are redacted before logging.
+func (o *Orchestrator) ProposeTasksFrom(ctx context.Context, workspaceID uint32, signal string) ([]ProposedTask, error) {
+	if o == nil || o.Resolver == nil {
+		return nil, ErrNoProvider
+	}
+	if err := o.Guard.Check(ctx, workspaceID); err != nil {
+		return nil, err
+	}
+	prov, err := o.Resolver.Default(ctx, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	if prov == nil {
+		return nil, ErrNoProvider
+	}
+
+	req := providers.Request{
+		System: proposeTasksSystem,
+		Prompt: signal,
+	}
+	resp, err := prov.Complete(ctx, req)
+	if err != nil {
+		o.logFailure(ctx, workspaceID, "propose_tasks_from", req, err)
+		return nil, fmt.Errorf("ai: provider call failed: %w", err)
+	}
+	o.logSuccess(ctx, workspaceID, "propose_tasks_from", req, resp)
+
+	tasks, parseErr := parseProposedTasks(resp.Text)
+	if parseErr != nil {
+		return nil, parseErr
+	}
+	return tasks, nil
+}
+
+// ProposePriority asks the LLM to suggest a priority for a task given a
+// short description.
+func (o *Orchestrator) ProposePriority(ctx context.Context, workspaceID uint32, taskSummary string) (string, error) {
+	if o == nil || o.Resolver == nil {
+		return "", ErrNoProvider
+	}
+	if err := o.Guard.Check(ctx, workspaceID); err != nil {
+		return "", err
+	}
+	prov, err := o.Resolver.Default(ctx, workspaceID)
+	if err != nil {
+		return "", err
+	}
+	if prov == nil {
+		return "", ErrNoProvider
+	}
+	req := providers.Request{
+		System: proposePrioritySystem,
+		Prompt: taskSummary,
+	}
+	resp, err := prov.Complete(ctx, req)
+	if err != nil {
+		o.logFailure(ctx, workspaceID, "propose_priority", req, err)
+		return "", fmt.Errorf("ai: provider call failed: %w", err)
+	}
+	o.logSuccess(ctx, workspaceID, "propose_priority", req, resp)
+
+	var parsed struct {
+		Priority string `json:"priority"`
+	}
+	if err := json.Unmarshal([]byte(extractJSON(resp.Text)), &parsed); err != nil {
+		return "", fmt.Errorf("%w: %v", ErrParse, err)
+	}
+	return parsed.Priority, nil
+}
+
+// parseProposedTasks tolerates the model wrapping the JSON array in prose
+// or fenced code blocks. extractJSON pulls the first balanced "[ ... ]"
+// substring before json.Unmarshal runs.
+func parseProposedTasks(s string) ([]ProposedTask, error) {
+	payload := extractJSON(s)
+	if payload == "" {
+		return nil, ErrParse
+	}
+	var tasks []ProposedTask
+	if err := json.Unmarshal([]byte(payload), &tasks); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrParse, err)
+	}
+	return tasks, nil
+}
+
+// extractJSON returns the first JSON object or array literal it finds in s.
+// Hand-written, no regex. Returns "" when nothing balanced is found.
+func extractJSON(s string) string {
+	start := -1
+	var open byte
+	var close byte
+	for i := 0; i < len(s); i++ {
+		if s[i] == '[' || s[i] == '{' {
+			start = i
+			open = s[i]
+			if open == '[' {
+				close = ']'
+			} else {
+				close = '}'
+			}
+			break
+		}
+	}
+	if start < 0 {
+		return ""
+	}
+	depth := 0
+	inStr := false
+	esc := false
+	for i := start; i < len(s); i++ {
+		c := s[i]
+		if inStr {
+			if esc {
+				esc = false
+				continue
+			}
+			if c == '\\' {
+				esc = true
+				continue
+			}
+			if c == '"' {
+				inStr = false
+			}
+			continue
+		}
+		if c == '"' {
+			inStr = true
+			continue
+		}
+		if c == open {
+			depth++
+		} else if c == close {
+			depth--
+			if depth == 0 {
+				return s[start : i+1]
+			}
+		}
+	}
+	return ""
+}
+
+func (o *Orchestrator) logSuccess(ctx context.Context, workspaceID uint32, purpose string, req providers.Request, resp *providers.Response) {
+	if o.LogInvoke == nil {
+		return
+	}
+	o.LogInvoke(ctx, InvocationRecord{
+		WorkspaceID:      workspaceID,
+		Purpose:          purpose,
+		Model:            req.Model,
+		PromptRedacted:   Redact(strings.TrimSpace(req.System + "\n" + req.Prompt)),
+		ResponseRedacted: Redact(resp.Text),
+		TokensInput:      resp.InputTokens,
+		TokensOutput:     resp.OutputTokens,
+		CostCents:        resp.CostCents,
+		Status:           "ok",
+	})
+}
+
+func (o *Orchestrator) logFailure(ctx context.Context, workspaceID uint32, purpose string, req providers.Request, err error) {
+	if o.LogInvoke == nil {
+		return
+	}
+	o.LogInvoke(ctx, InvocationRecord{
+		WorkspaceID:    workspaceID,
+		Purpose:        purpose,
+		Model:          req.Model,
+		PromptRedacted: Redact(strings.TrimSpace(req.System + "\n" + req.Prompt)),
+		Status:         "error",
+		ErrorCode:      err.Error(),
+	})
+}

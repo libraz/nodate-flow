@@ -1,6 +1,7 @@
 -- name: ListInbox :many
 -- List a workspace's inbox via v_inbox.
 SELECT
+  v.workspace_id,
   v.public_id,
   v.task_public_id,
   v.task_title,
@@ -14,6 +15,29 @@ SELECT
   COUNT(*) OVER() AS total
 FROM v_inbox v
 WHERE v.workspace_id = ?
+ORDER BY v.received_at DESC, v.public_id DESC
+LIMIT ? OFFSET ?;
+
+-- name: ListInboxForUser :many
+-- List inbox items across every workspace the actor is an active member of.
+SELECT
+  v.workspace_id,
+  v.public_id,
+  v.task_public_id,
+  v.task_title,
+  v.source,
+  v.kind,
+  v.external_id,
+  v.payload_json,
+  v.received_at,
+  v.updated_at,
+  v.created_at,
+  COUNT(*) OVER() AS total
+FROM v_inbox v
+INNER JOIN workspace_members wm
+  ON wm.workspace_id = v.workspace_id
+  AND wm.user_id = ?
+  AND wm.enabled = TRUE
 ORDER BY v.received_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
 

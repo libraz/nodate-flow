@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
@@ -33,6 +34,9 @@ import (
 type Deps struct {
 	DB      *sql.DB
 	Queries *generated.Queries
+	// AI is the optional LLM orchestrator. When nil, the propose_* tools
+	// return AI.PROVIDER.NOT_CONFIGURED.
+	AI *ai.Orchestrator
 }
 
 // Handler implements http.Handler for the /mcp endpoint.

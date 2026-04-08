@@ -291,6 +291,50 @@ func (q *Queries) FindUserByPublicId(ctx context.Context, publicID types.PublicI
 	return i, err
 }
 
+const findUserInternalIdByPublicId = `-- name: FindUserInternalIdByPublicId :one
+SELECT id
+FROM users
+WHERE public_id = ?
+  AND enabled = TRUE
+LIMIT 1
+`
+
+// Resolve the internal users.id for a public UUID, excluding disabled rows.
+func (q *Queries) FindUserInternalIdByPublicId(ctx context.Context, publicID types.PublicID) (uint32, error) {
+	row := q.db.QueryRowContext(ctx, findUserInternalIdByPublicId, publicID)
+	var id uint32
+	err := row.Scan(&id)
+	return id, err
+}
+
+const findUserProfileById = `-- name: FindUserProfileById :one
+SELECT public_id, email, display_name, locale
+FROM users
+WHERE id = ?
+  AND enabled = TRUE
+LIMIT 1
+`
+
+type FindUserProfileByIdRow struct {
+	PublicID    types.PublicID `json:"publicId"`
+	Email       string         `json:"email"`
+	DisplayName string         `json:"displayName"`
+	Locale      string         `json:"locale"`
+}
+
+// Fetch the minimal profile for the /me endpoint by internal id.
+func (q *Queries) FindUserProfileById(ctx context.Context, id uint32) (FindUserProfileByIdRow, error) {
+	row := q.db.QueryRowContext(ctx, findUserProfileById, id)
+	var i FindUserProfileByIdRow
+	err := row.Scan(
+		&i.PublicID,
+		&i.Email,
+		&i.DisplayName,
+		&i.Locale,
+	)
+	return i, err
+}
+
 const registerUser = `-- name: RegisterUser :execlastid
 INSERT INTO users (
   public_id,

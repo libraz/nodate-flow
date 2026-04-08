@@ -14,6 +14,8 @@ var (
 	AiProviderUpstreamTimeout = &Spec{Code: "AI.PROVIDER.UPSTREAM_TIMEOUT", Status: 504, Message: "AI provider call timed out"}
 	// AI.REDACTION.PIPELINE_FAILED — Sensitive data redaction failed
 	AiRedactionPipelineFailed = &Spec{Code: "AI.REDACTION.PIPELINE_FAILED", Status: 500, Message: "Sensitive data redaction failed"}
+	// AI.RESPONSE.PARSE_FAILED — AI provider response could not be parsed
+	AiResponseParseFailed = &Spec{Code: "AI.RESPONSE.PARSE_FAILED", Status: 502, Message: "AI provider response could not be parsed"}
 	// AI.SAFETY.BLOCKED — Request blocked by safety policy
 	AiSafetyBlocked = &Spec{Code: "AI.SAFETY.BLOCKED", Status: 422, Message: "Request blocked by safety policy"}
 )

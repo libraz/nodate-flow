@@ -1,48 +1,46 @@
 package providers
 
 import (
-	"context"
 	"errors"
 	"fmt"
 )
 
-// ErrNotImplemented is returned by stub providers until the concrete
-// implementations land in 1.AI-1.
-var ErrNotImplemented = errors.New("ai/providers: not implemented")
+// ErrUnknownKind is returned by New when cfg.Kind does not map to any
+// registered provider.
+var ErrUnknownKind = errors.New("ai/providers: unknown provider kind")
 
-// Factory builds a Provider for a given encrypted-key context. The
-// concrete signature will grow with the first real implementation; for
-// the stub it just takes a kind so registry.go compiles.
-type Factory func(kind Kind) Provider
+// ErrMissingKey is returned by New when a non-Ollama provider has no
+// sealed API key blob.
+var ErrMissingKey = errors.New("ai/providers: missing encrypted api key")
 
-// Registry maps a Kind to its factory. Lookup is the only public way to
-// obtain a Provider so callers cannot accidentally instantiate one
-// outside this package.
-var registry = map[Kind]Factory{
-	KindAnthropic:    func(k Kind) Provider { return &stub{kind: k} },
-	KindOpenAI:       func(k Kind) Provider { return &stub{kind: k} },
-	KindGoogle:       func(k Kind) Provider { return &stub{kind: k} },
-	KindOllama:       func(k Kind) Provider { return &stub{kind: k} },
-	KindOpenAICompat: func(k Kind) Provider { return &stub{kind: k} },
+// New constructs a Provider for cfg, decrypting nothing yet. The actual
+// decryption happens inside Complete, scoped to a single upstream HTTP
+// call. dec is the only object that holds the master key; it MUST be the
+// process-wide *crypto.Cipher built from NF_SECRET_KEY.
+func New(cfg Config, dec Decryptor) (Provider, error) {
+	if cfg.Kind != KindOllama && len(cfg.EncryptedKey) == 0 {
+		return nil, ErrMissingKey
+	}
+	switch cfg.Kind {
+	case KindAnthropic:
+		return &anthropicProvider{cfg: cfg, dec: dec}, nil
+	case KindOpenAI:
+		return &openAIProvider{cfg: cfg, dec: dec, baseURL: defaultOpenAIBaseURL}, nil
+	case KindGoogle:
+		return &googleProvider{cfg: cfg, dec: dec}, nil
+	case KindOllama:
+		return &ollamaProvider{cfg: cfg}, nil
+	case KindOpenAICompat:
+		return &openAIProvider{cfg: cfg, dec: dec, baseURL: chooseBaseURL(cfg.BaseURL, defaultOpenAIBaseURL)}, nil
+	}
+	return nil, fmt.Errorf("%w: %q", ErrUnknownKind, cfg.Kind)
 }
 
-// Lookup returns the factory for kind, or false if the kind is unknown.
-func Lookup(kind Kind) (Factory, bool) {
-	f, ok := registry[kind]
-	return f, ok
-}
-
-// stub is a placeholder Provider implementation that returns
-// ErrNotImplemented for every call. The real Anthropic / OpenAI / Google /
-// Ollama / openai_compat implementations replace it in 1.AI-1.
-type stub struct {
-	kind Kind
-}
-
-func (s *stub) Name() string {
-	return fmt.Sprintf("stub:%s", s.kind)
-}
-
-func (s *stub) Generate(_ context.Context, _ Request) (*Response, error) {
-	return nil, ErrNotImplemented
+// chooseBaseURL returns override if non-empty, otherwise fallback. Centralised
+// so each provider's New path stays one line.
+func chooseBaseURL(override, fallback string) string {
+	if override != "" {
+		return override
+	}
+	return fallback
 }

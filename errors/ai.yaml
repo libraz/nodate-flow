@@ -36,6 +36,16 @@ resources:
         description: "Returned when the workspace's monthly AI spend has reached the configured cost guard limit."
         userAction: "Wait for the next billing period or raise the cost guard in workspace settings."
 
+  response:
+    breadcrumb: "AI > Response"
+    errors:
+      parse_failed:
+        code: AI.RESPONSE.PARSE_FAILED
+        status: 502
+        message: "AI provider response could not be parsed"
+        description: "Returned when the upstream LLM returned a completion whose body could not be decoded into the expected JSON shape."
+        userAction: "Retry the request; if the problem persists, check the provider or model configuration."
+
   redaction:
     breadcrumb: "AI > Redaction"
     errors:

@@ -4,6 +4,8 @@ package errors
 
 // Error codes and specs.
 var (
+	// VALIDATION.BODY.DATE_FORMAT_INVALID — Date must be in YYYY-MM-DD format
+	ValidationBodyDateFormatInvalid = &Spec{Code: "VALIDATION.BODY.DATE_FORMAT_INVALID", Status: 400, Message: "Date must be in YYYY-MM-DD format"}
 	// VALIDATION.BODY.FIELD_INVALID — A field in the request body is invalid
 	ValidationBodyFieldInvalid = &Spec{Code: "VALIDATION.BODY.FIELD_INVALID", Status: 422, Message: "A field in the request body is invalid"}
 	// VALIDATION.BODY.FIELD_MISSING — A required field is missing in the request body

@@ -8,6 +8,7 @@ import (
 	stderrors "errors"
 	"time"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
@@ -509,16 +510,95 @@ func runSearchTasks(_ context.Context, _ Deps, _ *session, _ json.RawMessage) (a
 		"search_tasks: not implemented in Phase 1")
 }
 
-// runProposeTasksFrom is deferred: the AI provider pipeline is not yet
-// wired into the MCP tool layer in Phase 1.
-func runProposeTasksFrom(_ context.Context, _ Deps, _ *session, _ json.RawMessage) (any, error) {
-	return nil, apierrors.Newf(apierrors.AiProviderNotConfigured,
-		"propose_tasks_from: AI provider not wired in Phase 1")
+// runProposeTasksFrom asks the workspace's LLM provider to turn a free-text
+// source (meeting notes, email, etc.) into a list of candidate tasks. The
+// orchestrator handles cost guard, provider resolution, redaction, and
+// invocation logging.
+func runProposeTasksFrom(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	var in struct {
+		Source string `json:"source"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	if in.Source == "" {
+		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+	}
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+	if deps.AI == nil {
+		return nil, apierrors.New(apierrors.AiProviderNotConfigured)
+	}
+	tasks, err := deps.AI.ProposeTasksFrom(ctx, s.workspaceID, in.Source)
+	if err != nil {
+		return nil, mapAiError(err)
+	}
+	out := make([]map[string]any, 0, len(tasks))
+	for _, t := range tasks {
+		out = append(out, map[string]any{
+			"title":       t.Title,
+			"description": t.Description,
+			"priority":    t.Priority,
+		})
+	}
+	return map[string]any{"tasks": out}, nil
 }
 
-// runProposePriority is deferred for the same reason as runProposeTasksFrom.
-func runProposePriority(_ context.Context, _ Deps, _ *session, _ json.RawMessage) (any, error) {
-	return nil, apierrors.Newf(apierrors.AiProviderNotConfigured,
-		"propose_priority: AI provider not wired in Phase 1")
+// runProposePriority asks the workspace LLM to suggest a priority for an
+// existing task identified by public id.
+func runProposePriority(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	var in struct {
+		TaskID string `json:"taskId"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+	pub, err := types.Parse(in.TaskID)
+	if err != nil {
+		return nil, apierrors.New(apierrors.WsTaskNotFound)
+	}
+	row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
+		WorkspaceID: s.workspaceID,
+		PublicID:    pub,
+	})
+	if err != nil {
+		if stderrors.Is(err, sql.ErrNoRows) {
+			return nil, apierrors.New(apierrors.WsTaskNotFound)
+		}
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	if deps.AI == nil {
+		return nil, apierrors.New(apierrors.AiProviderNotConfigured)
+	}
+	summary := row.Title
+	if row.Description.Valid && row.Description.String != "" {
+		summary = row.Title + "\n\n" + row.Description.String
+	}
+	priority, err := deps.AI.ProposePriority(ctx, s.workspaceID, summary)
+	if err != nil {
+		return nil, mapAiError(err)
+	}
+	return map[string]any{
+		"priority":  priority,
+		"rationale": "",
+	}, nil
+}
+
+// mapAiError maps ai package sentinel errors to the appropriate API
+// error spec for the MCP boundary.
+func mapAiError(err error) error {
+	switch {
+	case stderrors.Is(err, ai.ErrNoProvider):
+		return apierrors.New(apierrors.AiProviderNotConfigured)
+	case stderrors.Is(err, ai.ErrDailyBudgetExceeded):
+		return apierrors.New(apierrors.AiCostGuardExceeded)
+	case stderrors.Is(err, ai.ErrParse):
+		return apierrors.New(apierrors.AiResponseParseFailed)
+	}
+	return apierrors.Wrap(apierrors.AiProviderUpstreamCallFailed, err)
 }
 

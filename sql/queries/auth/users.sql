@@ -118,6 +118,22 @@ SET failed_attempts = 0,
     locked_until_at = NULL
 WHERE id = ?;
 
+-- name: FindUserInternalIdByPublicId :one
+-- Resolve the internal users.id for a public UUID, excluding disabled rows.
+SELECT id
+FROM users
+WHERE public_id = ?
+  AND enabled = TRUE
+LIMIT 1;
+
+-- name: FindUserProfileById :one
+-- Fetch the minimal profile for the /me endpoint by internal id.
+SELECT public_id, email, display_name, locale
+FROM users
+WHERE id = ?
+  AND enabled = TRUE
+LIMIT 1;
+
 -- name: UpdateUserLastLoginAt :exec
 -- Stamp last successful login time on a user account.
 UPDATE users

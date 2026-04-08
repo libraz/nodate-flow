@@ -19,6 +19,13 @@ resources:
         description: "Returned when one or more fields fail schema validation (type, format, range). Failing field paths are listed in details."
         userAction: "Correct the fields listed in the error details and retry."
 
+      date_format_invalid:
+        code: VALIDATION.BODY.DATE_FORMAT_INVALID
+        status: 400
+        message: "Date must be in YYYY-MM-DD format"
+        description: "Returned when a date field fails to parse as an ISO 8601 calendar date (YYYY-MM-DD)."
+        userAction: "Send the date as a YYYY-MM-DD string (for example 2026-04-08)."
+
       unparseable:
         code: VALIDATION.BODY.UNPARSEABLE
         status: 400

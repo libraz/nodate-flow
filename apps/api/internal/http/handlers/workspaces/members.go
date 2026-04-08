@@ -17,13 +17,8 @@ import (
 // given public UUID. It is used by the membership handlers because the
 // generated FindUserByPublicId query targets v_users which does not expose
 // the internal id column.
-func resolveUserInternalID(ctx context.Context, db *sql.DB, pub types.PublicID) (uint32, error) {
-	const q = `SELECT id FROM users WHERE public_id = ? LIMIT 1`
-	var uid uint32
-	if err := db.QueryRowContext(ctx, q, pub).Scan(&uid); err != nil {
-		return 0, err
-	}
-	return uid, nil
+func resolveUserInternalID(ctx context.Context, q *generated.Queries, pub types.PublicID) (uint32, error) {
+	return q.FindUserInternalIdByPublicId(ctx, pub)
 }
 
 // ListMembers handles GET /workspaces/{wsId}/members.
@@ -156,7 +151,7 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 		if err != nil {
 			return nil, httpErr(apierrors.WsMemberNotFound)
 		}
-		uid, err := resolveUserInternalID(ctx, deps.DB, userPub)
+		uid, err := resolveUserInternalID(ctx, deps.Queries, userPub)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, httpErr(apierrors.WsMemberNotFound)
@@ -203,7 +198,7 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 		if err != nil {
 			return nil, httpErr(apierrors.WsMemberNotFound)
 		}
-		uid, err := resolveUserInternalID(ctx, deps.DB, userPub)
+		uid, err := resolveUserInternalID(ctx, deps.Queries, userPub)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, httpErr(apierrors.WsMemberNotFound)
