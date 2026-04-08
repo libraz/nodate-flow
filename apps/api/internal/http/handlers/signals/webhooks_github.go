@@ -64,6 +64,16 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 			writeError(w, apierrors.IntegrationGhWebhookEventUnsupported)
 			return
 		}
+		// 4.SIG-1: normalize event + action into a stable kind so the
+		// constraint engine and timeline filters can rely on a single
+		// shape across every github source.
+		var actionEnv struct {
+			Action string `json:"action"`
+		}
+		if json.Valid(body) {
+			_ = json.Unmarshal(body, &actionEnv)
+		}
+		event = gh.NormalizeEventKind(event, actionEnv.Action)
 
 		// Resolve workspace from the configured default.
 		if deps.DefaultWorkspaceID == "" {

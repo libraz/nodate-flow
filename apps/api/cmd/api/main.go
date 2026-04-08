@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/cors"
 	_ "github.com/go-sql-driver/mysql"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/agentruntime"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/providers"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/config"
@@ -134,6 +135,23 @@ func main() {
 	outer.Use(nflog.RequestLogger(logger))
 	outer.Use(buildCORS(cfg.CorsAllowedOrigins))
 	outer.Mount("/", inner)
+
+	// 4.AGENT-1: cron scheduler. Ticks once a minute, dispatches every
+	// enabled non-paused agent with a cron_expr to a log-only runner.
+	// Production wiring will swap LogRunner for an orchestrator-backed
+	// runner; the loop and Source contract stay identical.
+	scheduler := &agentruntime.Scheduler{
+		Source:   &agentruntime.DBSource{DB: db},
+		Runner:   &agentruntime.LogRunner{Sink: func(_ context.Context, j agentruntime.Job, _ time.Time) {
+			logger.Info("agent runtime: dispatch", "agent_id", j.AgentID, "ws", j.WsID)
+		}},
+		Interval: time.Minute,
+	}
+	schedulerCtx, schedulerCancel := context.WithCancel(context.Background())
+	defer schedulerCancel()
+	if err := scheduler.Start(schedulerCtx); err != nil {
+		logger.Warn("agent scheduler start failed", "err", err)
+	}
 
 	addr := ":" + cfg.Port
 	logger.Info("listening", "addr", addr)
