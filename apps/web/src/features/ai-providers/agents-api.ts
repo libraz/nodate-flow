@@ -1,13 +1,14 @@
 /**
- * Agents feature — minimal hooks for the 4.AGENT-3 kill switch UI.
+ * Agents feature — kill switch mutation (4.AGENT-3).
  *
- * NOTE: a full PATCH /workspaces/{wsId}/ai/agents/{agentId} REST
- * surface is not yet wired in the API; this hook scaffolds the
- * client-side interface so the dock can render a "pause" toggle as
- * soon as the backend lands.
+ * Calls POST /workspaces/{wsId}/ai/agents/{agentId}/pause through the
+ * typed SDK so 401/403 envelopes round-trip through the shared error
+ * surface instead of the raw fetch escape hatch.
  */
 
 import { type UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
+
+import { sdk } from '../../lib/sdk';
 
 export interface PauseAgentArgs {
   workspaceId: string;
@@ -15,28 +16,16 @@ export interface PauseAgentArgs {
   paused: boolean;
 }
 
-/**
- * usePauseAgent — placeholder mutation. Calls a future
- * `/workspaces/{wsId}/ai/agents/{agentId}/pause` endpoint via
- * window.fetch so it ships ahead of the typed SDK update. Returns
- * `{ ok: true }` on 2xx.
- */
+/** usePauseAgent toggles the `paused` column on an ai_agents row. */
 export function usePauseAgent(): UseMutationResult<{ ok: true }, Error, PauseAgentArgs> {
   const qc = useQueryClient();
   return useMutation<{ ok: true }, Error, PauseAgentArgs>({
     mutationFn: async ({ workspaceId, agentId, paused }) => {
-      const res = await fetch(
-        `/workspaces/${encodeURIComponent(workspaceId)}/ai/agents/${encodeURIComponent(
-          agentId,
-        )}/pause`,
-        {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ paused }),
-        },
-      );
-      if (!res.ok) throw new Error('Failed to toggle agent pause');
+      const { error } = await sdk.POST('/workspaces/{wsId}/ai/agents/{agentId}/pause', {
+        params: { path: { wsId: workspaceId, agentId } },
+        body: { paused },
+      });
+      if (error) throw new Error('Failed to toggle agent pause');
       return { ok: true };
     },
     onSuccess: (_res, { workspaceId }) => {
