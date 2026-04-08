@@ -7,6 +7,7 @@
  */
 
 import Dialog from '@nodate-flow/ui/primitives/dialog';
+import { useQueries } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import {
   type KeyboardEvent,
@@ -19,7 +20,9 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { TaskListItem } from '../../features/tasks/api';
 import { useWorkspacesQuery } from '../../features/workspaces/api';
+import { sdk } from '../../lib/sdk';
 
 interface CommandItem {
   id: string;
@@ -40,6 +43,7 @@ function PaletteBody({ onSelect }: InnerProps): ReactElement {
   const { t } = useTranslation('common');
   const { data: workspaces } = useWorkspacesQuery();
   const [query, setQuery] = useState('');
+  const [debounced, setDebounced] = useState('');
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -47,9 +51,42 @@ function PaletteBody({ onSelect }: InnerProps): ReactElement {
     inputRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebounced(query.trim()), 180);
+    return () => window.clearTimeout(id);
+  }, [query]);
+
+  const shouldSearchTasks = debounced.length >= 2;
+
+  const taskQueries = useQueries({
+    queries: workspaces.map((w) => ({
+      queryKey: ['command-palette', 'tasks', w.id, debounced] as const,
+      enabled: shouldSearchTasks,
+      staleTime: 10_000,
+      queryFn: async (): Promise<TaskListItem[]> => {
+        const { data, error } = await sdk.GET('/tasks', {
+          params: { query: { workspaceId: w.id, q: debounced, limit: 10, offset: 0 } },
+        });
+        if (error || !data) return [];
+        return data.tasks ?? [];
+      },
+    })),
+  });
+
+  const taskResults = useMemo<TaskListItem[]>(() => {
+    if (!shouldSearchTasks) return [];
+    const out: TaskListItem[] = [];
+    for (const q of taskQueries) {
+      if (q.data) out.push(...q.data);
+      if (out.length >= 10) break;
+    }
+    return out.slice(0, 10);
+  }, [shouldSearchTasks, taskQueries]);
+
   const items = useMemo<CommandItem[]>(() => {
     const navGroup = t('dock.command_palette.group_navigation');
     const wsGroup = t('dock.command_palette.group_workspaces');
+    const taskGroup = t('dock.command_palette.group_tasks');
     const nav: CommandItem[] = [
       { id: 'nav:home', label: t('dock.command_palette.home'), group: navGroup, href: '/' },
       { id: 'nav:today', label: t('nav.today'), group: navGroup, href: '/today' },
@@ -63,8 +100,14 @@ function PaletteBody({ onSelect }: InnerProps): ReactElement {
       group: wsGroup,
       href: `/workspaces/${w.id}`,
     }));
-    return [...nav, ...ws];
-  }, [t, workspaces]);
+    const tasks: CommandItem[] = taskResults.map((task) => ({
+      id: `task:${task.id}`,
+      label: task.title,
+      group: taskGroup,
+      href: `/tasks/${task.id}`,
+    }));
+    return [...tasks, ...nav, ...ws];
+  }, [t, workspaces, taskResults]);
 
   const filtered = useMemo<CommandItem[]>(() => {
     const q = normalize(query.trim());
