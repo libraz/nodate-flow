@@ -52,4 +52,12 @@
 
   --nf-motion-duration: var(--nf-duration-base);
   --nf-motion-easing: var(--nf-ease-emphasized);
+
+  /* Brand wordmark gradient — teal → indigo → warm rose, aurora-like sweep. */
+  --nf-gradient-wordmark: linear-gradient(
+    115deg,
+    oklch(62% 0.16 190) 0%,
+    oklch(56% 0.19 240) 45%,
+    oklch(66% 0.18 355) 100%
+  );
 }

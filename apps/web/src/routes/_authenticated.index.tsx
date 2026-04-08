@@ -172,6 +172,13 @@ function LandingPage(): ReactElement {
             lineHeight: 0.95,
             letterSpacing: '-0.02em',
             margin: 0,
+            backgroundImage: 'var(--nf-gradient-wordmark)',
+            backgroundClip: 'text',
+            // biome-ignore lint/style/useNamingConvention: React requires PascalCase for vendor-prefixed CSS properties
+            WebkitBackgroundClip: 'text',
+            color: 'transparent',
+            // biome-ignore lint/style/useNamingConvention: React requires PascalCase for vendor-prefixed CSS properties
+            WebkitTextFillColor: 'transparent',
           }}
         >
           {t('landing.wordmark')}

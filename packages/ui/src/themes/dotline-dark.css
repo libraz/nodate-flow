@@ -52,4 +52,12 @@
 
   --nf-motion-duration: var(--nf-duration-fast);
   --nf-motion-easing: var(--nf-ease-linear);
+
+  /* Brand wordmark gradient — monochrome chalk sweep, faithful to dotline. */
+  --nf-gradient-wordmark: linear-gradient(
+    115deg,
+    oklch(96% 0 0) 0%,
+    oklch(78% 0 0) 60%,
+    oklch(56% 0 0) 100%
+  );
 }
