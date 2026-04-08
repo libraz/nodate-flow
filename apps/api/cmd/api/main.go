@@ -166,13 +166,45 @@ func main() {
 	// schedule_kind='interval' to a log-only runner. Production wiring
 	// will swap LogRunner for an orchestrator-backed runner; the loop
 	// and Source contract stay identical.
-	scheduler := &agentruntime.Scheduler{
-		Source: &agentruntime.DBSource{DB: db},
-		Runner: &agentruntime.LogRunner{Sink: func(_ context.Context, j agentruntime.Job, _ time.Time) {
+	// Runner selection: the orchestrator runner writes real
+	// ai.agent.run.* audit events, but it leaves the actual LLM call
+	// to an AgentExecutor that the ai package will provide once the
+	// per-agent tick semantics are nailed down. Until then, the
+	// orchestrator runner with a nil executor is equivalent to
+	// "start + complete" bookkeeping without any provider traffic,
+	// which is what we want so the audit trail starts accumulating
+	// now. LogRunner stays available for dev / tests.
+	var runner agentruntime.Runner
+	if cfg.AgentRunner == "orchestrator" {
+		runner = &agentruntime.OrchestratorRunner{DB: db}
+		logger.Info("agent runner: orchestrator")
+	} else {
+		runner = &agentruntime.LogRunner{Sink: func(_ context.Context, j agentruntime.Job, _ time.Time) {
 			logger.Info("agent runtime: dispatch", "agent_id", j.AgentID, "ws", j.WsID)
-		}},
+		}}
+	}
+	scheduler := &agentruntime.Scheduler{
+		Source:   &agentruntime.DBSource{DB: db},
+		Runner:   runner,
 		Interval: cfg.AgentTickInterval,
 	}
+	var agentWorkers []*agentruntime.Worker
+	var workerCancel context.CancelFunc
+	if cfg.AgentQueueBackend == "mysql" {
+		mq := agentruntime.NewMySQLQueue(db)
+		scheduler.Queue = mq
+		if cfg.AgentWorkerCount > 0 {
+			var wctx context.Context
+			wctx, workerCancel = context.WithCancel(context.Background())
+			for i := 0; i < cfg.AgentWorkerCount; i++ {
+				w := &agentruntime.Worker{Queue: mq, Runner: runner}
+				agentWorkers = append(agentWorkers, w)
+				go w.Loop(wctx)
+			}
+			logger.Info("agent workers started", "count", cfg.AgentWorkerCount)
+		}
+	}
+	_ = agentWorkers
 	schedulerCtx, schedulerCancel := context.WithCancel(context.Background())
 	defer schedulerCancel()
 	if err := scheduler.Start(schedulerCtx); err != nil {
@@ -213,6 +245,9 @@ func main() {
 
 	scheduler.Stop()
 	schedulerCancel()
+	if workerCancel != nil {
+		workerCancel()
+	}
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer shutdownCancel()

@@ -10,6 +10,7 @@ package agentruntime
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -48,6 +49,12 @@ var ErrAlreadyRunning = errors.New("agentruntime: scheduler already running")
 type Scheduler struct {
 	Source   Source
 	Runner   Runner
+	// Queue is optional. When set, tick enqueues Runs instead of
+	// calling Runner directly — this is the scheduler/worker split
+	// path used in multi-replica deployments. When nil, tick falls
+	// back to synchronous Runner.Run so the single-binary default
+	// keeps working without a DB-backed queue.
+	Queue    Queue
 	Interval time.Duration
 	Now      func() time.Time
 
@@ -133,6 +140,22 @@ func (s *Scheduler) tick(ctx context.Context) {
 	}
 	for _, j := range jobs {
 		if j.Paused {
+			continue
+		}
+		if s.Queue != nil {
+			key := fmt.Sprintf("%d:%d", j.AgentID, now.Unix()/int64(s.Interval.Seconds()))
+			if err := s.Queue.Enqueue(ctx, Run{DedupeKey: key, Job: j, ScheduledAt: now}); err != nil {
+				if errors.Is(err, ErrDuplicate) {
+					continue
+				}
+				s.mu.Lock()
+				s.errors++
+				s.mu.Unlock()
+				continue
+			}
+			s.mu.Lock()
+			s.dispatch++
+			s.mu.Unlock()
 			continue
 		}
 		if err := s.Runner.Run(ctx, j, now); err != nil {

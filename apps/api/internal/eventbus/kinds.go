@@ -116,6 +116,15 @@ const (
 	AiAgentPaused Kind = "ai.agent.paused"
 	// AiAgentResumed is appended when the kill switch is released.
 	AiAgentResumed Kind = "ai.agent.resumed"
+	// AiAgentRunStarted is appended when a worker claims an agent_runs
+	// row and begins execution.
+	AiAgentRunStarted Kind = "ai.agent.run.started"
+	// AiAgentRunCompleted is appended when a worker finishes an agent
+	// run successfully.
+	AiAgentRunCompleted Kind = "ai.agent.run.completed"
+	// AiAgentRunFailed is appended when a worker's agent run returns
+	// an error.
+	AiAgentRunFailed Kind = "ai.agent.run.failed"
 )
 
 // Legacy / compatibility kinds. These are kept so historical events

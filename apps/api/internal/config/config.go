@@ -93,6 +93,27 @@ type Config struct {
 	// scheduler fires interval-scheduled agents. There is no per-agent
 	// cron expression — see ai_agents.schedule_kind.
 	AgentTickInterval time.Duration `env:"NF_AGENT_TICK_INTERVAL" envDefault:"1m"`
+
+	// AgentQueueBackend selects the agent runtime queue:
+	//   memory (default) — scheduler calls Runner inline, single-process only.
+	//   mysql           — scheduler enqueues into agent_runs; workers pull.
+	// Use mysql when running more than one api replica so schedulers do
+	// not double-fire and workers can scale independently.
+	AgentQueueBackend string `env:"NF_AGENT_QUEUE_BACKEND" envDefault:"memory"`
+	// AgentWorkerCount is the number of in-process workers started
+	// alongside the scheduler when AgentQueueBackend=mysql. 0 disables
+	// the worker loop entirely, useful for deploying scheduler-only or
+	// worker-only replicas.
+	AgentWorkerCount int `env:"NF_AGENT_WORKER_COUNT" envDefault:"1"`
+
+	// AgentRunner selects the Runner implementation the scheduler /
+	// worker pair dispatches to.
+	//   log          (default) — structured-log dispatch, no events.
+	//   orchestrator           — writes ai.agent.run.* events and
+	//                            delegates the LLM call to an
+	//                            AgentExecutor (nil until the ai
+	//                            package exposes one).
+	AgentRunner string `env:"NF_AGENT_RUNNER" envDefault:"log"`
 }
 
 // Load parses NF_* environment variables into a Config.
