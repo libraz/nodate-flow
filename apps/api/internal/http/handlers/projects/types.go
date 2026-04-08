@@ -30,10 +30,10 @@ type Project struct {
 	Description string    `json:"description,omitempty"`
 	Color       string    `json:"color,omitempty"`
 	IsArchived  bool      `json:"isArchived"`
-	StartedOn   time.Time `json:"startedOn,omitempty"`
-	EndedOn     time.Time `json:"endedOn,omitempty"`
-	UpdatedAt   time.Time `json:"updatedAt,omitempty"`
-	CreatedAt   time.Time `json:"createdAt"`
+	StartedOn   *time.Time `json:"startedOn,omitempty"`
+	EndedOn     *time.Time `json:"endedOn,omitempty"`
+	UpdatedAt   *time.Time `json:"updatedAt,omitempty"`
+	CreatedAt   time.Time  `json:"createdAt"`
 }
 
 // ProjectMember is the public DTO for a project_members row.
@@ -44,8 +44,8 @@ type ProjectMember struct {
 	DisplayName string    `json:"displayName"`
 	AvatarURL   string    `json:"avatarUrl,omitempty"`
 	Role        string    `json:"role"`
-	AddedAt     time.Time `json:"addedAt,omitempty"`
-	CreatedAt   time.Time `json:"createdAt"`
+	AddedAt     *time.Time `json:"addedAt,omitempty"`
+	CreatedAt   time.Time  `json:"createdAt"`
 }
 
 // CreateProjectBody is the request body for POST /workspaces/{wsId}/projects.
@@ -188,9 +188,16 @@ func nullStr(s sql.NullString) string {
 	return ""
 }
 
-func nullTime(t sql.NullTime) time.Time {
-	if t.Valid {
-		return t.Time
+func nullTime(t sql.NullTime) *time.Time {
+	if !t.Valid {
+		return nil
 	}
-	return time.Time{}
+	tt := t.Time
+	return &tt
+}
+
+// timePtr returns a pointer to a time.Time value, for assigning non-null
+// times into DTO fields declared as *time.Time.
+func timePtr(t time.Time) *time.Time {
+	return &t
 }

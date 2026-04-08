@@ -1,0 +1,44 @@
+domain: constraint
+breadcrumb: "Constraint"
+
+resources:
+  parse:
+    breadcrumb: "Constraint > Parse"
+    errors:
+      invalid_json:
+        code: CONSTRAINT.PARSE.INVALID_JSON
+        status: 422
+        message: "Constraint expression is not valid JSON"
+        description: "Returned when the stored constraint expression cannot be decoded as JSON before the DSL validator even runs."
+        userAction: "Fix the JSON syntax in the constraint expression."
+
+      unknown_op:
+        code: CONSTRAINT.PARSE.UNKNOWN_OP
+        status: 422
+        message: "Constraint expression uses an unknown operator"
+        description: "Returned when a constraint node references an op that is not in the closed DSL whitelist (ADR 0006)."
+        userAction: "Use one of the documented ops (and, or, not, time.*, dependency.*, actor.*, signal.*, approval.*, ci.*)."
+
+      missing_arg:
+        code: CONSTRAINT.PARSE.MISSING_ARG
+        status: 422
+        message: "Constraint expression is missing a required argument"
+        description: "Returned when a builtin is used without its required arg / taskIds / max field."
+        userAction: "Provide the argument listed in the constraint DSL reference."
+
+      empty_terms:
+        code: CONSTRAINT.PARSE.EMPTY_TERMS
+        status: 422
+        message: "Constraint and/or requires at least one term"
+        description: "Returned when an and / or node is supplied with an empty terms list."
+        userAction: "Add at least one child expression to the and / or node."
+
+  eval:
+    breadcrumb: "Constraint > Eval"
+    errors:
+      bad_date:
+        code: CONSTRAINT.EVAL.BAD_DATE
+        status: 422
+        message: "Constraint date argument is not a valid YYYY-MM-DD"
+        description: "Returned when time.* builtins receive a non-parseable date literal at evaluation time."
+        userAction: "Send the date as a YYYY-MM-DD string (for example 2026-04-08)."

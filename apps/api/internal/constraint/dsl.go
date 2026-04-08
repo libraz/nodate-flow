@@ -62,11 +62,30 @@ type Constraint struct {
 	Max *int `json:"max,omitempty"`
 }
 
-// ErrParse is returned by Parse when the input cannot be decoded or
-// contains an unknown Op / missing required field. Callers should
-// treat it as a validation error (AI.RESPONSE.PARSE_FAILED for the
-// AI path, VALIDATION.BODY.FIELD.INVALID for the hand-edit path).
+// ErrParse is the sentinel returned by Parse. Callers compare with
+// errors.Is; the concrete error returned by Parse is always a
+// *ParseError which carries a stable i18n Code (3.DSL-4).
 var ErrParse = errors.New("constraint: parse failed")
+
+// ParseError is the structured error produced by Parse. The Code
+// field is one of the CONSTRAINT.PARSE.* stable codes declared in
+// errors/constraint.yaml and is suitable for direct use as an i18n
+// message key.
+type ParseError struct {
+	Code    string
+	Message string
+}
+
+// Error implements the error interface.
+func (e *ParseError) Error() string { return e.Code + ": " + e.Message }
+
+// Is reports whether target is ErrParse so callers can use
+// errors.Is(err, ErrParse) without caring about the concrete type.
+func (e *ParseError) Is(target error) bool { return target == ErrParse }
+
+func parseErr(code, format string, args ...any) *ParseError {
+	return &ParseError{Code: code, Message: fmt.Sprintf(format, args...)}
+}
 
 // Parse decodes a JSON-encoded constraint expression and validates
 // that every referenced Op is known and every required field is
@@ -74,7 +93,7 @@ var ErrParse = errors.New("constraint: parse failed")
 func Parse(raw []byte) (Constraint, error) {
 	var c Constraint
 	if err := json.Unmarshal(raw, &c); err != nil {
-		return Constraint{}, fmt.Errorf("%w: %v", ErrParse, err)
+		return Constraint{}, parseErr(CodeInvalidJSON, "invalid json: %v", err)
 	}
 	if err := validate(&c); err != nil {
 		return Constraint{}, err
@@ -82,12 +101,21 @@ func Parse(raw []byte) (Constraint, error) {
 	return c, nil
 }
 
+// Stable i18n codes for parse errors. Keep in sync with
+// errors/constraint.yaml.
+const (
+	CodeInvalidJSON = "CONSTRAINT.PARSE.INVALID_JSON"
+	CodeUnknownOp   = "CONSTRAINT.PARSE.UNKNOWN_OP"
+	CodeMissingArg  = "CONSTRAINT.PARSE.MISSING_ARG"
+	CodeEmptyTerms  = "CONSTRAINT.PARSE.EMPTY_TERMS"
+)
+
 // validate walks the AST and enforces per-Op invariants.
 func validate(c *Constraint) error {
 	switch c.Op {
 	case OpAnd, OpOr:
 		if len(c.Terms) == 0 {
-			return fmt.Errorf("%w: %s requires non-empty terms", ErrParse, c.Op)
+			return parseErr(CodeEmptyTerms, "%s requires non-empty terms", c.Op)
 		}
 		for i := range c.Terms {
 			if err := validate(&c.Terms[i]); err != nil {
@@ -96,27 +124,27 @@ func validate(c *Constraint) error {
 		}
 	case OpNot:
 		if c.Term == nil {
-			return fmt.Errorf("%w: not requires term", ErrParse)
+			return parseErr(CodeMissingArg, "not requires term")
 		}
 		return validate(c.Term)
 	case OpTimeDueBefore, OpTimeDueAfter:
 		if c.Arg == "" {
-			return fmt.Errorf("%w: %s requires arg (YYYY-MM-DD)", ErrParse, c.Op)
+			return parseErr(CodeMissingArg, "%s requires arg (YYYY-MM-DD)", c.Op)
 		}
 	case OpDepAllDone:
 		if len(c.TaskIDs) == 0 {
-			return fmt.Errorf("%w: dependency.all_done requires taskIds", ErrParse)
+			return parseErr(CodeMissingArg, "dependency.all_done requires taskIds")
 		}
 	case OpDepOpenAtMost:
 		if c.Max == nil || *c.Max < 0 {
-			return fmt.Errorf("%w: dependency.open_at_most requires non-negative max", ErrParse)
+			return parseErr(CodeMissingArg, "dependency.open_at_most requires non-negative max")
 		}
 	case OpActorHasRole, OpSignalReceived, OpApprovalGranted, OpCIStatusIs:
 		if c.Arg == "" {
-			return fmt.Errorf("%w: %s requires arg", ErrParse, c.Op)
+			return parseErr(CodeMissingArg, "%s requires arg", c.Op)
 		}
 	default:
-		return fmt.Errorf("%w: unknown op %q", ErrParse, c.Op)
+		return parseErr(CodeUnknownOp, "unknown op %q", c.Op)
 	}
 	return nil
 }

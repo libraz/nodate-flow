@@ -14,7 +14,8 @@
   },
   "actor": {
     "system": "システム",
-    "unknown": "不明"
+    "unknown": "不明",
+    "initials_fallback": "?"
   },
   "event": {
     "task_created": "{actor} がこのタスクを作成しました",

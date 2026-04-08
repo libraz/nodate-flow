@@ -122,7 +122,7 @@ func AddMember(deps Deps) func(context.Context, *AddProjectMemberInput) (*AddPro
 			ID:        memPub.String(),
 			UserID:    userPub.String(),
 			Role:      string(role),
-			AddedAt:   now,
+			AddedAt:   timePtr(now),
 			CreatedAt: now,
 		}}, nil
 	}

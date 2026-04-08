@@ -354,3 +354,48 @@ func (q *Queries) ListPendingAiSuggestions(ctx context.Context, workspaceID uint
 	}
 	return items, nil
 }
+
+const listTransitionEventsForReplay = `-- name: ListTransitionEventsForReplay :many
+SELECT type, occurred_at
+FROM events
+WHERE workspace_id = ?
+  AND task_id = ?
+  AND type LIKE 'task.transition.%'
+ORDER BY occurred_at ASC, id ASC
+`
+
+type ListTransitionEventsForReplayParams struct {
+	WorkspaceID uint32        `json:"-"`
+	TaskID      sql.NullInt32 `json:"-"`
+}
+
+type ListTransitionEventsForReplayRow struct {
+	Type       string    `json:"type"`
+	OccurredAt time.Time `json:"occurredAt"`
+}
+
+// Ordered list of task.transition.* events for a single task,
+// ascending by occurred_at + id. Used by the Phase 3 replay tool
+// (3.ENG-1) to derive the expected derived_state from scratch.
+func (q *Queries) ListTransitionEventsForReplay(ctx context.Context, arg ListTransitionEventsForReplayParams) ([]ListTransitionEventsForReplayRow, error) {
+	rows, err := q.db.QueryContext(ctx, listTransitionEventsForReplay, arg.WorkspaceID, arg.TaskID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTransitionEventsForReplayRow{}
+	for rows.Next() {
+		var i ListTransitionEventsForReplayRow
+		if err := rows.Scan(&i.Type, &i.OccurredAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

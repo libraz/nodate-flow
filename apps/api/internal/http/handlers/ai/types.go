@@ -45,8 +45,8 @@ type Provider struct {
 	BaseURL      string    `json:"baseUrl,omitempty"`
 	DefaultModel string    `json:"defaultModel,omitempty"`
 	APIKeyMasked string    `json:"apiKeyMasked"`
-	UpdatedAt    time.Time `json:"updatedAt,omitempty"`
-	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    *time.Time `json:"updatedAt,omitempty"`
+	CreatedAt    time.Time  `json:"createdAt"`
 }
 
 // CreateProviderInput is the body for POST /workspaces/{wsId}/ai/providers.
@@ -191,11 +191,12 @@ func nullStr(s sql.NullString) string {
 	return ""
 }
 
-func nullTime(t sql.NullTime) time.Time {
-	if t.Valid {
-		return t.Time
+func nullTime(t sql.NullTime) *time.Time {
+	if !t.Valid {
+		return nil
 	}
-	return time.Time{}
+	tt := t.Time
+	return &tt
 }
 
 // nullTimeUnix converts a sql.NullTime to *int64 unix seconds. NULL → nil.

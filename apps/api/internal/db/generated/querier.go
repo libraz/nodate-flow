@@ -251,6 +251,10 @@ type Querier interface {
 	ListTasksForProject(ctx context.Context, arg ListTasksForProjectParams) ([]ListTasksForProjectRow, error)
 	// List tasks across an entire workspace via v_task_list.
 	ListTasksForWorkspace(ctx context.Context, arg ListTasksForWorkspaceParams) ([]ListTasksForWorkspaceRow, error)
+	// Ordered list of task.transition.* events for a single task,
+	// ascending by occurred_at + id. Used by the Phase 3 replay tool
+	// (3.ENG-1) to derive the expected derived_state from scratch.
+	ListTransitionEventsForReplay(ctx context.Context, arg ListTransitionEventsForReplayParams) ([]ListTransitionEventsForReplayRow, error)
 	// List signals in a workspace that have no task linkage yet.
 	ListUnattachedSignals(ctx context.Context, arg ListUnattachedSignalsParams) ([]ListUnattachedSignalsRow, error)
 	// List members of a workspace via v_workspace_members.

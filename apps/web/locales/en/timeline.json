@@ -14,7 +14,8 @@
   },
   "actor": {
     "system": "System",
-    "unknown": "Unknown"
+    "unknown": "Unknown",
+    "initials_fallback": "?"
   },
   "event": {
     "task_created": "{actor} created this task",

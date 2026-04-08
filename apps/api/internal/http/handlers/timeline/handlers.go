@@ -20,8 +20,8 @@ import (
 // package avoids leaking generated.* row types into the mapper layer.
 type timelineRow struct {
 	publicID         types.PublicID
-	taskPublicID     sql.NullString
-	actorPublicID    sql.NullString
+	taskPublicID     []byte
+	actorPublicID    []byte
 	actorDisplayName sql.NullString
 	eventType        string
 	payload          json.RawMessage
@@ -115,8 +115,8 @@ func toDTO(r timelineRow) TimelineEvent {
 	return TimelineEvent{
 		ID:               r.publicID.UUID().String(),
 		Type:             r.eventType,
-		TaskID:           nullStr(r.taskPublicID),
-		ActorUserID:      nullStr(r.actorPublicID),
+		TaskID:           uuidFromBytes(r.taskPublicID),
+		ActorUserID:      uuidFromBytes(r.actorPublicID),
 		ActorDisplayName: nullStr(r.actorDisplayName),
 		Payload:          r.payload,
 		OccurredAt:       r.occurredAt.Unix(),

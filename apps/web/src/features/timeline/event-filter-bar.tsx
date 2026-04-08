@@ -120,11 +120,26 @@ export default function EventFilterBar({
             color: 'var(--color-fg)',
           }}
         >
-          {TIMELINE_KINDS.map((kind) => (
-            <option key={kind} value={kind}>
-              {t(`event.${kind.replace(/\./g, '_')}`, { actor: '', defaultValue: kind })}
-            </option>
-          ))}
+          {(() => {
+            const seen = new Set<string>();
+            const options: { kind: string; label: string }[] = [];
+            for (const kind of TIMELINE_KINDS) {
+              const label = t(`event.${kind.replace(/\./g, '_')}`, {
+                actor: '',
+                defaultValue: kind,
+              })
+                .trim()
+                .replace(/\s+/g, ' ');
+              if (seen.has(label)) continue;
+              seen.add(label);
+              options.push({ kind, label });
+            }
+            return options.map((o) => (
+              <option key={o.kind} value={o.kind}>
+                {o.label}
+              </option>
+            ));
+          })()}
         </select>
       </label>
 

@@ -154,7 +154,7 @@ func EditComment(deps Deps) func(context.Context, *EditTaskCommentInput) (*EditT
 		return &EditTaskCommentOutput{Body: TaskComment{
 			ID:       cid.String(),
 			Body:     in.Body.Body,
-			EditedAt: time.Now(),
+			EditedAt: timePtr(time.Now()),
 		}}, nil
 	}
 }

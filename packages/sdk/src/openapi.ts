@@ -352,6 +352,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/{id}/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List AI agent actors on a task */
+        get: operations["tasks-agents-list"];
+        put?: never;
+        /** Attach an AI agent to a task */
+        post: operations["tasks-agents-add"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{id}/ai/invocations": {
         parameters: {
             query?: never;
@@ -457,6 +475,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/{id}/constraints/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run the Phase 3 constraint engine for a task and persist satisfied/failed markers */
+        post: operations["tasks-constraints-evaluate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{id}/constraints/{cid}": {
         parameters: {
             query?: never;
@@ -534,6 +569,23 @@ export interface paths {
         };
         /** Propose the next likely state transition for a task */
         get: operations["tasks-infer-state"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Replay transition events and report drift vs stored derived_state (3.ENG-1) */
+        get: operations["tasks-replay"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1019,6 +1071,17 @@ export interface components {
             /** @description User public id (UUID v7) */
             userId: string;
         };
+        AddTaskAgentActorBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description AI agent public id (UUID v7) */
+            agentId: string;
+            /** @enum {string} */
+            role: "assignee" | "reviewer" | "watcher" | "approver";
+        };
         AddTaskAttachmentBody: {
             /**
              * Format: uri
@@ -1200,6 +1263,8 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
+            /** @description Optional ai_agents public_id to bind this token to; tool calls will be attributed to the agent and subject to its cost cap */
+            agentId?: string;
             name: string;
             scopes: string[] | null;
         };
@@ -1209,6 +1274,7 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
+            agentId?: string;
             /** Format: int64 */
             createdAt: number;
             id: string;
@@ -1378,6 +1444,19 @@ export interface components {
              * @default about:blank
              */
             type: string;
+        };
+        EvaluateConstraintsOutcome: {
+            id: string;
+            parseError?: string;
+            satisfied: boolean;
+        };
+        EvaluateConstraintsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            outcomes: components["schemas"]["EvaluateConstraintsOutcome"][] | null;
         };
         HealthOutputBody: {
             /**
@@ -1575,6 +1654,16 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ListTaskAgentActorsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            agents: components["schemas"]["TaskAgentActor"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
         ListTaskAiInvocationsOutputBody: {
             /**
              * Format: uri
@@ -1676,6 +1765,7 @@ export interface components {
             ok: boolean;
         };
         McpTokenSummary: {
+            agentId?: string;
             /** Format: int64 */
             createdAt: number;
             /** Format: int64 */
@@ -1880,6 +1970,16 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        ReplayOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            derivedState: string;
+            equivalent: boolean;
+            stored: string;
+        };
         Signal: {
             /**
              * Format: uri
@@ -1983,6 +2083,21 @@ export interface components {
             /** Format: date-time */
             updatedAt?: string;
             userId: string;
+        };
+        TaskAgentActor: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            agentId: string;
+            agentName: string;
+            /** Format: date-time */
+            createdAt: string;
+            id: string;
+            role: string;
+            /** Format: date-time */
+            updatedAt?: string;
         };
         TaskAiInvocation: {
             costEstimate?: string;
@@ -3177,6 +3292,75 @@ export interface operations {
             };
         };
     };
+    "tasks-agents-list": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListTaskAgentActorsBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-agents-add": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddTaskAgentActorBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskAgentActor"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "tasks-ai-invocations-list": {
         parameters: {
             query?: {
@@ -3484,6 +3668,37 @@ export interface operations {
             };
         };
     };
+    "tasks-constraints-evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvaluateConstraintsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "tasks-constraints-remove": {
         parameters: {
             query?: never;
@@ -3632,6 +3847,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InferStateOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplayOutputBody"];
                 };
             };
             /** @description Error */

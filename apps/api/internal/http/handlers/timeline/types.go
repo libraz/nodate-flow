@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/google/uuid"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
@@ -55,6 +56,20 @@ func nullStr(s sql.NullString) string {
 		return s.String
 	}
 	return ""
+}
+
+// uuidFromBytes converts a raw BINARY(16) public_id into its canonical
+// UUID string form. Empty or malformed slices yield an empty string so
+// the field is omitted via the ",omitempty" JSON tag.
+func uuidFromBytes(b []byte) string {
+	if len(b) != 16 {
+		return ""
+	}
+	u, err := uuid.FromBytes(b)
+	if err != nil {
+		return ""
+	}
+	return u.String()
 }
 
 // TimelineEvent is the public DTO for a row in v_task_timeline. Time

@@ -45,6 +45,28 @@
         "required": ["userId", "role"],
         "type": "object"
       },
+      "AddTaskAgentActorBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AddTaskAgentActorBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "agentId": {
+            "description": "AI agent public id (UUID v7)",
+            "type": "string"
+          },
+          "role": {
+            "enum": ["assignee", "reviewer", "watcher", "approver"],
+            "type": "string"
+          }
+        },
+        "required": ["agentId", "role"],
+        "type": "object"
+      },
       "AddTaskAttachmentBody": {
         "additionalProperties": false,
         "properties": {
@@ -451,6 +473,10 @@
             "readOnly": true,
             "type": "string"
           },
+          "agentId": {
+            "description": "Optional ai_agents public_id to bind this token to; tool calls will be attributed to the agent and subject to its cost cap",
+            "type": "string"
+          },
           "name": {
             "maxLength": 255,
             "minLength": 1,
@@ -474,6 +500,9 @@
             "examples": ["https://example.com/schemas/CreateMcpTokenOutputBody.json"],
             "format": "uri",
             "readOnly": true,
+            "type": "string"
+          },
+          "agentId": {
             "type": "string"
           },
           "createdAt": {
@@ -867,6 +896,42 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "EvaluateConstraintsOutcome": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "parseError": {
+            "type": "string"
+          },
+          "satisfied": {
+            "type": "boolean"
+          }
+        },
+        "required": ["id", "satisfied"],
+        "type": "object"
+      },
+      "EvaluateConstraintsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/EvaluateConstraintsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "outcomes": {
+            "items": {
+              "$ref": "#/components/schemas/EvaluateConstraintsOutcome"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["outcomes"],
         "type": "object"
       },
       "HealthOutputBody": {
@@ -1344,6 +1409,30 @@
         "required": ["total", "actors", "nextCursor"],
         "type": "object"
       },
+      "ListTaskAgentActorsBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListTaskAgentActorsBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "agents": {
+            "items": {
+              "$ref": "#/components/schemas/TaskAgentActor"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "agents"],
+        "type": "object"
+      },
       "ListTaskAiInvocationsOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -1587,6 +1676,9 @@
       "McpTokenSummary": {
         "additionalProperties": false,
         "properties": {
+          "agentId": {
+            "type": "string"
+          },
           "createdAt": {
             "format": "int64",
             "type": "integer"
@@ -2078,6 +2170,29 @@
         "required": ["ok"],
         "type": "object"
       },
+      "ReplayOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ReplayOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "derivedState": {
+            "type": "string"
+          },
+          "equivalent": {
+            "type": "boolean"
+          },
+          "stored": {
+            "type": "string"
+          }
+        },
+        "required": ["derivedState", "equivalent", "stored"],
+        "type": "object"
+      },
       "Signal": {
         "additionalProperties": false,
         "properties": {
@@ -2326,6 +2441,40 @@
           }
         },
         "required": ["id", "userId", "email", "displayName", "role", "createdAt"],
+        "type": "object"
+      },
+      "TaskAgentActor": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/TaskAgentActor.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "agentId": {
+            "type": "string"
+          },
+          "agentName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": ["id", "agentId", "agentName", "role", "createdAt"],
         "type": "object"
       },
       "TaskAiInvocation": {
@@ -4305,6 +4454,113 @@
         "summary": "Remove an actor from a task"
       }
     },
+    "/tasks/{id}/agents": {
+      "get": {
+        "operationId": "tasks-agents-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 100,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListTaskAgentActorsBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List AI agent actors on a task"
+      },
+      "post": {
+        "operationId": "tasks-agents-add",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddTaskAgentActorBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskAgentActor"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Attach an AI agent to a task"
+      }
+    },
     "/tasks/{id}/ai/invocations": {
       "get": {
         "operationId": "tasks-ai-invocations-list",
@@ -4774,6 +5030,44 @@
         "summary": "Attach a constraint to a task"
       }
     },
+    "/tasks/{id}/constraints/evaluate": {
+      "post": {
+        "operationId": "tasks-constraints-evaluate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluateConstraintsOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Run the Phase 3 constraint engine for a task and persist satisfied/failed markers"
+      }
+    },
     "/tasks/{id}/constraints/{cid}": {
       "delete": {
         "operationId": "tasks-constraints-remove",
@@ -4988,6 +5282,44 @@
           }
         },
         "summary": "Propose the next likely state transition for a task"
+      }
+    },
+    "/tasks/{id}/replay": {
+      "get": {
+        "operationId": "tasks-replay",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Replay transition events and report drift vs stored derived_state (3.ENG-1)"
       }
     },
     "/tasks/{id}/timeline": {

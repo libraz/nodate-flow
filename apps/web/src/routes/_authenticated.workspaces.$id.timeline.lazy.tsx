@@ -14,16 +14,24 @@ const routeApi = getRouteApi('/_authenticated/workspaces/$id/timeline');
 function WorkspaceTimelineRoute(): ReactElement {
   const { id } = routeApi.useParams();
   const { t } = useTranslation('common');
+  const { t: tTimeline } = useTranslation('timeline');
   return (
-    <Suspense
-      fallback={
-        <div style={{ padding: '2rem', display: 'flex', justifyContent: 'center' }}>
-          <Spinner label={t('common.loading')} />
-        </div>
-      }
-    >
-      <TimelineView scope={{ kind: 'workspace', id }} />
-    </Suspense>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <header>
+        <h1 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--color-fg)' }}>
+          {tTimeline('view.title')}
+        </h1>
+      </header>
+      <Suspense
+        fallback={
+          <div style={{ padding: '2rem', display: 'flex', justifyContent: 'center' }}>
+            <Spinner label={t('common.loading')} />
+          </div>
+        }
+      >
+        <TimelineView scope={{ kind: 'workspace', id }} />
+      </Suspense>
+    </div>
   );
 }
 

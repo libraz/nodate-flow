@@ -28,6 +28,17 @@ WHERE v.workspace_id = ?
 ORDER BY v.occurred_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
 
+-- name: ListTransitionEventsForReplay :many
+-- Ordered list of task.transition.* events for a single task,
+-- ascending by occurred_at + id. Used by the Phase 3 replay tool
+-- (3.ENG-1) to derive the expected derived_state from scratch.
+SELECT type, occurred_at
+FROM events
+WHERE workspace_id = ?
+  AND task_id = ?
+  AND type LIKE 'task.transition.%'
+ORDER BY occurred_at ASC, id ASC;
+
 -- name: ListEventsForProject :many
 -- List a project's timeline via v_task_timeline. Filters events whose
 -- owning task lives in the given project (events with no task_id are

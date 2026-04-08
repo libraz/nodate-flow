@@ -41,10 +41,19 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
   const { t, i18n } = useTranslation('timeline');
   const locale = i18n.resolvedLanguage ?? 'en';
 
-  const actorId = event.actorUserId ?? null;
-  // TODO: resolve actorUserId to display name via user lookup endpoint.
-  const actorLabel = actorId ? actorId.slice(0, 8) : t('actor.system');
-  const initials = actorId ? actorId.slice(0, 2).toUpperCase() : 'SY';
+  const displayName = event.actorDisplayName?.trim();
+  const hasName = displayName !== undefined && displayName.length > 0;
+  const actorLabel = hasName ? displayName : t('actor.system');
+  // Avatar initial: first character of each whitespace-separated word, max 2.
+  // Never derive initials from the raw actorUserId (UUID).
+  const initials = hasName
+    ? displayName
+        .split(/\s+/)
+        .filter((w) => w.length > 0)
+        .slice(0, 2)
+        .map((w) => (w[0] ?? '').toUpperCase())
+        .join('') || (displayName[0] ?? '').toUpperCase()
+    : t('actor.initials_fallback');
 
   const messageKey = `event.${event.type.replace(/\./g, '_')}`;
   const translated = t(messageKey, { actor: actorLabel, defaultValue: event.type });

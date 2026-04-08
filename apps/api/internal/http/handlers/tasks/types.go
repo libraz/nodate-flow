@@ -35,11 +35,18 @@ func nullStr(s sql.NullString) string {
 	return ""
 }
 
-func nullTime(t sql.NullTime) time.Time {
-	if t.Valid {
-		return t.Time
+func nullTime(t sql.NullTime) *time.Time {
+	if !t.Valid {
+		return nil
 	}
-	return time.Time{}
+	tt := t.Time
+	return &tt
+}
+
+// timePtr returns a pointer to a time.Time value, for assigning non-null
+// times into DTO fields declared as *time.Time.
+func timePtr(t time.Time) *time.Time {
+	return &t
 }
 
 func nullDate(t sql.NullTime) string {
@@ -85,14 +92,14 @@ type Task struct {
 	Priority                 int32     `json:"priority"`
 	DueOn                    string    `json:"dueOn,omitempty"`
 	StartedOn                string    `json:"startedOn,omitempty"`
-	CompletedAt              time.Time `json:"completedAt,omitempty"`
-	ConstraintCount          int64     `json:"constraintCount"`
-	ConstraintSatisfiedCount int64     `json:"constraintSatisfiedCount"`
-	DependencyCount          int64     `json:"dependencyCount"`
-	ActorCount               int64     `json:"actorCount"`
-	SortWeight               int32     `json:"sortWeight"`
-	UpdatedAt                time.Time `json:"updatedAt,omitempty"`
-	CreatedAt                time.Time `json:"createdAt"`
+	CompletedAt              *time.Time `json:"completedAt,omitempty"`
+	ConstraintCount          int64      `json:"constraintCount"`
+	ConstraintSatisfiedCount int64      `json:"constraintSatisfiedCount"`
+	DependencyCount          int64      `json:"dependencyCount"`
+	ActorCount               int64      `json:"actorCount"`
+	SortWeight               int32      `json:"sortWeight"`
+	UpdatedAt                *time.Time `json:"updatedAt,omitempty"`
+	CreatedAt                time.Time  `json:"createdAt"`
 }
 
 // TaskListItem is the public DTO for a task row in list responses.
@@ -106,12 +113,12 @@ type TaskListItem struct {
 	Priority           int32     `json:"priority"`
 	DueOn              string    `json:"dueOn,omitempty"`
 	StartedOn          string    `json:"startedOn,omitempty"`
-	CompletedAt        time.Time `json:"completedAt,omitempty"`
-	SortWeight         int32     `json:"sortWeight"`
-	PrimaryAssigneeID  *string   `json:"primaryAssigneeId"`
-	AssigneeCount      int64     `json:"assigneeCount"`
-	UpdatedAt          time.Time `json:"updatedAt,omitempty"`
-	CreatedAt          time.Time `json:"createdAt"`
+	CompletedAt        *time.Time `json:"completedAt,omitempty"`
+	SortWeight         int32      `json:"sortWeight"`
+	PrimaryAssigneeID  *string    `json:"primaryAssigneeId"`
+	AssigneeCount      int64      `json:"assigneeCount"`
+	UpdatedAt          *time.Time `json:"updatedAt,omitempty"`
+	CreatedAt          time.Time  `json:"createdAt"`
 }
 
 // TaskConstraint is the public DTO for a task_constraints row.
@@ -119,47 +126,47 @@ type TaskConstraint struct {
 	ID          string    `json:"id"`
 	Kind        string    `json:"kind"`
 	Expression  string    `json:"expression"`
-	SatisfiedAt time.Time `json:"satisfiedAt,omitempty"`
-	FailedAt    time.Time `json:"failedAt,omitempty"`
-	SortWeight  int32     `json:"sortWeight"`
-	UpdatedAt   time.Time `json:"updatedAt,omitempty"`
-	CreatedAt   time.Time `json:"createdAt"`
+	SatisfiedAt *time.Time `json:"satisfiedAt,omitempty"`
+	FailedAt    *time.Time `json:"failedAt,omitempty"`
+	SortWeight  int32      `json:"sortWeight"`
+	UpdatedAt   *time.Time `json:"updatedAt,omitempty"`
+	CreatedAt   time.Time  `json:"createdAt"`
 }
 
 // TaskDependency is the public DTO for a task_dependencies row.
 type TaskDependency struct {
-	ID                 string    `json:"id"`
-	Kind               string    `json:"kind"`
-	FromTaskID         string    `json:"fromTaskId"`
-	ToTaskID           string    `json:"toTaskId"`
-	ToTaskTitle        string    `json:"toTaskTitle"`
-	ToTaskDerivedState string    `json:"toTaskDerivedState"`
-	UpdatedAt          time.Time `json:"updatedAt,omitempty"`
-	CreatedAt          time.Time `json:"createdAt"`
+	ID                 string     `json:"id"`
+	Kind               string     `json:"kind"`
+	FromTaskID         string     `json:"fromTaskId"`
+	ToTaskID           string     `json:"toTaskId"`
+	ToTaskTitle        string     `json:"toTaskTitle"`
+	ToTaskDerivedState string     `json:"toTaskDerivedState"`
+	UpdatedAt          *time.Time `json:"updatedAt,omitempty"`
+	CreatedAt          time.Time  `json:"createdAt"`
 }
 
 // TaskActor is the public DTO for a task_actors row.
 type TaskActor struct {
-	ID          string    `json:"id"`
-	UserID      string    `json:"userId"`
-	Email       string    `json:"email"`
-	DisplayName string    `json:"displayName"`
-	AvatarURL   string    `json:"avatarUrl,omitempty"`
-	Role        string    `json:"role"`
-	UpdatedAt   time.Time `json:"updatedAt,omitempty"`
-	CreatedAt   time.Time `json:"createdAt"`
+	ID          string     `json:"id"`
+	UserID      string     `json:"userId"`
+	Email       string     `json:"email"`
+	DisplayName string     `json:"displayName"`
+	AvatarURL   string     `json:"avatarUrl,omitempty"`
+	Role        string     `json:"role"`
+	UpdatedAt   *time.Time `json:"updatedAt,omitempty"`
+	CreatedAt   time.Time  `json:"createdAt"`
 }
 
 // TaskComment is the public DTO for a comments row attached to a task.
 type TaskComment struct {
-	ID                string    `json:"id"`
-	AuthorID          string    `json:"authorId"`
-	AuthorDisplayName string    `json:"authorDisplayName"`
-	AuthorAvatarURL   string    `json:"authorAvatarUrl,omitempty"`
-	Body              string    `json:"body"`
-	EditedAt          time.Time `json:"editedAt,omitempty"`
-	UpdatedAt         time.Time `json:"updatedAt,omitempty"`
-	CreatedAt         time.Time `json:"createdAt"`
+	ID                string     `json:"id"`
+	AuthorID          string     `json:"authorId"`
+	AuthorDisplayName string     `json:"authorDisplayName"`
+	AuthorAvatarURL   string     `json:"authorAvatarUrl,omitempty"`
+	Body              string     `json:"body"`
+	EditedAt          *time.Time `json:"editedAt,omitempty"`
+	UpdatedAt         *time.Time `json:"updatedAt,omitempty"`
+	CreatedAt         time.Time  `json:"createdAt"`
 }
 
 // TaskAttachment is the public DTO for an attachments row attached to a task.
@@ -171,9 +178,9 @@ type TaskAttachment struct {
 	ContentType         string    `json:"contentType"`
 	ByteSize            uint64    `json:"byteSize"`
 	StorageKey          string    `json:"storageKey"`
-	ChecksumSHA256      string    `json:"checksumSha256,omitempty"`
-	UpdatedAt           time.Time `json:"updatedAt,omitempty"`
-	CreatedAt           time.Time `json:"createdAt"`
+	ChecksumSHA256      string     `json:"checksumSha256,omitempty"`
+	UpdatedAt           *time.Time `json:"updatedAt,omitempty"`
+	CreatedAt           time.Time  `json:"createdAt"`
 }
 
 // ---- Task CRUD I/O ---------------------------------------------------------
@@ -414,12 +421,12 @@ type RemoveTaskActorOutput struct {
 // via task_actors (kind='agent'). Shape is deliberately distinct from
 // TaskActor so the frontend can render agents differently. (2.MCP-2)
 type TaskAgentActor struct {
-	ID        string    `json:"id"`
-	AgentID   string    `json:"agentId"`
-	AgentName string    `json:"agentName"`
-	Role      string    `json:"role"`
-	UpdatedAt time.Time `json:"updatedAt,omitempty"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID        string     `json:"id"`
+	AgentID   string     `json:"agentId"`
+	AgentName string     `json:"agentName"`
+	Role      string     `json:"role"`
+	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
+	CreatedAt time.Time  `json:"createdAt"`
 }
 
 // AddTaskAgentActorBody is the JSON body for POST /tasks/{id}/agents.

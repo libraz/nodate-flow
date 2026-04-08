@@ -55,8 +55,9 @@ function TimelineInner({
   const virtualizer = useVirtualizer({
     count: events.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 80,
+    estimateSize: () => 96,
     overscan: 5,
+    measureElement: (el) => el.getBoundingClientRect().height,
   });
 
   const virtualRows = virtualizer.getVirtualItems();
@@ -108,6 +109,8 @@ function TimelineInner({
                   return (
                     <div
                       key={ev.id}
+                      data-index={vr.index}
+                      ref={virtualizer.measureElement}
                       style={{
                         position: 'absolute',
                         insetBlockStart: 0,

@@ -109,9 +109,7 @@ func ListAgentActors(deps Deps) func(context.Context, *ListTaskAgentActorsInput)
 				Role:      string(r.Role),
 				CreatedAt: r.CreatedAt,
 			}
-			if r.UpdatedAt.Valid {
-				entry.UpdatedAt = r.UpdatedAt.Time
-			}
+			entry.UpdatedAt = nullTime(r.UpdatedAt)
 			out.Body.Agents = append(out.Body.Agents, entry)
 		}
 		if len(rows) > 0 {
