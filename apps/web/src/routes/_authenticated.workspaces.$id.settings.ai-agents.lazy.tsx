@@ -32,6 +32,7 @@ import {
   useModelsQuery,
   usePauseAgent,
   useTriggerAgent,
+  useUpdateAgentEventTriggers,
   useUpdateAgentSchedule,
 } from '../features/ai-providers/agents-api';
 
@@ -43,6 +44,7 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
   const pauseMut = usePauseAgent();
   const scheduleMut = useUpdateAgentSchedule();
   const triggerMut = useTriggerAgent();
+  const eventMut = useUpdateAgentEventTriggers();
 
   if (data.agents.length === 0) {
     return (
@@ -192,11 +194,97 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
                   {t('agents.trigger.label')}
                 </Button>
               </div>
+              {agent.scheduleKind === 'on_event' ? (
+                <EventTriggersEditor
+                  workspaceId={workspaceId}
+                  agentId={agent.id}
+                  initial={agent.eventTriggerTypes ?? []}
+                  pending={eventMut.isPending}
+                  onSave={async (kinds) => {
+                    try {
+                      await eventMut.mutateAsync({
+                        workspaceId,
+                        agentId: agent.id,
+                        eventTriggerTypes: kinds,
+                      });
+                      toaster.show({
+                        tone: 'success',
+                        message: t('agents.eventTriggers.saved'),
+                      });
+                    } catch {
+                      toaster.show({
+                        tone: 'danger',
+                        message: t('agents.eventTriggers.failed'),
+                      });
+                    }
+                  }}
+                />
+              ) : null}
             </Card>
           </li>
         );
       })}
     </ul>
+  );
+}
+
+/**
+ * EventTriggersEditor is a free-form comma-separated text editor for
+ * an agent's event_trigger_types JSON column. The eventbus kinds are
+ * not enumerated client-side on purpose: new kinds get added by the
+ * backend without a frontend deploy.
+ */
+function EventTriggersEditor({
+  agentId,
+  initial,
+  pending,
+  onSave,
+}: {
+  workspaceId: string;
+  agentId: string;
+  initial: string[];
+  pending: boolean;
+  onSave: (kinds: string[]) => Promise<void>;
+}): ReactElement {
+  const { t } = useTranslation('ai-suggestions');
+  const [value, setValue] = useState(initial.join(', '));
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: '0.5rem',
+        alignItems: 'center',
+        fontSize: '0.875rem',
+      }}
+    >
+      <label htmlFor={`agent-events-${agentId}`} style={{ color: 'var(--color-muted)' }}>
+        {t('agents.eventTriggers.label')}
+      </label>
+      <Input
+        id={`agent-events-${agentId}`}
+        value={value}
+        placeholder="task.updated, signal.attached"
+        onChange={(e) => {
+          setValue(e.target.value);
+        }}
+        style={{ flex: 1, minInlineSize: '16rem' }}
+      />
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        disabled={pending}
+        onClick={() => {
+          const kinds = value
+            .split(',')
+            .map((k) => k.trim())
+            .filter((k) => k.length > 0);
+          void onSave(kinds);
+        }}
+      >
+        {t('agents.eventTriggers.save')}
+      </Button>
+    </div>
   );
 }
 
@@ -221,6 +309,7 @@ function CreateAgentForm({
   const [name, setName] = useState('');
   const [systemPrompt, setSystemPrompt] = useState('');
   const [scheduleKind, setScheduleKind] = useState<AgentScheduleKind>('disabled');
+  const [eventTriggers, setEventTriggers] = useState('');
 
   if (models.models.length === 0) {
     return (
@@ -236,12 +325,17 @@ function CreateAgentForm({
       return;
     }
     try {
+      const kinds = eventTriggers
+        .split(',')
+        .map((k) => k.trim())
+        .filter((k) => k.length > 0);
       await createMut.mutateAsync({
         workspaceId,
         modelId,
         name: name.trim(),
         systemPrompt: systemPrompt.trim(),
         scheduleKind,
+        ...(scheduleKind === 'on_event' && kinds.length > 0 ? { eventTriggerTypes: kinds } : {}),
       });
       toaster.show({ tone: 'success', message: t('agents.create.success') });
       onDone();
@@ -318,6 +412,20 @@ function CreateAgentForm({
           </Select>
         )}
       </FormField>
+      {scheduleKind === 'on_event' ? (
+        <FormField label={t('agents.eventTriggers.label')}>
+          {(control) => (
+            <Input
+              {...control}
+              value={eventTriggers}
+              onChange={(e) => {
+                setEventTriggers(e.target.value);
+              }}
+              placeholder="task.updated, signal.attached"
+            />
+          )}
+        </FormField>
+      ) : null}
       <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
         <Button type="button" variant="ghost" onClick={onDone}>
           {t('agents.create.cancel')}

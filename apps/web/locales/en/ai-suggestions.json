@@ -32,6 +32,12 @@
       "label": "Run now",
       "queued": "Run queued"
     },
+    "eventTriggers": {
+      "label": "Event kinds",
+      "save": "Save triggers",
+      "saved": "Triggers saved",
+      "failed": "Failed to update event triggers"
+    },
     "create": {
       "open": "+ Agent",
       "title": "New agent",

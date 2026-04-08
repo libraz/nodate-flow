@@ -33,6 +33,7 @@ export interface AgentSummary {
   modelName: string;
   scheduleKind: AgentScheduleKind;
   paused: boolean;
+  eventTriggerTypes?: string[];
   createdAt: number;
   updatedAt?: number;
 }
@@ -91,6 +92,7 @@ export interface CreateAgentArgs {
   systemPrompt: string;
   temperature?: number;
   scheduleKind?: AgentScheduleKind;
+  eventTriggerTypes?: string[];
 }
 
 /** useCreateAgent provisions a new ai_agents row bound to a model. */
@@ -105,6 +107,7 @@ export function useCreateAgent(): UseMutationResult<AgentSummary, Error, CreateA
         scheduleKind: AgentScheduleKind;
         description?: string;
         temperature?: number;
+        eventTriggerTypes?: string[];
       } = {
         modelId: body.modelId,
         name: body.name,
@@ -113,6 +116,8 @@ export function useCreateAgent(): UseMutationResult<AgentSummary, Error, CreateA
       };
       if (body.description !== undefined) payload.description = body.description;
       if (body.temperature !== undefined) payload.temperature = body.temperature;
+      if (body.eventTriggerTypes !== undefined && body.eventTriggerTypes.length > 0)
+        payload.eventTriggerTypes = body.eventTriggerTypes;
       const { data, error } = await sdk.POST('/workspaces/{wsId}/ai/agents', {
         params: { path: { wsId: workspaceId } },
         body: payload,
@@ -172,6 +177,37 @@ export function useUpdateAgentSchedule(): UseMutationResult<
         body: { scheduleKind },
       });
       if (error) throw new Error('Failed to update agent schedule');
+      return { ok: true };
+    },
+    onSuccess: (_res, { workspaceId }) => {
+      qc.invalidateQueries({ queryKey: ['ai-agents', workspaceId] });
+    },
+  });
+}
+
+export interface UpdateAgentEventTriggersArgs {
+  workspaceId: string;
+  agentId: string;
+  eventTriggerTypes: string[];
+}
+
+/**
+ * useUpdateAgentEventTriggers replaces the JSON array of eventbus
+ * kinds that fire an on_event agent. Pass an empty array to clear.
+ */
+export function useUpdateAgentEventTriggers(): UseMutationResult<
+  { ok: true },
+  Error,
+  UpdateAgentEventTriggersArgs
+> {
+  const qc = useQueryClient();
+  return useMutation<{ ok: true }, Error, UpdateAgentEventTriggersArgs>({
+    mutationFn: async ({ workspaceId, agentId, eventTriggerTypes }) => {
+      const { error } = await sdk.PATCH('/workspaces/{wsId}/ai/agents/{agentId}/event-triggers', {
+        params: { path: { wsId: workspaceId, agentId } },
+        body: { eventTriggerTypes },
+      });
+      if (error) throw new Error('Failed to update agent event triggers');
       return { ok: true };
     },
     onSuccess: (_res, { workspaceId }) => {

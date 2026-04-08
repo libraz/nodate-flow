@@ -25,10 +25,11 @@ type AgentSummary struct {
 	SystemPrompt string `json:"systemPrompt"`
 	ModelID      string `json:"modelId"`
 	ModelName    string `json:"modelName"`
-	ScheduleKind string `json:"scheduleKind"`
-	Paused       bool   `json:"paused"`
-	CreatedAt    int64  `json:"createdAt"`
-	UpdatedAt    *int64 `json:"updatedAt,omitempty"`
+	ScheduleKind      string   `json:"scheduleKind"`
+	Paused            bool     `json:"paused"`
+	EventTriggerTypes []string `json:"eventTriggerTypes,omitempty"`
+	CreatedAt         int64    `json:"createdAt"`
+	UpdatedAt         *int64   `json:"updatedAt,omitempty"`
 }
 
 // ListAgentsInput is the query for GET /workspaces/{wsId}/ai/agents.
@@ -61,6 +62,31 @@ func ListAgents(deps Deps) func(context.Context, *ListAgentsInput) (*ListAgentsO
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		// Bulk-fetch event_trigger_types in a single round-trip so the
+		// list endpoint stays O(1) even if rows.length is large. The
+		// generated ListAgents query doesn't expose the JSON column
+		// today; this side query keeps the field optional without
+		// regenerating sqlc.
+		triggerByPub := map[string][]string{}
+		if len(rows) > 0 {
+			const tq = `SELECT public_id, event_trigger_types FROM ai_agents
+				WHERE workspace_id = ? AND enabled = TRUE
+				  AND event_trigger_types IS NOT NULL`
+			tr, terr := deps.DB.QueryContext(ctx, tq, ws.ID)
+			if terr == nil {
+				defer tr.Close()
+				for tr.Next() {
+					var pub types.PublicID
+					var raw json.RawMessage
+					if err := tr.Scan(&pub, &raw); err == nil {
+						var arr []string
+						if json.Unmarshal(raw, &arr) == nil && len(arr) > 0 {
+							triggerByPub[pub.String()] = arr
+						}
+					}
+				}
+			}
+		}
 		out := &ListAgentsOutput{}
 		out.Body.Agents = make([]AgentSummary, 0, len(rows))
 		var total int64
@@ -75,10 +101,11 @@ func ListAgents(deps Deps) func(context.Context, *ListAgentsInput) (*ListAgentsO
 				SystemPrompt: r.SystemPrompt,
 				ModelID:      r.ModelPublicID.String(),
 				ModelName:    r.ModelName,
-				ScheduleKind: string(r.ScheduleKind),
-				Paused:       r.Paused,
-				CreatedAt:    r.CreatedAt.Unix(),
-				UpdatedAt:    nullTimeUnixPtr(r.UpdatedAt),
+				ScheduleKind:      string(r.ScheduleKind),
+				Paused:            r.Paused,
+				EventTriggerTypes: triggerByPub[r.PublicID.String()],
+				CreatedAt:         r.CreatedAt.Unix(),
+				UpdatedAt:         nullTimeUnixPtr(r.UpdatedAt),
 			})
 		}
 		out.Body.Total = total
@@ -149,8 +176,9 @@ type CreateAgentInput struct {
 		Name         string `json:"name" minLength:"1" maxLength:"255"`
 		Description  string `json:"description,omitempty" maxLength:"1000"`
 		SystemPrompt string `json:"systemPrompt" minLength:"1" maxLength:"16000"`
-		Temperature  uint16 `json:"temperature,omitempty" minimum:"0" maximum:"200" doc:"Sampling temperature x100 (default 100)"`
-		ScheduleKind string `json:"scheduleKind,omitempty" enum:"disabled,interval,on_event,manual" default:"disabled"`
+		Temperature       uint16   `json:"temperature,omitempty" minimum:"0" maximum:"200" doc:"Sampling temperature x100 (default 100)"`
+		ScheduleKind      string   `json:"scheduleKind,omitempty" enum:"disabled,interval,on_event,manual" default:"disabled"`
+		EventTriggerTypes []string `json:"eventTriggerTypes,omitempty" doc:"Eventbus kinds that fire this agent when scheduleKind=on_event"`
 	}
 }
 
@@ -196,7 +224,7 @@ func CreateAgent(deps Deps) func(context.Context, *CreateAgentInput) (*CreateAge
 		}
 		pub := types.New()
 		descNull := sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""}
-		_, err = deps.Queries.CreateAgent(ctx, generated.CreateAgentParams{
+		insertID, err := deps.Queries.CreateAgent(ctx, generated.CreateAgentParams{
 			PublicID:        pub,
 			WorkspaceID:     ws.ID,
 			ModelID:         modelID,
@@ -211,6 +239,18 @@ func CreateAgent(deps Deps) func(context.Context, *CreateAgentInput) (*CreateAge
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		// Persist event_trigger_types via raw UPDATE so we don't have to
+		// regenerate the sqlc CreateAgent shape until the column gets a
+		// dedicated path. The id returned above scopes the update to
+		// exactly the freshly inserted row.
+		if len(in.Body.EventTriggerTypes) > 0 {
+			raw, jerr := json.Marshal(in.Body.EventTriggerTypes)
+			if jerr == nil {
+				_, _ = deps.DB.ExecContext(ctx,
+					`UPDATE ai_agents SET event_trigger_types = ? WHERE id = ?`,
+					raw, insertID)
+			}
+		}
 		now := time.Now()
 		out := &CreateAgentOutput{Body: AgentSummary{
 			ID:           pub.String(),
@@ -219,10 +259,68 @@ func CreateAgent(deps Deps) func(context.Context, *CreateAgentInput) (*CreateAge
 			SystemPrompt: in.Body.SystemPrompt,
 			ModelID:      modelPub.String(),
 			ModelName:    modelName,
-			ScheduleKind: scheduleKind,
-			Paused:       false,
-			CreatedAt:    now.Unix(),
+			ScheduleKind:      scheduleKind,
+			Paused:            false,
+			EventTriggerTypes: in.Body.EventTriggerTypes,
+			CreatedAt:         now.Unix(),
 		}}
+		return out, nil
+	}
+}
+
+// UpdateAgentEventTriggersInput is the body for
+// PATCH /workspaces/{wsId}/ai/agents/{agentId}/event-triggers.
+type UpdateAgentEventTriggersInput struct {
+	WsID    string `path:"wsId"`
+	AgentID string `path:"agentId"`
+	Body    struct {
+		EventTriggerTypes []string `json:"eventTriggerTypes" doc:"Pass [] to clear; otherwise list of eventbus kinds"`
+	}
+}
+
+// UpdateAgentEventTriggersOutput is the ack envelope.
+type UpdateAgentEventTriggersOutput struct {
+	Body struct {
+		Ok bool `json:"ok"`
+	}
+}
+
+// UpdateAgentEventTriggers replaces an agent's event_trigger_types
+// JSON column. Passing an empty list clears the column (NULL) so the
+// agent stops matching any on_event dispatch.
+func UpdateAgentEventTriggers(deps Deps) func(context.Context, *UpdateAgentEventTriggersInput) (*UpdateAgentEventTriggersOutput, error) {
+	return func(ctx context.Context, in *UpdateAgentEventTriggersInput) (*UpdateAgentEventTriggersOutput, error) {
+		ws, ok := middleware.WorkspaceFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsWorkspaceNotFound)
+		}
+		agentPub, err := types.Parse(in.AgentID)
+		if err != nil {
+			return nil, httpErr(apierrors.ValidationPathParamInvalid)
+		}
+		var raw any
+		if len(in.Body.EventTriggerTypes) == 0 {
+			raw = nil
+		} else {
+			b, jerr := json.Marshal(in.Body.EventTriggerTypes)
+			if jerr != nil {
+				return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+			}
+			raw = b
+		}
+		const q = `UPDATE ai_agents
+			SET event_trigger_types = ?
+			WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE`
+		res, err := deps.DB.ExecContext(ctx, q, raw, ws.ID, agentPub)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		n, _ := res.RowsAffected()
+		if n == 0 {
+			return nil, httpErr(apierrors.AiAgentNotFound)
+		}
+		out := &UpdateAgentEventTriggersOutput{}
+		out.Body.Ok = true
 		return out, nil
 	}
 }
