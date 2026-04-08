@@ -143,6 +143,20 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		return fmt.Errorf("ensure instance admin: %w", err)
 	}
 
+	// 6. Demo project + tasks (idempotent on project slug).
+	projID, projCreated, err := ensureProject(ctx, db, q, uint32(wsID))
+	if err != nil {
+		return fmt.Errorf("ensure project: %w", err)
+	}
+	if projCreated {
+		logger.Info("created project", "id", projID)
+	} else {
+		logger.Info("project exists", "id", projID)
+	}
+	if err := ensureTasks(ctx, db, q, uint32(wsID), uint32(projID), uint32(userID), logger); err != nil {
+		return fmt.Errorf("ensure tasks: %w", err)
+	}
+
 	logger.Info("seed complete",
 		"email", cfg.email,
 		"password", cfg.password,
@@ -216,6 +230,72 @@ func ensureMembership(ctx context.Context, db *sql.DB, q *generated.Queries, wsI
 		return err
 	}
 	logger.Info("created workspace membership", "workspace_id", wsID, "user_id", userID, "role", "owner")
+	return nil
+}
+
+const seedProjectSlug = "demo-project"
+
+func ensureProject(ctx context.Context, db *sql.DB, q *generated.Queries, wsID uint32) (int64, bool, error) {
+	var id uint32
+	err := db.QueryRowContext(ctx,
+		"SELECT id FROM projects WHERE workspace_id = ? AND slug = ?",
+		wsID, seedProjectSlug,
+	).Scan(&id)
+	if err == nil {
+		return int64(id), false, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return 0, false, err
+	}
+	newID, err := q.CreateProject(ctx, generated.CreateProjectParams{
+		PublicID:    types.New(),
+		WorkspaceID: wsID,
+		Slug:        seedProjectSlug,
+		Name:        "Demo Project",
+		Description: sql.NullString{String: "Sample project created by seed-dev.", Valid: true},
+	})
+	if err != nil {
+		return 0, false, err
+	}
+	return newID, true, nil
+}
+
+func ensureTasks(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, projID, userID uint32, logger *slog.Logger) error {
+	var count int
+	if err := db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM tasks WHERE workspace_id = ? AND project_id = ? AND enabled = TRUE",
+		wsID, projID,
+	).Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		logger.Info("tasks exist, skipping", "project_id", projID, "count", count)
+		return nil
+	}
+	seeds := []struct {
+		title    string
+		priority int32
+	}{
+		{"Review Q2 roadmap", 3},
+		{"Prepare sprint retro notes", 2},
+		{"Refactor auth middleware", 2},
+		{"Triage inbox backlog", 1},
+		{"Draft release announcement", 1},
+	}
+	createdBy := sql.NullInt32{Int32: int32(userID), Valid: true}
+	for _, s := range seeds {
+		if _, err := q.CreateTask(ctx, generated.CreateTaskParams{
+			PublicID:        types.New(),
+			WorkspaceID:     wsID,
+			ProjectID:       projID,
+			CreatedByUserID: createdBy,
+			Title:           s.title,
+			Priority:        s.priority,
+		}); err != nil {
+			return err
+		}
+	}
+	logger.Info("created seed tasks", "project_id", projID, "count", len(seeds))
 	return nil
 }
 
