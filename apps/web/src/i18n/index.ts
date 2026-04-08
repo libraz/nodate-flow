@@ -2,10 +2,20 @@ import i18n from 'i18next';
 import ICU from 'i18next-icu';
 import { initReactI18next } from 'react-i18next';
 
+import enAiSuggestions from '../../locales/en/ai-suggestions.json';
+import enAi from '../../locales/en/ai.json';
 import enCommon from '../../locales/en/common.json';
+import enErrors from '../../locales/en/errors.json';
+import enInbox from '../../locales/en/inbox.json';
 import enSettings from '../../locales/en/settings.json';
+import enTimeline from '../../locales/en/timeline.json';
+import jaAiSuggestions from '../../locales/ja/ai-suggestions.json';
+import jaAi from '../../locales/ja/ai.json';
 import jaCommon from '../../locales/ja/common.json';
+import jaErrors from '../../locales/ja/errors.json';
+import jaInbox from '../../locales/ja/inbox.json';
 import jaSettings from '../../locales/ja/settings.json';
+import jaTimeline from '../../locales/ja/timeline.json';
 import { defaultNamespace } from './namespaces';
 
 /** Supported UI languages. */
@@ -41,10 +51,26 @@ export function initI18n(): typeof i18n {
       fallbackLng: 'en',
       supportedLngs: supportedLanguages as unknown as string[],
       defaultNS: defaultNamespace,
-      ns: [defaultNamespace, 'settings'],
+      ns: [defaultNamespace, 'settings', 'inbox', 'timeline', 'ai', 'ai-suggestions', 'errors'],
       resources: {
-        en: { common: enCommon, settings: enSettings },
-        ja: { common: jaCommon, settings: jaSettings },
+        en: {
+          common: enCommon,
+          settings: enSettings,
+          inbox: enInbox,
+          timeline: enTimeline,
+          ai: enAi,
+          'ai-suggestions': enAiSuggestions,
+          errors: enErrors,
+        },
+        ja: {
+          common: jaCommon,
+          settings: jaSettings,
+          inbox: jaInbox,
+          timeline: jaTimeline,
+          ai: jaAi,
+          'ai-suggestions': jaAiSuggestions,
+          errors: jaErrors,
+        },
       },
       interpolation: { escapeValue: false },
       react: { useSuspense: true },

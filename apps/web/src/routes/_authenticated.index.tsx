@@ -179,18 +179,6 @@ function LandingPage(): ReactElement {
         <p
           style={{
             fontFamily: 'var(--font-display)',
-            fontStyle: 'italic',
-            fontSize: 'clamp(1.25rem, 2.5vw, 1.75rem)',
-            color: 'var(--color-muted)',
-            maxInlineSize: '36ch',
-            margin: 0,
-          }}
-        >
-          {t('landing.tagline')}
-        </p>
-        <p
-          style={{
-            fontFamily: 'var(--font-display)',
             fontSize: 'clamp(1rem, 1.75vw, 1.25rem)',
             margin: 0,
           }}

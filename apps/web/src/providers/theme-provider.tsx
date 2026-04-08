@@ -38,7 +38,26 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 const storageKey = 'nf.theme';
 
+/**
+ * Legacy / foreign theme keys that may exist in localStorage from prior
+ * implementations or sibling tools sharing the dev origin. We proactively
+ * clear them on boot so only `nf.theme` is authoritative.
+ */
+const legacyThemeKeys = ['libsonare-theme', 'vitepress-theme-appearance'] as const;
+
+function clearLegacyThemeKeys(): void {
+  if (typeof window === 'undefined') return;
+  for (const key of legacyThemeKeys) {
+    try {
+      window.localStorage.removeItem(key);
+    } catch {
+      // ignore
+    }
+  }
+}
+
 function readStored(): ThemePreference {
+  clearLegacyThemeKeys();
   try {
     const v = localStorage.getItem(storageKey);
     if (v === 'system') return 'system';

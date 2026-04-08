@@ -57,9 +57,17 @@ export default function GlassDock(): ReactElement {
       <div className={styles.dock} role="toolbar" aria-label={t('dock.quick_actions')}>
         {ACTIONS.map((action) => {
           const label = t(actionLabelKey(action.key));
+          const handleClick = (): void => {
+            setPaletteOpen(true);
+          };
           return (
             <Tooltip key={action.key} content={label}>
-              <button type="button" className={styles.button} aria-label={label}>
+              <button
+                type="button"
+                className={styles.button}
+                aria-label={label}
+                onClick={handleClick}
+              >
                 <Icon icon={action.icon} decorative />
               </button>
             </Tooltip>

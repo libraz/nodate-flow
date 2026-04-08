@@ -60,6 +60,15 @@
   "a11y": {
     "skipToContent": "本文へスキップ"
   },
+  "today": {
+    "title": "今日",
+    "empty": "今日のタスクはありません。"
+  },
+  "not_found": {
+    "title": "ページが見つかりません",
+    "description": "お探しのページは存在しません。",
+    "back_home": "ホームに戻る"
+  },
   "workspaces": {
     "title": "ワークスペース",
     "new": "ワークスペースを作成",

@@ -16,20 +16,21 @@ import { useTranslation } from 'react-i18next';
 
 import styles from './sidebar.module.css';
 
-const STORAGE_KEY = 'nf:sidebar-collapsed';
+const STORAGE_KEY = 'nf.sidebar-collapsed';
+const LEGACY_STORAGE_KEY = 'nf:sidebar-collapsed';
 
 interface NavItem {
   key: 'inbox' | 'today' | 'projects' | 'workspaces' | 'settings';
   icon: LucideIcon;
   /** Destination route (TanStack Router path). */
-  to: '/' | '/workspaces' | '/inbox' | '/settings/profile';
+  to: '/' | '/workspaces' | '/inbox' | '/today' | '/settings/profile';
   /** Whether the destination route exists yet. */
   enabled: boolean;
 }
 
 const NAV_ITEMS: readonly NavItem[] = [
   { key: 'inbox', icon: Inbox, to: '/inbox', enabled: true },
-  { key: 'today', icon: CalendarDays, to: '/', enabled: false },
+  { key: 'today', icon: CalendarDays, to: '/today', enabled: true },
   { key: 'projects', icon: FolderKanban, to: '/', enabled: false },
   { key: 'workspaces', icon: Briefcase, to: '/workspaces', enabled: true },
   { key: 'settings', icon: Settings, to: '/settings/profile', enabled: true },
@@ -38,7 +39,16 @@ const NAV_ITEMS: readonly NavItem[] = [
 function readInitialCollapsed(): boolean {
   if (typeof window === 'undefined') return false;
   try {
-    return window.localStorage.getItem(STORAGE_KEY) === '1';
+    const current = window.localStorage.getItem(STORAGE_KEY);
+    if (current !== null) return current === '1';
+    // Migrate from the legacy colon-separator key.
+    const legacy = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (legacy !== null) {
+      window.localStorage.setItem(STORAGE_KEY, legacy);
+      window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+      return legacy === '1';
+    }
+    return false;
   } catch {
     return false;
   }
@@ -102,14 +112,16 @@ export default function Sidebar(): ReactElement {
             );
           }
           return (
-            <span
+            <button
               key={item.key}
+              type="button"
               className={cx(styles.item, styles.itemDisabled)}
               aria-disabled="true"
+              disabled
             >
               <Icon icon={item.icon} decorative />
               <span className={styles.label}>{label}</span>
-            </span>
+            </button>
           );
         })}
       </nav>

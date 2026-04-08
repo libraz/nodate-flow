@@ -60,6 +60,15 @@
   "a11y": {
     "skipToContent": "Skip to content"
   },
+  "today": {
+    "title": "Today",
+    "empty": "No tasks for today."
+  },
+  "not_found": {
+    "title": "Page not found",
+    "description": "The page you're looking for doesn't exist.",
+    "back_home": "Back to home"
+  },
   "workspaces": {
     "title": "Workspaces",
     "new": "New workspace",
