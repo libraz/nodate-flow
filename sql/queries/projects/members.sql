@@ -49,6 +49,19 @@ WHERE project_id = ?
   AND enabled = TRUE
 LIMIT 1;
 
+-- name: ListProjectPublicIdsForUserInWorkspace :many
+-- List the public_ids of every enabled project in a workspace for which
+-- the given user has an enabled project_members row. Used by the
+-- per-project ACL filter on GET /workspaces/{wsId}/projects so non-member
+-- workspace members do not enumerate projects they cannot open.
+SELECT p.public_id
+FROM project_members pm
+JOIN projects p ON p.id = pm.project_id
+WHERE pm.workspace_id = ?
+  AND pm.user_id = ?
+  AND pm.enabled = TRUE
+  AND p.enabled = TRUE;
+
 -- name: RemoveProjectMemberByUserId :exec
 -- Soft-remove a project member keyed by user_id.
 UPDATE project_members
