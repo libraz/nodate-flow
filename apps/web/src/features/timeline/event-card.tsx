@@ -15,6 +15,37 @@ export interface EventCardProps {
   event: TimelineEvent;
 }
 
+/**
+ * eventSourceTag returns a short category label derived from the event
+ * type prefix. It powers the 4.WEB-1 timeline source-mix color coding
+ * so every event source lives in the same feed but stays
+ * distinguishable at a glance.
+ */
+export function eventSourceTag(type: string): {
+  label: string;
+  color: string;
+} {
+  if (type.startsWith('signal.github') || type.includes('github')) {
+    return { label: 'github', color: '#6e5494' };
+  }
+  if (type.startsWith('signal.slack') || type.includes('slack')) {
+    return { label: 'slack', color: '#4a154b' };
+  }
+  if (type.startsWith('signal.google') || type.includes('google')) {
+    return { label: 'google', color: '#4285f4' };
+  }
+  if (type.startsWith('signal.')) {
+    return { label: 'signal', color: '#0ea5e9' };
+  }
+  if (type.startsWith('ai.') || type.startsWith('mcp.')) {
+    return { label: 'ai', color: '#10b981' };
+  }
+  if (type.startsWith('task.')) {
+    return { label: 'task', color: '#f59e0b' };
+  }
+  return { label: 'system', color: 'var(--color-muted)' };
+}
+
 function formatRelative(occurredAt: number, locale: string): string {
   try {
     const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
@@ -69,6 +100,15 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
         alignItems: 'flex-start',
       }}
     >
+      <div
+        aria-hidden
+        style={{
+          inlineSize: '0.25rem',
+          alignSelf: 'stretch',
+          background: eventSourceTag(event.type).color,
+          borderRadius: '0.125rem',
+        }}
+      />
       <Avatar alt={actorLabel} initials={initials} size="sm" />
       <div
         style={{
@@ -82,7 +122,28 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
         <div style={{ color: 'var(--color-fg)', lineHeight: 1.4, wordBreak: 'break-word' }}>
           {translated}
         </div>
-        <div style={{ color: 'var(--color-muted)', fontSize: '0.75rem' }}>
+        <div
+          style={{
+            color: 'var(--color-muted)',
+            fontSize: '0.75rem',
+            display: 'flex',
+            gap: '0.5rem',
+            alignItems: 'center',
+          }}
+        >
+          <span
+            style={{
+              padding: '0 0.375rem',
+              borderRadius: '0.25rem',
+              border: `1px solid ${eventSourceTag(event.type).color}`,
+              color: eventSourceTag(event.type).color,
+              fontSize: '0.65rem',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+            }}
+          >
+            {eventSourceTag(event.type).label}
+          </span>
           {formatRelative(event.occurredAt, locale)}
         </div>
         {payloadVisible ? (

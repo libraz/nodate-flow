@@ -103,27 +103,33 @@ function TitleEditor({ id, initial }: { id: string; initial: string }): ReactEle
 
   if (!editing) {
     return (
-      <button
-        type="button"
-        onClick={() => {
-          setValue(initial);
-          setEditing(true);
-        }}
-        aria-label={t('tasks.detail.title_edit')}
+      <h1
         style={{
-          background: 'none',
-          border: 'none',
-          padding: 0,
-          cursor: 'pointer',
-          color: 'var(--color-fg)',
-          font: 'inherit',
+          margin: 0,
           fontFamily: 'var(--font-display)',
           fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
-          textAlign: 'start',
         }}
       >
-        {initial}
-      </button>
+        <button
+          type="button"
+          onClick={() => {
+            setValue(initial);
+            setEditing(true);
+          }}
+          aria-label={t('tasks.detail.title_edit_named', { title: initial })}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
+            color: 'var(--color-fg)',
+            font: 'inherit',
+            textAlign: 'start',
+          }}
+        >
+          {initial}
+        </button>
+      </h1>
     );
   }
 
