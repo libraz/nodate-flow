@@ -19,6 +19,7 @@ DROP TABLE IF EXISTS `instance_admins`;
 DROP TABLE IF EXISTS `instance_audit_logs`;
 DROP TABLE IF EXISTS `mcp_invocations`;
 DROP TABLE IF EXISTS `mcp_tokens`;
+DROP TABLE IF EXISTS `oauth_states`;
 DROP TABLE IF EXISTS `personal_access_tokens`;
 DROP TABLE IF EXISTS `project_members`;
 DROP TABLE IF EXISTS `projects`;
@@ -29,6 +30,8 @@ DROP TABLE IF EXISTS `task_constraints`;
 DROP TABLE IF EXISTS `task_dependencies`;
 DROP TABLE IF EXISTS `task_embeddings`;
 DROP TABLE IF EXISTS `tasks`;
+DROP TABLE IF EXISTS `user_integrations`;
+DROP TABLE IF EXISTS `user_recovery_codes`;
 DROP TABLE IF EXISTS `users`;
 DROP TABLE IF EXISTS `workspace_members`;
 DROP TABLE IF EXISTS `workspaces`;
@@ -552,6 +555,31 @@ CREATE TABLE mcp_tokens (
   CONSTRAINT fk_mcp_tokens_agent FOREIGN KEY (agent_id) REFERENCES ai_agents(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='MCP personal access tokens';
 
+-- >>> oauth_states.sql
+-- ====================================
+-- oauth_states
+-- Short-lived CSRF-protection state tokens for the personal OAuth
+-- flow (POST /me/integrations/{provider}/connect → GET /oauth/
+-- callback/{provider}). A row is inserted when the user clicks
+-- "Connect", and deleted atomically when the callback handler
+-- consumes the matching state. Rows expire after 15 minutes; the
+-- callback refuses stale rows.
+-- ====================================
+CREATE TABLE oauth_states (
+  state CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL PRIMARY KEY COMMENT 'Random 32-byte token, hex-encoded',
+
+  user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id — the user who started the connect flow',
+  provider ENUM('github','slack','google_calendar') NOT NULL COMMENT 'Which provider this state belongs to',
+  redirect_to VARCHAR(512) NULL COMMENT 'Optional client-supplied return URL to send the user to after the callback completes',
+
+  expires_at DATETIME NOT NULL COMMENT 'Hard expiry; callback handler rejects rows past this timestamp',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  KEY idx_oauth_states_expires_at (expires_at),
+
+  CONSTRAINT fk_oauth_states_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Short-lived OAuth CSRF state tokens for personal integrations';
+
 -- >>> personal_access_tokens.sql
 -- ====================================
 -- personal_access_tokens
@@ -877,6 +905,65 @@ CREATE TABLE tasks (
   CONSTRAINT fk_tasks_parent FOREIGN KEY (parent_task_id) REFERENCES tasks(id) ON DELETE SET NULL,
   CONSTRAINT fk_tasks_creator FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='nodate-flow core task object';
+
+-- >>> user_integrations.sql
+-- ====================================
+-- user_integrations
+-- Personal OAuth connections (GitHub / Slack / Google Calendar) owned
+-- by an individual user. Separate from workspace-level integrations
+-- managed by @mcp. Tokens are encrypted with NF_SECRET_KEY (same
+-- cipher as the AI provider credentials).
+-- ====================================
+CREATE TABLE user_integrations (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
+
+  provider ENUM('github','slack','google_calendar') NOT NULL COMMENT 'OAuth provider kind',
+  external_account_id VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Provider subject (GH login, Slack user id, Google sub)',
+  external_account_label VARCHAR(255) NOT NULL COMMENT 'Display-only label (email or @handle)',
+  scopes TEXT NOT NULL COMMENT 'Space-separated list of granted OAuth scopes',
+
+  access_token_ciphertext VARBINARY(4096) NOT NULL COMMENT 'AES-256-GCM encrypted access token',
+  refresh_token_ciphertext VARBINARY(4096) NULL COMMENT 'AES-256-GCM encrypted refresh token (nullable: GitHub OAuth apps do not issue one)',
+  access_token_expires_at DATETIME NULL COMMENT 'Access token expiry (providers that issue long-lived tokens leave this NULL)',
+
+  connected_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'When the user first authorised the app',
+  last_refreshed_at DATETIME NULL COMMENT 'Last successful token refresh',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  UNIQUE KEY uniq_user_integrations_public_id (public_id),
+  UNIQUE KEY uniq_user_integrations_user_provider (user_id, provider),
+  KEY idx_user_integrations_user_id (user_id),
+
+  CONSTRAINT fk_user_integrations_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Personal OAuth integrations owned by an individual user';
+
+-- >>> user_recovery_codes.sql
+-- ====================================
+-- user_recovery_codes
+-- One-time recovery codes used to bypass TOTP at login when the user
+-- loses access to their authenticator app. Codes are stored as
+-- SHA-256 hashes; the plaintext is shown to the user only once at
+-- generation time.
+-- ====================================
+CREATE TABLE user_recovery_codes (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
+  code_hash BINARY(32) NOT NULL COMMENT 'SHA-256 of the normalized recovery code',
+  used_at DATETIME NULL COMMENT 'Set when the code is consumed at login',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  UNIQUE KEY uniq_user_recovery_codes_user_hash (user_id, code_hash),
+  KEY idx_user_recovery_codes_user_used (user_id, used_at),
+
+  CONSTRAINT fk_user_recovery_codes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='TOTP recovery codes';
 
 -- >>> users.sql
 -- ====================================

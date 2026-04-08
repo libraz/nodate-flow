@@ -23,6 +23,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/config"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/outbound"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/crypto"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/integrations"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/router"
@@ -187,6 +188,18 @@ func main() {
 	}
 	eventbus.AddNotifyHook(eventTrigger.NotifyHook())
 
+	integrationsRegistry := integrations.NewRegistry(
+		func() (integrations.Provider, error) {
+			return integrations.NewGithub(cfg.GithubClientID, cfg.GithubClientSecret)
+		},
+		func() (integrations.Provider, error) {
+			return integrations.NewSlack(cfg.SlackClientID, cfg.SlackClientSecret)
+		},
+		func() (integrations.Provider, error) {
+			return integrations.NewGoogleCalendar(cfg.GoogleClientID, cfg.GoogleClientSecret)
+		},
+	)
+
 	inner := router.Build(router.Deps{
 		DB:                 db,
 		Queries:            queries,
@@ -204,6 +217,9 @@ func main() {
 		AiInvocationPublisher: aiInvocationPublisher,
 		AgentQueue:            agentQueue,
 		AgentRunner:           runner,
+		Integrations:          integrationsRegistry,
+		PublicBaseURL:         cfg.PublicBaseURL,
+		WebBaseURL:            cfg.WebBaseURL,
 	})
 
 	// Wrap the router with the request logger so the prod binary keeps

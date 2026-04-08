@@ -7,7 +7,38 @@
     "ai_providers": "AI プロバイダ",
     "ai_activity": "AI アクティビティ",
     "weekly_digest": "週次ダイジェスト",
-    "security": "セキュリティ"
+    "security": "セキュリティ",
+    "integrations": "連携"
+  },
+  "integrations": {
+    "title": "連携",
+    "description": "個人の GitHub / Slack / Google カレンダー アカウントを接続すると、nodate-flow がユーザーとして操作できるようになります。トークンは暗号化して保存されます。",
+    "connect": "接続",
+    "disconnect": "切断",
+    "disconnect_confirm": "{{provider}} を切断しますか？再度利用するには認可し直す必要があります。",
+    "disconnected": "連携を切断しました",
+    "connected_as": "{{account}} として接続中 · {{time}}",
+    "connected_toast": "{{provider}} を接続しました。",
+    "not_configured": "このサーバーでは設定されていません。管理者に OAuth 資格情報の設定を依頼してください。",
+    "provider": {
+      "github": {
+        "name": "GitHub",
+        "description": "あなたとしてリポジトリの読み取りと Issue の作成を行います。"
+      },
+      "slack": {
+        "name": "Slack",
+        "description": "あなたとして DM の送受信を行います。"
+      },
+      "google_calendar": {
+        "name": "Google カレンダー",
+        "description": "カレンダーと直近の予定を読み取ります。"
+      }
+    },
+    "errors": {
+      "connect_failed": "接続フローを開始できませんでした。もう一度お試しください。",
+      "disconnect_failed": "連携を切断できませんでした。もう一度お試しください。",
+      "callback_failed": "接続フローが失敗しました: {{reason}}"
+    }
   },
   "ai_activity": {
     "title": "AI アクティビティ",
@@ -133,6 +164,23 @@
         "password_mismatch": "現在のパスワードが正しくありません。",
         "disable_failed": "2FA を無効化できませんでした。もう一度お試しください。",
         "not_configured": "このサーバーでは二要素認証が利用できません。管理者に NF_SECRET_KEY の設定を依頼してください。"
+      },
+      "recovery": {
+        "title": "リカバリーコード",
+        "description": "認証アプリを使えなくなった場合に、これらのワンタイムコードでサインインできます。安全な場所に保存してください — 再表示はされません。",
+        "remaining": "残りリカバリーコード: {{count}}",
+        "remaining_plural": "残りリカバリーコード: {{count}}",
+        "regenerate": "リカバリーコードを再生成",
+        "regenerate_confirm": "リカバリーコードを新しく生成しますか?以前のコードは使用できなくなります。",
+        "regenerate_password_label": "現在のパスワード",
+        "copy_all": "すべてコピー",
+        "download": ".txt でダウンロード",
+        "saved": "保存しました",
+        "copied": "リカバリーコードをコピーしました",
+        "regenerated_toast": "新しいリカバリーコードを生成しました。",
+        "errors": {
+          "regenerate_failed": "リカバリーコードを再生成できませんでした。もう一度お試しください。"
+        }
       }
     },
     "sessions": {

@@ -21,6 +21,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/login/totp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete a TOTP step-up login after /auth/login returned totp_required */
+        post: operations["auth-login-totp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/logout": {
         parameters: {
             query?: never;
@@ -192,6 +209,57 @@ export interface paths {
         patch: operations["me-patch"];
         trace?: never;
     };
+    "/me/integrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the authenticated user's personal OAuth integrations */
+        get: operations["me-integrations-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/integrations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Disconnect a personal OAuth integration */
+        delete: operations["me-integrations-disconnect"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/integrations/{provider}/connect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start a personal OAuth connect flow */
+        post: operations["me-integrations-connect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/password": {
         parameters: {
             query?: never;
@@ -290,6 +358,41 @@ export interface paths {
         put?: never;
         /** Begin TOTP 2FA enrollment (returns otpauth URL) */
         post: operations["me-totp-enroll"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/totp/recovery-codes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Return remaining TOTP recovery code count */
+        get: operations["me-totp-recovery-status"];
+        put?: never;
+        /** Regenerate TOTP recovery codes after password reverification */
+        post: operations["me-totp-recovery-regenerate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/oauth/callback/{provider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Complete a personal OAuth integration flow */
+        get: operations["oauth-integration-callback"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -785,6 +888,23 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/ai/agents/{agentId}/event-triggers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Replace an AI agent's event_trigger_types list */
+        patch: operations["ai-agent-event-triggers-update"];
         trace?: never;
     };
     "/workspaces/{wsId}/ai/agents/{agentId}/pause": {
@@ -1333,6 +1453,7 @@ export interface components {
             /** Format: int64 */
             createdAt: number;
             description?: string;
+            eventTriggerTypes?: string[] | null;
             id: string;
             modelId: string;
             modelName: string;
@@ -1471,6 +1592,38 @@ export interface components {
             lens: components["schemas"]["Lens"];
             prompt: string;
         };
+        ConnectIntegrationInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Optional client-supplied return URL; defaults to the integrations settings page */
+            redirectTo?: string;
+        };
+        ConnectIntegrationOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            authorizeUrl: string;
+        };
+        ConnectionSummary: {
+            /** Format: int64 */
+            accessTokenExpiresAt?: number;
+            /** Format: int64 */
+            connectedAt: number;
+            externalAccountId: string;
+            externalAccountLabel: string;
+            /** @description Connection public id (UUID v7) */
+            id: string;
+            /** Format: int64 */
+            lastRefreshedAt?: number;
+            /** @enum {string} */
+            provider: "github" | "slack" | "google_calendar";
+            scopes: string;
+        };
         CreateAgentInputBody: {
             /**
              * Format: uri
@@ -1478,6 +1631,8 @@ export interface components {
              */
             readonly $schema?: string;
             description?: string;
+            /** @description Eventbus kinds that fire this agent when scheduleKind=on_event */
+            eventTriggerTypes?: string[] | null;
             /** @description ai_models public id */
             modelId: string;
             name: string;
@@ -1638,6 +1793,14 @@ export interface components {
             ok: boolean;
         };
         DisableWorkspaceOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        DisconnectOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
@@ -1824,6 +1987,14 @@ export interface components {
             nextCursor: string | null;
             /** Format: int64 */
             total: number;
+        };
+        ListIntegrationsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            providers: components["schemas"]["ProviderStatus"][] | null;
         };
         ListInvocationsOutputBody: {
             /**
@@ -2026,6 +2197,25 @@ export interface components {
             total: number;
             workspaces: components["schemas"]["Workspace"][] | null;
         };
+        LoginBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            accessToken?: string;
+            /** @description Short-lived token to present on /auth/login/totp */
+            challengeToken?: string;
+            /**
+             * Format: int64
+             * @description Access token expiry, unix seconds
+             */
+            expiresAt?: number;
+            /** @enum {string} */
+            step: "complete" | "totp_required";
+            /** @description User public id (UUID v7) */
+            userId?: string;
+        };
         LoginInputBody: {
             /**
              * Format: uri
@@ -2035,6 +2225,16 @@ export interface components {
             /** Format: email */
             email: string;
             password: string;
+        };
+        LoginTotpInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            challengeToken: string;
+            code?: string;
+            recoveryCode?: string;
         };
         LogoutOutputBody: {
             /**
@@ -2240,6 +2440,13 @@ export interface components {
             name: string;
             /** Format: date-time */
             updatedAt?: string;
+        };
+        ProviderStatus: {
+            /** @description True when the server has credentials for this provider */
+            configured: boolean;
+            connection?: components["schemas"]["ConnectionSummary"];
+            /** @enum {string} */
+            provider: "github" | "slack" | "google_calendar";
         };
         RegisterInputBody: {
             /**
@@ -2635,6 +2842,7 @@ export interface components {
              */
             readonly $schema?: string;
             ok: boolean;
+            recoveryCodes: string[] | null;
         };
         TotpDisableInputBody: {
             /**
@@ -2661,6 +2869,31 @@ export interface components {
             otpauthUrl: string;
             /** @description Base32-encoded secret, for manual entry */
             secret: string;
+        };
+        TotpRecoveryCodesStatusOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            remaining: number;
+        };
+        TotpRegenerateRecoveryCodesInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            password: string;
+        };
+        TotpRegenerateRecoveryCodesOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            recoveryCodes: string[] | null;
         };
         TotpStatusOutputBody: {
             /**
@@ -2700,6 +2933,23 @@ export interface components {
              */
             readonly $schema?: string;
             dedupeKey: string;
+            ok: boolean;
+        };
+        UpdateAgentEventTriggersInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Pass [] to clear; otherwise list of eventbus kinds */
+            eventTriggerTypes: string[] | null;
+        };
+        UpdateAgentEventTriggersOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
             ok: boolean;
         };
         UpdateAgentScheduleInputBody: {
@@ -2821,6 +3071,40 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["LoginInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "auth-login-totp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginTotpInputBody"];
             };
         };
         responses: {
@@ -3202,6 +3486,102 @@ export interface operations {
             };
         };
     };
+    "me-integrations-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListIntegrationsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "me-integrations-disconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Connection public id (UUID v7) */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisconnectOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "me-integrations-connect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: "github" | "slack" | "google_calendar";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectIntegrationInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectIntegrationOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "me-password-change": {
         parameters: {
             query?: never;
@@ -3443,6 +3823,102 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TotpEnrollOutputBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "me-totp-recovery-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotpRecoveryCodesStatusOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "me-totp-recovery-regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TotpRegenerateRecoveryCodesInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotpRegenerateRecoveryCodesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "oauth-integration-callback": {
+        parameters: {
+            query?: {
+                code?: string;
+                state?: string;
+                error?: string;
+            };
+            header?: never;
+            path: {
+                provider: "github" | "slack" | "google_calendar";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {
@@ -4887,6 +5363,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentSummary"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-agent-event-triggers-update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                agentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAgentEventTriggersInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateAgentEventTriggersOutputBody"];
                 };
             };
             /** @description Error */

@@ -336,7 +336,16 @@
       "email": "メールアドレス",
       "password": "パスワード",
       "no_account": "アカウントをお持ちでないですか？",
-      "signup_link": "新規作成"
+      "signup_link": "新規作成",
+      "totp_title": "二要素認証",
+      "totp_instructions": "認証アプリの 6 桁コードを入力してください。",
+      "totp_code": "コード",
+      "totp_submit": "確認",
+      "totp_cancel": "キャンセル",
+      "totp_use_recovery": "リカバリーコードを使用",
+      "totp_use_code": "認証アプリのコードを使用",
+      "recovery_code": "リカバリーコード",
+      "recovery_submit": "リカバリーコードで確認"
     },
     "signup": {
       "title": "アカウントを作成",
@@ -350,6 +359,10 @@
       "invalid_credentials": "メールアドレスまたはパスワードが正しくありません。",
       "email_taken": "このメールアドレスは既に登録されています。",
       "network": "サーバーに接続できませんでした。接続を確認してもう一度お試しください。",
+      "totp_code_mismatch": "コードが無効です。認証アプリを確認してもう一度お試しください。",
+      "totp_challenge_expired": "2FA の確認時間が切れました。もう一度サインインしてください。",
+      "totp_recovery_invalid": "リカバリーコードが無効か、すでに使用されています。",
+      "generic": "問題が発生しました。もう一度お試しください。",
       "unknown": "問題が発生しました。もう一度お試しください。"
     },
     "validation": {

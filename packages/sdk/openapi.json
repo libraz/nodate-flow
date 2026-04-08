@@ -204,6 +204,12 @@
           "description": {
             "type": "string"
           },
+          "eventTriggerTypes": {
+            "items": {
+              "type": "string"
+            },
+            "type": ["array", "null"]
+          },
           "id": {
             "type": "string"
           },
@@ -541,6 +547,84 @@
         "required": ["prompt", "lens"],
         "type": "object"
       },
+      "ConnectIntegrationInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ConnectIntegrationInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "redirectTo": {
+            "description": "Optional client-supplied return URL; defaults to the integrations settings page",
+            "maxLength": 512,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ConnectIntegrationOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ConnectIntegrationOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "authorizeUrl": {
+            "type": "string"
+          }
+        },
+        "required": ["authorizeUrl"],
+        "type": "object"
+      },
+      "ConnectionSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "accessTokenExpiresAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "connectedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "externalAccountId": {
+            "type": "string"
+          },
+          "externalAccountLabel": {
+            "type": "string"
+          },
+          "id": {
+            "description": "Connection public id (UUID v7)",
+            "type": "string"
+          },
+          "lastRefreshedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "provider": {
+            "enum": ["github", "slack", "google_calendar"],
+            "type": "string"
+          },
+          "scopes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "provider",
+          "externalAccountId",
+          "externalAccountLabel",
+          "scopes",
+          "connectedAt"
+        ],
+        "type": "object"
+      },
       "CreateAgentInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -554,6 +638,13 @@
           "description": {
             "maxLength": 1000,
             "type": "string"
+          },
+          "eventTriggerTypes": {
+            "description": "Eventbus kinds that fire this agent when scheduleKind=on_event",
+            "items": {
+              "type": "string"
+            },
+            "type": ["array", "null"]
           },
           "modelId": {
             "description": "ai_models public id",
@@ -940,6 +1031,23 @@
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
             "examples": ["https://example.com/schemas/DisableWorkspaceOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
+      "DisconnectOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/DisconnectOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -1368,6 +1476,26 @@
           }
         },
         "required": ["total", "items", "nextCursor"],
+        "type": "object"
+      },
+      "ListIntegrationsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListIntegrationsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderStatus"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["providers"],
         "type": "object"
       },
       "ListInvocationsOutputBody": {
@@ -1861,6 +1989,40 @@
         "required": ["total", "workspaces", "nextCursor"],
         "type": "object"
       },
+      "LoginBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/LoginBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "accessToken": {
+            "type": "string"
+          },
+          "challengeToken": {
+            "description": "Short-lived token to present on /auth/login/totp",
+            "type": "string"
+          },
+          "expiresAt": {
+            "description": "Access token expiry, unix seconds",
+            "format": "int64",
+            "type": "integer"
+          },
+          "step": {
+            "enum": ["complete", "totp_required"],
+            "type": "string"
+          },
+          "userId": {
+            "description": "User public id (UUID v7)",
+            "type": "string"
+          }
+        },
+        "required": ["step"],
+        "type": "object"
+      },
       "LoginInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -1880,6 +2042,32 @@
           }
         },
         "required": ["email", "password"],
+        "type": "object"
+      },
+      "LoginTotpInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/LoginTotpInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "challengeToken": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "code": {
+            "pattern": "^$|^[0-9]{6}$",
+            "type": "string"
+          },
+          "recoveryCode": {
+            "pattern": "^$|^[A-Za-z0-9-]{10,20}$",
+            "type": "string"
+          }
+        },
+        "required": ["challengeToken"],
         "type": "object"
       },
       "LogoutOutputBody": {
@@ -2401,6 +2589,24 @@
           }
         },
         "required": ["id", "kind", "name", "apiKeyMasked", "createdAt"],
+        "type": "object"
+      },
+      "ProviderStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "configured": {
+            "description": "True when the server has credentials for this provider",
+            "type": "boolean"
+          },
+          "connection": {
+            "$ref": "#/components/schemas/ConnectionSummary"
+          },
+          "provider": {
+            "enum": ["github", "slack", "google_calendar"],
+            "type": "string"
+          }
+        },
+        "required": ["provider", "configured"],
         "type": "object"
       },
       "RegisterInputBody": {
@@ -3352,9 +3558,15 @@
           },
           "ok": {
             "type": "boolean"
+          },
+          "recoveryCodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": ["array", "null"]
           }
         },
-        "required": ["ok"],
+        "required": ["ok", "recoveryCodes"],
         "type": "object"
       },
       "TotpDisableInputBody": {
@@ -3412,6 +3624,63 @@
           }
         },
         "required": ["otpauthUrl", "secret"],
+        "type": "object"
+      },
+      "TotpRecoveryCodesStatusOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/TotpRecoveryCodesStatusOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "remaining": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["remaining"],
+        "type": "object"
+      },
+      "TotpRegenerateRecoveryCodesInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/TotpRegenerateRecoveryCodesInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["password"],
+        "type": "object"
+      },
+      "TotpRegenerateRecoveryCodesOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/TotpRegenerateRecoveryCodesOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "recoveryCodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["recoveryCodes"],
         "type": "object"
       },
       "TotpStatusOutputBody": {
@@ -3480,6 +3749,44 @@
           }
         },
         "required": ["ok", "dedupeKey"],
+        "type": "object"
+      },
+      "UpdateAgentEventTriggersInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/UpdateAgentEventTriggersInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "eventTriggerTypes": {
+            "description": "Pass [] to clear; otherwise list of eventbus kinds",
+            "items": {
+              "type": "string"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["eventTriggerTypes"],
+        "type": "object"
+      },
+      "UpdateAgentEventTriggersOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/UpdateAgentEventTriggersOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
         "type": "object"
       },
       "UpdateAgentScheduleInputBody": {
@@ -3741,7 +4048,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AuthTokens"
+                  "$ref": "#/components/schemas/LoginBody"
                 }
               }
             },
@@ -3766,6 +4073,51 @@
           }
         },
         "summary": "Log in with email and password"
+      }
+    },
+    "/auth/login/totp": {
+      "post": {
+        "operationId": "auth-login-totp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginTotpInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthTokens"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Complete a TOTP step-up login after /auth/login returned totp_required"
       }
     },
     "/auth/logout": {
@@ -4243,6 +4595,123 @@
         "summary": "Patch the authenticated user's profile"
       }
     },
+    "/me/integrations": {
+      "get": {
+        "operationId": "me-integrations-list",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListIntegrationsOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List the authenticated user's personal OAuth integrations"
+      }
+    },
+    "/me/integrations/{id}": {
+      "delete": {
+        "operationId": "me-integrations-disconnect",
+        "parameters": [
+          {
+            "description": "Connection public id (UUID v7)",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Connection public id (UUID v7)",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisconnectOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Disconnect a personal OAuth integration"
+      }
+    },
+    "/me/integrations/{provider}/connect": {
+      "post": {
+        "operationId": "me-integrations-connect",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "enum": ["github", "slack", "google_calendar"],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectIntegrationInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectIntegrationOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Start a personal OAuth connect flow"
+      }
+    },
     "/me/password": {
       "post": {
         "operationId": "me-password-change",
@@ -4530,6 +4999,133 @@
           }
         },
         "summary": "Begin TOTP 2FA enrollment (returns otpauth URL)"
+      }
+    },
+    "/me/totp/recovery-codes": {
+      "get": {
+        "operationId": "me-totp-recovery-status",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TotpRecoveryCodesStatusOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Return remaining TOTP recovery code count"
+      },
+      "post": {
+        "operationId": "me-totp-recovery-regenerate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpRegenerateRecoveryCodesInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TotpRegenerateRecoveryCodesOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Regenerate TOTP recovery codes after password reverification"
+      }
+    },
+    "/oauth/callback/{provider}": {
+      "get": {
+        "operationId": "oauth-integration-callback",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "enum": ["github", "slack", "google_calendar"],
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "code",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "state",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "error",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Complete a personal OAuth integration flow"
       }
     },
     "/projects/{prjId}": {
@@ -6656,6 +7252,62 @@
           }
         },
         "summary": "Create a new AI agent"
+      }
+    },
+    "/workspaces/{wsId}/ai/agents/{agentId}/event-triggers": {
+      "patch": {
+        "operationId": "ai-agent-event-triggers-update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "agentId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAgentEventTriggersInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateAgentEventTriggersOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Replace an AI agent's event_trigger_types list"
       }
     },
     "/workspaces/{wsId}/ai/agents/{agentId}/pause": {

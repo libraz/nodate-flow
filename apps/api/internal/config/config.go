@@ -33,6 +33,27 @@ type Config struct {
 	// TODO: Replace with a real repo→workspace mapping table.
 	DefaultWorkspaceID string `env:"NF_DEFAULT_WORKSPACE_ID" envDefault:""`
 
+	// PublicBaseURL is the externally-visible origin of the api used to
+	// build OAuth redirect URIs for personal integrations (GitHub, Slack,
+	// Google Calendar). Must exactly match what is registered on each
+	// provider's developer console.
+	PublicBaseURL string `env:"NF_PUBLIC_BASE_URL" envDefault:"http://localhost:8080"`
+
+	// WebBaseURL is where the user is redirected after the OAuth
+	// callback handler completes. Defaults to the Vite dev origin.
+	WebBaseURL string `env:"NF_WEB_BASE_URL" envDefault:"http://localhost:5173"`
+
+	// Personal-integration OAuth apps. All three are optional; when the
+	// client id or secret is empty the corresponding provider is
+	// reported as unavailable and enrollment returns
+	// INTEGRATION.PROVIDER.NOT_CONFIGURED.
+	GithubClientID      string `env:"NF_GITHUB_CLIENT_ID"      envDefault:""`
+	GithubClientSecret  string `env:"NF_GITHUB_CLIENT_SECRET"  envDefault:""`
+	SlackClientID       string `env:"NF_SLACK_CLIENT_ID"       envDefault:""`
+	SlackClientSecret   string `env:"NF_SLACK_CLIENT_SECRET"   envDefault:""`
+	GoogleClientID      string `env:"NF_GOOGLE_CLIENT_ID"      envDefault:""`
+	GoogleClientSecret  string `env:"NF_GOOGLE_CLIENT_SECRET"  envDefault:""`
+
 	// CookieSecure toggles the Secure flag on the nf_rt refresh cookie
 	// and selects the paired SameSite mode (None when secure, Lax
 	// otherwise; see auth.refreshCookieSameSite).

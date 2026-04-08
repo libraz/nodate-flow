@@ -33,6 +33,8 @@ import (
 	aihandlers "github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/ai"
 	authhandlers "github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/inbox"
+	integrationshandlers "github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/integrations"
+	integrationspkg "github.com/nodate-flow/nodate-flow/apps/api/internal/integrations"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/projects"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/signals"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/tasks"
@@ -111,6 +113,17 @@ type Deps struct {
 	// handler to return AI.AGENT.RUNTIME_DISABLED so operators
 	// notice misconfiguration instead of a silent no-op.
 	AgentRunner agentruntime.Runner
+
+	// Integrations is the personal-OAuth provider registry (GitHub /
+	// Slack / Google Calendar). Nil in tests; the handlers degrade
+	// gracefully by returning INTEGRATION.OAUTH.PROVIDER_NOT_CONFIGURED.
+	Integrations *integrationspkg.Registry
+	// PublicBaseURL is the origin used to build OAuth callback URLs
+	// (e.g. https://api.example.com + /oauth/callback/github).
+	PublicBaseURL string
+	// WebBaseURL is where the OAuth callback handler bounces the user
+	// back to after writing the user_integrations row.
+	WebBaseURL string
 }
 
 // Result is what BuildResult returns: the composed chi router plus the
@@ -168,7 +181,21 @@ func BuildResult(deps Deps) Result {
 		sessionStore = sessionstore.NewMySQLStore(deps.Queries)
 	}
 	authDeps := authhandlers.Deps{DB: deps.DB, Queries: deps.Queries, Sessions: sessionStore, JWT: deps.JWT, Cipher: deps.Cipher, CookieSecure: deps.CookieSecure}
+	integrationsDeps := integrationshandlers.Deps{
+		DB:            deps.DB,
+		Queries:       deps.Queries,
+		Cipher:        deps.Cipher,
+		Registry:      deps.Integrations,
+		PublicBaseURL: deps.PublicBaseURL,
+		WebBaseURL:    deps.WebBaseURL,
+	}
 	registerPublicAuthRoutes(api, authDeps)
+	huma.Register(api, huma.Operation{
+		OperationID: "oauth-integration-callback",
+		Method:      http.MethodGet,
+		Path:        "/oauth/callback/{provider}",
+		Summary:     "Complete a personal OAuth integration flow",
+	}, integrationshandlers.Callback(integrationsDeps))
 
 	authMW := middleware.RequireAuth(middleware.AuthDeps{
 		JWT:     deps.JWT,
@@ -235,6 +262,24 @@ func BuildResult(deps Deps) Result {
 		sub.Use(authMW)
 		subAPI := newSubAPI(sub)
 		registerProtectedAuthRoutes(subAPI, authDeps)
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "me-integrations-list",
+			Method:      http.MethodGet,
+			Path:        "/me/integrations",
+			Summary:     "List the authenticated user's personal OAuth integrations",
+		}, integrationshandlers.List(integrationsDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "me-integrations-connect",
+			Method:      http.MethodPost,
+			Path:        "/me/integrations/{provider}/connect",
+			Summary:     "Start a personal OAuth connect flow",
+		}, integrationshandlers.Connect(integrationsDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "me-integrations-disconnect",
+			Method:      http.MethodDelete,
+			Path:        "/me/integrations/{id}",
+			Summary:     "Disconnect a personal OAuth integration",
+		}, integrationshandlers.Disconnect(integrationsDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "workspaces-create",
 			Method:      http.MethodPost,
@@ -314,6 +359,12 @@ func BuildResult(deps Deps) Result {
 				Path:        "/workspaces/{wsId}/ai/agents/{agentId}/schedule",
 				Summary:     "Update an AI agent's schedule_kind trigger mode",
 			}, aihandlers.UpdateAgentSchedule(aiDeps))
+			huma.Register(subAPI, huma.Operation{
+				OperationID: "ai-agent-event-triggers-update",
+				Method:      http.MethodPatch,
+				Path:        "/workspaces/{wsId}/ai/agents/{agentId}/event-triggers",
+				Summary:     "Replace an AI agent's event_trigger_types list",
+			}, aihandlers.UpdateAgentEventTriggers(aiDeps))
 			huma.Register(subAPI, huma.Operation{
 				OperationID: "ai-agent-trigger",
 				Method:      http.MethodPost,
@@ -565,6 +616,12 @@ func registerPublicAuthCookieRoutes(api huma.API, deps authhandlers.Deps) {
 		Path:        "/auth/logout",
 		Summary:     "Revoke a session",
 	}, authhandlers.Logout(deps))
+	huma.Register(api, huma.Operation{
+		OperationID: "auth-login-totp",
+		Method:      http.MethodPost,
+		Path:        "/auth/login/totp",
+		Summary:     "Complete a TOTP step-up login after /auth/login returned totp_required",
+	}, authhandlers.LoginTotp(deps))
 }
 
 // registerProtectedAuthRoutes wires the bearer-protected auth endpoints.
@@ -629,6 +686,18 @@ func registerProtectedAuthRoutes(api huma.API, deps authhandlers.Deps) {
 		Path:        "/me/totp",
 		Summary:     "Disable TOTP 2FA after password reverification",
 	}, authhandlers.TotpDisable(deps))
+	huma.Register(api, huma.Operation{
+		OperationID: "me-totp-recovery-status",
+		Method:      http.MethodGet,
+		Path:        "/me/totp/recovery-codes",
+		Summary:     "Return remaining TOTP recovery code count",
+	}, authhandlers.TotpRecoveryCodesStatus(deps))
+	huma.Register(api, huma.Operation{
+		OperationID: "me-totp-recovery-regenerate",
+		Method:      http.MethodPost,
+		Path:        "/me/totp/recovery-codes",
+		Summary:     "Regenerate TOTP recovery codes after password reverification",
+	}, authhandlers.TotpRegenerateRecoveryCodes(deps))
 }
 
 // newDBInvocationLogger returns an ai.InvocationLogger that persists

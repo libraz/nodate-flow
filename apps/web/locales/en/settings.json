@@ -7,7 +7,38 @@
     "ai_providers": "AI providers",
     "ai_activity": "AI activity",
     "weekly_digest": "Weekly digest",
-    "security": "Security"
+    "security": "Security",
+    "integrations": "Integrations"
+  },
+  "integrations": {
+    "title": "Integrations",
+    "description": "Connect your personal GitHub, Slack, and Google Calendar accounts so nodate-flow can act on your behalf. Tokens are encrypted at rest.",
+    "connect": "Connect",
+    "disconnect": "Disconnect",
+    "disconnect_confirm": "Disconnect {{provider}}? You will need to re-authorise to use it again.",
+    "disconnected": "Integration disconnected",
+    "connected_as": "Connected as {{account}} · {{time}}",
+    "connected_toast": "{{provider}} connected.",
+    "not_configured": "Not configured on this server. Ask the administrator to set the OAuth credentials.",
+    "provider": {
+      "github": {
+        "name": "GitHub",
+        "description": "Read your repositories and open issues as yourself."
+      },
+      "slack": {
+        "name": "Slack",
+        "description": "Send direct messages and read your DMs as yourself."
+      },
+      "google_calendar": {
+        "name": "Google Calendar",
+        "description": "Read your calendars and upcoming events."
+      }
+    },
+    "errors": {
+      "connect_failed": "Could not start the connect flow. Please try again.",
+      "disconnect_failed": "Could not disconnect the integration. Please try again.",
+      "callback_failed": "Connect flow failed: {{reason}}"
+    }
   },
   "ai_activity": {
     "title": "AI activity",
@@ -133,6 +164,23 @@
         "password_mismatch": "Current password is incorrect.",
         "disable_failed": "Could not disable 2FA. Please try again.",
         "not_configured": "Two-factor authentication is not available on this server. Ask an administrator to configure NF_SECRET_KEY."
+      },
+      "recovery": {
+        "title": "Recovery codes",
+        "description": "Use these one-time codes to sign in if you lose access to your authenticator app. Save them somewhere safe — they will not be shown again.",
+        "remaining": "{{count}} recovery code remaining",
+        "remaining_plural": "{{count}} recovery codes remaining",
+        "regenerate": "Regenerate recovery codes",
+        "regenerate_confirm": "Generate a new set of recovery codes? Your previous codes will stop working.",
+        "regenerate_password_label": "Current password",
+        "copy_all": "Copy all",
+        "download": "Download as .txt",
+        "saved": "I've saved them",
+        "copied": "Recovery codes copied",
+        "regenerated_toast": "New recovery codes generated.",
+        "errors": {
+          "regenerate_failed": "Could not regenerate recovery codes. Please try again."
+        }
       }
     },
     "sessions": {

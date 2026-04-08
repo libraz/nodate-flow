@@ -9,14 +9,19 @@ import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface SubNavItem {
-  key: 'profile' | 'notifications' | 'security';
-  to: '/settings/profile' | '/settings/notifications' | '/settings/security';
+  key: 'profile' | 'notifications' | 'security' | 'integrations';
+  to:
+    | '/settings/profile'
+    | '/settings/notifications'
+    | '/settings/security'
+    | '/settings/integrations';
 }
 
 const SUB_NAV: readonly SubNavItem[] = [
   { key: 'profile', to: '/settings/profile' },
   { key: 'notifications', to: '/settings/notifications' },
   { key: 'security', to: '/settings/security' },
+  { key: 'integrations', to: '/settings/integrations' },
 ];
 
 function SettingsLayout(): ReactElement {
@@ -24,7 +29,7 @@ function SettingsLayout(): ReactElement {
 
   const labelKeyFor = (
     key: SubNavItem['key'],
-  ): 'nav.profile' | 'nav.notifications' | 'nav.security' => {
+  ): 'nav.profile' | 'nav.notifications' | 'nav.security' | 'nav.integrations' => {
     switch (key) {
       case 'profile':
         return 'nav.profile';
@@ -32,6 +37,8 @@ function SettingsLayout(): ReactElement {
         return 'nav.notifications';
       case 'security':
         return 'nav.security';
+      case 'integrations':
+        return 'nav.integrations';
     }
   };
 

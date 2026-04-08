@@ -1,0 +1,51 @@
+domain: integration
+breadcrumb: "Integration"
+
+resources:
+  oauth:
+    breadcrumb: "Integration > OAuth"
+    errors:
+      provider_unsupported:
+        code: INTEGRATION.OAUTH.PROVIDER_UNSUPPORTED
+        status: 400
+        message: "Unknown integration provider"
+        description: "Returned when the {provider} path parameter is not one of the supported providers (github, slack, google_calendar)."
+        userAction: "Choose a supported provider from the integrations list."
+
+      provider_not_configured:
+        code: INTEGRATION.OAUTH.PROVIDER_NOT_CONFIGURED
+        status: 503
+        message: "Integration provider is not configured on this server"
+        description: "Returned when the api has no client id or client secret set for the requested provider (the NF_<provider>_CLIENT_ID/SECRET env vars are empty)."
+        userAction: "Ask the instance administrator to set the OAuth credentials."
+
+      state_invalid:
+        code: INTEGRATION.OAUTH.STATE_INVALID
+        status: 400
+        message: "OAuth state token is missing, unknown, or expired"
+        description: "Returned by the OAuth callback handler when the state query parameter does not match a row in oauth_states, or the row has expired."
+        userAction: "Start the connect flow again."
+
+      exchange_failed:
+        code: INTEGRATION.OAUTH.EXCHANGE_FAILED
+        status: 502
+        message: "Could not exchange the OAuth code for an access token"
+        description: "Returned when the provider's token endpoint rejects the authorization code or returns an unparseable response."
+        userAction: "Try the connect flow again. If the problem persists, check the server logs."
+
+      account_fetch_failed:
+        code: INTEGRATION.OAUTH.ACCOUNT_FETCH_FAILED
+        status: 502
+        message: "Could not fetch the provider account profile"
+        description: "Returned when the token exchange succeeded but the subsequent call to the provider's /me / user identity endpoint failed."
+        userAction: "Try the connect flow again."
+
+  connection:
+    breadcrumb: "Integration > Connection"
+    errors:
+      not_found:
+        code: INTEGRATION.CONNECTION.NOT_FOUND
+        status: 404
+        message: "Integration connection not found"
+        description: "Returned by DELETE /me/integrations/{publicId} when the row does not exist or does not belong to the caller."
+        userAction: "Refresh the integrations list."

@@ -6,6 +6,7 @@ export * from "./constraint";
 export * from "./instance";
 export * from "./integration-gh";
 export * from "./integration-slack";
+export * from "./integrations";
 export * from "./internal";
 export * from "./mcp";
 export * from "./rate";

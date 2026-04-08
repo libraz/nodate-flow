@@ -336,7 +336,16 @@
       "email": "Email",
       "password": "Password",
       "no_account": "Don't have an account?",
-      "signup_link": "Create one"
+      "signup_link": "Create one",
+      "totp_title": "Two-factor authentication",
+      "totp_instructions": "Enter the 6-digit code from your authenticator app.",
+      "totp_code": "Code",
+      "totp_submit": "Verify",
+      "totp_cancel": "Cancel",
+      "totp_use_recovery": "Use a recovery code instead",
+      "totp_use_code": "Use authenticator code instead",
+      "recovery_code": "Recovery code",
+      "recovery_submit": "Verify recovery code"
     },
     "signup": {
       "title": "Create your account",
@@ -350,6 +359,10 @@
       "invalid_credentials": "Invalid email or password.",
       "email_taken": "That email is already registered.",
       "network": "Could not reach the server. Check your connection and try again.",
+      "totp_code_mismatch": "That code is not valid. Check your authenticator app and try again.",
+      "totp_challenge_expired": "Your 2FA challenge expired. Sign in again.",
+      "totp_recovery_invalid": "That recovery code is not valid or has already been used.",
+      "generic": "Something went wrong. Please try again.",
       "unknown": "Something went wrong. Please try again."
     },
     "validation": {

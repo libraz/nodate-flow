@@ -133,6 +133,7 @@ export type TotpStatus = 'disabled' | 'pending' | 'enabled';
 
 export const totpKeys = {
   status: ['me', 'totp'] as const,
+  recovery: ['me', 'totp', 'recovery'] as const,
 };
 
 export function useTotpStatusQuery(): UseSuspenseQueryResult<TotpStatus> {
@@ -165,15 +166,50 @@ export function useTotpEnroll(): UseMutationResult<TotpEnrollResponse, SettingsA
   });
 }
 
-export function useTotpConfirm(): UseMutationResult<void, SettingsApiError, string> {
+export interface TotpConfirmResponse {
+  recoveryCodes: string[];
+}
+
+export function useTotpConfirm(): UseMutationResult<TotpConfirmResponse, SettingsApiError, string> {
   const qc = useQueryClient();
-  return useMutation<void, SettingsApiError, string>({
-    mutationFn: async (code: string): Promise<void> => {
-      const { error } = await sdk.POST('/me/totp/confirm', { body: { code } });
-      if (error) throw toError(error, 'Failed to confirm 2FA code');
+  return useMutation<TotpConfirmResponse, SettingsApiError, string>({
+    mutationFn: async (code: string): Promise<TotpConfirmResponse> => {
+      const { data, error } = await sdk.POST('/me/totp/confirm', { body: { code } });
+      if (error || !data) throw toError(error, 'Failed to confirm 2FA code');
+      return { recoveryCodes: data.recoveryCodes ?? [] };
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: totpKeys.status });
+      void qc.invalidateQueries({ queryKey: totpKeys.recovery });
+    },
+  });
+}
+
+export function useRecoveryCodesStatusQuery(): UseSuspenseQueryResult<number> {
+  return useSuspenseQuery({
+    queryKey: totpKeys.recovery,
+    queryFn: async (): Promise<number> => {
+      const { data, error } = await sdk.GET('/me/totp/recovery-codes');
+      if (error || !data) throw toError(error, 'Failed to load recovery code status');
+      return data.remaining;
+    },
+  });
+}
+
+export function useRegenerateRecoveryCodes(): UseMutationResult<
+  TotpConfirmResponse,
+  SettingsApiError,
+  string
+> {
+  const qc = useQueryClient();
+  return useMutation<TotpConfirmResponse, SettingsApiError, string>({
+    mutationFn: async (password: string): Promise<TotpConfirmResponse> => {
+      const { data, error } = await sdk.POST('/me/totp/recovery-codes', { body: { password } });
+      if (error || !data) throw toError(error, 'Failed to regenerate recovery codes');
+      return { recoveryCodes: data.recoveryCodes ?? [] };
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: totpKeys.recovery });
     },
   });
 }
