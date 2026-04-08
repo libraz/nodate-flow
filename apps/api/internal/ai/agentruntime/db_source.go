@@ -25,8 +25,10 @@ WHERE enabled = TRUE
   AND paused = FALSE
 `
 
-// Due implements [Source].
-func (s *DBSource) Due(ctx context.Context, _ time.Time) ([]Job, error) {
+// Due implements [Source]. Each candidate row's cron_expr is parsed
+// and matched against now; unparseable expressions are skipped so one
+// bad row cannot block the whole tick.
+func (s *DBSource) Due(ctx context.Context, now time.Time) ([]Job, error) {
 	rows, err := s.DB.QueryContext(ctx, dueAgentsQuery)
 	if err != nil {
 		return nil, err
@@ -37,6 +39,13 @@ func (s *DBSource) Due(ctx context.Context, _ time.Time) ([]Job, error) {
 		var j Job
 		if err := rows.Scan(&j.AgentID, &j.WsID, &j.CronExpr, &j.Paused); err != nil {
 			return nil, err
+		}
+		expr, err := ParseCron(j.CronExpr)
+		if err != nil {
+			continue
+		}
+		if !expr.Matches(now) {
+			continue
 		}
 		out = append(out, j)
 	}
