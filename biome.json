@@ -74,6 +74,17 @@
           }
         }
       }
+    },
+    {
+      "include": ["packages/ui/src/primitives/**"],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "useSemanticElements": "off",
+            "noNoninteractiveElementToInteractiveRole": "off"
+          }
+        }
+      }
     }
   ]
 }

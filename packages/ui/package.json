@@ -35,7 +35,15 @@
     "./primitives/separator": "./src/primitives/separator/separator.tsx",
     "./primitives/skeleton": "./src/primitives/skeleton/skeleton.tsx",
     "./primitives/spinner": "./src/primitives/spinner/spinner.tsx",
-    "./primitives/form-field": "./src/primitives/form-field/form-field.tsx"
+    "./primitives/form-field": "./src/primitives/form-field/form-field.tsx",
+    "./primitives/tooltip": "./src/primitives/tooltip/tooltip.tsx",
+    "./primitives/popover": "./src/primitives/popover/popover.tsx",
+    "./primitives/combobox": "./src/primitives/combobox/combobox.tsx",
+    "./primitives/dialog": "./src/primitives/dialog/dialog.tsx",
+    "./primitives/drawer": "./src/primitives/drawer/drawer.tsx",
+    "./primitives/toast": "./src/primitives/toast/toast.tsx",
+    "./primitives/tabs": "./src/primitives/tabs/tabs.tsx",
+    "./primitives/scroll-area": "./src/primitives/scroll-area/scroll-area.tsx"
   },
   "scripts": {
     "typecheck": "tsc -b",
@@ -43,6 +51,7 @@
     "check-themes": "tsx scripts/check-theme-parity.ts"
   },
   "dependencies": {
+    "@floating-ui/react": "0.27.0",
     "clsx": "2.1.1",
     "lucide-react": "0.453.0"
   },

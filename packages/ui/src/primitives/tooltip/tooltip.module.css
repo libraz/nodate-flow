@@ -1,0 +1,14 @@
+.tooltip {
+  background: var(--nf-color-fg);
+  color: var(--nf-color-bg-elevated);
+  font-family: var(--nf-font-sans);
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-medium);
+  padding-inline: var(--nf-space-2);
+  padding-block: var(--nf-space-1);
+  border-radius: var(--nf-radius-sm);
+  box-shadow: var(--nf-shadow-md);
+  z-index: var(--nf-z-tooltip);
+  max-inline-size: 16rem;
+  pointer-events: none;
+}

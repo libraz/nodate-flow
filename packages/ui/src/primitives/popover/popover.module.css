@@ -1,0 +1,18 @@
+.popover {
+  background: var(--nf-color-bg-elevated);
+  color: var(--nf-color-fg);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  box-shadow: var(--nf-shadow-lg);
+  padding: var(--nf-space-4);
+  font-family: var(--nf-font-sans);
+  font-size: var(--nf-text-sm);
+  z-index: var(--nf-z-popover);
+  min-inline-size: 12rem;
+  max-inline-size: 24rem;
+}
+
+.popover:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}

@@ -1,0 +1,159 @@
+/**
+ * Tabs — accessible tablist with roving tabindex.
+ *
+ * Implements the WAI-ARIA tabs pattern: `role="tablist"` + `role="tab"` +
+ * `role="tabpanel"`, Left/Right/Home/End keyboard navigation, and a roving
+ * tabindex so only the active tab is in the tab sequence. Supports both
+ * controlled (`value` + `onChange`) and uncontrolled (`defaultValue`) usage.
+ */
+
+import {
+  type HTMLAttributes,
+  type KeyboardEvent,
+  type ReactElement,
+  type ReactNode,
+  type Ref,
+  forwardRef,
+  useCallback,
+  useId,
+  useRef,
+} from 'react';
+import { useControllableState } from '../../hooks/use-controllable-state';
+import { cx } from '../../lib/cx';
+import styles from './tabs.module.css';
+
+export interface TabItem {
+  /** Stable identifier for the tab. */
+  value: string;
+  /** Already-translated tab label. */
+  label: ReactNode;
+  /** Panel content. */
+  content: ReactNode;
+  /** When true, the tab cannot be activated. */
+  disabled?: boolean;
+}
+
+export interface TabsProps
+  extends Omit<HTMLAttributes<HTMLDivElement>, 'onChange' | 'defaultValue'> {
+  /** Tab items in display order. */
+  items: TabItem[];
+  /** Controlled active value. */
+  value?: string;
+  /** Default active value (uncontrolled). */
+  defaultValue?: string;
+  /** Called when the active value changes. */
+  onChange?: (value: string) => void;
+  /** Already-translated accessible label for the tablist. */
+  'aria-label'?: string;
+}
+
+function TabsImpl(
+  { items, value, defaultValue, onChange, className, 'aria-label': ariaLabel, ...rest }: TabsProps,
+  ref: Ref<HTMLDivElement>,
+): ReactElement {
+  const fallback = items[0]?.value ?? '';
+  const [active, setActive] = useControllableState<string>({
+    value,
+    defaultValue: defaultValue ?? fallback,
+    onChange,
+  });
+  const current = active ?? fallback;
+  const baseId = useId();
+  const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+
+  const enabledItems = items.filter((it) => !it.disabled);
+
+  const focusValue = useCallback((next: string) => {
+    const node = tabRefs.current.get(next);
+    node?.focus();
+  }, []);
+
+  const onKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLButtonElement>, idx: number) => {
+      if (enabledItems.length === 0) return;
+      const currentEnabledIdx = enabledItems.findIndex(
+        (it) => it.value === enabledItems[idx]?.value,
+      );
+      let nextIdx = currentEnabledIdx;
+      switch (event.key) {
+        case 'ArrowRight':
+          nextIdx = (currentEnabledIdx + 1) % enabledItems.length;
+          break;
+        case 'ArrowLeft':
+          nextIdx = (currentEnabledIdx - 1 + enabledItems.length) % enabledItems.length;
+          break;
+        case 'Home':
+          nextIdx = 0;
+          break;
+        case 'End':
+          nextIdx = enabledItems.length - 1;
+          break;
+        default:
+          return;
+      }
+      event.preventDefault();
+      const nextItem = enabledItems[nextIdx];
+      if (!nextItem) return;
+      setActive(nextItem.value);
+      focusValue(nextItem.value);
+    },
+    [enabledItems, focusValue, setActive],
+  );
+
+  return (
+    <div ref={ref} className={cx(styles.root, className)} {...rest}>
+      <div role="tablist" aria-label={ariaLabel} className={styles.tablist}>
+        {enabledItems.map((item, idx) => {
+          const selected = item.value === current;
+          const tabId = `${baseId}-tab-${item.value}`;
+          const panelId = `${baseId}-panel-${item.value}`;
+          return (
+            <button
+              key={item.value}
+              ref={(node) => {
+                if (node) {
+                  tabRefs.current.set(item.value, node);
+                } else {
+                  tabRefs.current.delete(item.value);
+                }
+              }}
+              type="button"
+              role="tab"
+              id={tabId}
+              aria-selected={selected}
+              aria-controls={panelId}
+              tabIndex={selected ? 0 : -1}
+              className={cx(styles.tab, selected && styles.tabActive)}
+              onClick={() => setActive(item.value)}
+              onKeyDown={(e) => onKeyDown(e, idx)}
+            >
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+      {enabledItems.map((item) => {
+        const selected = item.value === current;
+        const tabId = `${baseId}-tab-${item.value}`;
+        const panelId = `${baseId}-panel-${item.value}`;
+        return (
+          <div
+            key={item.value}
+            role="tabpanel"
+            id={panelId}
+            aria-labelledby={tabId}
+            hidden={!selected}
+            className={styles.panel}
+          >
+            {selected ? item.content : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const Tabs = forwardRef<HTMLDivElement, TabsProps>(TabsImpl);
+Tabs.displayName = 'Tabs';
+
+export default Tabs;

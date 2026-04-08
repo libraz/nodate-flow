@@ -1,0 +1,58 @@
+.root {
+  display: inline-flex;
+  position: relative;
+  inline-size: 100%;
+}
+
+.input {
+  inline-size: 100%;
+  font-family: var(--nf-font-sans);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg);
+  background: var(--nf-color-bg-elevated);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  padding-inline: var(--nf-space-3);
+  padding-block: var(--nf-space-2);
+}
+
+.input:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: var(--nf-space-1);
+  background: var(--nf-color-bg-elevated);
+  color: var(--nf-color-fg);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  box-shadow: var(--nf-shadow-lg);
+  z-index: var(--nf-z-dropdown);
+  max-block-size: 16rem;
+  overflow: auto;
+}
+
+.option {
+  padding-inline: var(--nf-space-3);
+  padding-block: var(--nf-space-2);
+  border-radius: var(--nf-radius-sm);
+  font-size: var(--nf-text-sm);
+  cursor: pointer;
+}
+
+.optionActive {
+  background: var(--nf-color-surface-hover);
+}
+
+.optionSelected {
+  color: var(--nf-color-accent);
+  font-weight: var(--nf-weight-medium);
+}

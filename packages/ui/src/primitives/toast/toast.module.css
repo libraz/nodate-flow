@@ -1,0 +1,41 @@
+.viewport {
+  position: fixed;
+  inset-block-end: var(--nf-space-4);
+  inset-inline-end: var(--nf-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  z-index: var(--nf-z-toast);
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  background: var(--nf-color-bg-elevated);
+  color: var(--nf-color-fg);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  box-shadow: var(--nf-shadow-md);
+  padding-inline: var(--nf-space-4);
+  padding-block: var(--nf-space-3);
+  font-family: var(--nf-font-sans);
+  font-size: var(--nf-text-sm);
+  min-inline-size: 16rem;
+  max-inline-size: 24rem;
+}
+
+.info {
+  border-inline-start: 3px solid var(--nf-color-info);
+}
+
+.success {
+  border-inline-start: 3px solid var(--nf-color-success);
+}
+
+.warning {
+  border-inline-start: 3px solid var(--nf-color-warning);
+}
+
+.danger {
+  border-inline-start: 3px solid var(--nf-color-danger);
+}

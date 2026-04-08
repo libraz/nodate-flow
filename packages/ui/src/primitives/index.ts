@@ -1,5 +1,5 @@
 /**
- * Aggregate barrel re-exporting all F1b primitives.
+ * Aggregate barrel re-exporting all F1b + F1c primitives.
  * Prefer the `@nodate-flow/ui/primitives/<name>` subpaths for best tree-shaking.
  */
 
@@ -44,3 +44,27 @@ export type { SpinnerProps, SpinnerSize } from './spinner/spinner';
 
 export { default as FormField } from './form-field/form-field';
 export type { FormFieldControlProps, FormFieldProps } from './form-field/form-field';
+
+export { default as Tooltip } from './tooltip/tooltip';
+export type { TooltipProps } from './tooltip/tooltip';
+
+export { default as Popover } from './popover/popover';
+export type { PopoverProps } from './popover/popover';
+
+export { default as Combobox } from './combobox/combobox';
+export type { ComboboxProps, ComboboxOption } from './combobox/combobox';
+
+export { default as Dialog } from './dialog/dialog';
+export type { DialogProps } from './dialog/dialog';
+
+export { default as Drawer } from './drawer/drawer';
+export type { DrawerProps, DrawerSide } from './drawer/drawer';
+
+export { default as Tabs } from './tabs/tabs';
+export type { TabItem, TabsProps } from './tabs/tabs';
+
+export { default as ScrollArea } from './scroll-area/scroll-area';
+export type { ScrollAreaProps } from './scroll-area/scroll-area';
+
+export { ToastProvider, useToaster, toaster } from './toast/toast';
+export type { Toast, ToastOptions, ToastTone, ToastProviderProps } from './toast/toast';
