@@ -1,0 +1,61 @@
+.dock {
+  position: fixed;
+  inset-block-end: var(--nf-space-6);
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  padding-block: var(--nf-space-2);
+  padding-inline: var(--nf-space-3);
+  background: var(--nf-color-surface);
+  backdrop-filter: blur(var(--nf-surface-blur)) saturate(var(--nf-surface-saturation));
+  -webkit-backdrop-filter: blur(var(--nf-surface-blur)) saturate(var(--nf-surface-saturation));
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-lg);
+  box-shadow: var(--nf-shadow-lg);
+  z-index: var(--nf-z-sticky);
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  background: transparent;
+  border: none;
+  border-radius: var(--nf-radius-md);
+  color: var(--nf-color-fg-muted);
+  cursor: pointer;
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard), color
+    var(--nf-duration-fast) var(--nf-ease-standard), transform var(--nf-duration-fast)
+    var(--nf-ease-standard);
+}
+
+.button:hover {
+  background: var(--nf-color-surface-hover);
+  color: var(--nf-color-fg);
+  transform: translateY(-2px);
+}
+
+.button:focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: var(--nf-focus-ring-offset);
+}
+
+.divider {
+  inline-size: var(--nf-space-px);
+  block-size: 1.5rem;
+  background: var(--nf-color-border);
+  margin-inline: var(--nf-space-1);
+}
+
+.shortcut {
+  display: inline-flex;
+  align-items: center;
+  padding-inline: var(--nf-space-3);
+  font-family: var(--nf-font-mono);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-subtle);
+}

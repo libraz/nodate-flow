@@ -1,0 +1,88 @@
+.topBar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--nf-space-4);
+  padding-block: var(--nf-space-3);
+  padding-inline: var(--nf-space-5);
+  background: var(--nf-color-bg-elevated);
+  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
+  min-block-size: 3.5rem;
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  font-family: var(--nf-font-mono);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.center {
+  display: flex;
+  justify-content: center;
+  min-inline-size: 0;
+}
+
+.search {
+  inline-size: 100%;
+  max-inline-size: 32rem;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--nf-space-2);
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 2.25rem;
+  block-size: 2.25rem;
+  background: transparent;
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-sm);
+  color: var(--nf-color-fg-muted);
+  cursor: pointer;
+  font-family: var(--nf-font-mono);
+  font-size: var(--nf-text-xs);
+}
+
+.iconButton:hover {
+  background: var(--nf-color-surface-hover);
+  color: var(--nf-color-fg);
+}
+
+.iconButton:focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: var(--nf-focus-ring-offset);
+}
+
+.langToggle {
+  inline-size: auto;
+  padding-inline: var(--nf-space-3);
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 2.25rem;
+  block-size: 2.25rem;
+  border-radius: var(--nf-radius-pill);
+  background: var(--nf-color-accent-subtle);
+  color: var(--nf-color-fg);
+  font-family: var(--nf-font-sans);
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+}

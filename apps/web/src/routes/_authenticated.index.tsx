@@ -1,3 +1,8 @@
+/**
+ * Authenticated home (/). Moved from routes/index.tsx as part of F3 so
+ * the route can sit under the _authenticated layout guard.
+ */
+
 import { createFileRoute } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -136,10 +141,9 @@ function themeLabelKey(
 function LandingPage(): ReactElement {
   const { t } = useTranslation('common');
   return (
-    <main
-      id="main"
+    <section
       style={{
-        minBlockSize: '100dvh',
+        minBlockSize: '100%',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
@@ -206,10 +210,10 @@ function LandingPage(): ReactElement {
         <ThemeSwitcher />
         <LanguageSwitcher />
       </footer>
-    </main>
+    </section>
   );
 }
 
-export const Route = createFileRoute('/')({
+export const Route = createFileRoute('/_authenticated/')({
   component: LandingPage,
 });

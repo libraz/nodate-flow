@@ -1,0 +1,36 @@
+.shell {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  block-size: 100dvh;
+  inline-size: 100%;
+  background: var(--nf-color-bg);
+  color: var(--nf-color-fg);
+  font-family: var(--nf-font-sans);
+}
+
+.sidebarSlot {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  min-block-size: 0;
+}
+
+.topBarSlot {
+  grid-column: 2;
+  grid-row: 1;
+  min-inline-size: 0;
+}
+
+.main {
+  grid-column: 2;
+  grid-row: 2;
+  overflow-y: auto;
+  min-inline-size: 0;
+  min-block-size: 0;
+  padding-block-end: 6rem;
+}
+
+.main:focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: calc(var(--nf-focus-ring-offset) * -1);
+}

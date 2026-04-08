@@ -22,7 +22,9 @@ if (!container) {
   throw new Error('root container missing');
 }
 
-// TODO(F3): insert AuthProvider between ThemeProvider and RouterProvider.
+// F3: auth bootstrap runs inside the `_authenticated` layout route via
+// useAuthBootstrap; no top-level AuthProvider is required because the
+// auth slice is a vanilla zustand store accessible to non-React modules.
 createRoot(container).render(
   <StrictMode>
     <ErrorBoundary fallback={<FatalError />}>

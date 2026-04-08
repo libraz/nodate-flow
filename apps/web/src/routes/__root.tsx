@@ -1,7 +1,6 @@
 import { Outlet, createRootRouteWithContext } from '@tanstack/react-router';
 import { type ReactElement, Suspense, lazy } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
-import { useTranslation } from 'react-i18next';
 
 import type { RouterContext } from '../router/router';
 
@@ -22,18 +21,8 @@ function FatalFallback(): ReactElement {
 }
 
 function RootLayout(): ReactElement {
-  const { t } = useTranslation('common');
   return (
     <>
-      <a
-        href="#main"
-        style={{
-          position: 'absolute',
-          insetInlineStart: '-9999px',
-        }}
-      >
-        {t('a11y.skipToContent')}
-      </a>
       <ErrorBoundary fallback={<FatalFallback />}>
         <Suspense fallback={null}>
           <Outlet />

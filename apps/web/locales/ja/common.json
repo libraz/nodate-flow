@@ -7,7 +7,36 @@
   },
   "nav": {
     "theme": "テーマ",
-    "language": "言語"
+    "language": "言語",
+    "primary": "メインナビゲーション",
+    "inbox": "受信トレイ",
+    "today": "今日",
+    "projects": "プロジェクト",
+    "workspaces": "ワークスペース",
+    "settings": "設定",
+    "collapse": "サイドバーを折りたたむ",
+    "expand": "サイドバーを展開する"
+  },
+  "topbar": {
+    "search": {
+      "placeholder": "タスク・プロジェクト・メンバーを検索…"
+    },
+    "theme": {
+      "toggle": "テーマを切り替え"
+    },
+    "language": {
+      "toggle": "言語を切り替え"
+    }
+  },
+  "dock": {
+    "quick_actions": "クイックアクション",
+    "new_task": "新しいタスク",
+    "quick_capture": "クイックキャプチャ",
+    "ai_assist": "AI アシスト",
+    "command_palette": {
+      "title": "コマンドパレット",
+      "coming_soon": "コマンドパレットは近日公開予定です。"
+    }
   },
   "theme": {
     "aurora-light": "オーロラ ライト",
@@ -22,5 +51,35 @@
   },
   "a11y": {
     "skipToContent": "本文へスキップ"
+  },
+  "auth": {
+    "login": {
+      "title": "サインイン",
+      "submit": "サインイン",
+      "email": "メールアドレス",
+      "password": "パスワード",
+      "no_account": "アカウントをお持ちでないですか？",
+      "signup_link": "新規作成"
+    },
+    "signup": {
+      "title": "アカウントを作成",
+      "submit": "アカウントを作成",
+      "name": "表示名",
+      "have_account": "すでにアカウントをお持ちですか？",
+      "login_link": "サインイン"
+    },
+    "logout": "サインアウト",
+    "errors": {
+      "invalid_credentials": "メールアドレスまたはパスワードが正しくありません。",
+      "email_taken": "このメールアドレスは既に登録されています。",
+      "network": "サーバーに接続できませんでした。接続を確認してもう一度お試しください。",
+      "unknown": "問題が発生しました。もう一度お試しください。"
+    },
+    "validation": {
+      "email_required": "メールアドレスを入力してください。",
+      "email_invalid": "有効なメールアドレスを入力してください。",
+      "password_min": "パスワードは 8 文字以上で入力してください。",
+      "name_required": "表示名を入力してください。"
+    }
   }
 }

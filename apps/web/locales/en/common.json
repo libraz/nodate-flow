@@ -7,7 +7,36 @@
   },
   "nav": {
     "theme": "Theme",
-    "language": "Language"
+    "language": "Language",
+    "primary": "Primary navigation",
+    "inbox": "Inbox",
+    "today": "Today",
+    "projects": "Projects",
+    "workspaces": "Workspaces",
+    "settings": "Settings",
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar"
+  },
+  "topbar": {
+    "search": {
+      "placeholder": "Search tasks, projects, people..."
+    },
+    "theme": {
+      "toggle": "Toggle theme"
+    },
+    "language": {
+      "toggle": "Toggle language"
+    }
+  },
+  "dock": {
+    "quick_actions": "Quick actions",
+    "new_task": "New task",
+    "quick_capture": "Quick capture",
+    "ai_assist": "AI assist",
+    "command_palette": {
+      "title": "Command palette",
+      "coming_soon": "Command palette coming soon."
+    }
   },
   "theme": {
     "aurora-light": "Aurora Light",
@@ -22,5 +51,35 @@
   },
   "a11y": {
     "skipToContent": "Skip to content"
+  },
+  "auth": {
+    "login": {
+      "title": "Sign in",
+      "submit": "Sign in",
+      "email": "Email",
+      "password": "Password",
+      "no_account": "Don't have an account?",
+      "signup_link": "Create one"
+    },
+    "signup": {
+      "title": "Create your account",
+      "submit": "Create account",
+      "name": "Display name",
+      "have_account": "Already have an account?",
+      "login_link": "Sign in"
+    },
+    "logout": "Sign out",
+    "errors": {
+      "invalid_credentials": "Invalid email or password.",
+      "email_taken": "That email is already registered.",
+      "network": "Could not reach the server. Check your connection and try again.",
+      "unknown": "Something went wrong. Please try again."
+    },
+    "validation": {
+      "email_required": "Email is required.",
+      "email_invalid": "Enter a valid email address.",
+      "password_min": "Password must be at least 8 characters.",
+      "name_required": "Display name is required."
+    }
   }
 }
