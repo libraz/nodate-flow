@@ -20,6 +20,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { Project } from '../../features/projects/api';
 import type { TaskListItem } from '../../features/tasks/api';
 import { useWorkspacesQuery } from '../../features/workspaces/api';
 import { sdk } from '../../lib/sdk';
@@ -73,6 +74,28 @@ function PaletteBody({ onSelect }: InnerProps): ReactElement {
     })),
   });
 
+  const projectQueries = useQueries({
+    queries: workspaces.map((w) => ({
+      queryKey: ['command-palette', 'projects', w.id] as const,
+      staleTime: 60_000,
+      queryFn: async (): Promise<Array<Project & { workspaceId: string }>> => {
+        const { data, error } = await sdk.GET('/workspaces/{wsId}/projects', {
+          params: { path: { wsId: w.id } },
+        });
+        if (error || !data) return [];
+        return (data.projects ?? []).map((p) => ({ ...p, workspaceId: w.id }));
+      },
+    })),
+  });
+
+  const projectResults = useMemo<Array<Project & { workspaceId: string }>>(() => {
+    const out: Array<Project & { workspaceId: string }> = [];
+    for (const q of projectQueries) {
+      if (q.data) out.push(...q.data);
+    }
+    return out;
+  }, [projectQueries]);
+
   const taskResults = useMemo<TaskListItem[]>(() => {
     if (!shouldSearchTasks) return [];
     const out: TaskListItem[] = [];
@@ -87,6 +110,7 @@ function PaletteBody({ onSelect }: InnerProps): ReactElement {
     const navGroup = t('dock.command_palette.group_navigation');
     const wsGroup = t('dock.command_palette.group_workspaces');
     const taskGroup = t('dock.command_palette.group_tasks');
+    const projectGroup = t('dock.command_palette.group_projects');
     const nav: CommandItem[] = [
       { id: 'nav:home', label: t('dock.command_palette.home'), group: navGroup, href: '/' },
       { id: 'nav:today', label: t('nav.today'), group: navGroup, href: '/today' },
@@ -106,8 +130,14 @@ function PaletteBody({ onSelect }: InnerProps): ReactElement {
       group: taskGroup,
       href: `/tasks/${task.id}`,
     }));
-    return [...tasks, ...nav, ...ws];
-  }, [t, workspaces, taskResults]);
+    const projects: CommandItem[] = projectResults.map((p) => ({
+      id: `project:${p.id}`,
+      label: p.name,
+      group: projectGroup,
+      href: `/projects/${p.id}`,
+    }));
+    return [...tasks, ...projects, ...nav, ...ws];
+  }, [t, workspaces, taskResults, projectResults]);
 
   const filtered = useMemo<CommandItem[]>(() => {
     const q = normalize(query.trim());
