@@ -43,7 +43,11 @@
     "ai_assist": "AI assist",
     "command_palette": {
       "title": "Command palette",
-      "coming_soon": "Command palette coming soon."
+      "placeholder": "Type a command or search…",
+      "empty": "No results.",
+      "group_navigation": "Navigation",
+      "group_workspaces": "Workspaces",
+      "home": "Home"
     }
   },
   "theme": {

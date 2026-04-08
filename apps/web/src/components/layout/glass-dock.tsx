@@ -1,11 +1,11 @@
 import Icon from '@nodate-flow/ui/icon';
-import Dialog from '@nodate-flow/ui/primitives/dialog';
 import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { useNavigate } from '@tanstack/react-router';
 import { type LucideIcon, Plus, Sparkles, Zap } from 'lucide-react';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import CommandPalette from './command-palette';
 import styles from './glass-dock.module.css';
 
 interface DockAction {
@@ -81,9 +81,7 @@ export default function GlassDock(): ReactElement {
         <span className={styles.divider} aria-hidden="true" />
         <span className={styles.shortcut}>Cmd+K</span>
       </div>
-      <Dialog open={paletteOpen} onClose={handleClose} title={t('dock.command_palette.title')}>
-        <p>{t('dock.command_palette.coming_soon')}</p>
-      </Dialog>
+      <CommandPalette open={paletteOpen} onClose={handleClose} />
     </>
   );
 }

@@ -43,7 +43,11 @@
     "ai_assist": "AI アシスト",
     "command_palette": {
       "title": "コマンドパレット",
-      "coming_soon": "コマンドパレットは近日公開予定です。"
+      "placeholder": "コマンドを入力または検索…",
+      "empty": "結果がありません。",
+      "group_navigation": "ナビゲーション",
+      "group_workspaces": "ワークスペース",
+      "home": "ホーム"
     }
   },
   "theme": {
