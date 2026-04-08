@@ -283,6 +283,10 @@
         "title": "Suggested next step",
         "empty": "No suggestion right now."
       },
+      "ai_activity": {
+        "title": "AI reasoning",
+        "empty": "No AI activity recorded for this task yet."
+      },
       "transitions": {
         "title": "Transitions",
         "start": "Start",

@@ -17,6 +17,10 @@ services:
       - "${NF_DB_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+      # Schema is auto-applied on first boot (empty volume). Regenerate
+      # with `make db-schema` whenever sql/tables or sql/views change.
+      # To re-apply into an existing volume, use `make db-apply`.
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${NF_DB_ROOT_PASSWORD:-rootpw}"]
       interval: 5s

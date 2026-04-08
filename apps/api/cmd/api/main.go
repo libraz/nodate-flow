@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
+	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/config"
@@ -30,8 +32,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	// DB handle is left nil at scaffold time; production wiring will set it.
-	var db *sql.DB
+	if cfg.DbDsn == "" {
+		logger.Error("NF_DB_DSN is not set")
+		os.Exit(1)
+	}
+	db, err := sql.Open("mysql", cfg.DbDsn)
+	if err != nil {
+		logger.Error("db open failed", "err", err)
+		os.Exit(1)
+	}
+	db.SetMaxOpenConns(32)
+	db.SetMaxIdleConns(8)
+	db.SetConnMaxLifetime(30 * time.Minute)
+	if err := db.Ping(); err != nil {
+		logger.Error("db ping failed", "err", err)
+		os.Exit(1)
+	}
+	defer db.Close()
 	queries := generated.New(db)
 
 	// Cipher is optional at scaffold time: if NF_SECRET_KEY is unset the
@@ -78,6 +95,7 @@ func main() {
 	// its access logs; tests build the router directly without it.
 	outer := chi.NewRouter()
 	outer.Use(nflog.RequestLogger(logger))
+	outer.Use(buildCORS(cfg.CorsAllowedOrigins))
 	outer.Mount("/", inner)
 
 	addr := ":" + cfg.Port
@@ -86,4 +104,27 @@ func main() {
 		logger.Error("server exited", "err", err)
 		os.Exit(1)
 	}
+}
+
+// buildCORS returns a chi CORS middleware configured from the runtime
+// allowlist. Credentials are enabled so the refresh cookie and
+// Authorization header round-trip to the browser; a single "*" entry
+// disables credentials (per the CORS spec wildcard rules) and allows
+// any origin. An empty allowlist disables CORS entirely.
+func buildCORS(allowed []string) func(http.Handler) http.Handler {
+	if len(allowed) == 0 {
+		return func(next http.Handler) http.Handler { return next }
+	}
+	allowCreds := true
+	if len(allowed) == 1 && allowed[0] == "*" {
+		allowCreds = false
+	}
+	return cors.Handler(cors.Options{
+		AllowedOrigins:   allowed,
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Requested-With"},
+		ExposedHeaders:   []string{"X-Request-Id"},
+		AllowCredentials: allowCreds,
+		MaxAge:           600,
+	})
 }

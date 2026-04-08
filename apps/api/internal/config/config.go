@@ -8,6 +8,11 @@ type Config struct {
 	Port     string `env:"NF_PORT" envDefault:"8080"`
 	LogLevel string `env:"NF_LOG_LEVEL" envDefault:"info"`
 
+	// DbDsn is the MySQL DSN used by the api process. Required for the
+	// server to boot; handlers that touch the database panic on a nil
+	// *sql.DB otherwise.
+	DbDsn string `env:"NF_DB_DSN"`
+
 	// GhWebhookSecret is the shared HMAC secret used to verify inbound
 	// GitHub webhook deliveries (X-Hub-Signature-256).
 	GhWebhookSecret string `env:"NF_GH_WEBHOOK_SECRET" envDefault:""`
@@ -32,6 +37,12 @@ type Config struct {
 	// routes to a fixture-backed Provider that loads JSON from
 	// apps/api/testdata/ai/. Used by development and tests.
 	AiMock bool `env:"NF_AI_MOCK" envDefault:"false"`
+
+	// CorsAllowedOrigins is the comma-separated list of origins allowed to
+	// call the API with credentials. Defaults cover the Vite dev server
+	// on localhost. Set to a single "*" to allow any origin (credentials
+	// will then be disabled by the CORS spec).
+	CorsAllowedOrigins []string `env:"NF_CORS_ALLOWED_ORIGINS" envSeparator:"," envDefault:"http://localhost:5173,http://127.0.0.1:5173"`
 }
 
 // Load parses NF_* environment variables into a Config.

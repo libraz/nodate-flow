@@ -352,6 +352,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/{id}/ai/invocations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List recent AI invocations scoped to this task */
+        get: operations["tasks-ai-invocations-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{id}/attachments": {
         parameters: {
             query?: never;
@@ -656,6 +673,40 @@ export interface paths {
         };
         /** List redacted LLM call audit rows for the AI reasoning panel */
         get: operations["ai-invocations-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/ai/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** AI suggestion acceptance metrics over a trailing window */
+        get: operations["ai-metrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/ai/priority-suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Suggest priority adjustments for open tasks in a workspace */
+        get: operations["ai-priority-suggestions-list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1049,6 +1100,26 @@ export interface components {
             /** Format: int32 */
             tokensOutput?: number;
         };
+        AiMetricsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * Format: double
+             * @description applied / (applied + dismissed), 0 when no decisions
+             */
+            acceptanceRate: number;
+            /** Format: int64 */
+            applied: number;
+            /** Format: int64 */
+            dismissed: number;
+            /** Format: int64 */
+            proposed: number;
+            /** Format: int64 */
+            windowDays: number;
+        };
         AiSuggestionListBody: {
             /**
              * Format: uri
@@ -1431,6 +1502,16 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ListPrioritySuggestionsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            suggestions: components["schemas"]["TaskPrioritySuggestion"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
         ListProjectMembersBody: {
             /**
              * Format: uri
@@ -1493,6 +1574,14 @@ export interface components {
             nextCursor: string | null;
             /** Format: int64 */
             total: number;
+        };
+        ListTaskAiInvocationsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            invocations: components["schemas"]["TaskAiInvocation"][] | null;
         };
         ListTaskAttachmentsBody: {
             /**
@@ -1895,6 +1984,22 @@ export interface components {
             updatedAt?: string;
             userId: string;
         };
+        TaskAiInvocation: {
+            costEstimate?: string;
+            errorCode?: string;
+            id: string;
+            /** Format: int64 */
+            invokedAt: number;
+            model: string;
+            promptRedacted: string;
+            purpose: string;
+            responseRedacted?: string;
+            status: string;
+            /** Format: int32 */
+            tokensInput?: number;
+            /** Format: int32 */
+            tokensOutput?: number;
+        };
         TaskAttachment: {
             /**
              * Format: uri
@@ -2001,6 +2106,17 @@ export interface components {
             title: string;
             /** Format: date-time */
             updatedAt?: string;
+        };
+        TaskPrioritySuggestion: {
+            /** Format: float */
+            confidence: number;
+            /** Format: int32 */
+            currentPriority: number;
+            reason: string;
+            /** Format: int32 */
+            suggestedPriority: number;
+            taskId: string;
+            title: string;
         };
         TaskReminder: {
             /** Format: int64 */
@@ -3061,6 +3177,40 @@ export interface operations {
             };
         };
     };
+    "tasks-ai-invocations-list": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListTaskAiInvocationsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "tasks-attachments-list": {
         parameters: {
             query?: {
@@ -3848,6 +3998,71 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListInvocationsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-metrics": {
+        parameters: {
+            query?: {
+                /** @description Trailing window in days */
+                windowDays?: number;
+            };
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiMetricsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-priority-suggestions-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListPrioritySuggestionsOutputBody"];
                 };
             };
             /** @description Error */

@@ -40,6 +40,28 @@ WHERE workspace_id = ?
 ORDER BY invoked_at DESC, id DESC
 LIMIT ? OFFSET ?;
 
+-- name: ListAiInvocationsForTask :many
+-- Recent redacted LLM call records scoped to a single task. Used by
+-- the task detail AI reasoning panel (2.WEB-2). workspace_id is
+-- included so tenant isolation is enforced at the query level.
+SELECT
+  public_id,
+  purpose,
+  model,
+  prompt_redacted,
+  response_redacted,
+  tokens_input,
+  tokens_output,
+  cost_estimate,
+  status,
+  error_code,
+  invoked_at
+FROM ai_invocations
+WHERE workspace_id = ?
+  AND task_id = ?
+ORDER BY invoked_at DESC, id DESC
+LIMIT ? OFFSET ?;
+
 -- name: SumAiCostTodayForWorkspace :one
 -- Sum the estimated cost (in whole cents) of LLM calls made today for a
 -- workspace. cost_estimate is stored as DECIMAL(10,6) USD; multiply by 100

@@ -254,6 +254,37 @@ func (q *Queries) ListEventsForTask(ctx context.Context, arg ListEventsForTaskPa
 	return items, nil
 }
 
+const countAiSuggestionOutcomesForWorkspace = `-- name: CountAiSuggestionOutcomesForWorkspace :one
+SELECT
+  COALESCE(SUM(CASE WHEN type = 'ai.suggestion.proposed'  THEN 1 ELSE 0 END), 0) AS proposed,
+  COALESCE(SUM(CASE WHEN type = 'ai.suggestion.applied'   THEN 1 ELSE 0 END), 0) AS applied,
+  COALESCE(SUM(CASE WHEN type = 'ai.suggestion.dismissed' THEN 1 ELSE 0 END), 0) AS dismissed
+FROM events
+WHERE workspace_id = ?
+  AND occurred_at >= ?
+  AND type IN ('ai.suggestion.proposed', 'ai.suggestion.applied', 'ai.suggestion.dismissed')
+`
+
+type CountAiSuggestionOutcomesForWorkspaceParams struct {
+	WorkspaceID uint32    `json:"-"`
+	OccurredAt  time.Time `json:"occurredAt"`
+}
+
+type CountAiSuggestionOutcomesForWorkspaceRow struct {
+	Proposed  int64 `json:"proposed"`
+	Applied   int64 `json:"applied"`
+	Dismissed int64 `json:"dismissed"`
+}
+
+// Count ai.suggestion.{proposed,applied,dismissed} events for a workspace
+// within the given time window.
+func (q *Queries) CountAiSuggestionOutcomesForWorkspace(ctx context.Context, arg CountAiSuggestionOutcomesForWorkspaceParams) (CountAiSuggestionOutcomesForWorkspaceRow, error) {
+	row := q.db.QueryRowContext(ctx, countAiSuggestionOutcomesForWorkspace, arg.WorkspaceID, arg.OccurredAt)
+	var i CountAiSuggestionOutcomesForWorkspaceRow
+	err := row.Scan(&i.Proposed, &i.Applied, &i.Dismissed)
+	return i, err
+}
+
 const listEventsForWorkspace = `-- name: ListEventsForWorkspace :many
 SELECT
   v.public_id,

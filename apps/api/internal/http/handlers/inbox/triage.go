@@ -12,7 +12,11 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"time"
+
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/inboxtriage"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/middleware"
 )
@@ -54,6 +58,45 @@ type InboxTriageOutput struct {
 	Body InboxTriageOutputBody
 }
 
+// deterministicFallback runs the pure inboxtriage rule engine over
+// the workspace's current inbox and returns results in the same
+// shape as the LLM path. Used when no AI provider is configured
+// and when the daily budget is exhausted, so the triage UI is
+// never empty.
+func deterministicFallback(ctx context.Context, deps TriageDeps, wsID uint32, limit int) ([]ai.InboxTriageSuggestion, error) {
+	rows, err := deps.Queries.ListInbox(ctx, generated.ListInboxParams{
+		WorkspaceID: wsID,
+		Limit:       int32(limit),
+		Offset:      0,
+	})
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now().UTC()
+	signals := make([]inboxtriage.Signal, 0, len(rows))
+	for _, r := range rows {
+		signals = append(signals, inboxtriage.Signal{
+			InboxItemID: r.PublicID.String(),
+			Source:      string(r.Source),
+			Kind:        r.Kind,
+			ReceivedAt:  r.ReceivedAt,
+			HasTask:     r.TaskPublicID.Valid,
+			Now:         now,
+		})
+	}
+	results := inboxtriage.Evaluate(signals)
+	out := make([]ai.InboxTriageSuggestion, 0, len(results))
+	for _, r := range results {
+		out = append(out, ai.InboxTriageSuggestion{
+			InboxItemID:       r.InboxItemID,
+			Score:             r.Score,
+			RecommendedAction: string(r.RecommendedAction),
+			Reasoning:         r.Reasoning,
+		})
+	}
+	return out, nil
+}
+
 // RegisterTriage wires POST /workspaces/{wsId}/inbox/triage. The caller
 // must attach RequireAuth + RequireWorkspaceMember on the chi group it
 // hands in.
@@ -77,9 +120,6 @@ func Triage(deps TriageDeps) func(context.Context, *InboxTriageInput) (*InboxTri
 		if err != nil {
 			return nil, err
 		}
-		if deps.AI == nil {
-			return nil, httpErr(apierrors.AiProviderNotConfigured)
-		}
 		limit := in.Body.Limit
 		if limit <= 0 {
 			limit = 20
@@ -87,18 +127,31 @@ func Triage(deps TriageDeps) func(context.Context, *InboxTriageInput) (*InboxTri
 		if limit > 50 {
 			limit = 50
 		}
-		suggestions, err := deps.AI.ProposeInboxTriage(ctx, wsID, limit)
-		if err != nil {
-			switch {
-			case errors.Is(err, ai.ErrNoProvider):
-				return nil, httpErr(apierrors.AiProviderNotConfigured)
-			case errors.Is(err, ai.ErrDailyBudgetExceeded):
-				return nil, httpErr(apierrors.AiCostGuardExceeded)
-			case errors.Is(err, ai.ErrParse):
-				return nil, httpErr(apierrors.AiResponseParseFailed)
-			default:
-				return nil, httpErr(apierrors.AiProviderUpstreamCallFailed)
+
+		// Try the LLM-backed path first. On ErrNoProvider or
+		// ErrDailyBudgetExceeded we fall back to the deterministic
+		// rule engine (2.AI-7) so the triage UI is never empty.
+		// Other errors (parse failures, upstream errors) bubble up
+		// as before — those indicate a misconfigured provider, not
+		// the "no LLM" case.
+		var suggestions []ai.InboxTriageSuggestion
+		if deps.AI != nil {
+			suggestions, err = deps.AI.ProposeInboxTriage(ctx, wsID, limit)
+			if err != nil {
+				switch {
+				case errors.Is(err, ai.ErrNoProvider), errors.Is(err, ai.ErrDailyBudgetExceeded):
+					suggestions, err = deterministicFallback(ctx, deps, wsID, limit)
+				case errors.Is(err, ai.ErrParse):
+					return nil, httpErr(apierrors.AiResponseParseFailed)
+				default:
+					return nil, httpErr(apierrors.AiProviderUpstreamCallFailed)
+				}
 			}
+		} else {
+			suggestions, err = deterministicFallback(ctx, deps, wsID, limit)
+		}
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		out := &InboxTriageOutput{}
 		out.Body.Suggestions = make([]InboxTriageSuggestion, 0, len(suggestions))

@@ -67,6 +67,13 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 	}, InferState(deps))
 
 	huma.Register(api, huma.Operation{
+		OperationID: "tasks-ai-invocations-list",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/ai/invocations",
+		Summary:     "List recent AI invocations scoped to this task",
+	}, ListAiInvocations(deps))
+
+	huma.Register(api, huma.Operation{
 		OperationID: "tasks-transitions-apply",
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/transitions",

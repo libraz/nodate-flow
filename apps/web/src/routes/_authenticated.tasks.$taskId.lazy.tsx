@@ -32,6 +32,7 @@ import {
   useAddTaskComment,
   useRemoveTaskActor,
   useTaskActorsQuery,
+  useTaskAiInvocationsQuery,
   useTaskCommentsQuery,
   useTaskDuplicatesQuery,
   useTaskInferStateQuery,
@@ -598,6 +599,19 @@ function Sidebar({
       </Card>
 
       <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <h2 style={{ margin: 0, fontSize: '1rem' }}>{t('tasks.detail.ai_activity.title')}</h2>
+        <Suspense
+          fallback={
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem' }}>
+              <Spinner label={t('common.loading')} />
+            </div>
+          }
+        >
+          <AiActivitySection taskId={id} />
+        </Suspense>
+      </Card>
+
+      <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         <h2 style={{ margin: 0, fontSize: '1rem' }}>{t('tasks.detail.activity.title')}</h2>
         <Suspense
           fallback={
@@ -664,6 +678,80 @@ function RelatedTasksSection({ taskId }: { taskId: string }): ReactElement {
                 {c.score.toFixed(2)}
               </span>
             </a>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function AiActivitySection({ taskId }: { taskId: string }): ReactElement {
+  const { t, i18n } = useTranslation('common');
+  const { data: invocations } = useTaskAiInvocationsQuery(taskId);
+  const locale = i18n.resolvedLanguage ?? 'en';
+  if (invocations.length === 0) {
+    return (
+      <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+        {t('tasks.detail.ai_activity.empty')}
+      </p>
+    );
+  }
+  return (
+    <ul
+      style={{
+        listStyle: 'none',
+        padding: 0,
+        margin: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.625rem',
+      }}
+    >
+      {invocations.map((inv) => {
+        const tone: BadgeTone =
+          inv.status === 'ok' ? 'success' : inv.status === 'blocked' ? 'warning' : 'danger';
+        return (
+          <li key={inv.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Badge tone={tone}>{inv.purpose}</Badge>
+              <span
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '0.75rem',
+                  color: 'var(--color-muted)',
+                }}
+              >
+                {inv.model}
+              </span>
+              <span
+                style={{
+                  marginInlineStart: 'auto',
+                  fontSize: '0.75rem',
+                  color: 'var(--color-muted)',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {formatDate(new Date(inv.invokedAt * 1000).toISOString(), locale)}
+              </span>
+            </div>
+            {inv.promptRedacted ? (
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: '0.8125rem',
+                  color: 'var(--color-fg)',
+                  whiteSpace: 'pre-wrap',
+                  overflow: 'hidden',
+                  display: '-webkit-box',
+                  // biome-ignore lint/style/useNamingConvention: React inline CSS property
+                  WebkitLineClamp: 3,
+                  // biome-ignore lint/style/useNamingConvention: React inline CSS property
+                  WebkitBoxOrient: 'vertical',
+                }}
+              >
+                {inv.promptRedacted}
+              </p>
+            ) : null}
           </li>
         );
       })}

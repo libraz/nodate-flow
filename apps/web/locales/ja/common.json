@@ -283,6 +283,10 @@
         "title": "次の推奨アクション",
         "empty": "現時点で推奨はありません。"
       },
+      "ai_activity": {
+        "title": "AI の判断履歴",
+        "empty": "このタスクにはまだ AI の記録がありません。"
+      },
       "transitions": {
         "title": "遷移",
         "start": "開始",

@@ -58,7 +58,10 @@ export const tasksKeys = {
   actors: (id: string) => [...tasksKeys.all, 'detail', id, 'actors'] as const,
   duplicates: (id: string) => [...tasksKeys.all, 'detail', id, 'duplicates'] as const,
   inferState: (id: string) => [...tasksKeys.all, 'detail', id, 'infer-state'] as const,
+  aiInvocations: (id: string) => [...tasksKeys.all, 'detail', id, 'ai-invocations'] as const,
 };
+
+export type TaskAiInvocation = components['schemas']['TaskAiInvocation'];
 
 export type InferStateProposal = components['schemas']['InferStateProposal'];
 export interface InferStateResult {
@@ -216,6 +219,21 @@ export function useTaskInferStateQuery(taskId: string): UseSuspenseQueryResult<I
       };
       if (data.proposal) result.proposal = data.proposal;
       return result;
+    },
+  });
+}
+
+export function useTaskAiInvocationsQuery(
+  taskId: string,
+): UseSuspenseQueryResult<TaskAiInvocation[]> {
+  return useSuspenseQuery({
+    queryKey: tasksKeys.aiInvocations(taskId),
+    queryFn: async (): Promise<TaskAiInvocation[]> => {
+      const { data, error } = await sdk.GET('/tasks/{id}/ai/invocations', {
+        params: { path: { id: taskId } },
+      });
+      if (error || !data) throw toError(error, 'Failed to load task AI invocations');
+      return data.invocations ?? [];
     },
   });
 }

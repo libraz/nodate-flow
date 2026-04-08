@@ -13,7 +13,9 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/router"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/stream"
 )
 
 // TestServer is a running httptest.Server bound to the full
@@ -46,6 +48,10 @@ func StartTestServer(t *testing.T, db *sql.DB) *TestServer {
 	cipher, err := crypto.New(testCipherKey)
 	require.NoError(t, err, "init test cipher")
 
+	notifier := stream.NewInProcessNotifier()
+	tap := stream.NewEventbusTap(notifier)
+	eventbus.SetNotifyHook(tap.Publish)
+
 	handler := router.Build(router.Deps{
 		DB:                 db,
 		Queries:            queries,
@@ -55,10 +61,15 @@ func StartTestServer(t *testing.T, db *sql.DB) *TestServer {
 		SlackSigningSecret: "",
 		DefaultWorkspaceID: "",
 		AiMock:             os.Getenv("NF_AI_MOCK") != "" && os.Getenv("NF_AI_MOCK") != "0" && os.Getenv("NF_AI_MOCK") != "false",
+		StreamNotifier:     notifier,
+		StreamRemember:     tap.RememberWorkspace,
 	})
 
 	srv := httptest.NewServer(handler)
-	t.Cleanup(srv.Close)
+	t.Cleanup(func() {
+		eventbus.SetNotifyHook(nil)
+		srv.Close()
+	})
 
 	return &TestServer{BaseURL: srv.URL, Server: srv, DB: db}
 }
@@ -78,6 +89,10 @@ func NewTestServer(db *sql.DB) (*TestServer, func(), error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("init test cipher: %w", err)
 	}
+	notifier := stream.NewInProcessNotifier()
+	tap := stream.NewEventbusTap(notifier)
+	eventbus.SetNotifyHook(tap.Publish)
+
 	handler := router.Build(router.Deps{
 		DB:                 db,
 		Queries:            queries,
@@ -87,7 +102,13 @@ func NewTestServer(db *sql.DB) (*TestServer, func(), error) {
 		SlackSigningSecret: "",
 		DefaultWorkspaceID: "",
 		AiMock:             os.Getenv("NF_AI_MOCK") != "" && os.Getenv("NF_AI_MOCK") != "0" && os.Getenv("NF_AI_MOCK") != "false",
+		StreamNotifier:     notifier,
+		StreamRemember:     tap.RememberWorkspace,
 	})
 	srv := httptest.NewServer(handler)
-	return &TestServer{BaseURL: srv.URL, Server: srv, DB: db}, srv.Close, nil
+	cleanup := func() {
+		eventbus.SetNotifyHook(nil)
+		srv.Close()
+	}
+	return &TestServer{BaseURL: srv.URL, Server: srv, DB: db}, cleanup, nil
 }

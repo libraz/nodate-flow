@@ -234,6 +234,41 @@
         "required": ["id", "purpose", "model", "promptRedacted", "status", "invokedAt"],
         "type": "object"
       },
+      "AiMetricsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AiMetricsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "acceptanceRate": {
+            "description": "applied / (applied + dismissed), 0 when no decisions",
+            "format": "double",
+            "type": "number"
+          },
+          "applied": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "dismissed": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "proposed": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "windowDays": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["windowDays", "proposed", "applied", "dismissed", "acceptanceRate"],
+        "type": "object"
+      },
       "AiSuggestionListBody": {
         "additionalProperties": false,
         "properties": {
@@ -1132,6 +1167,30 @@
         "required": ["total", "tokens"],
         "type": "object"
       },
+      "ListPrioritySuggestionsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListPrioritySuggestionsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/TaskPrioritySuggestion"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "suggestions"],
+        "type": "object"
+      },
       "ListProjectMembersBody": {
         "additionalProperties": false,
         "properties": {
@@ -1283,6 +1342,26 @@
           }
         },
         "required": ["total", "actors", "nextCursor"],
+        "type": "object"
+      },
+      "ListTaskAiInvocationsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListTaskAiInvocationsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "invocations": {
+            "items": {
+              "$ref": "#/components/schemas/TaskAiInvocation"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["invocations"],
         "type": "object"
       },
       "ListTaskAttachmentsBody": {
@@ -2249,6 +2328,49 @@
         "required": ["id", "userId", "email", "displayName", "role", "createdAt"],
         "type": "object"
       },
+      "TaskAiInvocation": {
+        "additionalProperties": false,
+        "properties": {
+          "costEstimate": {
+            "type": "string"
+          },
+          "errorCode": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "invokedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "model": {
+            "type": "string"
+          },
+          "promptRedacted": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "responseRedacted": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "tokensInput": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "tokensOutput": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": ["id", "purpose", "model", "promptRedacted", "status", "invokedAt"],
+        "type": "object"
+      },
       "TaskAttachment": {
         "additionalProperties": false,
         "properties": {
@@ -2529,6 +2651,41 @@
           "primaryAssigneeId",
           "assigneeCount",
           "createdAt"
+        ],
+        "type": "object"
+      },
+      "TaskPrioritySuggestion": {
+        "additionalProperties": false,
+        "properties": {
+          "confidence": {
+            "format": "float",
+            "type": "number"
+          },
+          "currentPriority": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "suggestedPriority": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "taskId",
+          "title",
+          "currentPriority",
+          "suggestedPriority",
+          "confidence",
+          "reason"
         ],
         "type": "object"
       },
@@ -4148,6 +4305,67 @@
         "summary": "Remove an actor from a task"
       }
     },
+    "/tasks/{id}/ai/invocations": {
+      "get": {
+        "operationId": "tasks-ai-invocations-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 20,
+              "format": "int32",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListTaskAiInvocationsOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List recent AI invocations scoped to this task"
+      }
+    },
     "/tasks/{id}/attachments": {
       "get": {
         "operationId": "tasks-attachments-list",
@@ -5296,6 +5514,96 @@
           }
         },
         "summary": "List redacted LLM call audit rows for the AI reasoning panel"
+      }
+    },
+    "/workspaces/{wsId}/ai/metrics": {
+      "get": {
+        "operationId": "ai-metrics",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Trailing window in days",
+            "explode": false,
+            "in": "query",
+            "name": "windowDays",
+            "schema": {
+              "default": 30,
+              "description": "Trailing window in days",
+              "format": "int64",
+              "maximum": 365,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiMetricsOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "AI suggestion acceptance metrics over a trailing window"
+      }
+    },
+    "/workspaces/{wsId}/ai/priority-suggestions": {
+      "get": {
+        "operationId": "ai-priority-suggestions-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListPrioritySuggestionsOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Suggest priority adjustments for open tasks in a workspace"
       }
     },
     "/workspaces/{wsId}/ai/providers": {

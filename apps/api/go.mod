@@ -7,6 +7,7 @@ require (
 	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/danielgtaylor/huma/v2 v2.27.0
 	github.com/go-chi/chi/v5 v5.1.0
+	github.com/go-chi/cors v1.2.2
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0

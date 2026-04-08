@@ -247,6 +247,18 @@ func BuildResult(deps Deps) Result {
 			Summary:     "Today's accumulated LLM spend (USD) for a workspace",
 		}, aihandlers.CostToday(aiDeps))
 		huma.Register(subAPI, huma.Operation{
+			OperationID: "ai-metrics",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/ai/metrics",
+			Summary:     "AI suggestion acceptance metrics over a trailing window",
+		}, aihandlers.Metrics(aiDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "ai-priority-suggestions-list",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/ai/priority-suggestions",
+			Summary:     "Suggest priority adjustments for open tasks in a workspace",
+		}, aihandlers.ListPrioritySuggestions(aiDeps))
+		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-compile-lens",
 			Method:      http.MethodPost,
 			Path:        "/workspaces/{wsId}/ai/compile-lens",

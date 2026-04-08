@@ -70,6 +70,19 @@ WHERE e.workspace_id = ?
 ORDER BY e.occurred_at DESC
 LIMIT 100;
 
+-- name: CountAiSuggestionOutcomesForWorkspace :one
+-- Count ai.suggestion.{proposed,applied,dismissed} events for a workspace
+-- within the given time window. Used by the AI metrics endpoint
+-- (2.OBS-1) to compute acceptance rate.
+SELECT
+  COALESCE(SUM(CASE WHEN type = 'ai.suggestion.proposed'  THEN 1 ELSE 0 END), 0) AS proposed,
+  COALESCE(SUM(CASE WHEN type = 'ai.suggestion.applied'   THEN 1 ELSE 0 END), 0) AS applied,
+  COALESCE(SUM(CASE WHEN type = 'ai.suggestion.dismissed' THEN 1 ELSE 0 END), 0) AS dismissed
+FROM events
+WHERE workspace_id = ?
+  AND occurred_at >= ?
+  AND type IN ('ai.suggestion.proposed', 'ai.suggestion.applied', 'ai.suggestion.dismissed');
+
 -- name: ListEventsForWorkspace :many
 -- List the workspace-wide event timeline via v_task_timeline.
 SELECT

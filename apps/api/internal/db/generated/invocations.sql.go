@@ -205,6 +205,83 @@ func (q *Queries) ListAiInvocationsForWorkspace(ctx context.Context, arg ListAiI
 	return items, nil
 }
 
+const listAiInvocationsForTask = `-- name: ListAiInvocationsForTask :many
+SELECT
+  public_id,
+  purpose,
+  model,
+  prompt_redacted,
+  response_redacted,
+  tokens_input,
+  tokens_output,
+  cost_estimate,
+  status,
+  error_code,
+  invoked_at
+FROM ai_invocations
+WHERE workspace_id = ?
+  AND task_id = ?
+ORDER BY invoked_at DESC, id DESC
+LIMIT ? OFFSET ?
+`
+
+type ListAiInvocationsForTaskParams struct {
+	WorkspaceID uint32 `json:"-"`
+	TaskID      sql.NullInt32 `json:"-"`
+	Limit       int32  `json:"limit"`
+	Offset      int32  `json:"offset"`
+}
+
+type ListAiInvocationsForTaskRow struct {
+	PublicID         types.PublicID      `json:"publicId"`
+	Purpose          string              `json:"purpose"`
+	Model            string              `json:"model"`
+	PromptRedacted   string              `json:"promptRedacted"`
+	ResponseRedacted sql.NullString      `json:"responseRedacted"`
+	TokensInput      sql.NullInt32       `json:"tokensInput"`
+	TokensOutput     sql.NullInt32       `json:"tokensOutput"`
+	CostEstimate     sql.NullString      `json:"costEstimate"`
+	Status           AiInvocationsStatus `json:"status"`
+	ErrorCode        sql.NullString      `json:"errorCode"`
+	InvokedAt        time.Time           `json:"invokedAt"`
+}
+
+// Recent redacted LLM call records scoped to a single task.
+func (q *Queries) ListAiInvocationsForTask(ctx context.Context, arg ListAiInvocationsForTaskParams) ([]ListAiInvocationsForTaskRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAiInvocationsForTask, arg.WorkspaceID, arg.TaskID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAiInvocationsForTaskRow{}
+	for rows.Next() {
+		var i ListAiInvocationsForTaskRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.Purpose,
+			&i.Model,
+			&i.PromptRedacted,
+			&i.ResponseRedacted,
+			&i.TokensInput,
+			&i.TokensOutput,
+			&i.CostEstimate,
+			&i.Status,
+			&i.ErrorCode,
+			&i.InvokedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const sumAiCostTodayForWorkspace = `-- name: SumAiCostTodayForWorkspace :one
 SELECT CAST(COALESCE(ROUND(SUM(cost_estimate) * 100), 0) AS SIGNED) AS total_cents
 FROM ai_invocations
