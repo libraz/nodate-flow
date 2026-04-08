@@ -75,8 +75,8 @@ func rowToTaskListItemFromWorkspace(r generated.ListTasksForWorkspaceRow) TaskLi
 	}
 }
 
-func rowToConstraint(r generated.ListConstraintsForTaskRow) Constraint {
-	return Constraint{
+func rowToConstraint(r generated.ListConstraintsForTaskRow) TaskConstraint {
+	return TaskConstraint{
 		ID:          r.PublicID.String(),
 		Kind:        string(r.Kind),
 		Expression:  r.Expression,
@@ -88,8 +88,8 @@ func rowToConstraint(r generated.ListConstraintsForTaskRow) Constraint {
 	}
 }
 
-func rowToDependency(r generated.ListDependenciesForTaskRow) Dependency {
-	return Dependency{
+func rowToDependency(r generated.ListDependenciesForTaskRow) TaskDependency {
+	return TaskDependency{
 		ID:                 r.PublicID.String(),
 		Kind:               string(r.Kind),
 		FromTaskID:         r.FromTaskPublicID.String(),
@@ -101,8 +101,8 @@ func rowToDependency(r generated.ListDependenciesForTaskRow) Dependency {
 	}
 }
 
-func rowToActor(r generated.ListActorsForTaskRow) Actor {
-	return Actor{
+func rowToActor(r generated.ListActorsForTaskRow) TaskActor {
+	return TaskActor{
 		ID:          r.PublicID.String(),
 		UserID:      r.UserPublicID.String(),
 		Email:       r.Email,
@@ -114,8 +114,8 @@ func rowToActor(r generated.ListActorsForTaskRow) Actor {
 	}
 }
 
-func rowToComment(r generated.ListCommentsForTaskRow) Comment {
-	return Comment{
+func rowToComment(r generated.ListCommentsForTaskRow) TaskComment {
+	return TaskComment{
 		ID:                r.PublicID.String(),
 		AuthorID:          r.AuthorPublicID.String(),
 		AuthorDisplayName: r.AuthorDisplayName,
@@ -127,8 +127,8 @@ func rowToComment(r generated.ListCommentsForTaskRow) Comment {
 	}
 }
 
-func rowToAttachment(r generated.ListAttachmentsForTaskRow) Attachment {
-	return Attachment{
+func rowToAttachment(r generated.ListAttachmentsForTaskRow) TaskAttachment {
+	return TaskAttachment{
 		ID:                  r.PublicID.String(),
 		UploaderID:          r.UploaderPublicID.String(),
 		UploaderDisplayName: r.UploaderDisplayName,

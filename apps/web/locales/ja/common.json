@@ -52,6 +52,189 @@
   "a11y": {
     "skipToContent": "本文へスキップ"
   },
+  "workspaces": {
+    "title": "ワークスペース",
+    "new": "ワークスペースを作成",
+    "empty": "ワークスペースがまだありません。最初のワークスペースを作成しましょう。",
+    "columns": {
+      "name": "名前",
+      "slug": "スラッグ",
+      "members": "メンバー",
+      "created": "作成日",
+      "actions": "操作"
+    },
+    "form": {
+      "name": "名前",
+      "slug": "スラッグ",
+      "description": "説明",
+      "submit": "保存",
+      "cancel": "キャンセル"
+    },
+    "detail": {
+      "tabs": {
+        "overview": "概要",
+        "members": "メンバー",
+        "settings": "設定"
+      }
+    },
+    "members": {
+      "title": "メンバー",
+      "add": "メンバーを追加",
+      "email": "メールアドレス",
+      "role": "ロール",
+      "added_at": "追加日"
+    },
+    "roles": {
+      "owner": "オーナー",
+      "admin": "管理者",
+      "member": "メンバー",
+      "guest": "ゲスト"
+    },
+    "settings": {
+      "rename": "名前を変更",
+      "disable": "ワークスペースを無効化",
+      "disable_confirm": "このワークスペースを無効化してよろしいですか？ UI からは元に戻せません。"
+    },
+    "validation": {
+      "name_required": "名前を入力してください。",
+      "slug_required": "スラッグを入力してください。",
+      "slug_format": "スラッグには小文字・数字・ハイフンのみ使用できます。",
+      "email_required": "メールアドレスを入力してください。",
+      "email_invalid": "有効なメールアドレスを入力してください。"
+    },
+    "errors": {
+      "create_failed": "ワークスペースを作成できませんでした。もう一度お試しください。",
+      "update_failed": "ワークスペースを更新できませんでした。もう一度お試しください。",
+      "disable_failed": "ワークスペースを無効化できませんでした。もう一度お試しください。",
+      "add_member_failed": "メンバーを追加できませんでした。もう一度お試しください。"
+    }
+  },
+  "projects": {
+    "title": "プロジェクト",
+    "new": "プロジェクトを作成",
+    "empty": "プロジェクトがまだありません。最初のプロジェクトを作成しましょう。",
+    "columns": {
+      "name": "名前",
+      "key": "キー",
+      "visibility": "ステータス",
+      "created": "作成日",
+      "actions": "操作"
+    },
+    "status": {
+      "active": "アクティブ",
+      "archived": "アーカイブ済み"
+    },
+    "form": {
+      "name": "名前",
+      "key": "キー",
+      "description": "説明",
+      "visibility": "公開範囲",
+      "submit": "保存",
+      "cancel": "キャンセル"
+    },
+    "visibility": {
+      "private": "プライベート",
+      "workspace": "ワークスペース",
+      "public": "公開"
+    },
+    "detail": {
+      "tabs": {
+        "overview": "概要",
+        "members": "メンバー",
+        "settings": "設定"
+      }
+    },
+    "members": {
+      "title": "メンバー",
+      "add": "メンバーを追加",
+      "email": "メールアドレス",
+      "user_id": "ユーザー ID",
+      "role": "ロール",
+      "added_at": "追加日"
+    },
+    "roles": {
+      "lead": "リード",
+      "editor": "編集者",
+      "commenter": "コメンター",
+      "viewer": "閲覧者"
+    },
+    "settings": {
+      "rename": "名前を変更",
+      "disable": "プロジェクトを無効化",
+      "disable_confirm": "このプロジェクトを無効化してよろしいですか？ UI からは元に戻せません。"
+    },
+    "validation": {
+      "name_required": "名前を入力してください。",
+      "slug_required": "キーを入力してください。",
+      "slug_format": "キーには小文字・数字・ハイフンのみ使用できます。",
+      "user_id_required": "ユーザー ID を入力してください。"
+    },
+    "errors": {
+      "create_failed": "プロジェクトを作成できませんでした。もう一度お試しください。",
+      "update_failed": "プロジェクトを更新できませんでした。もう一度お試しください。",
+      "disable_failed": "プロジェクトを無効化できませんでした。もう一度お試しください。",
+      "add_member_failed": "メンバーを追加できませんでした。もう一度お試しください。"
+    }
+  },
+  "tasks": {
+    "title": "タスク",
+    "new": "タスクを作成",
+    "empty": "タスクがまだありません。最初のタスクを作成しましょう。",
+    "views": {
+      "board": "ボード",
+      "list": "リスト"
+    },
+    "columns": {
+      "title": "タイトル",
+      "status": "ステータス",
+      "assignee": "担当者",
+      "due": "期日",
+      "priority": "優先度",
+      "updated": "更新日"
+    },
+    "form": {
+      "title": "タイトル",
+      "description": "説明",
+      "priority": "優先度",
+      "assignee": "担当者",
+      "due": "期日",
+      "submit": "作成",
+      "cancel": "キャンセル"
+    },
+    "status": {
+      "open": "オープン",
+      "waiting": "待機中",
+      "review": "レビュー",
+      "done": "完了",
+      "cancelled": "キャンセル"
+    },
+    "priority": {
+      "none": "なし",
+      "low": "低",
+      "medium": "中",
+      "high": "高",
+      "urgent": "緊急"
+    },
+    "filters": {
+      "search_placeholder": "タスクを検索…",
+      "status": "ステータス",
+      "assignee": "担当者 ID"
+    },
+    "validation": {
+      "title_required": "タイトルを入力してください。",
+      "due_format": "期日は YYYY-MM-DD 形式で入力してください。"
+    },
+    "errors": {
+      "create_failed": "タスクを作成できませんでした。もう一度お試しください。",
+      "update_failed": "タスクを更新できませんでした。もう一度お試しください。",
+      "delete_failed": "タスクを削除できませんでした。もう一度お試しください。",
+      "move_failed": "タスクのステータス遷移はまだ有効化されていません。"
+    },
+    "board": {
+      "empty_column": "タスクなし",
+      "drop_hint": "ここにドロップして移動"
+    }
+  },
   "auth": {
     "login": {
       "title": "サインイン",

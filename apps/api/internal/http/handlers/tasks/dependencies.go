@@ -13,8 +13,8 @@ import (
 )
 
 // AddDependency handles POST /tasks/{id}/dependencies.
-func AddDependency(deps Deps) func(context.Context, *AddDependencyInput) (*AddDependencyOutput, error) {
-	return func(ctx context.Context, in *AddDependencyInput) (*AddDependencyOutput, error) {
+func AddDependency(deps Deps) func(context.Context, *AddTaskDependencyInput) (*AddTaskDependencyOutput, error) {
+	return func(ctx context.Context, in *AddTaskDependencyInput) (*AddTaskDependencyOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
@@ -59,7 +59,7 @@ func AddDependency(deps Deps) func(context.Context, *AddDependencyInput) (*AddDe
 				"kind":         in.Body.Kind,
 			},
 		})
-		return &AddDependencyOutput{Body: Dependency{
+		return &AddTaskDependencyOutput{Body: TaskDependency{
 			ID:         pub.String(),
 			Kind:       in.Body.Kind,
 			FromTaskID: task.PublicID.String(),
@@ -69,8 +69,8 @@ func AddDependency(deps Deps) func(context.Context, *AddDependencyInput) (*AddDe
 }
 
 // RemoveDependency handles DELETE /tasks/{id}/dependencies/{depId}.
-func RemoveDependency(deps Deps) func(context.Context, *RemoveDependencyInput) (*RemoveDependencyOutput, error) {
-	return func(ctx context.Context, in *RemoveDependencyInput) (*RemoveDependencyOutput, error) {
+func RemoveDependency(deps Deps) func(context.Context, *RemoveTaskDependencyInput) (*RemoveTaskDependencyOutput, error) {
+	return func(ctx context.Context, in *RemoveTaskDependencyInput) (*RemoveTaskDependencyOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
@@ -100,7 +100,7 @@ func RemoveDependency(deps Deps) func(context.Context, *RemoveDependencyInput) (
 				"dependencyId": depID.String(),
 			},
 		})
-		out := &RemoveDependencyOutput{}
+		out := &RemoveTaskDependencyOutput{}
 		out.Body.Ok = true
 		return out, nil
 	}

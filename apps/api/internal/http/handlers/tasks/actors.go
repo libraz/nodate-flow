@@ -13,8 +13,8 @@ import (
 )
 
 // AddActor handles POST /tasks/{id}/actors.
-func AddActor(deps Deps) func(context.Context, *AddActorInput) (*AddActorOutput, error) {
-	return func(ctx context.Context, in *AddActorInput) (*AddActorOutput, error) {
+func AddActor(deps Deps) func(context.Context, *AddTaskActorInput) (*AddTaskActorOutput, error) {
+	return func(ctx context.Context, in *AddTaskActorInput) (*AddTaskActorOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
@@ -58,7 +58,7 @@ func AddActor(deps Deps) func(context.Context, *AddActorInput) (*AddActorOutput,
 				"role":    in.Body.Role,
 			},
 		})
-		return &AddActorOutput{Body: Actor{
+		return &AddTaskActorOutput{Body: TaskActor{
 			ID:     pub.String(),
 			UserID: userPub.String(),
 			Role:   in.Body.Role,
@@ -67,8 +67,8 @@ func AddActor(deps Deps) func(context.Context, *AddActorInput) (*AddActorOutput,
 }
 
 // RemoveActor handles DELETE /tasks/{id}/actors/{actorId}.
-func RemoveActor(deps Deps) func(context.Context, *RemoveActorInput) (*RemoveActorOutput, error) {
-	return func(ctx context.Context, in *RemoveActorInput) (*RemoveActorOutput, error) {
+func RemoveActor(deps Deps) func(context.Context, *RemoveTaskActorInput) (*RemoveTaskActorOutput, error) {
+	return func(ctx context.Context, in *RemoveTaskActorInput) (*RemoveTaskActorOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
@@ -98,7 +98,7 @@ func RemoveActor(deps Deps) func(context.Context, *RemoveActorInput) (*RemoveAct
 				"actorId": aid.String(),
 			},
 		})
-		out := &RemoveActorOutput{}
+		out := &RemoveTaskActorOutput{}
 		out.Body.Ok = true
 		return out, nil
 	}

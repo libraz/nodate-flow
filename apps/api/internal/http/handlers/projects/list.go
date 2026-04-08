@@ -9,8 +9,8 @@ import (
 )
 
 // List handles GET /workspaces/{wsId}/projects.
-func List(deps Deps) func(context.Context, *ListInput) (*ListOutput, error) {
-	return func(ctx context.Context, in *ListInput) (*ListOutput, error) {
+func List(deps Deps) func(context.Context, *ListProjectsInput) (*ListProjectsOutput, error) {
+	return func(ctx context.Context, in *ListProjectsInput) (*ListProjectsOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
@@ -27,7 +27,7 @@ func List(deps Deps) func(context.Context, *ListInput) (*ListOutput, error) {
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		out := &ListOutput{}
+		out := &ListProjectsOutput{}
 		out.Body.Projects = make([]Project, 0, len(rows))
 		for _, r := range rows {
 			out.Body.Projects = append(out.Body.Projects, rowToProjectFromList(r))

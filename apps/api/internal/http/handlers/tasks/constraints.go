@@ -13,8 +13,8 @@ import (
 )
 
 // AddConstraint handles POST /tasks/{id}/constraints.
-func AddConstraint(deps Deps) func(context.Context, *AddConstraintInput) (*AddConstraintOutput, error) {
-	return func(ctx context.Context, in *AddConstraintInput) (*AddConstraintOutput, error) {
+func AddConstraint(deps Deps) func(context.Context, *AddTaskConstraintInput) (*AddTaskConstraintOutput, error) {
+	return func(ctx context.Context, in *AddTaskConstraintInput) (*AddTaskConstraintOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
@@ -45,7 +45,7 @@ func AddConstraint(deps Deps) func(context.Context, *AddConstraintInput) (*AddCo
 				"kind":         in.Body.Kind,
 			},
 		})
-		return &AddConstraintOutput{Body: Constraint{
+		return &AddTaskConstraintOutput{Body: TaskConstraint{
 			ID:         pub.String(),
 			Kind:       in.Body.Kind,
 			Expression: in.Body.Expression,
@@ -54,8 +54,8 @@ func AddConstraint(deps Deps) func(context.Context, *AddConstraintInput) (*AddCo
 }
 
 // RemoveConstraint handles DELETE /tasks/{id}/constraints/{cid}.
-func RemoveConstraint(deps Deps) func(context.Context, *RemoveConstraintInput) (*RemoveConstraintOutput, error) {
-	return func(ctx context.Context, in *RemoveConstraintInput) (*RemoveConstraintOutput, error) {
+func RemoveConstraint(deps Deps) func(context.Context, *RemoveTaskConstraintInput) (*RemoveTaskConstraintOutput, error) {
+	return func(ctx context.Context, in *RemoveTaskConstraintInput) (*RemoveTaskConstraintOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
@@ -88,7 +88,7 @@ func RemoveConstraint(deps Deps) func(context.Context, *RemoveConstraintInput) (
 				"constraintId": cid.String(),
 			},
 		})
-		out := &RemoveConstraintOutput{}
+		out := &RemoveTaskConstraintOutput{}
 		out.Body.Ok = true
 		return out, nil
 	}

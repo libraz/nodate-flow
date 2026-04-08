@@ -13,8 +13,8 @@ import (
 )
 
 // Patch handles PATCH /projects/{prjId}.
-func Patch(deps Deps) func(context.Context, *PatchInput) (*PatchOutput, error) {
-	return func(ctx context.Context, in *PatchInput) (*PatchOutput, error) {
+func Patch(deps Deps) func(context.Context, *PatchProjectInput) (*PatchProjectOutput, error) {
+	return func(ctx context.Context, in *PatchProjectInput) (*PatchProjectOutput, error) {
 		prj, ok := middleware.ProjectFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsProjectNotFound)
@@ -53,6 +53,6 @@ func Patch(deps Deps) func(context.Context, *PatchInput) (*PatchOutput, error) {
 		updated.Name = newName
 		updated.Slug = newSlug
 		updated.Description = nullStr(newDesc)
-		return &PatchOutput{Body: updated}, nil
+		return &PatchProjectOutput{Body: updated}, nil
 	}
 }

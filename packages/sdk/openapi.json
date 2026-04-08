@@ -1,74 +1,18 @@
 {
   "components": {
     "schemas": {
-      "Actor": {
+      "AddProjectMemberBody": {
         "additionalProperties": false,
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/Actor.json"
-            ],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "avatarUrl": {
-            "type": "string"
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "displayName": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "role": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "userId": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "userId",
-          "email",
-          "displayName",
-          "role",
-          "createdAt"
-        ],
-        "type": "object"
-      },
-      "AddActorInputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/AddActorInputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/AddProjectMemberBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
           },
           "role": {
-            "enum": [
-              "assignee",
-              "reviewer",
-              "watcher",
-              "approver"
-            ],
+            "enum": ["lead", "editor", "commenter", "viewer"],
             "type": "string"
           },
           "userId": {
@@ -76,20 +20,37 @@
             "type": "string"
           }
         },
-        "required": [
-          "userId",
-          "role"
-        ],
+        "required": ["userId", "role"],
         "type": "object"
       },
-      "AddAttachmentInputBody": {
+      "AddTaskActorBody": {
         "additionalProperties": false,
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/AddAttachmentInputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/AddTaskActorBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "role": {
+            "enum": ["assignee", "reviewer", "watcher", "approver"],
+            "type": "string"
+          },
+          "userId": {
+            "description": "User public id (UUID v7)",
+            "type": "string"
+          }
+        },
+        "required": ["userId", "role"],
+        "type": "object"
+      },
+      "AddTaskAttachmentBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AddTaskAttachmentBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -115,22 +76,15 @@
             "type": "string"
           }
         },
-        "required": [
-          "filename",
-          "contentType",
-          "byteSize",
-          "storageKey"
-        ],
+        "required": ["filename", "contentType", "byteSize", "storageKey"],
         "type": "object"
       },
-      "AddCommentInputBody": {
+      "AddTaskCommentBody": {
         "additionalProperties": false,
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/AddCommentInputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/AddTaskCommentBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -141,19 +95,15 @@
             "type": "string"
           }
         },
-        "required": [
-          "body"
-        ],
+        "required": ["body"],
         "type": "object"
       },
-      "AddConstraintInputBody": {
+      "AddTaskConstraintBody": {
         "additionalProperties": false,
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/AddConstraintInputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/AddTaskConstraintBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -164,41 +114,25 @@
             "type": "string"
           },
           "kind": {
-            "enum": [
-              "deadline",
-              "dependency",
-              "approval",
-              "signal",
-              "custom"
-            ],
+            "enum": ["deadline", "dependency", "approval", "signal", "custom"],
             "type": "string"
           }
         },
-        "required": [
-          "kind",
-          "expression"
-        ],
+        "required": ["kind", "expression"],
         "type": "object"
       },
-      "AddDependencyInputBody": {
+      "AddTaskDependencyBody": {
         "additionalProperties": false,
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/AddDependencyInputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/AddTaskDependencyBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
           },
           "kind": {
-            "enum": [
-              "blocks",
-              "relates",
-              "duplicates",
-              "subtask_of"
-            ],
+            "enum": ["blocks", "relates", "duplicates", "subtask_of"],
             "type": "string"
           },
           "toTaskId": {
@@ -206,42 +140,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "toTaskId",
-          "kind"
-        ],
-        "type": "object"
-      },
-      "AddMemberInputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/AddMemberInputBody.json"
-            ],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "role": {
-            "enum": [
-              "lead",
-              "editor",
-              "commenter",
-              "viewer"
-            ],
-            "type": "string"
-          },
-          "userId": {
-            "description": "User public id (UUID v7)",
-            "type": "string"
-          }
-        },
-        "required": [
-          "userId",
-          "role"
-        ],
+        "required": ["toTaskId", "kind"],
         "type": "object"
       },
       "ArchiveOutputBody": {
@@ -249,9 +148,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/ArchiveOutputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/ArchiveOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -260,68 +157,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "ok"
-        ],
-        "type": "object"
-      },
-      "Attachment": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/Attachment.json"
-            ],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "byteSize": {
-            "format": "int64",
-            "minimum": 0,
-            "type": "integer"
-          },
-          "checksumSha256": {
-            "type": "string"
-          },
-          "contentType": {
-            "type": "string"
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "filename": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "storageKey": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "uploaderDisplayName": {
-            "type": "string"
-          },
-          "uploaderId": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "uploaderId",
-          "uploaderDisplayName",
-          "filename",
-          "contentType",
-          "byteSize",
-          "storageKey",
-          "createdAt"
-        ],
+        "required": ["ok"],
         "type": "object"
       },
       "AuthTokens": {
@@ -329,9 +165,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/AuthTokens.json"
-            ],
+            "examples": ["https://example.com/schemas/AuthTokens.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -349,111 +183,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "accessToken",
-          "expiresAt",
-          "userId"
-        ],
-        "type": "object"
-      },
-      "Comment": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/Comment.json"
-            ],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "authorAvatarUrl": {
-            "type": "string"
-          },
-          "authorDisplayName": {
-            "type": "string"
-          },
-          "authorId": {
-            "type": "string"
-          },
-          "body": {
-            "type": "string"
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "editedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "authorId",
-          "authorDisplayName",
-          "body",
-          "createdAt"
-        ],
-        "type": "object"
-      },
-      "Constraint": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/Constraint.json"
-            ],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "expression": {
-            "type": "string"
-          },
-          "failedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "kind": {
-            "type": "string"
-          },
-          "satisfiedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "sortWeight": {
-            "format": "int32",
-            "type": "integer"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "kind",
-          "expression",
-          "sortWeight",
-          "createdAt"
-        ],
+        "required": ["accessToken", "expiresAt", "userId"],
         "type": "object"
       },
       "CreateInputBody": {
@@ -461,9 +191,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/CreateInputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/CreateInputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -487,10 +215,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "slug",
-          "name"
-        ],
+        "required": ["slug", "name"],
         "type": "object"
       },
       "CreateMcpTokenInputBody": {
@@ -498,9 +223,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/CreateMcpTokenInputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/CreateMcpTokenInputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -514,16 +237,10 @@
             "items": {
               "type": "string"
             },
-            "type": [
-              "array",
-              "null"
-            ]
+            "type": ["array", "null"]
           }
         },
-        "required": [
-          "name",
-          "scopes"
-        ],
+        "required": ["name", "scopes"],
         "type": "object"
       },
       "CreateMcpTokenOutputBody": {
@@ -531,9 +248,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/CreateMcpTokenOutputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/CreateMcpTokenOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -552,10 +267,7 @@
             "items": {
               "type": "string"
             },
-            "type": [
-              "array",
-              "null"
-            ]
+            "type": ["array", "null"]
           },
           "token": {
             "description": "Plaintext bearer token, shown only once",
@@ -565,14 +277,39 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "name",
-          "token",
-          "tokenPrefix",
-          "scopes",
-          "createdAt"
-        ],
+        "required": ["id", "name", "token", "tokenPrefix", "scopes", "createdAt"],
+        "type": "object"
+      },
+      "CreateProjectBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateProjectBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "color": {
+            "maxLength": 32,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "slug": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["slug", "name"],
         "type": "object"
       },
       "CreateProviderInputBody": {
@@ -580,9 +317,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/CreateProviderInputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/CreateProviderInputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -602,13 +337,7 @@
             "type": "string"
           },
           "kind": {
-            "enum": [
-              "anthropic",
-              "openai",
-              "google",
-              "ollama",
-              "openai_compat"
-            ],
+            "enum": ["anthropic", "openai", "google", "ollama", "openai_compat"],
             "type": "string"
           },
           "name": {
@@ -617,53 +346,48 @@
             "type": "string"
           }
         },
-        "required": [
-          "kind",
-          "name",
-          "apiKey"
-        ],
+        "required": ["kind", "name", "apiKey"],
         "type": "object"
       },
-      "DeleteAttachmentOutputBody": {
+      "CreateTaskBody": {
         "additionalProperties": false,
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/DeleteAttachmentOutputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/CreateTaskBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
           },
-          "ok": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "ok"
-        ],
-        "type": "object"
-      },
-      "DeleteCommentOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/DeleteCommentOutputBody.json"
-            ],
-            "format": "uri",
-            "readOnly": true,
+          "description": {
+            "maxLength": 50000,
             "type": "string"
           },
-          "ok": {
-            "type": "boolean"
+          "dueOn": {
+            "description": "YYYY-MM-DD",
+            "type": "string"
+          },
+          "priority": {
+            "format": "int32",
+            "maximum": 4,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "projectId": {
+            "description": "Project public id (UUID v7)",
+            "type": "string"
+          },
+          "startOn": {
+            "description": "YYYY-MM-DD",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
           }
         },
-        "required": [
-          "ok"
-        ],
+        "required": ["projectId", "title"],
         "type": "object"
       },
       "DeleteMcpTokenOutputBody": {
@@ -671,9 +395,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/DeleteMcpTokenOutputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/DeleteMcpTokenOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -682,9 +404,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "ok"
-        ],
+        "required": ["ok"],
         "type": "object"
       },
       "DeleteProviderOutputBody": {
@@ -692,9 +412,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/DeleteProviderOutputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/DeleteProviderOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -703,59 +421,41 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "ok"
-        ],
+        "required": ["ok"],
         "type": "object"
       },
-      "Dependency": {
+      "DeleteTaskAttachmentBody": {
         "additionalProperties": false,
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/Dependency.json"
-            ],
+            "examples": ["https://example.com/schemas/DeleteTaskAttachmentBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
           },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "fromTaskId": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "kind": {
-            "type": "string"
-          },
-          "toTaskDerivedState": {
-            "type": "string"
-          },
-          "toTaskId": {
-            "type": "string"
-          },
-          "toTaskTitle": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
+          "ok": {
+            "type": "boolean"
           }
         },
-        "required": [
-          "id",
-          "kind",
-          "fromTaskId",
-          "toTaskId",
-          "toTaskTitle",
-          "toTaskDerivedState",
-          "createdAt"
-        ],
+        "required": ["ok"],
+        "type": "object"
+      },
+      "DeleteTaskCommentBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/DeleteTaskCommentBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
         "type": "object"
       },
       "DisableOutputBody": {
@@ -763,9 +463,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/DisableOutputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/DisableOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -774,19 +472,49 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "ok"
-        ],
+        "required": ["ok"],
         "type": "object"
       },
-      "EditCommentInputBody": {
+      "DisableProjectBody": {
         "additionalProperties": false,
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/EditCommentInputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/DisableProjectBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
+      "DisableTaskBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/DisableTaskBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
+      "EditTaskCommentBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/EditTaskCommentBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -797,9 +525,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "body"
-        ],
+        "required": ["body"],
         "type": "object"
       },
       "ErrorDetail": {
@@ -824,18 +550,14 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/ErrorModel.json"
-            ],
+            "examples": ["https://example.com/schemas/ErrorModel.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
           },
           "detail": {
             "description": "A human-readable explanation specific to this occurrence of the problem.",
-            "examples": [
-              "Property foo is required but is missing."
-            ],
+            "examples": ["Property foo is required but is missing."],
             "type": "string"
           },
           "errors": {
@@ -843,40 +565,29 @@
             "items": {
               "$ref": "#/components/schemas/ErrorDetail"
             },
-            "type": [
-              "array",
-              "null"
-            ]
+            "type": ["array", "null"]
           },
           "instance": {
             "description": "A URI reference that identifies the specific occurrence of the problem.",
-            "examples": [
-              "https://example.com/error-log/abc123"
-            ],
+            "examples": ["https://example.com/error-log/abc123"],
             "format": "uri",
             "type": "string"
           },
           "status": {
             "description": "HTTP status code",
-            "examples": [
-              400
-            ],
+            "examples": [400],
             "format": "int64",
             "type": "integer"
           },
           "title": {
             "description": "A short, human-readable summary of the problem type. This value should not change between occurrences of the error.",
-            "examples": [
-              "Bad Request"
-            ],
+            "examples": ["Bad Request"],
             "type": "string"
           },
           "type": {
             "default": "about:blank",
             "description": "A URI reference to human-readable documentation for the error.",
-            "examples": [
-              "https://example.com/errors/example"
-            ],
+            "examples": ["https://example.com/errors/example"],
             "format": "uri",
             "type": "string"
           }
@@ -907,11 +618,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "type",
-          "occurredAt"
-        ],
+        "required": ["id", "type", "occurredAt"],
         "type": "object"
       },
       "HealthOutputBody": {
@@ -919,9 +626,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/HealthOutputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/HealthOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -930,9 +635,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "status"
-        ],
+        "required": ["status"],
         "type": "object"
       },
       "InviteMemberInputBody": {
@@ -940,9 +643,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/InviteMemberInputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/InviteMemberInputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -952,19 +653,11 @@
             "type": "string"
           },
           "role": {
-            "enum": [
-              "owner",
-              "admin",
-              "member",
-              "guest"
-            ],
+            "enum": ["owner", "admin", "member", "guest"],
             "type": "string"
           }
         },
-        "required": [
-          "email",
-          "role"
-        ],
+        "required": ["email", "role"],
         "type": "object"
       },
       "Item": {
@@ -998,91 +691,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "source",
-          "kind",
-          "receivedAt",
-          "createdAt"
-        ],
-        "type": "object"
-      },
-      "ListAttachmentsOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/ListAttachmentsOutputBody.json"
-            ],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "attachments": {
-            "items": {
-              "$ref": "#/components/schemas/Attachment"
-            },
-            "type": [
-              "array",
-              "null"
-            ]
-          },
-          "nextCursor": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "total": {
-            "format": "int64",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "total",
-          "attachments",
-          "nextCursor"
-        ],
-        "type": "object"
-      },
-      "ListCommentsOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/ListCommentsOutputBody.json"
-            ],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "comments": {
-            "items": {
-              "$ref": "#/components/schemas/Comment"
-            },
-            "type": [
-              "array",
-              "null"
-            ]
-          },
-          "nextCursor": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "total": {
-            "format": "int64",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "total",
-          "comments",
-          "nextCursor"
-        ],
+        "required": ["id", "source", "kind", "receivedAt", "createdAt"],
         "type": "object"
       },
       "ListMcpTokensOutputBody": {
@@ -1090,9 +699,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/ListMcpTokensOutputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/ListMcpTokensOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -1101,20 +708,14 @@
             "items": {
               "$ref": "#/components/schemas/McpTokenSummary"
             },
-            "type": [
-              "array",
-              "null"
-            ]
+            "type": ["array", "null"]
           },
           "total": {
             "format": "int64",
             "type": "integer"
           }
         },
-        "required": [
-          "total",
-          "tokens"
-        ],
+        "required": ["total", "tokens"],
         "type": "object"
       },
       "ListMembersOutputBody": {
@@ -1122,9 +723,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/ListMembersOutputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/ListMembersOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -1133,27 +732,17 @@
             "items": {
               "$ref": "#/components/schemas/WorkspaceMember"
             },
-            "type": [
-              "array",
-              "null"
-            ]
+            "type": ["array", "null"]
           },
           "nextCursor": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "total": {
             "format": "int64",
             "type": "integer"
           }
         },
-        "required": [
-          "total",
-          "members",
-          "nextCursor"
-        ],
+        "required": ["total", "members", "nextCursor"],
         "type": "object"
       },
       "ListOutputBody": {
@@ -1161,18 +750,13 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/ListOutputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/ListOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
           },
           "nextCursor": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "total": {
             "format": "int64",
@@ -1182,17 +766,64 @@
             "items": {
               "$ref": "#/components/schemas/Workspace"
             },
-            "type": [
-              "array",
-              "null"
-            ]
+            "type": ["array", "null"]
           }
         },
-        "required": [
-          "total",
-          "workspaces",
-          "nextCursor"
-        ],
+        "required": ["total", "workspaces", "nextCursor"],
+        "type": "object"
+      },
+      "ListProjectMembersBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListProjectMembersBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectMember"
+            },
+            "type": ["array", "null"]
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "members", "nextCursor"],
+        "type": "object"
+      },
+      "ListProjectsBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListProjectsBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/Project"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "projects", "nextCursor"],
         "type": "object"
       },
       "ListProvidersOutputBody": {
@@ -1200,9 +831,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/ListProvidersOutputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/ListProvidersOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -1211,20 +840,95 @@
             "items": {
               "$ref": "#/components/schemas/Provider"
             },
-            "type": [
-              "array",
-              "null"
-            ]
+            "type": ["array", "null"]
           },
           "total": {
             "format": "int64",
             "type": "integer"
           }
         },
-        "required": [
-          "total",
-          "providers"
-        ],
+        "required": ["total", "providers"],
+        "type": "object"
+      },
+      "ListTaskAttachmentsBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListTaskAttachmentsBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/TaskAttachment"
+            },
+            "type": ["array", "null"]
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "attachments", "nextCursor"],
+        "type": "object"
+      },
+      "ListTaskCommentsBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListTaskCommentsBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "comments": {
+            "items": {
+              "$ref": "#/components/schemas/TaskComment"
+            },
+            "type": ["array", "null"]
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "comments", "nextCursor"],
+        "type": "object"
+      },
+      "ListTasksBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListTasksBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TaskListItem"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "tasks", "nextCursor"],
         "type": "object"
       },
       "LoginInputBody": {
@@ -1232,9 +936,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/LoginInputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/LoginInputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -1247,10 +949,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "email",
-          "password"
-        ],
+        "required": ["email", "password"],
         "type": "object"
       },
       "LogoutOutputBody": {
@@ -1258,9 +957,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/LogoutOutputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/LogoutOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -1269,9 +966,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "ok"
-        ],
+        "required": ["ok"],
         "type": "object"
       },
       "McpTokenSummary": {
@@ -1295,22 +990,13 @@
             "items": {
               "type": "string"
             },
-            "type": [
-              "array",
-              "null"
-            ]
+            "type": ["array", "null"]
           },
           "tokenPrefix": {
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "name",
-          "tokenPrefix",
-          "scopes",
-          "createdAt"
-        ],
+        "required": ["id", "name", "tokenPrefix", "scopes", "createdAt"],
         "type": "object"
       },
       "MeOutputBody": {
@@ -1318,9 +1004,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/MeOutputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/MeOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -1338,12 +1022,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "email",
-          "displayName",
-          "locale"
-        ],
+        "required": ["id", "email", "displayName", "locale"],
         "type": "object"
       },
       "OIDCStartOutputBody": {
@@ -1351,9 +1030,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/OIDCStartOutputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/OIDCStartOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -1368,11 +1045,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "authorizationUrl",
-          "state",
-          "nonce"
-        ],
+        "required": ["authorizationUrl", "state", "nonce"],
         "type": "object"
       },
       "PatchInputBody": {
@@ -1380,11 +1053,36 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/PatchInputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/PatchInputBody.json"],
             "format": "uri",
             "readOnly": true,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "slug": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PatchProjectBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PatchProjectBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 500,
             "type": "string"
           },
           "name": {
@@ -1405,9 +1103,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/PatchProviderInputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/PatchProviderInputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -1419,9 +1115,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "apiKey"
-        ],
+        "required": ["apiKey"],
         "type": "object"
       },
       "PatchProviderOutputBody": {
@@ -1429,9 +1123,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/PatchProviderOutputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/PatchProviderOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -1440,9 +1132,43 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "ok"
-        ],
+        "required": ["ok"],
+        "type": "object"
+      },
+      "PatchTaskBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PatchTaskBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 50000,
+            "type": "string"
+          },
+          "dueOn": {
+            "description": "YYYY-MM-DD or empty string to clear",
+            "type": "string"
+          },
+          "priority": {
+            "format": "int32",
+            "maximum": 4,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "startOn": {
+            "description": "YYYY-MM-DD or empty string to clear",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "Project": {
@@ -1483,13 +1209,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "slug",
-          "name",
-          "isArchived",
-          "createdAt"
-        ],
+        "required": ["id", "slug", "name", "isArchived", "createdAt"],
         "type": "object"
       },
       "ProjectMember": {
@@ -1497,9 +1217,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/ProjectMember.json"
-            ],
+            "examples": ["https://example.com/schemas/ProjectMember.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -1531,14 +1249,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "userId",
-          "email",
-          "displayName",
-          "role",
-          "createdAt"
-        ],
+        "required": ["id", "userId", "email", "displayName", "role", "createdAt"],
         "type": "object"
       },
       "Provider": {
@@ -1546,9 +1257,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/Provider.json"
-            ],
+            "examples": ["https://example.com/schemas/Provider.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -1580,13 +1289,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "kind",
-          "name",
-          "apiKeyMasked",
-          "createdAt"
-        ],
+        "required": ["id", "kind", "name", "apiKeyMasked", "createdAt"],
         "type": "object"
       },
       "RegisterInputBody": {
@@ -1594,9 +1297,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/RegisterInputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/RegisterInputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -1621,74 +1322,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "email",
-          "password",
-          "displayName"
-        ],
-        "type": "object"
-      },
-      "RemoveActorOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/RemoveActorOutputBody.json"
-            ],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "ok": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "ok"
-        ],
-        "type": "object"
-      },
-      "RemoveConstraintOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/RemoveConstraintOutputBody.json"
-            ],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "ok": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "ok"
-        ],
-        "type": "object"
-      },
-      "RemoveDependencyOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/RemoveDependencyOutputBody.json"
-            ],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "ok": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "ok"
-        ],
+        "required": ["email", "password", "displayName"],
         "type": "object"
       },
       "RemoveMemberOutputBody": {
@@ -1696,9 +1330,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/RemoveMemberOutputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/RemoveMemberOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -1707,9 +1339,75 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "ok"
-        ],
+        "required": ["ok"],
+        "type": "object"
+      },
+      "RemoveProjectMemberBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/RemoveProjectMemberBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
+      "RemoveTaskActorBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/RemoveTaskActorBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
+      "RemoveTaskConstraintBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/RemoveTaskConstraintBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
+      "RemoveTaskDependencyBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/RemoveTaskDependencyBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
         "type": "object"
       },
       "Signal": {
@@ -1717,9 +1415,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/Signal.json"
-            ],
+            "examples": ["https://example.com/schemas/Signal.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -1749,13 +1445,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "source",
-          "kind",
-          "receivedAt",
-          "createdAt"
-        ],
+        "required": ["id", "source", "kind", "receivedAt", "createdAt"],
         "type": "object"
       },
       "SnoozeInputBody": {
@@ -1763,9 +1453,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/SnoozeInputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/SnoozeInputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -1776,9 +1464,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "snoozeUntil"
-        ],
+        "required": ["snoozeUntil"],
         "type": "object"
       },
       "SnoozeOutputBody": {
@@ -1786,9 +1472,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/SnoozeOutputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/SnoozeOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -1797,9 +1481,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "ok"
-        ],
+        "required": ["ok"],
         "type": "object"
       },
       "Task": {
@@ -1807,9 +1489,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/Task.json"
-            ],
+            "examples": ["https://example.com/schemas/Task.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -1896,6 +1576,235 @@
         ],
         "type": "object"
       },
+      "TaskActor": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/TaskActor.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "userId", "email", "displayName", "role", "createdAt"],
+        "type": "object"
+      },
+      "TaskAttachment": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/TaskAttachment.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "byteSize": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "checksumSha256": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "storageKey": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "uploaderDisplayName": {
+            "type": "string"
+          },
+          "uploaderId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "uploaderId",
+          "uploaderDisplayName",
+          "filename",
+          "contentType",
+          "byteSize",
+          "storageKey",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "TaskComment": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/TaskComment.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "authorAvatarUrl": {
+            "type": "string"
+          },
+          "authorDisplayName": {
+            "type": "string"
+          },
+          "authorId": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "editedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": ["id", "authorId", "authorDisplayName", "body", "createdAt"],
+        "type": "object"
+      },
+      "TaskConstraint": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/TaskConstraint.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "expression": {
+            "type": "string"
+          },
+          "failedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "satisfiedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "sortWeight": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": ["id", "kind", "expression", "sortWeight", "createdAt"],
+        "type": "object"
+      },
+      "TaskDependency": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/TaskDependency.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "fromTaskId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "toTaskDerivedState": {
+            "type": "string"
+          },
+          "toTaskId": {
+            "type": "string"
+          },
+          "toTaskTitle": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "fromTaskId",
+          "toTaskId",
+          "toTaskTitle",
+          "toTaskDerivedState",
+          "createdAt"
+        ],
+        "type": "object"
+      },
       "TaskListItem": {
         "additionalProperties": false,
         "properties": {
@@ -1960,26 +1869,17 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/UpdateMemberRoleInputBody.json"
-            ],
+            "examples": ["https://example.com/schemas/UpdateMemberRoleInputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
           },
           "role": {
-            "enum": [
-              "owner",
-              "admin",
-              "member",
-              "guest"
-            ],
+            "enum": ["owner", "admin", "member", "guest"],
             "type": "string"
           }
         },
-        "required": [
-          "role"
-        ],
+        "required": ["role"],
         "type": "object"
       },
       "Workspace": {
@@ -1987,9 +1887,7 @@
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/Workspace.json"
-            ],
+            "examples": ["https://example.com/schemas/Workspace.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -2023,12 +1921,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "slug",
-          "name",
-          "createdAt"
-        ],
+        "required": ["id", "slug", "name", "createdAt"],
         "type": "object"
       },
       "WorkspaceMember": {
@@ -2069,14 +1962,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "userId",
-          "email",
-          "displayName",
-          "role",
-          "createdAt"
-        ],
+        "required": ["id", "userId", "email", "displayName", "role", "createdAt"],
         "type": "object"
       }
     }
@@ -2589,7 +2475,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DisableOutputBody"
+                  "$ref": "#/components/schemas/DisableProjectBody"
                 }
               }
             },
@@ -2660,7 +2546,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PatchInputBody"
+                "$ref": "#/components/schemas/PatchProjectBody"
               }
             }
           },
@@ -2732,7 +2618,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListMembersOutputBody"
+                  "$ref": "#/components/schemas/ListProjectMembersBody"
                 }
               }
             },
@@ -2767,7 +2653,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AddMemberInputBody"
+                "$ref": "#/components/schemas/AddProjectMemberBody"
               }
             }
           },
@@ -2824,7 +2710,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RemoveMemberOutputBody"
+                  "$ref": "#/components/schemas/RemoveProjectMemberBody"
                 }
               }
             },
@@ -2935,7 +2821,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListOutputBody"
+                  "$ref": "#/components/schemas/ListTasksBody"
                 }
               }
             },
@@ -2960,7 +2846,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateInputBody"
+                "$ref": "#/components/schemas/CreateTaskBody"
               }
             }
           },
@@ -3009,7 +2895,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DisableOutputBody"
+                  "$ref": "#/components/schemas/DisableTaskBody"
                 }
               }
             },
@@ -3080,7 +2966,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PatchInputBody"
+                "$ref": "#/components/schemas/PatchTaskBody"
               }
             }
           },
@@ -3128,7 +3014,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AddActorInputBody"
+                "$ref": "#/components/schemas/AddTaskActorBody"
               }
             }
           },
@@ -3139,7 +3025,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Actor"
+                  "$ref": "#/components/schemas/TaskActor"
                 }
               }
             },
@@ -3185,7 +3071,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RemoveActorOutputBody"
+                  "$ref": "#/components/schemas/RemoveTaskActorBody"
                 }
               }
             },
@@ -3246,7 +3132,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListAttachmentsOutputBody"
+                  "$ref": "#/components/schemas/ListTaskAttachmentsBody"
                 }
               }
             },
@@ -3281,7 +3167,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AddAttachmentInputBody"
+                "$ref": "#/components/schemas/AddTaskAttachmentBody"
               }
             }
           },
@@ -3292,7 +3178,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Attachment"
+                  "$ref": "#/components/schemas/TaskAttachment"
                 }
               }
             },
@@ -3338,7 +3224,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DeleteAttachmentOutputBody"
+                  "$ref": "#/components/schemas/DeleteTaskAttachmentBody"
                 }
               }
             },
@@ -3399,7 +3285,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListCommentsOutputBody"
+                  "$ref": "#/components/schemas/ListTaskCommentsBody"
                 }
               }
             },
@@ -3434,7 +3320,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AddCommentInputBody"
+                "$ref": "#/components/schemas/AddTaskCommentBody"
               }
             }
           },
@@ -3445,7 +3331,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Comment"
+                  "$ref": "#/components/schemas/TaskComment"
                 }
               }
             },
@@ -3491,7 +3377,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DeleteCommentOutputBody"
+                  "$ref": "#/components/schemas/DeleteTaskCommentBody"
                 }
               }
             },
@@ -3534,7 +3420,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/EditCommentInputBody"
+                "$ref": "#/components/schemas/EditTaskCommentBody"
               }
             }
           },
@@ -3545,7 +3431,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Comment"
+                  "$ref": "#/components/schemas/TaskComment"
                 }
               }
             },
@@ -3582,7 +3468,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AddConstraintInputBody"
+                "$ref": "#/components/schemas/AddTaskConstraintBody"
               }
             }
           },
@@ -3593,7 +3479,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Constraint"
+                  "$ref": "#/components/schemas/TaskConstraint"
                 }
               }
             },
@@ -3639,7 +3525,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RemoveConstraintOutputBody"
+                  "$ref": "#/components/schemas/RemoveTaskConstraintBody"
                 }
               }
             },
@@ -3676,7 +3562,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AddDependencyInputBody"
+                "$ref": "#/components/schemas/AddTaskDependencyBody"
               }
             }
           },
@@ -3687,7 +3573,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Dependency"
+                  "$ref": "#/components/schemas/TaskDependency"
                 }
               }
             },
@@ -3733,7 +3619,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RemoveDependencyOutputBody"
+                  "$ref": "#/components/schemas/RemoveTaskDependencyBody"
                 }
               }
             },
@@ -4631,7 +4517,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListOutputBody"
+                  "$ref": "#/components/schemas/ListProjectsBody"
                 }
               }
             },
@@ -4666,7 +4552,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateInputBody"
+                "$ref": "#/components/schemas/CreateProjectBody"
               }
             }
           },

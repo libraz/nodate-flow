@@ -14,8 +14,8 @@ import (
 
 // AddAttachment handles POST /tasks/{id}/attachments. Phase 1 stores
 // metadata only; the actual upload happens out-of-band.
-func AddAttachment(deps Deps) func(context.Context, *AddAttachmentInput) (*AddAttachmentOutput, error) {
-	return func(ctx context.Context, in *AddAttachmentInput) (*AddAttachmentOutput, error) {
+func AddAttachment(deps Deps) func(context.Context, *AddTaskAttachmentInput) (*AddTaskAttachmentOutput, error) {
+	return func(ctx context.Context, in *AddTaskAttachmentInput) (*AddTaskAttachmentOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
@@ -54,7 +54,7 @@ func AddAttachment(deps Deps) func(context.Context, *AddAttachmentInput) (*AddAt
 				"filename":     in.Body.Filename,
 			},
 		})
-		return &AddAttachmentOutput{Body: Attachment{
+		return &AddTaskAttachmentOutput{Body: TaskAttachment{
 			ID:          pub.String(),
 			Filename:    in.Body.Filename,
 			ContentType: in.Body.ContentType,
@@ -66,8 +66,8 @@ func AddAttachment(deps Deps) func(context.Context, *AddAttachmentInput) (*AddAt
 }
 
 // ListAttachments handles GET /tasks/{id}/attachments.
-func ListAttachments(deps Deps) func(context.Context, *ListAttachmentsInput) (*ListAttachmentsOutput, error) {
-	return func(ctx context.Context, in *ListAttachmentsInput) (*ListAttachmentsOutput, error) {
+func ListAttachments(deps Deps) func(context.Context, *ListTaskAttachmentsInput) (*ListTaskAttachmentsOutput, error) {
+	return func(ctx context.Context, in *ListTaskAttachmentsInput) (*ListTaskAttachmentsOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
@@ -89,8 +89,8 @@ func ListAttachments(deps Deps) func(context.Context, *ListAttachmentsInput) (*L
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		out := &ListAttachmentsOutput{}
-		out.Body.Attachments = make([]Attachment, 0, len(rows))
+		out := &ListTaskAttachmentsOutput{}
+		out.Body.Attachments = make([]TaskAttachment, 0, len(rows))
 		for _, r := range rows {
 			out.Body.Attachments = append(out.Body.Attachments, rowToAttachment(r))
 		}
@@ -102,8 +102,8 @@ func ListAttachments(deps Deps) func(context.Context, *ListAttachmentsInput) (*L
 }
 
 // DeleteAttachment handles DELETE /tasks/{id}/attachments/{aid}.
-func DeleteAttachment(deps Deps) func(context.Context, *DeleteAttachmentInput) (*DeleteAttachmentOutput, error) {
-	return func(ctx context.Context, in *DeleteAttachmentInput) (*DeleteAttachmentOutput, error) {
+func DeleteAttachment(deps Deps) func(context.Context, *DeleteTaskAttachmentInput) (*DeleteTaskAttachmentOutput, error) {
+	return func(ctx context.Context, in *DeleteTaskAttachmentInput) (*DeleteTaskAttachmentOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
@@ -133,7 +133,7 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteAttachmentInput) (
 				"attachmentId": aid.String(),
 			},
 		})
-		out := &DeleteAttachmentOutput{}
+		out := &DeleteTaskAttachmentOutput{}
 		out.Body.Ok = true
 		return out, nil
 	}

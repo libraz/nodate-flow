@@ -10,8 +10,8 @@ import (
 )
 
 // Disable handles DELETE /projects/{prjId}.
-func Disable(deps Deps) func(context.Context, *DisableInput) (*DisableOutput, error) {
-	return func(ctx context.Context, in *DisableInput) (*DisableOutput, error) {
+func Disable(deps Deps) func(context.Context, *DisableProjectInput) (*DisableProjectOutput, error) {
+	return func(ctx context.Context, in *DisableProjectInput) (*DisableProjectOutput, error) {
 		prj, ok := middleware.ProjectFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsProjectNotFound)
@@ -26,7 +26,7 @@ func Disable(deps Deps) func(context.Context, *DisableInput) (*DisableOutput, er
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		out := &DisableOutput{}
+		out := &DisableProjectOutput{}
 		out.Body.Ok = true
 		return out, nil
 	}

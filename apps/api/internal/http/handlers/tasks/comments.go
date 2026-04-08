@@ -14,8 +14,8 @@ import (
 )
 
 // AddComment handles POST /tasks/{id}/comments.
-func AddComment(deps Deps) func(context.Context, *AddCommentInput) (*AddCommentOutput, error) {
-	return func(ctx context.Context, in *AddCommentInput) (*AddCommentOutput, error) {
+func AddComment(deps Deps) func(context.Context, *AddTaskCommentInput) (*AddTaskCommentOutput, error) {
+	return func(ctx context.Context, in *AddTaskCommentInput) (*AddTaskCommentOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
@@ -49,7 +49,7 @@ func AddComment(deps Deps) func(context.Context, *AddCommentInput) (*AddCommentO
 				"commentId": pub.String(),
 			},
 		})
-		return &AddCommentOutput{Body: Comment{
+		return &AddTaskCommentOutput{Body: TaskComment{
 			ID:        pub.String(),
 			Body:      in.Body.Body,
 			CreatedAt: time.Now(),
@@ -58,8 +58,8 @@ func AddComment(deps Deps) func(context.Context, *AddCommentInput) (*AddCommentO
 }
 
 // ListComments handles GET /tasks/{id}/comments.
-func ListComments(deps Deps) func(context.Context, *ListCommentsInput) (*ListCommentsOutput, error) {
-	return func(ctx context.Context, in *ListCommentsInput) (*ListCommentsOutput, error) {
+func ListComments(deps Deps) func(context.Context, *ListTaskCommentsInput) (*ListTaskCommentsOutput, error) {
+	return func(ctx context.Context, in *ListTaskCommentsInput) (*ListTaskCommentsOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
@@ -81,8 +81,8 @@ func ListComments(deps Deps) func(context.Context, *ListCommentsInput) (*ListCom
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		out := &ListCommentsOutput{}
-		out.Body.Comments = make([]Comment, 0, len(rows))
+		out := &ListTaskCommentsOutput{}
+		out.Body.Comments = make([]TaskComment, 0, len(rows))
 		for _, r := range rows {
 			out.Body.Comments = append(out.Body.Comments, rowToComment(r))
 		}
@@ -104,8 +104,8 @@ WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE LIMIT 1`
 }
 
 // EditComment handles PATCH /tasks/{id}/comments/{cid}. Author only.
-func EditComment(deps Deps) func(context.Context, *EditCommentInput) (*EditCommentOutput, error) {
-	return func(ctx context.Context, in *EditCommentInput) (*EditCommentOutput, error) {
+func EditComment(deps Deps) func(context.Context, *EditTaskCommentInput) (*EditTaskCommentOutput, error) {
+	return func(ctx context.Context, in *EditTaskCommentInput) (*EditTaskCommentOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
@@ -151,7 +151,7 @@ func EditComment(deps Deps) func(context.Context, *EditCommentInput) (*EditComme
 				"commentId": cid.String(),
 			},
 		})
-		return &EditCommentOutput{Body: Comment{
+		return &EditTaskCommentOutput{Body: TaskComment{
 			ID:       cid.String(),
 			Body:     in.Body.Body,
 			EditedAt: time.Now(),
@@ -161,8 +161,8 @@ func EditComment(deps Deps) func(context.Context, *EditCommentInput) (*EditComme
 
 // DeleteComment handles DELETE /tasks/{id}/comments/{cid}.
 // Allowed for the comment author or any workspace admin/owner.
-func DeleteComment(deps Deps) func(context.Context, *DeleteCommentInput) (*DeleteCommentOutput, error) {
-	return func(ctx context.Context, in *DeleteCommentInput) (*DeleteCommentOutput, error) {
+func DeleteComment(deps Deps) func(context.Context, *DeleteTaskCommentInput) (*DeleteTaskCommentOutput, error) {
+	return func(ctx context.Context, in *DeleteTaskCommentInput) (*DeleteTaskCommentOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
@@ -206,7 +206,7 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteCommentInput) (*Delet
 				"commentId": cid.String(),
 			},
 		})
-		out := &DeleteCommentOutput{}
+		out := &DeleteTaskCommentOutput{}
 		out.Body.Ok = true
 		return out, nil
 	}

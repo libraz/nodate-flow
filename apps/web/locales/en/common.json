@@ -52,6 +52,189 @@
   "a11y": {
     "skipToContent": "Skip to content"
   },
+  "workspaces": {
+    "title": "Workspaces",
+    "new": "New workspace",
+    "empty": "No workspaces yet. Create your first one to get started.",
+    "columns": {
+      "name": "Name",
+      "slug": "Slug",
+      "members": "Members",
+      "created": "Created",
+      "actions": "Actions"
+    },
+    "form": {
+      "name": "Name",
+      "slug": "Slug",
+      "description": "Description",
+      "submit": "Save",
+      "cancel": "Cancel"
+    },
+    "detail": {
+      "tabs": {
+        "overview": "Overview",
+        "members": "Members",
+        "settings": "Settings"
+      }
+    },
+    "members": {
+      "title": "Members",
+      "add": "Add member",
+      "email": "Email",
+      "role": "Role",
+      "added_at": "Added"
+    },
+    "roles": {
+      "owner": "Owner",
+      "admin": "Admin",
+      "member": "Member",
+      "guest": "Guest"
+    },
+    "settings": {
+      "rename": "Rename",
+      "disable": "Disable workspace",
+      "disable_confirm": "Are you sure you want to disable this workspace? This cannot be undone from the UI."
+    },
+    "validation": {
+      "name_required": "Name is required.",
+      "slug_required": "Slug is required.",
+      "slug_format": "Slug may only contain lowercase letters, numbers, and hyphens.",
+      "email_required": "Email is required.",
+      "email_invalid": "Enter a valid email address."
+    },
+    "errors": {
+      "create_failed": "Could not create the workspace. Please try again.",
+      "update_failed": "Could not update the workspace. Please try again.",
+      "disable_failed": "Could not disable the workspace. Please try again.",
+      "add_member_failed": "Could not add the member. Please try again."
+    }
+  },
+  "projects": {
+    "title": "Projects",
+    "new": "New project",
+    "empty": "No projects yet. Create your first one to get started.",
+    "columns": {
+      "name": "Name",
+      "key": "Key",
+      "visibility": "Status",
+      "created": "Created",
+      "actions": "Actions"
+    },
+    "status": {
+      "active": "Active",
+      "archived": "Archived"
+    },
+    "form": {
+      "name": "Name",
+      "key": "Key",
+      "description": "Description",
+      "visibility": "Visibility",
+      "submit": "Save",
+      "cancel": "Cancel"
+    },
+    "visibility": {
+      "private": "Private",
+      "workspace": "Workspace",
+      "public": "Public"
+    },
+    "detail": {
+      "tabs": {
+        "overview": "Overview",
+        "members": "Members",
+        "settings": "Settings"
+      }
+    },
+    "members": {
+      "title": "Members",
+      "add": "Add member",
+      "email": "Email",
+      "user_id": "User ID",
+      "role": "Role",
+      "added_at": "Added"
+    },
+    "roles": {
+      "lead": "Lead",
+      "editor": "Editor",
+      "commenter": "Commenter",
+      "viewer": "Viewer"
+    },
+    "settings": {
+      "rename": "Rename",
+      "disable": "Disable project",
+      "disable_confirm": "Are you sure you want to disable this project? This cannot be undone from the UI."
+    },
+    "validation": {
+      "name_required": "Name is required.",
+      "slug_required": "Key is required.",
+      "slug_format": "Key may only contain lowercase letters, numbers, and hyphens.",
+      "user_id_required": "User ID is required."
+    },
+    "errors": {
+      "create_failed": "Could not create the project. Please try again.",
+      "update_failed": "Could not update the project. Please try again.",
+      "disable_failed": "Could not disable the project. Please try again.",
+      "add_member_failed": "Could not add the member. Please try again."
+    }
+  },
+  "tasks": {
+    "title": "Tasks",
+    "new": "New task",
+    "empty": "No tasks yet. Create your first one to get started.",
+    "views": {
+      "board": "Board",
+      "list": "List"
+    },
+    "columns": {
+      "title": "Title",
+      "status": "Status",
+      "assignee": "Assignee",
+      "due": "Due",
+      "priority": "Priority",
+      "updated": "Updated"
+    },
+    "form": {
+      "title": "Title",
+      "description": "Description",
+      "priority": "Priority",
+      "assignee": "Assignee",
+      "due": "Due date",
+      "submit": "Create",
+      "cancel": "Cancel"
+    },
+    "status": {
+      "open": "Open",
+      "waiting": "Waiting",
+      "review": "Review",
+      "done": "Done",
+      "cancelled": "Cancelled"
+    },
+    "priority": {
+      "none": "None",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "urgent": "Urgent"
+    },
+    "filters": {
+      "search_placeholder": "Search tasks…",
+      "status": "Status",
+      "assignee": "Assignee ID"
+    },
+    "validation": {
+      "title_required": "Title is required.",
+      "due_format": "Due date must be YYYY-MM-DD."
+    },
+    "errors": {
+      "create_failed": "Could not create the task. Please try again.",
+      "update_failed": "Could not update the task. Please try again.",
+      "delete_failed": "Could not delete the task. Please try again.",
+      "move_failed": "Task transitions are not yet enabled."
+    },
+    "board": {
+      "empty_column": "No tasks",
+      "drop_hint": "Drop here to move"
+    }
+  },
   "auth": {
     "login": {
       "title": "Sign in",

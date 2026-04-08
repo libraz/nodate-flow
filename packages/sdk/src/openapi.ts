@@ -672,86 +672,10 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        Actor: {
+        AddProjectMemberBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/Actor.json
-             */
-            readonly $schema?: string;
-            avatarUrl?: string;
-            /** Format: date-time */
-            createdAt: string;
-            displayName: string;
-            email: string;
-            id: string;
-            role: string;
-            /** Format: date-time */
-            updatedAt?: string;
-            userId: string;
-        };
-        AddActorInputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/AddActorInputBody.json
-             */
-            readonly $schema?: string;
-            /** @enum {string} */
-            role: "assignee" | "reviewer" | "watcher" | "approver";
-            /** @description User public id (UUID v7) */
-            userId: string;
-        };
-        AddAttachmentInputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/AddAttachmentInputBody.json
-             */
-            readonly $schema?: string;
-            /** Format: int64 */
-            byteSize: number;
-            contentType: string;
-            filename: string;
-            storageKey: string;
-        };
-        AddCommentInputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/AddCommentInputBody.json
-             */
-            readonly $schema?: string;
-            body: string;
-        };
-        AddConstraintInputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/AddConstraintInputBody.json
-             */
-            readonly $schema?: string;
-            expression: string;
-            /** @enum {string} */
-            kind: "deadline" | "dependency" | "approval" | "signal" | "custom";
-        };
-        AddDependencyInputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/AddDependencyInputBody.json
-             */
-            readonly $schema?: string;
-            /** @enum {string} */
-            kind: "blocks" | "relates" | "duplicates" | "subtask_of";
-            /** @description Target task public id (UUID v7) */
-            toTaskId: string;
-        };
-        AddMemberInputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/AddMemberInputBody.json
              */
             readonly $schema?: string;
             /** @enum {string} */
@@ -759,41 +683,70 @@ export interface components {
             /** @description User public id (UUID v7) */
             userId: string;
         };
-        ArchiveOutputBody: {
+        AddTaskActorBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ArchiveOutputBody.json
              */
             readonly $schema?: string;
-            ok: boolean;
+            /** @enum {string} */
+            role: "assignee" | "reviewer" | "watcher" | "approver";
+            /** @description User public id (UUID v7) */
+            userId: string;
         };
-        Attachment: {
+        AddTaskAttachmentBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/Attachment.json
              */
             readonly $schema?: string;
             /** Format: int64 */
             byteSize: number;
-            checksumSha256?: string;
             contentType: string;
-            /** Format: date-time */
-            createdAt: string;
             filename: string;
-            id: string;
             storageKey: string;
-            /** Format: date-time */
-            updatedAt?: string;
-            uploaderDisplayName: string;
-            uploaderId: string;
+        };
+        AddTaskCommentBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            body: string;
+        };
+        AddTaskConstraintBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            expression: string;
+            /** @enum {string} */
+            kind: "deadline" | "dependency" | "approval" | "signal" | "custom";
+        };
+        AddTaskDependencyBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @enum {string} */
+            kind: "blocks" | "relates" | "duplicates" | "subtask_of";
+            /** @description Target task public id (UUID v7) */
+            toTaskId: string;
+        };
+        ArchiveOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
         };
         AuthTokens: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/AuthTokens.json
              */
             readonly $schema?: string;
             accessToken: string;
@@ -805,51 +758,10 @@ export interface components {
             /** @description User public id (UUID v7) */
             userId: string;
         };
-        Comment: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/Comment.json
-             */
-            readonly $schema?: string;
-            authorAvatarUrl?: string;
-            authorDisplayName: string;
-            authorId: string;
-            body: string;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            editedAt?: string;
-            id: string;
-            /** Format: date-time */
-            updatedAt?: string;
-        };
-        Constraint: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/Constraint.json
-             */
-            readonly $schema?: string;
-            /** Format: date-time */
-            createdAt: string;
-            expression: string;
-            /** Format: date-time */
-            failedAt?: string;
-            id: string;
-            kind: string;
-            /** Format: date-time */
-            satisfiedAt?: string;
-            /** Format: int32 */
-            sortWeight: number;
-            /** Format: date-time */
-            updatedAt?: string;
-        };
         CreateInputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/CreateInputBody.json
              */
             readonly $schema?: string;
             description?: string;
@@ -861,7 +773,6 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/CreateMcpTokenInputBody.json
              */
             readonly $schema?: string;
             name: string;
@@ -871,7 +782,6 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/CreateMcpTokenOutputBody.json
              */
             readonly $schema?: string;
             /** Format: date-time */
@@ -883,11 +793,21 @@ export interface components {
             token: string;
             tokenPrefix: string;
         };
+        CreateProjectBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            color?: string;
+            description?: string;
+            name: string;
+            slug: string;
+        };
         CreateProviderInputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/CreateProviderInputBody.json
              */
             readonly $schema?: string;
             /** @description Plaintext provider API key (write-only) */
@@ -898,29 +818,27 @@ export interface components {
             kind: "anthropic" | "openai" | "google" | "ollama" | "openai_compat";
             name: string;
         };
-        DeleteAttachmentOutputBody: {
+        CreateTaskBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/DeleteAttachmentOutputBody.json
              */
             readonly $schema?: string;
-            ok: boolean;
-        };
-        DeleteCommentOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/DeleteCommentOutputBody.json
-             */
-            readonly $schema?: string;
-            ok: boolean;
+            description?: string;
+            /** @description YYYY-MM-DD */
+            dueOn?: string;
+            /** Format: int32 */
+            priority?: number;
+            /** @description Project public id (UUID v7) */
+            projectId: string;
+            /** @description YYYY-MM-DD */
+            startOn?: string;
+            title: string;
         };
         DeleteMcpTokenOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/DeleteMcpTokenOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -929,43 +847,54 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/DeleteProviderOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
         };
-        Dependency: {
+        DeleteTaskAttachmentBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/Dependency.json
              */
             readonly $schema?: string;
-            /** Format: date-time */
-            createdAt: string;
-            fromTaskId: string;
-            id: string;
-            kind: string;
-            toTaskDerivedState: string;
-            toTaskId: string;
-            toTaskTitle: string;
-            /** Format: date-time */
-            updatedAt?: string;
+            ok: boolean;
+        };
+        DeleteTaskCommentBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
         };
         DisableOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/DisableOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
         };
-        EditCommentInputBody: {
+        DisableProjectBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/EditCommentInputBody.json
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        DisableTaskBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        EditTaskCommentBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
             body: string;
@@ -982,38 +911,28 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ErrorModel.json
              */
             readonly $schema?: string;
-            /**
-             * @description A human-readable explanation specific to this occurrence of the problem.
-             * @example Property foo is required but is missing.
-             */
+            /** @description A human-readable explanation specific to this occurrence of the problem. */
             detail?: string;
             /** @description Optional list of individual error details */
             errors?: components["schemas"]["ErrorDetail"][] | null;
             /**
              * Format: uri
              * @description A URI reference that identifies the specific occurrence of the problem.
-             * @example https://example.com/error-log/abc123
              */
             instance?: string;
             /**
              * Format: int64
              * @description HTTP status code
-             * @example 400
              */
             status?: number;
-            /**
-             * @description A short, human-readable summary of the problem type. This value should not change between occurrences of the error.
-             * @example Bad Request
-             */
+            /** @description A short, human-readable summary of the problem type. This value should not change between occurrences of the error. */
             title?: string;
             /**
              * Format: uri
              * @description A URI reference to human-readable documentation for the error.
              * @default about:blank
-             * @example https://example.com/errors/example
              */
             type: string;
         };
@@ -1031,7 +950,6 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/HealthOutputBody.json
              */
             readonly $schema?: string;
             status: string;
@@ -1040,7 +958,6 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/InviteMemberInputBody.json
              */
             readonly $schema?: string;
             /** Format: email */
@@ -1061,35 +978,10 @@ export interface components {
             taskId?: string;
             taskTitle?: string;
         };
-        ListAttachmentsOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListAttachmentsOutputBody.json
-             */
-            readonly $schema?: string;
-            attachments: components["schemas"]["Attachment"][] | null;
-            nextCursor: string | null;
-            /** Format: int64 */
-            total: number;
-        };
-        ListCommentsOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListCommentsOutputBody.json
-             */
-            readonly $schema?: string;
-            comments: components["schemas"]["Comment"][] | null;
-            nextCursor: string | null;
-            /** Format: int64 */
-            total: number;
-        };
         ListMcpTokensOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListMcpTokensOutputBody.json
              */
             readonly $schema?: string;
             tokens: components["schemas"]["McpTokenSummary"][] | null;
@@ -1100,7 +992,6 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListMembersOutputBody.json
              */
             readonly $schema?: string;
             members: components["schemas"]["WorkspaceMember"][] | null;
@@ -1112,7 +1003,6 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListOutputBody.json
              */
             readonly $schema?: string;
             nextCursor: string | null;
@@ -1120,14 +1010,68 @@ export interface components {
             total: number;
             workspaces: components["schemas"]["Workspace"][] | null;
         };
+        ListProjectMembersBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            members: components["schemas"]["ProjectMember"][] | null;
+            nextCursor: string | null;
+            /** Format: int64 */
+            total: number;
+        };
+        ListProjectsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            nextCursor: string | null;
+            projects: components["schemas"]["Project"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
         ListProvidersOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListProvidersOutputBody.json
              */
             readonly $schema?: string;
             providers: components["schemas"]["Provider"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
+        ListTaskAttachmentsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            attachments: components["schemas"]["TaskAttachment"][] | null;
+            nextCursor: string | null;
+            /** Format: int64 */
+            total: number;
+        };
+        ListTaskCommentsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            comments: components["schemas"]["TaskComment"][] | null;
+            nextCursor: string | null;
+            /** Format: int64 */
+            total: number;
+        };
+        ListTasksBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            nextCursor: string | null;
+            tasks: components["schemas"]["TaskListItem"][] | null;
             /** Format: int64 */
             total: number;
         };
@@ -1135,7 +1079,6 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/LoginInputBody.json
              */
             readonly $schema?: string;
             /** Format: email */
@@ -1146,7 +1089,6 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/LogoutOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -1165,7 +1107,6 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/MeOutputBody.json
              */
             readonly $schema?: string;
             displayName: string;
@@ -1177,7 +1118,6 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/OIDCStartOutputBody.json
              */
             readonly $schema?: string;
             authorizationUrl: string;
@@ -1188,9 +1128,18 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/PatchInputBody.json
              */
             readonly $schema?: string;
+            name?: string;
+            slug?: string;
+        };
+        PatchProjectBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            description?: string;
             name?: string;
             slug?: string;
         };
@@ -1198,7 +1147,6 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/PatchProviderInputBody.json
              */
             readonly $schema?: string;
             /** @description New plaintext provider API key (write-only) */
@@ -1208,10 +1156,24 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/PatchProviderOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
+        };
+        PatchTaskBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            description?: string;
+            /** @description YYYY-MM-DD or empty string to clear */
+            dueOn?: string;
+            /** Format: int32 */
+            priority?: number;
+            /** @description YYYY-MM-DD or empty string to clear */
+            startOn?: string;
+            title?: string;
         };
         Project: {
             color?: string;
@@ -1233,7 +1195,6 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ProjectMember.json
              */
             readonly $schema?: string;
             /** Format: date-time */
@@ -1251,7 +1212,6 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/Provider.json
              */
             readonly $schema?: string;
             apiKeyMasked: string;
@@ -1269,7 +1229,6 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/RegisterInputBody.json
              */
             readonly $schema?: string;
             displayName: string;
@@ -1278,38 +1237,42 @@ export interface components {
             locale?: string;
             password: string;
         };
-        RemoveActorOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/RemoveActorOutputBody.json
-             */
-            readonly $schema?: string;
-            ok: boolean;
-        };
-        RemoveConstraintOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/RemoveConstraintOutputBody.json
-             */
-            readonly $schema?: string;
-            ok: boolean;
-        };
-        RemoveDependencyOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/RemoveDependencyOutputBody.json
-             */
-            readonly $schema?: string;
-            ok: boolean;
-        };
         RemoveMemberOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/RemoveMemberOutputBody.json
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        RemoveProjectMemberBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        RemoveTaskActorBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        RemoveTaskConstraintBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        RemoveTaskDependencyBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
             ok: boolean;
@@ -1318,7 +1281,6 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/Signal.json
              */
             readonly $schema?: string;
             /** Format: date-time */
@@ -1336,7 +1298,6 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/SnoozeInputBody.json
              */
             readonly $schema?: string;
             /**
@@ -1349,7 +1310,6 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/SnoozeOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -1358,7 +1318,6 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/Task.json
              */
             readonly $schema?: string;
             /** Format: int64 */
@@ -1390,6 +1349,98 @@ export interface components {
             /** Format: date-time */
             updatedAt?: string;
         };
+        TaskActor: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            avatarUrl?: string;
+            /** Format: date-time */
+            createdAt: string;
+            displayName: string;
+            email: string;
+            id: string;
+            role: string;
+            /** Format: date-time */
+            updatedAt?: string;
+            userId: string;
+        };
+        TaskAttachment: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            byteSize: number;
+            checksumSha256?: string;
+            contentType: string;
+            /** Format: date-time */
+            createdAt: string;
+            filename: string;
+            id: string;
+            storageKey: string;
+            /** Format: date-time */
+            updatedAt?: string;
+            uploaderDisplayName: string;
+            uploaderId: string;
+        };
+        TaskComment: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            authorAvatarUrl?: string;
+            authorDisplayName: string;
+            authorId: string;
+            body: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            editedAt?: string;
+            id: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        TaskConstraint: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: date-time */
+            createdAt: string;
+            expression: string;
+            /** Format: date-time */
+            failedAt?: string;
+            id: string;
+            kind: string;
+            /** Format: date-time */
+            satisfiedAt?: string;
+            /** Format: int32 */
+            sortWeight: number;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        TaskDependency: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: date-time */
+            createdAt: string;
+            fromTaskId: string;
+            id: string;
+            kind: string;
+            toTaskDerivedState: string;
+            toTaskId: string;
+            toTaskTitle: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
         TaskListItem: {
             /** Format: date-time */
             completedAt?: string;
@@ -1414,7 +1465,6 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/UpdateMemberRoleInputBody.json
              */
             readonly $schema?: string;
             /** @enum {string} */
@@ -1424,7 +1474,6 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/Workspace.json
              */
             readonly $schema?: string;
             /** Format: date-time */
@@ -1871,7 +1920,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DisableOutputBody"];
+                    "application/json": components["schemas"]["DisableProjectBody"];
                 };
             };
             /** @description Error */
@@ -1896,7 +1945,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PatchInputBody"];
+                "application/json": components["schemas"]["PatchProjectBody"];
             };
         };
         responses: {
@@ -1940,7 +1989,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListMembersOutputBody"];
+                    "application/json": components["schemas"]["ListProjectMembersBody"];
                 };
             };
             /** @description Error */
@@ -1965,7 +2014,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AddMemberInputBody"];
+                "application/json": components["schemas"]["AddProjectMemberBody"];
             };
         };
         responses: {
@@ -2007,7 +2056,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RemoveMemberOutputBody"];
+                    "application/json": components["schemas"]["RemoveProjectMemberBody"];
                 };
             };
             /** @description Error */
@@ -2076,7 +2125,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListOutputBody"];
+                    "application/json": components["schemas"]["ListTasksBody"];
                 };
             };
             /** @description Error */
@@ -2099,7 +2148,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateInputBody"];
+                "application/json": components["schemas"]["CreateTaskBody"];
             };
         };
         responses: {
@@ -2171,7 +2220,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DisableOutputBody"];
+                    "application/json": components["schemas"]["DisableTaskBody"];
                 };
             };
             /** @description Error */
@@ -2196,7 +2245,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PatchInputBody"];
+                "application/json": components["schemas"]["PatchTaskBody"];
             };
         };
         responses: {
@@ -2231,7 +2280,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AddActorInputBody"];
+                "application/json": components["schemas"]["AddTaskActorBody"];
             };
         };
         responses: {
@@ -2241,7 +2290,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Actor"];
+                    "application/json": components["schemas"]["TaskActor"];
                 };
             };
             /** @description Error */
@@ -2273,7 +2322,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RemoveActorOutputBody"];
+                    "application/json": components["schemas"]["RemoveTaskActorBody"];
                 };
             };
             /** @description Error */
@@ -2307,7 +2356,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListAttachmentsOutputBody"];
+                    "application/json": components["schemas"]["ListTaskAttachmentsBody"];
                 };
             };
             /** @description Error */
@@ -2332,7 +2381,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AddAttachmentInputBody"];
+                "application/json": components["schemas"]["AddTaskAttachmentBody"];
             };
         };
         responses: {
@@ -2342,7 +2391,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Attachment"];
+                    "application/json": components["schemas"]["TaskAttachment"];
                 };
             };
             /** @description Error */
@@ -2374,7 +2423,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DeleteAttachmentOutputBody"];
+                    "application/json": components["schemas"]["DeleteTaskAttachmentBody"];
                 };
             };
             /** @description Error */
@@ -2408,7 +2457,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListCommentsOutputBody"];
+                    "application/json": components["schemas"]["ListTaskCommentsBody"];
                 };
             };
             /** @description Error */
@@ -2433,7 +2482,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AddCommentInputBody"];
+                "application/json": components["schemas"]["AddTaskCommentBody"];
             };
         };
         responses: {
@@ -2443,7 +2492,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Comment"];
+                    "application/json": components["schemas"]["TaskComment"];
                 };
             };
             /** @description Error */
@@ -2475,7 +2524,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DeleteCommentOutputBody"];
+                    "application/json": components["schemas"]["DeleteTaskCommentBody"];
                 };
             };
             /** @description Error */
@@ -2501,7 +2550,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["EditCommentInputBody"];
+                "application/json": components["schemas"]["EditTaskCommentBody"];
             };
         };
         responses: {
@@ -2511,7 +2560,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Comment"];
+                    "application/json": components["schemas"]["TaskComment"];
                 };
             };
             /** @description Error */
@@ -2536,7 +2585,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AddConstraintInputBody"];
+                "application/json": components["schemas"]["AddTaskConstraintBody"];
             };
         };
         responses: {
@@ -2546,7 +2595,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Constraint"];
+                    "application/json": components["schemas"]["TaskConstraint"];
                 };
             };
             /** @description Error */
@@ -2578,7 +2627,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RemoveConstraintOutputBody"];
+                    "application/json": components["schemas"]["RemoveTaskConstraintBody"];
                 };
             };
             /** @description Error */
@@ -2603,7 +2652,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AddDependencyInputBody"];
+                "application/json": components["schemas"]["AddTaskDependencyBody"];
             };
         };
         responses: {
@@ -2613,7 +2662,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Dependency"];
+                    "application/json": components["schemas"]["TaskDependency"];
                 };
             };
             /** @description Error */
@@ -2645,7 +2694,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RemoveDependencyOutputBody"];
+                    "application/json": components["schemas"]["RemoveTaskDependencyBody"];
                 };
             };
             /** @description Error */
@@ -3250,7 +3299,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListOutputBody"];
+                    "application/json": components["schemas"]["ListProjectsBody"];
                 };
             };
             /** @description Error */
@@ -3275,7 +3324,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateInputBody"];
+                "application/json": components["schemas"]["CreateProjectBody"];
             };
         };
         responses: {

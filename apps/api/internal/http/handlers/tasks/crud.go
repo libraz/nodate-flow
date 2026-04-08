@@ -35,8 +35,8 @@ func actorPtr(ctx context.Context) *int64 {
 
 // Create handles POST /tasks. The acting workspace and project are
 // resolved from the projectId in the body via FindProjectByPublicIdGlobal.
-func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error) {
-	return func(ctx context.Context, in *CreateInput) (*CreateOutput, error) {
+func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutput, error) {
+	return func(ctx context.Context, in *CreateTaskInput) (*CreateTaskOutput, error) {
 		actorID, ok := middleware.ActorFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskAccessDenied)
@@ -109,14 +109,14 @@ WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		return &CreateOutput{Body: rowToTaskFromFind(row)}, nil
+		return &CreateTaskOutput{Body: rowToTaskFromFind(row)}, nil
 	}
 }
 
 // List handles GET /tasks. When projectId is provided the list is scoped
 // to that project; otherwise workspaceId must be provided.
-func List(deps Deps) func(context.Context, *ListInput) (*ListOutput, error) {
-	return func(ctx context.Context, in *ListInput) (*ListOutput, error) {
+func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, error) {
+	return func(ctx context.Context, in *ListTasksInput) (*ListTasksOutput, error) {
 		actorID, ok := middleware.ActorFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskAccessDenied)
@@ -125,7 +125,7 @@ func List(deps Deps) func(context.Context, *ListInput) (*ListOutput, error) {
 		if limit <= 0 {
 			limit = 50
 		}
-		out := &ListOutput{}
+		out := &ListTasksOutput{}
 		out.Body.Tasks = []TaskListItem{}
 
 		const wsMemQuery = `SELECT 1 FROM workspace_members
@@ -210,8 +210,8 @@ WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 }
 
 // Get handles GET /tasks/{id}.
-func Get(deps Deps) func(context.Context, *GetInput) (*GetOutput, error) {
-	return func(ctx context.Context, in *GetInput) (*GetOutput, error) {
+func Get(deps Deps) func(context.Context, *GetTaskInput) (*GetTaskOutput, error) {
+	return func(ctx context.Context, in *GetTaskInput) (*GetTaskOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
@@ -230,14 +230,14 @@ func Get(deps Deps) func(context.Context, *GetInput) (*GetOutput, error) {
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		return &GetOutput{Body: rowToTaskFromFind(row)}, nil
+		return &GetTaskOutput{Body: rowToTaskFromFind(row)}, nil
 	}
 }
 
 // Patch handles PATCH /tasks/{id}. derived_state is intentionally not
 // writable here; the constraint engine and event bus mutate it.
-func Patch(deps Deps) func(context.Context, *PatchInput) (*PatchOutput, error) {
-	return func(ctx context.Context, in *PatchInput) (*PatchOutput, error) {
+func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, error) {
+	return func(ctx context.Context, in *PatchTaskInput) (*PatchTaskOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
@@ -315,13 +315,13 @@ func Patch(deps Deps) func(context.Context, *PatchInput) (*PatchOutput, error) {
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		return &PatchOutput{Body: rowToTaskFromFind(row)}, nil
+		return &PatchTaskOutput{Body: rowToTaskFromFind(row)}, nil
 	}
 }
 
 // Disable handles DELETE /tasks/{id}.
-func Disable(deps Deps) func(context.Context, *DisableInput) (*DisableOutput, error) {
-	return func(ctx context.Context, in *DisableInput) (*DisableOutput, error) {
+func Disable(deps Deps) func(context.Context, *DisableTaskInput) (*DisableTaskOutput, error) {
+	return func(ctx context.Context, in *DisableTaskInput) (*DisableTaskOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
@@ -346,7 +346,7 @@ func Disable(deps Deps) func(context.Context, *DisableInput) (*DisableOutput, er
 				"taskId": task.PublicID.String(),
 			},
 		})
-		out := &DisableOutput{}
+		out := &DisableTaskOutput{}
 		out.Body.Ok = true
 		return out, nil
 	}

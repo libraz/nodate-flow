@@ -105,8 +105,8 @@ type TaskListItem struct {
 	CreatedAt    time.Time `json:"createdAt"`
 }
 
-// Constraint is the public DTO for a task_constraints row.
-type Constraint struct {
+// TaskConstraint is the public DTO for a task_constraints row.
+type TaskConstraint struct {
 	ID          string    `json:"id"`
 	Kind        string    `json:"kind"`
 	Expression  string    `json:"expression"`
@@ -117,8 +117,8 @@ type Constraint struct {
 	CreatedAt   time.Time `json:"createdAt"`
 }
 
-// Dependency is the public DTO for a task_dependencies row.
-type Dependency struct {
+// TaskDependency is the public DTO for a task_dependencies row.
+type TaskDependency struct {
 	ID                 string    `json:"id"`
 	Kind               string    `json:"kind"`
 	FromTaskID         string    `json:"fromTaskId"`
@@ -129,8 +129,8 @@ type Dependency struct {
 	CreatedAt          time.Time `json:"createdAt"`
 }
 
-// Actor is the public DTO for a task_actors row.
-type Actor struct {
+// TaskActor is the public DTO for a task_actors row.
+type TaskActor struct {
 	ID          string    `json:"id"`
 	UserID      string    `json:"userId"`
 	Email       string    `json:"email"`
@@ -141,8 +141,8 @@ type Actor struct {
 	CreatedAt   time.Time `json:"createdAt"`
 }
 
-// Comment is the public DTO for a comments row.
-type Comment struct {
+// TaskComment is the public DTO for a comments row attached to a task.
+type TaskComment struct {
 	ID                string    `json:"id"`
 	AuthorID          string    `json:"authorId"`
 	AuthorDisplayName string    `json:"authorDisplayName"`
@@ -153,8 +153,8 @@ type Comment struct {
 	CreatedAt         time.Time `json:"createdAt"`
 }
 
-// Attachment is the public DTO for an attachments row.
-type Attachment struct {
+// TaskAttachment is the public DTO for an attachments row attached to a task.
+type TaskAttachment struct {
 	ID                  string    `json:"id"`
 	UploaderID          string    `json:"uploaderId"`
 	UploaderDisplayName string    `json:"uploaderDisplayName"`
@@ -169,267 +169,318 @@ type Attachment struct {
 
 // ---- Task CRUD I/O ---------------------------------------------------------
 
-// CreateInput is the body for POST /tasks.
-type CreateInput struct {
-	Body struct {
-		ProjectID   string `json:"projectId" doc:"Project public id (UUID v7)"`
-		Title       string `json:"title" minLength:"1" maxLength:"500"`
-		Description string `json:"description,omitempty" maxLength:"50000"`
-		Priority    int32  `json:"priority,omitempty" minimum:"0" maximum:"4"`
-		DueOn       string `json:"dueOn,omitempty" doc:"YYYY-MM-DD"`
-		StartOn     string `json:"startOn,omitempty" doc:"YYYY-MM-DD"`
-	}
+// CreateTaskBody is the JSON body for POST /tasks.
+type CreateTaskBody struct {
+	ProjectID   string `json:"projectId" doc:"Project public id (UUID v7)"`
+	Title       string `json:"title" minLength:"1" maxLength:"500"`
+	Description string `json:"description,omitempty" maxLength:"50000"`
+	Priority    int32  `json:"priority,omitempty" minimum:"0" maximum:"4"`
+	DueOn       string `json:"dueOn,omitempty" doc:"YYYY-MM-DD"`
+	StartOn     string `json:"startOn,omitempty" doc:"YYYY-MM-DD"`
 }
 
-// CreateOutput is the response for POST /tasks.
-type CreateOutput struct {
+// CreateTaskInput is the request for POST /tasks.
+type CreateTaskInput struct {
+	Body CreateTaskBody
+}
+
+// CreateTaskOutput is the response for POST /tasks.
+type CreateTaskOutput struct {
 	Body Task
 }
 
-// ListInput is the query for GET /tasks.
-type ListInput struct {
+// ListTasksInput is the query for GET /tasks.
+type ListTasksInput struct {
 	ProjectID   string `query:"projectId" doc:"Optional project public id (UUID v7) to scope the list"`
 	WorkspaceID string `query:"workspaceId" doc:"Workspace public id (UUID v7); required when projectId is not given"`
 	Limit       int32  `query:"limit" minimum:"1" maximum:"200" default:"50"`
 	Offset      int32  `query:"offset" minimum:"0" default:"0"`
 }
 
-// ListOutput is the response for GET /tasks.
-type ListOutput struct {
-	Body struct {
-		Total      int64          `json:"total"`
-		Tasks      []TaskListItem `json:"tasks"`
-		NextCursor *string        `json:"nextCursor"`
-	}
+// ListTasksBody is the response payload for GET /tasks.
+type ListTasksBody struct {
+	Total      int64          `json:"total"`
+	Tasks      []TaskListItem `json:"tasks"`
+	NextCursor *string        `json:"nextCursor"`
 }
 
-// GetInput is the path for GET /tasks/{id}.
-type GetInput struct {
+// ListTasksOutput is the response for GET /tasks.
+type ListTasksOutput struct {
+	Body ListTasksBody
+}
+
+// GetTaskInput is the path for GET /tasks/{id}.
+type GetTaskInput struct {
 	ID string `path:"id"`
 }
 
-// GetOutput is the response for GET /tasks/{id}.
-type GetOutput struct {
+// GetTaskOutput is the response for GET /tasks/{id}.
+type GetTaskOutput struct {
 	Body Task
 }
 
-// PatchInput is the body for PATCH /tasks/{id}.
-type PatchInput struct {
+// PatchTaskBody is the JSON body for PATCH /tasks/{id}.
+type PatchTaskBody struct {
+	Title       *string `json:"title,omitempty" minLength:"1" maxLength:"500"`
+	Description *string `json:"description,omitempty" maxLength:"50000"`
+	Priority    *int32  `json:"priority,omitempty" minimum:"0" maximum:"4"`
+	DueOn       *string `json:"dueOn,omitempty" doc:"YYYY-MM-DD or empty string to clear"`
+	StartOn     *string `json:"startOn,omitempty" doc:"YYYY-MM-DD or empty string to clear"`
+}
+
+// PatchTaskInput is the request for PATCH /tasks/{id}.
+type PatchTaskInput struct {
 	ID   string `path:"id"`
-	Body struct {
-		Title       *string `json:"title,omitempty" minLength:"1" maxLength:"500"`
-		Description *string `json:"description,omitempty" maxLength:"50000"`
-		Priority    *int32  `json:"priority,omitempty" minimum:"0" maximum:"4"`
-		DueOn       *string `json:"dueOn,omitempty" doc:"YYYY-MM-DD or empty string to clear"`
-		StartOn     *string `json:"startOn,omitempty" doc:"YYYY-MM-DD or empty string to clear"`
-	}
+	Body PatchTaskBody
 }
 
-// PatchOutput is the response for PATCH /tasks/{id}.
-type PatchOutput struct {
+// PatchTaskOutput is the response for PATCH /tasks/{id}.
+type PatchTaskOutput struct {
 	Body Task
 }
 
-// DisableInput is the path for DELETE /tasks/{id}.
-type DisableInput struct {
+// DisableTaskInput is the path for DELETE /tasks/{id}.
+type DisableTaskInput struct {
 	ID string `path:"id"`
 }
 
-// DisableOutput is the response for DELETE /tasks/{id}.
-type DisableOutput struct {
-	Body struct {
-		Ok bool `json:"ok"`
-	}
+// DisableTaskBody is the response payload for DELETE /tasks/{id}.
+type DisableTaskBody struct {
+	Ok bool `json:"ok"`
+}
+
+// DisableTaskOutput is the response for DELETE /tasks/{id}.
+type DisableTaskOutput struct {
+	Body DisableTaskBody
 }
 
 // ---- Constraints I/O -------------------------------------------------------
 
-// AddConstraintInput is the body for POST /tasks/{id}/constraints.
-type AddConstraintInput struct {
+// AddTaskConstraintBody is the JSON body for POST /tasks/{id}/constraints.
+type AddTaskConstraintBody struct {
+	Kind       string `json:"kind" enum:"deadline,dependency,approval,signal,custom"`
+	Expression string `json:"expression" minLength:"1" maxLength:"4000"`
+}
+
+// AddTaskConstraintInput is the request for POST /tasks/{id}/constraints.
+type AddTaskConstraintInput struct {
 	ID   string `path:"id"`
-	Body struct {
-		Kind       string `json:"kind" enum:"deadline,dependency,approval,signal,custom"`
-		Expression string `json:"expression" minLength:"1" maxLength:"4000"`
-	}
+	Body AddTaskConstraintBody
 }
 
-// AddConstraintOutput is the response for POST /tasks/{id}/constraints.
-type AddConstraintOutput struct {
-	Body Constraint
+// AddTaskConstraintOutput is the response for POST /tasks/{id}/constraints.
+type AddTaskConstraintOutput struct {
+	Body TaskConstraint
 }
 
-// RemoveConstraintInput is the path for DELETE /tasks/{id}/constraints/{cid}.
-type RemoveConstraintInput struct {
+// RemoveTaskConstraintInput is the path for DELETE /tasks/{id}/constraints/{cid}.
+type RemoveTaskConstraintInput struct {
 	ID  string `path:"id"`
 	CID string `path:"cid"`
 }
 
-// RemoveConstraintOutput is the response for DELETE /tasks/{id}/constraints/{cid}.
-type RemoveConstraintOutput struct {
-	Body struct {
-		Ok bool `json:"ok"`
-	}
+// RemoveTaskConstraintBody is the response payload for DELETE /tasks/{id}/constraints/{cid}.
+type RemoveTaskConstraintBody struct {
+	Ok bool `json:"ok"`
+}
+
+// RemoveTaskConstraintOutput is the response for DELETE /tasks/{id}/constraints/{cid}.
+type RemoveTaskConstraintOutput struct {
+	Body RemoveTaskConstraintBody
 }
 
 // ---- Dependencies I/O ------------------------------------------------------
 
-// AddDependencyInput is the body for POST /tasks/{id}/dependencies.
-type AddDependencyInput struct {
+// AddTaskDependencyBody is the JSON body for POST /tasks/{id}/dependencies.
+type AddTaskDependencyBody struct {
+	ToTaskID string `json:"toTaskId" doc:"Target task public id (UUID v7)"`
+	Kind     string `json:"kind" enum:"blocks,relates,duplicates,subtask_of"`
+}
+
+// AddTaskDependencyInput is the request for POST /tasks/{id}/dependencies.
+type AddTaskDependencyInput struct {
 	ID   string `path:"id"`
-	Body struct {
-		ToTaskID string `json:"toTaskId" doc:"Target task public id (UUID v7)"`
-		Kind     string `json:"kind" enum:"blocks,relates,duplicates,subtask_of"`
-	}
+	Body AddTaskDependencyBody
 }
 
-// AddDependencyOutput is the response for POST /tasks/{id}/dependencies.
-type AddDependencyOutput struct {
-	Body Dependency
+// AddTaskDependencyOutput is the response for POST /tasks/{id}/dependencies.
+type AddTaskDependencyOutput struct {
+	Body TaskDependency
 }
 
-// RemoveDependencyInput is the path for DELETE /tasks/{id}/dependencies/{depId}.
-type RemoveDependencyInput struct {
+// RemoveTaskDependencyInput is the path for DELETE /tasks/{id}/dependencies/{depId}.
+type RemoveTaskDependencyInput struct {
 	ID    string `path:"id"`
 	DepID string `path:"depId"`
 }
 
-// RemoveDependencyOutput is the response for DELETE /tasks/{id}/dependencies/{depId}.
-type RemoveDependencyOutput struct {
-	Body struct {
-		Ok bool `json:"ok"`
-	}
+// RemoveTaskDependencyBody is the response payload for DELETE /tasks/{id}/dependencies/{depId}.
+type RemoveTaskDependencyBody struct {
+	Ok bool `json:"ok"`
+}
+
+// RemoveTaskDependencyOutput is the response for DELETE /tasks/{id}/dependencies/{depId}.
+type RemoveTaskDependencyOutput struct {
+	Body RemoveTaskDependencyBody
 }
 
 // ---- Actors I/O ------------------------------------------------------------
 
-// AddActorInput is the body for POST /tasks/{id}/actors.
-type AddActorInput struct {
+// AddTaskActorBody is the JSON body for POST /tasks/{id}/actors.
+type AddTaskActorBody struct {
+	UserID string `json:"userId" doc:"User public id (UUID v7)"`
+	Role   string `json:"role" enum:"assignee,reviewer,watcher,approver"`
+}
+
+// AddTaskActorInput is the request for POST /tasks/{id}/actors.
+type AddTaskActorInput struct {
 	ID   string `path:"id"`
-	Body struct {
-		UserID string `json:"userId" doc:"User public id (UUID v7)"`
-		Role   string `json:"role" enum:"assignee,reviewer,watcher,approver"`
-	}
+	Body AddTaskActorBody
 }
 
-// AddActorOutput is the response for POST /tasks/{id}/actors.
-type AddActorOutput struct {
-	Body Actor
+// AddTaskActorOutput is the response for POST /tasks/{id}/actors.
+type AddTaskActorOutput struct {
+	Body TaskActor
 }
 
-// RemoveActorInput is the path for DELETE /tasks/{id}/actors/{actorId}.
-type RemoveActorInput struct {
+// RemoveTaskActorInput is the path for DELETE /tasks/{id}/actors/{actorId}.
+type RemoveTaskActorInput struct {
 	ID      string `path:"id"`
 	ActorID string `path:"actorId"`
 }
 
-// RemoveActorOutput is the response for DELETE /tasks/{id}/actors/{actorId}.
-type RemoveActorOutput struct {
-	Body struct {
-		Ok bool `json:"ok"`
-	}
+// RemoveTaskActorBody is the response payload for DELETE /tasks/{id}/actors/{actorId}.
+type RemoveTaskActorBody struct {
+	Ok bool `json:"ok"`
+}
+
+// RemoveTaskActorOutput is the response for DELETE /tasks/{id}/actors/{actorId}.
+type RemoveTaskActorOutput struct {
+	Body RemoveTaskActorBody
 }
 
 // ---- Comments I/O ----------------------------------------------------------
 
-// AddCommentInput is the body for POST /tasks/{id}/comments.
-type AddCommentInput struct {
+// AddTaskCommentBody is the JSON body for POST /tasks/{id}/comments.
+type AddTaskCommentBody struct {
+	Body string `json:"body" minLength:"1" maxLength:"50000"`
+}
+
+// AddTaskCommentInput is the request for POST /tasks/{id}/comments.
+type AddTaskCommentInput struct {
 	ID   string `path:"id"`
-	Body struct {
-		Body string `json:"body" minLength:"1" maxLength:"50000"`
-	}
+	Body AddTaskCommentBody
 }
 
-// AddCommentOutput is the response for POST /tasks/{id}/comments.
-type AddCommentOutput struct {
-	Body Comment
+// AddTaskCommentOutput is the response for POST /tasks/{id}/comments.
+type AddTaskCommentOutput struct {
+	Body TaskComment
 }
 
-// ListCommentsInput is the query for GET /tasks/{id}/comments.
-type ListCommentsInput struct {
+// ListTaskCommentsInput is the query for GET /tasks/{id}/comments.
+type ListTaskCommentsInput struct {
 	ID     string `path:"id"`
 	Limit  int32  `query:"limit" minimum:"1" maximum:"200" default:"50"`
 	Offset int32  `query:"offset" minimum:"0" default:"0"`
 }
 
-// ListCommentsOutput is the response for GET /tasks/{id}/comments.
-type ListCommentsOutput struct {
-	Body struct {
-		Total      int64     `json:"total"`
-		Comments   []Comment `json:"comments"`
-		NextCursor *string   `json:"nextCursor"`
-	}
+// ListTaskCommentsBody is the response payload for GET /tasks/{id}/comments.
+type ListTaskCommentsBody struct {
+	Total      int64         `json:"total"`
+	Comments   []TaskComment `json:"comments"`
+	NextCursor *string       `json:"nextCursor"`
 }
 
-// EditCommentInput is the body for PATCH /tasks/{id}/comments/{cid}.
-type EditCommentInput struct {
+// ListTaskCommentsOutput is the response for GET /tasks/{id}/comments.
+type ListTaskCommentsOutput struct {
+	Body ListTaskCommentsBody
+}
+
+// EditTaskCommentBody is the JSON body for PATCH /tasks/{id}/comments/{cid}.
+type EditTaskCommentBody struct {
+	Body string `json:"body" minLength:"1" maxLength:"50000"`
+}
+
+// EditTaskCommentInput is the request for PATCH /tasks/{id}/comments/{cid}.
+type EditTaskCommentInput struct {
 	ID   string `path:"id"`
 	CID  string `path:"cid"`
-	Body struct {
-		Body string `json:"body" minLength:"1" maxLength:"50000"`
-	}
+	Body EditTaskCommentBody
 }
 
-// EditCommentOutput is the response for PATCH /tasks/{id}/comments/{cid}.
-type EditCommentOutput struct {
-	Body Comment
+// EditTaskCommentOutput is the response for PATCH /tasks/{id}/comments/{cid}.
+type EditTaskCommentOutput struct {
+	Body TaskComment
 }
 
-// DeleteCommentInput is the path for DELETE /tasks/{id}/comments/{cid}.
-type DeleteCommentInput struct {
+// DeleteTaskCommentInput is the path for DELETE /tasks/{id}/comments/{cid}.
+type DeleteTaskCommentInput struct {
 	ID  string `path:"id"`
 	CID string `path:"cid"`
 }
 
-// DeleteCommentOutput is the response for DELETE /tasks/{id}/comments/{cid}.
-type DeleteCommentOutput struct {
-	Body struct {
-		Ok bool `json:"ok"`
-	}
+// DeleteTaskCommentBody is the response payload for DELETE /tasks/{id}/comments/{cid}.
+type DeleteTaskCommentBody struct {
+	Ok bool `json:"ok"`
+}
+
+// DeleteTaskCommentOutput is the response for DELETE /tasks/{id}/comments/{cid}.
+type DeleteTaskCommentOutput struct {
+	Body DeleteTaskCommentBody
 }
 
 // ---- Attachments I/O -------------------------------------------------------
 
-// AddAttachmentInput is the body for POST /tasks/{id}/attachments.
-type AddAttachmentInput struct {
+// AddTaskAttachmentBody is the JSON body for POST /tasks/{id}/attachments.
+type AddTaskAttachmentBody struct {
+	Filename    string `json:"filename" minLength:"1" maxLength:"512"`
+	ContentType string `json:"contentType" minLength:"1" maxLength:"255"`
+	ByteSize    uint64 `json:"byteSize" minimum:"0"`
+	StorageKey  string `json:"storageKey" minLength:"1" maxLength:"1024"`
+}
+
+// AddTaskAttachmentInput is the request for POST /tasks/{id}/attachments.
+type AddTaskAttachmentInput struct {
 	ID   string `path:"id"`
-	Body struct {
-		Filename    string `json:"filename" minLength:"1" maxLength:"512"`
-		ContentType string `json:"contentType" minLength:"1" maxLength:"255"`
-		ByteSize    uint64 `json:"byteSize" minimum:"0"`
-		StorageKey  string `json:"storageKey" minLength:"1" maxLength:"1024"`
-	}
+	Body AddTaskAttachmentBody
 }
 
-// AddAttachmentOutput is the response for POST /tasks/{id}/attachments.
-type AddAttachmentOutput struct {
-	Body Attachment
+// AddTaskAttachmentOutput is the response for POST /tasks/{id}/attachments.
+type AddTaskAttachmentOutput struct {
+	Body TaskAttachment
 }
 
-// ListAttachmentsInput is the query for GET /tasks/{id}/attachments.
-type ListAttachmentsInput struct {
+// ListTaskAttachmentsInput is the query for GET /tasks/{id}/attachments.
+type ListTaskAttachmentsInput struct {
 	ID     string `path:"id"`
 	Limit  int32  `query:"limit" minimum:"1" maximum:"200" default:"50"`
 	Offset int32  `query:"offset" minimum:"0" default:"0"`
 }
 
-// ListAttachmentsOutput is the response for GET /tasks/{id}/attachments.
-type ListAttachmentsOutput struct {
-	Body struct {
-		Total       int64        `json:"total"`
-		Attachments []Attachment `json:"attachments"`
-		NextCursor  *string      `json:"nextCursor"`
-	}
+// ListTaskAttachmentsBody is the response payload for GET /tasks/{id}/attachments.
+type ListTaskAttachmentsBody struct {
+	Total       int64            `json:"total"`
+	Attachments []TaskAttachment `json:"attachments"`
+	NextCursor  *string          `json:"nextCursor"`
 }
 
-// DeleteAttachmentInput is the path for DELETE /tasks/{id}/attachments/{aid}.
-type DeleteAttachmentInput struct {
+// ListTaskAttachmentsOutput is the response for GET /tasks/{id}/attachments.
+type ListTaskAttachmentsOutput struct {
+	Body ListTaskAttachmentsBody
+}
+
+// DeleteTaskAttachmentInput is the path for DELETE /tasks/{id}/attachments/{aid}.
+type DeleteTaskAttachmentInput struct {
 	ID  string `path:"id"`
 	AID string `path:"aid"`
 }
 
-// DeleteAttachmentOutput is the response for DELETE /tasks/{id}/attachments/{aid}.
-type DeleteAttachmentOutput struct {
-	Body struct {
-		Ok bool `json:"ok"`
-	}
+// DeleteTaskAttachmentBody is the response payload for DELETE /tasks/{id}/attachments/{aid}.
+type DeleteTaskAttachmentBody struct {
+	Ok bool `json:"ok"`
+}
+
+// DeleteTaskAttachmentOutput is the response for DELETE /tasks/{id}/attachments/{aid}.
+type DeleteTaskAttachmentOutput struct {
+	Body DeleteTaskAttachmentBody
 }

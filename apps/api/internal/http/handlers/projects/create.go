@@ -20,8 +20,8 @@ import (
 const mysqlErrDuplicateEntry = 1062
 
 // Create handles POST /workspaces/{wsId}/projects.
-func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error) {
-	return func(ctx context.Context, in *CreateInput) (*CreateOutput, error) {
+func Create(deps Deps) func(context.Context, *CreateProjectInput) (*CreateProjectOutput, error) {
+	return func(ctx context.Context, in *CreateProjectInput) (*CreateProjectOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
@@ -49,7 +49,7 @@ func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		return &CreateOutput{Body: Project{
+		return &CreateProjectOutput{Body: Project{
 			ID:          pub.String(),
 			Slug:        slug,
 			Name:        in.Body.Name,

@@ -21,16 +21,18 @@ const STORAGE_KEY = 'nf:sidebar-collapsed';
 interface NavItem {
   key: 'inbox' | 'today' | 'projects' | 'workspaces' | 'settings';
   icon: LucideIcon;
+  /** Destination route (TanStack Router path). */
+  to: '/' | '/workspaces';
   /** Whether the destination route exists yet. */
   enabled: boolean;
 }
 
 const NAV_ITEMS: readonly NavItem[] = [
-  { key: 'inbox', icon: Inbox, enabled: true },
-  { key: 'today', icon: CalendarDays, enabled: false },
-  { key: 'projects', icon: FolderKanban, enabled: false },
-  { key: 'workspaces', icon: Briefcase, enabled: false },
-  { key: 'settings', icon: Settings, enabled: false },
+  { key: 'inbox', icon: Inbox, to: '/', enabled: true },
+  { key: 'today', icon: CalendarDays, to: '/', enabled: false },
+  { key: 'projects', icon: FolderKanban, to: '/', enabled: false },
+  { key: 'workspaces', icon: Briefcase, to: '/workspaces', enabled: true },
+  { key: 'settings', icon: Settings, to: '/', enabled: false },
 ];
 
 function readInitialCollapsed(): boolean {
@@ -90,7 +92,7 @@ export default function Sidebar(): ReactElement {
             return (
               <Link
                 key={item.key}
-                to="/"
+                to={item.to}
                 className={styles.item}
                 activeProps={{ className: cx(styles.item, styles.itemActive) }}
               >

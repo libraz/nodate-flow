@@ -12,8 +12,8 @@ import (
 
 // Get handles GET /projects/{prjId}. The project context has already been
 // resolved by RequireProjectMemberByGlobalId.
-func Get(deps Deps) func(context.Context, *GetInput) (*GetOutput, error) {
-	return func(ctx context.Context, in *GetInput) (*GetOutput, error) {
+func Get(deps Deps) func(context.Context, *GetProjectInput) (*GetProjectOutput, error) {
+	return func(ctx context.Context, in *GetProjectInput) (*GetProjectOutput, error) {
 		prj, ok := middleware.ProjectFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsProjectNotFound)
@@ -25,6 +25,6 @@ func Get(deps Deps) func(context.Context, *GetInput) (*GetOutput, error) {
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		return &GetOutput{Body: rowToProjectFromFind(row)}, nil
+		return &GetProjectOutput{Body: rowToProjectFromFind(row)}, nil
 	}
 }

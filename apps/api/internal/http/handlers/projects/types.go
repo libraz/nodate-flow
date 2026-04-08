@@ -48,116 +48,137 @@ type ProjectMember struct {
 	CreatedAt   time.Time `json:"createdAt"`
 }
 
-// CreateInput is the body for POST /workspaces/{wsId}/projects.
-type CreateInput struct {
-	WsID string `path:"wsId"`
-	Body struct {
-		Slug        string `json:"slug" minLength:"1" maxLength:"64"`
-		Name        string `json:"name" minLength:"1" maxLength:"100"`
-		Description string `json:"description,omitempty" maxLength:"500"`
-		Color       string `json:"color,omitempty" maxLength:"32"`
-	}
+// CreateProjectBody is the request body for POST /workspaces/{wsId}/projects.
+type CreateProjectBody struct {
+	Slug        string `json:"slug" minLength:"1" maxLength:"64"`
+	Name        string `json:"name" minLength:"1" maxLength:"100"`
+	Description string `json:"description,omitempty" maxLength:"500"`
+	Color       string `json:"color,omitempty" maxLength:"32"`
 }
 
-// CreateOutput is the response for POST /workspaces/{wsId}/projects.
-type CreateOutput struct {
+// CreateProjectInput is the input for POST /workspaces/{wsId}/projects.
+type CreateProjectInput struct {
+	WsID string `path:"wsId"`
+	Body CreateProjectBody
+}
+
+// CreateProjectOutput is the response for POST /workspaces/{wsId}/projects.
+type CreateProjectOutput struct {
 	Body Project
 }
 
-// ListInput is the query for GET /workspaces/{wsId}/projects.
-type ListInput struct {
+// ListProjectsInput is the query for GET /workspaces/{wsId}/projects.
+type ListProjectsInput struct {
 	WsID   string `path:"wsId"`
 	Limit  int32  `query:"limit" minimum:"1" maximum:"200" default:"50"`
 	Offset int32  `query:"offset" minimum:"0" default:"0"`
 }
 
-// ListOutput is the response for GET /workspaces/{wsId}/projects.
-type ListOutput struct {
-	Body struct {
-		Total      int64     `json:"total"`
-		Projects   []Project `json:"projects"`
-		NextCursor *string   `json:"nextCursor"`
-	}
+// ListProjectsBody is the response body shape for GET /workspaces/{wsId}/projects.
+type ListProjectsBody struct {
+	Total      int64     `json:"total"`
+	Projects   []Project `json:"projects"`
+	NextCursor *string   `json:"nextCursor"`
 }
 
-// GetInput is the path for GET /projects/{prjId}.
-type GetInput struct {
+// ListProjectsOutput is the response for GET /workspaces/{wsId}/projects.
+type ListProjectsOutput struct {
+	Body ListProjectsBody
+}
+
+// GetProjectInput is the path for GET /projects/{prjId}.
+type GetProjectInput struct {
 	PrjID string `path:"prjId"`
 }
 
-// GetOutput is the response for GET /projects/{prjId}.
-type GetOutput struct {
+// GetProjectOutput is the response for GET /projects/{prjId}.
+type GetProjectOutput struct {
 	Body Project
 }
 
-// PatchInput is the body for PATCH /projects/{prjId}.
-type PatchInput struct {
-	PrjID string `path:"prjId"`
-	Body  struct {
-		Slug        *string `json:"slug,omitempty" minLength:"1" maxLength:"64"`
-		Name        *string `json:"name,omitempty" minLength:"1" maxLength:"100"`
-		Description *string `json:"description,omitempty" maxLength:"500"`
-	}
+// PatchProjectBody is the request body for PATCH /projects/{prjId}.
+type PatchProjectBody struct {
+	Slug        *string `json:"slug,omitempty" minLength:"1" maxLength:"64"`
+	Name        *string `json:"name,omitempty" minLength:"1" maxLength:"100"`
+	Description *string `json:"description,omitempty" maxLength:"500"`
 }
 
-// PatchOutput is the response for PATCH /projects/{prjId}.
-type PatchOutput struct {
+// PatchProjectInput is the input for PATCH /projects/{prjId}.
+type PatchProjectInput struct {
+	PrjID string `path:"prjId"`
+	Body  PatchProjectBody
+}
+
+// PatchProjectOutput is the response for PATCH /projects/{prjId}.
+type PatchProjectOutput struct {
 	Body Project
 }
 
-// DisableInput is the path for DELETE /projects/{prjId}.
-type DisableInput struct {
+// DisableProjectInput is the path for DELETE /projects/{prjId}.
+type DisableProjectInput struct {
 	PrjID string `path:"prjId"`
 }
 
-// DisableOutput is the response for DELETE /projects/{prjId}.
-type DisableOutput struct {
-	Body struct {
-		Ok bool `json:"ok"`
-	}
+// DisableProjectBody is the response body for DELETE /projects/{prjId}.
+type DisableProjectBody struct {
+	Ok bool `json:"ok"`
 }
 
-// ListMembersInput is the query for GET /projects/{prjId}/members.
-type ListMembersInput struct {
+// DisableProjectOutput is the response for DELETE /projects/{prjId}.
+type DisableProjectOutput struct {
+	Body DisableProjectBody
+}
+
+// ListProjectMembersInput is the query for GET /projects/{prjId}/members.
+type ListProjectMembersInput struct {
 	PrjID  string `path:"prjId"`
 	Limit  int32  `query:"limit" minimum:"1" maximum:"200" default:"50"`
 	Offset int32  `query:"offset" minimum:"0" default:"0"`
 }
 
-// ListMembersOutput is the response for GET /projects/{prjId}/members.
-type ListMembersOutput struct {
-	Body struct {
-		Total      int64           `json:"total"`
-		Members    []ProjectMember `json:"members"`
-		NextCursor *string         `json:"nextCursor"`
-	}
+// ListProjectMembersBody is the response body for GET /projects/{prjId}/members.
+type ListProjectMembersBody struct {
+	Total      int64           `json:"total"`
+	Members    []ProjectMember `json:"members"`
+	NextCursor *string         `json:"nextCursor"`
 }
 
-// AddMemberInput is the body for POST /projects/{prjId}/members.
-type AddMemberInput struct {
+// ListProjectMembersOutput is the response for GET /projects/{prjId}/members.
+type ListProjectMembersOutput struct {
+	Body ListProjectMembersBody
+}
+
+// AddProjectMemberBody is the request body for POST /projects/{prjId}/members.
+type AddProjectMemberBody struct {
+	UserID string `json:"userId" doc:"User public id (UUID v7)"`
+	Role   string `json:"role" enum:"lead,editor,commenter,viewer"`
+}
+
+// AddProjectMemberInput is the input for POST /projects/{prjId}/members.
+type AddProjectMemberInput struct {
 	PrjID string `path:"prjId"`
-	Body  struct {
-		UserID string `json:"userId" doc:"User public id (UUID v7)"`
-		Role   string `json:"role" enum:"lead,editor,commenter,viewer"`
-	}
+	Body  AddProjectMemberBody
 }
 
-// AddMemberOutput is the response for POST /projects/{prjId}/members.
-type AddMemberOutput struct {
+// AddProjectMemberOutput is the response for POST /projects/{prjId}/members.
+type AddProjectMemberOutput struct {
 	Body ProjectMember
 }
 
-// RemoveMemberInput is the path for DELETE /projects/{prjId}/members/{userId}.
-type RemoveMemberInput struct {
+// RemoveProjectMemberInput is the path for DELETE /projects/{prjId}/members/{userId}.
+type RemoveProjectMemberInput struct {
 	PrjID  string `path:"prjId"`
 	UserID string `path:"userId"`
 }
 
-// RemoveMemberOutput is the response for DELETE /projects/{prjId}/members/{userId}.
-type RemoveMemberOutput struct {
-	Body struct {
-		Ok bool `json:"ok"`
-	}
+// RemoveProjectMemberBody is the response body for DELETE /projects/{prjId}/members/{userId}.
+type RemoveProjectMemberBody struct {
+	Ok bool `json:"ok"`
+}
+
+// RemoveProjectMemberOutput is the response for DELETE /projects/{prjId}/members/{userId}.
+type RemoveProjectMemberOutput struct {
+	Body RemoveProjectMemberBody
 }
 
 func nullStr(s sql.NullString) string {

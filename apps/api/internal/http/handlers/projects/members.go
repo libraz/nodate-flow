@@ -22,8 +22,8 @@ func resolveUserInternalID(ctx context.Context, db *sql.DB, pub types.PublicID) 
 }
 
 // ListMembers handles GET /projects/{prjId}/members.
-func ListMembers(deps Deps) func(context.Context, *ListMembersInput) (*ListMembersOutput, error) {
-	return func(ctx context.Context, in *ListMembersInput) (*ListMembersOutput, error) {
+func ListMembers(deps Deps) func(context.Context, *ListProjectMembersInput) (*ListProjectMembersOutput, error) {
+	return func(ctx context.Context, in *ListProjectMembersInput) (*ListProjectMembersOutput, error) {
 		prj, ok := middleware.ProjectFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsProjectNotFound)
@@ -45,7 +45,7 @@ func ListMembers(deps Deps) func(context.Context, *ListMembersInput) (*ListMembe
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		out := &ListMembersOutput{}
+		out := &ListProjectMembersOutput{}
 		out.Body.Members = make([]ProjectMember, 0, len(rows))
 		for _, r := range rows {
 			out.Body.Members = append(out.Body.Members, rowToProjectMember(r))
@@ -58,8 +58,8 @@ func ListMembers(deps Deps) func(context.Context, *ListMembersInput) (*ListMembe
 }
 
 // AddMember handles POST /projects/{prjId}/members.
-func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutput, error) {
-	return func(ctx context.Context, in *AddMemberInput) (*AddMemberOutput, error) {
+func AddMember(deps Deps) func(context.Context, *AddProjectMemberInput) (*AddProjectMemberOutput, error) {
+	return func(ctx context.Context, in *AddProjectMemberInput) (*AddProjectMemberOutput, error) {
 		prj, ok := middleware.ProjectFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsProjectNotFound)
@@ -94,7 +94,7 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 			ProjectID: prj.ID,
 			UserID:    uid,
 		}); err == nil {
-			return &AddMemberOutput{Body: ProjectMember{
+			return &AddProjectMemberOutput{Body: ProjectMember{
 				ID:        existing.PublicID.String(),
 				UserID:    userPub.String(),
 				Role:      string(existing.Role),
@@ -118,7 +118,7 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		return &AddMemberOutput{Body: ProjectMember{
+		return &AddProjectMemberOutput{Body: ProjectMember{
 			ID:        memPub.String(),
 			UserID:    userPub.String(),
 			Role:      string(role),
@@ -129,8 +129,8 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 }
 
 // RemoveMember handles DELETE /projects/{prjId}/members/{userId}.
-func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveMemberOutput, error) {
-	return func(ctx context.Context, in *RemoveMemberInput) (*RemoveMemberOutput, error) {
+func RemoveMember(deps Deps) func(context.Context, *RemoveProjectMemberInput) (*RemoveProjectMemberOutput, error) {
+	return func(ctx context.Context, in *RemoveProjectMemberInput) (*RemoveProjectMemberOutput, error) {
 		prj, ok := middleware.ProjectFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsProjectNotFound)
@@ -152,7 +152,7 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		out := &RemoveMemberOutput{}
+		out := &RemoveProjectMemberOutput{}
 		out.Body.Ok = true
 		return out, nil
 	}

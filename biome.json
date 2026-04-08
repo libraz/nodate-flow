@@ -13,9 +13,10 @@
       "**/.next",
       "apps/api/internal/db/generated/**",
       "apps/api/internal/errors/**",
-      "packages/sdk/src/schema.d.ts",
       "packages/sdk/src/errors/**",
-      "apps/web/src/routeTree.gen.ts"
+      "apps/web/src/routeTree.gen.ts",
+      "packages/sdk/src/openapi.ts",
+      "packages/sdk/src/schema.d.ts"
     ]
   },
   "formatter": {
@@ -25,7 +26,9 @@
     "lineWidth": 100,
     "lineEnding": "lf"
   },
-  "organizeImports": { "enabled": true },
+  "organizeImports": {
+    "enabled": true
+  },
   "linter": {
     "enabled": true,
     "rules": {
@@ -37,11 +40,23 @@
             "strictCase": false,
             "conventions": [
               {
-                "selector": { "kind": "variable" },
+                "selector": {
+                  "kind": "variable"
+                },
                 "formats": ["camelCase", "PascalCase", "CONSTANT_CASE"]
               },
-              { "selector": { "kind": "function" }, "formats": ["camelCase", "PascalCase"] },
-              { "selector": { "kind": "typeLike" }, "formats": ["PascalCase"] }
+              {
+                "selector": {
+                  "kind": "function"
+                },
+                "formats": ["camelCase", "PascalCase"]
+              },
+              {
+                "selector": {
+                  "kind": "typeLike"
+                },
+                "formats": ["PascalCase"]
+              }
             ]
           }
         }
@@ -62,7 +77,9 @@
     }
   },
   "json": {
-    "formatter": { "trailingCommas": "none" }
+    "formatter": {
+      "trailingCommas": "none"
+    }
   },
   "overrides": [
     {
@@ -76,7 +93,7 @@
       }
     },
     {
-      "include": ["packages/ui/src/primitives/**"],
+      "include": ["packages/ui/src/primitives/**", "apps/web/src/features/**"],
       "linter": {
         "rules": {
           "a11y": {
