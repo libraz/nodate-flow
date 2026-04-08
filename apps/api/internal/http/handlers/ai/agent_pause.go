@@ -5,6 +5,7 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/middleware"
 )
 
@@ -52,6 +53,18 @@ func PauseAgent(deps Deps) func(context.Context, *PauseAgentInput) (*PauseAgentO
 		if n == 0 {
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
+		kind := eventbus.AiAgentResumed
+		if in.Body.Paused {
+			kind = eventbus.AiAgentPaused
+		}
+		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+			Type:        kind,
+			WorkspaceID: ws.ID,
+			Payload: map[string]any{
+				"agentId": agentPub.String(),
+				"paused":  in.Body.Paused,
+			},
+		})
 		out := &PauseAgentOutput{}
 		out.Body.Ok = true
 		return out, nil

@@ -109,6 +109,15 @@ const (
 	AiSuggestionEdited Kind = "ai.suggestion.edited"
 )
 
+// AI agent lifecycle events (4.AGENT-3 kill switch audit trail).
+const (
+	// AiAgentPaused is appended when an operator flips the kill switch
+	// on an ai_agents row via POST /workspaces/{wsId}/ai/agents/{id}/pause.
+	AiAgentPaused Kind = "ai.agent.paused"
+	// AiAgentResumed is appended when the kill switch is released.
+	AiAgentResumed Kind = "ai.agent.resumed"
+)
+
 // Legacy / compatibility kinds. These are kept so historical events
 // continue to round-trip even though new code should not emit them.
 const (
