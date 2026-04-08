@@ -23,11 +23,18 @@
       "save": "Save",
       "cancel": "Cancel",
       "delete": "Delete",
-      "confirm_delete": "Delete this provider?"
+      "confirm_delete": "Delete this provider?",
+      "rotate": "Rotate key"
+    },
+    "rotate_dialog": {
+      "title": "Rotate API key",
+      "description": "Replace the stored API key with a new value. The old key is discarded immediately.",
+      "submit": "Rotate"
     },
     "toast": {
       "created": "Provider added",
       "deleted": "Provider deleted",
+      "rotated": "API key rotated",
       "error": "Action failed"
     }
   }

@@ -23,11 +23,18 @@
       "save": "保存",
       "cancel": "キャンセル",
       "delete": "削除",
-      "confirm_delete": "このプロバイダを削除しますか？"
+      "confirm_delete": "このプロバイダを削除しますか？",
+      "rotate": "キーをローテーション"
+    },
+    "rotate_dialog": {
+      "title": "API キーをローテーション",
+      "description": "保存されている API キーを新しい値で置き換えます。古いキーは即座に破棄されます。",
+      "submit": "ローテーション"
     },
     "toast": {
       "created": "プロバイダを追加しました",
       "deleted": "プロバイダを削除しました",
+      "rotated": "API キーをローテーションしました",
       "error": "操作に失敗しました"
     }
   }

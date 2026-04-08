@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { useAiProvidersQuery, useDeleteAiProvider } from './api';
 import MaskedKey from './masked-key';
 import ProviderAddDialog from './provider-add-dialog';
+import ProviderRotateDialog from './provider-rotate-dialog';
 
 function useKindLabel(): (kind: string) => string {
   const { t } = useTranslation('ai');
@@ -42,6 +43,7 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
   const { data: providers } = useAiProvidersQuery(workspaceId);
   const del = useDeleteAiProvider(workspaceId);
   const [addOpen, setAddOpen] = useState(false);
+  const [rotateId, setRotateId] = useState<string | null>(null);
   const kindLabel = useKindLabel();
 
   const handleDelete = (providerId: string): void => {
@@ -118,14 +120,24 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
                     </span>
                     <MaskedKey value={p.apiKeyMasked} />
                   </div>
-                  <Button
-                    variant="danger"
-                    onClick={() => {
-                      handleDelete(p.id);
-                    }}
-                  >
-                    {t('providers.action.delete')}
-                  </Button>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setRotateId(p.id);
+                      }}
+                    >
+                      {t('providers.action.rotate')}
+                    </Button>
+                    <Button
+                      variant="danger"
+                      onClick={() => {
+                        handleDelete(p.id);
+                      }}
+                    >
+                      {t('providers.action.delete')}
+                    </Button>
+                  </div>
                 </div>
               </Card>
             </li>
@@ -138,6 +150,14 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
         open={addOpen}
         onClose={() => {
           setAddOpen(false);
+        }}
+      />
+      <ProviderRotateDialog
+        workspaceId={workspaceId}
+        providerId={rotateId}
+        open={rotateId !== null}
+        onClose={() => {
+          setRotateId(null);
         }}
       />
     </section>
