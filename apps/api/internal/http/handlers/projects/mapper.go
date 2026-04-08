@@ -7,6 +7,7 @@ import (
 func rowToProjectFromFind(r generated.FindProjectByPublicIdGlobalRow) Project {
 	return Project{
 		ID:          r.PublicID.String(),
+		WorkspaceID: r.WorkspacePublicID.String(),
 		Slug:        r.Slug,
 		Name:        r.Name,
 		Description: nullStr(r.Description),
@@ -19,9 +20,13 @@ func rowToProjectFromFind(r generated.FindProjectByPublicIdGlobalRow) Project {
 	}
 }
 
-func rowToProjectFromList(r generated.ListProjectsForWorkspaceRow) Project {
+// rowToProjectFromList builds a Project DTO from a list row. The workspace
+// public id is threaded in from the caller because v_projects does not
+// expose it (the list query is already workspace-scoped via the path).
+func rowToProjectFromList(r generated.ListProjectsForWorkspaceRow, workspacePublicID string) Project {
 	return Project{
 		ID:          r.PublicID.String(),
+		WorkspaceID: workspacePublicID,
 		Slug:        r.Slug,
 		Name:        r.Name,
 		Description: nullStr(r.Description),

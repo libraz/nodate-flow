@@ -1927,6 +1927,7 @@ export interface components {
             startedOn?: string;
             /** Format: date-time */
             updatedAt?: string;
+            workspaceId: string;
         };
         ProjectMember: {
             /**

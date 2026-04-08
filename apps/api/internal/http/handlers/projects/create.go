@@ -34,14 +34,15 @@ func Create(deps Deps) func(context.Context, *CreateProjectInput) (*CreateProjec
 		pub := types.New()
 		desc := sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""}
 		color := sql.NullString{String: in.Body.Color, Valid: in.Body.Color != ""}
-		if _, err := deps.Queries.CreateProject(ctx, generated.CreateProjectParams{
+		projectID, err := deps.Queries.CreateProject(ctx, generated.CreateProjectParams{
 			PublicID:    pub,
 			WorkspaceID: ws.ID,
 			Slug:        slug,
 			Name:        in.Body.Name,
 			Description: desc,
 			Color:       color,
-		}); err != nil {
+		})
+		if err != nil {
 			var mysqlErr *mysql.MySQLError
 			if errors.As(err, &mysqlErr) && mysqlErr.Number == mysqlErrDuplicateEntry {
 				// Only the (workspace_id, slug) unique key should map to
@@ -54,8 +55,30 @@ func Create(deps Deps) func(context.Context, *CreateProjectInput) (*CreateProjec
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
+		// Auto-enroll the creator as a project lead so they can see the
+		// project in the members grid, satisfy per-project ACL predicates
+		// (e.g. workspace timeline), and don't need the workspace
+		// owner/admin escape hatch. Best-effort: a failure here is
+		// logged but not fatal (the project itself is already created).
+		if userID, ok := middleware.ActorFromContext(ctx); ok {
+			memberPub := types.New()
+			if _, mErr := deps.Queries.AddProjectMember(ctx, generated.AddProjectMemberParams{
+				PublicID:    memberPub,
+				WorkspaceID: ws.ID,
+				ProjectID:   uint32(projectID),
+				UserID:      userID,
+				Role:        generated.ProjectMembersRoleLead,
+				AddedAt:     sql.NullTime{Time: time.Now(), Valid: true},
+			}); mErr != nil {
+				// Swallow: not fatal. Caller can still open the project
+				// via workspace owner/admin escape hatch if they have it.
+				_ = mErr
+			}
+		}
+
 		return &CreateProjectOutput{Body: Project{
 			ID:          pub.String(),
+			WorkspaceID: ws.PublicID.String(),
 			Slug:        slug,
 			Name:        in.Body.Name,
 			Description: in.Body.Description,

@@ -140,39 +140,42 @@ func (q *Queries) FindProjectByPublicId(ctx context.Context, arg FindProjectByPu
 
 const findProjectByPublicIdGlobal = `-- name: FindProjectByPublicIdGlobal :one
 SELECT
-  id,
-  public_id,
-  workspace_id,
-  slug,
-  name,
-  description,
-  color,
-  is_archived,
-  started_on,
-  ended_on,
-  enabled,
-  updated_at,
-  created_at
-FROM projects
-WHERE public_id = ?
-  AND enabled = TRUE
+  p.id,
+  p.public_id,
+  p.workspace_id,
+  w.public_id AS workspace_public_id,
+  p.slug,
+  p.name,
+  p.description,
+  p.color,
+  p.is_archived,
+  p.started_on,
+  p.ended_on,
+  p.enabled,
+  p.updated_at,
+  p.created_at
+FROM projects p
+JOIN workspaces w ON w.id = p.workspace_id
+WHERE p.public_id = ?
+  AND p.enabled = TRUE
 LIMIT 1
 `
 
 type FindProjectByPublicIdGlobalRow struct {
-	ID          uint32         `json:"-"`
-	PublicID    types.PublicID `json:"publicId"`
-	WorkspaceID uint32         `json:"-"`
-	Slug        string         `json:"slug"`
-	Name        string         `json:"name"`
-	Description sql.NullString `json:"description"`
-	Color       sql.NullString `json:"color"`
-	IsArchived  bool           `json:"isArchived"`
-	StartedOn   sql.NullTime   `json:"startedOn"`
-	EndedOn     sql.NullTime   `json:"endedOn"`
-	Enabled     bool           `json:"enabled"`
-	UpdatedAt   sql.NullTime   `json:"updatedAt"`
-	CreatedAt   time.Time      `json:"createdAt"`
+	ID                uint32         `json:"-"`
+	PublicID          types.PublicID `json:"publicId"`
+	WorkspaceID       uint32         `json:"-"`
+	WorkspacePublicID types.PublicID `json:"workspacePublicId"`
+	Slug              string         `json:"slug"`
+	Name              string         `json:"name"`
+	Description       sql.NullString `json:"description"`
+	Color             sql.NullString `json:"color"`
+	IsArchived        bool           `json:"isArchived"`
+	StartedOn         sql.NullTime   `json:"startedOn"`
+	EndedOn           sql.NullTime   `json:"endedOn"`
+	Enabled           bool           `json:"enabled"`
+	UpdatedAt         sql.NullTime   `json:"updatedAt"`
+	CreatedAt         time.Time      `json:"createdAt"`
 }
 
 // Resolve a project by its UUID v7 without workspace scope.
@@ -184,6 +187,7 @@ func (q *Queries) FindProjectByPublicIdGlobal(ctx context.Context, publicID type
 		&i.ID,
 		&i.PublicID,
 		&i.WorkspaceID,
+		&i.WorkspacePublicID,
 		&i.Slug,
 		&i.Name,
 		&i.Description,

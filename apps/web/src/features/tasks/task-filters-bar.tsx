@@ -1,13 +1,15 @@
 /**
  * TaskFiltersBar — minimal filter controls (search, status multi-select,
- * assignee id input). Plumbed through `useTaskFilters` so the active
+ * assignee picker). Plumbed through `useTaskFilters` so the active
  * board/list view re-queries on change.
  */
 
+import Combobox from '@nodate-flow/ui/primitives/combobox';
 import Input from '@nodate-flow/ui/primitives/input';
-import type { ChangeEvent, ReactElement } from 'react';
+import { type ChangeEvent, type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useWorkspaceUsersQuery } from '../workspaces/api';
 import { TASK_STATES, type TaskDerivedState } from './api';
 import {
   setTaskFilterAssignee,
@@ -18,19 +20,55 @@ import {
 
 export interface TaskFiltersBarProps {
   projectId: string;
+  /**
+   * Workspace the project belongs to. When provided, the Assignee filter
+   * renders as a workspace-scoped user picker; when absent it falls back
+   * to a disabled placeholder.
+   */
+  workspaceId?: string;
 }
 
-const STATE_KEY: Record<TaskDerivedState, string> = {
-  open: 'tasks.status.open',
-  waiting: 'tasks.status.waiting',
-  review: 'tasks.status.review',
-  done: 'tasks.status.done',
-  cancelled: 'tasks.status.cancelled',
-};
+interface AssigneePickerProps {
+  projectId: string;
+  workspaceId: string;
+  selected: string;
+  label: string;
+}
 
-export default function TaskFiltersBar({ projectId }: TaskFiltersBarProps): ReactElement {
+function AssigneePicker({
+  projectId,
+  workspaceId,
+  selected,
+  label,
+}: AssigneePickerProps): ReactElement {
+  const { data: users } = useWorkspaceUsersQuery(workspaceId);
+  return (
+    <Combobox
+      aria-label={label}
+      placeholder={label}
+      value={selected}
+      options={[{ value: '', label }, ...users.map((u) => ({ value: u.id, label: u.displayName }))]}
+      onChange={(v) => {
+        setTaskFilterAssignee(projectId, v);
+      }}
+    />
+  );
+}
+
+export default function TaskFiltersBar({
+  projectId,
+  workspaceId,
+}: TaskFiltersBarProps): ReactElement {
   const { t } = useTranslation('common');
   const filters = useTaskFilters(projectId);
+
+  const STATE_KEY: Record<TaskDerivedState, string> = {
+    open: 'tasks.status.open',
+    waiting: 'tasks.status.waiting',
+    review: 'tasks.status.review',
+    done: 'tasks.status.done',
+    cancelled: 'tasks.status.cancelled',
+  };
 
   const handleStatesChange = (e: ChangeEvent<HTMLSelectElement>): void => {
     const next: TaskDerivedState[] = [];
@@ -47,6 +85,8 @@ export default function TaskFiltersBar({ projectId }: TaskFiltersBarProps): Reac
     }
     setTaskFilterStates(projectId, next);
   };
+
+  const assigneeLabel = t('tasks.filters.assignee');
 
   return (
     <div
@@ -74,7 +114,15 @@ export default function TaskFiltersBar({ projectId }: TaskFiltersBarProps): Reac
         value={[...(filters.states ?? [])]}
         onChange={handleStatesChange}
         aria-label={t('tasks.filters.status')}
-        style={{ minInlineSize: '12rem', minBlockSize: '2.25rem' }}
+        style={{
+          minInlineSize: '12rem',
+          minBlockSize: '8rem',
+          padding: '0.25rem',
+          borderRadius: '0.25rem',
+          border: '1px solid var(--color-border)',
+          background: 'var(--color-bg)',
+          color: 'var(--color-fg)',
+        }}
       >
         {TASK_STATES.map((state) => (
           <option key={state} value={state}>
@@ -82,15 +130,20 @@ export default function TaskFiltersBar({ projectId }: TaskFiltersBarProps): Reac
           </option>
         ))}
       </select>
-      <Input
-        value={filters.assigneeId ?? ''}
-        onChange={(e) => {
-          setTaskFilterAssignee(projectId, e.target.value);
-        }}
-        placeholder={t('tasks.filters.assignee')}
-        aria-label={t('tasks.filters.assignee')}
-        style={{ minInlineSize: '14rem' }}
-      />
+      {workspaceId !== undefined ? (
+        <Suspense
+          fallback={<Input disabled placeholder={assigneeLabel} aria-label={assigneeLabel} />}
+        >
+          <AssigneePicker
+            projectId={projectId}
+            workspaceId={workspaceId}
+            selected={filters.assigneeId ?? ''}
+            label={assigneeLabel}
+          />
+        </Suspense>
+      ) : (
+        <Input disabled placeholder={assigneeLabel} aria-label={assigneeLabel} />
+      )}
     </div>
   );
 }

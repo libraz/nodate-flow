@@ -11,6 +11,7 @@ import { Outlet, createLazyFileRoute, getRouteApi } from '@tanstack/react-router
 import { type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useProjectQuery } from '../features/projects/api';
 import TaskCreateDialog from '../features/tasks/task-create-dialog';
 import TaskFiltersBar from '../features/tasks/task-filters-bar';
 import TaskViewSwitcher from '../features/tasks/task-view-switcher';
@@ -20,6 +21,7 @@ const routeApi = getRouteApi('/_authenticated/projects/$projectId/tasks');
 function TasksSectionLayout(): ReactElement {
   const { t } = useTranslation('common');
   const { projectId } = routeApi.useParams();
+  const { data: project } = useProjectQuery(projectId);
   const [createOpen, setCreateOpen] = useState(false);
 
   return (
@@ -63,7 +65,7 @@ function TasksSectionLayout(): ReactElement {
         </div>
       </header>
 
-      <TaskFiltersBar projectId={projectId} />
+      <TaskFiltersBar projectId={projectId} workspaceId={project.workspaceId} />
 
       <Suspense
         fallback={

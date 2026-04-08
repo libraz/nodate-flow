@@ -24,12 +24,13 @@ func httpErr(spec *apierrors.Spec) error {
 
 // Project is the public DTO for a project row.
 type Project struct {
-	ID          string    `json:"id"`
-	Slug        string    `json:"slug"`
-	Name        string    `json:"name"`
-	Description string    `json:"description,omitempty"`
-	Color       string    `json:"color,omitempty"`
-	IsArchived  bool      `json:"isArchived"`
+	ID          string     `json:"id"`
+	WorkspaceID string     `json:"workspaceId"`
+	Slug        string     `json:"slug"`
+	Name        string     `json:"name"`
+	Description string     `json:"description,omitempty"`
+	Color       string     `json:"color,omitempty"`
+	IsArchived  bool       `json:"isArchived"`
 	StartedOn   *time.Time `json:"startedOn,omitempty"`
 	EndedOn     *time.Time `json:"endedOn,omitempty"`
 	UpdatedAt   *time.Time `json:"updatedAt,omitempty"`

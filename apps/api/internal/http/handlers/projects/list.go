@@ -29,8 +29,9 @@ func List(deps Deps) func(context.Context, *ListProjectsInput) (*ListProjectsOut
 		}
 		out := &ListProjectsOutput{}
 		out.Body.Projects = make([]Project, 0, len(rows))
+		wsPublicID := ws.PublicID.String()
 		for _, r := range rows {
-			out.Body.Projects = append(out.Body.Projects, rowToProjectFromList(r))
+			out.Body.Projects = append(out.Body.Projects, rowToProjectFromList(r, wsPublicID))
 		}
 		if len(rows) > 0 {
 			out.Body.Total = totalAsInt64(rows[0].Total)

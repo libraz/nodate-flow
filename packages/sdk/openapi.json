@@ -2040,9 +2040,12 @@
           "updatedAt": {
             "format": "date-time",
             "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
           }
         },
-        "required": ["id", "slug", "name", "isArchived", "createdAt"],
+        "required": ["id", "workspaceId", "slug", "name", "isArchived", "createdAt"],
         "type": "object"
       },
       "ProjectMember": {
