@@ -7,6 +7,7 @@ package ai
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/providers"
@@ -103,9 +104,5 @@ func Metrics(deps Deps) func(context.Context, *AiMetricsInput) (*AiMetricsOutput
 // the response is stable across requests (snapshot iteration order is
 // non-deterministic).
 func sortOutboundLimits(s []OutboundLimitStat) {
-	for i := 1; i < len(s); i++ {
-		for j := i; j > 0 && s[j-1].Destination > s[j].Destination; j-- {
-			s[j-1], s[j] = s[j], s[j-1]
-		}
-	}
+	sort.Slice(s, func(i, j int) bool { return s[i].Destination < s[j].Destination })
 }
