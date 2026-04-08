@@ -596,6 +596,23 @@ export interface paths {
         patch: operations["workspaces-patch"];
         trace?: never;
     };
+    "/workspaces/{wsId}/ai/auto-actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Workspace-wide deterministic auto-action proposals (2.AI-3) */
+        get: operations["ai-auto-actions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{wsId}/ai/compile-lens": {
         parameters: {
             query?: never;
@@ -1365,6 +1382,16 @@ export interface components {
             groupBy: string | null;
             sort: components["schemas"]["SortSpec"][] | null;
         };
+        ListAutoActionsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            actions: components["schemas"]["TaskAutoAction"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
         ListDuplicatesOutputBody: {
             /**
              * Format: uri
@@ -1887,6 +1914,15 @@ export interface components {
             updatedAt?: string;
             uploaderDisplayName: string;
             uploaderId: string;
+        };
+        TaskAutoAction: {
+            /** Format: float */
+            confidence: number;
+            kind: string;
+            reason: string;
+            state: string;
+            taskId: string;
+            title: string;
         };
         TaskComment: {
             /**
@@ -3681,6 +3717,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Workspace"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-auto-actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListAutoActionsOutputBody"];
                 };
             };
             /** @description Error */

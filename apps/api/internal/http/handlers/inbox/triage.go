@@ -1,4 +1,4 @@
-// Package inbox - triage.go is the Phase 2 Wave 1 endpoint that asks
+// Package inbox - triage.go is the endpoint that asks
 // the AI orchestrator to score the workspace inbox and return
 // per-item recommended actions. The route is registered separately
 // from the v1 inbox routes (Register) because it needs the orchestrator

@@ -53,7 +53,7 @@ type Orchestrator struct {
 	Guard     *CostGuard
 	LogInvoke InvocationLogger
 
-	// DB and Queries are optional Phase 2 dependencies used by
+	// DB and Queries are optional dependencies used by
 	// orchestration methods that need to read project state (for
 	// example ProposeInboxTriage reads the workspace inbox) and append
 	// ai.suggestion.* events. They may be left nil for code paths

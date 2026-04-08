@@ -35,9 +35,8 @@ type MySQLInstance struct {
 
 const (
 	// MySQL 9 Community is used in tests to match the production target
-	// (see docs/requirements.md §3.5). Phase 1 stores embeddings as
-	// LONGBLOB of float32[]; native VECTOR columns are deferred to
-	// Wave 2 per ADR 0003.
+	// (see docs/requirements.md §3.5). Embeddings are stored via the
+	// schema defined in ADR 0003.
 	mysqlImage    = "mysql:9.1"
 	mysqlDatabase = "nodate_flow_test"
 	mysqlUser     = "nodate"

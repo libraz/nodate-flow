@@ -1,5 +1,5 @@
-// Package stateinfer implements the Phase 2 Wave 2 "state inference"
-// stream (2.AI-1). Given a compact view of a task's signals (current
+// Package stateinfer implements the "state inference" stream
+// (2.AI-1). Given a compact view of a task's signals (current
 // derived state, staleness, dependency count, due date), it proposes
 // the next likely state machine transition.
 //

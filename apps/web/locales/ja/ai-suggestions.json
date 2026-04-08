@@ -46,6 +46,15 @@
       "due_soon": "期限間近"
     }
   },
+  "auto_actions": {
+    "title": "推奨アクション",
+    "kind": {
+      "escalate_overdue": "エスカレーション",
+      "assign_owner": "担当者を割当",
+      "nudge_assignee": "リマインド",
+      "close_stale_review": "レビューを閉じる"
+    }
+  },
   "nl_query": {
     "label": "自然言語で問い合わせ",
     "placeholder": "今週ブロックされているものを見せて",

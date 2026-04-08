@@ -6,7 +6,7 @@
 // the purposes of the DRY rule — the generated queries package is the
 // single source of truth for SQL.
 //
-// Phase 1 covers: list_projects, list_tasks, get_task, create_task,
+// Current tool set: list_projects, list_tasks, get_task, create_task,
 // update_task, add_comment, search_tasks (stub), propose_tasks_from
 // (stub), propose_priority (stub). Rate limiting, SSE streaming, and
 // the full propose_* AI wiring are deferred.
@@ -49,8 +49,8 @@ type Handler struct {
 	tools map[string]tool
 }
 
-// NewHandler constructs the MCP HTTP handler with the default Phase 1
-// tool set registered.
+// NewHandler constructs the MCP HTTP handler with the default tool
+// set registered.
 func NewHandler(deps Deps) *Handler {
 	h := &Handler{deps: deps, tools: map[string]tool{}}
 	registerTools(h)
@@ -239,7 +239,7 @@ func (h *Handler) audit(
 	if h.deps.Queries == nil {
 		return
 	}
-	// Phase 1 redaction is a no-op: we store the raw args / result JSON.
+	// Redaction is currently a no-op: we store the raw args / result JSON.
 	// Future: run through the redaction pipeline before persisting.
 	argsBlob := args
 	if len(argsBlob) == 0 {

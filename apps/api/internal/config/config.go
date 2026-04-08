@@ -15,10 +15,10 @@ type Config struct {
 	// Slack event deliveries.
 	SlackSigningSecret string `env:"NF_SLACK_SIGNING_SECRET" envDefault:""`
 	// DefaultWorkspaceID is the workspace public id (UUID v7) that
-	// inbound webhook signals are routed to in Phase 1, where there is
-	// no per-repo workspace mapping yet.
+	// inbound webhook signals are routed to while there is no per-repo
+	// workspace mapping yet.
 	//
-	// TODO(phase 2): Replace with a real repo→workspace mapping table.
+	// TODO: Replace with a real repo→workspace mapping table.
 	DefaultWorkspaceID string `env:"NF_DEFAULT_WORKSPACE_ID" envDefault:""`
 
 	// CookieSecure toggles the Secure flag on the nf_rt refresh cookie.
@@ -30,7 +30,7 @@ type Config struct {
 	// AiMock toggles the deterministic in-memory AI provider. When true,
 	// every workspace.ai_providers row is ignored and ai.Orchestrator
 	// routes to a fixture-backed Provider that loads JSON from
-	// apps/api/testdata/ai/. Used by Phase 2 development and tests.
+	// apps/api/testdata/ai/. Used by development and tests.
 	AiMock bool `env:"NF_AI_MOCK" envDefault:"false"`
 }
 

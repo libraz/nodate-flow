@@ -45,8 +45,8 @@ func extractTaskMarker(body []byte) (string, bool) {
 // HandleGithubWebhook is a chi-level handler for POST /webhooks/github.
 // It verifies the X-Hub-Signature-256 header and inserts a signals row.
 //
-// Phase 1 routes every inbound delivery to deps.DefaultWorkspaceID; a
-// real per-repo workspace mapping table is deferred to a later phase.
+// Currently routes every inbound delivery to deps.DefaultWorkspaceID;
+// a real per-repo workspace mapping table is deferred.
 func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
@@ -65,7 +65,7 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 			return
 		}
 
-		// Resolve workspace from the configured default. Phase 1 only.
+		// Resolve workspace from the configured default.
 		if deps.DefaultWorkspaceID == "" {
 			writeError(w, apierrors.InternalUnexpected)
 			return

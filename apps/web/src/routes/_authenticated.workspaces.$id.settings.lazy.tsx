@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next';
 
 const routeApi = getRouteApi('/_authenticated/workspaces/$id/settings');
 
-type SubNavKey = 'general' | 'mcp_tokens' | 'ai_providers' | 'ai_activity';
+type SubNavKey = 'general' | 'mcp_tokens' | 'ai_providers' | 'ai_activity' | 'weekly_digest';
 
 interface SubNavItem {
   key: SubNavKey;
@@ -20,7 +20,8 @@ interface SubNavItem {
     | '/workspaces/$id/settings/general'
     | '/workspaces/$id/settings/mcp-tokens'
     | '/workspaces/$id/settings/ai-providers'
-    | '/workspaces/$id/settings/ai-activity';
+    | '/workspaces/$id/settings/ai-activity'
+    | '/workspaces/$id/settings/weekly-digest';
 }
 
 const SUB_NAV: readonly SubNavItem[] = [
@@ -28,11 +29,12 @@ const SUB_NAV: readonly SubNavItem[] = [
   { key: 'mcp_tokens', to: '/workspaces/$id/settings/mcp-tokens' },
   { key: 'ai_providers', to: '/workspaces/$id/settings/ai-providers' },
   { key: 'ai_activity', to: '/workspaces/$id/settings/ai-activity' },
+  { key: 'weekly_digest', to: '/workspaces/$id/settings/weekly-digest' },
 ];
 
 function labelKeyFor(
   key: SubNavKey,
-): 'nav.general' | 'nav.mcp_tokens' | 'nav.ai_providers' | 'nav.ai_activity' {
+): 'nav.general' | 'nav.mcp_tokens' | 'nav.ai_providers' | 'nav.ai_activity' | 'nav.weekly_digest' {
   switch (key) {
     case 'general':
       return 'nav.general';
@@ -42,6 +44,8 @@ function labelKeyFor(
       return 'nav.ai_providers';
     case 'ai_activity':
       return 'nav.ai_activity';
+    case 'weekly_digest':
+      return 'nav.weekly_digest';
   }
 }
 

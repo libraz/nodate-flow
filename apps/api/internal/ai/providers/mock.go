@@ -1,7 +1,7 @@
 // Package providers - mock.go is a deterministic in-memory Provider used
 // when NF_AI_MOCK=1. It bypasses all upstream HTTP calls and returns
 // fixture text loaded from apps/api/testdata/ai/. The mock is the seam
-// Phase 2 tests rely on for reproducible LLM behaviour.
+// tests rely on for reproducible LLM behaviour.
 package providers
 
 import (
@@ -83,8 +83,8 @@ func (m *MockProvider) load(name string) (string, error) {
 }
 
 // fixtureNameForSystem maps an orchestrator system prompt to a fixture
-// file name. The mapping is intentionally tiny: Phase 2 Wave 1 only
-// needs inbox_triage, and additional purposes can be added later as
+// file name. The mapping is intentionally tiny: currently only
+// inbox_triage is needed, and additional purposes can be added later as
 // new orchestrator methods are introduced.
 func fixtureNameForSystem(_ string) string {
 	return "inbox_triage"

@@ -1,5 +1,5 @@
 /**
- * Phase 1 closeout smoke test (roadmap B.1 + B.2).
+ * Closeout smoke test.
  *
  * Happy path:
  *   1. Create a fresh tenant via REST (workspace + project seeded).

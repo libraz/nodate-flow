@@ -4,11 +4,28 @@
     "general": "General",
     "mcp_tokens": "MCP tokens",
     "ai_providers": "AI providers",
-    "ai_activity": "AI activity"
+    "ai_activity": "AI activity",
+    "weekly_digest": "Weekly digest"
   },
   "ai_activity": {
     "empty": "No LLM calls recorded yet.",
     "error_code": "Error: {{code}}"
+  },
+  "weekly_digest": {
+    "title": "Weekly digest",
+    "description": "A deterministic snapshot of this workspace: state counts, what was completed in the last seven days, and what is overdue.",
+    "counts": {
+      "open": "Open",
+      "waiting": "Waiting",
+      "review": "Review",
+      "done": "Done",
+      "cancelled": "Cancelled"
+    },
+    "completed_this_week": "Completed this week",
+    "overdue_open": "Overdue",
+    "empty_completed": "Nothing completed in the last seven days.",
+    "empty_overdue": "No overdue tasks.",
+    "markdown": "Markdown"
   },
   "profile": {
     "title": "Profile",

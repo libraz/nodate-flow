@@ -14,6 +14,7 @@ import {
 } from '@tanstack/react-query';
 
 import { sdk } from '../../lib/sdk';
+import { useStreamHealthy } from '../realtime/stream-health';
 
 /** AI suggestion summary mirrored from the SDK. */
 export type AiSuggestion = components['schemas']['AiSuggestionSummary'];
@@ -56,10 +57,11 @@ function toError(err: unknown, fallback: string): AiSuggestionsApiError {
 export function useAiSuggestionsQuery(
   workspaceId: string | undefined,
 ): UseQueryResult<AiSuggestion[], AiSuggestionsApiError> {
+  const streamHealthy = useStreamHealthy();
   return useQuery<AiSuggestion[], AiSuggestionsApiError>({
     queryKey: aiSuggestionsKeys.list(workspaceId ?? ''),
     enabled: typeof workspaceId === 'string' && workspaceId.length > 0,
-    refetchInterval: POLL_INTERVAL_MS,
+    refetchInterval: streamHealthy ? false : POLL_INTERVAL_MS,
     staleTime: POLL_INTERVAL_MS,
     retry: false,
     queryFn: async (): Promise<AiSuggestion[]> => {

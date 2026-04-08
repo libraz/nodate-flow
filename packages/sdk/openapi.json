@@ -1011,6 +1011,30 @@
         "required": ["filter", "sort", "groupBy"],
         "type": "object"
       },
+      "ListAutoActionsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListAutoActionsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/TaskAutoAction"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "actions"],
+        "type": "object"
+      },
       "ListDuplicatesOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -2280,6 +2304,32 @@
           "storageKey",
           "createdAt"
         ],
+        "type": "object"
+      },
+      "TaskAutoAction": {
+        "additionalProperties": false,
+        "properties": {
+          "confidence": {
+            "format": "float",
+            "type": "number"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": ["taskId", "title", "state", "kind", "confidence", "reason"],
         "type": "object"
       },
       "TaskComment": {
@@ -5061,6 +5111,44 @@
           }
         },
         "summary": "Patch a workspace"
+      }
+    },
+    "/workspaces/{wsId}/ai/auto-actions": {
+      "get": {
+        "operationId": "ai-auto-actions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListAutoActionsOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Workspace-wide deterministic auto-action proposals (2.AI-3)"
       }
     },
     "/workspaces/{wsId}/ai/compile-lens": {

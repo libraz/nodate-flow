@@ -219,8 +219,8 @@ type Querier interface {
 	RotateSessionRefreshHash(ctx context.Context, arg RotateSessionRefreshHashParams) error
 	// Mark a constraint as satisfied at the current time.
 	SatisfyConstraint(ctx context.Context, arg SatisfyConstraintParams) error
-	// Snooze a signal by pushing its received_at forward. Phase 1 minimal impl;
-	// a dedicated snoozed_until_at column may be added in a later phase.
+	// Snooze a signal by pushing its received_at forward. Minimal impl;
+	// a dedicated snoozed_until_at column may be added later on.
 	SnoozeInboxItem(ctx context.Context, arg SnoozeInboxItemParams) error
 	// Sum the estimated cost (in whole cents) of LLM calls made today for a
 	// workspace. cost_estimate is stored as DECIMAL(10,6) USD; multiply by 100

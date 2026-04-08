@@ -48,6 +48,22 @@ type Event struct {
 	Payload any
 }
 
+// NotifyHook is the optional realtime-stream hook. It is called
+// *after* a successful append with the internal workspace id and the
+// event type so an external package (apps/api/internal/stream) can
+// fan the change out to SSE subscribers without eventbus taking a
+// direct dependency on the stream package.
+//
+// Hook must be non-blocking and must never panic. Leave nil for a
+// no-op; [SetNotifyHook] installs a real hook at server startup.
+var notifyHook func(ctx context.Context, workspaceInternalID uint32, eventType string)
+
+// SetNotifyHook installs the realtime notification hook. Calling
+// SetNotifyHook(nil) restores the no-op behaviour.
+func SetNotifyHook(hook func(ctx context.Context, workspaceInternalID uint32, eventType string)) {
+	notifyHook = hook
+}
+
 // Append inserts a single event row using the provided DBTX. When db is
 // a *sql.Tx the event is part of that transaction.
 func Append(ctx context.Context, db DBTX, evt Event) error {
@@ -79,5 +95,8 @@ func Append(ctx context.Context, db DBTX, evt Event) error {
 		PayloadJson: raw,
 		OccurredAt:  time.Now().UTC(),
 	})
+	if err == nil && notifyHook != nil {
+		notifyHook(ctx, evt.WorkspaceID, evt.Type)
+	}
 	return err
 }

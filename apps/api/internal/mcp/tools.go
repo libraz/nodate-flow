@@ -1,4 +1,4 @@
-// Package mcp tool registry and Phase 1 tool implementations.
+// Package mcp tool registry and tool implementations.
 package mcp
 
 import (
@@ -117,7 +117,7 @@ func registerTools(h *Handler) {
 	})
 	h.register(tool{
 		name:          "search_tasks",
-		description:   "Full-text search across tasks. NOT YET IMPLEMENTED in Phase 1.",
+		description:   "Full-text search across tasks. NOT YET IMPLEMENTED.",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"query": stringSchema("Search query."),
@@ -126,7 +126,7 @@ func registerTools(h *Handler) {
 	})
 	h.register(tool{
 		name:          "propose_tasks_from",
-		description:   "Ask the workspace LLM to propose tasks from free text. AI not wired in Phase 1.",
+		description:   "Ask the workspace LLM to propose tasks from free text. AI not wired yet.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"source": stringSchema("Input text to propose tasks from."),
@@ -135,7 +135,7 @@ func registerTools(h *Handler) {
 	})
 	h.register(tool{
 		name:          "propose_priority",
-		description:   "Ask the workspace LLM to propose a priority for a task. AI not wired in Phase 1.",
+		description:   "Ask the workspace LLM to propose a priority for a task. AI not wired yet.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"taskId": stringSchema("Task public id (UUID v7)."),
@@ -516,11 +516,11 @@ func runAddComment(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	return map[string]any{"id": cpub.String()}, nil
 }
 
-// runSearchTasks is deferred to Phase 2: the SearchTasks sqlc query does
-// not exist yet and adding it would expand the scope of Phase 1.
+// runSearchTasks is deferred: the SearchTasks sqlc query does not
+// exist yet and adding it would expand the current scope.
 func runSearchTasks(_ context.Context, _ Deps, _ *session, _ json.RawMessage) (any, error) {
 	return nil, apierrors.Newf(apierrors.McpToolExecutionFailed,
-		"search_tasks: not implemented in Phase 1")
+		"search_tasks: not implemented")
 }
 
 // runProposeTasksFrom asks the workspace's LLM provider to turn a free-text

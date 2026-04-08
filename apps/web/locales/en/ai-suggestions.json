@@ -46,6 +46,15 @@
       "due_soon": "Due soon"
     }
   },
+  "auto_actions": {
+    "title": "Suggested actions",
+    "kind": {
+      "escalate_overdue": "Escalate",
+      "assign_owner": "Assign owner",
+      "nudge_assignee": "Nudge",
+      "close_stale_review": "Close review"
+    }
+  },
   "nl_query": {
     "label": "Ask in plain language",
     "placeholder": "show me everything blocked this week",

@@ -8,7 +8,7 @@ import (
 )
 
 // MockProvider is a deterministic in-process embedding provider used by
-// Phase 2 Wave 2 development and tests. It derives a reproducible
+// development and tests. It derives a reproducible
 // 768-dim vector from the SHA-256 of the input text, so the same input
 // always produces the same vector across machines, CI runs, and
 // processes. Cosine similarity between two mock vectors is therefore a

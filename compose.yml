@@ -1,5 +1,5 @@
 # Local development compose stack for nodate-flow.
-# Minimal Phase 0 set: mysql + api. No web/prometheus/grafana yet.
+# Minimal set: mysql + api. No web/prometheus/grafana yet.
 services:
   mysql:
     image: mysql:9.1

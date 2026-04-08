@@ -1,6 +1,6 @@
 /**
  * EditSuggestionDialog — modal form for editing an AI triage suggestion's
- * `recommendedAction` and `reasoning` before applying. Wave 1: local edits
+ * `recommendedAction` and `reasoning` before applying. Local edits
  * only; the `ai.suggestion.edited` event is wired in a later polish.
  */
 

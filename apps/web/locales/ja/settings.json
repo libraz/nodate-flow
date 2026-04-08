@@ -4,11 +4,28 @@
     "general": "一般",
     "mcp_tokens": "MCP トークン",
     "ai_providers": "AI プロバイダ",
-    "ai_activity": "AI アクティビティ"
+    "ai_activity": "AI アクティビティ",
+    "weekly_digest": "週次ダイジェスト"
   },
   "ai_activity": {
     "empty": "LLM 呼び出しの記録はまだありません。",
     "error_code": "エラー: {{code}}"
+  },
+  "weekly_digest": {
+    "title": "週次ダイジェスト",
+    "description": "このワークスペースの決定論的スナップショットです。状態ごとの件数、直近 7 日間で完了したタスク、期限超過のタスクを表示します。",
+    "counts": {
+      "open": "オープン",
+      "waiting": "待機",
+      "review": "レビュー",
+      "done": "完了",
+      "cancelled": "キャンセル"
+    },
+    "completed_this_week": "今週完了したタスク",
+    "overdue_open": "期限超過",
+    "empty_completed": "直近 7 日間で完了したタスクはありません。",
+    "empty_overdue": "期限超過のタスクはありません。",
+    "markdown": "Markdown"
   },
   "profile": {
     "title": "プロフィール",

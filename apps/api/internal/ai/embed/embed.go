@@ -1,4 +1,4 @@
-// Package embed provides the task embedding client used by the Wave 2
+// Package embed provides the task embedding client used by the
 // duplicate-detection pipeline (ADR 0003). It normalizes vectors from a
 // pluggable Provider, hashes the source text to skip redundant work,
 // and upserts rows into task_embeddings via the sqlc-generated query
@@ -24,7 +24,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 )
 
-// Dim is the default embedding dimensionality for Wave 2 (see ADR 0003).
+// Dim is the default embedding dimensionality (see ADR 0003).
 const Dim = 768
 
 // Provider produces a raw embedding for a piece of text. Implementations

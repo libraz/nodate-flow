@@ -10,6 +10,7 @@ import type { components } from '@nodate-flow/sdk';
 import { type UseQueryResult, useQuery } from '@tanstack/react-query';
 
 import { sdk } from '../../lib/sdk';
+import { useStreamHealthy } from '../realtime/stream-health';
 
 export type TaskReminder = components['schemas']['TaskReminder'];
 
@@ -27,10 +28,11 @@ export const remindersKeys = {
 export function useRemindersQuery(
   workspaceId: string | undefined,
 ): UseQueryResult<TaskReminder[], Error> {
+  const streamHealthy = useStreamHealthy();
   return useQuery<TaskReminder[], Error>({
     queryKey: remindersKeys.list(workspaceId ?? ''),
     enabled: typeof workspaceId === 'string' && workspaceId.length > 0,
-    refetchInterval: POLL_INTERVAL_MS,
+    refetchInterval: streamHealthy ? false : POLL_INTERVAL_MS,
     staleTime: POLL_INTERVAL_MS,
     retry: false,
     queryFn: async (): Promise<TaskReminder[]> => {

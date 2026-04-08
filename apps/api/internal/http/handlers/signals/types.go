@@ -27,7 +27,7 @@ type Deps struct {
 	// inbound Slack event signatures.
 	SlackSigningSecret string
 	// DefaultWorkspaceID is the workspace public id (UUID v7) that
-	// inbound webhook signals are routed to in Phase 1.
+	// inbound webhook signals are routed to.
 	DefaultWorkspaceID string
 }
 

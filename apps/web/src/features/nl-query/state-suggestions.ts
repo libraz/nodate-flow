@@ -10,6 +10,7 @@ import type { components } from '@nodate-flow/sdk';
 import { type UseQueryResult, useQuery } from '@tanstack/react-query';
 
 import { sdk } from '../../lib/sdk';
+import { useStreamHealthy } from '../realtime/stream-health';
 
 export type StateSuggestion = components['schemas']['StateSuggestion'];
 
@@ -27,10 +28,11 @@ export const stateSuggestionsKeys = {
 export function useStateSuggestionsQuery(
   workspaceId: string | undefined,
 ): UseQueryResult<StateSuggestion[], Error> {
+  const streamHealthy = useStreamHealthy();
   return useQuery<StateSuggestion[], Error>({
     queryKey: stateSuggestionsKeys.list(workspaceId ?? ''),
     enabled: typeof workspaceId === 'string' && workspaceId.length > 0,
-    refetchInterval: POLL_INTERVAL_MS,
+    refetchInterval: streamHealthy ? false : POLL_INTERVAL_MS,
     staleTime: POLL_INTERVAL_MS,
     retry: false,
     queryFn: async (): Promise<StateSuggestion[]> => {

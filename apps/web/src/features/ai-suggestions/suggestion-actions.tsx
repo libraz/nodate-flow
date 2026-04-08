@@ -1,7 +1,7 @@
 /**
  * SuggestionActions — reusable 3-button action row for AI suggestions
  * (apply / dismiss / edit). Domain-agnostic; consumers wire the callbacks
- * to whatever mutation they need. This is the scaffold for all Phase 2
+ * to whatever mutation they need. This is the scaffold for all
  * suggestion UIs (inbox triage, project planning, etc).
  */
 

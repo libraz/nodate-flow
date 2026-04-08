@@ -24,8 +24,10 @@ import {
   useDismissAiSuggestion,
 } from '../ai-suggestions/api';
 import SuggestionActions from '../ai-suggestions/suggestion-actions';
+import { type TaskAutoAction, useAutoActionsQuery } from '../auto-actions/api';
 import { type CompileLensResult, NlQueryError, useCompileLens } from '../nl-query/api';
 import { type StateSuggestion, useStateSuggestionsQuery } from '../nl-query/state-suggestions';
+import { useWorkspaceStream } from '../realtime/use-workspace-stream';
 import { type TaskReminder, useRemindersQuery } from '../reminders/api';
 
 const NL_UNPARSEABLE = 'AI.NL_QUERY.UNPARSEABLE';
@@ -197,7 +199,7 @@ function GlassDockSuggestionRow({
           onApply={handleApply}
           onDismiss={handleDismiss}
           onEdit={() => {
-            /* edit modal — wave 1 follow-up */
+            /* edit modal — follow-up */
           }}
         />
       </div>
@@ -339,12 +341,86 @@ function RemindersPanel({
   );
 }
 
+function AutoActionsPanel({
+  workspaceId,
+}: {
+  workspaceId: string | undefined;
+}): ReactElement | null {
+  const { t } = useTranslation('ai-suggestions');
+  const { data } = useAutoActionsQuery(workspaceId);
+  const items: TaskAutoAction[] = data ?? [];
+  if (items.length === 0) return null;
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.375rem',
+        padding: '0.75rem',
+        borderBlockEnd: '1px solid var(--color-border)',
+      }}
+    >
+      <strong style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}>
+        {t('auto_actions.title')}
+      </strong>
+      <ul
+        style={{
+          listStyle: 'none',
+          padding: 0,
+          margin: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.375rem',
+        }}
+      >
+        {items.slice(0, 5).map((a) => {
+          const tone =
+            a.kind === 'escalate_overdue'
+              ? 'danger'
+              : a.kind === 'assign_owner'
+                ? 'warning'
+                : 'accent';
+          return (
+            <li key={`${a.taskId}-${a.kind}`}>
+              <a
+                href={`/tasks/${a.taskId}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  color: 'var(--color-fg)',
+                  textDecoration: 'none',
+                  fontSize: '0.75rem',
+                }}
+              >
+                <Badge tone={tone}>{t(`auto_actions.kind.${a.kind}`)}</Badge>
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {a.title}
+                </span>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    color: 'var(--color-muted)',
+                  }}
+                >
+                  {a.confidence.toFixed(2)}
+                </span>
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 export default function GlassDock(): ReactElement {
   const { t } = useTranslation('ai-suggestions');
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
   const workspaceId = useActiveWorkspaceId();
+  useWorkspaceStream(workspaceId);
   const { data } = useAiSuggestionsQuery(workspaceId);
   const suggestions: AiSuggestion[] = data ?? [];
   const applyMutation = useApplyAiSuggestion(workspaceId ?? '');
@@ -453,6 +529,7 @@ export default function GlassDock(): ReactElement {
         </button>
       </div>
       <NlQueryPanel workspaceId={workspaceId} />
+      <AutoActionsPanel workspaceId={workspaceId} />
       <RemindersPanel workspaceId={workspaceId} />
       <StateSuggestionsPanel workspaceId={workspaceId} />
       <div

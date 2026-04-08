@@ -19,7 +19,7 @@ type Deps struct {
 	Queries *generated.Queries
 	// Embedder upserts task embeddings on Create / Patch when title or
 	// description changes (ADR 0003). Optional: nil disables write-time
-	// embedding, which is fine for Wave 1 and the weekly reindex cron
+	// embedding, which is fine currently and the weekly reindex cron
 	// will catch up.
 	Embedder *embed.Client
 }

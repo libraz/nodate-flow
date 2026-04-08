@@ -1,5 +1,5 @@
-// Package ai - inbox.go is the Phase 2 Wave 1 entry point for AI-driven
-// inbox triage. ProposeInboxTriage walks the top-N unarchived inbox items
+// Package ai - inbox.go is the entry point for AI-driven inbox
+// triage. ProposeInboxTriage walks the top-N unarchived inbox items
 // for a workspace, asks the wired Provider to score them, and appends a
 // ai.suggestion.proposed event for each result so the Glass Dock and
 // constraint engine can react.

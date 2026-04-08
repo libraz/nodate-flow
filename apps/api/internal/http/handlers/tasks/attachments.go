@@ -12,7 +12,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/middleware"
 )
 
-// AddAttachment handles POST /tasks/{id}/attachments. Phase 1 stores
+// AddAttachment handles POST /tasks/{id}/attachments. Currently stores
 // metadata only; the actual upload happens out-of-band.
 func AddAttachment(deps Deps) func(context.Context, *AddTaskAttachmentInput) (*AddTaskAttachmentOutput, error) {
 	return func(ctx context.Context, in *AddTaskAttachmentInput) (*AddTaskAttachmentOutput, error) {

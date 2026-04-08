@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Entry point for the `tnk` CLI. This is a Phase 0 stub.
+// Entry point for the `tnk` CLI. This is a stub.
 
 const [, , cmd] = process.argv;
 

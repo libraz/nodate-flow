@@ -10,8 +10,8 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/middleware"
 )
 
-// digestLimit caps how many tasks the weekly digest ingests. Phase 2
-// workspaces are small enough that 500 is plenty without a second
+// digestLimit caps how many tasks the weekly digest ingests.
+// Workspaces are small enough that 500 is plenty without a second
 // aggregation query.
 const digestLimit = 500
 

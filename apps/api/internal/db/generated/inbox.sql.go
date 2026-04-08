@@ -210,8 +210,8 @@ type SnoozeInboxItemParams struct {
 	PublicID    types.PublicID `json:"publicId"`
 }
 
-// Snooze a signal by pushing its received_at forward. Phase 1 minimal impl;
-// a dedicated snoozed_until_at column may be added in a later phase.
+// Snooze a signal by pushing its received_at forward. Minimal impl;
+// a dedicated snoozed_until_at column may be added later on.
 func (q *Queries) SnoozeInboxItem(ctx context.Context, arg SnoozeInboxItemParams) error {
 	_, err := q.db.ExecContext(ctx, snoozeInboxItem, arg.ReceivedAt, arg.WorkspaceID, arg.PublicID)
 	return err

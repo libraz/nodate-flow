@@ -9,10 +9,10 @@ import (
 	"testing"
 )
 
-// TestNewHandlerRegistersPhase1Tools verifies that all Phase 1 tools
-// are registered on a freshly-constructed handler. The test avoids
-// exercising the transport path that requires a live DB.
-func TestNewHandlerRegistersPhase1Tools(t *testing.T) {
+// TestNewHandlerRegistersTools verifies that all tools are registered
+// on a freshly-constructed handler. The test avoids exercising the
+// transport path that requires a live DB.
+func TestNewHandlerRegistersTools(t *testing.T) {
 	h := NewHandler(Deps{})
 	want := []string{
 		"list_projects",
@@ -32,7 +32,7 @@ func TestNewHandlerRegistersPhase1Tools(t *testing.T) {
 	}
 }
 
-// TestGETReturns405 documents that SSE is deferred in Phase 1.
+// TestGETReturns405 documents that SSE is deferred.
 func TestGETReturns405(t *testing.T) {
 	h := NewHandler(Deps{})
 	req := httptest.NewRequest(http.MethodGet, "/mcp", nil)

@@ -14,8 +14,10 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/config"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/router"
 	nflog "github.com/nodate-flow/nodate-flow/apps/api/internal/log"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/stream"
 )
 
 func main() {
@@ -49,6 +51,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Realtime SSE fan-out (ADR 0005). The notifier is in-process
+	// for v1; swap for a Redis/NATS implementation when moving to
+	// multi-replica. eventbus.Append calls the tap after every
+	// successful insert so SSE subscribers see task.* and
+	// ai.suggestion.* changes without polling.
+	notifier := stream.NewInProcessNotifier()
+	tap := stream.NewEventbusTap(notifier)
+	eventbus.SetNotifyHook(tap.Publish)
+
 	inner := router.Build(router.Deps{
 		DB:                 db,
 		Queries:            queries,
@@ -59,6 +70,8 @@ func main() {
 		DefaultWorkspaceID: cfg.DefaultWorkspaceID,
 		CookieSecure:       cfg.CookieSecure,
 		AiMock:             cfg.AiMock,
+		StreamNotifier:     notifier,
+		StreamRemember:     tap.RememberWorkspace,
 	})
 
 	// Wrap the router with the request logger so the prod binary keeps

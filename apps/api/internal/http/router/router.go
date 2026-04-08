@@ -36,6 +36,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/workspaces"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/middleware"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/mcp"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/stream"
 )
 
 // Deps is the dependency bundle Build needs in order to wire every
@@ -70,10 +71,19 @@ type Deps struct {
 	// wires it from cfg.CookieSecure.
 	CookieSecure bool
 	// AiMock toggles the deterministic in-memory AI provider used by
-	// Phase 2 development and tests. When true the orchestrator routes
+	// development and tests. When true the orchestrator routes
 	// every workspace to a fixture-backed Provider regardless of the
 	// workspace.ai_providers rows.
 	AiMock bool
+	// StreamNotifier is the realtime fan-out for SSE subscribers.
+	// Nil means realtime is disabled: the SSE route still mounts
+	// but serves only heartbeats, and eventbus.Append does not
+	// publish. Tests that don't care pass nil.
+	StreamNotifier stream.Notifier
+	// StreamRemember is the callback the SSE handler uses to teach
+	// the eventbus tap the internal→public workspace id mapping.
+	// May be nil when StreamNotifier is nil.
+	StreamRemember stream.RememberWorkspaceFunc
 }
 
 // Result is what BuildResult returns: the composed chi router plus the
@@ -137,8 +147,9 @@ func BuildResult(deps Deps) Result {
 	aclDB := passthroughDB{deps.DB}
 	wsDeps := workspaces.Deps{DB: deps.DB, Queries: deps.Queries}
 	prjDeps := projects.Deps{DB: deps.DB, Queries: deps.Queries}
-	// Write-time embedding client (ADR 0003). Wave 2 only ships the mock
-	// provider; the real provider integration is a separate follow-up.
+	// Write-time embedding client (ADR 0003). Currently only the mock
+	// provider is shipped; the real provider integration is a separate
+	// follow-up.
 	var embedClient *embed.Client
 	var nlQueryCompiler *nlquery.Compiler
 	if deps.AiMock {
@@ -151,7 +162,7 @@ func BuildResult(deps Deps) Result {
 	aiDeps := aihandlers.Deps{DB: deps.DB, Queries: deps.Queries, Cipher: deps.Cipher, NlQuery: nlQueryCompiler}
 
 	// AI orchestrator. Built once and shared by the MCP server, the
-	// inbox triage handler, and any future Phase 2 endpoint. When
+	// inbox triage handler, and any future AI endpoint. When
 	// NF_AI_MOCK is set the resolver short-circuits to a deterministic
 	// fixture-backed provider so tests do not need a cipher.
 	var aiOrch *ai.Orchestrator
@@ -254,6 +265,12 @@ func BuildResult(deps Deps) Result {
 			Summary:     "Workspace-wide deterministic reminder engine proposals (2.AI-4)",
 		}, aihandlers.ListReminders(aiDeps))
 		huma.Register(subAPI, huma.Operation{
+			OperationID: "ai-auto-actions",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/ai/auto-actions",
+			Summary:     "Workspace-wide deterministic auto-action proposals (2.AI-3)",
+		}, aihandlers.ListAutoActions(aiDeps))
+		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-weekly-digest",
 			Method:      http.MethodGet,
 			Path:        "/workspaces/{wsId}/ai/weekly-digest",
@@ -265,6 +282,16 @@ func BuildResult(deps Deps) Result {
 			Path:        "/workspaces/{wsId}/ai/invocations",
 			Summary:     "List redacted LLM call audit rows for the AI reasoning panel",
 		}, aihandlers.ListInvocations(aiDeps))
+
+		// Realtime SSE stream for this workspace. Not a Huma
+		// operation because the response is a long-lived
+		// text/event-stream that never fits the request/response DTO
+		// model. See ADR 0005.
+		notifier := deps.StreamNotifier
+		if notifier == nil {
+			notifier = stream.NopNotifier{}
+		}
+		sub.Get("/workspaces/{wsId}/stream", stream.SSEHandler(notifier, deps.StreamRemember))
 	})
 
 	// Per-user MCP tokens (workspace member, not admin).
@@ -379,7 +406,7 @@ func BuildResult(deps Deps) Result {
 	// MCP server uses the orchestrator built above.
 	r.Handle("/mcp", mcp.NewHandler(mcp.Deps{DB: deps.DB, Queries: deps.Queries, AI: aiOrch, Embedder: embedClient}))
 
-	// Workspace-scoped AI inbox triage (Phase 2 Wave 1). Registered in
+	// Workspace-scoped AI inbox triage. Registered in
 	// its own group so the auth + workspace-member middleware applies
 	// without leaking the orchestrator to the v1 inbox routes.
 	r.Group(func(sub chi.Router) {
@@ -466,4 +493,3 @@ type passthroughDB struct{ db *sql.DB }
 func (p passthroughDB) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
 	return p.db.QueryRowContext(ctx, query, args...)
 }
-

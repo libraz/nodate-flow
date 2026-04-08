@@ -159,7 +159,7 @@ function LandingPage(): ReactElement {
           color: 'var(--color-muted)',
         }}
       >
-        {t('landing.phase')}
+        {t('landing.tagline')}
       </header>
 
       <section style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>

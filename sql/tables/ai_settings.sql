@@ -1,6 +1,6 @@
 -- ====================================
 -- ai_settings
--- Per-workspace AI configuration introduced in Phase 2 Wave 2 (ADR 0003).
+-- Per-workspace AI configuration (ADR 0003).
 -- Holds duplicate-detection thresholds and the embed-budget bucket that
 -- the CostGuard tracks separately from the LLM chat budget.
 --

@@ -51,8 +51,8 @@ WHERE workspace_id = ?
   AND public_id = ?;
 
 -- name: SnoozeInboxItem :exec
--- Snooze a signal by pushing its received_at forward. Phase 1 minimal impl;
--- a dedicated snoozed_until_at column may be added in a later phase.
+-- Snooze a signal by pushing its received_at forward. Minimal impl;
+-- a dedicated snoozed_until_at column may be added later on.
 UPDATE signals
 SET received_at = ?
 WHERE workspace_id = ?

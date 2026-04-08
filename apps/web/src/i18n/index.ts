@@ -8,7 +8,7 @@ import jaCommon from '../../locales/ja/common.json';
 import jaSettings from '../../locales/ja/settings.json';
 import { defaultNamespace } from './namespaces';
 
-/** Supported UI languages for Phase 1. */
+/** Supported UI languages. */
 export const supportedLanguages = ['en', 'ja'] as const;
 
 /** Union of supported UI language codes. */

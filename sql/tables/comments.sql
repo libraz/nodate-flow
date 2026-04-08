@@ -1,7 +1,7 @@
 -- ====================================
 -- comments
 -- Discussion thread attached to a task. Markdown body with edit history
--- captured via edited_at (full revisions out of scope for Phase 1).
+-- captured via edited_at (full revisions out of scope).
 -- ====================================
 CREATE TABLE comments (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',

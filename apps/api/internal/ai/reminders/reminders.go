@@ -1,5 +1,5 @@
-// Package reminders implements the Phase 2 Wave 2 "reminder engine"
-// stream (2.AI-4). Given a compact view of a task's timing signals
+// Package reminders implements the "reminder engine" stream
+// (2.AI-4). Given a compact view of a task's timing signals
 // (current state, due date, now), it emits at most one reminder of a
 // fixed kind. Like stateinfer, the v1 ruleset is deterministic — the
 // signals already carry enough structure that a handful of date

@@ -353,7 +353,7 @@ func RequireWorkspaceRole(min WorkspaceRole) func(http.Handler) http.Handler {
 //     workspace or the path param is not a valid UUID.
 //   - 403 WS.PROJECT.ACCESS_DENIED otherwise.
 //
-// TODO(phase 2): Layer 4 task visibility (public/project/private) is
+// TODO: Layer 4 task visibility (public/project/private) is
 // enforced inside task handlers, not here. This middleware only covers
 // instance/workspace/project layers.
 func RequireProjectMember(db ACLDB) func(http.Handler) http.Handler {

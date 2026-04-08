@@ -2,7 +2,7 @@
  * Zustand store for AI suggestions across the app.
  *
  * Holds an in-memory list of inbox triage suggestions, deduped by
- * `inboxItemId`. No persistence — Wave 1 has no GET endpoint, so the
+ * `inboxItemId`. No persistence — there is no GET endpoint yet, so the
  * inbox triage mutation is the sole producer and the Glass Dock + inbox
  * UI are consumers.
  */
@@ -21,7 +21,7 @@ export interface SuggestionsState {
   pushSuggestions: (next: Suggestion[]) => void;
   /** Remove a single suggestion by inboxItemId. */
   dismissSuggestion: (inboxItemId: string) => void;
-  /** Patch a single suggestion in place (Wave 1: local-only edits). */
+  /** Patch a single suggestion in place (local-only edits). */
   updateSuggestion: (
     inboxItemId: string,
     patch: { recommendedAction: string; reasoning: string },
