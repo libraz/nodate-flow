@@ -38,7 +38,7 @@ function SettingsLayout(): ReactElement {
       }}
     >
       <nav
-        aria-label={t('nav.profile')}
+        aria-label={t('settings_sections_label')}
         style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}
       >
         {SUB_NAV.map((item) => (

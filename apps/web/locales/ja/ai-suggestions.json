@@ -14,7 +14,9 @@
     "score": "スコア",
     "recommended": "推奨アクション",
     "reasoning": "理由",
-    "missing_item": "対応する受信トレイ項目が見つかりません"
+    "missing_item": "対応する受信トレイ項目が見つかりません",
+    "success": "AI の提案を {count} 件受信しました",
+    "success_empty": "仕分けが完了しました — 提案はありません"
   },
   "edit": {
     "title": "提案を編集",

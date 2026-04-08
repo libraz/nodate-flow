@@ -14,7 +14,9 @@
     "score": "Score",
     "recommended": "Recommended",
     "reasoning": "Reasoning",
-    "missing_item": "Inbox item not found"
+    "missing_item": "Inbox item not found",
+    "success": "{count, plural, one {# AI suggestion ready} other {# AI suggestions ready}}",
+    "success_empty": "Triage complete — no suggestions"
   },
   "edit": {
     "title": "Edit suggestion",

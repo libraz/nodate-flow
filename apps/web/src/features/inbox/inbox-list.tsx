@@ -80,6 +80,15 @@ export default function InboxList(): ReactElement {
   const handleTriageClick = (): void => {
     if (!triageWorkspaceId) return;
     triage.mutate(undefined, {
+      onSuccess: (suggestions) => {
+        toaster.show({
+          tone: 'success',
+          message:
+            suggestions.length > 0
+              ? tAi('triage.success', { count: suggestions.length })
+              : tAi('triage.success_empty'),
+        });
+      },
       onError: () => {
         toaster.show({ tone: 'danger', message: tAi('error') });
       },
@@ -204,7 +213,7 @@ export default function InboxList(): ReactElement {
           variant="primary"
           size="sm"
           onClick={handleTriageClick}
-          disabled={!triageWorkspaceId || triage.isPending}
+          disabled={!triageWorkspaceId || triage.isPending || items.length === 0}
         >
           {triage.isPending ? tAi('triage.running') : tAi('triage.trigger')}
         </Button>

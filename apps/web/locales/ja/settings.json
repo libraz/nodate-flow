@@ -14,6 +14,7 @@
     "error_code": "エラー: {{code}}"
   },
   "sections_label": "ワークスペース設定セクション",
+  "settings_sections_label": "設定セクション",
   "weekly_digest": {
     "title": "週次ダイジェスト",
     "description": "このワークスペースの決定論的スナップショットです。状態ごとの件数、直近 7 日間で完了したタスク、期限超過のタスクを表示します。",
