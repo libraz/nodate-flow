@@ -15,7 +15,24 @@ SELECT
   t.completed_at,
   t.sort_weight,
   t.updated_at,
-  t.created_at
+  t.created_at,
+  (
+    SELECT u.public_id
+    FROM task_actors ta
+    INNER JOIN users u ON u.id = ta.user_id AND u.enabled = TRUE
+    WHERE ta.task_id = t.id
+      AND ta.enabled = TRUE
+      AND ta.role = 'assignee'
+    ORDER BY ta.sort_weight ASC, ta.id ASC
+    LIMIT 1
+  ) AS primary_assignee_public_id,
+  (
+    SELECT COUNT(*)
+    FROM task_actors ta
+    WHERE ta.task_id = t.id
+      AND ta.enabled = TRUE
+      AND ta.role = 'assignee'
+  ) AS assignee_count
 FROM tasks t
 INNER JOIN projects p
   ON p.id = t.project_id AND p.enabled = TRUE

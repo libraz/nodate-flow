@@ -53,6 +53,13 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 	}, Disable(deps))
 
 	huma.Register(api, huma.Operation{
+		OperationID: "tasks-transitions-apply",
+		Method:      http.MethodPost,
+		Path:        "/tasks/{id}/transitions",
+		Summary:     "Apply a state machine transition to a task",
+	}, Transition(deps))
+
+	huma.Register(api, huma.Operation{
 		OperationID: "tasks-constraints-add",
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/constraints",
@@ -79,6 +86,13 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Path:        "/tasks/{id}/dependencies/{depId}",
 		Summary:     "Remove a dependency edge",
 	}, RemoveDependency(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-actors-list",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/actors",
+		Summary:     "List actors on a task",
+	}, ListActors(deps))
 
 	huma.Register(api, huma.Operation{
 		OperationID: "tasks-actors-add",

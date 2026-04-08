@@ -228,6 +228,8 @@ type Querier interface {
 	UpdateProjectFull(ctx context.Context, arg UpdateProjectFullParams) error
 	// Rotate a provider's API key. Caller passes new ciphertext + prefix + suffix.
 	UpdateProviderKey(ctx context.Context, arg UpdateProviderKeyParams) error
+	// Write the new derived_state computed by the transition handler.
+	TransitionTaskState(ctx context.Context, arg TransitionTaskStateParams) error
 	// Update mutable task fields. derived_state is intentionally NOT writable.
 	UpdateTask(ctx context.Context, arg UpdateTaskParams) error
 	// Stamp last successful login time on a user account.

@@ -67,6 +67,8 @@
   "WS.TASK.NOT_FOUND": "Task not found",
   "WS.TASK.STATE_TRANSITION_BLOCKED_BY_CONSTRAINT": "Task cannot transition to the requested state",
   "WS.TASK.TITLE_TOO_LONG": "Task title is too long",
+  "WS.TASK.TRANSITION_REJECTED": "Task transition not allowed in current state",
+  "WS.TASK.TRANSITION_UNKNOWN": "Unknown task transition",
   "WS.TASK.UPDATE_CONFLICT": "Task was modified by someone else",
   "WS.WORKSPACE.ACCESS_DENIED": "You do not have access to this workspace",
   "WS.WORKSPACE.NOT_FOUND": "Workspace not found",

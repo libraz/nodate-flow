@@ -4,6 +4,7 @@
 CREATE OR REPLACE VIEW v_task_detail AS
 SELECT
   t.workspace_id,
+  w.public_id AS workspace_public_id,
   t.public_id,
   p.public_id AS project_public_id,
   p.name AS project_name,
@@ -41,6 +42,7 @@ LEFT JOIN task_actors a
 WHERE t.enabled = TRUE
 GROUP BY
   t.workspace_id,
+  w.public_id,
   t.public_id,
   p.public_id,
   p.name,

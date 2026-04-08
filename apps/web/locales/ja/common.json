@@ -228,11 +228,52 @@
       "create_failed": "タスクを作成できませんでした。もう一度お試しください。",
       "update_failed": "タスクを更新できませんでした。もう一度お試しください。",
       "delete_failed": "タスクを削除できませんでした。もう一度お試しください。",
-      "move_failed": "タスクのステータス遷移はまだ有効化されていません。"
+      "move_failed": "タスクを移動できませんでした。もう一度お試しください。",
+      "illegal_transition": "現在の状態からその移動はできません。",
+      "comment_add_failed": "コメントを追加できませんでした。もう一度お試しください。"
     },
     "board": {
       "empty_column": "タスクなし",
       "drop_hint": "ここにドロップして移動"
+    },
+    "assignee": {
+      "plus_n": "+他{n}件"
+    },
+    "detail": {
+      "title_edit": "タイトルを編集",
+      "description_edit": "説明を編集",
+      "description_empty": "説明はまだありません。",
+      "save": "保存",
+      "cancel": "キャンセル",
+      "priority_label": "優先度",
+      "due_label": "期日",
+      "state_label": "状態",
+      "assignees_label": "担当者",
+      "assignees": {
+        "title": "担当者",
+        "add": "担当者を追加",
+        "remove": "{name} を外す",
+        "empty": "担当者はまだいません。",
+        "none": "追加できるメンバーがいません。"
+      },
+      "transitions": {
+        "title": "遷移",
+        "start": "開始",
+        "block": "ブロック",
+        "unblock": "ブロック解除",
+        "submit": "レビュー依頼",
+        "complete": "完了",
+        "reopen": "再オープン",
+        "cancel": "キャンセル"
+      }
+    },
+    "comments": {
+      "title": "コメント",
+      "add_placeholder": "コメントを入力…",
+      "add": "投稿",
+      "empty": "コメントはまだありません。",
+      "edit": "編集",
+      "delete": "削除"
     }
   },
   "auth": {

@@ -18,8 +18,14 @@ import { sdk } from '../../lib/sdk';
 
 export type Task = components['schemas']['Task'];
 export type TaskListItem = components['schemas']['TaskListItem'];
+export type TaskComment = components['schemas']['TaskComment'];
+export type TaskActor = components['schemas']['TaskActor'];
 export type CreateTaskInput = components['schemas']['CreateTaskBody'];
 export type PatchTaskInput = components['schemas']['PatchTaskBody'];
+export type TransitionInput = components['schemas']['TransitionTaskBody'];
+export type TransitionName = TransitionInput['transition'];
+export type AddCommentInput = components['schemas']['AddTaskCommentBody'];
+export type AddActorInput = components['schemas']['AddTaskActorBody'];
 
 /** Backend `derived_state` enum (see sql/tables/tasks.sql). */
 export type TaskDerivedState = 'open' | 'waiting' | 'review' | 'done' | 'cancelled';
@@ -48,6 +54,8 @@ export const tasksKeys = {
   list: (projectId: string, filters?: TaskFilters) =>
     [...tasksKeys.all, 'list', projectId, filters ?? {}] as const,
   detail: (id: string) => [...tasksKeys.all, 'detail', id] as const,
+  comments: (id: string) => [...tasksKeys.all, 'detail', id, 'comments'] as const,
+  actors: (id: string) => [...tasksKeys.all, 'detail', id, 'actors'] as const,
 };
 
 /** Lightweight error thrown when the SDK returns an error envelope. */
@@ -73,17 +81,52 @@ function toError(err: unknown, fallback: string): TaskApiError {
   return new TaskApiError(undefined, fallback);
 }
 
-function applyFilters(items: TaskListItem[], filters: TaskFilters | undefined): TaskListItem[] {
-  if (!filters) return items;
-  const search = filters.search?.trim().toLowerCase() ?? '';
-  const states = filters.states && filters.states.length > 0 ? new Set(filters.states) : null;
-  return items.filter((t) => {
-    if (search && !t.title.toLowerCase().includes(search)) return false;
-    if (states && !states.has(t.derivedState as TaskDerivedState)) return false;
-    // assigneeId is currently not exposed on TaskListItem; F8 will plumb actors
-    // through the list response. Until then, this filter is a no-op client-side.
-    return true;
-  });
+/**
+ * Legal transitions from a given derived state, per ADR 0001 (v1 state
+ * machine) as specialized for the board drop / transitions panel UX.
+ *
+ * Keep this in sync with `transitionForDrop` below — the transitions panel
+ * simply enumerates these, while the board infers the right transition from
+ * the (from, to) column pair.
+ */
+export const TRANSITIONS_BY_STATE: Record<TaskDerivedState, readonly TransitionName[]> = {
+  open: ['start', 'cancel'],
+  waiting: ['submit', 'block', 'complete', 'cancel'],
+  review: ['complete', 'cancel'],
+  done: ['reopen', 'cancel'],
+  cancelled: ['reopen'],
+};
+
+/**
+ * Map a board column drop onto a state machine transition, or `null` if the
+ * drop is illegal. See task spec F7.
+ */
+export function transitionForDrop(
+  from: TaskDerivedState,
+  to: TaskDerivedState,
+): TransitionName | null {
+  if (from === to) return null;
+  switch (to) {
+    case 'waiting':
+      if (from === 'open') return 'start';
+      if (from === 'review') return 'unblock';
+      if (from === 'done' || from === 'cancelled') return 'reopen';
+      return null;
+    case 'review':
+      if (from === 'waiting') return 'submit';
+      return null;
+    case 'done':
+      if (from === 'review' || from === 'waiting') return 'complete';
+      return null;
+    case 'open':
+      if (from === 'cancelled') return 'reopen';
+      if (from === 'waiting') return 'block';
+      return null;
+    case 'cancelled':
+      return 'cancel';
+    default:
+      return null;
+  }
 }
 
 export function useTasksQuery(
@@ -93,11 +136,27 @@ export function useTasksQuery(
   return useSuspenseQuery({
     queryKey: tasksKeys.list(projectId, filters),
     queryFn: async (): Promise<TaskListItem[]> => {
-      const { data, error } = await sdk.GET('/tasks', {
-        params: { query: { projectId, limit: 200, offset: 0 } },
-      });
+      const search = filters?.search?.trim() ?? '';
+      const states = filters?.states ?? [];
+      const assignee = filters?.assigneeId?.trim() ?? '';
+      const query: {
+        projectId: string;
+        limit: number;
+        offset: number;
+        q?: string;
+        state?: string[];
+        assignee?: string;
+      } = {
+        projectId,
+        limit: 200,
+        offset: 0,
+      };
+      if (search.length > 0) query.q = search;
+      if (states.length > 0) query.state = [...states];
+      if (assignee.length > 0) query.assignee = assignee;
+      const { data, error } = await sdk.GET('/tasks', { params: { query } });
       if (error || !data) throw toError(error, 'Failed to load tasks');
-      return applyFilters(data.tasks ?? [], filters);
+      return data.tasks ?? [];
     },
   });
 }
@@ -111,6 +170,76 @@ export function useTaskQuery(taskId: string): UseSuspenseQueryResult<Task> {
       });
       if (error || !data) throw toError(error, 'Failed to load task');
       return data;
+    },
+  });
+}
+
+export function useTaskActorsQuery(taskId: string): UseSuspenseQueryResult<TaskActor[]> {
+  return useSuspenseQuery({
+    queryKey: tasksKeys.actors(taskId),
+    queryFn: async (): Promise<TaskActor[]> => {
+      const { data, error } = await sdk.GET('/tasks/{id}/actors', {
+        params: { path: { id: taskId } },
+      });
+      if (error || !data) throw toError(error, 'Failed to load task actors');
+      return data.actors ?? [];
+    },
+  });
+}
+
+export interface AddActorArgs {
+  taskId: string;
+  input: AddActorInput;
+}
+
+export function useAddTaskActor(): UseMutationResult<TaskActor, TaskApiError, AddActorArgs> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskId, input }: AddActorArgs): Promise<TaskActor> => {
+      const { data, error } = await sdk.POST('/tasks/{id}/actors', {
+        params: { path: { id: taskId } },
+        body: input,
+      });
+      if (error || !data) throw toError(error, 'Failed to add task actor');
+      return data;
+    },
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: tasksKeys.actors(vars.taskId) });
+      void qc.invalidateQueries({ queryKey: tasksKeys.detail(vars.taskId) });
+    },
+  });
+}
+
+export interface RemoveActorArgs {
+  taskId: string;
+  actorId: string;
+}
+
+export function useRemoveTaskActor(): UseMutationResult<void, TaskApiError, RemoveActorArgs> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskId, actorId }: RemoveActorArgs): Promise<void> => {
+      const { error } = await sdk.DELETE('/tasks/{id}/actors/{actorId}', {
+        params: { path: { id: taskId, actorId } },
+      });
+      if (error) throw toError(error, 'Failed to remove task actor');
+    },
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: tasksKeys.actors(vars.taskId) });
+      void qc.invalidateQueries({ queryKey: tasksKeys.detail(vars.taskId) });
+    },
+  });
+}
+
+export function useTaskCommentsQuery(taskId: string): UseSuspenseQueryResult<TaskComment[]> {
+  return useSuspenseQuery({
+    queryKey: tasksKeys.comments(taskId),
+    queryFn: async (): Promise<TaskComment[]> => {
+      const { data, error } = await sdk.GET('/tasks/{id}/comments', {
+        params: { path: { id: taskId } },
+      });
+      if (error || !data) throw toError(error, 'Failed to load comments');
+      return data.comments ?? [];
     },
   });
 }
@@ -167,32 +296,106 @@ export function useDeleteTask(): UseMutationResult<void, TaskApiError, string> {
   });
 }
 
-export interface MoveTaskArgs {
+export interface AddCommentArgs {
+  taskId: string;
+  body: string;
+}
+
+export function useAddTaskComment(): UseMutationResult<TaskComment, TaskApiError, AddCommentArgs> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskId, body }: AddCommentArgs): Promise<TaskComment> => {
+      const { data, error } = await sdk.POST('/tasks/{id}/comments', {
+        params: { path: { id: taskId } },
+        body: { body },
+      });
+      if (error || !data) throw toError(error, 'Failed to add comment');
+      return data;
+    },
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: tasksKeys.comments(vars.taskId) });
+    },
+  });
+}
+
+export interface TransitionTaskArgs {
   id: string;
-  toState: TaskDerivedState;
+  transition: TransitionName;
+  /** Optional projectId for cache list invalidation. */
+  projectId?: string;
+  /** Optional expected target state for optimistic list update. */
+  optimisticState?: TaskDerivedState;
 }
 
 /**
- * useMoveTask — board drag-and-drop handler.
+ * useTransitionTask — POST /tasks/{id}/transitions.
  *
- * KNOWN LIMITATION (F6): the backend deliberately does not accept
- * `derivedState` writes via PATCH /tasks. State transitions happen via the
- * constraint engine + event bus. Until F7 introduces a `task.transition`
- * event endpoint, this mutation only invalidates the local cache so the
- * board UI snaps the card back. The mutation always rejects with a
- * domain error so callers can show a toast.
+ * Performs optimistic cache updates for `tasks.list` (move the card between
+ * columns) and `tasks.detail` (flip derivedState), then reconciles with the
+ * authoritative Task returned by the server. Rolls back on error.
  */
-export function useMoveTask(): UseMutationResult<void, TaskApiError, MoveTaskArgs> {
+export function useTransitionTask(): UseMutationResult<Task, TaskApiError, TransitionTaskArgs> {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (_args: MoveTaskArgs): Promise<void> => {
-      throw new TaskApiError(
-        'WS_TASK_TRANSITION_NOT_IMPLEMENTED',
-        'Task state transitions are not yet wired to the event bus.',
-      );
+    mutationFn: async ({ id, transition }: TransitionTaskArgs): Promise<Task> => {
+      const { data, error } = await sdk.POST('/tasks/{id}/transitions', {
+        params: { path: { id } },
+        body: { transition },
+      });
+      if (error || !data) throw toError(error, 'Failed to apply transition');
+      return data;
     },
-    onSettled: () => {
-      void qc.invalidateQueries({ queryKey: tasksKeys.all });
+    onMutate: async (vars) => {
+      await qc.cancelQueries({ queryKey: tasksKeys.all });
+      const listSnapshots = qc.getQueriesData<TaskListItem[]>({
+        queryKey: [...tasksKeys.all, 'list'],
+      });
+      const detailSnapshot = qc.getQueryData<Task>(tasksKeys.detail(vars.id));
+      if (vars.optimisticState) {
+        const nextState = vars.optimisticState;
+        for (const [key, value] of listSnapshots) {
+          if (!value) continue;
+          const updated = value.map((task) =>
+            task.id === vars.id ? { ...task, derivedState: nextState } : task,
+          );
+          qc.setQueryData(key, updated);
+        }
+        if (detailSnapshot) {
+          qc.setQueryData(tasksKeys.detail(vars.id), {
+            ...detailSnapshot,
+            derivedState: nextState,
+          });
+        }
+      }
+      return { listSnapshots, detailSnapshot };
+    },
+    onError: (_err, vars, ctx) => {
+      const snap = ctx as
+        | {
+            listSnapshots: [readonly unknown[], TaskListItem[] | undefined][];
+            detailSnapshot: Task | undefined;
+          }
+        | undefined;
+      if (!snap) return;
+      for (const [key, value] of snap.listSnapshots) {
+        qc.setQueryData(key, value);
+      }
+      if (snap.detailSnapshot) {
+        qc.setQueryData(tasksKeys.detail(vars.id), snap.detailSnapshot);
+      }
+    },
+    onSuccess: (task) => {
+      qc.setQueryData(tasksKeys.detail(task.id), task);
+    },
+    onSettled: (_data, _err, vars) => {
+      void qc.invalidateQueries({ queryKey: tasksKeys.detail(vars.id) });
+      if (vars.projectId) {
+        void qc.invalidateQueries({
+          queryKey: [...tasksKeys.all, 'list', vars.projectId],
+        });
+      } else {
+        void qc.invalidateQueries({ queryKey: [...tasksKeys.all, 'list'] });
+      }
     },
   });
 }

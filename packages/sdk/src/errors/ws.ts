@@ -46,6 +46,16 @@ export const WsErrors = {
     status: 422,
     message: "Task title is too long",
   },
+  WS_TASK_TRANSITION_REJECTED: {
+    code: "WS.TASK.TRANSITION_REJECTED",
+    status: 422,
+    message: "Task transition not allowed in current state",
+  },
+  WS_TASK_TRANSITION_UNKNOWN: {
+    code: "WS.TASK.TRANSITION_UNKNOWN",
+    status: 400,
+    message: "Unknown task transition",
+  },
   WS_TASK_UPDATE_CONFLICT: {
     code: "WS.TASK.UPDATE_CONFLICT",
     status: 409,

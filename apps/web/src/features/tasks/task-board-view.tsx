@@ -17,8 +17,9 @@ import {
   TASK_STATES,
   type TaskDerivedState,
   type TaskListItem,
-  useMoveTask,
+  transitionForDrop,
   useTasksQuery,
+  useTransitionTask,
 } from './api';
 import TaskCard from './task-card';
 import { useTaskFilters } from './use-task-filters';
@@ -58,7 +59,7 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
   const navigate = useNavigate();
   const filters = useTaskFilters(projectId);
   const { data: tasks } = useTasksQuery(projectId, filters);
-  const move = useMoveTask();
+  const transition = useTransitionTask();
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [hoverState, setHoverState] = useState<TaskDerivedState | null>(null);
@@ -94,9 +95,15 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
     if (!taskId) return;
     const current = tasks.find((task) => task.id === taskId);
     if (!current) return;
-    if (current.derivedState === toState) return;
-    move.mutate(
-      { id: taskId, toState },
+    const fromState = current.derivedState as TaskDerivedState;
+    if (fromState === toState) return;
+    const name = transitionForDrop(fromState, toState);
+    if (!name) {
+      toaster.show({ tone: 'warning', message: t('tasks.errors.illegal_transition') });
+      return;
+    }
+    transition.mutate(
+      { id: taskId, transition: name, projectId, optimisticState: toState },
       {
         onError: () => {
           toaster.show({ tone: 'warning', message: t('tasks.errors.move_failed') });

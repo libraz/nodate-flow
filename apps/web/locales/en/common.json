@@ -228,11 +228,52 @@
       "create_failed": "Could not create the task. Please try again.",
       "update_failed": "Could not update the task. Please try again.",
       "delete_failed": "Could not delete the task. Please try again.",
-      "move_failed": "Task transitions are not yet enabled."
+      "move_failed": "Could not move the task. Please try again.",
+      "illegal_transition": "That move isn't allowed from the current state.",
+      "comment_add_failed": "Could not add the comment. Please try again."
     },
     "board": {
       "empty_column": "No tasks",
       "drop_hint": "Drop here to move"
+    },
+    "assignee": {
+      "plus_n": "+{n, plural, one {# more} other {# more}}"
+    },
+    "detail": {
+      "title_edit": "Edit title",
+      "description_edit": "Edit description",
+      "description_empty": "No description yet.",
+      "save": "Save",
+      "cancel": "Cancel",
+      "priority_label": "Priority",
+      "due_label": "Due date",
+      "state_label": "State",
+      "assignees_label": "Assignees",
+      "assignees": {
+        "title": "Assignees",
+        "add": "Add assignee",
+        "remove": "Remove {name}",
+        "empty": "No assignees yet.",
+        "none": "No members available."
+      },
+      "transitions": {
+        "title": "Transitions",
+        "start": "Start",
+        "block": "Block",
+        "unblock": "Unblock",
+        "submit": "Submit",
+        "complete": "Complete",
+        "reopen": "Reopen",
+        "cancel": "Cancel"
+      }
+    },
+    "comments": {
+      "title": "Comments",
+      "add_placeholder": "Write a comment…",
+      "add": "Comment",
+      "empty": "No comments yet.",
+      "edit": "Edit",
+      "delete": "Delete"
     }
   },
   "auth": {

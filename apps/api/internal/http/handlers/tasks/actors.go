@@ -66,6 +66,42 @@ func AddActor(deps Deps) func(context.Context, *AddTaskActorInput) (*AddTaskActo
 	}
 }
 
+// ListActors handles GET /tasks/{id}/actors.
+func ListActors(deps Deps) func(context.Context, *ListTaskActorsInput) (*ListTaskActorsOutput, error) {
+	return func(ctx context.Context, in *ListTaskActorsInput) (*ListTaskActorsOutput, error) {
+		ws, ok := middleware.WorkspaceFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsTaskNotFound)
+		}
+		task, ok := middleware.TaskFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsTaskNotFound)
+		}
+		limit := in.Limit
+		if limit <= 0 {
+			limit = 100
+		}
+		rows, err := deps.Queries.ListActorsForTask(ctx, generated.ListActorsForTaskParams{
+			WorkspaceID: ws.ID,
+			PublicID:    types.FromUUID(task.PublicID),
+			Limit:       limit,
+			Offset:      in.Offset,
+		})
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		out := &ListTaskActorsOutput{}
+		out.Body.Actors = []TaskActor{}
+		for _, r := range rows {
+			out.Body.Actors = append(out.Body.Actors, rowToActor(r))
+		}
+		if len(rows) > 0 {
+			out.Body.Total = totalAsInt64(rows[0].Total)
+		}
+		return out, nil
+	}
+}
+
 // RemoveActor handles DELETE /tasks/{id}/actors/{actorId}.
 func RemoveActor(deps Deps) func(context.Context, *RemoveTaskActorInput) (*RemoveTaskActorOutput, error) {
 	return func(ctx context.Context, in *RemoveTaskActorInput) (*RemoveTaskActorOutput, error) {

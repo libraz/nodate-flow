@@ -83,6 +83,7 @@ func (q *Queries) DisableTask(ctx context.Context, arg DisableTaskParams) error 
 const findTaskByPublicId = `-- name: FindTaskByPublicId :one
 SELECT
   v.public_id,
+  v.workspace_public_id,
   v.project_public_id,
   v.project_name,
   v.parent_task_public_id,
@@ -114,6 +115,7 @@ type FindTaskByPublicIdParams struct {
 
 type FindTaskByPublicIdRow struct {
 	PublicID                 types.PublicID    `json:"publicId"`
+	WorkspacePublicID        []byte            `json:"workspacePublicId"`
 	ProjectPublicID          []byte            `json:"projectPublicId"`
 	ProjectName              string            `json:"projectName"`
 	ParentTaskPublicID       sql.NullString    `json:"parentTaskPublicId"`
@@ -140,6 +142,7 @@ func (q *Queries) FindTaskByPublicId(ctx context.Context, arg FindTaskByPublicId
 	var i FindTaskByPublicIdRow
 	err := row.Scan(
 		&i.PublicID,
+		&i.WorkspacePublicID,
 		&i.ProjectPublicID,
 		&i.ProjectName,
 		&i.ParentTaskPublicID,
@@ -259,6 +262,8 @@ SELECT
   v.sort_weight,
   v.updated_at,
   v.created_at,
+  v.primary_assignee_public_id,
+  v.assignee_count,
   COUNT(*) OVER() AS total
 FROM v_task_list v
 WHERE v.workspace_id = ?
@@ -275,20 +280,22 @@ type ListTasksForProjectParams struct {
 }
 
 type ListTasksForProjectRow struct {
-	PublicID           types.PublicID    `json:"publicId"`
-	ProjectPublicID    []byte            `json:"projectPublicId"`
-	ProjectName        string            `json:"projectName"`
-	ParentTaskPublicID sql.NullString    `json:"parentTaskPublicId"`
-	Title              string            `json:"title"`
-	DerivedState       TasksDerivedState `json:"derivedState"`
-	Priority           int32             `json:"priority"`
-	DueOn              sql.NullTime      `json:"dueOn"`
-	StartedOn          sql.NullTime      `json:"startedOn"`
-	CompletedAt        sql.NullTime      `json:"completedAt"`
-	SortWeight         int32             `json:"sortWeight"`
-	UpdatedAt          sql.NullTime      `json:"updatedAt"`
-	CreatedAt          time.Time         `json:"createdAt"`
-	Total              interface{}       `json:"total"`
+	PublicID                types.PublicID    `json:"publicId"`
+	ProjectPublicID         []byte            `json:"projectPublicId"`
+	ProjectName             string            `json:"projectName"`
+	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
+	Title                   string            `json:"title"`
+	DerivedState            TasksDerivedState `json:"derivedState"`
+	Priority                int32             `json:"priority"`
+	DueOn                   sql.NullTime      `json:"dueOn"`
+	StartedOn               sql.NullTime      `json:"startedOn"`
+	CompletedAt             sql.NullTime      `json:"completedAt"`
+	SortWeight              int32             `json:"sortWeight"`
+	UpdatedAt               sql.NullTime      `json:"updatedAt"`
+	CreatedAt               time.Time         `json:"createdAt"`
+	PrimaryAssigneePublicID sql.NullString    `json:"primaryAssigneePublicId"`
+	AssigneeCount           int64             `json:"assigneeCount"`
+	Total                   interface{}       `json:"total"`
 }
 
 // List tasks in a project via v_task_list with window-function pagination.
@@ -320,6 +327,8 @@ func (q *Queries) ListTasksForProject(ctx context.Context, arg ListTasksForProje
 			&i.SortWeight,
 			&i.UpdatedAt,
 			&i.CreatedAt,
+			&i.PrimaryAssigneePublicID,
+			&i.AssigneeCount,
 			&i.Total,
 		); err != nil {
 			return nil, err
@@ -350,6 +359,8 @@ SELECT
   v.sort_weight,
   v.updated_at,
   v.created_at,
+  v.primary_assignee_public_id,
+  v.assignee_count,
   COUNT(*) OVER() AS total
 FROM v_task_list v
 WHERE v.workspace_id = ?
@@ -364,20 +375,22 @@ type ListTasksForWorkspaceParams struct {
 }
 
 type ListTasksForWorkspaceRow struct {
-	PublicID           types.PublicID    `json:"publicId"`
-	ProjectPublicID    []byte            `json:"projectPublicId"`
-	ProjectName        string            `json:"projectName"`
-	ParentTaskPublicID sql.NullString    `json:"parentTaskPublicId"`
-	Title              string            `json:"title"`
-	DerivedState       TasksDerivedState `json:"derivedState"`
-	Priority           int32             `json:"priority"`
-	DueOn              sql.NullTime      `json:"dueOn"`
-	StartedOn          sql.NullTime      `json:"startedOn"`
-	CompletedAt        sql.NullTime      `json:"completedAt"`
-	SortWeight         int32             `json:"sortWeight"`
-	UpdatedAt          sql.NullTime      `json:"updatedAt"`
-	CreatedAt          time.Time         `json:"createdAt"`
-	Total              interface{}       `json:"total"`
+	PublicID                types.PublicID    `json:"publicId"`
+	ProjectPublicID         []byte            `json:"projectPublicId"`
+	ProjectName             string            `json:"projectName"`
+	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
+	Title                   string            `json:"title"`
+	DerivedState            TasksDerivedState `json:"derivedState"`
+	Priority                int32             `json:"priority"`
+	DueOn                   sql.NullTime      `json:"dueOn"`
+	StartedOn               sql.NullTime      `json:"startedOn"`
+	CompletedAt             sql.NullTime      `json:"completedAt"`
+	SortWeight              int32             `json:"sortWeight"`
+	UpdatedAt               sql.NullTime      `json:"updatedAt"`
+	CreatedAt               time.Time         `json:"createdAt"`
+	PrimaryAssigneePublicID sql.NullString    `json:"primaryAssigneePublicId"`
+	AssigneeCount           int64             `json:"assigneeCount"`
+	Total                   interface{}       `json:"total"`
 }
 
 // List tasks across an entire workspace via v_task_list.
@@ -404,6 +417,8 @@ func (q *Queries) ListTasksForWorkspace(ctx context.Context, arg ListTasksForWor
 			&i.SortWeight,
 			&i.UpdatedAt,
 			&i.CreatedAt,
+			&i.PrimaryAssigneePublicID,
+			&i.AssigneeCount,
 			&i.Total,
 		); err != nil {
 			return nil, err
@@ -417,6 +432,36 @@ func (q *Queries) ListTasksForWorkspace(ctx context.Context, arg ListTasksForWor
 		return nil, err
 	}
 	return items, nil
+}
+
+const transitionTaskState = `-- name: TransitionTaskState :exec
+UPDATE tasks
+SET derived_state = ?,
+    completed_at = CASE WHEN ? = 'done' THEN CURRENT_TIMESTAMP ELSE completed_at END
+WHERE workspace_id = ?
+  AND public_id = ?
+  AND enabled = TRUE
+`
+
+// TransitionTaskStateParams carries arguments for TransitionTaskState.
+type TransitionTaskStateParams struct {
+	DerivedState    TasksDerivedState `json:"derivedState"`
+	DerivedStateStr string            `json:"derivedStateStr"`
+	WorkspaceID     uint32            `json:"-"`
+	PublicID        types.PublicID    `json:"publicId"`
+}
+
+// TransitionTaskState updates the task's derived_state. This is the only
+// path allowed to mutate derived_state and MUST be called inside the same
+// transaction as the events append.
+func (q *Queries) TransitionTaskState(ctx context.Context, arg TransitionTaskStateParams) error {
+	_, err := q.db.ExecContext(ctx, transitionTaskState,
+		arg.DerivedState,
+		arg.DerivedStateStr,
+		arg.WorkspaceID,
+		arg.PublicID,
+	)
+	return err
 }
 
 const updateTask = `-- name: UpdateTask :exec

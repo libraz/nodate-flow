@@ -22,6 +22,10 @@ var (
 	WsTaskStateTransitionBlockedByConstraint = &Spec{Code: "WS.TASK.STATE_TRANSITION_BLOCKED_BY_CONSTRAINT", Status: 422, Message: "Task cannot transition to the requested state"}
 	// WS.TASK.TITLE_TOO_LONG — Task title is too long
 	WsTaskTitleTooLong = &Spec{Code: "WS.TASK.TITLE_TOO_LONG", Status: 422, Message: "Task title is too long"}
+	// WS.TASK.TRANSITION_REJECTED — Task transition not allowed in current state
+	WsTaskTransitionRejected = &Spec{Code: "WS.TASK.TRANSITION_REJECTED", Status: 422, Message: "Task transition not allowed in current state"}
+	// WS.TASK.TRANSITION_UNKNOWN — Unknown task transition
+	WsTaskTransitionUnknown = &Spec{Code: "WS.TASK.TRANSITION_UNKNOWN", Status: 400, Message: "Unknown task transition"}
 	// WS.TASK.UPDATE_CONFLICT — Task was modified by someone else
 	WsTaskUpdateConflict = &Spec{Code: "WS.TASK.UPDATE_CONFLICT", Status: 409, Message: "Task was modified by someone else"}
 	// WS.WORKSPACE.ACCESS_DENIED — You do not have access to this workspace

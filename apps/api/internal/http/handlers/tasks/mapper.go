@@ -1,6 +1,8 @@
 package tasks
 
 import (
+	"database/sql"
+
 	"github.com/google/uuid"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
@@ -18,6 +20,7 @@ func bytesToUUIDString(b []byte) string {
 func rowToTaskFromFind(r generated.FindTaskByPublicIdRow) Task {
 	return Task{
 		ID:                       r.PublicID.String(),
+		WorkspaceID:              bytesToUUIDString(r.WorkspacePublicID),
 		ProjectID:                bytesToUUIDString(r.ProjectPublicID),
 		ProjectName:              r.ProjectName,
 		ParentTaskID:             nullStr(r.ParentTaskPublicID),
@@ -39,39 +42,58 @@ func rowToTaskFromFind(r generated.FindTaskByPublicIdRow) Task {
 	}
 }
 
+// nullBytesToUUIDPtr converts a sql.NullString carrying raw BINARY(16) bytes
+// into a UUID string pointer; returns nil when NULL or wrong length.
+func nullBytesToUUIDPtr(s sql.NullString) *string {
+	if !s.Valid {
+		return nil
+	}
+	if len(s.String) != 16 {
+		return nil
+	}
+	var u uuid.UUID
+	copy(u[:], s.String)
+	out := u.String()
+	return &out
+}
+
 func rowToTaskListItemFromProject(r generated.ListTasksForProjectRow) TaskListItem {
 	return TaskListItem{
-		ID:           r.PublicID.String(),
-		ProjectID:    bytesToUUIDString(r.ProjectPublicID),
-		ProjectName:  r.ProjectName,
-		ParentTaskID: nullStr(r.ParentTaskPublicID),
-		Title:        r.Title,
-		DerivedState: string(r.DerivedState),
-		Priority:     r.Priority,
-		DueOn:        nullDate(r.DueOn),
-		StartedOn:    nullDate(r.StartedOn),
-		CompletedAt:  nullTime(r.CompletedAt),
-		SortWeight:   r.SortWeight,
-		UpdatedAt:    nullTime(r.UpdatedAt),
-		CreatedAt:    r.CreatedAt,
+		ID:                r.PublicID.String(),
+		ProjectID:         bytesToUUIDString(r.ProjectPublicID),
+		ProjectName:       r.ProjectName,
+		ParentTaskID:      nullStr(r.ParentTaskPublicID),
+		Title:             r.Title,
+		DerivedState:      string(r.DerivedState),
+		Priority:          r.Priority,
+		DueOn:             nullDate(r.DueOn),
+		StartedOn:         nullDate(r.StartedOn),
+		CompletedAt:       nullTime(r.CompletedAt),
+		SortWeight:        r.SortWeight,
+		PrimaryAssigneeID: nullBytesToUUIDPtr(r.PrimaryAssigneePublicID),
+		AssigneeCount:     r.AssigneeCount,
+		UpdatedAt:         nullTime(r.UpdatedAt),
+		CreatedAt:         r.CreatedAt,
 	}
 }
 
 func rowToTaskListItemFromWorkspace(r generated.ListTasksForWorkspaceRow) TaskListItem {
 	return TaskListItem{
-		ID:           r.PublicID.String(),
-		ProjectID:    bytesToUUIDString(r.ProjectPublicID),
-		ProjectName:  r.ProjectName,
-		ParentTaskID: nullStr(r.ParentTaskPublicID),
-		Title:        r.Title,
-		DerivedState: string(r.DerivedState),
-		Priority:     r.Priority,
-		DueOn:        nullDate(r.DueOn),
-		StartedOn:    nullDate(r.StartedOn),
-		CompletedAt:  nullTime(r.CompletedAt),
-		SortWeight:   r.SortWeight,
-		UpdatedAt:    nullTime(r.UpdatedAt),
-		CreatedAt:    r.CreatedAt,
+		ID:                r.PublicID.String(),
+		ProjectID:         bytesToUUIDString(r.ProjectPublicID),
+		ProjectName:       r.ProjectName,
+		ParentTaskID:      nullStr(r.ParentTaskPublicID),
+		Title:             r.Title,
+		DerivedState:      string(r.DerivedState),
+		Priority:          r.Priority,
+		DueOn:             nullDate(r.DueOn),
+		StartedOn:         nullDate(r.StartedOn),
+		CompletedAt:       nullTime(r.CompletedAt),
+		SortWeight:        r.SortWeight,
+		PrimaryAssigneeID: nullBytesToUUIDPtr(r.PrimaryAssigneePublicID),
+		AssigneeCount:     r.AssigneeCount,
+		UpdatedAt:         nullTime(r.UpdatedAt),
+		CreatedAt:         r.CreatedAt,
 	}
 }
 

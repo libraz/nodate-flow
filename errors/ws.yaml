@@ -88,6 +88,20 @@ resources:
         description: "Returned when an unsatisfied constraint blocks the requested lifecycle transition."
         userAction: "Review unmet constraints in the task detail panel and resolve them before retrying."
 
+      transition_unknown:
+        code: WS.TASK.TRANSITION_UNKNOWN
+        status: 400
+        message: "Unknown task transition"
+        description: "Returned when the client submits a transition name that is not one of {start|block|unblock|submit|complete|reopen|cancel}. Rejected at the HTTP layer before the constraint engine runs."
+        userAction: "Use one of the supported transition names defined by the API."
+
+      transition_rejected:
+        code: WS.TASK.TRANSITION_REJECTED
+        status: 422
+        message: "Task transition not allowed in current state"
+        description: "Returned by the constraint engine when the requested transition is illegal for the task's current lifecycle state."
+        userAction: "Refresh the task to see its current state and choose a valid transition."
+
   member:
     breadcrumb: "Workspace > Member"
     errors:

@@ -306,7 +306,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** List actors on a task */
+        get: operations["tasks-actors-list"];
         put?: never;
         /** Attach an actor to a task */
         post: operations["tasks-actors-add"];
@@ -483,6 +484,23 @@ export interface paths {
         get: operations["tasks-timeline-list"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/transitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply a state machine transition to a task */
+        post: operations["tasks-transitions-apply"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1042,6 +1060,17 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ListTaskActorsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            actors: components["schemas"]["TaskActor"][] | null;
+            nextCursor: string | null;
+            /** Format: int64 */
+            total: number;
+        };
         ListTaskAttachmentsBody: {
             /**
              * Format: uri
@@ -1348,6 +1377,8 @@ export interface components {
             title: string;
             /** Format: date-time */
             updatedAt?: string;
+            /** Format: uuid */
+            workspaceId: string;
         };
         TaskActor: {
             /**
@@ -1442,6 +1473,8 @@ export interface components {
             updatedAt?: string;
         };
         TaskListItem: {
+            /** Format: int64 */
+            assigneeCount: number;
             /** Format: date-time */
             completedAt?: string;
             /** Format: date-time */
@@ -1450,6 +1483,7 @@ export interface components {
             dueOn?: string;
             id: string;
             parentTaskId?: string;
+            primaryAssigneeId: string | null;
             /** Format: int32 */
             priority: number;
             projectId: string;
@@ -1460,6 +1494,25 @@ export interface components {
             title: string;
             /** Format: date-time */
             updatedAt?: string;
+        };
+        TransitionTaskBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description Optional client-provided unix seconds timestamp; ignored for storage
+             */
+            occurredAt?: number;
+            /** @description Optional human-readable reason recorded on the event */
+            reason?: string;
+            /**
+             * @description State machine transition name
+             * @enum {string}
+             */
+            transition: "start" | "block" | "unblock" | "submit" | "complete" | "reopen" | "cancel";
         };
         UpdateMemberRoleInputBody: {
             /**
@@ -2110,6 +2163,12 @@ export interface operations {
                 projectId?: string;
                 /** @description Workspace public id (UUID v7); required when projectId is not given */
                 workspaceId?: string;
+                /** @description Case-insensitive substring match on title */
+                q?: string;
+                /** @description Filter by derived_state; repeat to OR multiple values */
+                state?: string[] | null;
+                /** @description Filter to tasks with this user as an assignee (user public id UUID v7) */
+                assignee?: string;
                 limit?: number;
                 offset?: number;
             };
@@ -2256,6 +2315,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Task"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-actors-list": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListTaskActorsBody"];
                 };
             };
             /** @description Error */
@@ -2729,6 +2822,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-transitions-apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransitionTaskBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Task"];
                 };
             };
             /** @description Error */

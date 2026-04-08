@@ -68,6 +68,7 @@ func totalAsInt64(v interface{}) int64 {
 // Task is the public DTO for a task row.
 type Task struct {
 	ID                       string    `json:"id"`
+	WorkspaceID              string    `json:"workspaceId" format:"uuid"`
 	ProjectID                string    `json:"projectId"`
 	ProjectName              string    `json:"projectName,omitempty"`
 	ParentTaskID             string    `json:"parentTaskId,omitempty"`
@@ -90,19 +91,21 @@ type Task struct {
 
 // TaskListItem is the public DTO for a task row in list responses.
 type TaskListItem struct {
-	ID           string    `json:"id"`
-	ProjectID    string    `json:"projectId"`
-	ProjectName  string    `json:"projectName,omitempty"`
-	ParentTaskID string    `json:"parentTaskId,omitempty"`
-	Title        string    `json:"title"`
-	DerivedState string    `json:"derivedState"`
-	Priority     int32     `json:"priority"`
-	DueOn        string    `json:"dueOn,omitempty"`
-	StartedOn    string    `json:"startedOn,omitempty"`
-	CompletedAt  time.Time `json:"completedAt,omitempty"`
-	SortWeight   int32     `json:"sortWeight"`
-	UpdatedAt    time.Time `json:"updatedAt,omitempty"`
-	CreatedAt    time.Time `json:"createdAt"`
+	ID                 string    `json:"id"`
+	ProjectID          string    `json:"projectId"`
+	ProjectName        string    `json:"projectName,omitempty"`
+	ParentTaskID       string    `json:"parentTaskId,omitempty"`
+	Title              string    `json:"title"`
+	DerivedState       string    `json:"derivedState"`
+	Priority           int32     `json:"priority"`
+	DueOn              string    `json:"dueOn,omitempty"`
+	StartedOn          string    `json:"startedOn,omitempty"`
+	CompletedAt        time.Time `json:"completedAt,omitempty"`
+	SortWeight         int32     `json:"sortWeight"`
+	PrimaryAssigneeID  *string   `json:"primaryAssigneeId"`
+	AssigneeCount      int64     `json:"assigneeCount"`
+	UpdatedAt          time.Time `json:"updatedAt,omitempty"`
+	CreatedAt          time.Time `json:"createdAt"`
 }
 
 // TaskConstraint is the public DTO for a task_constraints row.
@@ -191,10 +194,13 @@ type CreateTaskOutput struct {
 
 // ListTasksInput is the query for GET /tasks.
 type ListTasksInput struct {
-	ProjectID   string `query:"projectId" doc:"Optional project public id (UUID v7) to scope the list"`
-	WorkspaceID string `query:"workspaceId" doc:"Workspace public id (UUID v7); required when projectId is not given"`
-	Limit       int32  `query:"limit" minimum:"1" maximum:"200" default:"50"`
-	Offset      int32  `query:"offset" minimum:"0" default:"0"`
+	ProjectID   string   `query:"projectId" doc:"Optional project public id (UUID v7) to scope the list"`
+	WorkspaceID string   `query:"workspaceId" doc:"Workspace public id (UUID v7); required when projectId is not given"`
+	Q           string   `query:"q" doc:"Case-insensitive substring match on title"`
+	State       []string `query:"state" doc:"Filter by derived_state; repeat to OR multiple values"`
+	Assignee    string   `query:"assignee" doc:"Filter to tasks with this user as an assignee (user public id UUID v7)"`
+	Limit       int32    `query:"limit" minimum:"1" maximum:"200" default:"50"`
+	Offset      int32    `query:"offset" minimum:"0" default:"0"`
 }
 
 // ListTasksBody is the response payload for GET /tasks.
@@ -252,6 +258,26 @@ type DisableTaskBody struct {
 // DisableTaskOutput is the response for DELETE /tasks/{id}.
 type DisableTaskOutput struct {
 	Body DisableTaskBody
+}
+
+// ---- Transitions I/O -------------------------------------------------------
+
+// TransitionTaskBody is the JSON body for POST /tasks/{id}/transitions.
+type TransitionTaskBody struct {
+	Transition string `json:"transition" enum:"start,block,unblock,submit,complete,reopen,cancel" doc:"State machine transition name"`
+	Reason     string `json:"reason,omitempty" maxLength:"2000" doc:"Optional human-readable reason recorded on the event"`
+	OccurredAt int64  `json:"occurredAt,omitempty" doc:"Optional client-provided unix seconds timestamp; ignored for storage"`
+}
+
+// TransitionTaskInput is the request for POST /tasks/{id}/transitions.
+type TransitionTaskInput struct {
+	ID   string `path:"id"`
+	Body TransitionTaskBody
+}
+
+// TransitionTaskOutput is the response for POST /tasks/{id}/transitions.
+type TransitionTaskOutput struct {
+	Body Task
 }
 
 // ---- Constraints I/O -------------------------------------------------------
@@ -341,6 +367,25 @@ type AddTaskActorInput struct {
 // AddTaskActorOutput is the response for POST /tasks/{id}/actors.
 type AddTaskActorOutput struct {
 	Body TaskActor
+}
+
+// ListTaskActorsInput is the query for GET /tasks/{id}/actors.
+type ListTaskActorsInput struct {
+	ID     string `path:"id"`
+	Limit  int32  `query:"limit" minimum:"1" maximum:"200" default:"100"`
+	Offset int32  `query:"offset" minimum:"0" default:"0"`
+}
+
+// ListTaskActorsBody is the response payload for GET /tasks/{id}/actors.
+type ListTaskActorsBody struct {
+	Total      int64       `json:"total"`
+	Actors     []TaskActor `json:"actors"`
+	NextCursor *string     `json:"nextCursor"`
+}
+
+// ListTaskActorsOutput is the response for GET /tasks/{id}/actors.
+type ListTaskActorsOutput struct {
+	Body ListTaskActorsBody
 }
 
 // RemoveTaskActorInput is the path for DELETE /tasks/{id}/actors/{actorId}.

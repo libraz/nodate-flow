@@ -86,8 +86,23 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
     {
       id: 'assignee',
       header: () => t('tasks.columns.assignee'),
-      // F8: plumb actors into TaskListItem and render avatar + name here.
-      cell: () => <span style={{ color: 'var(--color-muted)' }}>—</span>,
+      cell: ({ row }) => {
+        const pid = row.original.primaryAssigneeId;
+        const count = row.original.assigneeCount;
+        if (!pid) return <span style={{ color: 'var(--color-muted)' }}>—</span>;
+        const shortId = pid.slice(0, 8);
+        const extra = count > 1 ? count - 1 : 0;
+        return (
+          <span style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center' }}>
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{shortId}</span>
+            {extra > 0 ? (
+              <span style={{ color: 'var(--color-muted)' }}>
+                {t('tasks.assignee.plus_n', { n: extra })}
+              </span>
+            ) : null}
+          </span>
+        );
+      },
     },
     {
       id: 'due',

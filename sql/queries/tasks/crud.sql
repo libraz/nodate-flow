@@ -18,6 +18,7 @@ INSERT INTO tasks (
 -- Detail projection via v_task_detail. Workspace-scoped.
 SELECT
   v.public_id,
+  v.workspace_public_id,
   v.project_public_id,
   v.project_name,
   v.parent_task_public_id,
@@ -57,6 +58,8 @@ SELECT
   v.sort_weight,
   v.updated_at,
   v.created_at,
+  v.primary_assignee_public_id,
+  v.assignee_count,
   COUNT(*) OVER() AS total
 FROM v_task_list v
 WHERE v.workspace_id = ?
@@ -80,6 +83,8 @@ SELECT
   v.sort_weight,
   v.updated_at,
   v.created_at,
+  v.primary_assignee_public_id,
+  v.assignee_count,
   COUNT(*) OVER() AS total
 FROM v_task_list v
 WHERE v.workspace_id = ?
@@ -94,6 +99,17 @@ SET title = ?,
     priority = ?,
     due_on = ?,
     started_on = ?
+WHERE workspace_id = ?
+  AND public_id = ?
+  AND enabled = TRUE;
+
+-- name: TransitionTaskState :exec
+-- Write the new derived_state computed by the transition handler. This is
+-- the only path allowed to mutate derived_state and must be called inside
+-- the same transaction as the events append.
+UPDATE tasks
+SET derived_state = ?,
+    completed_at = CASE WHEN ? = 'done' THEN CURRENT_TIMESTAMP ELSE completed_at END
 WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
