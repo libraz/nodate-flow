@@ -16,9 +16,32 @@ const refreshCookiePath = "/auth"
 // CreateSession / RotateSessionRefreshHash (30 days).
 const refreshCookieTTL = 30 * 24 * time.Hour
 
+// refreshCookieSameSite returns the SameSite mode that pairs with the
+// given Secure flag. The web app and the api are served from different
+// origins (e.g. http://localhost:5173 → http://localhost:8080 in dev,
+// https://app.example.com → https://api.example.com in prod), so the
+// refresh cookie has to survive a cross-site fetch on boot.
+//
+//   - secure=true  (https/prod): SameSite=None is the only mode that
+//     allows cross-site sending; the spec also requires Secure, which
+//     is already set.
+//   - secure=false (http/dev):   SameSite=None is rejected by Chrome
+//     without Secure, so we fall back to Lax. Lax is enough for the
+//     localhost dev case because Chrome treats different ports on the
+//     same host as same-site, and the cookie is only ever read by the
+//     POST /auth/refresh fetch, which Lax permits for same-site
+//     requests.
+func refreshCookieSameSite(secure bool) http.SameSite {
+	if secure {
+		return http.SameSiteNoneMode
+	}
+	return http.SameSiteLaxMode
+}
+
 // newRefreshCookie builds a Set-Cookie value carrying the rotated
-// refresh token. The cookie is HttpOnly + SameSite=Strict + scoped to
-// /auth; Secure is toggled by cfg so local http dev still works.
+// refresh token. The cookie is HttpOnly + scoped to /auth; Secure and
+// SameSite are derived from cfg so local http dev still works while
+// production https remains cross-site safe.
 func newRefreshCookie(token string, secure bool) http.Cookie {
 	return http.Cookie{
 		Name:     refreshCookieName,
@@ -26,13 +49,15 @@ func newRefreshCookie(token string, secure bool) http.Cookie {
 		Path:     refreshCookiePath,
 		HttpOnly: true,
 		Secure:   secure,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: refreshCookieSameSite(secure),
 		MaxAge:   int(refreshCookieTTL.Seconds()),
 	}
 }
 
 // clearedRefreshCookie builds a Set-Cookie value that deletes the
-// refresh cookie on the client (MaxAge=-1 emits Max-Age=0).
+// refresh cookie on the client (MaxAge=-1 emits Max-Age=0). The
+// SameSite/Secure attributes must mirror newRefreshCookie or browsers
+// treat it as a different cookie and refuse to evict the original.
 func clearedRefreshCookie(secure bool) http.Cookie {
 	return http.Cookie{
 		Name:     refreshCookieName,
@@ -40,7 +65,7 @@ func clearedRefreshCookie(secure bool) http.Cookie {
 		Path:     refreshCookiePath,
 		HttpOnly: true,
 		Secure:   secure,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: refreshCookieSameSite(secure),
 		MaxAge:   -1,
 	}
 }

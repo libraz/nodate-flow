@@ -26,11 +26,16 @@ type Config struct {
 	// TODO: Replace with a real repo→workspace mapping table.
 	DefaultWorkspaceID string `env:"NF_DEFAULT_WORKSPACE_ID" envDefault:""`
 
-	// CookieSecure toggles the Secure flag on the nf_rt refresh cookie.
-	// It defaults to true so production deployments over https are safe;
-	// local http dev can set NF_COOKIE_SECURE=false to allow the browser
-	// to accept the cookie over plaintext.
-	CookieSecure bool `env:"NF_COOKIE_SECURE" envDefault:"true"`
+	// CookieSecure toggles the Secure flag on the nf_rt refresh cookie
+	// and selects the paired SameSite mode (None when secure, Lax
+	// otherwise; see auth.refreshCookieSameSite).
+	//
+	// It defaults to false so the out-of-the-box `make dev` flow on
+	// http://localhost works without extra env wiring; every non-local
+	// deployment must explicitly set NF_COOKIE_SECURE=true so the
+	// cookie survives the cross-site fetch from the web origin to the
+	// api origin over https.
+	CookieSecure bool `env:"NF_COOKIE_SECURE" envDefault:"false"`
 
 	// AiMock toggles the deterministic in-memory AI provider. When true,
 	// every workspace.ai_providers row is ignored and ai.Orchestrator
