@@ -10,6 +10,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/middleware"
 )
 
 // maxFailedBeforeLock is the failed-login threshold that triggers a
@@ -64,7 +65,7 @@ func Login(deps Deps) func(context.Context, *LoginInput) (*LoginOutput, error) {
 		}
 
 		_ = deps.Queries.UpdateUserLastLoginAt(ctx, row.UserID)
-		tokens, refresh, err := issueTokens(ctx, deps, row.UserID, row.UserPublicID)
+		tokens, refresh, err := issueTokens(ctx, deps, row.UserID, row.UserPublicID, in.UserAgent, middleware.ClientIPFromContext(ctx))
 		if err != nil {
 			return nil, err
 		}
@@ -139,7 +140,7 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		_ = deps.Queries.UpdateUserLastLoginAt(ctx, uid)
-		tokens, refresh, err := issueTokens(ctx, deps, uid, u.PublicID)
+		tokens, refresh, err := issueTokens(ctx, deps, uid, u.PublicID, in.UserAgent, middleware.ClientIPFromContext(ctx))
 		if err != nil {
 			return nil, err
 		}

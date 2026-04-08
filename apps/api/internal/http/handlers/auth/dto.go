@@ -31,7 +31,8 @@ type Deps struct {
 
 // RegisterInput is the body for POST /auth/register.
 type RegisterInput struct {
-	Body struct {
+	UserAgent string `header:"User-Agent"`
+	Body      struct {
 		Email       string `json:"email" format:"email" maxLength:"254"`
 		Password    string `json:"password" minLength:"8" maxLength:"256"`
 		DisplayName string `json:"displayName" minLength:"1" maxLength:"100"`
@@ -56,7 +57,8 @@ type RegisterOutput struct {
 
 // LoginInput is the body for POST /auth/login.
 type LoginInput struct {
-	Body struct {
+	UserAgent string `header:"User-Agent"`
+	Body      struct {
 		Email    string `json:"email" format:"email"`
 		Password string `json:"password"`
 	}
@@ -85,7 +87,8 @@ type LoginOutput struct {
 // LoginTotpInput is the body for POST /auth/login/totp. Exactly one of
 // Code (6-digit authenticator) or RecoveryCode must be supplied.
 type LoginTotpInput struct {
-	Body struct {
+	UserAgent string `header:"User-Agent"`
+	Body      struct {
 		ChallengeToken string `json:"challengeToken" minLength:"1"`
 		Code           string `json:"code,omitempty" pattern:"^$|^[0-9]{6}$"`
 		RecoveryCode   string `json:"recoveryCode,omitempty" pattern:"^$|^[A-Za-z0-9-]{10,20}$"`
@@ -101,6 +104,7 @@ type LoginTotpOutput struct {
 // RefreshInput is the request for POST /auth/refresh. The refresh token
 // is read from the nf_rt httpOnly cookie; there is no request body.
 type RefreshInput struct {
+	UserAgent     string      `header:"User-Agent"`
 	RefreshCookie http.Cookie `cookie:"nf_rt"`
 }
 
@@ -135,8 +139,9 @@ type OIDCStartOutput struct {
 
 // OIDCCallbackInput is the query for GET /auth/oidc/google/callback.
 type OIDCCallbackInput struct {
-	Code  string `query:"code"`
-	State string `query:"state"`
+	UserAgent string `header:"User-Agent"`
+	Code      string `query:"code"`
+	State     string `query:"state"`
 }
 
 // OIDCCallbackOutput is the response for OIDC callback.

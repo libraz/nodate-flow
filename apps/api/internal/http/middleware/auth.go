@@ -11,6 +11,7 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
 )
 
@@ -37,7 +38,7 @@ func RequireAuth(deps AuthDeps) func(http.Handler) http.Handler {
 				writeAuthError(w, apierrors.AuthTokenSignatureInvalid)
 				return
 			}
-			userID, err := resolveBearer(r.Context(), deps, tok)
+			userID, sid, err := resolveBearer(r.Context(), deps, tok)
 			if err != nil {
 				var ae *apierrors.APIError
 				if errors.As(err, &ae) {
@@ -48,6 +49,10 @@ func RequireAuth(deps AuthDeps) func(http.Handler) http.Handler {
 				return
 			}
 			ctx := WithActor(r.Context(), userID)
+			var zeroSid types.PublicID
+			if sid != zeroSid {
+				ctx = WithSessionPublicID(ctx, sid)
+			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -68,34 +73,36 @@ func bearerFromHeader(h string) (string, bool) {
 	return tok, true
 }
 
-func resolveBearer(ctx context.Context, deps AuthDeps, tok string) (uint32, error) {
+func resolveBearer(ctx context.Context, deps AuthDeps, tok string) (uint32, types.PublicID, error) {
 	switch {
 	case strings.HasPrefix(tok, auth.PrefixPAT):
-		return resolvePAT(ctx, deps, tok)
+		uid, err := resolvePAT(ctx, deps, tok)
+		return uid, types.PublicID{}, err
 	case strings.HasPrefix(tok, auth.PrefixMCP):
-		return resolveMCP(ctx, deps, tok)
+		uid, err := resolveMCP(ctx, deps, tok)
+		return uid, types.PublicID{}, err
 	default:
 		return resolveJWT(deps, tok)
 	}
 }
 
-func resolveJWT(deps AuthDeps, tok string) (uint32, error) {
+func resolveJWT(deps AuthDeps, tok string) (uint32, types.PublicID, error) {
 	if deps.JWT == nil || deps.DB == nil {
-		return 0, apierrors.New(apierrors.AuthTokenSignatureInvalid)
+		return 0, types.PublicID{}, apierrors.New(apierrors.AuthTokenSignatureInvalid)
 	}
 	claims, err := deps.JWT.Verify(tok)
 	if err != nil {
-		return 0, apierrors.New(apierrors.AuthTokenSignatureInvalid)
+		return 0, types.PublicID{}, apierrors.New(apierrors.AuthTokenSignatureInvalid)
 	}
 	const q = `SELECT id FROM users WHERE public_id = ? AND enabled = TRUE LIMIT 1`
 	var uid uint32
 	if err := deps.DB.QueryRowContext(context.Background(), q, claims.UserPublicID).Scan(&uid); err != nil {
 		if errors.Is(err, stddb.ErrNoRows) {
-			return 0, apierrors.New(apierrors.AuthSessionRevoked)
+			return 0, types.PublicID{}, apierrors.New(apierrors.AuthSessionRevoked)
 		}
-		return 0, err
+		return 0, types.PublicID{}, err
 	}
-	return uid, nil
+	return uid, claims.SessionPublicID, nil
 }
 
 func resolvePAT(ctx context.Context, deps AuthDeps, tok string) (uint32, error) {

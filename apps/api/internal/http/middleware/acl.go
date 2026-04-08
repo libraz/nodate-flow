@@ -103,6 +103,8 @@ const (
 	ctxKeyProjectIDPublic
 	ctxKeyTaskID
 	ctxKeyTaskIDPublic
+	ctxKeySessionIDPublic
+	ctxKeyClientIP
 )
 
 // TaskContext is the task metadata injected by [RequireTaskAccess]. It is
@@ -138,6 +140,41 @@ func WithActor(ctx context.Context, userID uint32) context.Context {
 func ActorFromContext(ctx context.Context) (uint32, bool) {
 	v, ok := ctx.Value(ctxKeyActorUserID).(uint32)
 	return v, ok
+}
+
+// WithSessionPublicID returns a new context carrying the caller's session
+// public id, resolved from the "sid" claim on the access token.
+func WithSessionPublicID(ctx context.Context, sid types.PublicID) context.Context {
+	return context.WithValue(ctx, ctxKeySessionIDPublic, sid)
+}
+
+// SessionPublicIDFromContext extracts the caller's session public id
+// as populated by [RequireAuth]. The boolean is false when no session
+// id was present on the access token (e.g. legacy PAT/MCP tokens).
+func SessionPublicIDFromContext(ctx context.Context) (types.PublicID, bool) {
+	v, ok := ctx.Value(ctxKeySessionIDPublic).(types.PublicID)
+	if !ok {
+		return types.PublicID{}, false
+	}
+	var zero types.PublicID
+	if v == zero {
+		return zero, false
+	}
+	return v, true
+}
+
+// WithClientIP returns a new context carrying the caller's client IP
+// address (already normalized by [ClientIP]).
+func WithClientIP(ctx context.Context, ip string) context.Context {
+	return context.WithValue(ctx, ctxKeyClientIP, ip)
+}
+
+// ClientIPFromContext extracts the caller's client IP address as
+// populated by [ClientIP]. Returns an empty string when no middleware
+// has populated the context.
+func ClientIPFromContext(ctx context.Context) string {
+	v, _ := ctx.Value(ctxKeyClientIP).(string)
+	return v
 }
 
 // WorkspaceContext is the workspace metadata injected by

@@ -106,10 +106,16 @@ func RevokeAllOtherSessions(deps Deps) func(context.Context, *RevokeAllOtherSess
 	}
 }
 
-// currentSessionPublicID resolves the nf_rt plaintext refresh token
-// into the owning session's public id. Returns (zero, false) when the
-// cookie is missing or no longer matches an active session.
+// currentSessionPublicID resolves the caller's current session public
+// id. It prefers the "sid" claim on the access token (stashed on
+// context by the auth middleware) because the refresh cookie is scoped
+// to /auth and is not sent on /me/* requests. Falls back to hashing
+// the nf_rt cookie for safety / backwards compatibility with older
+// tokens that predate the sid claim.
 func currentSessionPublicID(ctx context.Context, deps Deps, plain string) (types.PublicID, bool) {
+	if sid, ok := middleware.SessionPublicIDFromContext(ctx); ok {
+		return sid, true
+	}
 	var zero types.PublicID
 	if plain == "" {
 		return zero, false

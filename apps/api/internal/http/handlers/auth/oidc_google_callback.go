@@ -8,6 +8,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/middleware"
 )
 
 // OIDCGoogleCallback handles GET /auth/oidc/google/callback. It exchanges
@@ -76,7 +77,7 @@ func OIDCGoogleCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*O
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		tokens, refresh, err := issueTokens(ctx, deps, userID, userPub)
+		tokens, refresh, err := issueTokens(ctx, deps, userID, userPub, in.UserAgent, middleware.ClientIPFromContext(ctx))
 		if err != nil {
 			return nil, err
 		}

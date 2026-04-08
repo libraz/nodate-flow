@@ -148,6 +148,10 @@ func Build(deps Deps) http.Handler {
 // can exercise the full API surface without duplicating the wiring.
 func BuildResult(deps Deps) Result {
 	r := chi.NewRouter()
+	// Outermost layer: extract and stash the client IP so auth
+	// handlers can record it on new sessions without re-parsing
+	// X-Forwarded-For themselves.
+	r.Use(middleware.ClientIP())
 	// Each huma.API needs its own huma.Config so it gets a fresh
 	// schema registry and its own *OpenAPI document; sharing one
 	// config between sub-APIs would point every group at the same

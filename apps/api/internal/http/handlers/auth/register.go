@@ -12,6 +12,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/middleware"
 )
 
 // Register handles POST /auth/register and creates a new local-password
@@ -61,7 +62,7 @@ func Register(deps Deps) func(context.Context, *RegisterInput) (*RegisterOutput,
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		tokens, refresh, err := issueTokens(ctx, deps, uint32(uid), userPub)
+		tokens, refresh, err := issueTokens(ctx, deps, uint32(uid), userPub, in.UserAgent, middleware.ClientIPFromContext(ctx))
 		if err != nil {
 			return nil, err
 		}
@@ -76,8 +77,9 @@ func Register(deps Deps) func(context.Context, *RegisterInput) (*RegisterOutput,
 // returns the JSON-body AuthTokens envelope plus the freshly-minted
 // plaintext refresh token, which the caller must attach to the
 // response via a Set-Cookie header (never in the JSON body).
-func issueTokens(ctx context.Context, deps Deps, userID uint32, userPub types.PublicID) (AuthTokens, string, error) {
-	access, exp, err := deps.JWT.Sign(userPub)
+func issueTokens(ctx context.Context, deps Deps, userID uint32, userPub types.PublicID, userAgent, ipAddress string) (AuthTokens, string, error) {
+	sessPub := types.New()
+	access, exp, err := deps.JWT.Sign(userPub, sessPub)
 	if err != nil {
 		return AuthTokens{}, "", httpErr(apierrors.InternalUnexpected)
 	}
@@ -85,11 +87,12 @@ func issueTokens(ctx context.Context, deps Deps, userID uint32, userPub types.Pu
 	if err != nil {
 		return AuthTokens{}, "", httpErr(apierrors.InternalUnexpected)
 	}
-	sessPub := types.New()
 	if _, err := deps.Sessions.Create(ctx, sessionstore.CreateParams{
 		PublicID:    sessPub,
 		UserID:      userID,
 		RefreshHash: refreshHash,
+		UserAgent:   truncateUserAgent(userAgent),
+		IPAddress:   ipAddress,
 		ExpiresAt:   time.Now().Add(refreshCookieTTL),
 	}); err != nil {
 		return AuthTokens{}, "", httpErr(apierrors.InternalUnexpected)
@@ -99,4 +102,15 @@ func issueTokens(ctx context.Context, deps Deps, userID uint32, userPub types.Pu
 		ExpiresAt:   exp.Unix(),
 		UserID:      userPub.String(),
 	}, refresh, nil
+}
+
+// userAgentMaxLen caps the stored User-Agent string. The sessions
+// table column is sized for this upper bound.
+const userAgentMaxLen = 255
+
+func truncateUserAgent(ua string) string {
+	if len(ua) > userAgentMaxLen {
+		return ua[:userAgentMaxLen]
+	}
+	return ua
 }

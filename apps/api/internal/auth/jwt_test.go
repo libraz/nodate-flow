@@ -16,7 +16,8 @@ func TestJWTSignVerifyRoundTrip(t *testing.T) {
 		t.Fatalf("new issuer: %v", err)
 	}
 	sub := types.FromUUID(uuid.New())
-	tok, exp, err := iss.Sign(sub)
+	sid := types.FromUUID(uuid.New())
+	tok, exp, err := iss.Sign(sub, sid)
 	if err != nil {
 		t.Fatalf("sign: %v", err)
 	}
@@ -35,7 +36,7 @@ func TestJWTSignVerifyRoundTrip(t *testing.T) {
 func TestJWTVerifyRejectsTampered(t *testing.T) {
 	t.Parallel()
 	iss, _ := NewJWTIssuer(nil, "nodate-flow", "api", time.Minute)
-	tok, _, _ := iss.Sign(types.FromUUID(uuid.New()))
+	tok, _, _ := iss.Sign(types.FromUUID(uuid.New()), types.FromUUID(uuid.New()))
 	if _, err := iss.Verify(tok + "garbage"); err == nil {
 		t.Fatal("expected error on tampered token")
 	}

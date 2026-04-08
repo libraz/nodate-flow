@@ -25,7 +25,8 @@ type JWTIssuer struct {
 
 // AccessClaims is the structured claims body of an access token.
 type AccessClaims struct {
-	UserPublicID types.PublicID `json:"sub_uid"`
+	UserPublicID    types.PublicID `json:"sub_uid"`
+	SessionPublicID types.PublicID `json:"sid,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -43,12 +44,16 @@ func NewJWTIssuer(priv ed25519.PrivateKey, issuer, audience string, ttl time.Dur
 	return &JWTIssuer{priv: priv, pub: priv.Public().(ed25519.PublicKey), issuer: issuer, audience: audience, ttl: ttl}, nil
 }
 
-// Sign issues a signed access token for the given user public id.
-func (j *JWTIssuer) Sign(userPublicID types.PublicID) (string, time.Time, error) {
+// Sign issues a signed access token for the given user + session public id.
+// The session public id is embedded as the "sid" claim so downstream
+// middleware can identify the calling session without requiring the
+// refresh cookie (which is scoped to /auth and not sent on other paths).
+func (j *JWTIssuer) Sign(userPublicID types.PublicID, sessionPublicID types.PublicID) (string, time.Time, error) {
 	now := time.Now().UTC()
 	exp := now.Add(j.ttl)
 	claims := AccessClaims{
-		UserPublicID: userPublicID,
+		UserPublicID:    userPublicID,
+		SessionPublicID: sessionPublicID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    j.issuer,
 			Audience:  jwt.ClaimStrings{j.audience},

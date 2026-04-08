@@ -44,7 +44,7 @@ func Refresh(deps Deps) func(context.Context, *RefreshInput) (*RefreshOutput, er
 		if err := deps.DB.QueryRowContext(ctx, `SELECT public_id FROM users WHERE id = ?`, sess.UserID).Scan(&pub); err != nil {
 			return nil, httpErr(apierrors.AuthSessionRevoked)
 		}
-		access, exp, err := deps.JWT.Sign(pub)
+		access, exp, err := deps.JWT.Sign(pub, sess.PublicID)
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
