@@ -64,8 +64,11 @@ export default function WorkspaceList(): ReactElement {
     },
     {
       id: 'members',
+      accessorKey: 'memberCount',
       header: () => t('workspaces.columns.members'),
-      cell: () => <span aria-hidden="true">—</span>,
+      cell: ({ row }) => (
+        <span>{new Intl.NumberFormat(locale).format(row.original.memberCount)}</span>
+      ),
     },
     {
       id: 'created',

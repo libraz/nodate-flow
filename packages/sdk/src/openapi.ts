@@ -1178,6 +1178,8 @@ export interface components {
             applied: number;
             /** Format: int64 */
             dismissed: number;
+            /** @description Per-provider egress rate limiter counters (4.AGENT-2) */
+            outboundLimits: components["schemas"]["OutboundLimitStat"][] | null;
             /** Format: int64 */
             proposed: number;
             /** Format: int64 */
@@ -1803,6 +1805,15 @@ export interface components {
             nonce: string;
             state: string;
         };
+        OutboundLimitStat: {
+            /** Format: int64 */
+            allowed: number;
+            /** Format: int64 */
+            denied: number;
+            destination: string;
+            /** Format: int64 */
+            waited: number;
+        };
         PatchMeInputBody: {
             /**
              * Format: uri
@@ -2321,6 +2332,11 @@ export interface components {
             iconUrl?: string;
             /** @description Workspace public id (UUID v7) */
             id: string;
+            /**
+             * Format: int64
+             * @description Number of enabled members in this workspace
+             */
+            memberCount: number;
             name: string;
             /** @description Caller's role in this workspace */
             role?: string;

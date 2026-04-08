@@ -32,6 +32,7 @@ type Workspace struct {
 	Description string    `json:"description,omitempty"`
 	IconURL     string    `json:"iconUrl,omitempty"`
 	Role        string     `json:"role,omitempty" doc:"Caller's role in this workspace"`
+	MemberCount int64      `json:"memberCount" doc:"Number of enabled members in this workspace"`
 	UpdatedAt   *time.Time `json:"updatedAt,omitempty"`
 	CreatedAt   time.Time  `json:"createdAt"`
 }

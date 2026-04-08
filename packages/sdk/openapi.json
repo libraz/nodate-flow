@@ -279,6 +279,13 @@
             "format": "int64",
             "type": "integer"
           },
+          "outboundLimits": {
+            "description": "Per-provider egress rate limiter counters (4.AGENT-2)",
+            "items": {
+              "$ref": "#/components/schemas/OutboundLimitStat"
+            },
+            "type": ["array", "null"]
+          },
           "proposed": {
             "format": "int64",
             "type": "integer"
@@ -288,7 +295,14 @@
             "type": "integer"
           }
         },
-        "required": ["windowDays", "proposed", "applied", "dismissed", "acceptanceRate"],
+        "required": [
+          "windowDays",
+          "proposed",
+          "applied",
+          "dismissed",
+          "acceptanceRate",
+          "outboundLimits"
+        ],
         "type": "object"
       },
       "AiSuggestionListBody": {
@@ -1770,6 +1784,31 @@
         "required": ["authorizationUrl", "state", "nonce"],
         "type": "object"
       },
+      "OutboundLimitStat": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "denied": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "destination": {
+            "type": "string"
+          },
+          "waited": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": ["destination", "allowed", "waited", "denied"],
+        "type": "object"
+      },
       "PatchMeInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -3040,6 +3079,11 @@
             "description": "Workspace public id (UUID v7)",
             "type": "string"
           },
+          "memberCount": {
+            "description": "Number of enabled members in this workspace",
+            "format": "int64",
+            "type": "integer"
+          },
           "name": {
             "type": "string"
           },
@@ -3055,7 +3099,7 @@
             "type": "string"
           }
         },
-        "required": ["id", "slug", "name", "createdAt"],
+        "required": ["id", "slug", "name", "memberCount", "createdAt"],
         "type": "object"
       },
       "WorkspaceMember": {

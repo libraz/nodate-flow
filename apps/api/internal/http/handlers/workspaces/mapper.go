@@ -27,6 +27,7 @@ func rowToWorkspaceFromList(r generated.ListWorkspacesForUserRow) Workspace {
 		Description: nullStr(r.Description),
 		IconURL:     nullStr(r.IconUrl),
 		Role:        string(r.Role),
+		MemberCount: r.MemberCount,
 		UpdatedAt:   nullTime(r.UpdatedAt),
 		CreatedAt:   r.CreatedAt,
 	}

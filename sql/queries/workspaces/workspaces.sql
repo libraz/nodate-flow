@@ -53,6 +53,12 @@ SELECT
   wm.role,
   w.updated_at,
   w.created_at,
+  (
+    SELECT COUNT(*)
+    FROM workspace_members wm2
+    WHERE wm2.workspace_id = w.id
+      AND wm2.enabled = TRUE
+  ) AS member_count,
   COUNT(*) OVER() AS total
 FROM workspace_members wm
 INNER JOIN workspaces w

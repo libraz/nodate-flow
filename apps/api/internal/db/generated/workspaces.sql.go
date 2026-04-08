@@ -162,6 +162,12 @@ SELECT
   wm.role,
   w.updated_at,
   w.created_at,
+  (
+    SELECT COUNT(*)
+    FROM workspace_members wm2
+    WHERE wm2.workspace_id = w.id
+      AND wm2.enabled = TRUE
+  ) AS member_count,
   COUNT(*) OVER() AS total
 FROM workspace_members wm
 INNER JOIN workspaces w
@@ -187,6 +193,7 @@ type ListWorkspacesForUserRow struct {
 	Role        WorkspaceMembersRole `json:"role"`
 	UpdatedAt   sql.NullTime         `json:"updatedAt"`
 	CreatedAt   time.Time            `json:"createdAt"`
+	MemberCount int64                `json:"memberCount"`
 	Total       interface{}          `json:"total"`
 }
 
@@ -209,6 +216,7 @@ func (q *Queries) ListWorkspacesForUser(ctx context.Context, arg ListWorkspacesF
 			&i.Role,
 			&i.UpdatedAt,
 			&i.CreatedAt,
+			&i.MemberCount,
 			&i.Total,
 		); err != nil {
 			return nil, err
