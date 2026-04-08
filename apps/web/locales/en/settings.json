@@ -53,7 +53,7 @@
     "description": "A deterministic snapshot of this workspace: state counts, what was completed in the last seven days, and what is overdue.",
     "counts": {
       "open": "Open",
-      "waiting": "Waiting",
+      "waiting": "In progress",
       "review": "Review",
       "done": "Done",
       "cancelled": "Cancelled"

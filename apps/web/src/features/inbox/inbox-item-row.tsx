@@ -53,7 +53,8 @@ function isKnownSource(source: string): source is SourceKey {
 
 function formatRelative(unixSec: number, locale: string): string {
   const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
-  const diffSec = unixSec - Math.floor(Date.now() / 1000);
+  const rawDiff = unixSec - Math.floor(Date.now() / 1000);
+  const diffSec = rawDiff > 0 ? 0 : rawDiff;
   const abs = Math.abs(diffSec);
   if (abs < 60) return rtf.format(Math.round(diffSec), 'second');
   if (abs < 3600) return rtf.format(Math.round(diffSec / 60), 'minute');

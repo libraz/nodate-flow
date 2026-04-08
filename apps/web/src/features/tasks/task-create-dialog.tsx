@@ -54,7 +54,7 @@ export default function TaskCreateDialog({
   open,
   onClose,
 }: TaskCreateDialogProps): ReactElement {
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
   const create = useCreateTask();
 
   const [title, setTitle] = useState('');
@@ -198,6 +198,7 @@ export default function TaskCreateDialog({
             <Input
               {...control}
               type="date"
+              lang={i18n.resolvedLanguage ?? 'en'}
               value={dueOn}
               onChange={(e) => {
                 setDueOn(e.target.value);

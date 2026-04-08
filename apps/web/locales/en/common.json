@@ -238,7 +238,7 @@
     },
     "status": {
       "open": "Open",
-      "waiting": "Waiting",
+      "waiting": "In progress",
       "review": "Review",
       "done": "Done",
       "cancelled": "Cancelled"

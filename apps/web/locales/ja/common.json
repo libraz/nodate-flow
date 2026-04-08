@@ -238,7 +238,7 @@
     },
     "status": {
       "open": "オープン",
-      "waiting": "待機中",
+      "waiting": "進行中",
       "review": "レビュー",
       "done": "完了",
       "cancelled": "キャンセル"
