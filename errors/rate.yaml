@@ -1,0 +1,13 @@
+domain: rate
+breadcrumb: "Rate Limit"
+
+resources:
+  limit:
+    breadcrumb: "Rate Limit"
+    errors:
+      exceeded:
+        code: RATE.LIMIT.EXCEEDED
+        status: 429
+        message: "Request rate limit exceeded"
+        description: "Returned when the global, per-IP, or per-user request rate limit has been exceeded for the called endpoint."
+        userAction: "Wait for the Retry-After interval before retrying."

@@ -1,0 +1,164 @@
+domain: auth
+breadcrumb: "Auth"
+
+resources:
+  register:
+    breadcrumb: "Auth > Register"
+    errors:
+      email_already_taken:
+        code: AUTH.REGISTER.EMAIL_ALREADY_TAKEN
+        status: 409
+        message: "Email address is already registered"
+        description: "Returned when a registration attempt uses an email that is already associated with an existing account."
+        userAction: "Sign in with the existing account, or use a different email address."
+
+      password_too_weak:
+        code: AUTH.REGISTER.PASSWORD_TOO_WEAK
+        status: 422
+        message: "Password does not meet strength requirements"
+        description: "Returned when the submitted password fails the minimum complexity policy (length, character classes)."
+        userAction: "Choose a stronger password with at least 12 characters including mixed case, numbers, and symbols."
+
+      instance_registration_disabled:
+        code: AUTH.REGISTER.INSTANCE_REGISTRATION_DISABLED
+        status: 403
+        message: "Self-service registration is disabled on this instance"
+        description: "Returned when an open registration attempt is made on an instance where self-service signup has been disabled by an admin."
+        userAction: "Contact your instance administrator to request an account."
+
+  login:
+    breadcrumb: "Auth > Login"
+    errors:
+      invalid_credentials:
+        code: AUTH.LOGIN.INVALID_CREDENTIALS
+        status: 401
+        message: "Invalid email or password"
+        description: "Returned when the submitted email does not exist or the password does not match. The same code is returned in both cases to prevent user enumeration."
+        userAction: "Check your credentials and try again, or reset your password."
+
+      account_locked:
+        code: AUTH.LOGIN.ACCOUNT_LOCKED
+        status: 423
+        message: "Account is temporarily locked"
+        description: "Returned when the account has been locked after repeated failed login attempts."
+        userAction: "Wait for the lock period to elapse or contact an administrator."
+
+      rate_limited_after_retries:
+        code: AUTH.LOGIN.RATE_LIMITED_AFTER_RETRIES
+        status: 429
+        message: "Too many failed login attempts"
+        description: "Returned when the login rate limit for the source IP or account has been exceeded."
+        userAction: "Wait a few minutes before trying again."
+
+  totp:
+    breadcrumb: "Auth > TOTP"
+    errors:
+      code_required:
+        code: AUTH.TOTP.CODE_REQUIRED
+        status: 401
+        message: "Two-factor authentication code is required"
+        description: "Returned when the account has 2FA enabled and the login request did not include a TOTP code."
+        userAction: "Submit the 6-digit code from your authenticator app."
+
+      code_mismatch:
+        code: AUTH.TOTP.CODE_MISMATCH
+        status: 401
+        message: "Two-factor authentication code is incorrect"
+        description: "Returned when the submitted TOTP code does not match the expected value within the allowed time window."
+        userAction: "Re-enter the current code from your authenticator app."
+
+      already_enrolled:
+        code: AUTH.TOTP.ALREADY_ENROLLED
+        status: 409
+        message: "Two-factor authentication is already enabled"
+        description: "Returned when attempting to enroll TOTP for an account that already has it active."
+        userAction: "Disable the existing 2FA before enrolling again."
+
+  session:
+    breadcrumb: "Auth > Session"
+    errors:
+      expired:
+        code: AUTH.SESSION.EXPIRED
+        status: 401
+        message: "Session has expired"
+        description: "Returned when the session or access token is past its expiration timestamp."
+        userAction: "Sign in again to continue."
+
+      revoked:
+        code: AUTH.SESSION.REVOKED
+        status: 401
+        message: "Session has been revoked"
+        description: "Returned when the session has been explicitly invalidated (logout elsewhere, admin revoke, password change)."
+        userAction: "Sign in again."
+
+  token:
+    breadcrumb: "Auth > Token"
+    errors:
+      refresh_invalid:
+        code: AUTH.TOKEN.REFRESH_INVALID
+        status: 401
+        message: "Refresh token is invalid"
+        description: "Returned when a refresh token is malformed, unknown, or has already been rotated."
+        userAction: "Sign in again to obtain a new session."
+
+      refresh_expired:
+        code: AUTH.TOKEN.REFRESH_EXPIRED
+        status: 401
+        message: "Refresh token has expired"
+        description: "Returned when the refresh token is past its lifetime and can no longer be exchanged."
+        userAction: "Sign in again."
+
+      signature_invalid:
+        code: AUTH.TOKEN.SIGNATURE_INVALID
+        status: 401
+        message: "Token signature is invalid"
+        description: "Returned when the JWT signature verification fails (wrong key, tampered payload)."
+        userAction: "Sign in again."
+
+  oidc:
+    breadcrumb: "Auth > OIDC"
+    errors:
+      state_mismatch:
+        code: AUTH.OIDC.STATE_MISMATCH
+        status: 400
+        message: "OIDC state parameter does not match"
+        description: "Returned when the state value returned by the identity provider does not match the one issued at the start of the flow, indicating possible CSRF."
+        userAction: "Restart the sign-in flow from the login page."
+
+      nonce_mismatch:
+        code: AUTH.OIDC.NONCE_MISMATCH
+        status: 400
+        message: "OIDC nonce does not match"
+        description: "Returned when the nonce claim in the ID token does not match the one embedded in the authentication request."
+        userAction: "Restart the sign-in flow from the login page."
+
+      id_token_invalid:
+        code: AUTH.OIDC.ID_TOKEN_INVALID
+        status: 401
+        message: "OIDC ID token is invalid"
+        description: "Returned when the ID token fails verification (signature, issuer, audience, or expiration)."
+        userAction: "Restart the sign-in flow, or contact support if the problem persists."
+
+      provider_unreachable:
+        code: AUTH.OIDC.PROVIDER_UNREACHABLE
+        status: 502
+        message: "OIDC provider is unreachable"
+        description: "Returned when the configured OIDC provider cannot be contacted for discovery or token exchange."
+        userAction: "Try again in a moment; contact your administrator if the problem persists."
+
+  pat:
+    breadcrumb: "Auth > Personal Access Token"
+    errors:
+      token_unknown:
+        code: AUTH.PAT.TOKEN_UNKNOWN
+        status: 401
+        message: "Personal access token is invalid"
+        description: "Returned when the supplied personal access token is unknown, malformed, or has been revoked."
+        userAction: "Generate a new personal access token and update the client configuration."
+
+      expired:
+        code: AUTH.PAT.EXPIRED
+        status: 401
+        message: "Personal access token has expired"
+        description: "Returned when the PAT's expiration timestamp has passed."
+        userAction: "Create a new personal access token."

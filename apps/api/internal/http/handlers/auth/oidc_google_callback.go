@@ -1,0 +1,85 @@
+package auth
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
+	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
+)
+
+// OIDCGoogleCallback handles GET /auth/oidc/google/callback. It exchanges
+// the authorization code for an id_token, finds or creates an identity
+// row, and issues fresh app tokens.
+func OIDCGoogleCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*OIDCCallbackOutput, error) {
+	return func(ctx context.Context, in *OIDCCallbackInput) (*OIDCCallbackOutput, error) {
+		if deps.OIDC == nil {
+			return nil, httpErr(apierrors.AuthOidcProviderUnreachable)
+		}
+		idTok, err := deps.OIDC.Exchange(ctx, in.Code)
+		if err != nil {
+			return nil, httpErr(apierrors.AuthOidcIdTokenInvalid)
+		}
+		var claims struct {
+			Email       string `json:"email"`
+			Sub         string `json:"sub"`
+			Name        string `json:"name"`
+			Locale      string `json:"locale"`
+			Verified    bool   `json:"email_verified"`
+		}
+		if err := idTok.Claims(&claims); err != nil {
+			return nil, httpErr(apierrors.AuthOidcIdTokenInvalid)
+		}
+
+		ident, err := deps.Queries.FindIdentityByProviderSubject(ctx, generated.FindIdentityByProviderSubjectParams{
+			Provider: generated.IdentitiesProvider("google"),
+			Subject:  claims.Sub,
+		})
+		var userID uint32
+		var userPub types.PublicID
+		switch {
+		case err == nil:
+			userID = ident.UserID
+			if err := deps.DB.QueryRowContext(ctx, `SELECT public_id FROM users WHERE id = ?`, userID).Scan(&userPub); err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+		case errors.Is(err, sql.ErrNoRows):
+			// Auto-provision a new user.
+			userPub = types.New()
+			locale := claims.Locale
+			if locale == "" {
+				locale = "en"
+			}
+			uid, err := deps.Queries.RegisterUser(ctx, generated.RegisterUserParams{
+				PublicID:        userPub,
+				Email:           claims.Email,
+				DisplayName:     claims.Name,
+				Locale:          locale,
+				ThemePreference: generated.UsersThemePreference("system"),
+			})
+			if err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			userID = uint32(uid)
+			identPub := types.New()
+			if _, err := deps.Queries.CreateIdentity(ctx, generated.CreateIdentityParams{
+				PublicID: identPub,
+				UserID:   userID,
+				Provider: generated.IdentitiesProvider("google"),
+				Subject:  claims.Sub,
+			}); err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+		default:
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
+		tokens, err := issueTokens(ctx, deps, userID, userPub)
+		if err != nil {
+			return nil, err
+		}
+		return &OIDCCallbackOutput{Body: tokens}, nil
+	}
+}

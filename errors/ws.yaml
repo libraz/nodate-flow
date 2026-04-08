@@ -1,0 +1,106 @@
+domain: ws
+breadcrumb: "Workspace"
+
+resources:
+  workspace:
+    breadcrumb: "Workspace"
+    errors:
+      not_found:
+        code: WS.WORKSPACE.NOT_FOUND
+        status: 404
+        message: "Workspace not found"
+        description: "Returned when a workspace with the given public_id does not exist or the actor has no visibility into it."
+        userAction: "Verify the workspace ID, or ask an admin to add you as a member."
+
+      access_denied:
+        code: WS.WORKSPACE.ACCESS_DENIED
+        status: 403
+        message: "You do not have access to this workspace"
+        description: "Returned when the actor is authenticated but is not a member of the target workspace."
+        userAction: "Ask a workspace admin to invite you."
+
+      slug_already_taken:
+        code: WS.WORKSPACE.SLUG_ALREADY_TAKEN
+        status: 409
+        message: "Workspace slug is already taken"
+        description: "Returned when the requested workspace slug conflicts with an existing workspace on the same instance."
+        userAction: "Choose a different slug."
+
+  project:
+    breadcrumb: "Workspace > Project"
+    errors:
+      not_found:
+        code: WS.PROJECT.NOT_FOUND
+        status: 404
+        message: "Project not found"
+        description: "Returned when a project does not exist or when the actor cannot access it (404 to avoid leaking existence)."
+        userAction: "Verify the project ID, or contact a workspace admin if you should have access."
+
+      access_denied:
+        code: WS.PROJECT.ACCESS_DENIED
+        status: 403
+        message: "You do not have access to this project"
+        description: "Returned when the actor is a workspace member but lacks the required project role."
+        userAction: "Ask a project lead to grant you access."
+
+      slug_already_taken:
+        code: WS.PROJECT.SLUG_ALREADY_TAKEN
+        status: 409
+        message: "Project slug is already taken"
+        description: "Returned when the requested project slug already exists within the workspace."
+        userAction: "Choose a different slug."
+
+  task:
+    breadcrumb: "Workspace > Task"
+    errors:
+      not_found:
+        code: WS.TASK.NOT_FOUND
+        status: 404
+        message: "Task not found"
+        description: "Returned when a task with the given public_id does not exist or has been deleted in the current workspace."
+        userAction: "Verify the task ID, or refresh the list to see current tasks."
+
+      access_denied:
+        code: WS.TASK.ACCESS_DENIED
+        status: 403
+        message: "You do not have access to this task"
+        description: "Returned when the actor lacks the required project role to read or modify the task."
+        userAction: "Ask a project lead to grant you access."
+
+      update_conflict:
+        code: WS.TASK.UPDATE_CONFLICT
+        status: 409
+        message: "Task was modified by someone else"
+        description: "Returned when an optimistic concurrency check (version or updated_at) fails during update."
+        userAction: "Reload the task to see the latest version, then re-apply your changes."
+
+      title_too_long:
+        code: WS.TASK.TITLE_TOO_LONG
+        status: 422
+        message: "Task title is too long"
+        description: "Returned when the submitted title exceeds the maximum allowed length."
+        userAction: "Shorten the title and retry."
+
+      state_transition_blocked_by_constraint:
+        code: WS.TASK.STATE_TRANSITION_BLOCKED_BY_CONSTRAINT
+        status: 422
+        message: "Task cannot transition to the requested state"
+        description: "Returned when an unsatisfied constraint blocks the requested lifecycle transition."
+        userAction: "Review unmet constraints in the task detail panel and resolve them before retrying."
+
+  member:
+    breadcrumb: "Workspace > Member"
+    errors:
+      role_denied:
+        code: WS.MEMBER.ROLE_DENIED
+        status: 403
+        message: "Your role does not permit this action"
+        description: "Returned when the actor's workspace role is insufficient for the attempted operation."
+        userAction: "Ask a workspace admin to elevate your role."
+
+      not_found:
+        code: WS.MEMBER.NOT_FOUND
+        status: 404
+        message: "Workspace member not found"
+        description: "Returned when the target user is not a member of the workspace."
+        userAction: "Invite the user to the workspace first."

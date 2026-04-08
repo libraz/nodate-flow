@@ -1,0 +1,20 @@
+{
+  "name": "@nodate-flow/cli",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "bin": {
+    "tnk": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@libraz/node-cli": "0.5.0"
+  },
+  "devDependencies": {
+    "typescript": "5.6.3",
+    "@types/node": "22.8.6"
+  }
+}

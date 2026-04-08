@@ -1,0 +1,88 @@
+domain: mcp
+breadcrumb: "MCP"
+
+resources:
+  token:
+    breadcrumb: "MCP > Token"
+    errors:
+      unknown:
+        code: MCP.TOKEN.UNKNOWN
+        status: 401
+        message: "MCP token is invalid"
+        description: "Returned when the bearer token presented to the MCP endpoint is unknown or malformed."
+        userAction: "Re-issue an MCP token from your account settings."
+
+      expired:
+        code: MCP.TOKEN.EXPIRED
+        status: 401
+        message: "MCP token has expired"
+        description: "Returned when the MCP token has passed its expiration timestamp."
+        userAction: "Re-issue a new MCP token."
+
+      revoked:
+        code: MCP.TOKEN.REVOKED
+        status: 401
+        message: "MCP token has been revoked"
+        description: "Returned when the MCP token has been explicitly revoked by the user or an admin."
+        userAction: "Re-issue a new MCP token."
+
+      workspace_mismatch:
+        code: MCP.TOKEN.WORKSPACE_MISMATCH
+        status: 403
+        message: "MCP token is bound to a different workspace"
+        description: "Returned when the MCP token is bound to one workspace but the tool arguments reference a resource belonging to another workspace."
+        userAction: "Use an MCP token issued for the workspace that owns the target resource."
+
+  scope:
+    breadcrumb: "MCP > Scope"
+    errors:
+      insufficient:
+        code: MCP.SCOPE.INSUFFICIENT
+        status: 403
+        message: "MCP token does not have the required scope"
+        description: "Returned when the requested tool or resource requires a scope not granted to the presented MCP token."
+        userAction: "Re-issue the MCP token with the required scope."
+
+  tool:
+    breadcrumb: "MCP > Tool"
+    errors:
+      not_found:
+        code: MCP.TOOL.NOT_FOUND
+        status: 404
+        message: "MCP tool not found"
+        description: "Returned when the client requests a tool name that is not registered on this MCP server."
+        userAction: "Check the tool name against the list returned by tools/list."
+
+      arguments_invalid:
+        code: MCP.TOOL.ARGUMENTS_INVALID
+        status: 422
+        message: "MCP tool arguments are invalid"
+        description: "Returned when the supplied arguments do not match the tool's input schema."
+        userAction: "Inspect the tool schema and correct the argument types or required fields."
+
+      execution_failed:
+        code: MCP.TOOL.EXECUTION_FAILED
+        status: 500
+        message: "MCP tool execution failed"
+        description: "Returned when an internal error occurs inside the tool body, such as a database error while executing the tool."
+        userAction: "Retry the call; if the problem persists, contact the server administrator."
+
+  protocol:
+    breadcrumb: "MCP > Protocol"
+    errors:
+      frame_malformed:
+        code: MCP.PROTOCOL.FRAME_MALFORMED
+        status: 400
+        message: "MCP protocol frame is malformed"
+        description: "Returned when the incoming JSON-RPC frame cannot be parsed, uses an unsupported method, or declares a jsonrpc version other than 2.0."
+        userAction: "Ensure the client sends a well-formed JSON-RPC 2.0 request with a supported method."
+
+  rate:
+    breadcrumb: "MCP > Rate Limit"
+    errors:
+      limited:
+        code: MCP.RATE.LIMITED
+        status: 429
+        message: "MCP request rate limit exceeded"
+        description: "Returned when the per-token MCP call rate limit has been reached."
+        userAction: "Slow down the request rate and retry after the Retry-After interval."

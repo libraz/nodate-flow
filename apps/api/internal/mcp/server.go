@@ -1,0 +1,276 @@
+// Package mcp implements the nodate-flow MCP server. It exposes a small
+// Streamable HTTP (JSON-RPC 2.0) transport at POST /mcp and a set of
+// tools scoped to a workspace. Tools are intentionally implemented as
+// direct sqlc calls in-process (Path A) rather than calling the HTTP
+// handlers of the REST API. Direct sqlc is not considered "raw SQL" for
+// the purposes of the DRY rule — the generated queries package is the
+// single source of truth for SQL.
+//
+// Phase 1 covers: list_projects, list_tasks, get_task, create_task,
+// update_task, add_comment, search_tasks (stub), propose_tasks_from
+// (stub), propose_priority (stub). Rate limiting, SSE streaming, and
+// the full propose_* AI wiring are deferred.
+package mcp
+
+import (
+	"bytes"
+	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
+	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
+)
+
+// Deps is the dependency bundle needed to construct an MCP [Handler].
+type Deps struct {
+	DB      *sql.DB
+	Queries *generated.Queries
+}
+
+// Handler implements http.Handler for the /mcp endpoint.
+type Handler struct {
+	deps  Deps
+	tools map[string]tool
+}
+
+// NewHandler constructs the MCP HTTP handler with the default Phase 1
+// tool set registered.
+func NewHandler(deps Deps) *Handler {
+	h := &Handler{deps: deps, tools: map[string]tool{}}
+	registerTools(h)
+	return h
+}
+
+// ServeHTTP is the Streamable HTTP entry point. GET returns 405 (SSE is
+// deferred). POST expects a single JSON-RPC 2.0 request frame.
+func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", "POST")
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		writeRPCError(w, nil, apierrors.McpProtocolFrameMalformed, err.Error())
+		return
+	}
+	var req rpcRequest
+	if err := json.Unmarshal(body, &req); err != nil || req.JSONRPC != "2.0" {
+		writeRPCError(w, nil, apierrors.McpProtocolFrameMalformed, "invalid JSON-RPC 2.0 frame")
+		return
+	}
+
+	// Authenticate via Authorization: Bearer mcp_...
+	tok, ok := bearerFromHeader(r.Header.Get("Authorization"))
+	if !ok || !strings.HasPrefix(tok, auth.PrefixMCP) {
+		writeRPCError(w, req.ID, apierrors.McpTokenUnknown, "missing mcp bearer")
+		return
+	}
+	session, err := h.authenticate(r.Context(), tok)
+	if err != nil {
+		var ae *apierrors.APIError
+		if errors.As(err, &ae) {
+			writeRPCError(w, req.ID, ae.Spec, ae.Spec.Message)
+			return
+		}
+		writeRPCError(w, req.ID, apierrors.InternalUnexpected, "auth failed")
+		return
+	}
+
+	switch req.Method {
+	case "initialize":
+		writeRPCResult(w, req.ID, map[string]any{
+			"protocolVersion": "2024-11-05",
+			"serverInfo": map[string]any{
+				"name":    "nodate-flow",
+				"version": "0.1.0",
+			},
+			"capabilities": map[string]any{
+				"tools": map[string]any{},
+			},
+		})
+	case "tools/list":
+		writeRPCResult(w, req.ID, map[string]any{"tools": h.listTools()})
+	case "tools/call":
+		h.handleToolCall(w, r, session, req)
+	default:
+		writeRPCError(w, req.ID, apierrors.McpProtocolFrameMalformed, "unknown method: "+req.Method)
+	}
+}
+
+func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *session, req rpcRequest) {
+	var params struct {
+		Name      string          `json:"name"`
+		Arguments json.RawMessage `json:"arguments"`
+	}
+	if len(req.Params) == 0 {
+		writeRPCError(w, req.ID, apierrors.McpProtocolFrameMalformed, "missing params")
+		return
+	}
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		writeRPCError(w, req.ID, apierrors.McpProtocolFrameMalformed, "invalid params")
+		return
+	}
+	t, ok := h.tools[params.Name]
+	if !ok {
+		writeRPCError(w, req.ID, apierrors.McpToolNotFound, "tool not found: "+params.Name)
+		return
+	}
+	if !s.hasScope(t.requiredScope) {
+		h.audit(r.Context(), s, params.Name, params.Arguments, nil,
+			generated.McpInvocationsStatusDenied, apierrors.McpScopeInsufficient.Code, 0)
+		writeRPCError(w, req.ID, apierrors.McpScopeInsufficient, "scope "+t.requiredScope+" required")
+		return
+	}
+	args := params.Arguments
+	if len(args) == 0 {
+		args = json.RawMessage("{}")
+	}
+	start := time.Now()
+	result, toolErr := t.run(r.Context(), h.deps, s, args)
+	dur := int32(time.Since(start).Milliseconds())
+	if toolErr != nil {
+		var ae *apierrors.APIError
+		spec := apierrors.McpToolExecutionFailed
+		if errors.As(toolErr, &ae) {
+			spec = ae.Spec
+		}
+		h.audit(r.Context(), s, params.Name, args, nil,
+			generated.McpInvocationsStatusError, spec.Code, dur)
+		writeRPCError(w, req.ID, spec, toolErr.Error())
+		return
+	}
+	resultJSON, _ := json.Marshal(result)
+	h.audit(r.Context(), s, params.Name, args, resultJSON,
+		generated.McpInvocationsStatusOk, "", dur)
+	// MCP spec: result content is a list of content parts. We wrap the
+	// tool output as a single JSON text part.
+	writeRPCResult(w, req.ID, map[string]any{
+		"content": []map[string]any{
+			{"type": "text", "text": string(resultJSON)},
+		},
+		"isError": false,
+	})
+}
+
+// ----------------------------------------------------------------------------
+// JSON-RPC primitives
+// ----------------------------------------------------------------------------
+
+type rpcRequest struct {
+	JSONRPC string          `json:"jsonrpc"`
+	ID      json.RawMessage `json:"id"`
+	Method  string          `json:"method"`
+	Params  json.RawMessage `json:"params"`
+}
+
+type rpcError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Data    any    `json:"data,omitempty"`
+}
+
+type rpcResponse struct {
+	JSONRPC string          `json:"jsonrpc"`
+	ID      json.RawMessage `json:"id,omitempty"`
+	Result  any             `json:"result,omitempty"`
+	Error   *rpcError       `json:"error,omitempty"`
+}
+
+func writeRPCResult(w http.ResponseWriter, id json.RawMessage, result any) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_ = json.NewEncoder(w).Encode(rpcResponse{JSONRPC: "2.0", ID: id, Result: result})
+}
+
+func writeRPCError(w http.ResponseWriter, id json.RawMessage, spec *apierrors.Spec, msg string) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(spec.Status)
+	// JSON-RPC code = -32000 block reserved for server errors; we encode the
+	// nodate-flow error code string in data.code for callers that care.
+	_ = json.NewEncoder(w).Encode(rpcResponse{
+		JSONRPC: "2.0",
+		ID:      id,
+		Error: &rpcError{
+			Code:    -32000,
+			Message: msg,
+			Data:    map[string]any{"code": spec.Code},
+		},
+	})
+}
+
+func bearerFromHeader(h string) (string, bool) {
+	const prefix = "Bearer "
+	if !strings.HasPrefix(h, prefix) {
+		return "", false
+	}
+	tok := strings.TrimSpace(h[len(prefix):])
+	return tok, tok != ""
+}
+
+// audit writes a single mcp_invocations row. It never returns an error
+// to the caller; audit failures are logged via fmt.Errorf and swallowed
+// because they must not break the tool response.
+func (h *Handler) audit(
+	ctx context.Context,
+	s *session,
+	toolName string,
+	args json.RawMessage,
+	result json.RawMessage,
+	status generated.McpInvocationsStatus,
+	errCode string,
+	durMs int32,
+) {
+	if h.deps.Queries == nil {
+		return
+	}
+	// Phase 1 redaction is a no-op: we store the raw args / result JSON.
+	// Future: run through the redaction pipeline before persisting.
+	argsBlob := args
+	if len(argsBlob) == 0 {
+		argsBlob = json.RawMessage("{}")
+	}
+	resBlob := result
+	if len(resBlob) == 0 {
+		resBlob = json.RawMessage("{}")
+	}
+	// Compact to keep stored JSON minimal.
+	var buf bytes.Buffer
+	_ = json.Compact(&buf, argsBlob)
+	argsBlob = buf.Bytes()
+	buf.Reset()
+	_ = json.Compact(&buf, resBlob)
+	resBlob = buf.Bytes()
+
+	var userID sql.NullInt32
+	if s != nil {
+		userID = sql.NullInt32{Int32: int32(s.userID), Valid: true}
+	}
+	var ec sql.NullString
+	if errCode != "" {
+		ec = sql.NullString{String: errCode, Valid: true}
+	}
+	_, err := h.deps.Queries.LogMcpInvocation(ctx, generated.LogMcpInvocationParams{
+		PublicID:              newPublicID(),
+		WorkspaceID:           s.workspaceID,
+		UserID:                userID,
+		TaskID:                sql.NullInt32{},
+		ToolName:              toolName,
+		ArgumentsRedactedJson: argsBlob,
+		ResultRedactedJson:    resBlob,
+		Status:                status,
+		ErrorCode:             ec,
+		DurationMs:            sql.NullInt32{Int32: durMs, Valid: true},
+		InvokedAt:             time.Now().UTC(),
+	})
+	if err != nil {
+		_ = fmt.Errorf("mcp audit log failed: %w", err)
+	}
+}

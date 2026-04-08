@@ -1,0 +1,44 @@
+domain: integration_gh
+breadcrumb: "Integration > GitHub"
+
+resources:
+  webhook:
+    breadcrumb: "Integration > GitHub > Webhook"
+    errors:
+      invalid_signature:
+        code: INTEGRATION.GH.WEBHOOK_INVALID_SIGNATURE
+        status: 401
+        message: "GitHub webhook signature is invalid"
+        description: "Returned when the X-Hub-Signature-256 header does not match the HMAC computed from the configured webhook secret."
+        userAction: "Verify that the webhook secret in GitHub matches the one configured in the integration settings."
+
+      payload_unparseable:
+        code: INTEGRATION.GH.WEBHOOK_PAYLOAD_UNPARSEABLE
+        status: 400
+        message: "GitHub webhook payload could not be parsed"
+        description: "Returned when the webhook body is not valid JSON or does not match the expected event schema."
+        userAction: "Check the webhook delivery in GitHub for the failing payload."
+
+      event_unsupported:
+        code: INTEGRATION.GH.WEBHOOK_EVENT_UNSUPPORTED
+        status: 400
+        message: "GitHub webhook event type is not supported"
+        description: "Returned when the X-GitHub-Event header indicates an event that this integration does not handle."
+        userAction: "Disable unsupported event types in the GitHub webhook configuration."
+
+  api:
+    breadcrumb: "Integration > GitHub > API"
+    errors:
+      rate_limited:
+        code: INTEGRATION.GH.RATE_LIMITED
+        status: 429
+        message: "GitHub API rate limit exceeded"
+        description: "Returned when the GitHub REST or GraphQL API rejected the request because the integration token has hit its rate limit."
+        userAction: "Wait for the rate limit window to reset, or use a token with higher quota."
+
+      token_invalid:
+        code: INTEGRATION.GH.TOKEN_INVALID
+        status: 401
+        message: "GitHub API token is invalid"
+        description: "Returned when GitHub rejects the integration's installation or PAT credentials."
+        userAction: "Re-authorize the GitHub integration."

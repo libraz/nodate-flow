@@ -1,0 +1,145 @@
+package tasks
+
+import (
+	"net/http"
+
+	"github.com/danielgtaylor/huma/v2"
+)
+
+// RegisterCollection wires the unscoped task collection routes
+// (POST /tasks and GET /tasks). The caller must attach RequireAuth
+// to the underlying chi router; the handlers perform their own
+// project / workspace membership checks because there is no path
+// parameter for ACL middleware to bind onto.
+func RegisterCollection(api huma.API, deps Deps) {
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-create",
+		Method:      http.MethodPost,
+		Path:        "/tasks",
+		Summary:     "Create a task",
+	}, Create(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-list",
+		Method:      http.MethodGet,
+		Path:        "/tasks",
+		Summary:     "List tasks for a project or workspace",
+	}, List(deps))
+}
+
+// RegisterTaskScoped wires the per-task routes that operate on a single
+// {id}. The caller must attach RequireTaskAccess to the underlying chi
+// router so the task / project / workspace contexts are populated.
+func RegisterTaskScoped(api huma.API, deps Deps) {
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-get",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}",
+		Summary:     "Fetch a task",
+	}, Get(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-patch",
+		Method:      http.MethodPatch,
+		Path:        "/tasks/{id}",
+		Summary:     "Patch a task",
+	}, Patch(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-disable",
+		Method:      http.MethodDelete,
+		Path:        "/tasks/{id}",
+		Summary:     "Soft-disable a task",
+	}, Disable(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-constraints-add",
+		Method:      http.MethodPost,
+		Path:        "/tasks/{id}/constraints",
+		Summary:     "Attach a constraint to a task",
+	}, AddConstraint(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-constraints-remove",
+		Method:      http.MethodDelete,
+		Path:        "/tasks/{id}/constraints/{cid}",
+		Summary:     "Remove a constraint from a task",
+	}, RemoveConstraint(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-dependencies-add",
+		Method:      http.MethodPost,
+		Path:        "/tasks/{id}/dependencies",
+		Summary:     "Add a dependency edge from a task",
+	}, AddDependency(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-dependencies-remove",
+		Method:      http.MethodDelete,
+		Path:        "/tasks/{id}/dependencies/{depId}",
+		Summary:     "Remove a dependency edge",
+	}, RemoveDependency(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-actors-add",
+		Method:      http.MethodPost,
+		Path:        "/tasks/{id}/actors",
+		Summary:     "Attach an actor to a task",
+	}, AddActor(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-actors-remove",
+		Method:      http.MethodDelete,
+		Path:        "/tasks/{id}/actors/{actorId}",
+		Summary:     "Remove an actor from a task",
+	}, RemoveActor(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-comments-add",
+		Method:      http.MethodPost,
+		Path:        "/tasks/{id}/comments",
+		Summary:     "Add a comment to a task",
+	}, AddComment(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-comments-list",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/comments",
+		Summary:     "List comments on a task",
+	}, ListComments(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-comments-edit",
+		Method:      http.MethodPatch,
+		Path:        "/tasks/{id}/comments/{cid}",
+		Summary:     "Edit a comment (author only)",
+	}, EditComment(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-comments-delete",
+		Method:      http.MethodDelete,
+		Path:        "/tasks/{id}/comments/{cid}",
+		Summary:     "Delete a comment (author or workspace admin)",
+	}, DeleteComment(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-attachments-add",
+		Method:      http.MethodPost,
+		Path:        "/tasks/{id}/attachments",
+		Summary:     "Register an attachment metadata row on a task",
+	}, AddAttachment(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-attachments-list",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/attachments",
+		Summary:     "List attachments on a task",
+	}, ListAttachments(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-attachments-delete",
+		Method:      http.MethodDelete,
+		Path:        "/tasks/{id}/attachments/{aid}",
+		Summary:     "Soft-delete an attachment from a task",
+	}, DeleteAttachment(deps))
+}

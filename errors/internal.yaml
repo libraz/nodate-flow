@@ -1,0 +1,23 @@
+domain: internal
+breadcrumb: "Internal"
+
+resources:
+  _root:
+    breadcrumb: "Internal"
+    errors:
+      unexpected:
+        code: INTERNAL.UNEXPECTED
+        status: 500
+        message: "An unexpected internal error occurred"
+        description: "Final catch-all for unhandled panics or bugs. Should never be thrown explicitly from a handler; always paired with a request_id in the structured log for triage."
+        userAction: "Retry; if the problem persists, contact your administrator with the request ID."
+
+  db:
+    breadcrumb: "Internal > Database"
+    errors:
+      unavailable:
+        code: INTERNAL.DB.UNAVAILABLE
+        status: 503
+        message: "Database is temporarily unavailable"
+        description: "Returned when the API cannot reach the database (connection refused, timeout, failover in progress)."
+        userAction: "Retry shortly; contact your administrator if the problem persists."

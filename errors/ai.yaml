@@ -1,0 +1,57 @@
+domain: ai
+breadcrumb: "AI"
+
+resources:
+  provider:
+    breadcrumb: "AI > Provider"
+    errors:
+      not_configured:
+        code: AI.PROVIDER.NOT_CONFIGURED
+        status: 412
+        message: "AI provider is not configured"
+        description: "Returned when an AI feature is invoked but no provider credentials have been configured for the workspace or instance."
+        userAction: "Configure an AI provider in workspace or instance settings."
+
+      upstream_call_failed:
+        code: AI.PROVIDER.UPSTREAM_CALL_FAILED
+        status: 502
+        message: "AI provider call failed"
+        description: "Returned when the upstream LLM provider returned a non-success response or could not be reached."
+        userAction: "Retry in a moment; if the problem persists, check the provider's status page."
+
+      upstream_timeout:
+        code: AI.PROVIDER.UPSTREAM_TIMEOUT
+        status: 504
+        message: "AI provider call timed out"
+        description: "Returned when the upstream LLM provider did not respond within the configured timeout."
+        userAction: "Retry the request, or reduce the prompt size."
+
+  cost:
+    breadcrumb: "AI > Cost"
+    errors:
+      guard_exceeded:
+        code: AI.COST.GUARD_EXCEEDED
+        status: 402
+        message: "AI cost guard threshold exceeded"
+        description: "Returned when the workspace's monthly AI spend has reached the configured cost guard limit."
+        userAction: "Wait for the next billing period or raise the cost guard in workspace settings."
+
+  redaction:
+    breadcrumb: "AI > Redaction"
+    errors:
+      pipeline_failed:
+        code: AI.REDACTION.PIPELINE_FAILED
+        status: 500
+        message: "Sensitive data redaction failed"
+        description: "Returned when the pre-LLM redaction pipeline raised an error and the request was blocked to prevent leaking secrets."
+        userAction: "Retry; if the problem persists, contact your administrator."
+
+  safety:
+    breadcrumb: "AI > Safety"
+    errors:
+      blocked:
+        code: AI.SAFETY.BLOCKED
+        status: 422
+        message: "Request blocked by safety policy"
+        description: "Returned when the prompt or response was blocked by the configured safety filters."
+        userAction: "Rephrase the request to comply with the safety policy."

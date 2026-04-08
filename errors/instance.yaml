@@ -1,0 +1,33 @@
+domain: instance
+breadcrumb: "Instance"
+
+resources:
+  setup:
+    breadcrumb: "Instance > Setup"
+    errors:
+      already_initialized:
+        code: INSTANCE.SETUP.ALREADY_INITIALIZED
+        status: 409
+        message: "Instance has already been initialized"
+        description: "Returned when the initial setup endpoint is called after the instance has already been bootstrapped with an admin account."
+        userAction: "Sign in with the existing admin account instead of running setup again."
+
+  admin:
+    breadcrumb: "Instance > Admin"
+    errors:
+      required:
+        code: INSTANCE.ADMIN.REQUIRED
+        status: 403
+        message: "Instance administrator privileges are required"
+        description: "Returned when an endpoint that requires the instance-admin role is called by a non-admin user."
+        userAction: "Ask an instance administrator to perform this operation."
+
+  quota:
+    breadcrumb: "Instance > Quota"
+    errors:
+      exceeded:
+        code: INSTANCE.QUOTA.EXCEEDED
+        status: 429
+        message: "Instance quota has been exceeded"
+        description: "Returned when an instance-wide resource quota (workspaces, users, storage) is exhausted."
+        userAction: "Contact your instance administrator to raise the quota."
