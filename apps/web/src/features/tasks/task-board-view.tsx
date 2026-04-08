@@ -122,10 +122,13 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
       aria-label={t('tasks.views.board')}
       style={{
         display: 'grid',
+        gridAutoFlow: 'column',
+        gridAutoColumns: 'minmax(16rem, 1fr)',
         gridTemplateColumns: `repeat(${TASK_STATES.length}, minmax(16rem, 1fr))`,
         gap: '1rem',
         overflowX: 'auto',
         paddingBlockEnd: '1rem',
+        maxInlineSize: '100%',
       }}
     >
       {TASK_STATES.map((state) => {

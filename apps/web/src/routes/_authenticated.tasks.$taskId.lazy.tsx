@@ -475,7 +475,8 @@ function Sidebar({
   priority,
   dueOn,
 }: SidebarProps): ReactElement {
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
+  const dateLocale = i18n.resolvedLanguage ?? 'en';
   const update = useUpdateTask();
   const transition = useTransitionTask();
 
@@ -539,6 +540,7 @@ function Sidebar({
             <Input
               {...control}
               type="date"
+              lang={dateLocale}
               value={dueOn ?? ''}
               onChange={(e) => {
                 void handleDueChange(e.target.value);

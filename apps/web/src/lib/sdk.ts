@@ -37,8 +37,15 @@ export const sdk: NodateFlowClient = createClient({
  * returns null.
  *
  * The in-flight promise is memoized so concurrent 401s collapse into a
- * single refresh round-trip.
+ * single refresh round-trip. After a successful refresh, the resolved
+ * promise is held for a short grace window (REFRESH_GRACE_MS) so that
+ * 401 responses from requests that were already in flight with the
+ * pre-rotation token all reuse the same new token instead of each
+ * triggering another refresh — consecutive refreshes invalidate the
+ * single-use refresh cookie and would cascade the whole session into
+ * a logged-out state.
  */
+const REFRESH_GRACE_MS = 1500;
 let refreshInFlight: Promise<string | null> | null = null;
 
 export function refreshAccessToken(): Promise<string | null> {
@@ -64,11 +71,18 @@ export function refreshAccessToken(): Promise<string | null> {
     } catch {
       authStore.getState().clearSession();
       return null;
-    } finally {
-      // Allow the next refresh attempt only after this one settles.
-      refreshInFlight = null;
     }
   })();
+  // Schedule the grace-window clear regardless of success/failure so a
+  // single failed refresh still gates out subsequent attempts for a
+  // moment (preventing thundering-herd refresh loops on logged-out
+  // state), but eventually allows a fresh refresh attempt.
+  const cleared = refreshInFlight;
+  void cleared.finally(() => {
+    setTimeout(() => {
+      if (refreshInFlight === cleared) refreshInFlight = null;
+    }, REFRESH_GRACE_MS);
+  });
   return refreshInFlight;
 }
 

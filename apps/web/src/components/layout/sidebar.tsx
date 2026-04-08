@@ -6,7 +6,6 @@ import {
   CalendarDays,
   ChevronsLeft,
   ChevronsRight,
-  FolderKanban,
   Inbox,
   type LucideIcon,
   Settings,
@@ -20,20 +19,17 @@ const STORAGE_KEY = 'nf.sidebar-collapsed';
 const LEGACY_STORAGE_KEY = 'nf:sidebar-collapsed';
 
 interface NavItem {
-  key: 'inbox' | 'today' | 'projects' | 'workspaces' | 'settings';
+  key: 'inbox' | 'today' | 'workspaces' | 'settings';
   icon: LucideIcon;
   /** Destination route (TanStack Router path). */
-  to: '/' | '/workspaces' | '/inbox' | '/today' | '/settings/profile';
-  /** Whether the destination route exists yet. */
-  enabled: boolean;
+  to: '/workspaces' | '/inbox' | '/today' | '/settings/profile';
 }
 
 const NAV_ITEMS: readonly NavItem[] = [
-  { key: 'inbox', icon: Inbox, to: '/inbox', enabled: true },
-  { key: 'today', icon: CalendarDays, to: '/today', enabled: true },
-  { key: 'projects', icon: FolderKanban, to: '/', enabled: false },
-  { key: 'workspaces', icon: Briefcase, to: '/workspaces', enabled: true },
-  { key: 'settings', icon: Settings, to: '/settings/profile', enabled: true },
+  { key: 'inbox', icon: Inbox, to: '/inbox' },
+  { key: 'today', icon: CalendarDays, to: '/today' },
+  { key: 'workspaces', icon: Briefcase, to: '/workspaces' },
+  { key: 'settings', icon: Settings, to: '/settings/profile' },
 ];
 
 function readInitialCollapsed(): boolean {
@@ -72,14 +68,12 @@ export default function Sidebar(): ReactElement {
 
   const labelKeyFor = (
     key: NavItem['key'],
-  ): 'nav.inbox' | 'nav.today' | 'nav.projects' | 'nav.workspaces' | 'nav.settings' => {
+  ): 'nav.inbox' | 'nav.today' | 'nav.workspaces' | 'nav.settings' => {
     switch (key) {
       case 'inbox':
         return 'nav.inbox';
       case 'today':
         return 'nav.today';
-      case 'projects':
-        return 'nav.projects';
       case 'workspaces':
         return 'nav.workspaces';
       case 'settings':
@@ -98,30 +92,16 @@ export default function Sidebar(): ReactElement {
       <nav className={styles.nav} aria-label={t('nav.primary')}>
         {NAV_ITEMS.map((item) => {
           const label = t(labelKeyFor(item.key));
-          if (item.enabled) {
-            return (
-              <Link
-                key={item.key}
-                to={item.to}
-                className={styles.item}
-                activeProps={{ className: cx(styles.item, styles.itemActive) }}
-              >
-                <Icon icon={item.icon} decorative />
-                <span className={styles.label}>{label}</span>
-              </Link>
-            );
-          }
           return (
-            <button
+            <Link
               key={item.key}
-              type="button"
-              className={cx(styles.item, styles.itemDisabled)}
-              aria-disabled="true"
-              disabled
+              to={item.to}
+              className={styles.item}
+              activeProps={{ className: cx(styles.item, styles.itemActive) }}
             >
               <Icon icon={item.icon} decorative />
               <span className={styles.label}>{label}</span>
-            </button>
+            </Link>
           );
         })}
       </nav>
