@@ -1,0 +1,39 @@
+{
+  "editor": {
+    "title": "Constraints",
+    "kind": "Kind",
+    "expression": "Expression (JSON)",
+    "add": "Add constraint",
+    "evaluate": "Evaluate now",
+    "placeholder": "{\"op\":\"ci.status_is\",\"arg\":\"success\"}",
+    "outcomes": "Outcomes",
+    "satisfied": "satisfied",
+    "failed": "failed",
+    "parseError": "Parse error",
+    "errors": {
+      "addFailed": "Failed to add constraint",
+      "evaluateFailed": "Failed to evaluate constraints"
+    },
+    "kinds": {
+      "deadline": "Deadline",
+      "dependency": "Dependency",
+      "approval": "Approval",
+      "signal": "Signal",
+      "custom": "Custom"
+    }
+  },
+  "replay": {
+    "title": "Replay",
+    "derived": "Replayed",
+    "stored": "Stored",
+    "equivalent": "Equivalent",
+    "drift": "Drift detected",
+    "refresh": "Refresh",
+    "loading": "Loading…",
+    "error": "Failed to replay task"
+  },
+  "stateGraph": {
+    "title": "State graph",
+    "legend": "Current state highlighted"
+  }
+}

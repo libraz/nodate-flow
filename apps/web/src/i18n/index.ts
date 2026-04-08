@@ -5,6 +5,7 @@ import { initReactI18next } from 'react-i18next';
 import enAiSuggestions from '../../locales/en/ai-suggestions.json';
 import enAi from '../../locales/en/ai.json';
 import enCommon from '../../locales/en/common.json';
+import enConstraints from '../../locales/en/constraints.json';
 import enErrors from '../../locales/en/errors.json';
 import enInbox from '../../locales/en/inbox.json';
 import enSettings from '../../locales/en/settings.json';
@@ -12,6 +13,7 @@ import enTimeline from '../../locales/en/timeline.json';
 import jaAiSuggestions from '../../locales/ja/ai-suggestions.json';
 import jaAi from '../../locales/ja/ai.json';
 import jaCommon from '../../locales/ja/common.json';
+import jaConstraints from '../../locales/ja/constraints.json';
 import jaErrors from '../../locales/ja/errors.json';
 import jaInbox from '../../locales/ja/inbox.json';
 import jaSettings from '../../locales/ja/settings.json';
@@ -51,7 +53,16 @@ export function initI18n(): typeof i18n {
       fallbackLng: 'en',
       supportedLngs: supportedLanguages as unknown as string[],
       defaultNS: defaultNamespace,
-      ns: [defaultNamespace, 'settings', 'inbox', 'timeline', 'ai', 'ai-suggestions', 'errors'],
+      ns: [
+        defaultNamespace,
+        'settings',
+        'inbox',
+        'timeline',
+        'ai',
+        'ai-suggestions',
+        'constraints',
+        'errors',
+      ],
       resources: {
         en: {
           common: enCommon,
@@ -60,6 +71,7 @@ export function initI18n(): typeof i18n {
           timeline: enTimeline,
           ai: enAi,
           'ai-suggestions': enAiSuggestions,
+          constraints: enConstraints,
           errors: enErrors,
         },
         ja: {
@@ -69,6 +81,7 @@ export function initI18n(): typeof i18n {
           timeline: jaTimeline,
           ai: jaAi,
           'ai-suggestions': jaAiSuggestions,
+          constraints: jaConstraints,
           errors: jaErrors,
         },
       },

@@ -1,0 +1,39 @@
+{
+  "editor": {
+    "title": "制約",
+    "kind": "種類",
+    "expression": "式 (JSON)",
+    "add": "制約を追加",
+    "evaluate": "いま評価",
+    "placeholder": "{\"op\":\"ci.status_is\",\"arg\":\"success\"}",
+    "outcomes": "評価結果",
+    "satisfied": "満たされた",
+    "failed": "満たされない",
+    "parseError": "パースエラー",
+    "errors": {
+      "addFailed": "制約の追加に失敗しました",
+      "evaluateFailed": "評価に失敗しました"
+    },
+    "kinds": {
+      "deadline": "期限",
+      "dependency": "依存",
+      "approval": "承認",
+      "signal": "シグナル",
+      "custom": "カスタム"
+    }
+  },
+  "replay": {
+    "title": "リプレイ",
+    "derived": "再計算",
+    "stored": "保存値",
+    "equivalent": "一致",
+    "drift": "差分あり",
+    "refresh": "更新",
+    "loading": "読み込み中…",
+    "error": "リプレイに失敗しました"
+  },
+  "stateGraph": {
+    "title": "状態グラフ",
+    "legend": "現在の状態をハイライト"
+  }
+}
