@@ -4,6 +4,8 @@ package errors
 
 // Error codes and specs.
 var (
+	// AI.AGENT.NOT_FOUND — AI agent not found
+	AiAgentNotFound = &Spec{Code: "AI.AGENT.NOT_FOUND", Status: 404, Message: "AI agent not found"}
 	// AI.COST.GUARD_EXCEEDED — AI cost guard threshold exceeded
 	AiCostGuardExceeded = &Spec{Code: "AI.COST.GUARD_EXCEEDED", Status: 402, Message: "AI cost guard threshold exceeded"}
 	// AI.NL_QUERY.UNPARSEABLE — Could not turn that into a filter

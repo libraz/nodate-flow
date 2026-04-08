@@ -51,7 +51,7 @@ func PauseAgent(deps Deps) func(context.Context, *PauseAgentInput) (*PauseAgentO
 		}
 		n, _ := res.RowsAffected()
 		if n == 0 {
-			return nil, httpErr(apierrors.ValidationPathParamInvalid)
+			return nil, httpErr(apierrors.AiAgentNotFound)
 		}
 		kind := eventbus.AiAgentResumed
 		if in.Body.Paused {

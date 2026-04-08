@@ -66,6 +66,16 @@ resources:
         description: "Returned when the pre-LLM redaction pipeline raised an error and the request was blocked to prevent leaking secrets."
         userAction: "Retry; if the problem persists, contact your administrator."
 
+  agent:
+    breadcrumb: "AI > Agent"
+    errors:
+      not_found:
+        code: AI.AGENT.NOT_FOUND
+        status: 404
+        message: "AI agent not found"
+        description: "Returned when an operation targets an ai_agents row that does not exist in the workspace or has been disabled."
+        userAction: "Verify the agent id and that it belongs to this workspace."
+
   safety:
     breadcrumb: "AI > Safety"
     errors:

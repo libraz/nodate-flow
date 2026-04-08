@@ -19,6 +19,7 @@ import {
   type ConstraintOutcome,
   useAddConstraint,
   useEvaluateConstraints,
+  useRemoveConstraint,
 } from './api';
 
 const KINDS: ConstraintKind[] = ['deadline', 'dependency', 'approval', 'signal', 'custom'];
@@ -40,6 +41,19 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
 
   const addMut = useAddConstraint();
   const evalMut = useEvaluateConstraints();
+  const removeMut = useRemoveConstraint();
+
+  const onRemove = (constraintId: string): void => {
+    setError(null);
+    removeMut.mutate(
+      { taskId, constraintId },
+      {
+        onError: () => setError(t('editor.errors.removeFailed')),
+        onSuccess: () =>
+          setOutcomes((prev) => (prev ? prev.filter((o) => o.id !== constraintId) : prev)),
+      },
+    );
+  };
 
   const onSubmit = (ev: FormEvent<HTMLFormElement>): void => {
     ev.preventDefault();
@@ -121,7 +135,10 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
                   ? `${t('editor.parseError')}: ${o.parseError}`
                   : o.satisfied
                     ? t('editor.satisfied')
-                    : t('editor.failed')}
+                    : t('editor.failed')}{' '}
+                <Button type="button" onClick={() => onRemove(o.id)} disabled={removeMut.isPending}>
+                  {t('editor.remove')}
+                </Button>
               </li>
             ))}
           </ul>

@@ -4,6 +4,7 @@
     "kind": "種類",
     "expression": "式 (JSON)",
     "add": "制約を追加",
+    "remove": "削除",
     "evaluate": "いま評価",
     "placeholder": "{\"op\":\"ci.status_is\",\"arg\":\"success\"}",
     "outcomes": "評価結果",
@@ -12,6 +13,7 @@
     "parseError": "パースエラー",
     "errors": {
       "addFailed": "制約の追加に失敗しました",
+      "removeFailed": "制約の削除に失敗しました",
       "evaluateFailed": "評価に失敗しました"
     },
     "kinds": {

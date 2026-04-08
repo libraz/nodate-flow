@@ -4,6 +4,7 @@
     "kind": "Kind",
     "expression": "Expression (JSON)",
     "add": "Add constraint",
+    "remove": "Remove",
     "evaluate": "Evaluate now",
     "placeholder": "{\"op\":\"ci.status_is\",\"arg\":\"success\"}",
     "outcomes": "Outcomes",
@@ -12,6 +13,7 @@
     "parseError": "Parse error",
     "errors": {
       "addFailed": "Failed to add constraint",
+      "removeFailed": "Failed to remove constraint",
       "evaluateFailed": "Failed to evaluate constraints"
     },
     "kinds": {
