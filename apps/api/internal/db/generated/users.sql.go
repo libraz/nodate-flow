@@ -115,6 +115,8 @@ SELECT
   i.password_hash,
   i.failed_attempts,
   i.locked_until_at,
+  i.mfa_secret_ciphertext,
+  i.mfa_confirmed_at,
   u.public_id AS user_public_id,
   u.enabled AS user_enabled
 FROM identities i
@@ -127,17 +129,18 @@ LIMIT 1
 `
 
 type FindLocalIdentityByEmailRow struct {
-	ID             uint32         `json:"-"`
-	UserID         uint32         `json:"-"`
-	PasswordHash   sql.NullString `json:"passwordHash"`
-	FailedAttempts uint32         `json:"failedAttempts"`
-	LockedUntilAt  sql.NullTime   `json:"lockedUntilAt"`
-	UserPublicID   types.PublicID `json:"userPublicId"`
-	UserEnabled    bool           `json:"userEnabled"`
+	ID                  uint32         `json:"-"`
+	UserID              uint32         `json:"-"`
+	PasswordHash        sql.NullString `json:"passwordHash"`
+	FailedAttempts      uint32         `json:"failedAttempts"`
+	LockedUntilAt       sql.NullTime   `json:"lockedUntilAt"`
+	MfaSecretCiphertext []byte         `json:"mfaSecretCiphertext"`
+	MfaConfirmedAt      sql.NullTime   `json:"mfaConfirmedAt"`
+	UserPublicID        types.PublicID `json:"userPublicId"`
+	UserEnabled         bool           `json:"userEnabled"`
 }
 
 // Resolve a local-password identity by user email for the login pipeline.
-// Joins identities with users on email and provider='local'.
 func (q *Queries) FindLocalIdentityByEmail(ctx context.Context, email string) (FindLocalIdentityByEmailRow, error) {
 	row := q.db.QueryRowContext(ctx, findLocalIdentityByEmail, email)
 	var i FindLocalIdentityByEmailRow
@@ -147,6 +150,8 @@ func (q *Queries) FindLocalIdentityByEmail(ctx context.Context, email string) (F
 		&i.PasswordHash,
 		&i.FailedAttempts,
 		&i.LockedUntilAt,
+		&i.MfaSecretCiphertext,
+		&i.MfaConfirmedAt,
 		&i.UserPublicID,
 		&i.UserEnabled,
 	)

@@ -137,8 +137,81 @@ func TotpConfirm(deps Deps) func(context.Context, *TotpConfirmInput) (*TotpConfi
 		if err := deps.Queries.ConfirmIdentityMfa(ctx, row.ID); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		codes, err := issueRecoveryCodes(ctx, deps, uid)
+		if err != nil {
+			return nil, err
+		}
 		out := &TotpConfirmOutput{}
 		out.Body.Ok = true
+		out.Body.RecoveryCodes = codes
+		return out, nil
+	}
+}
+
+// issueRecoveryCodes wipes any existing codes for the user and inserts
+// 10 fresh ones, returning the plaintext set.
+func issueRecoveryCodes(ctx context.Context, deps Deps, uid uint32) ([]string, error) {
+	codes, hashes, err := auth.GenerateRecoveryCodes()
+	if err != nil {
+		return nil, httpErr(apierrors.InternalUnexpected)
+	}
+	if err := deps.Queries.DeleteAllRecoveryCodesForUser(ctx, uid); err != nil {
+		return nil, httpErr(apierrors.InternalUnexpected)
+	}
+	for _, h := range hashes {
+		if err := deps.Queries.InsertRecoveryCode(ctx, generated.InsertRecoveryCodeParams{UserID: uid, CodeHash: h}); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+	}
+	return codes, nil
+}
+
+// TotpRegenerateRecoveryCodes handles POST /me/totp/recovery-codes.
+// Requires password reverification and only works on a fully enabled
+// TOTP account.
+func TotpRegenerateRecoveryCodes(deps Deps) func(context.Context, *TotpRegenerateRecoveryCodesInput) (*TotpRegenerateRecoveryCodesOutput, error) {
+	return func(ctx context.Context, in *TotpRegenerateRecoveryCodesInput) (*TotpRegenerateRecoveryCodesOutput, error) {
+		uid, ok := middleware.ActorFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.AuthSessionRevoked)
+		}
+		row, err := loadLocalIdentity(ctx, deps, uid)
+		if err != nil {
+			return nil, err
+		}
+		if !row.MfaConfirmedAt.Valid {
+			return nil, httpErr(apierrors.AuthTotpNotEnrolled)
+		}
+		if !row.PasswordHash.Valid {
+			return nil, httpErr(apierrors.AuthPasswordNoLocalIdentity)
+		}
+		okPw, err := auth.VerifyPassword(row.PasswordHash.String, in.Body.Password)
+		if err != nil || !okPw {
+			return nil, httpErr(apierrors.AuthPasswordCurrentMismatch)
+		}
+		codes, err := issueRecoveryCodes(ctx, deps, uid)
+		if err != nil {
+			return nil, err
+		}
+		out := &TotpRegenerateRecoveryCodesOutput{}
+		out.Body.RecoveryCodes = codes
+		return out, nil
+	}
+}
+
+// TotpRecoveryCodesStatus handles GET /me/totp/recovery-codes.
+func TotpRecoveryCodesStatus(deps Deps) func(context.Context, *struct{}) (*TotpRecoveryCodesStatusOutput, error) {
+	return func(ctx context.Context, _ *struct{}) (*TotpRecoveryCodesStatusOutput, error) {
+		uid, ok := middleware.ActorFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.AuthSessionRevoked)
+		}
+		n, err := deps.Queries.CountActiveRecoveryCodes(ctx, uid)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		out := &TotpRecoveryCodesStatusOutput{}
+		out.Body.Remaining = int(n)
 		return out, nil
 	}
 }
@@ -169,6 +242,7 @@ func TotpDisable(deps Deps) func(context.Context, *TotpDisableInput) (*TotpDisab
 		if err := deps.Queries.ClearIdentityMfa(ctx, row.ID); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		_ = deps.Queries.DeleteAllRecoveryCodesForUser(ctx, uid)
 		out := &TotpDisableOutput{}
 		out.Body.Ok = true
 		return out, nil

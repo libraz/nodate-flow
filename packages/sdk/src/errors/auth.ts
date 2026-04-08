@@ -126,6 +126,16 @@ export const AuthErrors = {
     status: 409,
     message: "Two-factor authentication is not enabled",
   },
+  AUTH_TOTP_RECOVERY_CODE_INVALID: {
+    code: "AUTH.TOTP.RECOVERY_CODE_INVALID",
+    status: 401,
+    message: "Recovery code is invalid",
+  },
+  AUTH_TOTP_RECOVERY_CODE_REQUIRED: {
+    code: "AUTH.TOTP.RECOVERY_CODE_REQUIRED",
+    status: 400,
+    message: "Either a TOTP code or a recovery code is required",
+  },
 } as const;
 
 export type AuthErrorCode = (typeof AuthErrors)[keyof typeof AuthErrors]["code"];

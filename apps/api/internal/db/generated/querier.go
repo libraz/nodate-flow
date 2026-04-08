@@ -399,6 +399,24 @@ type Querier interface {
 	// content_hash lets callers skip re-embedding when the input text is
 	// unchanged.
 	UpsertTaskEmbedding(ctx context.Context, arg UpsertTaskEmbeddingParams) error
+
+	// --- TOTP recovery codes (recovery_codes.sql.go) ---
+	InsertRecoveryCode(ctx context.Context, arg InsertRecoveryCodeParams) error
+	DeleteAllRecoveryCodesForUser(ctx context.Context, userID uint32) error
+	CountActiveRecoveryCodes(ctx context.Context, userID uint32) (int64, error)
+	FindUnusedRecoveryCode(ctx context.Context, arg FindUnusedRecoveryCodeParams) (uint32, error)
+	MarkRecoveryCodeUsed(ctx context.Context, id uint32) error
+
+	// --- Personal OAuth integrations (integrations.sql.go) ---
+	ListUserIntegrations(ctx context.Context, userID uint32) ([]ListUserIntegrationsRow, error)
+	FindUserIntegrationByPublicId(ctx context.Context, arg FindUserIntegrationByPublicIdParams) (FindUserIntegrationByPublicIdRow, error)
+	FindUserIntegrationByUserProvider(ctx context.Context, arg FindUserIntegrationByUserProviderParams) (FindUserIntegrationByUserProviderRow, error)
+	UpsertUserIntegration(ctx context.Context, arg UpsertUserIntegrationParams) (int64, error)
+	DeleteUserIntegration(ctx context.Context, arg DeleteUserIntegrationParams) error
+	CreateOauthState(ctx context.Context, arg CreateOauthStateParams) error
+	ConsumeOauthState(ctx context.Context, state string) (ConsumeOauthStateRow, error)
+	DeleteOauthState(ctx context.Context, state string) error
+	PurgeExpiredOauthStates(ctx context.Context) error
 }
 
 var _ Querier = (*Queries)(nil)

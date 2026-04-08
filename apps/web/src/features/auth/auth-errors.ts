@@ -14,6 +14,10 @@ export type AuthErrorI18nKey =
   | 'auth.errors.invalid_credentials'
   | 'auth.errors.email_taken'
   | 'auth.errors.network'
+  | 'auth.errors.totp_code_mismatch'
+  | 'auth.errors.totp_challenge_expired'
+  | 'auth.errors.totp_recovery_invalid'
+  | 'auth.errors.generic'
   | 'auth.errors.unknown';
 
 interface ProblemJson {
@@ -50,6 +54,15 @@ export function mapAuthError(problem: ProblemJson | null | undefined): AuthError
   }
   if (code === AuthErrors.AUTH_REGISTER_EMAIL_ALREADY_TAKEN.code) {
     return 'auth.errors.email_taken';
+  }
+  if (code === 'AUTH.TOTP.CODE_MISMATCH') {
+    return 'auth.errors.totp_code_mismatch';
+  }
+  if (code === 'AUTH.TOTP.RECOVERY_CODE_INVALID') {
+    return 'auth.errors.totp_recovery_invalid';
+  }
+  if (code === 'AUTH.SESSION.EXPIRED') {
+    return 'auth.errors.totp_challenge_expired';
   }
   // TODO(f3): expand mapping for AUTH.LOGIN.ACCOUNT_LOCKED,
   // AUTH.LOGIN.RATE_LIMITED_AFTER_RETRIES, AUTH.REGISTER.PASSWORD_TOO_WEAK,

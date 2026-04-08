@@ -42,15 +42,108 @@ func Login(deps Deps) func(context.Context, *LoginInput) (*LoginOutput, error) {
 			}
 			return nil, httpErr(apierrors.AuthLoginInvalidCredentials)
 		}
-		// Success: clear counters, stamp last_login.
+		// Password OK. Clear counters immediately so a second-factor
+		// failure does not re-trigger the lockout counter.
 		_ = deps.Queries.ResetIdentityFailedAttempts(ctx, row.ID)
-		_ = deps.Queries.UpdateUserLastLoginAt(ctx, row.UserID)
 
+		// If the account has confirmed TOTP, do NOT issue session
+		// tokens yet. Return a short-lived challenge instead; the
+		// client must finish at POST /auth/login/totp. last_login_at
+		// is deferred to that happy path.
+		if row.MfaConfirmedAt.Valid && len(row.MfaSecretCiphertext) > 0 {
+			challenge, _, cerr := deps.JWT.SignTotpChallenge(row.UserID)
+			if cerr != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			return &LoginOutput{
+				Body: LoginBody{
+					Step:           "totp_required",
+					ChallengeToken: challenge,
+				},
+			}, nil
+		}
+
+		_ = deps.Queries.UpdateUserLastLoginAt(ctx, row.UserID)
 		tokens, refresh, err := issueTokens(ctx, deps, row.UserID, row.UserPublicID)
 		if err != nil {
 			return nil, err
 		}
 		return &LoginOutput{
+			SetCookie: newRefreshCookie(refresh, deps.CookieSecure),
+			Body: LoginBody{
+				Step:        "complete",
+				AccessToken: tokens.AccessToken,
+				ExpiresAt:   tokens.ExpiresAt,
+				UserID:      tokens.UserID,
+			},
+		}, nil
+	}
+}
+
+// LoginTotp handles POST /auth/login/totp. It validates the
+// step-up challenge from a previous /auth/login call, verifies the
+// submitted 6-digit code against the user's stored TOTP secret,
+// then issues real session tokens. This is the only path on which
+// last_login_at is stamped for a 2FA-enabled account.
+func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutput, error) {
+	return func(ctx context.Context, in *LoginTotpInput) (*LoginTotpOutput, error) {
+		if deps.Cipher == nil {
+			return nil, httpErr(apierrors.AuthTotpNotConfigured)
+		}
+		uid, err := deps.JWT.VerifyTotpChallenge(in.Body.ChallengeToken)
+		if err != nil {
+			return nil, httpErr(apierrors.AuthSessionExpired)
+		}
+		ident, err := deps.Queries.FindLocalIdentityByUserId(ctx, uid)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, httpErr(apierrors.AuthLoginInvalidCredentials)
+			}
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if !ident.MfaConfirmedAt.Valid || len(ident.MfaSecretCiphertext) == 0 {
+			// TOTP was disabled between /auth/login and here. Refuse
+			// the challenge so the client retries single-factor
+			// login instead of silently completing on stale state.
+			return nil, httpErr(apierrors.AuthTotpNotEnrolled)
+		}
+		hasCode := strings.TrimSpace(in.Body.Code) != ""
+		hasRecovery := strings.TrimSpace(in.Body.RecoveryCode) != ""
+		if hasCode == hasRecovery {
+			// Either both supplied or neither.
+			return nil, httpErr(apierrors.AuthTotpRecoveryCodeRequired)
+		}
+		if hasCode {
+			secret, derr := deps.Cipher.Decrypt(ident.MfaSecretCiphertext)
+			if derr != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			if !auth.VerifyTotp(secret, in.Body.Code, time.Now()) {
+				return nil, httpErr(apierrors.AuthTotpCodeMismatch)
+			}
+		} else {
+			hash := auth.HashRecoveryCode(in.Body.RecoveryCode)
+			rcID, lerr := deps.Queries.FindUnusedRecoveryCode(ctx, generated.FindUnusedRecoveryCodeParams{UserID: uid, CodeHash: hash})
+			if lerr != nil {
+				if errors.Is(lerr, sql.ErrNoRows) {
+					return nil, httpErr(apierrors.AuthTotpRecoveryCodeInvalid)
+				}
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			if merr := deps.Queries.MarkRecoveryCodeUsed(ctx, rcID); merr != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+		}
+		u, err := deps.Queries.FindUserProfileById(ctx, uid)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		_ = deps.Queries.UpdateUserLastLoginAt(ctx, uid)
+		tokens, refresh, err := issueTokens(ctx, deps, uid, u.PublicID)
+		if err != nil {
+			return nil, err
+		}
+		return &LoginTotpOutput{
 			SetCookie: newRefreshCookie(refresh, deps.CookieSecure),
 			Body:      tokens,
 		}, nil

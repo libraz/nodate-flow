@@ -14,37 +14,110 @@ import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import { type FormEvent, type ReactElement, useState } from 'react';
+import QRCode from 'qrcode';
+import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
   type SettingsApiError,
   type TotpEnrollResponse,
+  useRecoveryCodesStatusQuery,
+  useRegenerateRecoveryCodes,
   useTotpConfirm,
   useTotpDisable,
   useTotpEnroll,
   useTotpStatusQuery,
 } from './api';
 
+function RecoveryCodesView({
+  codes,
+  onDismiss,
+}: { codes: string[]; onDismiss: () => void }): ReactElement {
+  const { t } = useTranslation('settings');
+  const handleCopyAll = (): void => {
+    void navigator.clipboard.writeText(codes.join('\n')).then(() => {
+      toaster.show({ tone: 'success', message: t('security.totp.recovery.copied') });
+    });
+  };
+  const handleDownload = (): void => {
+    const blob = new Blob([`${codes.join('\n')}\n`], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'nodate-flow-recovery-codes.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      <p style={{ margin: 0 }}>{t('security.totp.recovery.description')}</p>
+      <ul
+        style={{
+          listStyle: 'none',
+          padding: '0.75rem 1rem',
+          margin: 0,
+          border: '1px solid var(--color-border)',
+          borderRadius: '0.5rem',
+          fontFamily: 'var(--font-mono)',
+          fontSize: '0.875rem',
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '0.25rem 1rem',
+        }}
+      >
+        {codes.map((c) => (
+          <li key={c}>{c}</li>
+        ))}
+      </ul>
+      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <Button type="button" variant="ghost" onClick={handleCopyAll}>
+          {t('security.totp.recovery.copy_all')}
+        </Button>
+        <Button type="button" variant="ghost" onClick={handleDownload}>
+          {t('security.totp.recovery.download')}
+        </Button>
+        <Button type="button" variant="primary" onClick={onDismiss}>
+          {t('security.totp.recovery.saved')}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function EnrollmentForm({
   enrollment,
   onConfirmed,
 }: {
   enrollment: TotpEnrollResponse;
-  onConfirmed: () => void;
+  onConfirmed: (recoveryCodes: string[]) => void;
 }): ReactElement {
   const { t } = useTranslation('settings');
   const confirm = useTotpConfirm();
   const [code, setCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    QRCode.toDataURL(enrollment.otpauthUrl, { width: 200, margin: 1 })
+      .then((url: string) => {
+        if (!cancelled) setQrDataUrl(url);
+      })
+      .catch(() => {
+        if (!cancelled) setQrDataUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [enrollment.otpauthUrl]);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await confirm.mutateAsync(code);
+      const result = await confirm.mutateAsync(code);
       toaster.show({ tone: 'success', message: t('security.totp.enabled_toast') });
-      onConfirmed();
+      onConfirmed(result.recoveryCodes);
     } catch (err) {
       const apiErr = err as SettingsApiError;
       if (apiErr.code === 'AUTH.TOTP.CODE_MISMATCH') {
@@ -71,6 +144,15 @@ function EnrollmentForm({
       style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
     >
       <p style={{ margin: 0 }}>{t('security.totp.enroll_instructions')}</p>
+      {qrDataUrl ? (
+        <img
+          src={qrDataUrl}
+          alt="TOTP QR code"
+          width={200}
+          height={200}
+          style={{ alignSelf: 'center' }}
+        />
+      ) : null}
       <div
         style={{
           display: 'grid',
@@ -121,6 +203,89 @@ function EnrollmentForm({
         </Button>
       </div>
     </form>
+  );
+}
+
+function EnabledPanel(): ReactElement {
+  const { t } = useTranslation('settings');
+  const { data: remaining } = useRecoveryCodesStatusQuery();
+  const regenerate = useRegenerateRecoveryCodes();
+  const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [newCodes, setNewCodes] = useState<string[] | null>(null);
+
+  if (newCodes != null) {
+    return (
+      <RecoveryCodesView
+        codes={newCodes}
+        onDismiss={() => {
+          setNewCodes(null);
+        }}
+      />
+    );
+  }
+
+  const handleRegenerate = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
+    e.preventDefault();
+    if (!window.confirm(t('security.totp.recovery.regenerate_confirm'))) return;
+    setSubmitting(true);
+    try {
+      const result = await regenerate.mutateAsync(password);
+      setPassword('');
+      setNewCodes(result.recoveryCodes);
+      toaster.show({ tone: 'success', message: t('security.totp.recovery.regenerated_toast') });
+    } catch (err) {
+      const apiErr = err as SettingsApiError;
+      if (apiErr.code === 'AUTH.PASSWORD.CURRENT_MISMATCH') {
+        toaster.show({ tone: 'danger', message: t('security.totp.errors.password_mismatch') });
+      } else {
+        toaster.show({
+          tone: 'danger',
+          message: t('security.totp.recovery.errors.regenerate_failed'),
+        });
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <DisableForm />
+      <hr style={{ border: 0, borderTop: '1px solid var(--color-border)', width: '100%' }} />
+      <div>
+        <h3 style={{ margin: '0 0 0.5rem' }}>{t('security.totp.recovery.title')}</h3>
+        <p style={{ margin: '0 0 0.75rem' }}>
+          {t('security.totp.recovery.remaining', { count: remaining })}
+        </p>
+        <form
+          onSubmit={(e) => {
+            void handleRegenerate(e);
+          }}
+          style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
+        >
+          <FormField label={t('security.totp.recovery.regenerate_password_label')} required>
+            {(control) => (
+              <Input
+                {...control}
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                }}
+                required
+              />
+            )}
+          </FormField>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Button type="submit" variant="default" disabled={submitting || password === ''}>
+              {t('security.totp.recovery.regenerate')}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 
@@ -186,6 +351,7 @@ export default function TotpPanel(): ReactElement {
   const { data: status } = useTotpStatusQuery();
   const enroll = useTotpEnroll();
   const [enrollment, setEnrollment] = useState<TotpEnrollResponse | null>(null);
+  const [postConfirmCodes, setPostConfirmCodes] = useState<string[] | null>(null);
 
   const handleEnroll = async (): Promise<void> => {
     try {
@@ -201,8 +367,19 @@ export default function TotpPanel(): ReactElement {
     }
   };
 
+  if (postConfirmCodes != null) {
+    return (
+      <RecoveryCodesView
+        codes={postConfirmCodes}
+        onDismiss={() => {
+          setPostConfirmCodes(null);
+        }}
+      />
+    );
+  }
+
   if (status === 'enabled') {
-    return <DisableForm />;
+    return <EnabledPanel />;
   }
 
   if (enrollment != null || status === 'pending') {
@@ -230,8 +407,9 @@ export default function TotpPanel(): ReactElement {
     return (
       <EnrollmentForm
         enrollment={enrollment}
-        onConfirmed={() => {
+        onConfirmed={(codes) => {
           setEnrollment(null);
+          setPostConfirmCodes(codes);
         }}
       />
     );

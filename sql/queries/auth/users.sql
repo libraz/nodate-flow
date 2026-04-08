@@ -69,13 +69,17 @@ INSERT INTO identities (
 
 -- name: FindLocalIdentityByEmail :one
 -- Resolve a local-password identity by user email for the login pipeline.
--- Joins identities with users on email and provider='local'.
+-- Joins identities with users on email and provider='local'. Also
+-- returns the TOTP columns so the login handler can decide whether
+-- to issue session tokens directly or return a totp-challenge.
 SELECT
   i.id,
   i.user_id,
   i.password_hash,
   i.failed_attempts,
   i.locked_until_at,
+  i.mfa_secret_ciphertext,
+  i.mfa_confirmed_at,
   u.public_id AS user_public_id,
   u.enabled AS user_enabled
 FROM identities i

@@ -54,4 +54,8 @@ var (
 	AuthTotpNotConfigured = &Spec{Code: "AUTH.TOTP.NOT_CONFIGURED", Status: 503, Message: "Two-factor authentication is not available on this server"}
 	// AUTH.TOTP.NOT_ENROLLED — Two-factor authentication is not enabled
 	AuthTotpNotEnrolled = &Spec{Code: "AUTH.TOTP.NOT_ENROLLED", Status: 409, Message: "Two-factor authentication is not enabled"}
+	// AUTH.TOTP.RECOVERY_CODE_INVALID — Recovery code is invalid
+	AuthTotpRecoveryCodeInvalid = &Spec{Code: "AUTH.TOTP.RECOVERY_CODE_INVALID", Status: 401, Message: "Recovery code is invalid"}
+	// AUTH.TOTP.RECOVERY_CODE_REQUIRED — Either a TOTP code or a recovery code is required
+	AuthTotpRecoveryCodeRequired = &Spec{Code: "AUTH.TOTP.RECOVERY_CODE_REQUIRED", Status: 400, Message: "Either a TOTP code or a recovery code is required"}
 )

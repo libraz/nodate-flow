@@ -62,8 +62,38 @@ type LoginInput struct {
 	}
 }
 
-// LoginOutput is the response for POST /auth/login.
+// LoginBody is a discriminated envelope: when step="complete" the
+// accessToken/expiresAt/userId fields are populated and the refresh
+// cookie is set on the response; when step="totp_required" only
+// challengeToken is populated and the client must call
+// POST /auth/login/totp to finish signing in.
+type LoginBody struct {
+	Step           string `json:"step" enum:"complete,totp_required"`
+	AccessToken    string `json:"accessToken,omitempty"`
+	ExpiresAt      int64  `json:"expiresAt,omitempty" doc:"Access token expiry, unix seconds"`
+	UserID         string `json:"userId,omitempty" doc:"User public id (UUID v7)"`
+	ChallengeToken string `json:"challengeToken,omitempty" doc:"Short-lived token to present on /auth/login/totp"`
+}
+
+// LoginOutput is the response for POST /auth/login. SetCookie is
+// only meaningful when Body.Step == "complete".
 type LoginOutput struct {
+	SetCookie http.Cookie `header:"Set-Cookie"`
+	Body      LoginBody
+}
+
+// LoginTotpInput is the body for POST /auth/login/totp. Exactly one of
+// Code (6-digit authenticator) or RecoveryCode must be supplied.
+type LoginTotpInput struct {
+	Body struct {
+		ChallengeToken string `json:"challengeToken" minLength:"1"`
+		Code           string `json:"code,omitempty" pattern:"^$|^[0-9]{6}$"`
+		RecoveryCode   string `json:"recoveryCode,omitempty" pattern:"^$|^[A-Za-z0-9-]{10,20}$"`
+	}
+}
+
+// LoginTotpOutput is the response for POST /auth/login/totp.
+type LoginTotpOutput struct {
 	SetCookie http.Cookie `header:"Set-Cookie"`
 	Body      AuthTokens
 }
@@ -254,10 +284,34 @@ type TotpConfirmInput struct {
 	}
 }
 
-// TotpConfirmOutput is the response for POST /me/totp/confirm.
+// TotpConfirmOutput is the response for POST /me/totp/confirm. The
+// recovery codes are returned in plaintext exactly once at this point;
+// the server stores only their SHA-256 hashes.
 type TotpConfirmOutput struct {
 	Body struct {
-		Ok bool `json:"ok"`
+		Ok            bool     `json:"ok"`
+		RecoveryCodes []string `json:"recoveryCodes"`
+	}
+}
+
+// TotpRegenerateRecoveryCodesInput is the body for POST /me/totp/recovery-codes.
+type TotpRegenerateRecoveryCodesInput struct {
+	Body struct {
+		Password string `json:"password" minLength:"1" maxLength:"256"`
+	}
+}
+
+// TotpRegenerateRecoveryCodesOutput is the response for POST /me/totp/recovery-codes.
+type TotpRegenerateRecoveryCodesOutput struct {
+	Body struct {
+		RecoveryCodes []string `json:"recoveryCodes"`
+	}
+}
+
+// TotpRecoveryCodesStatusOutput is the response for GET /me/totp/recovery-codes.
+type TotpRecoveryCodesStatusOutput struct {
+	Body struct {
+		Remaining int `json:"remaining"`
 	}
 }
 

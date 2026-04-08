@@ -105,6 +105,20 @@ resources:
         description: "Returned when confirming or disabling TOTP on an account that has no pending or active enrollment."
         userAction: "Start a new TOTP enrollment first."
 
+      recovery_code_invalid:
+        code: AUTH.TOTP.RECOVERY_CODE_INVALID
+        status: 401
+        message: "Recovery code is invalid"
+        description: "Returned when the submitted recovery code does not match any unused code on file for the account."
+        userAction: "Try a different recovery code, or sign in with your authenticator app code."
+
+      recovery_code_required:
+        code: AUTH.TOTP.RECOVERY_CODE_REQUIRED
+        status: 400
+        message: "Either a TOTP code or a recovery code is required"
+        description: "Returned when the TOTP login step is called with neither a 6-digit code nor a recovery code."
+        userAction: "Provide your authenticator code or one of your saved recovery codes."
+
       not_configured:
         code: AUTH.TOTP.NOT_CONFIGURED
         status: 503

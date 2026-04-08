@@ -79,6 +79,10 @@ function LoginPage(): ReactElement {
   const [errors, setErrors] = useState<FormErrors>({});
   const [serverError, setServerError] = useState<AuthErrorI18nKey | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [challengeToken, setChallengeToken] = useState<string | null>(null);
+  const [totpCode, setTotpCode] = useState('');
+  const [useRecovery, setUseRecovery] = useState(false);
+  const [recoveryCode, setRecoveryCode] = useState('');
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -110,28 +114,171 @@ function LoginPage(): ReactElement {
         setServerError(mapAuthError(error ?? null));
         return;
       }
-      // Backend returns only AuthTokens; fetch /me to populate the user.
-      authStore.getState().setAccessToken(data.accessToken);
-      const me = await sdk.GET('/me');
-      if (me.error || !me.data) {
-        setServerError(mapAuthError(me.error ?? null));
-        authStore.getState().clearSession();
+      if (data.step === 'totp_required') {
+        setChallengeToken(data.challengeToken ?? '');
         return;
       }
-      const user: AuthUser = {
-        id: me.data.id,
-        email: me.data.email,
-        displayName: me.data.displayName,
-        locale: me.data.locale,
-      };
-      authStore.getState().setSession(data.accessToken, user);
-      void navigate({ to: '/', replace: true });
+      if (!data.accessToken) {
+        setServerError('auth.errors.generic');
+        return;
+      }
+      await completeSignIn(data.accessToken);
     } catch (err) {
       setServerError(mapAuthThrown(err));
     } finally {
       setSubmitting(false);
     }
   };
+
+  const completeSignIn = async (accessToken: string): Promise<void> => {
+    authStore.getState().setAccessToken(accessToken);
+    const me = await sdk.GET('/me');
+    if (me.error || !me.data) {
+      setServerError(mapAuthError(me.error ?? null));
+      authStore.getState().clearSession();
+      return;
+    }
+    const user: AuthUser = {
+      id: me.data.id,
+      email: me.data.email,
+      displayName: me.data.displayName,
+      locale: me.data.locale,
+    };
+    authStore.getState().setSession(accessToken, user);
+    void navigate({ to: '/', replace: true });
+  };
+
+  const handleTotpSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
+    e.preventDefault();
+    setServerError(null);
+    if (challengeToken == null) return;
+    if (useRecovery ? recoveryCode.trim().length < 10 : totpCode.length !== 6) return;
+    setSubmitting(true);
+    try {
+      const { data, error } = await sdk.POST('/auth/login/totp', {
+        body: useRecovery
+          ? { challengeToken, recoveryCode: recoveryCode.trim() }
+          : { challengeToken, code: totpCode },
+      });
+      if (error || !data) {
+        setServerError(mapAuthError(error ?? null));
+        return;
+      }
+      await completeSignIn(data.accessToken);
+    } catch (err) {
+      setServerError(mapAuthThrown(err));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCancelTotp = (): void => {
+    setChallengeToken(null);
+    setTotpCode('');
+    setRecoveryCode('');
+    setUseRecovery(false);
+    setServerError(null);
+  };
+
+  if (challengeToken != null) {
+    return (
+      <CenteredCard>
+        <form
+          onSubmit={(e) => {
+            void handleTotpSubmit(e);
+          }}
+          noValidate
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5, 1.5rem)' }}
+        >
+          <h1
+            style={{
+              fontFamily: 'var(--nf-font-display, var(--font-display))',
+              fontSize: 'var(--nf-text-2xl, 1.5rem)',
+              margin: 0,
+            }}
+          >
+            {t('auth.login.totp_title')}
+          </h1>
+          <p
+            style={{
+              margin: 0,
+              color: 'var(--nf-color-fg-muted, var(--color-muted))',
+              fontSize: 'var(--nf-text-sm, 0.875rem)',
+            }}
+          >
+            {t('auth.login.totp_instructions')}
+          </p>
+          {useRecovery ? (
+            <FormField label={t('auth.login.recovery_code')} required>
+              {(control) => (
+                <Input
+                  {...control}
+                  autoComplete="one-time-code"
+                  value={recoveryCode}
+                  onChange={(e) => {
+                    setRecoveryCode(e.target.value.toUpperCase().slice(0, 20));
+                  }}
+                  autoFocus
+                />
+              )}
+            </FormField>
+          ) : (
+            <FormField label={t('auth.login.totp_code')} required>
+              {(control) => (
+                <Input
+                  {...control}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  pattern="[0-9]{6}"
+                  maxLength={6}
+                  value={totpCode}
+                  onChange={(e) => {
+                    setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+                  }}
+                  autoFocus
+                />
+              )}
+            </FormField>
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              setUseRecovery((v) => !v);
+              setServerError(null);
+            }}
+            disabled={submitting}
+          >
+            {useRecovery ? t('auth.login.totp_use_code') : t('auth.login.totp_use_recovery')}
+          </Button>
+          {serverError ? (
+            <p
+              role="alert"
+              style={{
+                margin: 0,
+                color: 'var(--nf-color-fg-danger, var(--color-danger))',
+                fontSize: 'var(--nf-text-sm, 0.875rem)',
+              }}
+            >
+              {t(serverError)}
+            </p>
+          ) : null}
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={
+              submitting || (useRecovery ? recoveryCode.trim().length < 10 : totpCode.length !== 6)
+            }
+          >
+            {useRecovery ? t('auth.login.recovery_submit') : t('auth.login.totp_submit')}
+          </Button>
+          <Button type="button" variant="ghost" onClick={handleCancelTotp} disabled={submitting}>
+            {t('auth.login.totp_cancel')}
+          </Button>
+        </form>
+      </CenteredCard>
+    );
+  }
 
   return (
     <CenteredCard>
