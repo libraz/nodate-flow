@@ -99,6 +99,7 @@
     },
     "nav": {
       "overview": "Overview",
+      "projects": "Projects",
       "timeline": "Timeline",
       "settings": "Settings",
       "label": "Workspace sections"
@@ -139,6 +140,12 @@
   "projects": {
     "title": "Projects",
     "new": "New project",
+    "nav": {
+      "label": "Project sections",
+      "overview": "Overview",
+      "tasks": "Tasks",
+      "timeline": "Timeline"
+    },
     "empty": "No projects yet. Create your first one to get started.",
     "columns": {
       "name": "Name",
@@ -165,6 +172,7 @@
       "public": "Public"
     },
     "detail": {
+      "description_empty": "No description for this project yet.",
       "tabs": {
         "overview": "Overview",
         "members": "Members",

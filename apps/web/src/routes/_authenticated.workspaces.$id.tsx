@@ -14,25 +14,36 @@ import { useTranslation } from 'react-i18next';
 import WorkspaceDetail from '../features/workspaces/workspace-detail';
 import { sdk } from '../lib/sdk';
 
-type SubNavKey = 'overview' | 'timeline' | 'settings';
+type SubNavKey = 'overview' | 'projects' | 'timeline' | 'settings';
 
 interface SubNavItem {
   key: SubNavKey;
-  to: '/workspaces/$id' | '/workspaces/$id/timeline' | '/workspaces/$id/settings';
+  to:
+    | '/workspaces/$id'
+    | '/workspaces/$id/projects'
+    | '/workspaces/$id/timeline'
+    | '/workspaces/$id/settings';
 }
 
 const SUB_NAV: readonly SubNavItem[] = [
   { key: 'overview', to: '/workspaces/$id' },
+  { key: 'projects', to: '/workspaces/$id/projects' },
   { key: 'timeline', to: '/workspaces/$id/timeline' },
   { key: 'settings', to: '/workspaces/$id/settings' },
 ];
 
 function labelKeyFor(
   key: SubNavKey,
-): 'workspaces.nav.overview' | 'workspaces.nav.timeline' | 'workspaces.nav.settings' {
+):
+  | 'workspaces.nav.overview'
+  | 'workspaces.nav.projects'
+  | 'workspaces.nav.timeline'
+  | 'workspaces.nav.settings' {
   switch (key) {
     case 'overview':
       return 'workspaces.nav.overview';
+    case 'projects':
+      return 'workspaces.nav.projects';
     case 'timeline':
       return 'workspaces.nav.timeline';
     case 'settings':

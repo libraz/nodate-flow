@@ -99,6 +99,7 @@
     },
     "nav": {
       "overview": "概要",
+      "projects": "プロジェクト",
       "timeline": "タイムライン",
       "settings": "設定",
       "label": "ワークスペースセクション"
@@ -139,6 +140,12 @@
   "projects": {
     "title": "プロジェクト",
     "new": "プロジェクトを作成",
+    "nav": {
+      "label": "プロジェクトセクション",
+      "overview": "概要",
+      "tasks": "タスク",
+      "timeline": "タイムライン"
+    },
     "empty": "プロジェクトがまだありません。最初のプロジェクトを作成しましょう。",
     "columns": {
       "name": "名前",
@@ -165,6 +172,7 @@
       "public": "公開"
     },
     "detail": {
+      "description_empty": "このプロジェクトにはまだ説明がありません。",
       "tabs": {
         "overview": "概要",
         "members": "メンバー",

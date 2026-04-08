@@ -8,7 +8,7 @@ import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import Tabs, { type TabItem } from '@nodate-flow/ui/primitives/tabs';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -99,21 +99,15 @@ function SettingsPanel({ id }: { id: string }): ReactElement {
 function OverviewPanel({ id }: { id: string }): ReactElement {
   const { t } = useTranslation('common');
   const { data: project } = useProjectQuery(id);
+  const description = project.description?.trim();
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <Card style={{ padding: '1.5rem' }}>
-        <p style={{ margin: 0, color: 'var(--color-muted)' }}>{project.description ?? ''}</p>
-      </Card>
-      <div>
-        <Link
-          to="/projects/$projectId/tasks"
-          params={{ projectId: id }}
-          style={{ color: 'var(--color-accent)', textDecoration: 'none', fontWeight: 600 }}
-        >
-          {t('tasks.title')}
-        </Link>
-      </div>
-    </div>
+    <Card style={{ padding: '1.5rem' }}>
+      <p style={{ margin: 0, color: description ? 'var(--color-fg)' : 'var(--color-muted)' }}>
+        {description && description.length > 0
+          ? description
+          : t('projects.detail.description_empty')}
+      </p>
+    </Card>
   );
 }
 
