@@ -15,6 +15,13 @@ CREATE TABLE users (
   theme_preference ENUM('aurora-light','aurora-dark','dotline-light','dotline-dark','system') NOT NULL DEFAULT 'system' COMMENT 'UI theme preference',
   last_login_at DATETIME NULL COMMENT 'Last successful login',
 
+  -- Notification channel toggles (see /settings/notifications).
+  notif_email_digest_enabled     BOOLEAN NOT NULL DEFAULT TRUE  COMMENT 'Weekly digest email',
+  notif_email_mention_enabled    BOOLEAN NOT NULL DEFAULT TRUE  COMMENT 'Email when mentioned in comments',
+  notif_email_assignment_enabled BOOLEAN NOT NULL DEFAULT TRUE  COMMENT 'Email when assigned to a task',
+  notif_email_due_soon_enabled   BOOLEAN NOT NULL DEFAULT TRUE  COMMENT 'Email when owned task is due within 24h',
+  notif_web_push_enabled         BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Browser push notifications',
+
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',

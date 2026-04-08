@@ -34,11 +34,16 @@ func rowToMe(row generated.FindUserProfileByIdRow) MeBody {
 		avatar = &s
 	}
 	return MeBody{
-		ID:              row.PublicID.String(),
-		Email:           row.Email,
-		DisplayName:     row.DisplayName,
-		Locale:          row.Locale,
-		ThemePreference: string(row.ThemePreference),
-		AvatarURL:       avatar,
+		ID:                   row.PublicID.String(),
+		Email:                row.Email,
+		DisplayName:          row.DisplayName,
+		Locale:               row.Locale,
+		ThemePreference:      string(row.ThemePreference),
+		AvatarURL:            avatar,
+		NotifEmailDigest:     row.NotifEmailDigestEnabled,
+		NotifEmailMention:    row.NotifEmailMentionEnabled,
+		NotifEmailAssignment: row.NotifEmailAssignmentEnabled,
+		NotifEmailDueSoon:    row.NotifEmailDueSoonEnabled,
+		NotifWebPush:         row.NotifWebPushEnabled,
 	}
 }

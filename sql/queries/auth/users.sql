@@ -128,7 +128,10 @@ LIMIT 1;
 
 -- name: FindUserProfileById :one
 -- Fetch the minimal profile for the /me endpoint by internal id.
-SELECT public_id, email, display_name, locale, theme_preference, avatar_url
+SELECT public_id, email, display_name, locale, theme_preference, avatar_url,
+       notif_email_digest_enabled, notif_email_mention_enabled,
+       notif_email_assignment_enabled, notif_email_due_soon_enabled,
+       notif_web_push_enabled
 FROM users
 WHERE id = ?
   AND enabled = TRUE
@@ -137,10 +140,15 @@ LIMIT 1;
 -- name: PatchMe :exec
 -- Patch the authenticated user's profile. NULL params leave the column untouched.
 UPDATE users
-SET display_name     = COALESCE(sqlc.narg('display_name'), display_name),
-    locale           = COALESCE(sqlc.narg('locale'), locale),
-    theme_preference = COALESCE(sqlc.narg('theme_preference'), theme_preference),
-    avatar_url       = COALESCE(sqlc.narg('avatar_url'), avatar_url)
+SET display_name                   = COALESCE(sqlc.narg('display_name'), display_name),
+    locale                         = COALESCE(sqlc.narg('locale'), locale),
+    theme_preference               = COALESCE(sqlc.narg('theme_preference'), theme_preference),
+    avatar_url                     = COALESCE(sqlc.narg('avatar_url'), avatar_url),
+    notif_email_digest_enabled     = COALESCE(sqlc.narg('notif_email_digest_enabled'), notif_email_digest_enabled),
+    notif_email_mention_enabled    = COALESCE(sqlc.narg('notif_email_mention_enabled'), notif_email_mention_enabled),
+    notif_email_assignment_enabled = COALESCE(sqlc.narg('notif_email_assignment_enabled'), notif_email_assignment_enabled),
+    notif_email_due_soon_enabled   = COALESCE(sqlc.narg('notif_email_due_soon_enabled'), notif_email_due_soon_enabled),
+    notif_web_push_enabled         = COALESCE(sqlc.narg('notif_web_push_enabled'), notif_web_push_enabled)
 WHERE id = ?
   AND enabled = TRUE;
 

@@ -35,6 +35,21 @@ func PatchMe(deps Deps) func(context.Context, *PatchMeInput) (*PatchMeOutput, er
 		if in.Body.AvatarURL != nil {
 			params.AvatarUrl = sql.NullString{String: *in.Body.AvatarURL, Valid: true}
 		}
+		if in.Body.NotifEmailDigest != nil {
+			params.NotifEmailDigestEnabled = sql.NullBool{Bool: *in.Body.NotifEmailDigest, Valid: true}
+		}
+		if in.Body.NotifEmailMention != nil {
+			params.NotifEmailMentionEnabled = sql.NullBool{Bool: *in.Body.NotifEmailMention, Valid: true}
+		}
+		if in.Body.NotifEmailAssignment != nil {
+			params.NotifEmailAssignmentEnabled = sql.NullBool{Bool: *in.Body.NotifEmailAssignment, Valid: true}
+		}
+		if in.Body.NotifEmailDueSoon != nil {
+			params.NotifEmailDueSoonEnabled = sql.NullBool{Bool: *in.Body.NotifEmailDueSoon, Valid: true}
+		}
+		if in.Body.NotifWebPush != nil {
+			params.NotifWebPushEnabled = sql.NullBool{Bool: *in.Body.NotifWebPush, Valid: true}
+		}
 
 		if err := deps.Queries.PatchMe(ctx, params); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)

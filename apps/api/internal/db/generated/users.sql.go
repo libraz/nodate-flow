@@ -308,7 +308,10 @@ func (q *Queries) FindUserInternalIdByPublicId(ctx context.Context, publicID typ
 }
 
 const findUserProfileById = `-- name: FindUserProfileById :one
-SELECT public_id, email, display_name, locale, theme_preference, avatar_url
+SELECT public_id, email, display_name, locale, theme_preference, avatar_url,
+       notif_email_digest_enabled, notif_email_mention_enabled,
+       notif_email_assignment_enabled, notif_email_due_soon_enabled,
+       notif_web_push_enabled
 FROM users
 WHERE id = ?
   AND enabled = TRUE
@@ -316,12 +319,17 @@ LIMIT 1
 `
 
 type FindUserProfileByIdRow struct {
-	PublicID        types.PublicID       `json:"publicId"`
-	Email           string               `json:"email"`
-	DisplayName     string               `json:"displayName"`
-	Locale          string               `json:"locale"`
-	ThemePreference UsersThemePreference `json:"themePreference"`
-	AvatarUrl       sql.NullString       `json:"avatarUrl"`
+	PublicID                    types.PublicID       `json:"publicId"`
+	Email                       string               `json:"email"`
+	DisplayName                 string               `json:"displayName"`
+	Locale                      string               `json:"locale"`
+	ThemePreference             UsersThemePreference `json:"themePreference"`
+	AvatarUrl                   sql.NullString       `json:"avatarUrl"`
+	NotifEmailDigestEnabled     bool                 `json:"notifEmailDigestEnabled"`
+	NotifEmailMentionEnabled    bool                 `json:"notifEmailMentionEnabled"`
+	NotifEmailAssignmentEnabled bool                 `json:"notifEmailAssignmentEnabled"`
+	NotifEmailDueSoonEnabled    bool                 `json:"notifEmailDueSoonEnabled"`
+	NotifWebPushEnabled         bool                 `json:"notifWebPushEnabled"`
 }
 
 // Fetch the minimal profile for the /me endpoint by internal id.
@@ -335,26 +343,41 @@ func (q *Queries) FindUserProfileById(ctx context.Context, id uint32) (FindUserP
 		&i.Locale,
 		&i.ThemePreference,
 		&i.AvatarUrl,
+		&i.NotifEmailDigestEnabled,
+		&i.NotifEmailMentionEnabled,
+		&i.NotifEmailAssignmentEnabled,
+		&i.NotifEmailDueSoonEnabled,
+		&i.NotifWebPushEnabled,
 	)
 	return i, err
 }
 
 const patchMe = `-- name: PatchMe :exec
 UPDATE users
-SET display_name     = COALESCE(?, display_name),
-    locale           = COALESCE(?, locale),
-    theme_preference = COALESCE(?, theme_preference),
-    avatar_url       = COALESCE(?, avatar_url)
+SET display_name                   = COALESCE(?, display_name),
+    locale                         = COALESCE(?, locale),
+    theme_preference               = COALESCE(?, theme_preference),
+    avatar_url                     = COALESCE(?, avatar_url),
+    notif_email_digest_enabled     = COALESCE(?, notif_email_digest_enabled),
+    notif_email_mention_enabled    = COALESCE(?, notif_email_mention_enabled),
+    notif_email_assignment_enabled = COALESCE(?, notif_email_assignment_enabled),
+    notif_email_due_soon_enabled   = COALESCE(?, notif_email_due_soon_enabled),
+    notif_web_push_enabled         = COALESCE(?, notif_web_push_enabled)
 WHERE id = ?
   AND enabled = TRUE
 `
 
 type PatchMeParams struct {
-	DisplayName     sql.NullString           `json:"displayName"`
-	Locale          sql.NullString           `json:"locale"`
-	ThemePreference NullUsersThemePreference `json:"themePreference"`
-	AvatarUrl       sql.NullString           `json:"avatarUrl"`
-	ID              uint32                   `json:"-"`
+	DisplayName                 sql.NullString           `json:"displayName"`
+	Locale                      sql.NullString           `json:"locale"`
+	ThemePreference             NullUsersThemePreference `json:"themePreference"`
+	AvatarUrl                   sql.NullString           `json:"avatarUrl"`
+	NotifEmailDigestEnabled     sql.NullBool             `json:"notifEmailDigestEnabled"`
+	NotifEmailMentionEnabled    sql.NullBool             `json:"notifEmailMentionEnabled"`
+	NotifEmailAssignmentEnabled sql.NullBool             `json:"notifEmailAssignmentEnabled"`
+	NotifEmailDueSoonEnabled    sql.NullBool             `json:"notifEmailDueSoonEnabled"`
+	NotifWebPushEnabled         sql.NullBool             `json:"notifWebPushEnabled"`
+	ID                          uint32                   `json:"-"`
 }
 
 // Patch the authenticated user's profile. NULL params leave the column untouched.
@@ -364,6 +387,11 @@ func (q *Queries) PatchMe(ctx context.Context, arg PatchMeParams) error {
 		arg.Locale,
 		arg.ThemePreference,
 		arg.AvatarUrl,
+		arg.NotifEmailDigestEnabled,
+		arg.NotifEmailMentionEnabled,
+		arg.NotifEmailAssignmentEnabled,
+		arg.NotifEmailDueSoonEnabled,
+		arg.NotifWebPushEnabled,
 		arg.ID,
 	)
 	return err

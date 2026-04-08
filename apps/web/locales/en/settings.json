@@ -1,6 +1,7 @@
 {
   "nav": {
     "profile": "Profile",
+    "notifications": "Notifications",
     "general": "General",
     "mcp_tokens": "MCP tokens",
     "ai_providers": "AI providers",
@@ -51,6 +52,35 @@
     },
     "errors": {
       "update_failed": "Could not update your profile. Please try again."
+    }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "save": "Save",
+    "saving": "Saving...",
+    "saved": "Notification preferences updated",
+    "email_digest": {
+      "label": "Weekly digest email",
+      "description": "Receive a summary of your workspace activity every week."
+    },
+    "email_mention": {
+      "label": "Mentions",
+      "description": "Email me when someone @-mentions me in a comment."
+    },
+    "email_assignment": {
+      "label": "Task assignments",
+      "description": "Email me when a task is assigned to me."
+    },
+    "email_due_soon": {
+      "label": "Due soon",
+      "description": "Email me when a task I own is due within the next 24 hours."
+    },
+    "web_push": {
+      "label": "Browser push notifications",
+      "description": "Show desktop notifications in this browser. Requires permission."
+    },
+    "errors": {
+      "update_failed": "Could not update your notification preferences. Please try again."
     }
   },
   "workspace": {

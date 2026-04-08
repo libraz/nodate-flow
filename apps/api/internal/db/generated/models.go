@@ -1471,6 +1471,16 @@ type User struct {
 	ThemePreference UsersThemePreference `json:"themePreference"`
 	// Last successful login
 	LastLoginAt sql.NullTime `json:"lastLoginAt"`
+	// Weekly digest email
+	NotifEmailDigestEnabled bool `json:"notifEmailDigestEnabled"`
+	// Email when mentioned in comments
+	NotifEmailMentionEnabled bool `json:"notifEmailMentionEnabled"`
+	// Email when assigned to a task
+	NotifEmailAssignmentEnabled bool `json:"notifEmailAssignmentEnabled"`
+	// Email when owned task is due within 24h
+	NotifEmailDueSoonEnabled bool `json:"notifEmailDueSoonEnabled"`
+	// Browser push notifications
+	NotifWebPushEnabled bool `json:"notifWebPushEnabled"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes

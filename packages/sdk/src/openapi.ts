@@ -1809,6 +1809,11 @@ export interface components {
             email: string;
             id: string;
             locale: string;
+            notifEmailAssignment: boolean;
+            notifEmailDigest: boolean;
+            notifEmailDueSoon: boolean;
+            notifEmailMention: boolean;
+            notifWebPush: boolean;
             /** @enum {string} */
             themePreference: "aurora-light" | "aurora-dark" | "dotline-light" | "dotline-dark" | "system";
         };
@@ -1840,6 +1845,11 @@ export interface components {
             avatarUrl?: string;
             displayName?: string;
             locale?: string;
+            notifEmailAssignment?: boolean;
+            notifEmailDigest?: boolean;
+            notifEmailDueSoon?: boolean;
+            notifEmailMention?: boolean;
+            notifWebPush?: boolean;
             /** @enum {string} */
             themePreference?: "aurora-light" | "aurora-dark" | "dotline-light" | "dotline-dark" | "system";
         };

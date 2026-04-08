@@ -1753,12 +1753,38 @@
           "locale": {
             "type": "string"
           },
+          "notifEmailAssignment": {
+            "type": "boolean"
+          },
+          "notifEmailDigest": {
+            "type": "boolean"
+          },
+          "notifEmailDueSoon": {
+            "type": "boolean"
+          },
+          "notifEmailMention": {
+            "type": "boolean"
+          },
+          "notifWebPush": {
+            "type": "boolean"
+          },
           "themePreference": {
             "enum": ["aurora-light", "aurora-dark", "dotline-light", "dotline-dark", "system"],
             "type": "string"
           }
         },
-        "required": ["id", "email", "displayName", "locale", "themePreference"],
+        "required": [
+          "id",
+          "email",
+          "displayName",
+          "locale",
+          "themePreference",
+          "notifEmailDigest",
+          "notifEmailMention",
+          "notifEmailAssignment",
+          "notifEmailDueSoon",
+          "notifWebPush"
+        ],
         "type": "object"
       },
       "OIDCStartOutputBody": {
@@ -1831,6 +1857,21 @@
           "locale": {
             "maxLength": 10,
             "type": "string"
+          },
+          "notifEmailAssignment": {
+            "type": "boolean"
+          },
+          "notifEmailDigest": {
+            "type": "boolean"
+          },
+          "notifEmailDueSoon": {
+            "type": "boolean"
+          },
+          "notifEmailMention": {
+            "type": "boolean"
+          },
+          "notifWebPush": {
+            "type": "boolean"
           },
           "themePreference": {
             "enum": ["aurora-light", "aurora-dark", "dotline-light", "dotline-dark", "system"],

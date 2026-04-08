@@ -4,6 +4,7 @@ SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 SET UNIQUE_CHECKS = 0;
 
+DROP TABLE IF EXISTS `agent_runs`;
 DROP TABLE IF EXISTS `ai_agents`;
 DROP TABLE IF EXISTS `ai_invocations`;
 DROP TABLE IF EXISTS `ai_models`;
@@ -32,6 +33,46 @@ DROP TABLE IF EXISTS `users`;
 DROP TABLE IF EXISTS `workspace_members`;
 DROP TABLE IF EXISTS `workspaces`;
 
+-- >>> agent_runs.sql
+-- ====================================
+-- agent_runs
+-- Queue + history for AI agent executions (4.AGENT-1 scheduler/worker
+-- split). The scheduler enqueues one row per due (agent, scheduled_at)
+-- pair with a UNIQUE dedupe_key so multiple scheduler replicas cannot
+-- double-fire a job. Workers claim rows with SELECT ... FOR UPDATE
+-- SKIP LOCKED, run the agent, then update status to succeeded / failed.
+-- Completed rows are retained as the audit trail for
+-- `ai.agent.run.*` events (ADR 0002 — events in MySQL).
+-- ====================================
+CREATE TABLE agent_runs (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  agent_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to ai_agents.id',
+
+  dedupe_key VARCHAR(128) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Unique key shaped as <agent_id>:<unix_minute> to prevent double enqueue across scheduler replicas',
+  status ENUM('pending','claimed','succeeded','failed') NOT NULL DEFAULT 'pending' COMMENT 'Lifecycle state',
+  attempts TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Number of claim attempts (for retry budget)',
+  scheduled_at DATETIME NOT NULL COMMENT 'Tick time the scheduler enqueued the run for',
+  claimed_at DATETIME NULL COMMENT 'When a worker claimed the row',
+  finished_at DATETIME NULL COMMENT 'When the worker ack/nacked the row',
+  error_message TEXT NULL COMMENT 'Last failure message for operator visibility',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  UNIQUE KEY uniq_agent_runs_public_id (public_id),
+  UNIQUE KEY uniq_agent_runs_dedupe_key (dedupe_key),
+  KEY idx_agent_runs_status_scheduled_at (status, scheduled_at),
+  KEY idx_agent_runs_workspace_id_agent_id (workspace_id, agent_id),
+
+  CONSTRAINT fk_agent_runs_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_agent_runs_agent FOREIGN KEY (agent_id) REFERENCES ai_agents(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Agent execution queue + history';
+
 -- >>> ai_agents.sql
 -- ====================================
 -- ai_agents
@@ -52,7 +93,7 @@ CREATE TABLE ai_agents (
   tools_json JSON NULL COMMENT 'Allowed tool list as JSON array',
   allowed_scopes_json JSON NULL COMMENT 'Allowed MCP scope list as JSON array (null = inherit from token)',
   monthly_cost_cap_cents INT UNSIGNED NULL COMMENT 'Monthly spend cap in USD cents (null = no cap)',
-  cron_expr VARCHAR(128) NULL COMMENT 'Optional cron expression for scheduled runs',
+  schedule_kind ENUM('disabled','interval','on_event','manual') NOT NULL DEFAULT 'disabled' COMMENT 'Trigger mode: interval = fires every NF_AGENT_TICK_INTERVAL; on_event = fires from eventbus; manual = only via /agents/{id}/trigger',
   paused BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Manually or automatically paused (e.g., cost cap exceeded)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
@@ -648,7 +689,7 @@ CREATE TABLE signals (
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id, if resolved',
 
-  source ENUM('manual','github','slack','email','webhook') NOT NULL COMMENT 'Originating channel',
+  source ENUM('manual','github','slack','email','google','webhook') NOT NULL COMMENT 'Originating channel',
   kind VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Source-specific event kind (e.g., pull_request.opened)',
   external_id VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'External identifier (delivery id, message ts, ...)',
   payload_json JSON NOT NULL COMMENT 'Raw normalized payload',
@@ -852,6 +893,13 @@ CREATE TABLE users (
   locale VARCHAR(16) NOT NULL DEFAULT 'en' COMMENT 'Preferred locale tag (BCP 47)',
   theme_preference ENUM('aurora-light','aurora-dark','dotline-light','dotline-dark','system') NOT NULL DEFAULT 'system' COMMENT 'UI theme preference',
   last_login_at DATETIME NULL COMMENT 'Last successful login',
+
+  -- Notification channel toggles (see /settings/notifications).
+  notif_email_digest_enabled     BOOLEAN NOT NULL DEFAULT TRUE  COMMENT 'Weekly digest email',
+  notif_email_mention_enabled    BOOLEAN NOT NULL DEFAULT TRUE  COMMENT 'Email when mentioned in comments',
+  notif_email_assignment_enabled BOOLEAN NOT NULL DEFAULT TRUE  COMMENT 'Email when assigned to a task',
+  notif_email_due_soon_enabled   BOOLEAN NOT NULL DEFAULT TRUE  COMMENT 'Email when owned task is due within 24h',
+  notif_web_push_enabled         BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Browser push notifications',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',

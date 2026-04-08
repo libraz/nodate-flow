@@ -1,6 +1,7 @@
 {
   "nav": {
     "profile": "プロフィール",
+    "notifications": "通知",
     "general": "一般",
     "mcp_tokens": "MCP トークン",
     "ai_providers": "AI プロバイダ",
@@ -51,6 +52,35 @@
     },
     "errors": {
       "update_failed": "プロフィールを更新できませんでした。もう一度お試しください。"
+    }
+  },
+  "notifications": {
+    "title": "通知",
+    "save": "保存",
+    "saving": "保存中…",
+    "saved": "通知設定を更新しました",
+    "email_digest": {
+      "label": "週次ダイジェストメール",
+      "description": "毎週ワークスペースのアクティビティサマリをメールで受け取ります。"
+    },
+    "email_mention": {
+      "label": "メンション",
+      "description": "コメントで @ メンションされたときにメールで通知します。"
+    },
+    "email_assignment": {
+      "label": "タスクの割り当て",
+      "description": "自分にタスクが割り当てられたときにメールで通知します。"
+    },
+    "email_due_soon": {
+      "label": "期限間近",
+      "description": "担当タスクの期限が 24 時間以内に迫ったときにメールで通知します。"
+    },
+    "web_push": {
+      "label": "ブラウザプッシュ通知",
+      "description": "このブラウザでデスクトップ通知を表示します。許可が必要です。"
+    },
+    "errors": {
+      "update_failed": "通知設定を更新できませんでした。もう一度お試しください。"
     }
   },
   "workspace": {

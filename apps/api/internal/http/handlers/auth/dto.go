@@ -119,6 +119,14 @@ type MeBody struct {
 	Locale          string  `json:"locale"`
 	ThemePreference string  `json:"themePreference" enum:"aurora-light,aurora-dark,dotline-light,dotline-dark,system"`
 	AvatarURL       *string `json:"avatarUrl,omitempty"`
+
+	// Notification channel toggles. Exposed on /me so the settings UI
+	// can render them without a separate request; mutated via PATCH /me.
+	NotifEmailDigest     bool `json:"notifEmailDigest"`
+	NotifEmailMention    bool `json:"notifEmailMention"`
+	NotifEmailAssignment bool `json:"notifEmailAssignment"`
+	NotifEmailDueSoon    bool `json:"notifEmailDueSoon"`
+	NotifWebPush         bool `json:"notifWebPush"`
 }
 
 // MeOutput is the response for GET /me.
@@ -138,6 +146,13 @@ type PatchMeInputBody struct {
 	Locale          *string `json:"locale,omitempty" maxLength:"10"`
 	ThemePreference *string `json:"themePreference,omitempty" enum:"aurora-light,aurora-dark,dotline-light,dotline-dark,system"`
 	AvatarURL       *string `json:"avatarUrl,omitempty" maxLength:"1024"`
+
+	// Notification channel toggles. nil leaves the column untouched.
+	NotifEmailDigest     *bool `json:"notifEmailDigest,omitempty"`
+	NotifEmailMention    *bool `json:"notifEmailMention,omitempty"`
+	NotifEmailAssignment *bool `json:"notifEmailAssignment,omitempty"`
+	NotifEmailDueSoon    *bool `json:"notifEmailDueSoon,omitempty"`
+	NotifWebPush         *bool `json:"notifWebPush,omitempty"`
 }
 
 // PatchMeOutput is the response for PATCH /me. It returns the updated

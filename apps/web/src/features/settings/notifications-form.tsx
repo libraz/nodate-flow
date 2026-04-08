@@ -1,0 +1,145 @@
+/**
+ * NotificationsForm — edit the authenticated user's notification channel
+ * toggles. Parent must wrap this in `<Suspense>` because it consumes
+ * `useMeQuery` (Suspense mode).
+ */
+
+import Button from '@nodate-flow/ui/primitives/button';
+import Switch from '@nodate-flow/ui/primitives/switch';
+import { toaster } from '@nodate-flow/ui/primitives/toast';
+import { type FormEvent, type ReactElement, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import { type PatchMeInput, useMeQuery, useUpdateMe } from './api';
+
+interface ToggleKey {
+  readonly key:
+    | 'notifEmailDigest'
+    | 'notifEmailMention'
+    | 'notifEmailAssignment'
+    | 'notifEmailDueSoon'
+    | 'notifWebPush';
+  readonly labelKey: string;
+  readonly descriptionKey: string;
+}
+
+const TOGGLES: readonly ToggleKey[] = [
+  {
+    key: 'notifEmailDigest',
+    labelKey: 'notifications.email_digest.label',
+    descriptionKey: 'notifications.email_digest.description',
+  },
+  {
+    key: 'notifEmailMention',
+    labelKey: 'notifications.email_mention.label',
+    descriptionKey: 'notifications.email_mention.description',
+  },
+  {
+    key: 'notifEmailAssignment',
+    labelKey: 'notifications.email_assignment.label',
+    descriptionKey: 'notifications.email_assignment.description',
+  },
+  {
+    key: 'notifEmailDueSoon',
+    labelKey: 'notifications.email_due_soon.label',
+    descriptionKey: 'notifications.email_due_soon.description',
+  },
+  {
+    key: 'notifWebPush',
+    labelKey: 'notifications.web_push.label',
+    descriptionKey: 'notifications.web_push.description',
+  },
+] as const;
+
+type ToggleState = Record<ToggleKey['key'], boolean>;
+
+export default function NotificationsForm(): ReactElement {
+  const { t } = useTranslation('settings');
+  const { data: me } = useMeQuery();
+  const update = useUpdateMe();
+
+  const [state, setState] = useState<ToggleState>({
+    notifEmailDigest: me.notifEmailDigest,
+    notifEmailMention: me.notifEmailMention,
+    notifEmailAssignment: me.notifEmailAssignment,
+    notifEmailDueSoon: me.notifEmailDueSoon,
+    notifWebPush: me.notifWebPush,
+  });
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
+    e.preventDefault();
+    setSubmitting(true);
+    const patch: PatchMeInput = { ...state };
+    try {
+      await update.mutateAsync(patch);
+      toaster.show({ tone: 'success', message: t('notifications.saved') });
+    } catch {
+      toaster.show({ tone: 'danger', message: t('notifications.errors.update_failed') });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form
+      onSubmit={(e) => {
+        void handleSubmit(e);
+      }}
+      style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxInlineSize: '40rem' }}
+    >
+      <ul
+        style={{
+          listStyle: 'none',
+          margin: 0,
+          padding: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.75rem',
+        }}
+      >
+        {TOGGLES.map((item) => {
+          const checked = state[item.key];
+          const id = `notif-${item.key}`;
+          return (
+            <li
+              key={item.key}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr auto',
+                gap: '0.75rem',
+                alignItems: 'start',
+                padding: '0.75rem 1rem',
+                border: '1px solid var(--color-border)',
+                borderRadius: '0.5rem',
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <label htmlFor={id} style={{ fontWeight: 500, color: 'var(--color-fg)' }}>
+                  {t(item.labelKey)}
+                </label>
+                <span style={{ fontSize: '0.875rem', color: 'var(--color-fg-muted)' }}>
+                  {t(item.descriptionKey)}
+                </span>
+              </div>
+              <Switch
+                id={id}
+                checked={checked}
+                onCheckedChange={(next) => {
+                  setState((prev) => ({ ...prev, [item.key]: next }));
+                }}
+                aria-label={t(item.labelKey)}
+              />
+            </li>
+          );
+        })}
+      </ul>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <Button type="submit" variant="primary" disabled={submitting}>
+          {submitting ? t('notifications.saving') : t('notifications.save')}
+        </Button>
+      </div>
+    </form>
+  );
+}
