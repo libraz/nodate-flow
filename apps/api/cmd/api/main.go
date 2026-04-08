@@ -19,7 +19,6 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/agentruntime"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/providers"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
-	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth/sessionstore"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/config"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/outbound"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/crypto"
@@ -70,28 +69,32 @@ func main() {
 		logger.Warn("ai cipher disabled", "err", cerr)
 	}
 
-	// Per-provider egress rate limits (4.SEC-2). A zero rps leaves the
-	// registry empty and every provider call falls through to the
-	// underlying *http.Client untouched.
+	// Per-provider egress rate limits (4.SEC-2). When NF_OUTBOUND_BACKEND=redis
+	// is set and the binary is built with -tags redis, the limiters are
+	// swapped for RedisLimiter so the budget is shared across replicas.
+	// Otherwise the default in-process token bucket applies.
+	llmDests := []string{
+		providers.DestAnthropic,
+		providers.DestOpenAI,
+		providers.DestGoogle,
+		providers.DestOllama,
+	}
 	if cfg.OutboundLlmRps > 0 {
-		burst := cfg.OutboundLlmBurst
-		if burst <= 0 {
-			if b := int(cfg.OutboundLlmRps); b > 0 {
-				burst = b
-			} else {
-				burst = 1
+		if !configureOutboundLimiters(cfg, logger, llmDests) {
+			burst := cfg.OutboundLlmBurst
+			if burst <= 0 {
+				if b := int(cfg.OutboundLlmRps); b > 0 {
+					burst = b
+				} else {
+					burst = 1
+				}
 			}
+			for _, dest := range llmDests {
+				providers.ConfigureLimiter(dest, outbound.NewLimiter(cfg.OutboundLlmRps, burst))
+			}
+			logger.Info("outbound llm rate limit enabled",
+				"rps", cfg.OutboundLlmRps, "burst", burst)
 		}
-		for _, dest := range []string{
-			providers.DestAnthropic,
-			providers.DestOpenAI,
-			providers.DestGoogle,
-			providers.DestOllama,
-		} {
-			providers.ConfigureLimiter(dest, outbound.NewLimiter(cfg.OutboundLlmRps, burst))
-		}
-		logger.Info("outbound llm rate limit enabled",
-			"rps", cfg.OutboundLlmRps, "burst", burst)
 	}
 
 	jwtIssuer, err := auth.NewJWTIssuer(nil, "nodate-flow", "api", 15*time.Minute)
@@ -110,38 +113,29 @@ func main() {
 	var streamRemember stream.RememberWorkspaceFunc
 	var aiInvocationPublisher func(context.Context, uint32)
 	if cfg.StreamEnabled {
-		in := stream.NewInProcessNotifier()
-		notifier = in
-		tap = stream.NewEventbusTap(in)
+		// Prefer a Redis-backed notifier when the env asks for it and
+		// the binary was compiled with -tags redis; otherwise fall
+		// through to the in-process notifier. The EventbusTap is wired
+		// on top of whichever notifier is selected so eventbus.Append
+		// publishes uniformly.
+		if rn := buildStreamNotifier(cfg, logger); rn != nil {
+			notifier = rn
+			tap = stream.NewEventbusTap(rn)
+		} else {
+			in := stream.NewInProcessNotifier()
+			notifier = in
+			tap = stream.NewEventbusTap(in)
+		}
 		eventbus.SetNotifyHook(tap.Publish)
 		streamRemember = tap.RememberWorkspace
 		aiInvocationPublisher = tap.PublishAiInvocation
 	}
 
 	// Session store driver. MySQL is the default; NF_SESSION_STORE=redis
-	// selects the redis-tagged driver (requires building with -tags redis).
-	// Unknown values fall back to MySQL with a warning so misconfiguration
-	// never locks users out.
-	var sessions sessionstore.Store = sessionstore.NewMySQLStore(queries)
-	switch cfg.SessionStore {
-	case "", "mysql":
-		// default
-	case "redis":
-		logger.Warn("NF_SESSION_STORE=redis requires the -tags redis build; falling back to MySQL")
-	default:
-		logger.Warn("unknown NF_SESSION_STORE value; falling back to MySQL", "value", cfg.SessionStore)
-	}
-
-	// Stream / outbound backend selectors. The in-process (memory) drivers
-	// are the default; "redis" is only honored when the binary is compiled
-	// with `-tags redis` so mis-set env values degrade gracefully to the
-	// in-process behavior instead of panicking at startup.
-	if cfg.StreamBackend == "redis" {
-		logger.Warn("NF_STREAM_BACKEND=redis requires the -tags redis build; using in-process notifier")
-	}
-	if cfg.OutboundBackend == "redis" {
-		logger.Warn("NF_OUTBOUND_BACKEND=redis requires the -tags redis build; using in-process limiter")
-	}
+	// selects the redis-tagged driver when the binary is built with
+	// -tags redis. Mis-configured values log and fall back to MySQL
+	// so a bad env never locks users out.
+	sessions := buildSessionStore(cfg, queries, logger)
 
 	inner := router.Build(router.Deps{
 		DB:                 db,
@@ -167,16 +161,17 @@ func main() {
 	outer.Use(buildCORS(cfg.CorsAllowedOrigins))
 	outer.Mount("/", inner)
 
-	// 4.AGENT-1: cron scheduler. Ticks once a minute, dispatches every
-	// enabled non-paused agent with a cron_expr to a log-only runner.
-	// Production wiring will swap LogRunner for an orchestrator-backed
-	// runner; the loop and Source contract stay identical.
+	// 4.AGENT-1: interval scheduler. Ticks every NF_AGENT_TICK_INTERVAL
+	// (default 1m) and dispatches every enabled non-paused agent whose
+	// schedule_kind='interval' to a log-only runner. Production wiring
+	// will swap LogRunner for an orchestrator-backed runner; the loop
+	// and Source contract stay identical.
 	scheduler := &agentruntime.Scheduler{
-		Source:   &agentruntime.DBSource{DB: db},
-		Runner:   &agentruntime.LogRunner{Sink: func(_ context.Context, j agentruntime.Job, _ time.Time) {
+		Source: &agentruntime.DBSource{DB: db},
+		Runner: &agentruntime.LogRunner{Sink: func(_ context.Context, j agentruntime.Job, _ time.Time) {
 			logger.Info("agent runtime: dispatch", "agent_id", j.AgentID, "ws", j.WsID)
 		}},
-		Interval: time.Minute,
+		Interval: cfg.AgentTickInterval,
 	}
 	schedulerCtx, schedulerCancel := context.WithCancel(context.Background())
 	defer schedulerCancel()
