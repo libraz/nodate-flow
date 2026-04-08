@@ -67,7 +67,7 @@ func HandleGoogleWebhook(deps Deps) http.HandlerFunc {
 		if _, err := deps.Queries.InsertSignal(ctx, generated.InsertSignalParams{
 			PublicID:    pub,
 			WorkspaceID: wsID,
-			Source:      generated.SignalsSourceWebhook,
+			Source:      generated.SignalsSourceGoogle,
 			Kind:        kind,
 			ExternalID:  ext,
 			PayloadJson: payload,
