@@ -112,7 +112,10 @@ export function ThemeProvider({ children }: { children: ReactNode }): ReactEleme
         Array.isArray(event.query.queryKey) &&
         event.query.queryKey[0] === 'me'
       ) {
-        tryHydrate();
+        // Defer to a microtask so we never call setState synchronously
+        // during another component's render (cache subscribers may fire
+        // mid-render under Suspense).
+        queueMicrotask(tryHydrate);
       }
     });
     return () => {

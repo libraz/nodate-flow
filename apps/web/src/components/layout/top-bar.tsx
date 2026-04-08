@@ -1,10 +1,11 @@
 import Icon from '@nodate-flow/ui/icon';
 import { cx } from '@nodate-flow/ui/lib/cx';
-import Dialog from '@nodate-flow/ui/primitives/dialog';
 import { useNavigate } from '@tanstack/react-router';
+
 import { LogOut, Moon, Search, Sun } from 'lucide-react';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import CommandPalette from './command-palette';
 
 import AiCostMeter from '../../features/ai-providers/cost-meter';
 import { authStore } from '../../features/auth/auth-store';
@@ -105,15 +106,12 @@ export default function TopBar(): ReactElement {
           </div>
         </div>
       </header>
-      <Dialog
+      <CommandPalette
         open={paletteOpen}
         onClose={() => {
           setPaletteOpen(false);
         }}
-        title={t('dock.command_palette.title')}
-      >
-        <p>{t('dock.command_palette.coming_soon')}</p>
-      </Dialog>
+      />
     </>
   );
 }

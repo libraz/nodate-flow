@@ -13,6 +13,7 @@
 import { useEffect, useState } from 'react';
 
 import { refreshAccessToken, sdk } from '../../lib/sdk';
+import { queryClient } from '../../providers/query-client';
 import { type AuthUser, authStore } from './auth-store';
 
 export type AuthBootstrapStatus = 'loading' | 'authenticated' | 'unauthenticated';
@@ -38,6 +39,10 @@ async function runBootstrap(): Promise<AuthBootstrapStatus> {
     locale: data.locale,
   };
   authStore.getState().setSession(token, user);
+  // Seed the react-query cache so ThemeProvider can hydrate from the server
+  // preference immediately on login, instead of waiting for the first
+  // settings page visit.
+  queryClient.setQueryData(['me'], data);
   return 'authenticated';
 }
 

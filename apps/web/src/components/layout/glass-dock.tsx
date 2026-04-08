@@ -8,18 +8,24 @@ import { useTranslation } from 'react-i18next';
 import CommandPalette from './command-palette';
 import styles from './glass-dock.module.css';
 
+type DockActionKey = 'new_task' | 'quick_capture' | 'ai_assist';
+type DockActionTarget = { kind: 'navigate'; href: string } | { kind: 'palette' };
+
 interface DockAction {
-  key: 'new_task' | 'quick_capture' | 'ai_assist';
+  key: DockActionKey;
   icon: LucideIcon;
-  href: string;
+  target: DockActionTarget;
 }
 
-// Until the command palette ships, the dock deep-links to the most
-// relevant existing surface for each action. See docs/plan.
+// Dock actions. `new_task` and `ai_assist` don't have dedicated dialogs
+// yet — they open the command palette so the user can jump directly to
+// a project / task / workspace instead of being bounced to a random
+// landing page. `quick_capture` still deep-links to the inbox, which is
+// where the capture surface lives.
 const ACTIONS: readonly DockAction[] = [
-  { key: 'new_task', icon: Plus, href: '/workspaces' },
-  { key: 'quick_capture', icon: Zap, href: '/inbox' },
-  { key: 'ai_assist', icon: Sparkles, href: '/inbox' },
+  { key: 'new_task', icon: Plus, target: { kind: 'palette' } },
+  { key: 'quick_capture', icon: Zap, target: { kind: 'navigate', href: '/inbox' } },
+  { key: 'ai_assist', icon: Sparkles, target: { kind: 'palette' } },
 ];
 
 function actionLabelKey(
@@ -63,7 +69,11 @@ export default function GlassDock(): ReactElement {
         {ACTIONS.map((action) => {
           const label = t(actionLabelKey(action.key));
           const handleClick = (): void => {
-            void navigate({ to: action.href });
+            if (action.target.kind === 'palette') {
+              setPaletteOpen(true);
+              return;
+            }
+            void navigate({ to: action.target.href });
           };
           return (
             <Tooltip key={action.key} content={label}>
