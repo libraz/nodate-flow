@@ -147,6 +147,8 @@ type Querier interface {
 	ListEventsForTask(ctx context.Context, arg ListEventsForTaskParams) ([]ListEventsForTaskRow, error)
 	// List the workspace-wide event timeline via v_task_timeline.
 	ListEventsForWorkspace(ctx context.Context, arg ListEventsForWorkspaceParams) ([]ListEventsForWorkspaceRow, error)
+	// List pending AI suggestions (proposed without a later applied/dismissed) for a workspace.
+	ListPendingAiSuggestions(ctx context.Context, workspaceID uint32) ([]ListPendingAiSuggestionsRow, error)
 	// List a workspace's inbox via v_inbox.
 	ListInbox(ctx context.Context, arg ListInboxParams) ([]ListInboxRow, error)
 	// List inbox items across every workspace the actor is an active member of.

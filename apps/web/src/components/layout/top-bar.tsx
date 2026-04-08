@@ -6,6 +6,7 @@ import { LogOut, Moon, Sun } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import AiCostMeter from '../../features/ai-providers/cost-meter';
 import { authStore } from '../../features/auth/auth-store';
 import { type SupportedLanguage, setLanguage } from '../../i18n';
 import { apiBaseUrl } from '../../lib/sdk';
@@ -61,6 +62,7 @@ export default function TopBar(): ReactElement {
         </div>
       </div>
       <div className={styles.right}>
+        <AiCostMeter />
         <button
           type="button"
           className={styles.iconButton}

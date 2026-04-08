@@ -1,0 +1,38 @@
+{
+  "action": {
+    "apply": "Apply",
+    "dismiss": "Dismiss",
+    "edit": "Edit"
+  },
+  "empty": "No suggestions yet",
+  "loading": "Thinking...",
+  "error": "Failed to load suggestions",
+  "triage": {
+    "trigger": "Triage with AI",
+    "running": "Triaging...",
+    "result_title": "AI suggestions",
+    "score": "Score",
+    "recommended": "Recommended",
+    "reasoning": "Reasoning",
+    "missing_item": "Inbox item not found"
+  },
+  "edit": {
+    "title": "Edit suggestion",
+    "action_label": "Recommended action",
+    "reasoning_label": "Reasoning",
+    "reasoning_required": "Reasoning is required",
+    "save": "Save",
+    "cancel": "Cancel",
+    "action": {
+      "open": "Open",
+      "snooze": "Snooze",
+      "archive": "Archive"
+    }
+  },
+  "glass_dock": {
+    "title": "AI suggestions",
+    "empty": "No pending suggestions",
+    "expand": "Expand suggestions panel",
+    "collapse": "Collapse suggestions panel"
+  }
+}

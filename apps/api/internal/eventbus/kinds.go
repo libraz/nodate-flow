@@ -87,6 +87,28 @@ const (
 	SignalAttached Kind = "signal.attached"
 )
 
+// AI suggestion lifecycle events. Per ADR 0002 (events in MySQL, not a
+// dedicated ai_suggestions table), AI proposals live in the same
+// append-only events table as the rest of the system. payload_json
+// carries the suggestion-specific shape (inbox_item_id, score, action,
+// reasoning, ...). Handlers append "proposed" when the orchestrator
+// returns a suggestion and "applied" / "dismissed" / "edited" when the
+// user reacts to it from the Glass Dock.
+const (
+	// AiSuggestionProposed is appended when the orchestrator emits a
+	// new AI suggestion to the user.
+	AiSuggestionProposed Kind = "ai.suggestion.proposed"
+	// AiSuggestionApplied is appended when the user accepts and runs
+	// the recommended action.
+	AiSuggestionApplied Kind = "ai.suggestion.applied"
+	// AiSuggestionDismissed is appended when the user rejects the
+	// suggestion outright.
+	AiSuggestionDismissed Kind = "ai.suggestion.dismissed"
+	// AiSuggestionEdited is appended when the user accepts the
+	// suggestion after modifying its parameters.
+	AiSuggestionEdited Kind = "ai.suggestion.edited"
+)
+
 // Legacy / compatibility kinds. These are kept so historical events
 // continue to round-trip even though new code should not emit them.
 const (

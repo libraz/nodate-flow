@@ -1,0 +1,20 @@
+[
+  {
+    "inboxItemId": "fixture-item-1",
+    "score": 0.95,
+    "recommendedAction": "open",
+    "reasoning": "Mentions production outage and an explicit @mention; treat as urgent."
+  },
+  {
+    "inboxItemId": "fixture-item-2",
+    "score": 0.62,
+    "recommendedAction": "snooze",
+    "reasoning": "Useful follow-up but not time critical; revisit tomorrow."
+  },
+  {
+    "inboxItemId": "fixture-item-3",
+    "score": 0.2,
+    "recommendedAction": "archive",
+    "reasoning": "Automated CI notification with no actionable signal."
+  }
+]

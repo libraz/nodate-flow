@@ -27,6 +27,29 @@ type WorkspaceResolver struct {
 // at the HTTP / MCP boundary.
 var ErrNoEnabledProvider = errors.New("ai/providers: no enabled provider for workspace")
 
+// MockResolver is a ProviderResolver that always returns the same
+// MockProvider regardless of workspace. It is wired in when the api
+// boots with NF_AI_MOCK=1 and short-circuits both the
+// ListProvidersForWorkspace lookup and any decryption.
+type MockResolver struct {
+	Provider Provider
+}
+
+// NewMockResolver constructs a MockResolver pre-loaded with the supplied
+// provider. Pass NewMockProvider("") to use the default fixture path.
+func NewMockResolver(p Provider) *MockResolver {
+	return &MockResolver{Provider: p}
+}
+
+// Default implements ai.ProviderResolver. The workspaceID is ignored:
+// the mock returns the same fixture provider for every caller.
+func (r *MockResolver) Default(_ context.Context, _ uint32) (Provider, error) {
+	if r == nil || r.Provider == nil {
+		return nil, ErrNoEnabledProvider
+	}
+	return r.Provider, nil
+}
+
 // NewWorkspaceResolver constructs a WorkspaceResolver. Both arguments
 // are required; a nil Decryptor would make Complete fail downstream.
 func NewWorkspaceResolver(q generated.Querier, dec Decryptor) *WorkspaceResolver {

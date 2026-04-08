@@ -29,6 +29,12 @@
     },
     "language": {
       "toggle": "言語を切り替え"
+    },
+    "ai": {
+      "cost_today": {
+        "label": "本日の AI コスト",
+        "none": "本日の AI 利用はありません"
+      }
     }
   },
   "dock": {

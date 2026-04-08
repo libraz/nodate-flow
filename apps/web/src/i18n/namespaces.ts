@@ -13,6 +13,7 @@ export const namespaces = [
   'inbox',
   'settings',
   'ai',
+  'ai-suggestions',
   'mcp',
   'errors',
 ] as const;

@@ -1,0 +1,38 @@
+{
+  "action": {
+    "apply": "適用",
+    "dismiss": "破棄",
+    "edit": "編集"
+  },
+  "empty": "提案はまだありません",
+  "loading": "考え中...",
+  "error": "提案の取得に失敗しました",
+  "triage": {
+    "trigger": "AI で仕分け",
+    "running": "仕分け中...",
+    "result_title": "AI からの提案",
+    "score": "スコア",
+    "recommended": "推奨アクション",
+    "reasoning": "理由",
+    "missing_item": "対応する受信トレイ項目が見つかりません"
+  },
+  "edit": {
+    "title": "提案を編集",
+    "action_label": "推奨アクション",
+    "reasoning_label": "理由",
+    "reasoning_required": "理由を入力してください",
+    "save": "保存",
+    "cancel": "キャンセル",
+    "action": {
+      "open": "開く",
+      "snooze": "スヌーズ",
+      "archive": "アーカイブ"
+    }
+  },
+  "glass_dock": {
+    "title": "AI 提案",
+    "empty": "保留中の提案はありません",
+    "expand": "提案パネルを展開",
+    "collapse": "提案パネルを折りたたむ"
+  }
+}

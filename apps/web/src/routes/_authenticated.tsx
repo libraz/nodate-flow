@@ -11,6 +11,7 @@ import { type ReactElement, useEffect } from 'react';
 import AppShell from '../components/layout/app-shell';
 import { selectIsAuthenticated, useAuth } from '../features/auth/auth-store';
 import { useAuthBootstrap } from '../features/auth/use-auth-bootstrap';
+import AiSuggestionsDock from '../features/glass-dock/glass-dock';
 
 function AuthenticatedLayout(): ReactElement | null {
   const { status } = useAuthBootstrap();
@@ -29,6 +30,7 @@ function AuthenticatedLayout(): ReactElement | null {
   return (
     <AppShell>
       <Outlet />
+      <AiSuggestionsDock />
     </AppShell>
   );
 }

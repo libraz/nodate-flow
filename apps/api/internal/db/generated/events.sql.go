@@ -130,6 +130,57 @@ func (q *Queries) ListEventsForProject(ctx context.Context, arg ListEventsForPro
 	return items, nil
 }
 
+const listPendingAiSuggestions = `-- name: ListPendingAiSuggestions :many
+SELECT
+  e.public_id,
+  e.occurred_at,
+  e.payload_json
+FROM events e
+WHERE e.workspace_id = ?
+  AND e.type = 'ai.suggestion.proposed'
+  AND NOT EXISTS (
+    SELECT 1 FROM events e2
+    WHERE e2.workspace_id = e.workspace_id
+      AND e2.type IN ('ai.suggestion.applied', 'ai.suggestion.dismissed')
+      AND e2.id > e.id
+      AND JSON_EXTRACT(e2.payload_json, '$.inbox_item_id') = JSON_EXTRACT(e.payload_json, '$.inbox_item_id')
+  )
+ORDER BY e.occurred_at DESC
+LIMIT 100
+`
+
+// ListPendingAiSuggestionsRow is a single pending suggestion row.
+type ListPendingAiSuggestionsRow struct {
+	PublicID    types.PublicID  `json:"publicId"`
+	OccurredAt  time.Time       `json:"occurredAt"`
+	PayloadJson json.RawMessage `json:"payloadJson"`
+}
+
+// ListPendingAiSuggestions returns ai.suggestion.proposed events that
+// have no later applied/dismissed event for the same inbox_item_id.
+func (q *Queries) ListPendingAiSuggestions(ctx context.Context, workspaceID uint32) ([]ListPendingAiSuggestionsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listPendingAiSuggestions, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPendingAiSuggestionsRow{}
+	for rows.Next() {
+		var i ListPendingAiSuggestionsRow
+		if err := rows.Scan(&i.PublicID, &i.OccurredAt, &i.PayloadJson); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listEventsForTask = `-- name: ListEventsForTask :many
 SELECT
   v.public_id,

@@ -29,6 +29,12 @@
     },
     "language": {
       "toggle": "Toggle language"
+    },
+    "ai": {
+      "cost_today": {
+        "label": "AI cost today",
+        "none": "No AI usage today"
+      }
     }
   },
   "dock": {

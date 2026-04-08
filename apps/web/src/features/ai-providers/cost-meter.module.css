@@ -1,0 +1,22 @@
+.meter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  padding-block: var(--nf-space-1);
+  padding-inline: var(--nf-space-2);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-sm);
+  color: var(--nf-color-fg-muted);
+  font-family: var(--nf-font-mono);
+  font-size: var(--nf-text-xs);
+  white-space: nowrap;
+}
+
+.icon {
+  inline-size: 0.875rem;
+  block-size: 0.875rem;
+}
+
+.value {
+  color: var(--nf-color-fg);
+}

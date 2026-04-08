@@ -165,6 +165,86 @@
         "required": ["email", "role"],
         "type": "object"
       },
+      "AiCostTodayOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AiCostTodayOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "costUsd": {
+            "format": "double",
+            "type": "number"
+          },
+          "date": {
+            "description": "UTC date (YYYY-MM-DD)",
+            "type": "string"
+          },
+          "monthlyCapUsd": {
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": ["costUsd", "date"],
+        "type": "object"
+      },
+      "AiSuggestionListBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AiSuggestionListBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/AiSuggestionSummary"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["suggestions"],
+        "type": "object"
+      },
+      "AiSuggestionSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "eventId": {
+            "type": "string"
+          },
+          "inboxItemId": {
+            "type": "string"
+          },
+          "proposedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "reasoning": {
+            "type": "string"
+          },
+          "recommendedAction": {
+            "type": "string"
+          },
+          "score": {
+            "format": "float",
+            "type": "number"
+          }
+        },
+        "required": [
+          "eventId",
+          "inboxItemId",
+          "score",
+          "recommendedAction",
+          "reasoning",
+          "proposedAt"
+        ],
+        "type": "object"
+      },
       "ArchiveInboxOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -704,6 +784,66 @@
           }
         },
         "required": ["id", "workspaceId", "source", "kind", "receivedAt", "createdAt"],
+        "type": "object"
+      },
+      "InboxTriageInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/InboxTriageInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "limit": {
+            "description": "Number of inbox items to score (default 20, max 50)",
+            "format": "int64",
+            "maximum": 50,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "InboxTriageOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/InboxTriageOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/InboxTriageSuggestion"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["suggestions"],
+        "type": "object"
+      },
+      "InboxTriageSuggestion": {
+        "additionalProperties": false,
+        "properties": {
+          "inboxItemId": {
+            "type": "string"
+          },
+          "reasoning": {
+            "type": "string"
+          },
+          "recommendedAction": {
+            "type": "string"
+          },
+          "score": {
+            "format": "float",
+            "type": "number"
+          }
+        },
+        "required": ["inboxItemId", "score", "recommendedAction", "reasoning"],
         "type": "object"
       },
       "ListInboxOutputBody": {
@@ -4445,6 +4585,44 @@
         "summary": "Patch a workspace"
       }
     },
+    "/workspaces/{wsId}/ai/cost-today": {
+      "get": {
+        "operationId": "ai-cost-today",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiCostTodayOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Today's accumulated LLM spend (USD) for a workspace"
+      }
+    },
     "/workspaces/{wsId}/ai/providers": {
       "get": {
         "operationId": "ai-providers-list",
@@ -4650,6 +4828,170 @@
           }
         },
         "summary": "Rotate an LLM provider API key"
+      }
+    },
+    "/workspaces/{wsId}/ai/suggestions": {
+      "get": {
+        "operationId": "ai-suggestions-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiSuggestionListBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List pending AI suggestions for a workspace"
+      }
+    },
+    "/workspaces/{wsId}/ai/suggestions/{inboxItemId}/apply": {
+      "post": {
+        "operationId": "ai-suggestions-apply",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "inboxItemId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Mark an AI suggestion as applied"
+      }
+    },
+    "/workspaces/{wsId}/ai/suggestions/{inboxItemId}/dismiss": {
+      "post": {
+        "operationId": "ai-suggestions-dismiss",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "inboxItemId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Dismiss an AI suggestion"
+      }
+    },
+    "/workspaces/{wsId}/inbox/triage": {
+      "post": {
+        "operationId": "inbox-triage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InboxTriageInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxTriageOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Ask the AI orchestrator to score and recommend actions for inbox items"
       }
     },
     "/workspaces/{wsId}/me/mcp-tokens": {

@@ -58,6 +58,7 @@ func main() {
 		SlackSigningSecret: cfg.SlackSigningSecret,
 		DefaultWorkspaceID: cfg.DefaultWorkspaceID,
 		CookieSecure:       cfg.CookieSecure,
+		AiMock:             cfg.AiMock,
 	})
 
 	// Wrap the router with the request logger so the prod binary keeps

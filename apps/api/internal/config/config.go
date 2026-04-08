@@ -26,6 +26,12 @@ type Config struct {
 	// local http dev can set NF_COOKIE_SECURE=false to allow the browser
 	// to accept the cookie over plaintext.
 	CookieSecure bool `env:"NF_COOKIE_SECURE" envDefault:"true"`
+
+	// AiMock toggles the deterministic in-memory AI provider. When true,
+	// every workspace.ai_providers row is ignored and ai.Orchestrator
+	// routes to a fixture-backed Provider that loads JSON from
+	// apps/api/testdata/ai/. Used by Phase 2 development and tests.
+	AiMock bool `env:"NF_AI_MOCK" envDefault:"false"`
 }
 
 // Load parses NF_* environment variables into a Config.

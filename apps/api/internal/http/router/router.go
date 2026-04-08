@@ -67,6 +67,11 @@ type Deps struct {
 	// leave it false so http://127.0.0.1 traffic works; the prod main
 	// wires it from cfg.CookieSecure.
 	CookieSecure bool
+	// AiMock toggles the deterministic in-memory AI provider used by
+	// Phase 2 development and tests. When true the orchestrator routes
+	// every workspace to a fixture-backed Provider regardless of the
+	// workspace.ai_providers rows.
+	AiMock bool
 }
 
 // Result is what BuildResult returns: the composed chi router plus the
@@ -135,6 +140,37 @@ func BuildResult(deps Deps) Result {
 	inboxDeps := inbox.Deps{DB: deps.DB, Queries: deps.Queries}
 	aiDeps := aihandlers.Deps{DB: deps.DB, Queries: deps.Queries, Cipher: deps.Cipher}
 
+	// AI orchestrator. Built once and shared by the MCP server, the
+	// inbox triage handler, and any future Phase 2 endpoint. When
+	// NF_AI_MOCK is set the resolver short-circuits to a deterministic
+	// fixture-backed provider so tests do not need a cipher.
+	var aiOrch *ai.Orchestrator
+	switch {
+	case deps.AiMock:
+		mockResolver := providers.NewMockResolver(providers.NewMockProvider(""))
+		budget := ai.BudgetReaderFunc(func(_ context.Context, _ uint32) (int64, error) { return 0, nil })
+		aiOrch = &ai.Orchestrator{
+			Resolver: mockResolver,
+			Guard:    ai.NewCostGuard(budget, 0),
+			DB:       deps.DB,
+			Queries:  deps.Queries,
+		}
+	case deps.Cipher != nil:
+		resolver := providers.NewWorkspaceResolver(deps.Queries, deps.Cipher)
+		budget := ai.BudgetReaderFunc(func(ctx context.Context, wsID uint32) (int64, error) {
+			return deps.Queries.SumAiCostTodayForWorkspace(ctx, generated.SumAiCostTodayForWorkspaceParams{
+				WorkspaceID: wsID,
+				InvokedAt:   time.Now().UTC().Truncate(24 * time.Hour),
+			})
+		})
+		aiOrch = &ai.Orchestrator{
+			Resolver: resolver,
+			Guard:    ai.NewCostGuard(budget, 0),
+			DB:       deps.DB,
+			Queries:  deps.Queries,
+		}
+	}
+
 	// /auth/refresh, /auth/logout, /me, /workspaces{,list}.
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
@@ -183,6 +219,12 @@ func BuildResult(deps Deps) Result {
 			Path:        "/workspaces/{wsId}/projects",
 			Summary:     "List projects in a workspace",
 		}, projects.List(prjDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "ai-cost-today",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/ai/cost-today",
+			Summary:     "Today's accumulated LLM spend (USD) for a workspace",
+		}, aihandlers.CostToday(aiDeps))
 	})
 
 	// Per-user MCP tokens (workspace member, not admin).
@@ -294,22 +336,20 @@ func BuildResult(deps Deps) Result {
 		inbox.Register(subAPI, inboxDeps)
 	})
 
-	// MCP orchestrator: only available when a cipher is configured.
-	var aiOrch *ai.Orchestrator
-	if deps.Cipher != nil {
-		resolver := providers.NewWorkspaceResolver(deps.Queries, deps.Cipher)
-		budget := ai.BudgetReaderFunc(func(ctx context.Context, wsID uint32) (int64, error) {
-			return deps.Queries.SumAiCostTodayForWorkspace(ctx, generated.SumAiCostTodayForWorkspaceParams{
-				WorkspaceID: wsID,
-				InvokedAt:   time.Now().UTC().Truncate(24 * time.Hour),
-			})
-		})
-		aiOrch = &ai.Orchestrator{
-			Resolver: resolver,
-			Guard:    ai.NewCostGuard(budget, 0),
-		}
-	}
+	// MCP server uses the orchestrator built above.
 	r.Handle("/mcp", mcp.NewHandler(mcp.Deps{DB: deps.DB, Queries: deps.Queries, AI: aiOrch}))
+
+	// Workspace-scoped AI inbox triage (Phase 2 Wave 1). Registered in
+	// its own group so the auth + workspace-member middleware applies
+	// without leaking the orchestrator to the v1 inbox routes.
+	r.Group(func(sub chi.Router) {
+		sub.Use(authMW)
+		sub.Use(middleware.RequireWorkspaceMember(aclDB))
+		subAPI := newSubAPI(sub)
+		triageDeps := inbox.TriageDeps{Deps: inboxDeps, AI: aiOrch}
+		inbox.RegisterTriage(subAPI, triageDeps)
+		inbox.RegisterAiSuggestions(subAPI, triageDeps)
+	})
 
 	// Public webhooks (verify their own signatures).
 	r.Post("/webhooks/github", signals.HandleGithubWebhook(signalDeps))

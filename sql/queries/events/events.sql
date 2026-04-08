@@ -48,6 +48,28 @@ WHERE v.workspace_id = ?
 ORDER BY v.occurred_at DESC, v.event_id DESC
 LIMIT ? OFFSET ?;
 
+-- name: ListPendingAiSuggestions :many
+-- List pending AI suggestions for a workspace. A suggestion is "pending"
+-- when an ai.suggestion.proposed event exists with no later
+-- ai.suggestion.applied / ai.suggestion.dismissed event for the same
+-- inbox_item_id (compared via JSON_EXTRACT on payload_json).
+SELECT
+  e.public_id,
+  e.occurred_at,
+  e.payload_json
+FROM events e
+WHERE e.workspace_id = ?
+  AND e.type = 'ai.suggestion.proposed'
+  AND NOT EXISTS (
+    SELECT 1 FROM events e2
+    WHERE e2.workspace_id = e.workspace_id
+      AND e2.type IN ('ai.suggestion.applied', 'ai.suggestion.dismissed')
+      AND e2.id > e.id
+      AND JSON_EXTRACT(e2.payload_json, '$.inbox_item_id') = JSON_EXTRACT(e.payload_json, '$.inbox_item_id')
+  )
+ORDER BY e.occurred_at DESC
+LIMIT 100;
+
 -- name: ListEventsForWorkspace :many
 -- List the workspace-wide event timeline via v_task_timeline.
 SELECT

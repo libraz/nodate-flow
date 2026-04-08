@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -53,6 +54,7 @@ func StartTestServer(t *testing.T, db *sql.DB) *TestServer {
 		GhWebhookSecret:    "",
 		SlackSigningSecret: "",
 		DefaultWorkspaceID: "",
+		AiMock:             os.Getenv("NF_AI_MOCK") != "" && os.Getenv("NF_AI_MOCK") != "0" && os.Getenv("NF_AI_MOCK") != "false",
 	})
 
 	srv := httptest.NewServer(handler)
@@ -84,6 +86,7 @@ func NewTestServer(db *sql.DB) (*TestServer, func(), error) {
 		GhWebhookSecret:    "",
 		SlackSigningSecret: "",
 		DefaultWorkspaceID: "",
+		AiMock:             os.Getenv("NF_AI_MOCK") != "" && os.Getenv("NF_AI_MOCK") != "0" && os.Getenv("NF_AI_MOCK") != "false",
 	})
 	srv := httptest.NewServer(handler)
 	return &TestServer{BaseURL: srv.URL, Server: srv, DB: db}, srv.Close, nil

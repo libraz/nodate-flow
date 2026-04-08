@@ -2,12 +2,14 @@ package ai
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/providers"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 )
 
 // ErrNoProvider is returned by ProposeTasksFrom / ProposePriority when the
@@ -50,6 +52,30 @@ type Orchestrator struct {
 	Resolver  ProviderResolver
 	Guard     *CostGuard
 	LogInvoke InvocationLogger
+
+	// DB and Queries are optional Phase 2 dependencies used by
+	// orchestration methods that need to read project state (for
+	// example ProposeInboxTriage reads the workspace inbox) and append
+	// ai.suggestion.* events. They may be left nil for code paths
+	// that only call ProposeTasksFrom / ProposePriority.
+	DB      EventDB
+	Queries InboxReader
+}
+
+// EventDB is the narrow surface ProposeInboxTriage needs to append a
+// row to the events table. It is satisfied by *sql.DB and *sql.Tx.
+type EventDB interface {
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+	PrepareContext(ctx context.Context, query string) (*sql.Stmt, error)
+	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
+}
+
+// InboxReader is the narrow contract ProposeInboxTriage uses to fetch
+// the top-N inbox items for a workspace. The production wiring passes
+// the sqlc Queries handle.
+type InboxReader interface {
+	ListInbox(ctx context.Context, arg generated.ListInboxParams) ([]generated.ListInboxRow, error)
 }
 
 // InvocationLogger persists a redacted record of the LLM call. The

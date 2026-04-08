@@ -562,6 +562,23 @@ export interface paths {
         patch: operations["workspaces-patch"];
         trace?: never;
     };
+    "/workspaces/{wsId}/ai/cost-today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Today's accumulated LLM spend (USD) for a workspace */
+        get: operations["ai-cost-today"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{wsId}/ai/providers": {
         parameters: {
             query?: never;
@@ -596,6 +613,74 @@ export interface paths {
         head?: never;
         /** Rotate an LLM provider API key */
         patch: operations["ai-providers-patch"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/ai/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List pending AI suggestions for a workspace */
+        get: operations["ai-suggestions-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/ai/suggestions/{inboxItemId}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark an AI suggestion as applied */
+        post: operations["ai-suggestions-apply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/ai/suggestions/{inboxItemId}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss an AI suggestion */
+        post: operations["ai-suggestions-dismiss"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/inbox/triage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ask the AI orchestrator to score and recommend actions for inbox items */
+        post: operations["inbox-triage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/workspaces/{wsId}/me/mcp-tokens": {
@@ -798,6 +883,37 @@ export interface components {
             email: string;
             /** @enum {string} */
             role: "owner" | "admin" | "member" | "guest";
+        };
+        AiCostTodayOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: double */
+            costUsd: number;
+            /** @description UTC date (YYYY-MM-DD) */
+            date: string;
+            /** Format: double */
+            monthlyCapUsd?: number;
+        };
+        AiSuggestionListBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            suggestions: components["schemas"]["AiSuggestionSummary"][] | null;
+        };
+        AiSuggestionSummary: {
+            eventId: string;
+            inboxItemId: string;
+            /** Format: int64 */
+            proposedAt: number;
+            reasoning: string;
+            recommendedAction: string;
+            /** Format: float */
+            score: number;
         };
         ArchiveInboxOutputBody: {
             /**
@@ -1037,6 +1153,33 @@ export interface components {
             taskId?: string;
             taskTitle?: string;
             workspaceId: string;
+        };
+        InboxTriageInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description Number of inbox items to score (default 20, max 50)
+             */
+            limit?: number;
+        };
+        InboxTriageOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            suggestions: components["schemas"]["InboxTriageSuggestion"][] | null;
+        };
+        InboxTriageSuggestion: {
+            inboxItemId: string;
+            reasoning: string;
+            recommendedAction: string;
+            /** Format: float */
+            score: number;
         };
         ListInboxOutputBody: {
             /**
@@ -3216,6 +3359,37 @@ export interface operations {
             };
         };
     };
+    "ai-cost-today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCostTodayOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "ai-providers-list": {
         parameters: {
             query?: {
@@ -3340,6 +3514,132 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PatchProviderOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-suggestions-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiSuggestionListBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-suggestions-apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                inboxItemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-suggestions-dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                inboxItemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "inbox-triage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InboxTriageInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxTriageOutputBody"];
                 };
             };
             /** @description Error */
