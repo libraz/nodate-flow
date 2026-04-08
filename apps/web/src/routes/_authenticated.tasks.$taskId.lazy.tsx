@@ -23,6 +23,7 @@ import { createLazyFileRoute, getRouteApi } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import StateGraph from '../features/constraints/state-graph';
 import {
   TRANSITIONS_BY_STATE,
   type TaskDerivedState,
@@ -40,6 +41,7 @@ import {
   useTransitionTask,
   useUpdateTask,
 } from '../features/tasks/api';
+import { useTaskTimelineQuery } from '../features/timeline/api';
 import TaskMiniTimeline from '../features/timeline/task-mini-timeline';
 import { useWorkspaceMembersQuery } from '../features/workspaces/api';
 
@@ -581,6 +583,18 @@ function Sidebar({
       </Card>
 
       <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <Suspense
+          fallback={
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem' }}>
+              <Spinner label={t('common.loading')} />
+            </div>
+          }
+        >
+          <StateGraphSection taskId={id} current={state} />
+        </Suspense>
+      </Card>
+
+      <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         <h2 style={{ margin: 0, fontSize: '1rem' }}>{t('tasks.detail.infer_state.title')}</h2>
         <Suspense
           fallback={
@@ -765,6 +779,32 @@ function AiActivitySection({ taskId }: { taskId: string }): ReactElement {
       })}
     </ul>
   );
+}
+
+/**
+ * StateGraphSection renders the task state graph with the set of
+ * external signal sources that have actually fired on this task
+ * highlighted. The active set is derived from `signal.attached` events
+ * in the task timeline — every such event carries `payload.source`
+ * matching the StateGraph node ids (`github` / `slack` / `google`).
+ */
+function StateGraphSection({
+  taskId,
+  current,
+}: {
+  taskId: string;
+  current: TaskDerivedState;
+}): ReactElement {
+  const { data } = useTaskTimelineQuery(taskId, { kind: ['signal.attached'], limit: 100 });
+  const active = new Set<string>();
+  for (const ev of data.events) {
+    const payload = ev.payload;
+    if (payload && typeof payload === 'object' && 'source' in payload) {
+      const src = String((payload as { source?: unknown }).source ?? '');
+      if (src.length > 0) active.add(src);
+    }
+  }
+  return <StateGraph current={current} activeSources={active} />;
 }
 
 function InferStateSection({ taskId }: { taskId: string }): ReactElement {
