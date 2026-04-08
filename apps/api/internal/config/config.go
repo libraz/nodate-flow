@@ -1,7 +1,11 @@
 // Package config loads runtime configuration from NF_* environment variables.
 package config
 
-import "github.com/caarlos0/env/v11"
+import (
+	"time"
+
+	"github.com/caarlos0/env/v11"
+)
 
 // Config holds runtime configuration for the api server.
 type Config struct {
@@ -84,6 +88,11 @@ type Config struct {
 	// OutboundBackend selects the egress rate limiter driver: "memory"
 	// (default) or "redis" (requires -tags redis).
 	OutboundBackend string `env:"NF_OUTBOUND_BACKEND" envDefault:"memory"`
+
+	// AgentTickInterval is the global period at which the agent
+	// scheduler fires interval-scheduled agents. There is no per-agent
+	// cron expression — see ai_agents.schedule_kind.
+	AgentTickInterval time.Duration `env:"NF_AGENT_TICK_INTERVAL" envDefault:"1m"`
 }
 
 // Load parses NF_* environment variables into a Config.

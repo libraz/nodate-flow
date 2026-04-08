@@ -18,10 +18,9 @@ import (
 // know about. The Source decides what counts as "due"; this struct is
 // only data.
 type Job struct {
-	AgentID  uint32
-	WsID     uint32
-	CronExpr string
-	Paused   bool
+	AgentID uint32
+	WsID    uint32
+	Paused  bool
 }
 
 // Source returns the set of jobs that should run at the given tick.

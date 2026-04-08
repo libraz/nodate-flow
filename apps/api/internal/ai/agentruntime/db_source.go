@@ -7,28 +7,26 @@ import (
 )
 
 // DBSource is a [Source] backed by raw SQL against the ai_agents
-// table. It returns every agent with a non-empty cron_expr that is
-// not paused. Cron-expression matching is intentionally trivial: the
-// scheduler is expected to tick once a minute and the runner is
-// idempotent, so "due" simply means "scheduled and not paused". A
-// real cron parser can replace this without changing callers.
+// table. It returns every agent with schedule_kind = 'interval' that
+// is not paused. The scheduler fires at a fixed interval configured
+// via NF_AGENT_TICK_INTERVAL, so there is no per-row cron evaluation.
 type DBSource struct {
 	DB *sql.DB
 }
 
 const dueAgentsQuery = `
-SELECT id, workspace_id, COALESCE(cron_expr, ''), paused
+SELECT id, workspace_id, paused
 FROM ai_agents
 WHERE enabled = TRUE
-  AND cron_expr IS NOT NULL
-  AND cron_expr <> ''
+  AND schedule_kind = 'interval'
   AND paused = FALSE
 `
 
-// Due implements [Source]. Each candidate row's cron_expr is parsed
-// and matched against now; unparseable expressions are skipped so one
-// bad row cannot block the whole tick.
-func (s *DBSource) Due(ctx context.Context, now time.Time) ([]Job, error) {
+// Due implements [Source]. Every non-paused interval-scheduled agent
+// is considered due on every tick — rate control is global, not
+// per-row, which matches the "one tick interval for the whole
+// process" design.
+func (s *DBSource) Due(ctx context.Context, _ time.Time) ([]Job, error) {
 	rows, err := s.DB.QueryContext(ctx, dueAgentsQuery)
 	if err != nil {
 		return nil, err
@@ -37,15 +35,8 @@ func (s *DBSource) Due(ctx context.Context, now time.Time) ([]Job, error) {
 	out := make([]Job, 0)
 	for rows.Next() {
 		var j Job
-		if err := rows.Scan(&j.AgentID, &j.WsID, &j.CronExpr, &j.Paused); err != nil {
+		if err := rows.Scan(&j.AgentID, &j.WsID, &j.Paused); err != nil {
 			return nil, err
-		}
-		expr, err := ParseCron(j.CronExpr)
-		if err != nil {
-			continue
-		}
-		if !expr.Matches(now) {
-			continue
 		}
 		out = append(out, j)
 	}
