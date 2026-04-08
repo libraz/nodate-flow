@@ -192,6 +192,110 @@ export interface paths {
         patch: operations["me-patch"];
         trace?: never;
     };
+    "/me/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change the authenticated user's password */
+        post: operations["me-password-change"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the authenticated user's active sessions */
+        get: operations["me-sessions-list"];
+        put?: never;
+        post?: never;
+        /** Revoke every session except the one on the current request */
+        delete: operations["me-sessions-revoke-others"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke a single session by public id */
+        delete: operations["me-sessions-revoke"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/totp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Return the authenticated user's TOTP 2FA status */
+        get: operations["me-totp-status"];
+        put?: never;
+        post?: never;
+        /** Disable TOTP 2FA after password reverification */
+        delete: operations["me-totp-disable"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/totp/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm TOTP 2FA enrollment with a generated code */
+        post: operations["me-totp-confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/totp/enroll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Begin TOTP 2FA enrollment (returns otpauth URL) */
+        post: operations["me-totp-enroll"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{prjId}": {
         parameters: {
             query?: never;
@@ -675,7 +779,8 @@ export interface paths {
         /** List AI agents for a workspace */
         get: operations["ai-agents-list"];
         put?: never;
-        post?: never;
+        /** Create a new AI agent */
+        post: operations["ai-agents-create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -714,6 +819,23 @@ export interface paths {
         head?: never;
         /** Update an AI agent's schedule_kind trigger mode */
         patch: operations["ai-agent-schedule-update"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/ai/agents/{agentId}/trigger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Manually trigger one run of an AI agent */
+        post: operations["ai-agent-trigger"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/workspaces/{wsId}/ai/auto-actions": {
@@ -793,6 +915,23 @@ export interface paths {
         };
         /** AI suggestion acceptance metrics over a trailing window */
         get: operations["ai-metrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/ai/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List workspace AI models across all providers */
+        get: operations["ai-models-list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1186,6 +1325,11 @@ export interface components {
             role: "owner" | "admin" | "member" | "guest";
         };
         AgentSummary: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
             /** Format: int64 */
             createdAt: number;
             description?: string;
@@ -1291,6 +1435,25 @@ export interface components {
             /** @description User public id (UUID v7) */
             userId: string;
         };
+        ChangePasswordInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            currentPassword: string;
+            newPassword: string;
+        };
+        ChangePasswordOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+            /** Format: int64 */
+            otherSessionsRevoked: number;
+        };
         CompileLensInputBody: {
             /**
              * Format: uri
@@ -1307,6 +1470,28 @@ export interface components {
             readonly $schema?: string;
             lens: components["schemas"]["Lens"];
             prompt: string;
+        };
+        CreateAgentInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            description?: string;
+            /** @description ai_models public id */
+            modelId: string;
+            name: string;
+            /**
+             * @default disabled
+             * @enum {string}
+             */
+            scheduleKind: "disabled" | "interval" | "on_event" | "manual";
+            systemPrompt: string;
+            /**
+             * Format: int32
+             * @description Sampling temperature x100 (default 100)
+             */
+            temperature?: number;
         };
         CreateInputBody: {
             /**
@@ -1658,6 +1843,16 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ListModelsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            models: components["schemas"]["ModelSummary"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
         ListPrioritySuggestionsOutputBody: {
             /**
              * Format: uri
@@ -1709,6 +1904,14 @@ export interface components {
             reminders: components["schemas"]["TaskReminder"][] | null;
             /** Format: int64 */
             total: number;
+        };
+        ListSessionsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["SessionSummary"][] | null;
         };
         ListStateSuggestionsOutputBody: {
             /**
@@ -1874,6 +2077,13 @@ export interface components {
             notifWebPush: boolean;
             /** @enum {string} */
             themePreference: "aurora-light" | "aurora-dark" | "dotline-light" | "dotline-dark" | "system";
+        };
+        ModelSummary: {
+            displayName: string;
+            id: string;
+            name: string;
+            providerId: string;
+            providerKind: string;
         };
         OIDCStartOutputBody: {
             /**
@@ -2092,6 +2302,50 @@ export interface components {
             derivedState: string;
             equivalent: boolean;
             stored: string;
+        };
+        RevokeAllOtherSessionsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+            /**
+             * Format: int64
+             * @description Number of sessions revoked
+             */
+            revoked: number;
+        };
+        RevokeSessionOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        SessionSummary: {
+            /**
+             * Format: int64
+             * @description Session creation time, unix seconds
+             */
+            createdAt: number;
+            /** @description True if this matches the refresh cookie on the current request */
+            current: boolean;
+            /**
+             * Format: int64
+             * @description Expiry time, unix seconds
+             */
+            expiresAt: number;
+            /** @description Session public id (UUID v7) */
+            id: string;
+            ipAddress: string;
+            /**
+             * Format: int64
+             * @description Last activity time, unix seconds
+             */
+            lastUsedAt?: number;
+            userAgent: string;
         };
         Signal: {
             /**
@@ -2366,6 +2620,60 @@ export interface components {
             taskId?: string;
             type: string;
         };
+        TotpConfirmInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            code: string;
+        };
+        TotpConfirmOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        TotpDisableInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            password: string;
+        };
+        TotpDisableOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        TotpEnrollOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            otpauthUrl: string;
+            /** @description Base32-encoded secret, for manual entry */
+            secret: string;
+        };
+        TotpStatusOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * @description disabled = no secret, pending = secret issued but never confirmed, enabled = confirmed
+             * @enum {string}
+             */
+            status: "disabled" | "pending" | "enabled";
+        };
         TransitionTaskBody: {
             /**
              * Format: uri
@@ -2384,6 +2692,15 @@ export interface components {
              * @enum {string}
              */
             transition: "start" | "block" | "unblock" | "submit" | "complete" | "reopen" | "cancel";
+        };
+        TriggerAgentOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            dedupeKey: string;
+            ok: boolean;
         };
         UpdateAgentScheduleInputBody: {
             /**
@@ -2872,6 +3189,259 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "me-password-change": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                nf_rt?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangePasswordOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "me-sessions-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                nf_rt?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListSessionsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "me-sessions-revoke-others": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                nf_rt?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevokeAllOtherSessionsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "me-sessions-revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Session public id (UUID v7) */
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevokeSessionOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "me-totp-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotpStatusOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "me-totp-disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TotpDisableInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotpDisableOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "me-totp-confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TotpConfirmInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotpConfirmOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "me-totp-enroll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotpEnrollOutputBody"];
                 };
             };
             /** @description Error */
@@ -4295,6 +4865,41 @@ export interface operations {
             };
         };
     };
+    "ai-agents-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAgentInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSummary"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "ai-agent-pause": {
         parameters: {
             query?: never;
@@ -4354,6 +4959,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UpdateAgentScheduleOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-agent-trigger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                agentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerAgentOutputBody"];
                 };
             };
             /** @description Error */
@@ -4519,6 +5156,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiMetricsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-models-list": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListModelsOutputBody"];
                 };
             };
             /** @description Error */

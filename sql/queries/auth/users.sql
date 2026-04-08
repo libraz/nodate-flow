@@ -104,6 +104,50 @@ WHERE provider = ?
   AND enabled = TRUE
 LIMIT 1;
 
+-- name: FindLocalIdentityByUserId :one
+-- Resolve a local-password identity by internal user id. Used by
+-- /me/password to verify the caller's current password and by the
+-- TOTP handlers to read / write mfa_secret_ciphertext.
+SELECT
+  id,
+  password_hash,
+  mfa_secret_ciphertext,
+  mfa_confirmed_at
+FROM identities
+WHERE user_id = ?
+  AND provider = 'local'
+  AND enabled = TRUE
+LIMIT 1;
+
+-- name: SetIdentityMfaSecret :exec
+-- Begin (or restart) TOTP enrollment by writing a fresh encrypted
+-- secret and clearing any previous confirmation timestamp.
+UPDATE identities
+SET mfa_secret_ciphertext = ?,
+    mfa_confirmed_at = NULL
+WHERE id = ?;
+
+-- name: ConfirmIdentityMfa :exec
+-- Mark a pending TOTP enrollment as confirmed by stamping
+-- mfa_confirmed_at. The caller must have already validated a code
+-- against the stored secret.
+UPDATE identities
+SET mfa_confirmed_at = CURRENT_TIMESTAMP
+WHERE id = ?;
+
+-- name: ClearIdentityMfa :exec
+-- Disable TOTP on a local identity.
+UPDATE identities
+SET mfa_secret_ciphertext = NULL,
+    mfa_confirmed_at = NULL
+WHERE id = ?;
+
+-- name: UpdateIdentityPasswordHash :exec
+-- Replace the Argon2id password hash on a local identity.
+UPDATE identities
+SET password_hash = ?
+WHERE id = ?;
+
 -- name: UpdateIdentityFailedAttempts :exec
 -- Bump failed login counter and optionally apply a lockout deadline.
 UPDATE identities

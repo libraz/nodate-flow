@@ -9,24 +9,29 @@ import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface SubNavItem {
-  key: 'profile' | 'notifications';
-  to: '/settings/profile' | '/settings/notifications';
+  key: 'profile' | 'notifications' | 'security';
+  to: '/settings/profile' | '/settings/notifications' | '/settings/security';
 }
 
 const SUB_NAV: readonly SubNavItem[] = [
   { key: 'profile', to: '/settings/profile' },
   { key: 'notifications', to: '/settings/notifications' },
+  { key: 'security', to: '/settings/security' },
 ];
 
 function SettingsLayout(): ReactElement {
   const { t } = useTranslation('settings');
 
-  const labelKeyFor = (key: SubNavItem['key']): 'nav.profile' | 'nav.notifications' => {
+  const labelKeyFor = (
+    key: SubNavItem['key'],
+  ): 'nav.profile' | 'nav.notifications' | 'nav.security' => {
     switch (key) {
       case 'profile':
         return 'nav.profile';
       case 'notifications':
         return 'nav.notifications';
+      case 'security':
+        return 'nav.security';
     }
   };
 

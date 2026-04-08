@@ -6,8 +6,14 @@ package errors
 var (
 	// AI.AGENT.NOT_FOUND — AI agent not found
 	AiAgentNotFound = &Spec{Code: "AI.AGENT.NOT_FOUND", Status: 404, Message: "AI agent not found"}
+	// AI.AGENT.PAUSED — AI agent is paused
+	AiAgentPaused = &Spec{Code: "AI.AGENT.PAUSED", Status: 409, Message: "AI agent is paused"}
+	// AI.AGENT.RUNTIME_DISABLED — AI agent runtime is not configured
+	AiAgentRuntimeDisabled = &Spec{Code: "AI.AGENT.RUNTIME_DISABLED", Status: 503, Message: "AI agent runtime is not configured"}
 	// AI.COST.GUARD_EXCEEDED — AI cost guard threshold exceeded
 	AiCostGuardExceeded = &Spec{Code: "AI.COST.GUARD_EXCEEDED", Status: 402, Message: "AI cost guard threshold exceeded"}
+	// AI.MODEL.NOT_FOUND — AI model not found
+	AiModelNotFound = &Spec{Code: "AI.MODEL.NOT_FOUND", Status: 404, Message: "AI model not found"}
 	// AI.NL_QUERY.UNPARSEABLE — Could not turn that into a filter
 	AiNlQueryUnparseable = &Spec{Code: "AI.NL_QUERY.UNPARSEABLE", Status: 422, Message: "Could not turn that into a filter"}
 	// AI.PROVIDER.NOT_CONFIGURED — AI provider is not configured

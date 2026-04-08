@@ -25,7 +25,25 @@
     },
     "errors": {
       "scheduleFailed": "Failed to update trigger",
-      "pauseFailed": "Failed to toggle kill switch"
+      "pauseFailed": "Failed to toggle kill switch",
+      "triggerFailed": "Failed to trigger agent"
+    },
+    "trigger": {
+      "label": "Run now",
+      "queued": "Run queued"
+    },
+    "create": {
+      "open": "+ Agent",
+      "title": "New agent",
+      "name": "Name",
+      "model": "Model",
+      "systemPrompt": "System prompt",
+      "submit": "Create",
+      "cancel": "Cancel",
+      "success": "Agent created",
+      "failed": "Failed to create agent",
+      "missingFields": "Fill in name, model and system prompt",
+      "noModels": "No models registered. Add an AI provider and model first."
     }
   },
   "empty": "No suggestions yet",

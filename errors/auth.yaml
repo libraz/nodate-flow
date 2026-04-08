@@ -50,6 +50,30 @@ resources:
         description: "Returned when the login rate limit for the source IP or account has been exceeded."
         userAction: "Wait a few minutes before trying again."
 
+  password:
+    breadcrumb: "Auth > Password"
+    errors:
+      current_mismatch:
+        code: AUTH.PASSWORD.CURRENT_MISMATCH
+        status: 401
+        message: "Current password is incorrect"
+        description: "Returned by /me/password when the submitted current password does not verify against the stored hash."
+        userAction: "Re-enter your current password."
+
+      too_weak:
+        code: AUTH.PASSWORD.TOO_WEAK
+        status: 422
+        message: "Password does not meet strength requirements"
+        description: "Returned by /me/password when the new password is shorter than the minimum length."
+        userAction: "Choose a longer password."
+
+      no_local_identity:
+        code: AUTH.PASSWORD.NO_LOCAL_IDENTITY
+        status: 409
+        message: "Account has no local password to change"
+        description: "Returned when /me/password is called for an account that only has OIDC identities."
+        userAction: "Change your password through your identity provider instead."
+
   totp:
     breadcrumb: "Auth > TOTP"
     errors:
@@ -73,6 +97,20 @@ resources:
         message: "Two-factor authentication is already enabled"
         description: "Returned when attempting to enroll TOTP for an account that already has it active."
         userAction: "Disable the existing 2FA before enrolling again."
+
+      not_enrolled:
+        code: AUTH.TOTP.NOT_ENROLLED
+        status: 409
+        message: "Two-factor authentication is not enabled"
+        description: "Returned when confirming or disabling TOTP on an account that has no pending or active enrollment."
+        userAction: "Start a new TOTP enrollment first."
+
+      not_configured:
+        code: AUTH.TOTP.NOT_CONFIGURED
+        status: 503
+        message: "Two-factor authentication is not available on this server"
+        description: "Returned when the server has no encryption key configured (NF_SECRET_KEY is unset) so TOTP secrets cannot be stored."
+        userAction: "Ask the instance administrator to configure NF_SECRET_KEY."
 
   session:
     breadcrumb: "Auth > Session"

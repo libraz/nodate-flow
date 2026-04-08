@@ -36,6 +36,21 @@ export const AuthErrors = {
     status: 400,
     message: "OIDC state parameter does not match",
   },
+  AUTH_PASSWORD_CURRENT_MISMATCH: {
+    code: "AUTH.PASSWORD.CURRENT_MISMATCH",
+    status: 401,
+    message: "Current password is incorrect",
+  },
+  AUTH_PASSWORD_NO_LOCAL_IDENTITY: {
+    code: "AUTH.PASSWORD.NO_LOCAL_IDENTITY",
+    status: 409,
+    message: "Account has no local password to change",
+  },
+  AUTH_PASSWORD_TOO_WEAK: {
+    code: "AUTH.PASSWORD.TOO_WEAK",
+    status: 422,
+    message: "Password does not meet strength requirements",
+  },
   AUTH_PAT_EXPIRED: {
     code: "AUTH.PAT.EXPIRED",
     status: 401,
@@ -100,6 +115,16 @@ export const AuthErrors = {
     code: "AUTH.TOTP.CODE_REQUIRED",
     status: 401,
     message: "Two-factor authentication code is required",
+  },
+  AUTH_TOTP_NOT_CONFIGURED: {
+    code: "AUTH.TOTP.NOT_CONFIGURED",
+    status: 503,
+    message: "Two-factor authentication is not available on this server",
+  },
+  AUTH_TOTP_NOT_ENROLLED: {
+    code: "AUTH.TOTP.NOT_ENROLLED",
+    status: 409,
+    message: "Two-factor authentication is not enabled",
   },
 } as const;
 

@@ -739,6 +739,8 @@ type AiAgent struct {
 	MonthlyCostCapCents sql.NullInt32 `json:"monthlyCostCapCents"`
 	// Trigger mode: interval = fires every NF_AGENT_TICK_INTERVAL; on_event = fires from eventbus; manual = only via /agents/{id}/trigger
 	ScheduleKind AiAgentsScheduleKind `json:"scheduleKind"`
+	// JSON array of eventbus Kind strings that fire this agent when schedule_kind=on_event (e.g., ["signal.attached","task.transition.submit"])
+	EventTriggerTypes json.RawMessage `json:"eventTriggerTypes"`
 	// Manually or automatically paused (e.g., cost cap exceeded)
 	Paused bool `json:"paused"`
 	// Display order
@@ -1018,7 +1020,9 @@ type Identity struct {
 	// Argon2id encoded hash, only for provider=local
 	PasswordHash sql.NullString `json:"passwordHash"`
 	// Encrypted TOTP secret (AES-256-GCM)
-	MfaSecretCiphertext sql.NullString `json:"mfaSecretCiphertext"`
+	MfaSecretCiphertext []byte `json:"mfaSecretCiphertext"`
+	// When the TOTP enrollment was confirmed by submitting a valid code
+	MfaConfirmedAt sql.NullTime `json:"mfaConfirmedAt"`
 	// Consecutive failed login attempts
 	FailedAttempts uint32 `json:"failedAttempts"`
 	// Lockout expiry timestamp

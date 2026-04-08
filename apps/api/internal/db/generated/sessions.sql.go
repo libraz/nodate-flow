@@ -212,6 +212,28 @@ func (q *Queries) ListSessionsForUser(ctx context.Context, arg ListSessionsForUs
 	return items, nil
 }
 
+const revokeAllSessionsForUserExcept = `-- name: RevokeAllSessionsForUserExcept :exec
+UPDATE sessions
+SET revoked_at = CURRENT_TIMESTAMP,
+    enabled = FALSE
+WHERE user_id = ?
+  AND enabled = TRUE
+  AND revoked_at IS NULL
+  AND public_id <> ?
+`
+
+type RevokeAllSessionsForUserExceptParams struct {
+	UserID   uint32         `json:"-"`
+	PublicID types.PublicID `json:"publicId"`
+}
+
+// Revoke every active session for a user except one identified by public_id.
+// Used by "sign out of all other devices" in /settings/security.
+func (q *Queries) RevokeAllSessionsForUserExcept(ctx context.Context, arg RevokeAllSessionsForUserExceptParams) error {
+	_, err := q.db.ExecContext(ctx, revokeAllSessionsForUserExcept, arg.UserID, arg.PublicID)
+	return err
+}
+
 const revokeSession = `-- name: RevokeSession :exec
 UPDATE sessions
 SET revoked_at = CURRENT_TIMESTAMP,

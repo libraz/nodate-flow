@@ -87,6 +87,39 @@ func (s *MySQLStore) Revoke(ctx context.Context, userID uint32, publicID types.P
 	})
 }
 
+// ListActive implements [Store].
+func (s *MySQLStore) ListActive(ctx context.Context, userID uint32) ([]Session, error) {
+	rows, err := s.q.ListSessionsForUser(ctx, generated.ListSessionsForUserParams{
+		UserID: userID,
+		Limit:  100,
+		Offset: 0,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Session, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, Session{
+			PublicID:   r.PublicID,
+			UserID:     userID,
+			UserAgent:  r.UserAgent.String,
+			IPAddress:  r.IpAddress.String,
+			ExpiresAt:  r.ExpiresAt,
+			LastUsedAt: nullTimePtr(r.LastUsedAt),
+			CreatedAt:  r.CreatedAt,
+		})
+	}
+	return out, nil
+}
+
+// RevokeAllExcept implements [Store].
+func (s *MySQLStore) RevokeAllExcept(ctx context.Context, userID uint32, keep types.PublicID) error {
+	return s.q.RevokeAllSessionsForUserExcept(ctx, generated.RevokeAllSessionsForUserExceptParams{
+		UserID:   userID,
+		PublicID: keep,
+	})
+}
+
 func nullTimePtr(n sql.NullTime) *time.Time {
 	if !n.Valid {
 		return nil

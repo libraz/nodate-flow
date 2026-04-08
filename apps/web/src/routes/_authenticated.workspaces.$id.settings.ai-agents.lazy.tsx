@@ -2,30 +2,36 @@
  * /workspaces/$id/settings/ai-agents — workspace AI agent management (lazy).
  *
  * The page lists every ai_agents row for the workspace and exposes
- * two inline controls:
+ * four inline controls per agent:
  *   - schedule_kind dropdown (PATCH /ai/agents/{id}/schedule)
  *   - paused kill switch   (POST  /ai/agents/{id}/pause)
+ *   - manual trigger       (POST  /ai/agents/{id}/trigger)
  *
- * Creation is not on the UI yet — agents are currently provisioned
- * via MCP / CLI / direct SQL. Once a `createAgent` endpoint lands,
- * a dialog will slot in here alongside the list.
+ * Creation goes through a dialog that reads the workspace model
+ * inventory from GET /ai/models and POSTs /ai/agents.
  */
 
 import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
+import FormField from '@nodate-flow/ui/primitives/form-field';
+import Input from '@nodate-flow/ui/primitives/input';
 import Select from '@nodate-flow/ui/primitives/select';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
+import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { createLazyFileRoute, getRouteApi } from '@tanstack/react-router';
-import { type ReactElement, Suspense } from 'react';
+import { type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
   AGENT_SCHEDULE_KINDS,
   type AgentScheduleKind,
   useAgentsQuery,
+  useCreateAgent,
+  useModelsQuery,
   usePauseAgent,
+  useTriggerAgent,
   useUpdateAgentSchedule,
 } from '../features/ai-providers/agents-api';
 
@@ -36,6 +42,7 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
   const { data } = useAgentsQuery(workspaceId);
   const pauseMut = usePauseAgent();
   const scheduleMut = useUpdateAgentSchedule();
+  const triggerMut = useTriggerAgent();
 
   if (data.agents.length === 0) {
     return (
@@ -77,6 +84,14 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
             });
           } catch {
             toaster.show({ tone: 'danger', message: t('agents.errors.pauseFailed') });
+          }
+        };
+        const handleTrigger = async (): Promise<void> => {
+          try {
+            await triggerMut.mutateAsync({ workspaceId, agentId: agent.id });
+            toaster.show({ tone: 'success', message: t('agents.trigger.queued') });
+          } catch {
+            toaster.show({ tone: 'danger', message: t('agents.errors.triggerFailed') });
           }
         };
         return (
@@ -166,6 +181,16 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
                 >
                   {agent.paused ? t('agents.resume') : t('agents.pause')}
                 </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    void handleTrigger();
+                  }}
+                  disabled={triggerMut.isPending || agent.paused}
+                >
+                  {t('agents.trigger.label')}
+                </Button>
               </div>
             </Card>
           </li>
@@ -175,17 +200,183 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
   );
 }
 
+/**
+ * CreateAgentForm is the inline form rendered when the operator
+ * clicks "+ Agent". It reads the workspace model inventory via
+ * useModelsQuery so the Select only offers models that exist. A
+ * zero-model workspace gets a helpful empty state that links to the
+ * ai-providers settings page instead of an unusable form.
+ */
+function CreateAgentForm({
+  workspaceId,
+  onDone,
+}: {
+  workspaceId: string;
+  onDone: () => void;
+}): ReactElement {
+  const { t } = useTranslation('ai-suggestions');
+  const { data: models } = useModelsQuery(workspaceId);
+  const createMut = useCreateAgent();
+  const [modelId, setModelId] = useState<string>(models.models[0]?.id ?? '');
+  const [name, setName] = useState('');
+  const [systemPrompt, setSystemPrompt] = useState('');
+  const [scheduleKind, setScheduleKind] = useState<AgentScheduleKind>('disabled');
+
+  if (models.models.length === 0) {
+    return (
+      <Card style={{ padding: '1rem' }}>
+        <p style={{ margin: 0, color: 'var(--color-muted)' }}>{t('agents.create.noModels')}</p>
+      </Card>
+    );
+  }
+
+  const handleSubmit = async (): Promise<void> => {
+    if (!modelId || name.trim().length === 0 || systemPrompt.trim().length === 0) {
+      toaster.show({ tone: 'warning', message: t('agents.create.missingFields') });
+      return;
+    }
+    try {
+      await createMut.mutateAsync({
+        workspaceId,
+        modelId,
+        name: name.trim(),
+        systemPrompt: systemPrompt.trim(),
+        scheduleKind,
+      });
+      toaster.show({ tone: 'success', message: t('agents.create.success') });
+      onDone();
+    } catch {
+      toaster.show({ tone: 'danger', message: t('agents.create.failed') });
+    }
+  };
+
+  return (
+    <Card
+      style={{
+        padding: '1rem',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.75rem',
+      }}
+    >
+      <h2 style={{ margin: 0, fontSize: '1rem' }}>{t('agents.create.title')}</h2>
+      <FormField label={t('agents.create.name')}>
+        {(control) => (
+          <Input
+            {...control}
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+            }}
+            maxLength={255}
+          />
+        )}
+      </FormField>
+      <FormField label={t('agents.create.model')}>
+        {(control) => (
+          <Select
+            {...control}
+            value={modelId}
+            onChange={(e) => {
+              setModelId(e.target.value);
+            }}
+          >
+            {models.models.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.displayName} ({m.providerKind})
+              </option>
+            ))}
+          </Select>
+        )}
+      </FormField>
+      <FormField label={t('agents.create.systemPrompt')}>
+        {(control) => (
+          <Textarea
+            {...control}
+            value={systemPrompt}
+            onChange={(e) => {
+              setSystemPrompt(e.target.value);
+            }}
+            rows={5}
+          />
+        )}
+      </FormField>
+      <FormField label={t('agents.scheduleKind.label')}>
+        {(control) => (
+          <Select
+            {...control}
+            value={scheduleKind}
+            onChange={(e) => {
+              setScheduleKind(e.target.value as AgentScheduleKind);
+            }}
+          >
+            {AGENT_SCHEDULE_KINDS.map((kind) => (
+              <option key={kind} value={kind}>
+                {t(`agents.scheduleKind.options.${kind}`)}
+              </option>
+            ))}
+          </Select>
+        )}
+      </FormField>
+      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+        <Button type="button" variant="ghost" onClick={onDone}>
+          {t('agents.create.cancel')}
+        </Button>
+        <Button
+          type="button"
+          onClick={() => {
+            void handleSubmit();
+          }}
+          disabled={createMut.isPending}
+        >
+          {t('agents.create.submit')}
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
 function AiAgentsRoute(): ReactElement {
   const { id } = routeApi.useParams();
   const { t } = useTranslation('ai-suggestions');
+  const [creating, setCreating] = useState(false);
   return (
     <section
       style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', inlineSize: '100%' }}
     >
-      <header>
-        <h1 style={{ margin: 0, fontSize: '1.25rem' }}>{t('agents.title')}</h1>
-        <p style={{ margin: 0, color: 'var(--color-muted)' }}>{t('agents.subtitle')}</p>
+      <header
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.5rem',
+        }}
+      >
+        <div>
+          <h1 style={{ margin: 0, fontSize: '1.25rem' }}>{t('agents.title')}</h1>
+          <p style={{ margin: 0, color: 'var(--color-muted)' }}>{t('agents.subtitle')}</p>
+        </div>
+        {creating ? null : (
+          <Button
+            type="button"
+            onClick={() => {
+              setCreating(true);
+            }}
+          >
+            {t('agents.create.open')}
+          </Button>
+        )}
       </header>
+      {creating ? (
+        <Suspense fallback={<Skeleton style={{ blockSize: '12rem', inlineSize: '100%' }} />}>
+          <CreateAgentForm
+            workspaceId={id}
+            onDone={() => {
+              setCreating(false);
+            }}
+          />
+        </Suspense>
+      ) : null}
       <Suspense
         fallback={
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>

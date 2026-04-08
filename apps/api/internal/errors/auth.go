@@ -18,6 +18,12 @@ var (
 	AuthOidcProviderUnreachable = &Spec{Code: "AUTH.OIDC.PROVIDER_UNREACHABLE", Status: 502, Message: "OIDC provider is unreachable"}
 	// AUTH.OIDC.STATE_MISMATCH — OIDC state parameter does not match
 	AuthOidcStateMismatch = &Spec{Code: "AUTH.OIDC.STATE_MISMATCH", Status: 400, Message: "OIDC state parameter does not match"}
+	// AUTH.PASSWORD.CURRENT_MISMATCH — Current password is incorrect
+	AuthPasswordCurrentMismatch = &Spec{Code: "AUTH.PASSWORD.CURRENT_MISMATCH", Status: 401, Message: "Current password is incorrect"}
+	// AUTH.PASSWORD.NO_LOCAL_IDENTITY — Account has no local password to change
+	AuthPasswordNoLocalIdentity = &Spec{Code: "AUTH.PASSWORD.NO_LOCAL_IDENTITY", Status: 409, Message: "Account has no local password to change"}
+	// AUTH.PASSWORD.TOO_WEAK — Password does not meet strength requirements
+	AuthPasswordTooWeak = &Spec{Code: "AUTH.PASSWORD.TOO_WEAK", Status: 422, Message: "Password does not meet strength requirements"}
 	// AUTH.PAT.EXPIRED — Personal access token has expired
 	AuthPatExpired = &Spec{Code: "AUTH.PAT.EXPIRED", Status: 401, Message: "Personal access token has expired"}
 	// AUTH.PAT.TOKEN_UNKNOWN — Personal access token is invalid
@@ -44,4 +50,8 @@ var (
 	AuthTotpCodeMismatch = &Spec{Code: "AUTH.TOTP.CODE_MISMATCH", Status: 401, Message: "Two-factor authentication code is incorrect"}
 	// AUTH.TOTP.CODE_REQUIRED — Two-factor authentication code is required
 	AuthTotpCodeRequired = &Spec{Code: "AUTH.TOTP.CODE_REQUIRED", Status: 401, Message: "Two-factor authentication code is required"}
+	// AUTH.TOTP.NOT_CONFIGURED — Two-factor authentication is not available on this server
+	AuthTotpNotConfigured = &Spec{Code: "AUTH.TOTP.NOT_CONFIGURED", Status: 503, Message: "Two-factor authentication is not available on this server"}
+	// AUTH.TOTP.NOT_ENROLLED — Two-factor authentication is not enabled
+	AuthTotpNotEnrolled = &Spec{Code: "AUTH.TOTP.NOT_ENROLLED", Status: 409, Message: "Two-factor authentication is not enabled"}
 )

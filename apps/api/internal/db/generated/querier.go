@@ -120,6 +120,14 @@ type Querier interface {
 	// Resolve a local-password identity by user email for the login pipeline.
 	// Joins identities with users on email and provider='local'.
 	FindLocalIdentityByEmail(ctx context.Context, email string) (FindLocalIdentityByEmailRow, error)
+	// Resolve a local-password identity by internal user id.
+	FindLocalIdentityByUserId(ctx context.Context, userID uint32) (FindLocalIdentityByUserIdRow, error)
+	// Begin (or restart) TOTP enrollment.
+	SetIdentityMfaSecret(ctx context.Context, arg SetIdentityMfaSecretParams) error
+	// Mark a pending TOTP enrollment as confirmed.
+	ConfirmIdentityMfa(ctx context.Context, id uint32) error
+	// Disable TOTP on a local identity.
+	ClearIdentityMfa(ctx context.Context, id uint32) error
 	// Resolve an MCP token by its SHA-256 hash for bearer auth.
 	FindMcpTokenByHash(ctx context.Context, tokenHash string) (FindMcpTokenByHashRow, error)
 	// Resolve a PAT row from its SHA-256 hash for bearer auth.
@@ -231,6 +239,11 @@ type Querier interface {
 	ListModelsForProvider(ctx context.Context, arg ListModelsForProviderParams) ([]ListModelsForProviderRow, error)
 	// Tasks where the given user is attached as an actor, via v_my_tasks.
 	ListMyTasks(ctx context.Context, arg ListMyTasksParams) ([]ListMyTasksRow, error)
+	// List every enabled non-paused agent whose event_trigger_types
+	// contains the given event kind. Driven by the eventbus notify hook
+	// so the fan-out from a single eventbus.Append to N agents is one
+	// round-trip per append (vs one per agent).
+	ListOnEventAgents(ctx context.Context, arg ListOnEventAgentsParams) ([]ListOnEventAgentsRow, error)
 	// List a user's PATs in a workspace, masked (no token_hash).
 	ListPatsForUser(ctx context.Context, arg ListPatsForUserParams) ([]ListPatsForUserRow, error)
 	// List pending AI suggestions for a workspace. A suggestion is "pending"
@@ -311,6 +324,9 @@ type Querier interface {
 	RemoveWorkspaceMemberByUserId(ctx context.Context, arg RemoveWorkspaceMemberByUserIdParams) error
 	// Clear failed login counter and lockout after a successful authentication.
 	ResetIdentityFailedAttempts(ctx context.Context, id uint32) error
+	// Revoke every active session for a user except one identified by public_id.
+	// Used by "sign out of all other devices" in /settings/security.
+	RevokeAllSessionsForUserExcept(ctx context.Context, arg RevokeAllSessionsForUserExceptParams) error
 	// Revoke an MCP token (workspace + user scoped).
 	RevokeMcpToken(ctx context.Context, arg RevokeMcpTokenParams) error
 	// Revoke a PAT (workspace + user scoped).
@@ -340,6 +356,8 @@ type Querier interface {
 	UpdateAgentScheduleKind(ctx context.Context, arg UpdateAgentScheduleKindParams) error
 	// Bump failed login counter and optionally apply a lockout deadline.
 	UpdateIdentityFailedAttempts(ctx context.Context, arg UpdateIdentityFailedAttemptsParams) error
+	// Replace the Argon2id password hash on a local identity.
+	UpdateIdentityPasswordHash(ctx context.Context, arg UpdateIdentityPasswordHashParams) error
 	// Change a member's role.
 	UpdateMemberRole(ctx context.Context, arg UpdateMemberRoleParams) error
 	// Change a member's role keyed by user_id.

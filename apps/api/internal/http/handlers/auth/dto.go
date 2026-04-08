@@ -8,6 +8,7 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth/sessionstore"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 )
 
@@ -18,6 +19,10 @@ type Deps struct {
 	Sessions sessionstore.Store
 	JWT      *auth.JWTIssuer
 	OIDC     *auth.OIDCClient
+	// Cipher encrypts/decrypts TOTP secrets. Nil when NF_SECRET_KEY is
+	// unset; the TOTP endpoints return AUTH.TOTP.NOT_CONFIGURED in that
+	// case so the rest of the api still boots.
+	Cipher *crypto.Cipher
 	// CookieSecure toggles the Secure flag on the refresh cookie. It
 	// defaults to true in production; local http dev can disable it via
 	// NF_COOKIE_SECURE=false.
@@ -159,4 +164,125 @@ type PatchMeInputBody struct {
 // profile in the same shape as GET /me.
 type PatchMeOutput struct {
 	Body MeBody
+}
+
+// SessionSummary is the public DTO for a refresh-token session, used
+// by the /settings/security sessions panel. It intentionally omits
+// the refresh hash and internal id.
+type SessionSummary struct {
+	ID         string  `json:"id" doc:"Session public id (UUID v7)"`
+	UserAgent  string  `json:"userAgent"`
+	IPAddress  string  `json:"ipAddress"`
+	Current    bool    `json:"current" doc:"True if this matches the refresh cookie on the current request"`
+	CreatedAt  int64   `json:"createdAt" doc:"Session creation time, unix seconds"`
+	LastUsedAt *int64  `json:"lastUsedAt,omitempty" doc:"Last activity time, unix seconds"`
+	ExpiresAt  int64   `json:"expiresAt" doc:"Expiry time, unix seconds"`
+}
+
+// ListSessionsInput binds the refresh cookie so the handler can mark
+// the current session in the response.
+type ListSessionsInput struct {
+	RefreshCookie http.Cookie `cookie:"nf_rt"`
+}
+
+// ListSessionsOutput is the response for GET /me/sessions.
+type ListSessionsOutput struct {
+	Body struct {
+		Items []SessionSummary `json:"items"`
+	}
+}
+
+// RevokeSessionInput is the request for DELETE /me/sessions/{sessionId}.
+type RevokeSessionInput struct {
+	SessionID string `path:"sessionId" doc:"Session public id (UUID v7)"`
+}
+
+// RevokeSessionOutput is the response for DELETE /me/sessions/{sessionId}.
+type RevokeSessionOutput struct {
+	Body struct {
+		Ok bool `json:"ok"`
+	}
+}
+
+// RevokeAllOtherSessionsInput binds the refresh cookie so the handler
+// can preserve the session on the current request while revoking the
+// rest.
+type RevokeAllOtherSessionsInput struct {
+	RefreshCookie http.Cookie `cookie:"nf_rt"`
+}
+
+// RevokeAllOtherSessionsOutput is the response for DELETE /me/sessions.
+type RevokeAllOtherSessionsOutput struct {
+	Body struct {
+		Ok      bool `json:"ok"`
+		Revoked int  `json:"revoked" doc:"Number of sessions revoked"`
+	}
+}
+
+// ChangePasswordInput is the body for POST /me/password. Both fields
+// are required; the handler verifies currentPassword against the
+// stored Argon2id hash before accepting newPassword.
+type ChangePasswordInput struct {
+	RefreshCookie http.Cookie `cookie:"nf_rt"`
+	Body          struct {
+		CurrentPassword string `json:"currentPassword" minLength:"1" maxLength:"256"`
+		NewPassword     string `json:"newPassword" minLength:"8" maxLength:"256"`
+	}
+}
+
+// TotpStatusOutput is the response for GET /me/totp.
+type TotpStatusOutput struct {
+	Body struct {
+		Status string `json:"status" enum:"disabled,pending,enabled" doc:"disabled = no secret, pending = secret issued but never confirmed, enabled = confirmed"`
+	}
+}
+
+// TotpEnrollOutput is the response for POST /me/totp/enroll. The
+// server returns the otpauth:// URL (for QR rendering on the client)
+// plus the raw base32 secret so the user can type it in manually.
+type TotpEnrollOutput struct {
+	Body struct {
+		OtpauthURL string `json:"otpauthUrl"`
+		Secret     string `json:"secret" doc:"Base32-encoded secret, for manual entry"`
+	}
+}
+
+// TotpConfirmInput is the body for POST /me/totp/confirm.
+type TotpConfirmInput struct {
+	Body struct {
+		Code string `json:"code" minLength:"6" maxLength:"6" pattern:"^[0-9]{6}$"`
+	}
+}
+
+// TotpConfirmOutput is the response for POST /me/totp/confirm.
+type TotpConfirmOutput struct {
+	Body struct {
+		Ok bool `json:"ok"`
+	}
+}
+
+// TotpDisableInput is the body for DELETE /me/totp. Requires the
+// current password to guard against session-hijack scenarios.
+type TotpDisableInput struct {
+	Body struct {
+		Password string `json:"password" minLength:"1" maxLength:"256"`
+	}
+}
+
+// TotpDisableOutput is the response for DELETE /me/totp.
+type TotpDisableOutput struct {
+	Body struct {
+		Ok bool `json:"ok"`
+	}
+}
+
+// ChangePasswordOutput is the response for POST /me/password. The
+// change revokes every other session as a side effect; the count is
+// returned so the UI can tell the user "you were signed out of N
+// other devices".
+type ChangePasswordOutput struct {
+	Body struct {
+		Ok                    bool `json:"ok"`
+		OtherSessionsRevoked  int  `json:"otherSessionsRevoked"`
+	}
 }

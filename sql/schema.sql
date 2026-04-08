@@ -94,6 +94,7 @@ CREATE TABLE ai_agents (
   allowed_scopes_json JSON NULL COMMENT 'Allowed MCP scope list as JSON array (null = inherit from token)',
   monthly_cost_cap_cents INT UNSIGNED NULL COMMENT 'Monthly spend cap in USD cents (null = no cap)',
   schedule_kind ENUM('disabled','interval','on_event','manual') NOT NULL DEFAULT 'disabled' COMMENT 'Trigger mode: interval = fires every NF_AGENT_TICK_INTERVAL; on_event = fires from eventbus; manual = only via /agents/{id}/trigger',
+  event_trigger_types JSON NULL COMMENT 'JSON array of eventbus Kind strings that fire this agent when schedule_kind=on_event (e.g., ["signal.attached","task.transition.submit"])',
   paused BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Manually or automatically paused (e.g., cost cap exceeded)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
@@ -397,6 +398,7 @@ CREATE TABLE identities (
   subject VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Provider subject / external ID (ASCII)',
   password_hash CHAR(97) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'Argon2id encoded hash, only for provider=local', -- argon2id encoded form (97 chars)
   mfa_secret_ciphertext VARBINARY(512) NULL COMMENT 'Encrypted TOTP secret (AES-256-GCM)',
+  mfa_confirmed_at DATETIME NULL COMMENT 'When the TOTP enrollment was confirmed by submitting a valid code',
   failed_attempts INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Consecutive failed login attempts',
   locked_until_at DATETIME NULL COMMENT 'Lockout expiry timestamp',
   last_used_at DATETIME NULL COMMENT 'Last successful authentication time',

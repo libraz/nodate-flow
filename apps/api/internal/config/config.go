@@ -114,6 +114,14 @@ type Config struct {
 	//                            AgentExecutor (nil until the ai
 	//                            package exposes one).
 	AgentRunner string `env:"NF_AGENT_RUNNER" envDefault:"log"`
+
+	// AgentRunsPurgeInterval is how often the purger wakes up to
+	// delete completed agent_runs rows. Only active when
+	// AgentQueueBackend=mysql. 0 disables the purger.
+	AgentRunsPurgeInterval time.Duration `env:"NF_AGENT_RUNS_PURGE_INTERVAL" envDefault:"1h"`
+	// AgentRunsRetention is the minimum age a finished agent_runs
+	// row must reach before the purger deletes it.
+	AgentRunsRetention time.Duration `env:"NF_AGENT_RUNS_RETENTION" envDefault:"168h"`
 }
 
 // Load parses NF_* environment variables into a Config.

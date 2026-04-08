@@ -21,6 +21,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/agentruntime"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/embed"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/nlquery"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/providers"
@@ -98,6 +99,18 @@ type Deps struct {
 	// ai.invocation.written marker without depending on eventbus.
 	// Nil means the hook is skipped. Tests typically leave this nil.
 	AiInvocationPublisher func(context.Context, uint32)
+
+	// AgentQueue is the queue the manual-trigger endpoint enqueues
+	// runs into when the api is running in multi-replica mode. Nil
+	// in single-process deployments and tests; the handler falls
+	// back to dispatching AgentRunner synchronously so manual
+	// triggers still work without an agent_runs table.
+	AgentQueue agentruntime.Queue
+	// AgentRunner is the synchronous Runner used by the manual
+	// trigger when AgentQueue is nil. Leaving both nil forces the
+	// handler to return AI.AGENT.RUNTIME_DISABLED so operators
+	// notice misconfiguration instead of a silent no-op.
+	AgentRunner agentruntime.Runner
 }
 
 // Result is what BuildResult returns: the composed chi router plus the
@@ -154,7 +167,7 @@ func BuildResult(deps Deps) Result {
 	if sessionStore == nil {
 		sessionStore = sessionstore.NewMySQLStore(deps.Queries)
 	}
-	authDeps := authhandlers.Deps{DB: deps.DB, Queries: deps.Queries, Sessions: sessionStore, JWT: deps.JWT, CookieSecure: deps.CookieSecure}
+	authDeps := authhandlers.Deps{DB: deps.DB, Queries: deps.Queries, Sessions: sessionStore, JWT: deps.JWT, Cipher: deps.Cipher, CookieSecure: deps.CookieSecure}
 	registerPublicAuthRoutes(api, authDeps)
 
 	authMW := middleware.RequireAuth(middleware.AuthDeps{
@@ -290,11 +303,29 @@ func BuildResult(deps Deps) Result {
 				Summary:     "List AI agents for a workspace",
 			}, aihandlers.ListAgents(aiDeps))
 			huma.Register(subAPI, huma.Operation{
+				OperationID: "ai-agents-create",
+				Method:      http.MethodPost,
+				Path:        "/workspaces/{wsId}/ai/agents",
+				Summary:     "Create a new AI agent",
+			}, aihandlers.CreateAgent(aiDeps))
+			huma.Register(subAPI, huma.Operation{
 				OperationID: "ai-agent-schedule-update",
 				Method:      http.MethodPatch,
 				Path:        "/workspaces/{wsId}/ai/agents/{agentId}/schedule",
 				Summary:     "Update an AI agent's schedule_kind trigger mode",
 			}, aihandlers.UpdateAgentSchedule(aiDeps))
+			huma.Register(subAPI, huma.Operation{
+				OperationID: "ai-agent-trigger",
+				Method:      http.MethodPost,
+				Path:        "/workspaces/{wsId}/ai/agents/{agentId}/trigger",
+				Summary:     "Manually trigger one run of an AI agent",
+			}, aihandlers.TriggerAgent(aiDeps, deps.AgentQueue, deps.AgentRunner))
+			huma.Register(subAPI, huma.Operation{
+				OperationID: "ai-models-list",
+				Method:      http.MethodGet,
+				Path:        "/workspaces/{wsId}/ai/models",
+				Summary:     "List workspace AI models across all providers",
+			}, aihandlers.ListModels(aiDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-priority-suggestions-list",
 			Method:      http.MethodGet,
@@ -550,6 +581,54 @@ func registerProtectedAuthRoutes(api huma.API, deps authhandlers.Deps) {
 		Path:        "/me",
 		Summary:     "Patch the authenticated user's profile",
 	}, authhandlers.PatchMe(deps))
+	huma.Register(api, huma.Operation{
+		OperationID: "me-sessions-list",
+		Method:      http.MethodGet,
+		Path:        "/me/sessions",
+		Summary:     "List the authenticated user's active sessions",
+	}, authhandlers.ListSessions(deps))
+	huma.Register(api, huma.Operation{
+		OperationID: "me-sessions-revoke",
+		Method:      http.MethodDelete,
+		Path:        "/me/sessions/{sessionId}",
+		Summary:     "Revoke a single session by public id",
+	}, authhandlers.RevokeOneSession(deps))
+	huma.Register(api, huma.Operation{
+		OperationID: "me-sessions-revoke-others",
+		Method:      http.MethodDelete,
+		Path:        "/me/sessions",
+		Summary:     "Revoke every session except the one on the current request",
+	}, authhandlers.RevokeAllOtherSessions(deps))
+	huma.Register(api, huma.Operation{
+		OperationID: "me-password-change",
+		Method:      http.MethodPost,
+		Path:        "/me/password",
+		Summary:     "Change the authenticated user's password",
+	}, authhandlers.ChangePassword(deps))
+	huma.Register(api, huma.Operation{
+		OperationID: "me-totp-status",
+		Method:      http.MethodGet,
+		Path:        "/me/totp",
+		Summary:     "Return the authenticated user's TOTP 2FA status",
+	}, authhandlers.TotpStatus(deps))
+	huma.Register(api, huma.Operation{
+		OperationID: "me-totp-enroll",
+		Method:      http.MethodPost,
+		Path:        "/me/totp/enroll",
+		Summary:     "Begin TOTP 2FA enrollment (returns otpauth URL)",
+	}, authhandlers.TotpEnroll(deps))
+	huma.Register(api, huma.Operation{
+		OperationID: "me-totp-confirm",
+		Method:      http.MethodPost,
+		Path:        "/me/totp/confirm",
+		Summary:     "Confirm TOTP 2FA enrollment with a generated code",
+	}, authhandlers.TotpConfirm(deps))
+	huma.Register(api, huma.Operation{
+		OperationID: "me-totp-disable",
+		Method:      http.MethodDelete,
+		Path:        "/me/totp",
+		Summary:     "Disable TOTP 2FA after password reverification",
+	}, authhandlers.TotpDisable(deps))
 }
 
 // newDBInvocationLogger returns an ai.InvocationLogger that persists

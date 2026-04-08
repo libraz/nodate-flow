@@ -56,6 +56,98 @@ export function useAgentsQuery(
   });
 }
 
+export interface ModelSummary {
+  id: string;
+  name: string;
+  displayName: string;
+  providerId: string;
+  providerKind: string;
+}
+
+/** useModelsQuery lists every enabled ai_models row for a workspace. */
+export function useModelsQuery(
+  workspaceId: string,
+): UseSuspenseQueryResult<{ total: number; models: ModelSummary[] }> {
+  return useSuspenseQuery({
+    queryKey: ['ai-models', workspaceId],
+    queryFn: async () => {
+      const { data, error } = await sdk.GET('/workspaces/{wsId}/ai/models', {
+        params: { path: { wsId: workspaceId }, query: { limit: 200, offset: 0 } },
+      });
+      if (error || !data) throw new Error('Failed to list models');
+      return {
+        total: data.total ?? 0,
+        models: (data.models ?? []) as ModelSummary[],
+      };
+    },
+  });
+}
+
+export interface CreateAgentArgs {
+  workspaceId: string;
+  modelId: string;
+  name: string;
+  description?: string;
+  systemPrompt: string;
+  temperature?: number;
+  scheduleKind?: AgentScheduleKind;
+}
+
+/** useCreateAgent provisions a new ai_agents row bound to a model. */
+export function useCreateAgent(): UseMutationResult<AgentSummary, Error, CreateAgentArgs> {
+  const qc = useQueryClient();
+  return useMutation<AgentSummary, Error, CreateAgentArgs>({
+    mutationFn: async ({ workspaceId, ...body }) => {
+      const payload: {
+        modelId: string;
+        name: string;
+        systemPrompt: string;
+        scheduleKind: AgentScheduleKind;
+        description?: string;
+        temperature?: number;
+      } = {
+        modelId: body.modelId,
+        name: body.name,
+        systemPrompt: body.systemPrompt,
+        scheduleKind: body.scheduleKind ?? 'disabled',
+      };
+      if (body.description !== undefined) payload.description = body.description;
+      if (body.temperature !== undefined) payload.temperature = body.temperature;
+      const { data, error } = await sdk.POST('/workspaces/{wsId}/ai/agents', {
+        params: { path: { wsId: workspaceId } },
+        body: payload,
+      });
+      if (error || !data) throw new Error('Failed to create agent');
+      return data as AgentSummary;
+    },
+    onSuccess: (_res, { workspaceId }) => {
+      qc.invalidateQueries({ queryKey: ['ai-agents', workspaceId] });
+    },
+  });
+}
+
+export interface TriggerAgentArgs {
+  workspaceId: string;
+  agentId: string;
+}
+
+/** useTriggerAgent enqueues / dispatches one manual run for an agent. */
+export function useTriggerAgent(): UseMutationResult<
+  { ok: true; dedupeKey: string },
+  Error,
+  TriggerAgentArgs
+> {
+  return useMutation<{ ok: true; dedupeKey: string }, Error, TriggerAgentArgs>({
+    mutationFn: async ({ workspaceId, agentId }) => {
+      const { data, error } = await sdk.POST('/workspaces/{wsId}/ai/agents/{agentId}/trigger', {
+        params: { path: { wsId: workspaceId, agentId } },
+      });
+      if (error || !data) throw new Error('Failed to trigger agent');
+      return { ok: true, dedupeKey: data.dedupeKey ?? '' };
+    },
+  });
+}
+
 export interface UpdateAgentScheduleArgs {
   workspaceId: string;
   agentId: string;

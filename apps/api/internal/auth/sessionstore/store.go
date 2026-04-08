@@ -78,4 +78,13 @@ type Store interface {
 	// Revoke marks a session as revoked by (userID, publicID). A
 	// missing row is not an error; callers treat it as idempotent.
 	Revoke(ctx context.Context, userID uint32, publicID types.PublicID) error
+
+	// ListActive returns every active session for a user ordered by
+	// most recent first. Used by the /settings/security sessions list.
+	ListActive(ctx context.Context, userID uint32) ([]Session, error)
+
+	// RevokeAllExcept revokes every active session for a user except
+	// the one whose publicID matches `keep`. Used by "sign out of all
+	// other devices". A missing match is not an error.
+	RevokeAllExcept(ctx context.Context, userID uint32, keep types.PublicID) error
 }

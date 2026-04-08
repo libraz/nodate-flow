@@ -70,6 +70,17 @@ WHERE public_id = ?
   AND enabled = TRUE
 LIMIT 1;
 
+-- name: RevokeAllSessionsForUserExcept :exec
+-- Revoke every active session for a user except one identified by public_id.
+-- Used by "sign out of all other devices" in /settings/security.
+UPDATE sessions
+SET revoked_at = CURRENT_TIMESTAMP,
+    enabled = FALSE
+WHERE user_id = ?
+  AND enabled = TRUE
+  AND revoked_at IS NULL
+  AND public_id <> ?;
+
 -- name: RotateSessionRefreshHash :exec
 -- Replace the refresh token hash and extend expiry on a refresh rotation.
 UPDATE sessions

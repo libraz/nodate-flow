@@ -3,9 +3,12 @@ package ai
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/agentruntime"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
@@ -138,9 +141,246 @@ func UpdateAgentSchedule(deps Deps) func(context.Context, *UpdateAgentScheduleIn
 	}
 }
 
-// unused placeholders to keep imports stable even if a handler branch
-// is removed during refactors. Not referenced at runtime.
-var (
-	_ = errors.New
-	_ = time.Now
-)
+// CreateAgentInput is the body for POST /workspaces/{wsId}/ai/agents.
+type CreateAgentInput struct {
+	WsID string `path:"wsId"`
+	Body struct {
+		ModelID      string `json:"modelId" doc:"ai_models public id"`
+		Name         string `json:"name" minLength:"1" maxLength:"255"`
+		Description  string `json:"description,omitempty" maxLength:"1000"`
+		SystemPrompt string `json:"systemPrompt" minLength:"1" maxLength:"16000"`
+		Temperature  uint16 `json:"temperature,omitempty" minimum:"0" maximum:"200" doc:"Sampling temperature x100 (default 100)"`
+		ScheduleKind string `json:"scheduleKind,omitempty" enum:"disabled,interval,on_event,manual" default:"disabled"`
+	}
+}
+
+// CreateAgentOutput returns the newly created agent summary.
+type CreateAgentOutput struct {
+	Body AgentSummary
+}
+
+// CreateAgent provisions a new ai_agents row bound to the given
+// ai_models public id. The handler does not accept tools_json yet;
+// agents mint tool access implicitly via their paired MCP token.
+func CreateAgent(deps Deps) func(context.Context, *CreateAgentInput) (*CreateAgentOutput, error) {
+	return func(ctx context.Context, in *CreateAgentInput) (*CreateAgentOutput, error) {
+		ws, ok := middleware.WorkspaceFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsWorkspaceNotFound)
+		}
+		modelPub, err := types.Parse(in.Body.ModelID)
+		if err != nil {
+			return nil, httpErr(apierrors.ValidationPathParamInvalid)
+		}
+		// Resolve the internal model id; the generated CreateAgent
+		// query takes the internal FK.
+		var (
+			modelID   uint32
+			modelName string
+		)
+		const q = `SELECT id, name FROM ai_models
+			WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE LIMIT 1`
+		if err := deps.DB.QueryRowContext(ctx, q, ws.ID, modelPub).Scan(&modelID, &modelName); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, httpErr(apierrors.AiModelNotFound)
+			}
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		temp := in.Body.Temperature
+		if temp == 0 {
+			temp = 100
+		}
+		scheduleKind := in.Body.ScheduleKind
+		if scheduleKind == "" {
+			scheduleKind = "disabled"
+		}
+		pub := types.New()
+		descNull := sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""}
+		_, err = deps.Queries.CreateAgent(ctx, generated.CreateAgentParams{
+			PublicID:        pub,
+			WorkspaceID:     ws.ID,
+			ModelID:         modelID,
+			Name:            in.Body.Name,
+			Description:     descNull,
+			SystemPrompt:    in.Body.SystemPrompt,
+			Temperature:     temp,
+			MaxOutputTokens: sql.NullInt32{},
+			ToolsJson:       json.RawMessage(`null`),
+			ScheduleKind:    generated.AiAgentsScheduleKind(scheduleKind),
+		})
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		now := time.Now()
+		out := &CreateAgentOutput{Body: AgentSummary{
+			ID:           pub.String(),
+			Name:         in.Body.Name,
+			Description:  in.Body.Description,
+			SystemPrompt: in.Body.SystemPrompt,
+			ModelID:      modelPub.String(),
+			ModelName:    modelName,
+			ScheduleKind: scheduleKind,
+			Paused:       false,
+			CreatedAt:    now.Unix(),
+		}}
+		return out, nil
+	}
+}
+
+// TriggerAgentInput is the path for
+// POST /workspaces/{wsId}/ai/agents/{agentId}/trigger.
+type TriggerAgentInput struct {
+	WsID    string `path:"wsId"`
+	AgentID string `path:"agentId"`
+}
+
+// TriggerAgentOutput is the ack envelope.
+type TriggerAgentOutput struct {
+	Body struct {
+		Ok bool `json:"ok"`
+		// DedupeKey is echoed back so operators can correlate the
+		// manual trigger with the row that lands in agent_runs (or
+		// the synchronous log line).
+		DedupeKey string `json:"dedupeKey"`
+	}
+}
+
+// TriggerAgent enqueues (or synchronously dispatches) one run for
+// the given agent. Honors the paused kill switch and refuses when
+// neither a Queue nor a synchronous Runner is wired.
+func TriggerAgent(deps Deps, queue agentruntime.Queue, runner agentruntime.Runner) func(context.Context, *TriggerAgentInput) (*TriggerAgentOutput, error) {
+	return func(ctx context.Context, in *TriggerAgentInput) (*TriggerAgentOutput, error) {
+		if queue == nil && runner == nil {
+			return nil, httpErr(apierrors.AiAgentRuntimeDisabled)
+		}
+		ws, ok := middleware.WorkspaceFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsWorkspaceNotFound)
+		}
+		agentPub, err := types.Parse(in.AgentID)
+		if err != nil {
+			return nil, httpErr(apierrors.ValidationPathParamInvalid)
+		}
+		// Resolve internal id + paused in a single round-trip so the
+		// scheduler's DBSource and this handler share the same
+		// source of truth.
+		var (
+			agentID uint32
+			paused  bool
+		)
+		const sel = `SELECT id, paused FROM ai_agents
+			WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE LIMIT 1`
+		if err := deps.DB.QueryRowContext(ctx, sel, ws.ID, agentPub).Scan(&agentID, &paused); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, httpErr(apierrors.AiAgentNotFound)
+			}
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if paused {
+			return nil, httpErr(apierrors.AiAgentPaused)
+		}
+		now := time.Now().UTC()
+		dedupeKey := fmt.Sprintf("%d:manual:%d", agentID, now.UnixNano())
+		job := agentruntime.Job{AgentID: agentID, WsID: ws.ID}
+		if queue != nil {
+			if err := queue.Enqueue(ctx, agentruntime.Run{
+				DedupeKey:   dedupeKey,
+				Job:         job,
+				ScheduledAt: now,
+			}); err != nil && !errors.Is(err, agentruntime.ErrDuplicate) {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+		} else {
+			if err := runner.Run(ctx, job, now); err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+		}
+		out := &TriggerAgentOutput{}
+		out.Body.Ok = true
+		out.Body.DedupeKey = dedupeKey
+		return out, nil
+	}
+}
+
+// Models list endpoint so the agents create dialog can populate a
+// model picker without hitting every provider individually.
+
+// ModelSummary is the public DTO for an ai_models row.
+type ModelSummary struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	DisplayName  string `json:"displayName"`
+	ProviderID   string `json:"providerId"`
+	ProviderKind string `json:"providerKind"`
+}
+
+// ListModelsInput is the query for GET /workspaces/{wsId}/ai/models.
+type ListModelsInput struct {
+	WsID   string `path:"wsId"`
+	Limit  int32  `query:"limit" minimum:"1" maximum:"200" default:"50"`
+	Offset int32  `query:"offset" minimum:"0" default:"0"`
+}
+
+// ListModelsOutput is the response for GET /workspaces/{wsId}/ai/models.
+type ListModelsOutput struct {
+	Body struct {
+		Total  int64          `json:"total"`
+		Models []ModelSummary `json:"models"`
+	}
+}
+
+// ListModels lists every enabled ai_models row across all providers
+// in the workspace. The agents create dialog uses this to populate a
+// Select; workspaces with zero models get an empty list and the UI
+// points operators at the provider registration flow.
+func ListModels(deps Deps) func(context.Context, *ListModelsInput) (*ListModelsOutput, error) {
+	return func(ctx context.Context, in *ListModelsInput) (*ListModelsOutput, error) {
+		ws, ok := middleware.WorkspaceFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsWorkspaceNotFound)
+		}
+		const q = `
+			SELECT m.public_id, m.name, m.display_name,
+			       p.public_id AS provider_public_id, p.kind AS provider_kind,
+			       COUNT(*) OVER() AS total
+			FROM ai_models m
+			INNER JOIN ai_providers p ON p.id = m.provider_id AND p.enabled = TRUE
+			WHERE m.workspace_id = ? AND m.enabled = TRUE
+			ORDER BY m.sort_weight ASC, m.created_at DESC, m.public_id DESC
+			LIMIT ? OFFSET ?`
+		rows, err := deps.DB.QueryContext(ctx, q, ws.ID, in.Limit, in.Offset)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		defer rows.Close()
+		out := &ListModelsOutput{}
+		out.Body.Models = make([]ModelSummary, 0)
+		var total int64
+		for rows.Next() {
+			var (
+				modelPub    types.PublicID
+				name        string
+				displayName string
+				providerPub types.PublicID
+				providerKnd string
+				row         int64
+			)
+			if err := rows.Scan(&modelPub, &name, &displayName, &providerPub, &providerKnd, &row); err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			total = row
+			out.Body.Models = append(out.Body.Models, ModelSummary{
+				ID:           modelPub.String(),
+				Name:         name,
+				DisplayName:  displayName,
+				ProviderID:   providerPub.String(),
+				ProviderKind: providerKnd,
+			})
+		}
+		if err := rows.Err(); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		out.Body.Total = total
+		return out, nil
+	}
+}

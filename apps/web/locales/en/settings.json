@@ -6,7 +6,8 @@
     "mcp_tokens": "MCP tokens",
     "ai_providers": "AI providers",
     "ai_activity": "AI activity",
-    "weekly_digest": "Weekly digest"
+    "weekly_digest": "Weekly digest",
+    "security": "Security"
   },
   "ai_activity": {
     "title": "AI activity",
@@ -81,6 +82,77 @@
     },
     "errors": {
       "update_failed": "Could not update your notification preferences. Please try again."
+    }
+  },
+  "security": {
+    "title": "Security",
+    "password": {
+      "title": "Password",
+      "description": "Change your password. Every other device will be signed out.",
+      "current": "Current password",
+      "next": "New password",
+      "confirm": "Confirm new password",
+      "save": "Change password",
+      "saving": "Saving...",
+      "changed": "Password changed. {{count}} other session(s) were signed out.",
+      "validation": {
+        "too_short": "New password must be at least 8 characters.",
+        "mismatch": "New password and confirmation do not match."
+      },
+      "errors": {
+        "current_mismatch": "Current password is incorrect.",
+        "no_local_identity": "This account has no local password to change. Change it through your identity provider instead.",
+        "generic": "Could not change your password. Please try again."
+      }
+    },
+    "totp": {
+      "title": "Two-factor authentication",
+      "disabled_description": "Add an extra layer of protection by requiring a 6-digit code from your authenticator app at sign-in.",
+      "enabled_description": "Two-factor authentication is enabled. Enter your password to disable it.",
+      "pending_description": "An enrollment was started but never confirmed. Regenerate the secret to finish setting up 2FA.",
+      "enroll_instructions": "Add this secret to your authenticator app (Google Authenticator, 1Password, Authy, ...) and enter the 6-digit code it shows.",
+      "secret_label": "Secret",
+      "code_label": "6-digit code",
+      "password_label": "Current password",
+      "enable": "Enable two-factor authentication",
+      "resume_enroll": "Restart enrollment",
+      "confirm": "Confirm",
+      "confirming": "Confirming...",
+      "disable": "Disable",
+      "disabling": "Disabling...",
+      "disable_confirm": "Disable two-factor authentication? Your account will be protected by a password only.",
+      "copy": "Copy",
+      "secret_copied": "Secret copied",
+      "open_in_app": "Open in authenticator app",
+      "enabled_toast": "Two-factor authentication is now enabled.",
+      "disabled_toast": "Two-factor authentication disabled.",
+      "errors": {
+        "enroll_failed": "Could not start enrollment. Please try again.",
+        "confirm_failed": "Could not confirm the code. Please try again.",
+        "code_mismatch": "That code is not valid. Check your authenticator app and try again.",
+        "password_mismatch": "Current password is incorrect.",
+        "disable_failed": "Could not disable 2FA. Please try again.",
+        "not_configured": "Two-factor authentication is not available on this server. Ask an administrator to configure NF_SECRET_KEY."
+      }
+    },
+    "sessions": {
+      "title": "Active sessions",
+      "description": "Devices currently signed in to your account. Revoke any session you do not recognise.",
+      "empty": "No active sessions.",
+      "revoke": "Revoke",
+      "revoke_all": "Sign out of all other devices",
+      "revoke_all_confirm": "Sign out of all other devices? Other browsers and apps will stop working immediately.",
+      "revoked": "Session revoked",
+      "revoked_all": "Revoked {{count}} other session(s)",
+      "current_badge": "Current",
+      "unknown_device": "Unknown device",
+      "unknown_ip": "Unknown location",
+      "created_at": "Signed in {{time}}",
+      "last_used_at": "last active {{time}}",
+      "errors": {
+        "revoke_failed": "Could not revoke the session. Please try again.",
+        "revoke_all_failed": "Could not revoke the other sessions. Please try again."
+      }
     }
   },
   "workspace": {

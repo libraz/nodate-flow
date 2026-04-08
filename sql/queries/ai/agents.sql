@@ -43,6 +43,22 @@ UPDATE ai_agents
 SET schedule_kind = ?
 WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE;
 
+-- name: ListOnEventAgents :many
+-- List every enabled non-paused agent whose event_trigger_types
+-- contains the given event kind. Driven by the eventbus notify hook
+-- so the fan-out from a single eventbus.Append to N agents is one
+-- round-trip per append (vs one per agent).
+SELECT
+  a.id,
+  a.workspace_id,
+  a.public_id
+FROM ai_agents a
+WHERE a.enabled = TRUE
+  AND a.paused = FALSE
+  AND a.schedule_kind = 'on_event'
+  AND a.workspace_id = ?
+  AND JSON_CONTAINS(a.event_trigger_types, JSON_QUOTE(?));
+
 -- name: GetAgentForExec :one
 -- Fetch the minimal fields an agent runner needs to invoke an LLM.
 SELECT

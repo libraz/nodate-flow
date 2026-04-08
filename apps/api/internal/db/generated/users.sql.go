@@ -153,6 +153,77 @@ func (q *Queries) FindLocalIdentityByEmail(ctx context.Context, email string) (F
 	return i, err
 }
 
+const findLocalIdentityByUserId = `-- name: FindLocalIdentityByUserId :one
+SELECT
+  id,
+  password_hash,
+  mfa_secret_ciphertext,
+  mfa_confirmed_at
+FROM identities
+WHERE user_id = ?
+  AND provider = 'local'
+  AND enabled = TRUE
+LIMIT 1
+`
+
+type FindLocalIdentityByUserIdRow struct {
+	ID                  uint32         `json:"-"`
+	PasswordHash        sql.NullString `json:"passwordHash"`
+	MfaSecretCiphertext []byte         `json:"mfaSecretCiphertext"`
+	MfaConfirmedAt      sql.NullTime   `json:"mfaConfirmedAt"`
+}
+
+// Resolve a local-password identity by internal user id.
+func (q *Queries) FindLocalIdentityByUserId(ctx context.Context, userID uint32) (FindLocalIdentityByUserIdRow, error) {
+	row := q.db.QueryRowContext(ctx, findLocalIdentityByUserId, userID)
+	var i FindLocalIdentityByUserIdRow
+	err := row.Scan(&i.ID, &i.PasswordHash, &i.MfaSecretCiphertext, &i.MfaConfirmedAt)
+	return i, err
+}
+
+const setIdentityMfaSecret = `-- name: SetIdentityMfaSecret :exec
+UPDATE identities
+SET mfa_secret_ciphertext = ?,
+    mfa_confirmed_at = NULL
+WHERE id = ?
+`
+
+type SetIdentityMfaSecretParams struct {
+	MfaSecretCiphertext []byte `json:"mfaSecretCiphertext"`
+	ID                  uint32 `json:"-"`
+}
+
+// Begin (or restart) TOTP enrollment.
+func (q *Queries) SetIdentityMfaSecret(ctx context.Context, arg SetIdentityMfaSecretParams) error {
+	_, err := q.db.ExecContext(ctx, setIdentityMfaSecret, arg.MfaSecretCiphertext, arg.ID)
+	return err
+}
+
+const confirmIdentityMfa = `-- name: ConfirmIdentityMfa :exec
+UPDATE identities
+SET mfa_confirmed_at = CURRENT_TIMESTAMP
+WHERE id = ?
+`
+
+// Mark a pending TOTP enrollment as confirmed.
+func (q *Queries) ConfirmIdentityMfa(ctx context.Context, id uint32) error {
+	_, err := q.db.ExecContext(ctx, confirmIdentityMfa, id)
+	return err
+}
+
+const clearIdentityMfa = `-- name: ClearIdentityMfa :exec
+UPDATE identities
+SET mfa_secret_ciphertext = NULL,
+    mfa_confirmed_at = NULL
+WHERE id = ?
+`
+
+// Disable TOTP on a local identity.
+func (q *Queries) ClearIdentityMfa(ctx context.Context, id uint32) error {
+	_, err := q.db.ExecContext(ctx, clearIdentityMfa, id)
+	return err
+}
+
 const findUserByEmail = `-- name: FindUserByEmail :one
 SELECT
   id,
@@ -459,6 +530,23 @@ type UpdateIdentityFailedAttemptsParams struct {
 // Bump failed login counter and optionally apply a lockout deadline.
 func (q *Queries) UpdateIdentityFailedAttempts(ctx context.Context, arg UpdateIdentityFailedAttemptsParams) error {
 	_, err := q.db.ExecContext(ctx, updateIdentityFailedAttempts, arg.FailedAttempts, arg.LockedUntilAt, arg.ID)
+	return err
+}
+
+const updateIdentityPasswordHash = `-- name: UpdateIdentityPasswordHash :exec
+UPDATE identities
+SET password_hash = ?
+WHERE id = ?
+`
+
+type UpdateIdentityPasswordHashParams struct {
+	PasswordHash sql.NullString `json:"passwordHash"`
+	ID           uint32         `json:"-"`
+}
+
+// Replace the Argon2id password hash on a local identity.
+func (q *Queries) UpdateIdentityPasswordHash(ctx context.Context, arg UpdateIdentityPasswordHashParams) error {
+	_, err := q.db.ExecContext(ctx, updateIdentityPasswordHash, arg.PasswordHash, arg.ID)
 	return err
 }
 

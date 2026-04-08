@@ -202,6 +202,57 @@ func (q *Queries) ListAgentsForWorkspace(ctx context.Context, arg ListAgentsForW
 	return items, nil
 }
 
+const listOnEventAgents = `-- name: ListOnEventAgents :many
+SELECT
+  a.id,
+  a.workspace_id,
+  a.public_id
+FROM ai_agents a
+WHERE a.enabled = TRUE
+  AND a.paused = FALSE
+  AND a.schedule_kind = 'on_event'
+  AND a.workspace_id = ?
+  AND JSON_CONTAINS(a.event_trigger_types, JSON_QUOTE(?))
+`
+
+type ListOnEventAgentsParams struct {
+	WorkspaceID uint32 `json:"-"`
+	JSONQUOTE   string `json:"JSONQUOTE"`
+}
+
+type ListOnEventAgentsRow struct {
+	ID          uint32         `json:"-"`
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+// List every enabled non-paused agent whose event_trigger_types
+// contains the given event kind. Driven by the eventbus notify hook
+// so the fan-out from a single eventbus.Append to N agents is one
+// round-trip per append (vs one per agent).
+func (q *Queries) ListOnEventAgents(ctx context.Context, arg ListOnEventAgentsParams) ([]ListOnEventAgentsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listOnEventAgents, arg.WorkspaceID, arg.JSONQUOTE)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListOnEventAgentsRow{}
+	for rows.Next() {
+		var i ListOnEventAgentsRow
+		if err := rows.Scan(&i.ID, &i.WorkspaceID, &i.PublicID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateAgentScheduleKind = `-- name: UpdateAgentScheduleKind :exec
 UPDATE ai_agents
 SET schedule_kind = ?

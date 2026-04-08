@@ -138,43 +138,10 @@ func main() {
 	// so a bad env never locks users out.
 	sessions := buildSessionStore(cfg, queries, logger)
 
-	inner := router.Build(router.Deps{
-		DB:                 db,
-		Queries:            queries,
-		Sessions:           sessions,
-		JWT:                jwtIssuer,
-		Cipher:             cipher,
-		GhWebhookSecret:    cfg.GhWebhookSecret,
-		SlackSigningSecret: cfg.SlackSigningSecret,
-		GoogleChannelToken: cfg.GoogleChannelToken,
-		DefaultWorkspaceID: cfg.DefaultWorkspaceID,
-		CookieSecure:       cfg.CookieSecure,
-		AiMock:             cfg.AiMock,
-		StreamNotifier:        notifier,
-		StreamRemember:        streamRemember,
-		AiInvocationPublisher: aiInvocationPublisher,
-	})
-
-	// Wrap the router with the request logger so the prod binary keeps
-	// its access logs; tests build the router directly without it.
-	outer := chi.NewRouter()
-	outer.Use(nflog.RequestLogger(logger))
-	outer.Use(buildCORS(cfg.CorsAllowedOrigins))
-	outer.Mount("/", inner)
-
-	// 4.AGENT-1: interval scheduler. Ticks every NF_AGENT_TICK_INTERVAL
-	// (default 1m) and dispatches every enabled non-paused agent whose
-	// schedule_kind='interval' to a log-only runner. Production wiring
-	// will swap LogRunner for an orchestrator-backed runner; the loop
-	// and Source contract stay identical.
-	// Runner selection: the orchestrator runner writes real
-	// ai.agent.run.* audit events, but it leaves the actual LLM call
-	// to an AgentExecutor that the ai package will provide once the
-	// per-agent tick semantics are nailed down. Until then, the
-	// orchestrator runner with a nil executor is equivalent to
-	// "start + complete" bookkeeping without any provider traffic,
-	// which is what we want so the audit trail starts accumulating
-	// now. LogRunner stays available for dev / tests.
+	// Agent runtime wiring. The runner (and optionally the mysql
+	// queue) is constructed before router.Build so the manual
+	// trigger endpoint can enqueue / dispatch through the same
+	// instances that the scheduler uses.
 	var runner agentruntime.Runner
 	if cfg.AgentRunner == "orchestrator" {
 		var executor agentruntime.AgentExecutor
@@ -199,25 +166,93 @@ func main() {
 			logger.Info("agent runtime: dispatch", "agent_id", j.AgentID, "ws", j.WsID)
 		}}
 	}
+	var agentQueue agentruntime.Queue
+	if cfg.AgentQueueBackend == "mysql" {
+		agentQueue = agentruntime.NewMySQLQueue(db)
+	} else {
+		// The in-process queue lets single-binary deployments still
+		// use the on_event trigger without opting into the mysql
+		// queue. Workers below consume from whichever queue is set.
+		agentQueue = agentruntime.NewInProcessQueue(256)
+	}
+
+	// Register the on_event trigger against the eventbus notify
+	// fan-out. This sits alongside the stream tap so a single
+	// eventbus.Append both wakes SSE subscribers and enqueues any
+	// agents that opted in to the same event kind.
+	eventTrigger := &agentruntime.EventTrigger{
+		Queries: agentruntime.NewSqlcOnEventQuerier(db),
+		Queue:   agentQueue,
+		Logger:  logger,
+	}
+	eventbus.AddNotifyHook(eventTrigger.NotifyHook())
+
+	inner := router.Build(router.Deps{
+		DB:                 db,
+		Queries:            queries,
+		Sessions:           sessions,
+		JWT:                jwtIssuer,
+		Cipher:             cipher,
+		GhWebhookSecret:    cfg.GhWebhookSecret,
+		SlackSigningSecret: cfg.SlackSigningSecret,
+		GoogleChannelToken: cfg.GoogleChannelToken,
+		DefaultWorkspaceID: cfg.DefaultWorkspaceID,
+		CookieSecure:       cfg.CookieSecure,
+		AiMock:             cfg.AiMock,
+		StreamNotifier:        notifier,
+		StreamRemember:        streamRemember,
+		AiInvocationPublisher: aiInvocationPublisher,
+		AgentQueue:            agentQueue,
+		AgentRunner:           runner,
+	})
+
+	// Wrap the router with the request logger so the prod binary keeps
+	// its access logs; tests build the router directly without it.
+	outer := chi.NewRouter()
+	outer.Use(nflog.RequestLogger(logger))
+	outer.Use(buildCORS(cfg.CorsAllowedOrigins))
+	outer.Mount("/", inner)
+
+	// 4.AGENT-1: interval scheduler. Ticks every NF_AGENT_TICK_INTERVAL
+	// and dispatches due agents to the runner built above. When
+	// AgentQueueBackend=mysql the scheduler enqueues into agent_runs
+	// instead, and separate Worker goroutines pull and execute.
 	scheduler := &agentruntime.Scheduler{
 		Source:   &agentruntime.DBSource{DB: db},
 		Runner:   runner,
 		Interval: cfg.AgentTickInterval,
 	}
+	scheduler.Queue = agentQueue
 	var agentWorkers []*agentruntime.Worker
 	var workerCancel context.CancelFunc
-	if cfg.AgentQueueBackend == "mysql" {
-		mq := agentruntime.NewMySQLQueue(db)
-		scheduler.Queue = mq
-		if cfg.AgentWorkerCount > 0 {
-			var wctx context.Context
-			wctx, workerCancel = context.WithCancel(context.Background())
-			for i := 0; i < cfg.AgentWorkerCount; i++ {
-				w := &agentruntime.Worker{Queue: mq, Runner: runner}
-				agentWorkers = append(agentWorkers, w)
-				go w.Loop(wctx)
-			}
-			logger.Info("agent workers started", "count", cfg.AgentWorkerCount)
+	var agentPurger *agentruntime.Purger
+	workerCount := cfg.AgentWorkerCount
+	if workerCount <= 0 {
+		workerCount = 1
+	}
+	{
+		var wctx context.Context
+		wctx, workerCancel = context.WithCancel(context.Background())
+		for i := 0; i < workerCount; i++ {
+			w := &agentruntime.Worker{Queue: agentQueue, Runner: runner}
+			agentWorkers = append(agentWorkers, w)
+			go w.Loop(wctx)
+		}
+		logger.Info("agent workers started", "count", workerCount, "backend", cfg.AgentQueueBackend)
+	}
+	if cfg.AgentQueueBackend == "mysql" && cfg.AgentRunsPurgeInterval > 0 {
+		agentPurger = &agentruntime.Purger{
+			Queries:   queries,
+			Interval:  cfg.AgentRunsPurgeInterval,
+			Retention: cfg.AgentRunsRetention,
+			Logger:    logger,
+		}
+		if err := agentPurger.Start(context.Background()); err != nil {
+			logger.Warn("agent_runs purger start failed", "err", err)
+		} else {
+			logger.Info("agent_runs purger started",
+				"interval", cfg.AgentRunsPurgeInterval,
+				"retention", cfg.AgentRunsRetention)
 		}
 	}
 	_ = agentWorkers
@@ -263,6 +298,9 @@ func main() {
 	schedulerCancel()
 	if workerCancel != nil {
 		workerCancel()
+	}
+	if agentPurger != nil {
+		agentPurger.Stop()
 	}
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 20*time.Second)

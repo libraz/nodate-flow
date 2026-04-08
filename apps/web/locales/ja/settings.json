@@ -6,7 +6,8 @@
     "mcp_tokens": "MCP トークン",
     "ai_providers": "AI プロバイダ",
     "ai_activity": "AI アクティビティ",
-    "weekly_digest": "週次ダイジェスト"
+    "weekly_digest": "週次ダイジェスト",
+    "security": "セキュリティ"
   },
   "ai_activity": {
     "title": "AI アクティビティ",
@@ -81,6 +82,77 @@
     },
     "errors": {
       "update_failed": "通知設定を更新できませんでした。もう一度お試しください。"
+    }
+  },
+  "security": {
+    "title": "セキュリティ",
+    "password": {
+      "title": "パスワード",
+      "description": "パスワードを変更します。他の端末はすべてサインアウトされます。",
+      "current": "現在のパスワード",
+      "next": "新しいパスワード",
+      "confirm": "新しいパスワード（確認）",
+      "save": "パスワードを変更",
+      "saving": "保存中…",
+      "changed": "パスワードを変更しました。他の {{count}} 件のセッションがサインアウトされました。",
+      "validation": {
+        "too_short": "新しいパスワードは 8 文字以上で入力してください。",
+        "mismatch": "新しいパスワードと確認用が一致しません。"
+      },
+      "errors": {
+        "current_mismatch": "現在のパスワードが正しくありません。",
+        "no_local_identity": "このアカウントにはローカルパスワードがありません。ID プロバイダ側で変更してください。",
+        "generic": "パスワードを変更できませんでした。もう一度お試しください。"
+      }
+    },
+    "totp": {
+      "title": "二要素認証",
+      "disabled_description": "サインイン時に認証アプリの 6 桁コードを要求して、アカウントを追加保護します。",
+      "enabled_description": "二要素認証が有効です。無効化するには現在のパスワードを入力してください。",
+      "pending_description": "登録を開始しましたが確認が完了していません。シークレットを再生成して 2FA を完了してください。",
+      "enroll_instructions": "このシークレットを認証アプリ（Google Authenticator、1Password、Authy など）に追加し、表示される 6 桁コードを入力してください。",
+      "secret_label": "シークレット",
+      "code_label": "6 桁のコード",
+      "password_label": "現在のパスワード",
+      "enable": "二要素認証を有効にする",
+      "resume_enroll": "登録をやり直す",
+      "confirm": "確認",
+      "confirming": "確認中…",
+      "disable": "無効化",
+      "disabling": "無効化中…",
+      "disable_confirm": "二要素認証を無効にしますか？アカウントはパスワードのみで保護されます。",
+      "copy": "コピー",
+      "secret_copied": "シークレットをコピーしました",
+      "open_in_app": "認証アプリで開く",
+      "enabled_toast": "二要素認証を有効にしました。",
+      "disabled_toast": "二要素認証を無効にしました。",
+      "errors": {
+        "enroll_failed": "登録を開始できませんでした。もう一度お試しください。",
+        "confirm_failed": "コードを確認できませんでした。もう一度お試しください。",
+        "code_mismatch": "このコードは無効です。認証アプリを確認してもう一度お試しください。",
+        "password_mismatch": "現在のパスワードが正しくありません。",
+        "disable_failed": "2FA を無効化できませんでした。もう一度お試しください。",
+        "not_configured": "このサーバーでは二要素認証が利用できません。管理者に NF_SECRET_KEY の設定を依頼してください。"
+      }
+    },
+    "sessions": {
+      "title": "アクティブなセッション",
+      "description": "現在アカウントにサインインしている端末です。見覚えのないセッションは失効させてください。",
+      "empty": "アクティブなセッションはありません。",
+      "revoke": "失効",
+      "revoke_all": "他の端末からすべてサインアウト",
+      "revoke_all_confirm": "他の端末からすべてサインアウトしますか？他のブラウザやアプリは直ちに動作しなくなります。",
+      "revoked": "セッションを失効しました",
+      "revoked_all": "他の {{count}} 件のセッションを失効しました",
+      "current_badge": "現在",
+      "unknown_device": "不明なデバイス",
+      "unknown_ip": "不明な場所",
+      "created_at": "サインイン: {{time}}",
+      "last_used_at": "最終利用: {{time}}",
+      "errors": {
+        "revoke_failed": "セッションを失効できませんでした。もう一度お試しください。",
+        "revoke_all_failed": "他のセッションを失効できませんでした。もう一度お試しください。"
+      }
     }
   },
   "workspace": {

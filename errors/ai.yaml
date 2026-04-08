@@ -76,6 +76,30 @@ resources:
         description: "Returned when an operation targets an ai_agents row that does not exist in the workspace or has been disabled."
         userAction: "Verify the agent id and that it belongs to this workspace."
 
+      paused:
+        code: AI.AGENT.PAUSED
+        status: 409
+        message: "AI agent is paused"
+        description: "Returned when a manual trigger targets an agent whose paused=TRUE kill switch is engaged."
+        userAction: "Resume the agent from the agents settings page before triggering it."
+
+      runtime_disabled:
+        code: AI.AGENT.RUNTIME_DISABLED
+        status: 503
+        message: "AI agent runtime is not configured"
+        description: "Returned when a trigger endpoint is reached but neither the scheduler queue nor a synchronous runner is wired on this replica."
+        userAction: "Set NF_AGENT_RUNNER on the api deployment to enable the agent runtime."
+
+  model:
+    breadcrumb: "AI > Model"
+    errors:
+      not_found:
+        code: AI.MODEL.NOT_FOUND
+        status: 404
+        message: "AI model not found"
+        description: "Returned when an operation references an ai_models row that does not exist in the workspace or has been disabled."
+        userAction: "Pick a model from the workspace's registered providers."
+
   safety:
     breadcrumb: "AI > Safety"
     errors:

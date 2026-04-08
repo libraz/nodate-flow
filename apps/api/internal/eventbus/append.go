@@ -12,6 +12,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
@@ -48,20 +49,59 @@ type Event struct {
 	Payload any
 }
 
-// NotifyHook is the optional realtime-stream hook. It is called
-// *after* a successful append with the internal workspace id and the
-// event type so an external package (apps/api/internal/stream) can
-// fan the change out to SSE subscribers without eventbus taking a
-// direct dependency on the stream package.
+// NotifyHook is a post-append fan-out subscriber. Multiple
+// subscribers are supported: the stream tap publishes realtime SSE
+// events, and the agentruntime event-source enqueues on_event agent
+// runs, both off the same dispatch.
 //
-// Hook must be non-blocking and must never panic. Leave nil for a
-// no-op; [SetNotifyHook] installs a real hook at server startup.
-var notifyHook func(ctx context.Context, workspaceInternalID uint32, eventType string)
+// Hooks must be non-blocking and must never panic. Leave unset for
+// the no-op behaviour.
+type NotifyHook = func(ctx context.Context, workspaceInternalID uint32, eventType string)
 
-// SetNotifyHook installs the realtime notification hook. Calling
-// SetNotifyHook(nil) restores the no-op behaviour.
-func SetNotifyHook(hook func(ctx context.Context, workspaceInternalID uint32, eventType string)) {
-	notifyHook = hook
+var (
+	notifyMu    sync.RWMutex
+	notifyHooks []NotifyHook
+)
+
+// SetNotifyHook replaces the hook list with a single subscriber.
+// Kept for backwards compatibility with the previous single-hook
+// API; new call sites should prefer [AddNotifyHook]. Calling
+// SetNotifyHook(nil) clears the list.
+func SetNotifyHook(hook NotifyHook) {
+	notifyMu.Lock()
+	defer notifyMu.Unlock()
+	if hook == nil {
+		notifyHooks = nil
+		return
+	}
+	notifyHooks = []NotifyHook{hook}
+}
+
+// AddNotifyHook appends a subscriber to the notify fan-out. Returns
+// an index that can be passed to [RemoveNotifyHook]; tests use this
+// to unregister a hook when they tear down.
+func AddNotifyHook(hook NotifyHook) int {
+	notifyMu.Lock()
+	defer notifyMu.Unlock()
+	notifyHooks = append(notifyHooks, hook)
+	return len(notifyHooks) - 1
+}
+
+// ClearNotifyHooks drops every registered subscriber. Used by tests
+// that want a clean slate between runs.
+func ClearNotifyHooks() {
+	notifyMu.Lock()
+	defer notifyMu.Unlock()
+	notifyHooks = nil
+}
+
+func fireNotifyHooks(ctx context.Context, workspaceInternalID uint32, eventType string) {
+	notifyMu.RLock()
+	hooks := notifyHooks
+	notifyMu.RUnlock()
+	for _, h := range hooks {
+		h(ctx, workspaceInternalID, eventType)
+	}
 }
 
 // Append inserts a single event row using the provided DBTX. When db is
@@ -95,8 +135,8 @@ func Append(ctx context.Context, db DBTX, evt Event) error {
 		PayloadJson: raw,
 		OccurredAt:  time.Now().UTC(),
 	})
-	if err == nil && notifyHook != nil {
-		notifyHook(ctx, evt.WorkspaceID, evt.Type)
+	if err == nil {
+		fireNotifyHooks(ctx, evt.WorkspaceID, evt.Type)
 	}
 	return err
 }

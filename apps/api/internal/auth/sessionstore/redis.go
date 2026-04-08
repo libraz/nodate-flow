@@ -129,6 +129,47 @@ func (s *RedisStore) RotateRefreshHash(ctx context.Context, oldHash, newHash str
 	return err
 }
 
+// ListActive implements [Store]. It iterates the user's set of
+// refresh hashes and hydrates each HASH entry. Expired keys drop out
+// automatically because Redis TTL purges them.
+func (s *RedisStore) ListActive(ctx context.Context, userID uint32) ([]Session, error) {
+	hashes, err := s.rdb.SMembers(ctx, userKey(userID)).Result()
+	if err != nil {
+		return nil, fmt.Errorf("sessionstore/redis: smembers: %w", err)
+	}
+	out := make([]Session, 0, len(hashes))
+	for _, h := range hashes {
+		sess, err := s.FindByRefreshHash(ctx, h)
+		if errors.Is(err, ErrNotFound) {
+			// TTL purged; drop the stale reference.
+			_ = s.rdb.SRem(ctx, userKey(userID), h).Err()
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *sess)
+	}
+	return out, nil
+}
+
+// RevokeAllExcept implements [Store].
+func (s *RedisStore) RevokeAllExcept(ctx context.Context, userID uint32, keep types.PublicID) error {
+	sessions, err := s.ListActive(ctx, userID)
+	if err != nil {
+		return err
+	}
+	for _, sess := range sessions {
+		if sess.PublicID == keep {
+			continue
+		}
+		if err := s.Revoke(ctx, userID, sess.PublicID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Revoke implements [Store]. The publicID reverse index gives us the
 // current refresh hash so we can delete the HASH and pop it from the
 // user's set in one pipeline.

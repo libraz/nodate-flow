@@ -6,10 +6,25 @@ export const AiErrors = {
     status: 404,
     message: "AI agent not found",
   },
+  AI_AGENT_PAUSED: {
+    code: "AI.AGENT.PAUSED",
+    status: 409,
+    message: "AI agent is paused",
+  },
+  AI_AGENT_RUNTIME_DISABLED: {
+    code: "AI.AGENT.RUNTIME_DISABLED",
+    status: 503,
+    message: "AI agent runtime is not configured",
+  },
   AI_COST_GUARD_EXCEEDED: {
     code: "AI.COST.GUARD_EXCEEDED",
     status: 402,
     message: "AI cost guard threshold exceeded",
+  },
+  AI_MODEL_NOT_FOUND: {
+    code: "AI.MODEL.NOT_FOUND",
+    status: 404,
+    message: "AI model not found",
   },
   AI_NL_QUERY_UNPARSEABLE: {
     code: "AI.NL_QUERY.UNPARSEABLE",
