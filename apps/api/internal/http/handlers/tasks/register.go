@@ -53,6 +53,13 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 	}, Disable(deps))
 
 	huma.Register(api, huma.Operation{
+		OperationID: "tasks-duplicates-list",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/duplicates",
+		Summary:     "List likely-duplicate tasks by embedding similarity",
+	}, ListDuplicates(deps))
+
+	huma.Register(api, huma.Operation{
 		OperationID: "tasks-transitions-apply",
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/transitions",

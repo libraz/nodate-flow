@@ -288,6 +288,45 @@
         "required": ["accessToken", "expiresAt", "userId"],
         "type": "object"
       },
+      "CompileLensInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CompileLensInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "prompt": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["prompt"],
+        "type": "object"
+      },
+      "CompileLensOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CompileLensOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "lens": {
+            "$ref": "#/components/schemas/Lens"
+          },
+          "prompt": {
+            "type": "string"
+          }
+        },
+        "required": ["prompt", "lens"],
+        "type": "object"
+      },
       "CreateInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -647,6 +686,26 @@
         "required": ["ok"],
         "type": "object"
       },
+      "DuplicateCandidate": {
+        "additionalProperties": false,
+        "properties": {
+          "classification": {
+            "type": "string"
+          },
+          "score": {
+            "format": "double",
+            "type": "number"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": ["taskId", "title", "score", "classification"],
+        "type": "object"
+      },
       "EditTaskCommentBody": {
         "additionalProperties": false,
         "properties": {
@@ -844,6 +903,55 @@
           }
         },
         "required": ["inboxItemId", "score", "recommendedAction", "reasoning"],
+        "type": "object"
+      },
+      "Lens": {
+        "additionalProperties": false,
+        "properties": {
+          "filter": {
+            "additionalProperties": {
+              "additionalProperties": {},
+              "type": "object"
+            },
+            "type": "object"
+          },
+          "groupBy": {
+            "type": ["string", "null"]
+          },
+          "sort": {
+            "items": {
+              "$ref": "#/components/schemas/SortSpec"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["filter", "sort", "groupBy"],
+        "type": "object"
+      },
+      "ListDuplicatesOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListDuplicatesOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/DuplicateCandidate"
+            },
+            "type": ["array", "null"]
+          },
+          "model": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "required": ["source", "model", "candidates"],
         "type": "object"
       },
       "ListInboxOutputBody": {
@@ -1788,6 +1896,19 @@
           }
         },
         "required": ["ok"],
+        "type": "object"
+      },
+      "SortSpec": {
+        "additionalProperties": false,
+        "properties": {
+          "dir": {
+            "type": "string"
+          },
+          "field": {
+            "type": "string"
+          }
+        },
+        "required": ["field", "dir"],
         "type": "object"
       },
       "Task": {
@@ -4244,6 +4365,44 @@
         "summary": "Remove a dependency edge"
       }
     },
+    "/tasks/{id}/duplicates": {
+      "get": {
+        "operationId": "tasks-duplicates-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListDuplicatesOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List likely-duplicate tasks by embedding similarity"
+      }
+    },
     "/tasks/{id}/timeline": {
       "get": {
         "operationId": "tasks-timeline-list",
@@ -4583,6 +4742,54 @@
           }
         },
         "summary": "Patch a workspace"
+      }
+    },
+    "/workspaces/{wsId}/ai/compile-lens": {
+      "post": {
+        "operationId": "ai-compile-lens",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompileLensInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompileLensOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Compile natural-language prose into a validated Lens JSON (ADR 0004)"
       }
     },
     "/workspaces/{wsId}/ai/cost-today": {

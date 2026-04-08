@@ -6,6 +6,8 @@ package errors
 var (
 	// AI.COST.GUARD_EXCEEDED — AI cost guard threshold exceeded
 	AiCostGuardExceeded = &Spec{Code: "AI.COST.GUARD_EXCEEDED", Status: 402, Message: "AI cost guard threshold exceeded"}
+	// AI.NL_QUERY.UNPARSEABLE — Could not turn that into a filter
+	AiNlQueryUnparseable = &Spec{Code: "AI.NL_QUERY.UNPARSEABLE", Status: 422, Message: "Could not turn that into a filter"}
 	// AI.PROVIDER.NOT_CONFIGURED — AI provider is not configured
 	AiProviderNotConfigured = &Spec{Code: "AI.PROVIDER.NOT_CONFIGURED", Status: 412, Message: "AI provider is not configured"}
 	// AI.PROVIDER.UPSTREAM_CALL_FAILED — AI provider call failed

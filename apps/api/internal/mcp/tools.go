@@ -8,7 +8,11 @@ import (
 	stderrors "errors"
 	"time"
 
+	"sort"
+	"strconv"
+
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/embed"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
@@ -137,6 +141,15 @@ func registerTools(h *Handler) {
 			"taskId": stringSchema("Task public id (UUID v7)."),
 		}, []string{"taskId"}),
 		run: runProposePriority,
+	})
+	h.register(tool{
+		name:          "propose_duplicates",
+		description:   "Return likely-duplicate tasks for a given task by embedding similarity (ADR 0003).",
+		requiredScope: "read:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"taskId": stringSchema("Task public id (UUID v7)."),
+		}, []string{"taskId"}),
+		run: runProposeDuplicates,
 	})
 }
 
@@ -586,6 +599,129 @@ func runProposePriority(ctx context.Context, deps Deps, s *session, raw json.Raw
 		"priority":  priority,
 		"rationale": "",
 	}, nil
+}
+
+// runProposeDuplicates ranks stored embeddings against the source task
+// via Go-side cosine similarity (MySQL 9.1 Community lacks
+// VEC_DISTANCE_COSINE). Thresholds come from ai_settings, with ADR 0003
+// defaults when the workspace has no row yet.
+func runProposeDuplicates(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	var in struct {
+		TaskID string `json:"taskId"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+	if deps.Embedder == nil {
+		return nil, apierrors.New(apierrors.AiProviderNotConfigured)
+	}
+	taskInternal, pub, err := resolveTask(ctx, deps, s, in.TaskID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Resolve model + thresholds from ai_settings (ADR 0003 defaults on
+	// miss).
+	model := "mock-768"
+	high := 0.870
+	low := 0.750
+	if settings, serr := deps.Queries.GetAiSettings(ctx, s.workspaceID); serr == nil {
+		if settings.EmbedModel != "" {
+			model = settings.EmbedModel
+		}
+		if v, perr := strconv.ParseFloat(settings.DuplicateThresholdHigh, 64); perr == nil {
+			high = v
+		}
+		if v, perr := strconv.ParseFloat(settings.DuplicateThresholdLow, 64); perr == nil {
+			low = v
+		}
+	}
+
+	src, err := deps.Queries.GetTaskEmbedding(ctx, generated.GetTaskEmbeddingParams{
+		TaskID: taskInternal,
+		Model:  model,
+	})
+	if stderrors.Is(err, sql.ErrNoRows) {
+		row, ferr := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
+			WorkspaceID: s.workspaceID,
+			PublicID:    pub,
+		})
+		if ferr != nil {
+			return map[string]any{"candidates": []any{}, "model": model}, nil
+		}
+		desc := ""
+		if row.Description.Valid {
+			desc = row.Description.String
+		}
+		if eerr := deps.Embedder.EmbedTask(ctx, taskInternal, row.Title, desc); eerr != nil {
+			return map[string]any{"candidates": []any{}, "model": model}, nil
+		}
+		src, err = deps.Queries.GetTaskEmbedding(ctx, generated.GetTaskEmbeddingParams{
+			TaskID: taskInternal,
+			Model:  model,
+		})
+	}
+	if err != nil {
+		return map[string]any{"candidates": []any{}, "model": model}, nil
+	}
+	srcVec, err := embed.Decode(src.Vector)
+	if err != nil || len(srcVec) == 0 {
+		return map[string]any{"candidates": []any{}, "model": model}, nil
+	}
+
+	rows, err := deps.Queries.ListCandidateTaskEmbeddings(ctx, generated.ListCandidateTaskEmbeddingsParams{
+		WorkspaceID: s.workspaceID,
+		Model:       model,
+		TaskID:      taskInternal,
+		Limit:       200,
+	})
+	if err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	type cand struct {
+		id       string
+		title    string
+		score    float64
+		classify string
+	}
+	ranked := make([]cand, 0, len(rows))
+	for _, r := range rows {
+		v, derr := embed.Decode(r.Vector)
+		if derr != nil || len(v) != len(srcVec) {
+			continue
+		}
+		score := float64(embed.Cosine(srcVec, v))
+		if score < low {
+			continue
+		}
+		classification := "related"
+		if score >= high {
+			classification = "duplicate"
+		}
+		ranked = append(ranked, cand{
+			id:       r.PublicID.String(),
+			title:    r.Title,
+			score:    score,
+			classify: classification,
+		})
+	}
+	sort.SliceStable(ranked, func(i, j int) bool { return ranked[i].score > ranked[j].score })
+	if len(ranked) > 20 {
+		ranked = ranked[:20]
+	}
+	out := make([]map[string]any, 0, len(ranked))
+	for _, c := range ranked {
+		out = append(out, map[string]any{
+			"taskId":         c.id,
+			"title":          c.title,
+			"score":          c.score,
+			"classification": c.classify,
+		})
+	}
+	return map[string]any{"candidates": out, "model": model}, nil
 }
 
 // mapAiError maps ai package sentinel errors to the appropriate API

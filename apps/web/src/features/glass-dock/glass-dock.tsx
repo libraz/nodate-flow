@@ -24,6 +24,110 @@ import {
   useDismissAiSuggestion,
 } from '../ai-suggestions/api';
 import SuggestionActions from '../ai-suggestions/suggestion-actions';
+import { type CompileLensResult, NlQueryError, useCompileLens } from '../nl-query/api';
+
+const NL_UNPARSEABLE = 'AI.NL_QUERY.UNPARSEABLE';
+
+function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): ReactElement {
+  const { t } = useTranslation('ai-suggestions');
+  const [prompt, setPrompt] = useState('');
+  const [result, setResult] = useState<CompileLensResult | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const mutation = useCompileLens();
+
+  const disabled = !workspaceId || prompt.trim().length === 0 || mutation.isPending;
+
+  const handleSubmit = (event: React.FormEvent): void => {
+    event.preventDefault();
+    if (!workspaceId || prompt.trim().length === 0) return;
+    setErrorMsg(null);
+    setResult(null);
+    mutation.mutate(
+      { workspaceId, prompt: prompt.trim() },
+      {
+        onSuccess: (r) => setResult(r),
+        onError: (err) => {
+          if (err instanceof NlQueryError && err.code?.includes(NL_UNPARSEABLE)) {
+            setErrorMsg(t('nl_query.unparseable'));
+          } else {
+            setErrorMsg(t('nl_query.error'));
+          }
+        },
+      },
+    );
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.5rem',
+        padding: '0.75rem',
+        borderBlockEnd: '1px solid var(--color-border)',
+      }}
+    >
+      <label htmlFor="nl-query-input" style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}>
+        {t('nl_query.label')}
+      </label>
+      <input
+        id="nl-query-input"
+        type="text"
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        placeholder={t('nl_query.placeholder')}
+        maxLength={500}
+        style={{
+          padding: '0.5rem 0.625rem',
+          borderRadius: '0.375rem',
+          border: '1px solid var(--color-border)',
+          background: 'var(--color-bg)',
+          color: 'var(--color-fg)',
+          fontSize: '0.8125rem',
+        }}
+      />
+      <button
+        type="submit"
+        disabled={disabled}
+        style={{
+          padding: '0.4rem 0.75rem',
+          borderRadius: '0.375rem',
+          border: '1px solid var(--color-border)',
+          background: 'var(--color-surface)',
+          color: 'var(--color-fg)',
+          fontSize: '0.75rem',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          opacity: disabled ? 0.6 : 1,
+        }}
+      >
+        {mutation.isPending ? t('nl_query.compiling') : t('nl_query.submit')}
+      </button>
+      {errorMsg ? (
+        <p role="alert" style={{ margin: 0, fontSize: '0.75rem', color: 'var(--color-danger)' }}>
+          {errorMsg}
+        </p>
+      ) : null}
+      {result ? (
+        <pre
+          style={{
+            margin: 0,
+            padding: '0.5rem',
+            background: 'var(--color-bg)',
+            border: '1px solid var(--color-border)',
+            borderRadius: '0.375rem',
+            fontSize: '0.6875rem',
+            color: 'var(--color-fg)',
+            overflow: 'auto',
+            maxBlockSize: '8rem',
+          }}
+        >
+          {JSON.stringify(result.lens, null, 2)}
+        </pre>
+      ) : null}
+    </form>
+  );
+}
 
 function useActiveWorkspaceId(): string | undefined {
   const matches = useMatches();
@@ -212,6 +316,7 @@ export default function GlassDock(): ReactElement {
           <Icon icon={X} decorative />
         </button>
       </div>
+      <NlQueryPanel workspaceId={workspaceId} />
       <div
         style={{
           overflow: 'auto',

@@ -1,0 +1,68 @@
+{
+  "show me everything blocked this week": {
+    "filter": {
+      "blocked": { "eq": true },
+      "updated_at": { "between": "this_week" }
+    },
+    "sort": [{ "field": "updated_at", "dir": "desc" }],
+    "groupBy": null
+  },
+  "open tasks assigned to me without an estimate": {
+    "filter": {
+      "status": { "in": ["open", "in_progress"] },
+      "assignee": { "eq": "@me" },
+      "has_estimate": { "eq": false }
+    },
+    "sort": [{ "field": "priority", "dir": "desc" }],
+    "groupBy": null
+  },
+  "recently updated bugs in the web workspace": {
+    "filter": {
+      "labels": { "contains": "bug" },
+      "workspace": { "eq": "web" },
+      "updated_at": { "between": "last_7d" }
+    },
+    "sort": [{ "field": "updated_at", "dir": "desc" }],
+    "groupBy": null
+  },
+  "tasks due today grouped by project": {
+    "filter": {
+      "due_on": { "eq": "today" }
+    },
+    "sort": [{ "field": "priority", "dir": "desc" }],
+    "groupBy": "project"
+  },
+  "overdue high priority": {
+    "filter": {
+      "due_on": { "eq": "overdue" },
+      "priority": { "gte": 3 }
+    },
+    "sort": [{ "field": "due_on", "dir": "asc" }],
+    "groupBy": null
+  },
+  "tasks i closed last week": {
+    "filter": {
+      "status": { "eq": "done" },
+      "assignee": { "eq": "@me" },
+      "updated_at": { "between": "last_week" }
+    },
+    "sort": [{ "field": "updated_at", "dir": "desc" }],
+    "groupBy": null
+  },
+  "anything unassigned in triage": {
+    "filter": {
+      "assignee": { "is_null": true },
+      "status": { "eq": "triage" }
+    },
+    "sort": [{ "field": "created_at", "dir": "asc" }],
+    "groupBy": null
+  },
+  "long-running tasks over 5 days old": {
+    "filter": {
+      "status": { "in": ["open", "in_progress"] },
+      "created_at": { "lt": "now-5d" }
+    },
+    "sort": [{ "field": "created_at", "dir": "asc" }],
+    "groupBy": null
+  }
+}

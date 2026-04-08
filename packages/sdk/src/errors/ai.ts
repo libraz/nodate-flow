@@ -6,6 +6,11 @@ export const AiErrors = {
     status: 402,
     message: "AI cost guard threshold exceeded",
   },
+  AI_NL_QUERY_UNPARSEABLE: {
+    code: "AI.NL_QUERY.UNPARSEABLE",
+    status: 422,
+    message: "Could not turn that into a filter",
+  },
   AI_PROVIDER_NOT_CONFIGURED: {
     code: "AI.PROVIDER.NOT_CONFIGURED",
     status: 412,

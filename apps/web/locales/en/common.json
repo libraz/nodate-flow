@@ -274,6 +274,12 @@
       "activity": {
         "title": "Activity"
       },
+      "duplicates": {
+        "title": "Related tasks",
+        "empty": "No related tasks found.",
+        "duplicate": "Likely duplicate",
+        "related": "Related"
+      },
       "transitions": {
         "title": "Transitions",
         "start": "Start",

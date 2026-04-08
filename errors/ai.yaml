@@ -46,6 +46,16 @@ resources:
         description: "Returned when the upstream LLM returned a completion whose body could not be decoded into the expected JSON shape."
         userAction: "Retry the request; if the problem persists, check the provider or model configuration."
 
+  nl_query:
+    breadcrumb: "AI > NL Query"
+    errors:
+      unparseable:
+        code: AI.NL_QUERY.UNPARSEABLE
+        status: 422
+        message: "Could not turn that into a filter"
+        description: "Returned when the NL query compiler could not produce a valid Lens JSON from the user's prose, either because the upstream LLM emitted malformed output or because the result failed schema validation against the closed Lens grammar (ADR 0004)."
+        userAction: "Rephrase the request — e.g. \"blocked tasks due this week\"."
+
   redaction:
     breadcrumb: "AI > Redaction"
     errors:

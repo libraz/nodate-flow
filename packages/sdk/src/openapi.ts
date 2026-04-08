@@ -491,6 +491,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/{id}/duplicates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List likely-duplicate tasks by embedding similarity */
+        get: operations["tasks-duplicates-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{id}/timeline": {
         parameters: {
             query?: never;
@@ -560,6 +577,23 @@ export interface paths {
         head?: never;
         /** Patch a workspace */
         patch: operations["workspaces-patch"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/ai/compile-lens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Compile natural-language prose into a validated Lens JSON (ADR 0004) */
+        post: operations["ai-compile-lens"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/workspaces/{wsId}/ai/cost-today": {
@@ -938,6 +972,23 @@ export interface components {
             /** @description User public id (UUID v7) */
             userId: string;
         };
+        CompileLensInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            prompt: string;
+        };
+        CompileLensOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            lens: components["schemas"]["Lens"];
+            prompt: string;
+        };
         CreateInputBody: {
             /**
              * Format: uri
@@ -1087,6 +1138,13 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        DuplicateCandidate: {
+            classification: string;
+            /** Format: double */
+            score: number;
+            taskId: string;
+            title: string;
+        };
         EditTaskCommentBody: {
             /**
              * Format: uri
@@ -1180,6 +1238,25 @@ export interface components {
             recommendedAction: string;
             /** Format: float */
             score: number;
+        };
+        Lens: {
+            filter: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
+            groupBy: string | null;
+            sort: components["schemas"]["SortSpec"][] | null;
+        };
+        ListDuplicatesOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            candidates: components["schemas"]["DuplicateCandidate"][] | null;
+            model: string;
+            source: string;
         };
         ListInboxOutputBody: {
             /**
@@ -1578,6 +1655,10 @@ export interface components {
              */
             readonly $schema?: string;
             ok: boolean;
+        };
+        SortSpec: {
+            dir: string;
+            field: string;
         };
         Task: {
             /**
@@ -3124,6 +3205,37 @@ export interface operations {
             };
         };
     };
+    "tasks-duplicates-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListDuplicatesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "tasks-timeline-list": {
         parameters: {
             query?: {
@@ -3346,6 +3458,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Workspace"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-compile-lens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompileLensInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompileLensOutputBody"];
                 };
             };
             /** @description Error */

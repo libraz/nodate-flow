@@ -18,6 +18,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/nlquery"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
@@ -25,9 +26,10 @@ import (
 
 // Deps is the dependency bundle for handlers in this package.
 type Deps struct {
-	DB      *sql.DB
-	Queries *generated.Queries
-	Cipher  *crypto.Cipher
+	DB       *sql.DB
+	Queries  *generated.Queries
+	Cipher   *crypto.Cipher
+	NlQuery  *nlquery.Compiler
 }
 
 func httpErr(spec *apierrors.Spec) error {

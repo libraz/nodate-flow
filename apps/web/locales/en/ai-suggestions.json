@@ -34,5 +34,13 @@
     "empty": "No pending suggestions",
     "expand": "Expand suggestions panel",
     "collapse": "Collapse suggestions panel"
+  },
+  "nl_query": {
+    "label": "Ask in plain language",
+    "placeholder": "show me everything blocked this week",
+    "submit": "Compile",
+    "compiling": "Compiling...",
+    "unparseable": "Couldn't understand that — try rephrasing.",
+    "error": "Failed to compile prompt"
   }
 }

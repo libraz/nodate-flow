@@ -21,6 +21,7 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/embed"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/nlquery"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/providers"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/crypto"
@@ -139,13 +140,15 @@ func BuildResult(deps Deps) Result {
 	// Write-time embedding client (ADR 0003). Wave 2 only ships the mock
 	// provider; the real provider integration is a separate follow-up.
 	var embedClient *embed.Client
+	var nlQueryCompiler *nlquery.Compiler
 	if deps.AiMock {
 		embedClient = embed.New(embed.NewMockProvider(), deps.Queries)
+		nlQueryCompiler = nlquery.New(nlquery.NewMockProvider())
 	}
 	taskDeps := tasks.Deps{DB: deps.DB, Queries: deps.Queries, Embedder: embedClient}
 	tlDeps := timeline.Deps{DB: deps.DB, Queries: deps.Queries}
 	inboxDeps := inbox.Deps{DB: deps.DB, Queries: deps.Queries}
-	aiDeps := aihandlers.Deps{DB: deps.DB, Queries: deps.Queries, Cipher: deps.Cipher}
+	aiDeps := aihandlers.Deps{DB: deps.DB, Queries: deps.Queries, Cipher: deps.Cipher, NlQuery: nlQueryCompiler}
 
 	// AI orchestrator. Built once and shared by the MCP server, the
 	// inbox triage handler, and any future Phase 2 endpoint. When
@@ -232,6 +235,12 @@ func BuildResult(deps Deps) Result {
 			Path:        "/workspaces/{wsId}/ai/cost-today",
 			Summary:     "Today's accumulated LLM spend (USD) for a workspace",
 		}, aihandlers.CostToday(aiDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "ai-compile-lens",
+			Method:      http.MethodPost,
+			Path:        "/workspaces/{wsId}/ai/compile-lens",
+			Summary:     "Compile natural-language prose into a validated Lens JSON (ADR 0004)",
+		}, aihandlers.CompileLens(aiDeps))
 	})
 
 	// Per-user MCP tokens (workspace member, not admin).
@@ -344,7 +353,7 @@ func BuildResult(deps Deps) Result {
 	})
 
 	// MCP server uses the orchestrator built above.
-	r.Handle("/mcp", mcp.NewHandler(mcp.Deps{DB: deps.DB, Queries: deps.Queries, AI: aiOrch}))
+	r.Handle("/mcp", mcp.NewHandler(mcp.Deps{DB: deps.DB, Queries: deps.Queries, AI: aiOrch, Embedder: embedClient}))
 
 	// Workspace-scoped AI inbox triage (Phase 2 Wave 1). Registered in
 	// its own group so the auth + workspace-member middleware applies

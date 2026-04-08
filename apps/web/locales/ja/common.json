@@ -274,6 +274,12 @@
       "activity": {
         "title": "アクティビティ"
       },
+      "duplicates": {
+        "title": "関連タスク",
+        "empty": "関連するタスクは見つかりませんでした。",
+        "duplicate": "重複の可能性",
+        "related": "関連"
+      },
       "transitions": {
         "title": "遷移",
         "start": "開始",

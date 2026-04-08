@@ -56,7 +56,14 @@ export const tasksKeys = {
   detail: (id: string) => [...tasksKeys.all, 'detail', id] as const,
   comments: (id: string) => [...tasksKeys.all, 'detail', id, 'comments'] as const,
   actors: (id: string) => [...tasksKeys.all, 'detail', id, 'actors'] as const,
+  duplicates: (id: string) => [...tasksKeys.all, 'detail', id, 'duplicates'] as const,
 };
+
+export type DuplicateCandidate = components['schemas']['DuplicateCandidate'];
+export interface DuplicatesResult {
+  model: string;
+  candidates: DuplicateCandidate[];
+}
 
 /** Lightweight error thrown when the SDK returns an error envelope. */
 export class TaskApiError extends Error {
@@ -170,6 +177,19 @@ export function useTaskQuery(taskId: string): UseSuspenseQueryResult<Task> {
       });
       if (error || !data) throw toError(error, 'Failed to load task');
       return data;
+    },
+  });
+}
+
+export function useTaskDuplicatesQuery(taskId: string): UseSuspenseQueryResult<DuplicatesResult> {
+  return useSuspenseQuery({
+    queryKey: tasksKeys.duplicates(taskId),
+    queryFn: async (): Promise<DuplicatesResult> => {
+      const { data, error } = await sdk.GET('/tasks/{id}/duplicates', {
+        params: { path: { id: taskId } },
+      });
+      if (error || !data) throw toError(error, 'Failed to load duplicates');
+      return { model: data.model, candidates: data.candidates ?? [] };
     },
   });
 }

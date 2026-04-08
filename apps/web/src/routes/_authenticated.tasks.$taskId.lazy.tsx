@@ -33,6 +33,7 @@ import {
   useRemoveTaskActor,
   useTaskActorsQuery,
   useTaskCommentsQuery,
+  useTaskDuplicatesQuery,
   useTaskQuery,
   useTransitionTask,
   useUpdateTask,
@@ -570,6 +571,19 @@ function Sidebar({
       </Card>
 
       <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <h2 style={{ margin: 0, fontSize: '1rem' }}>{t('tasks.detail.duplicates.title')}</h2>
+        <Suspense
+          fallback={
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem' }}>
+              <Spinner label={t('common.loading')} />
+            </div>
+          }
+        >
+          <RelatedTasksSection taskId={id} />
+        </Suspense>
+      </Card>
+
+      <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         <h2 style={{ margin: 0, fontSize: '1rem' }}>{t('tasks.detail.activity.title')}</h2>
         <Suspense
           fallback={
@@ -582,6 +596,64 @@ function Sidebar({
         </Suspense>
       </Card>
     </aside>
+  );
+}
+
+function RelatedTasksSection({ taskId }: { taskId: string }): ReactElement {
+  const { t } = useTranslation('common');
+  const { data } = useTaskDuplicatesQuery(taskId);
+  if (data.candidates.length === 0) {
+    return (
+      <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+        {t('tasks.detail.duplicates.empty')}
+      </p>
+    );
+  }
+  return (
+    <ul
+      style={{
+        listStyle: 'none',
+        padding: 0,
+        margin: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.5rem',
+      }}
+    >
+      {data.candidates.map((c) => {
+        const isDup = c.classification === 'duplicate';
+        return (
+          <li key={c.taskId}>
+            <a
+              href={`/tasks/${c.taskId}`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                color: 'var(--color-fg)',
+                textDecoration: 'none',
+              }}
+            >
+              <Badge tone={isDup ? 'danger' : 'warning'}>
+                {t(`tasks.detail.duplicates.${isDup ? 'duplicate' : 'related'}`)}
+              </Badge>
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {c.title}
+              </span>
+              <span
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '0.75rem',
+                  color: 'var(--color-muted)',
+                }}
+              >
+                {c.score.toFixed(2)}
+              </span>
+            </a>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

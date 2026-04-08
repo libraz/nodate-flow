@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/embed"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
@@ -37,6 +38,9 @@ type Deps struct {
 	// AI is the optional LLM orchestrator. When nil, the propose_* tools
 	// return AI.PROVIDER.NOT_CONFIGURED.
 	AI *ai.Orchestrator
+	// Embedder is the optional task embedding client. When nil,
+	// propose_duplicates returns AI.PROVIDER.NOT_CONFIGURED.
+	Embedder *embed.Client
 }
 
 // Handler implements http.Handler for the /mcp endpoint.
