@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/cors"
 	_ "github.com/go-sql-driver/mysql"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/agentruntime"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/providers"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
@@ -176,7 +177,22 @@ func main() {
 	// now. LogRunner stays available for dev / tests.
 	var runner agentruntime.Runner
 	if cfg.AgentRunner == "orchestrator" {
-		runner = &agentruntime.OrchestratorRunner{DB: db}
+		var executor agentruntime.AgentExecutor
+		if cipher != nil && !cfg.AiMock {
+			resolver := providers.NewWorkspaceResolver(queries, cipher)
+			budget := ai.BudgetReaderFunc(func(ctx context.Context, wsID uint32) (int64, error) {
+				return 0, nil
+			})
+			executor = &ai.AgentExecutor{
+				Queries:  queries,
+				Resolver: resolver,
+				Guard:    ai.NewCostGuard(budget, 0),
+			}
+			logger.Info("agent executor: workspace resolver")
+		} else {
+			logger.Info("agent executor: nil (bookkeeping only)")
+		}
+		runner = &agentruntime.OrchestratorRunner{DB: db, Executor: executor}
 		logger.Info("agent runner: orchestrator")
 	} else {
 		runner = &agentruntime.LogRunner{Sink: func(_ context.Context, j agentruntime.Job, _ time.Time) {

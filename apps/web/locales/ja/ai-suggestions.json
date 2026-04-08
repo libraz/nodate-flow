@@ -4,6 +4,30 @@
     "dismiss": "破棄",
     "edit": "編集"
   },
+  "agents": {
+    "title": "AIエージェント",
+    "subtitle": "ワークスペースのエージェントのトリガーモードとキルスイッチを管理します。",
+    "empty": "AIエージェントがまだありません。MCPまたはCLIから作成してください。",
+    "pause": "一時停止",
+    "resume": "再開",
+    "status": {
+      "active": "稼働中",
+      "paused": "停止中"
+    },
+    "scheduleKind": {
+      "label": "トリガー",
+      "options": {
+        "disabled": "無効",
+        "interval": "毎ティック",
+        "on_event": "イベント駆動",
+        "manual": "手動のみ"
+      }
+    },
+    "errors": {
+      "scheduleFailed": "トリガーの更新に失敗しました",
+      "pauseFailed": "キルスイッチの切り替えに失敗しました"
+    }
+  },
   "empty": "提案はまだありません",
   "loading": "考え中...",
   "error": "提案の取得に失敗しました",

@@ -144,48 +144,6 @@ func (q *Queries) FindProjectMemberByUserId(ctx context.Context, arg FindProject
 	return i, err
 }
 
-const listProjectPublicIdsForUserInWorkspace = `-- name: ListProjectPublicIdsForUserInWorkspace :many
-SELECT p.public_id
-FROM project_members pm
-JOIN projects p ON p.id = pm.project_id
-WHERE pm.workspace_id = ?
-  AND pm.user_id = ?
-  AND pm.enabled = TRUE
-  AND p.enabled = TRUE
-`
-
-type ListProjectPublicIdsForUserInWorkspaceParams struct {
-	WorkspaceID uint32 `json:"-"`
-	UserID      uint32 `json:"-"`
-}
-
-// List the public_ids of every enabled project in a workspace for which
-// the given user has an enabled project_members row. Used by the
-// per-project ACL filter on GET /workspaces/{wsId}/projects so non-member
-// workspace members do not enumerate projects they cannot open.
-func (q *Queries) ListProjectPublicIdsForUserInWorkspace(ctx context.Context, arg ListProjectPublicIdsForUserInWorkspaceParams) ([]types.PublicID, error) {
-	rows, err := q.db.QueryContext(ctx, listProjectPublicIdsForUserInWorkspace, arg.WorkspaceID, arg.UserID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []types.PublicID{}
-	for rows.Next() {
-		var id types.PublicID
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const findWorkspaceMemberByUserId = `-- name: FindWorkspaceMemberByUserId :one
 SELECT
   id,
@@ -316,6 +274,48 @@ func (q *Queries) ListProjectMembers(ctx context.Context, arg ListProjectMembers
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listProjectPublicIdsForUserInWorkspace = `-- name: ListProjectPublicIdsForUserInWorkspace :many
+SELECT p.public_id
+FROM project_members pm
+JOIN projects p ON p.id = pm.project_id
+WHERE pm.workspace_id = ?
+  AND pm.user_id = ?
+  AND pm.enabled = TRUE
+  AND p.enabled = TRUE
+`
+
+type ListProjectPublicIdsForUserInWorkspaceParams struct {
+	WorkspaceID uint32 `json:"-"`
+	UserID      uint32 `json:"-"`
+}
+
+// List the public_ids of every enabled project in a workspace for which
+// the given user has an enabled project_members row. Used by the
+// per-project ACL filter on GET /workspaces/{wsId}/projects so non-member
+// workspace members do not enumerate projects they cannot open.
+func (q *Queries) ListProjectPublicIdsForUserInWorkspace(ctx context.Context, arg ListProjectPublicIdsForUserInWorkspaceParams) ([]types.PublicID, error) {
+	rows, err := q.db.QueryContext(ctx, listProjectPublicIdsForUserInWorkspace, arg.WorkspaceID, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []types.PublicID{}
+	for rows.Next() {
+		var public_id types.PublicID
+		if err := rows.Scan(&public_id); err != nil {
+			return nil, err
+		}
+		items = append(items, public_id)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err

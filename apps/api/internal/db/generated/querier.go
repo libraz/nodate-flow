@@ -160,6 +160,8 @@ type Querier interface {
 	FindWorkspaceBySlug(ctx context.Context, slug string) (FindWorkspaceBySlugRow, error)
 	// Resolve a workspace membership by (workspace_id, user_id).
 	FindWorkspaceMemberByUserId(ctx context.Context, arg FindWorkspaceMemberByUserIdParams) (FindWorkspaceMemberByUserIdRow, error)
+	// Fetch the minimal fields an agent runner needs to invoke an LLM.
+	GetAgentForExec(ctx context.Context, arg GetAgentForExecParams) (GetAgentForExecRow, error)
 	// ============================================================================
 	// ai_settings queries (ADR 0003)
 	// Per-workspace AI knobs: embed model, daily embed budget, and the
@@ -334,6 +336,8 @@ type Querier interface {
 	// the only path allowed to mutate derived_state and must be called inside
 	// the same transaction as the events append.
 	TransitionTaskState(ctx context.Context, arg TransitionTaskStateParams) error
+	// Update the schedule_kind on an existing agent.
+	UpdateAgentScheduleKind(ctx context.Context, arg UpdateAgentScheduleKindParams) error
 	// Bump failed login counter and optionally apply a lockout deadline.
 	UpdateIdentityFailedAttempts(ctx context.Context, arg UpdateIdentityFailedAttemptsParams) error
 	// Change a member's role.

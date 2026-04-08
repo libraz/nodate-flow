@@ -24,20 +24,22 @@ INSERT INTO ai_agents (
   system_prompt,
   temperature,
   max_output_tokens,
-  tools_json
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  tools_json,
+  schedule_kind
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateAgentParams struct {
-	PublicID        types.PublicID  `json:"publicId"`
-	WorkspaceID     uint32          `json:"-"`
-	ModelID         uint32          `json:"modelId"`
-	Name            string          `json:"name"`
-	Description     sql.NullString  `json:"description"`
-	SystemPrompt    string          `json:"systemPrompt"`
-	Temperature     uint16          `json:"temperature"`
-	MaxOutputTokens sql.NullInt32   `json:"maxOutputTokens"`
-	ToolsJson       json.RawMessage `json:"toolsJson"`
+	PublicID        types.PublicID       `json:"publicId"`
+	WorkspaceID     uint32               `json:"-"`
+	ModelID         uint32               `json:"modelId"`
+	Name            string               `json:"name"`
+	Description     sql.NullString       `json:"description"`
+	SystemPrompt    string               `json:"systemPrompt"`
+	Temperature     uint16               `json:"temperature"`
+	MaxOutputTokens sql.NullInt32        `json:"maxOutputTokens"`
+	ToolsJson       json.RawMessage      `json:"toolsJson"`
+	ScheduleKind    AiAgentsScheduleKind `json:"scheduleKind"`
 }
 
 // Insert a new reusable agent configuration.
@@ -52,11 +54,66 @@ func (q *Queries) CreateAgent(ctx context.Context, arg CreateAgentParams) (int64
 		arg.Temperature,
 		arg.MaxOutputTokens,
 		arg.ToolsJson,
+		arg.ScheduleKind,
 	)
 	if err != nil {
 		return 0, err
 	}
 	return result.LastInsertId()
+}
+
+const getAgentForExec = `-- name: GetAgentForExec :one
+SELECT
+  a.id,
+  a.public_id,
+  a.workspace_id,
+  a.name,
+  a.system_prompt,
+  a.temperature,
+  a.max_output_tokens,
+  a.paused,
+  m.public_id AS model_public_id,
+  m.name AS model_name
+FROM ai_agents a
+INNER JOIN ai_models m ON m.id = a.model_id AND m.enabled = TRUE
+WHERE a.workspace_id = ? AND a.id = ? AND a.enabled = TRUE
+`
+
+type GetAgentForExecParams struct {
+	WorkspaceID uint32 `json:"-"`
+	ID          uint32 `json:"-"`
+}
+
+type GetAgentForExecRow struct {
+	ID              uint32         `json:"-"`
+	PublicID        types.PublicID `json:"publicId"`
+	WorkspaceID     uint32         `json:"-"`
+	Name            string         `json:"name"`
+	SystemPrompt    string         `json:"systemPrompt"`
+	Temperature     uint16         `json:"temperature"`
+	MaxOutputTokens sql.NullInt32  `json:"maxOutputTokens"`
+	Paused          bool           `json:"paused"`
+	ModelPublicID   types.PublicID `json:"modelPublicId"`
+	ModelName       string         `json:"modelName"`
+}
+
+// Fetch the minimal fields an agent runner needs to invoke an LLM.
+func (q *Queries) GetAgentForExec(ctx context.Context, arg GetAgentForExecParams) (GetAgentForExecRow, error) {
+	row := q.db.QueryRowContext(ctx, getAgentForExec, arg.WorkspaceID, arg.ID)
+	var i GetAgentForExecRow
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.WorkspaceID,
+		&i.Name,
+		&i.SystemPrompt,
+		&i.Temperature,
+		&i.MaxOutputTokens,
+		&i.Paused,
+		&i.ModelPublicID,
+		&i.ModelName,
+	)
+	return i, err
 }
 
 const listAgentsForWorkspace = `-- name: ListAgentsForWorkspace :many
@@ -70,6 +127,8 @@ SELECT
   a.temperature,
   a.max_output_tokens,
   a.tools_json,
+  a.schedule_kind,
+  a.paused,
   a.updated_at,
   a.created_at,
   COUNT(*) OVER() AS total
@@ -88,18 +147,20 @@ type ListAgentsForWorkspaceParams struct {
 }
 
 type ListAgentsForWorkspaceRow struct {
-	PublicID        types.PublicID  `json:"publicId"`
-	ModelPublicID   types.PublicID  `json:"modelPublicId"`
-	ModelName       string          `json:"modelName"`
-	Name            string          `json:"name"`
-	Description     sql.NullString  `json:"description"`
-	SystemPrompt    string          `json:"systemPrompt"`
-	Temperature     uint16          `json:"temperature"`
-	MaxOutputTokens sql.NullInt32   `json:"maxOutputTokens"`
-	ToolsJson       json.RawMessage `json:"toolsJson"`
-	UpdatedAt       sql.NullTime    `json:"updatedAt"`
-	CreatedAt       time.Time       `json:"createdAt"`
-	Total           interface{}     `json:"total"`
+	PublicID        types.PublicID       `json:"publicId"`
+	ModelPublicID   types.PublicID       `json:"modelPublicId"`
+	ModelName       string               `json:"modelName"`
+	Name            string               `json:"name"`
+	Description     sql.NullString       `json:"description"`
+	SystemPrompt    string               `json:"systemPrompt"`
+	Temperature     uint16               `json:"temperature"`
+	MaxOutputTokens sql.NullInt32        `json:"maxOutputTokens"`
+	ToolsJson       json.RawMessage      `json:"toolsJson"`
+	ScheduleKind    AiAgentsScheduleKind `json:"scheduleKind"`
+	Paused          bool                 `json:"paused"`
+	UpdatedAt       sql.NullTime         `json:"updatedAt"`
+	CreatedAt       time.Time            `json:"createdAt"`
+	Total           interface{}          `json:"total"`
 }
 
 // List a workspace's agents joined with the underlying model.
@@ -122,6 +183,8 @@ func (q *Queries) ListAgentsForWorkspace(ctx context.Context, arg ListAgentsForW
 			&i.Temperature,
 			&i.MaxOutputTokens,
 			&i.ToolsJson,
+			&i.ScheduleKind,
+			&i.Paused,
 			&i.UpdatedAt,
 			&i.CreatedAt,
 			&i.Total,
@@ -137,4 +200,22 @@ func (q *Queries) ListAgentsForWorkspace(ctx context.Context, arg ListAgentsForW
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateAgentScheduleKind = `-- name: UpdateAgentScheduleKind :exec
+UPDATE ai_agents
+SET schedule_kind = ?
+WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE
+`
+
+type UpdateAgentScheduleKindParams struct {
+	ScheduleKind AiAgentsScheduleKind `json:"scheduleKind"`
+	WorkspaceID  uint32               `json:"-"`
+	PublicID     types.PublicID       `json:"publicId"`
+}
+
+// Update the schedule_kind on an existing agent.
+func (q *Queries) UpdateAgentScheduleKind(ctx context.Context, arg UpdateAgentScheduleKindParams) error {
+	_, err := q.db.ExecContext(ctx, updateAgentScheduleKind, arg.ScheduleKind, arg.WorkspaceID, arg.PublicID)
+	return err
 }

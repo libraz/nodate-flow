@@ -665,6 +665,23 @@ export interface paths {
         patch: operations["workspaces-patch"];
         trace?: never;
     };
+    "/workspaces/{wsId}/ai/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List AI agents for a workspace */
+        get: operations["ai-agents-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{wsId}/ai/agents/{agentId}/pause": {
         parameters: {
             query?: never;
@@ -680,6 +697,23 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/ai/agents/{agentId}/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update an AI agent's schedule_kind trigger mode */
+        patch: operations["ai-agent-schedule-update"];
         trace?: never;
     };
     "/workspaces/{wsId}/ai/auto-actions": {
@@ -1151,6 +1185,20 @@ export interface components {
             /** @enum {string} */
             role: "owner" | "admin" | "member" | "guest";
         };
+        AgentSummary: {
+            /** Format: int64 */
+            createdAt: number;
+            description?: string;
+            id: string;
+            modelId: string;
+            modelName: string;
+            name: string;
+            paused: boolean;
+            scheduleKind: string;
+            systemPrompt: string;
+            /** Format: int64 */
+            updatedAt?: number;
+        };
         AiCostTodayOutputBody: {
             /**
              * Format: uri
@@ -1550,6 +1598,16 @@ export interface components {
             };
             groupBy: string | null;
             sort: components["schemas"]["SortSpec"][] | null;
+        };
+        ListAgentsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            agents: components["schemas"]["AgentSummary"][] | null;
+            /** Format: int64 */
+            total: number;
         };
         ListAutoActionsOutputBody: {
             /**
@@ -2326,6 +2384,23 @@ export interface components {
              * @enum {string}
              */
             transition: "start" | "block" | "unblock" | "submit" | "complete" | "reopen" | "cancel";
+        };
+        UpdateAgentScheduleInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @enum {string} */
+            scheduleKind: "disabled" | "interval" | "on_event" | "manual";
+        };
+        UpdateAgentScheduleOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
         };
         UpdateWorkspaceMemberRoleInputBody: {
             /**
@@ -4186,6 +4261,40 @@ export interface operations {
             };
         };
     };
+    "ai-agents-list": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListAgentsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "ai-agent-pause": {
         parameters: {
             query?: never;
@@ -4209,6 +4318,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PauseAgentOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-agent-schedule-update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                agentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAgentScheduleInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateAgentScheduleOutputBody"];
                 };
             };
             /** @description Error */

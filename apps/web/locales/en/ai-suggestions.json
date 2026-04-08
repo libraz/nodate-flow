@@ -4,6 +4,30 @@
     "dismiss": "Dismiss",
     "edit": "Edit"
   },
+  "agents": {
+    "title": "AI agents",
+    "subtitle": "Manage trigger mode and kill switch for workspace agents.",
+    "empty": "No AI agents yet. Provision one via MCP or CLI.",
+    "pause": "Pause",
+    "resume": "Resume",
+    "status": {
+      "active": "Active",
+      "paused": "Paused"
+    },
+    "scheduleKind": {
+      "label": "Trigger",
+      "options": {
+        "disabled": "Disabled",
+        "interval": "Every tick",
+        "on_event": "On event",
+        "manual": "Manual only"
+      }
+    },
+    "errors": {
+      "scheduleFailed": "Failed to update trigger",
+      "pauseFailed": "Failed to toggle kill switch"
+    }
+  },
   "empty": "No suggestions yet",
   "loading": "Thinking...",
   "error": "Failed to load suggestions",

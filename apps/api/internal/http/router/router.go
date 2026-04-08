@@ -283,6 +283,18 @@ func BuildResult(deps Deps) Result {
 				Path:        "/workspaces/{wsId}/ai/agents/{agentId}/pause",
 				Summary:     "Toggle the kill switch on an AI agent (4.AGENT-3)",
 			}, aihandlers.PauseAgent(aiDeps))
+			huma.Register(subAPI, huma.Operation{
+				OperationID: "ai-agents-list",
+				Method:      http.MethodGet,
+				Path:        "/workspaces/{wsId}/ai/agents",
+				Summary:     "List AI agents for a workspace",
+			}, aihandlers.ListAgents(aiDeps))
+			huma.Register(subAPI, huma.Operation{
+				OperationID: "ai-agent-schedule-update",
+				Method:      http.MethodPatch,
+				Path:        "/workspaces/{wsId}/ai/agents/{agentId}/schedule",
+				Summary:     "Update an AI agent's schedule_kind trigger mode",
+			}, aihandlers.UpdateAgentSchedule(aiDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-priority-suggestions-list",
 			Method:      http.MethodGet,
