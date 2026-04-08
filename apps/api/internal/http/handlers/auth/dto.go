@@ -4,6 +4,7 @@ package auth
 
 import (
 	"database/sql"
+	"net/http"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
@@ -15,6 +16,10 @@ type Deps struct {
 	Queries *generated.Queries
 	JWT     *auth.JWTIssuer
 	OIDC    *auth.OIDCClient
+	// CookieSecure toggles the Secure flag on the refresh cookie. It
+	// defaults to true in production; local http dev can disable it via
+	// NF_COOKIE_SECURE=false.
+	CookieSecure bool
 }
 
 // RegisterInput is the body for POST /auth/register.
@@ -28,16 +33,18 @@ type RegisterInput struct {
 }
 
 // AuthTokens is the tokens envelope returned by register/login/refresh.
+// The refresh token is intentionally NOT part of this struct: it is
+// delivered as an httpOnly Set-Cookie header instead.
 type AuthTokens struct {
-	AccessToken  string `json:"accessToken"`
-	RefreshToken string `json:"refreshToken"`
-	ExpiresAt    int64  `json:"expiresAt" doc:"Access token expiry, unix seconds"`
-	UserID       string `json:"userId" doc:"User public id (UUID v7)"`
+	AccessToken string `json:"accessToken"`
+	ExpiresAt   int64  `json:"expiresAt" doc:"Access token expiry, unix seconds"`
+	UserID      string `json:"userId" doc:"User public id (UUID v7)"`
 }
 
 // RegisterOutput is the response for POST /auth/register.
 type RegisterOutput struct {
-	Body AuthTokens
+	SetCookie http.Cookie `header:"Set-Cookie"`
+	Body      AuthTokens
 }
 
 // LoginInput is the body for POST /auth/login.
@@ -50,31 +57,32 @@ type LoginInput struct {
 
 // LoginOutput is the response for POST /auth/login.
 type LoginOutput struct {
-	Body AuthTokens
+	SetCookie http.Cookie `header:"Set-Cookie"`
+	Body      AuthTokens
 }
 
-// RefreshInput is the body for POST /auth/refresh.
+// RefreshInput is the request for POST /auth/refresh. The refresh token
+// is read from the nf_rt httpOnly cookie; there is no request body.
 type RefreshInput struct {
-	Body struct {
-		RefreshToken string `json:"refreshToken"`
-	}
+	RefreshCookie http.Cookie `cookie:"nf_rt"`
 }
 
 // RefreshOutput is the response for POST /auth/refresh.
 type RefreshOutput struct {
-	Body AuthTokens
+	SetCookie http.Cookie `header:"Set-Cookie"`
+	Body      AuthTokens
 }
 
-// LogoutInput is the body for POST /auth/logout.
+// LogoutInput is the request for POST /auth/logout. The refresh token is
+// read from the nf_rt httpOnly cookie.
 type LogoutInput struct {
-	Body struct {
-		RefreshToken string `json:"refreshToken,omitempty"`
-	}
+	RefreshCookie http.Cookie `cookie:"nf_rt"`
 }
 
 // LogoutOutput is the response for POST /auth/logout.
 type LogoutOutput struct {
-	Body struct {
+	SetCookie http.Cookie `header:"Set-Cookie"`
+	Body      struct {
 		Ok bool `json:"ok"`
 	}
 }
@@ -96,7 +104,8 @@ type OIDCCallbackInput struct {
 
 // OIDCCallbackOutput is the response for OIDC callback.
 type OIDCCallbackOutput struct {
-	Body AuthTokens
+	SetCookie http.Cookie `header:"Set-Cookie"`
+	Body      AuthTokens
 }
 
 // MeOutput is the response for GET /me.

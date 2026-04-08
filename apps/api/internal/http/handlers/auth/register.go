@@ -60,38 +60,42 @@ func Register(deps Deps) func(context.Context, *RegisterInput) (*RegisterOutput,
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		tokens, err := issueTokens(ctx, deps, uint32(uid), userPub)
+		tokens, refresh, err := issueTokens(ctx, deps, uint32(uid), userPub)
 		if err != nil {
 			return nil, err
 		}
-		return &RegisterOutput{Body: tokens}, nil
+		return &RegisterOutput{
+			SetCookie: newRefreshCookie(refresh, deps.CookieSecure),
+			Body:      tokens,
+		}, nil
 	}
 }
 
-// issueTokens signs an access JWT and creates a new session row, returning
-// the AuthTokens envelope shared by register/login/refresh.
-func issueTokens(ctx context.Context, deps Deps, userID uint32, userPub types.PublicID) (AuthTokens, error) {
+// issueTokens signs an access JWT and creates a new session row. It
+// returns the JSON-body AuthTokens envelope plus the freshly-minted
+// plaintext refresh token, which the caller must attach to the
+// response via a Set-Cookie header (never in the JSON body).
+func issueTokens(ctx context.Context, deps Deps, userID uint32, userPub types.PublicID) (AuthTokens, string, error) {
 	access, exp, err := deps.JWT.Sign(userPub)
 	if err != nil {
-		return AuthTokens{}, httpErr(apierrors.InternalUnexpected)
+		return AuthTokens{}, "", httpErr(apierrors.InternalUnexpected)
 	}
 	refresh, refreshHash, err := auth.GenerateRefresh()
 	if err != nil {
-		return AuthTokens{}, httpErr(apierrors.InternalUnexpected)
+		return AuthTokens{}, "", httpErr(apierrors.InternalUnexpected)
 	}
 	sessPub := types.New()
 	if _, err := deps.Queries.CreateSession(ctx, generated.CreateSessionParams{
 		PublicID:    sessPub,
 		UserID:      userID,
 		RefreshHash: refreshHash,
-		ExpiresAt:   time.Now().Add(30 * 24 * time.Hour),
+		ExpiresAt:   time.Now().Add(refreshCookieTTL),
 	}); err != nil {
-		return AuthTokens{}, httpErr(apierrors.InternalUnexpected)
+		return AuthTokens{}, "", httpErr(apierrors.InternalUnexpected)
 	}
 	return AuthTokens{
-		AccessToken:  access,
-		RefreshToken: refresh,
-		ExpiresAt:    exp.Unix(),
-		UserID:       userPub.String(),
-	}, nil
+		AccessToken: access,
+		ExpiresAt:   exp.Unix(),
+		UserID:      userPub.String(),
+	}, refresh, nil
 }

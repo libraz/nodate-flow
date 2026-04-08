@@ -344,9 +344,6 @@
             "format": "int64",
             "type": "integer"
           },
-          "refreshToken": {
-            "type": "string"
-          },
           "userId": {
             "description": "User public id (UUID v7)",
             "type": "string"
@@ -354,7 +351,6 @@
         },
         "required": [
           "accessToken",
-          "refreshToken",
           "expiresAt",
           "userId"
         ],
@@ -1257,24 +1253,6 @@
         ],
         "type": "object"
       },
-      "LogoutInputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/LogoutInputBody.json"
-            ],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "refreshToken": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
       "LogoutOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -1608,27 +1586,6 @@
           "name",
           "apiKeyMasked",
           "createdAt"
-        ],
-        "type": "object"
-      },
-      "RefreshInputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/RefreshInputBody.json"
-            ],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "refreshToken": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "refreshToken"
         ],
         "type": "object"
       },
@@ -2152,7 +2109,14 @@
                 }
               }
             },
-            "description": "OK"
+            "description": "OK",
+            "headers": {
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "default": {
             "content": {
@@ -2171,16 +2135,15 @@
     "/auth/logout": {
       "post": {
         "operationId": "auth-logout",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LogoutInputBody"
-              }
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "nf_rt",
+            "schema": {
+              "type": "string"
             }
-          },
-          "required": true
-        },
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -2190,7 +2153,14 @@
                 }
               }
             },
-            "description": "OK"
+            "description": "OK",
+            "headers": {
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "default": {
             "content": {
@@ -2236,7 +2206,14 @@
                 }
               }
             },
-            "description": "OK"
+            "description": "OK",
+            "headers": {
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "default": {
             "content": {
@@ -2283,16 +2260,15 @@
     "/auth/refresh": {
       "post": {
         "operationId": "auth-refresh",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RefreshInputBody"
-              }
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "nf_rt",
+            "schema": {
+              "type": "string"
             }
-          },
-          "required": true
-        },
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -2302,7 +2278,14 @@
                 }
               }
             },
-            "description": "OK"
+            "description": "OK",
+            "headers": {
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "default": {
             "content": {
@@ -2340,7 +2323,14 @@
                 }
               }
             },
-            "description": "OK"
+            "description": "OK",
+            "headers": {
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "default": {
             "content": {

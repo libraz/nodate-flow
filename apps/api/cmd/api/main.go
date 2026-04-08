@@ -57,6 +57,7 @@ func main() {
 		GhWebhookSecret:    cfg.GhWebhookSecret,
 		SlackSigningSecret: cfg.SlackSigningSecret,
 		DefaultWorkspaceID: cfg.DefaultWorkspaceID,
+		CookieSecure:       cfg.CookieSecure,
 	})
 
 	// Wrap the router with the request logger so the prod binary keeps

@@ -61,18 +61,17 @@ func CreateTestTenant(t *testing.T, baseURL string) *TestTenant {
 	}
 
 	var resp struct {
-		AccessToken  string `json:"accessToken"`
-		RefreshToken string `json:"refreshToken"`
-		ExpiresAt    int64  `json:"expiresAt"`
-		UserID       string `json:"userId"`
+		AccessToken string `json:"accessToken"`
+		ExpiresAt   int64  `json:"expiresAt"`
+		UserID      string `json:"userId"`
 	}
-	doJSON(t, http.MethodPost, baseURL+"/auth/register", "", body, &resp)
+	refresh := doJSONCapturingRefreshCookie(t, http.MethodPost, baseURL+"/auth/register", "", "", body, &resp)
 	require.NotEmpty(t, resp.AccessToken, "register did not return access token")
-	require.NotEmpty(t, resp.RefreshToken, "register did not return refresh token")
+	require.NotEmpty(t, refresh, "register did not set nf_rt refresh cookie")
 	require.NotEmpty(t, resp.UserID, "register did not return user id")
 
 	tt.AccessToken = resp.AccessToken
-	tt.RefreshToken = resp.RefreshToken
+	tt.RefreshToken = refresh
 	tt.UserPublicID = resp.UserID
 
 	// Create a workspace owned by this tenant.
@@ -120,8 +119,10 @@ func CleanupTenant(t *testing.T, tt *TestTenant) {
 	if tt == nil || tt.BaseURL == "" {
 		return
 	}
-	body := map[string]any{"refreshToken": tt.RefreshToken}
-	req := newJSONRequest(t, http.MethodPost, tt.BaseURL+"/auth/logout", tt.AccessToken, body)
+	req := newJSONRequest(t, http.MethodPost, tt.BaseURL+"/auth/logout", tt.AccessToken, nil)
+	if tt.RefreshToken != "" {
+		req.AddCookie(&http.Cookie{Name: "nf_rt", Value: tt.RefreshToken})
+	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Logf("logout request failed: %v", err)
@@ -250,6 +251,38 @@ func newJSONRequest(t *testing.T, method, url, bearer string, body any) *http.Re
 		req.Header.Set("Authorization", "Bearer "+bearer)
 	}
 	return req
+}
+
+// doJSONCapturingRefreshCookie sends a JSON request and additionally
+// extracts the value of the nf_rt Set-Cookie header from the response,
+// returning it to the caller. If refreshCookie is non-empty it is
+// attached to the outbound request so callers can drive /auth/refresh
+// and /auth/logout without plumbing a full cookie jar.
+func doJSONCapturingRefreshCookie(t *testing.T, method, url, bearer, refreshCookie string, body any, out any) string {
+	t.Helper()
+	req := newJSONRequest(t, method, url, bearer, body)
+	if refreshCookie != "" {
+		req.AddCookie(&http.Cookie{Name: "nf_rt", Value: refreshCookie})
+	}
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err, "%s %s", method, url)
+	defer func() { _ = resp.Body.Close() }()
+
+	raw, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	require.GreaterOrEqualf(t, resp.StatusCode, 200, "%s %s -> %d body=%s", method, url, resp.StatusCode, string(raw))
+	require.Lessf(t, resp.StatusCode, 300, "%s %s -> %d body=%s", method, url, resp.StatusCode, string(raw))
+
+	if out != nil && len(raw) > 0 {
+		require.NoError(t, json.Unmarshal(raw, out), "decode %s %s body=%s", method, url, string(raw))
+	}
+
+	for _, c := range resp.Cookies() {
+		if c.Name == "nf_rt" {
+			return c.Value
+		}
+	}
+	return ""
 }
 
 // randomHex returns 2*n hex characters from crypto/rand.

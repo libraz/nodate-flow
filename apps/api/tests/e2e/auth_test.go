@@ -1,16 +1,21 @@
 package e2e
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
 // TestAuthLifecycle exercises the happy path of the auth stream:
-// register, /me, login, refresh, logout. It also verifies the negative
-// paths (bad credentials, lockout after 5 failed attempts).
+// register, /me, login, refresh, logout. It also verifies that the
+// refresh token is only delivered via the nf_rt httpOnly cookie and
+// never in the JSON body.
 func TestAuthLifecycle(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -28,37 +33,55 @@ func TestAuthLifecycle(t *testing.T) {
 	require.Equal(t, tt.UserPublicID, me.ID)
 	require.Equal(t, tt.Email, me.Email)
 
-	// Login with correct password returns a fresh token envelope.
-	var login struct {
-		AccessToken  string `json:"accessToken"`
-		RefreshToken string `json:"refreshToken"`
-		ExpiresAt    int64  `json:"expiresAt"`
-		UserID       string `json:"userId"`
-	}
-	doJSON(t, http.MethodPost, testServerURL+"/auth/login", "", map[string]any{
+	// Login with correct password. The JSON body must NOT contain any
+	// refreshToken field; the refresh token lives in the nf_rt cookie.
+	loginStatus, loginBody, loginResp := doRaw(t, http.MethodPost, testServerURL+"/auth/login", "", nil, map[string]any{
 		"email":    tt.Email,
 		"password": tt.Password,
-	}, &login)
+	})
+	require.Equal(t, http.StatusOK, loginStatus, "login body=%s", string(loginBody))
+	require.NotContainsf(t, string(loginBody), "refreshToken", "login body leaked refreshToken: %s", string(loginBody))
+
+	var login struct {
+		AccessToken string `json:"accessToken"`
+		UserID      string `json:"userId"`
+	}
+	require.NoError(t, json.Unmarshal(loginBody, &login))
 	require.NotEmpty(t, login.AccessToken)
-	require.NotEmpty(t, login.RefreshToken)
 	require.Equal(t, tt.UserPublicID, login.UserID)
 
-	// Refresh rotates the refresh token and issues a new access token.
-	var refreshed struct {
-		AccessToken  string `json:"accessToken"`
-		RefreshToken string `json:"refreshToken"`
-	}
-	doJSON(t, http.MethodPost, testServerURL+"/auth/refresh", login.AccessToken, map[string]any{
-		"refreshToken": login.RefreshToken,
-	}, &refreshed)
-	require.NotEmpty(t, refreshed.AccessToken)
-	require.NotEmpty(t, refreshed.RefreshToken)
-	require.NotEqual(t, login.RefreshToken, refreshed.RefreshToken, "refresh must rotate")
+	loginCookie := pickCookie(loginResp, "nf_rt")
+	require.NotNil(t, loginCookie, "login did not set nf_rt cookie")
+	require.True(t, loginCookie.HttpOnly, "nf_rt must be HttpOnly")
+	require.Equal(t, http.SameSiteStrictMode, loginCookie.SameSite, "nf_rt must be SameSite=Strict")
+	require.Equal(t, "/auth", loginCookie.Path, "nf_rt must be scoped to /auth")
+	require.NotEmpty(t, loginCookie.Value)
 
-	// Logout succeeds.
-	status, _ := doJSONStatus(t, http.MethodPost, testServerURL+"/auth/logout",
-		refreshed.AccessToken, map[string]any{"refreshToken": refreshed.RefreshToken})
-	require.Equal(t, http.StatusOK, status)
+	// Refresh rotates the refresh cookie and issues a new access token.
+	// No request body is sent; the token travels in the cookie header.
+	refStatus, refBody, refResp := doRaw(t, http.MethodPost, testServerURL+"/auth/refresh", login.AccessToken,
+		[]*http.Cookie{{Name: "nf_rt", Value: loginCookie.Value}}, nil)
+	require.Equal(t, http.StatusOK, refStatus, "refresh body=%s", string(refBody))
+	require.NotContainsf(t, string(refBody), "refreshToken", "refresh body leaked refreshToken: %s", string(refBody))
+
+	var refreshed struct {
+		AccessToken string `json:"accessToken"`
+	}
+	require.NoError(t, json.Unmarshal(refBody, &refreshed))
+	require.NotEmpty(t, refreshed.AccessToken)
+
+	rotated := pickCookie(refResp, "nf_rt")
+	require.NotNil(t, rotated, "refresh did not set rotated nf_rt cookie")
+	require.NotEqual(t, loginCookie.Value, rotated.Value, "refresh must rotate the cookie value")
+
+	// Logout clears the refresh cookie.
+	outStatus, _, outResp := doRaw(t, http.MethodPost, testServerURL+"/auth/logout", refreshed.AccessToken,
+		[]*http.Cookie{{Name: "nf_rt", Value: rotated.Value}}, nil)
+	require.Equal(t, http.StatusOK, outStatus)
+	cleared := pickCookie(outResp, "nf_rt")
+	require.NotNil(t, cleared, "logout must emit a Set-Cookie to clear nf_rt")
+	require.Equal(t, "", cleared.Value, "logout must clear nf_rt value")
+	require.True(t, cleared.MaxAge < 0 || cleared.MaxAge == 0, "logout must set Max-Age=0 (got %d)", cleared.MaxAge)
 }
 
 // TestAuthBadCredentials verifies that a wrong password returns a
@@ -100,4 +123,46 @@ func TestAuthLockout(t *testing.T) {
 	if status < 400 {
 		t.Skipf("lockout not enforced by this build; got %d body=%s", status, string(body))
 	}
+}
+
+// doRaw sends a request with optional JSON body and optional request
+// cookies, returning status, raw body, and the full *http.Response so
+// tests can inspect Set-Cookie headers.
+func doRaw(t *testing.T, method, url, bearer string, cookies []*http.Cookie, body any) (int, []byte, *http.Response) {
+	t.Helper()
+	var rdr io.Reader
+	if body != nil {
+		buf, err := json.Marshal(body)
+		require.NoError(t, err)
+		rdr = bytes.NewReader(buf)
+	}
+	req, err := http.NewRequest(method, url, rdr)
+	require.NoError(t, err)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	req.Header.Set("Accept", "application/json")
+	if bearer != "" {
+		req.Header.Set("Authorization", "Bearer "+bearer)
+	}
+	for _, c := range cookies {
+		req.AddCookie(c)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+	raw, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	return resp.StatusCode, raw, resp
+}
+
+// pickCookie returns the first Set-Cookie in resp with the given name,
+// or nil if none matches.
+func pickCookie(resp *http.Response, name string) *http.Cookie {
+	for _, c := range resp.Cookies() {
+		if strings.EqualFold(c.Name, name) {
+			return c
+		}
+	}
+	return nil
 }

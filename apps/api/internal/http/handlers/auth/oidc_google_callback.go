@@ -76,10 +76,13 @@ func OIDCGoogleCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*O
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		tokens, err := issueTokens(ctx, deps, userID, userPub)
+		tokens, refresh, err := issueTokens(ctx, deps, userID, userPub)
 		if err != nil {
 			return nil, err
 		}
-		return &OIDCCallbackOutput{Body: tokens}, nil
+		return &OIDCCallbackOutput{
+			SetCookie: newRefreshCookie(refresh, deps.CookieSecure),
+			Body:      tokens,
+		}, nil
 	}
 }

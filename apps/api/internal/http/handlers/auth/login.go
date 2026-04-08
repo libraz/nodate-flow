@@ -46,11 +46,14 @@ func Login(deps Deps) func(context.Context, *LoginInput) (*LoginOutput, error) {
 		_ = deps.Queries.ResetIdentityFailedAttempts(ctx, row.ID)
 		_ = deps.Queries.UpdateUserLastLoginAt(ctx, row.UserID)
 
-		tokens, err := issueTokens(ctx, deps, row.UserID, row.UserPublicID)
+		tokens, refresh, err := issueTokens(ctx, deps, row.UserID, row.UserPublicID)
 		if err != nil {
 			return nil, err
 		}
-		return &LoginOutput{Body: tokens}, nil
+		return &LoginOutput{
+			SetCookie: newRefreshCookie(refresh, deps.CookieSecure),
+			Body:      tokens,
+		}, nil
 	}
 }
 

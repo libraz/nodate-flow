@@ -8,16 +8,20 @@ import (
 )
 
 // Logout handles POST /auth/logout. It revokes the session matching the
-// provided refresh token. Errors are intentionally swallowed so logout is
+// refresh token carried in the nf_rt httpOnly cookie and clears the
+// cookie on the client. Errors are intentionally swallowed so logout is
 // idempotent from the client's perspective.
 func Logout(deps Deps) func(context.Context, *LogoutInput) (*LogoutOutput, error) {
 	return func(ctx context.Context, in *LogoutInput) (*LogoutOutput, error) {
-		out := &LogoutOutput{}
+		out := &LogoutOutput{
+			SetCookie: clearedRefreshCookie(deps.CookieSecure),
+		}
 		out.Body.Ok = true
-		if in.Body.RefreshToken == "" {
+		plain := in.RefreshCookie.Value
+		if plain == "" {
 			return out, nil
 		}
-		hash := auth.HashOpaque(in.Body.RefreshToken)
+		hash := auth.HashOpaque(plain)
 		row, err := deps.Queries.FindSessionByRefreshHash(ctx, hash)
 		if err != nil {
 			return out, nil

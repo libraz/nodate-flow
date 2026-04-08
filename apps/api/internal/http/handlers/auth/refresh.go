@@ -12,11 +12,17 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
 )
 
-// Refresh handles POST /auth/refresh. It rotates the refresh token and
-// issues a new access JWT.
+// Refresh handles POST /auth/refresh. It reads the refresh token from
+// the nf_rt httpOnly cookie, rotates it, and issues a new access JWT.
+// The rotated refresh token is returned via a Set-Cookie header; only
+// the access token appears in the JSON body.
 func Refresh(deps Deps) func(context.Context, *RefreshInput) (*RefreshOutput, error) {
 	return func(ctx context.Context, in *RefreshInput) (*RefreshOutput, error) {
-		hash := auth.HashOpaque(in.Body.RefreshToken)
+		plain := in.RefreshCookie.Value
+		if plain == "" {
+			return nil, httpErr(apierrors.AuthTokenRefreshInvalid)
+		}
+		hash := auth.HashOpaque(plain)
 		row, err := deps.Queries.FindSessionByRefreshHash(ctx, hash)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -31,7 +37,7 @@ func Refresh(deps Deps) func(context.Context, *RefreshInput) (*RefreshOutput, er
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		newExp := time.Now().Add(30 * 24 * time.Hour)
+		newExp := time.Now().Add(refreshCookieTTL)
 		if err := deps.Queries.RotateSessionRefreshHash(ctx, generated.RotateSessionRefreshHashParams{
 			RefreshHash: newHash,
 			ExpiresAt:   newExp,
@@ -47,11 +53,13 @@ func Refresh(deps Deps) func(context.Context, *RefreshInput) (*RefreshOutput, er
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		return &RefreshOutput{Body: AuthTokens{
-			AccessToken:  access,
-			RefreshToken: newPlain,
-			ExpiresAt:    exp.Unix(),
-			UserID:       pub.String(),
-		}}, nil
+		return &RefreshOutput{
+			SetCookie: newRefreshCookie(newPlain, deps.CookieSecure),
+			Body: AuthTokens{
+				AccessToken: access,
+				ExpiresAt:   exp.Unix(),
+				UserID:      pub.String(),
+			},
+		}, nil
 	}
 }

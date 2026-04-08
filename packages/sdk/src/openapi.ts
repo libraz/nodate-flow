@@ -802,7 +802,6 @@ export interface components {
              * @description Access token expiry, unix seconds
              */
             expiresAt: number;
-            refreshToken: string;
             /** @description User public id (UUID v7) */
             userId: string;
         };
@@ -1143,15 +1142,6 @@ export interface components {
             email: string;
             password: string;
         };
-        LogoutInputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/LogoutInputBody.json
-             */
-            readonly $schema?: string;
-            refreshToken?: string;
-        };
         LogoutOutputBody: {
             /**
              * Format: uri
@@ -1274,15 +1264,6 @@ export interface components {
             name: string;
             /** Format: date-time */
             updatedAt?: string;
-        };
-        RefreshInputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/RefreshInputBody.json
-             */
-            readonly $schema?: string;
-            refreshToken: string;
         };
         RegisterInputBody: {
             /**
@@ -1500,6 +1481,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1522,17 +1504,16 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LogoutInputBody"];
+            cookie?: {
+                nf_rt?: string;
             };
         };
+        requestBody?: never;
         responses: {
             /** @description OK */
             200: {
                 headers: {
+                    "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1565,6 +1546,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1616,17 +1598,16 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RefreshInputBody"];
+            cookie?: {
+                nf_rt?: string;
             };
         };
+        requestBody?: never;
         responses: {
             /** @description OK */
             200: {
                 headers: {
+                    "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1660,6 +1641,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };
                 content: {

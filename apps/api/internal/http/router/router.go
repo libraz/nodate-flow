@@ -63,6 +63,10 @@ type Deps struct {
 	// DefaultWorkspaceID is the workspace public id (UUID v7) that
 	// webhook-origin signals are routed to. Empty in tests.
 	DefaultWorkspaceID string
+	// CookieSecure toggles the Secure flag on the refresh cookie. Tests
+	// leave it false so http://127.0.0.1 traffic works; the prod main
+	// wires it from cfg.CookieSecure.
+	CookieSecure bool
 }
 
 // Result is what BuildResult returns: the composed chi router plus the
@@ -115,7 +119,7 @@ func BuildResult(deps Deps) Result {
 		return out, nil
 	})
 
-	authDeps := authhandlers.Deps{DB: deps.DB, Queries: deps.Queries, JWT: deps.JWT}
+	authDeps := authhandlers.Deps{DB: deps.DB, Queries: deps.Queries, JWT: deps.JWT, CookieSecure: deps.CookieSecure}
 	registerPublicAuthRoutes(api, authDeps)
 
 	authMW := middleware.RequireAuth(middleware.AuthDeps{

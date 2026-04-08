@@ -20,6 +20,12 @@ type Config struct {
 	//
 	// TODO(phase 2): Replace with a real repo→workspace mapping table.
 	DefaultWorkspaceID string `env:"NF_DEFAULT_WORKSPACE_ID" envDefault:""`
+
+	// CookieSecure toggles the Secure flag on the nf_rt refresh cookie.
+	// It defaults to true so production deployments over https are safe;
+	// local http dev can set NF_COOKIE_SECURE=false to allow the browser
+	// to accept the cookie over plaintext.
+	CookieSecure bool `env:"NF_COOKIE_SECURE" envDefault:"true"`
 }
 
 // Load parses NF_* environment variables into a Config.
