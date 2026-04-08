@@ -26,6 +26,9 @@ type Deps struct {
 	// SlackSigningSecret is the v0 signing secret used to verify
 	// inbound Slack event signatures.
 	SlackSigningSecret string
+	// GoogleChannelToken is the per-channel shared secret Google Drive
+	// echoes back via X-Goog-Channel-Token on every push notification.
+	GoogleChannelToken string
 	// DefaultWorkspaceID is the workspace public id (UUID v7) that
 	// inbound webhook signals are routed to.
 	DefaultWorkspaceID string

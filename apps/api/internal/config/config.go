@@ -19,6 +19,9 @@ type Config struct {
 	// SlackSigningSecret is the v0 signing secret used to verify inbound
 	// Slack event deliveries.
 	SlackSigningSecret string `env:"NF_SLACK_SIGNING_SECRET" envDefault:""`
+	// GoogleChannelToken is the X-Goog-Channel-Token shared secret that
+	// Google Drive push notifications must echo back on every delivery.
+	GoogleChannelToken string `env:"NF_GOOGLE_CHANNEL_TOKEN" envDefault:""`
 	// DefaultWorkspaceID is the workspace public id (UUID v7) that
 	// inbound webhook signals are routed to while there is no per-repo
 	// workspace mapping yet.

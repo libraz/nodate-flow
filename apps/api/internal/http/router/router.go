@@ -65,6 +65,8 @@ type Deps struct {
 	// SlackSigningSecret is the v0 signing secret for the Slack webhook.
 	// Empty in tests.
 	SlackSigningSecret string
+	// GoogleChannelToken authenticates inbound Google Drive push notifications.
+	GoogleChannelToken string
 	// DefaultWorkspaceID is the workspace public id (UUID v7) that
 	// webhook-origin signals are routed to. Empty in tests.
 	DefaultWorkspaceID string
@@ -426,6 +428,7 @@ func BuildResult(deps Deps) Result {
 		Queries:            deps.Queries,
 		GhWebhookSecret:    deps.GhWebhookSecret,
 		SlackSigningSecret: deps.SlackSigningSecret,
+		GoogleChannelToken: deps.GoogleChannelToken,
 		DefaultWorkspaceID: deps.DefaultWorkspaceID,
 	}
 	r.Group(func(sub chi.Router) {
@@ -453,6 +456,7 @@ func BuildResult(deps Deps) Result {
 	// Public webhooks (verify their own signatures).
 	r.Post("/webhooks/github", signals.HandleGithubWebhook(signalDeps))
 	r.Post("/webhooks/slack", signals.HandleSlackWebhook(signalDeps))
+	r.Post("/webhooks/google", signals.HandleGoogleWebhook(signalDeps))
 
 	return Result{Handler: r, APIs: apis}
 }

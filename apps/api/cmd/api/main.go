@@ -121,6 +121,7 @@ func main() {
 		Cipher:             cipher,
 		GhWebhookSecret:    cfg.GhWebhookSecret,
 		SlackSigningSecret: cfg.SlackSigningSecret,
+		GoogleChannelToken: cfg.GoogleChannelToken,
 		DefaultWorkspaceID: cfg.DefaultWorkspaceID,
 		CookieSecure:       cfg.CookieSecure,
 		AiMock:             cfg.AiMock,
