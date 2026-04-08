@@ -1,0 +1,46 @@
+/**
+ * Aggregate barrel re-exporting all F1b primitives.
+ * Prefer the `@nodate-flow/ui/primitives/<name>` subpaths for best tree-shaking.
+ */
+
+export { default as Button } from './button/button';
+export type { ButtonProps, ButtonSize, ButtonVariant } from './button/button';
+
+export { default as Input } from './input/input';
+export type { InputProps } from './input/input';
+
+export { default as Textarea } from './textarea/textarea';
+export type { TextareaProps } from './textarea/textarea';
+
+export { default as Select } from './select/select';
+export type { SelectProps } from './select/select';
+
+export { default as Checkbox } from './checkbox/checkbox';
+export type { CheckboxProps } from './checkbox/checkbox';
+
+export { default as Radio } from './radio/radio';
+export type { RadioProps } from './radio/radio';
+
+export { default as Switch } from './switch/switch';
+export type { SwitchProps } from './switch/switch';
+
+export { default as Card } from './card/card';
+export type { CardProps } from './card/card';
+
+export { default as Badge } from './badge/badge';
+export type { BadgeProps, BadgeTone } from './badge/badge';
+
+export { default as Avatar } from './avatar/avatar';
+export type { AvatarProps, AvatarSize } from './avatar/avatar';
+
+export { default as Separator } from './separator/separator';
+export type { SeparatorOrientation, SeparatorProps } from './separator/separator';
+
+export { default as Skeleton } from './skeleton/skeleton';
+export type { SkeletonProps } from './skeleton/skeleton';
+
+export { default as Spinner } from './spinner/spinner';
+export type { SpinnerProps, SpinnerSize } from './spinner/spinner';
+
+export { default as FormField } from './form-field/form-field';
+export type { FormFieldControlProps, FormFieldProps } from './form-field/form-field';

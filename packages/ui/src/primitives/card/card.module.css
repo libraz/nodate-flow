@@ -1,0 +1,14 @@
+.root {
+  display: block;
+  padding: var(--nf-space-4);
+  border-radius: var(--nf-radius-lg);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  background: var(--nf-color-surface);
+  color: var(--nf-color-fg);
+  box-shadow: var(--nf-shadow-sm);
+  font-family: var(--nf-font-sans);
+}
+
+.elevated {
+  box-shadow: var(--nf-shadow-md);
+}

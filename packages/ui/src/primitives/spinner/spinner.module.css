@@ -1,0 +1,31 @@
+.root {
+  display: inline-block;
+  inline-size: var(--nf-space-5);
+  block-size: var(--nf-space-5);
+  border-radius: var(--nf-radius-pill);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-inline-start-color: var(--nf-color-accent);
+  animation: spin var(--nf-duration-slow) var(--nf-ease-linear) infinite;
+}
+
+.sm {
+  inline-size: var(--nf-space-4);
+  block-size: var(--nf-space-4);
+}
+
+.lg {
+  inline-size: var(--nf-space-8);
+  block-size: var(--nf-space-8);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root {
+    animation-duration: 0ms;
+  }
+}

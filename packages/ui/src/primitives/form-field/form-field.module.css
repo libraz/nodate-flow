@@ -1,0 +1,28 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  font-family: var(--nf-font-sans);
+  color: var(--nf-color-fg);
+}
+
+.label {
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
+}
+
+.required {
+  color: var(--nf-color-danger);
+  margin-inline-start: var(--nf-space-1);
+}
+
+.description {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.error {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-danger);
+}

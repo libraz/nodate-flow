@@ -1,0 +1,33 @@
+.root {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--nf-space-10);
+  block-size: var(--nf-space-10);
+  border-radius: var(--nf-radius-pill);
+  background: var(--nf-color-bg-sunken);
+  color: var(--nf-color-fg);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  overflow: hidden;
+  font-family: var(--nf-font-sans);
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+}
+
+.image {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+.sm {
+  inline-size: var(--nf-space-6);
+  block-size: var(--nf-space-6);
+  font-size: var(--nf-text-xs);
+}
+
+.lg {
+  inline-size: var(--nf-space-12);
+  block-size: var(--nf-space-12);
+  font-size: var(--nf-text-base);
+}

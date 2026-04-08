@@ -63,5 +63,17 @@
   },
   "json": {
     "formatter": { "trailingCommas": "none" }
-  }
+  },
+  "overrides": [
+    {
+      "include": ["**/*.test.tsx", "**/*.test.ts"],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "noLabelWithoutControl": "off"
+          }
+        }
+      }
+    }
+  ]
 }

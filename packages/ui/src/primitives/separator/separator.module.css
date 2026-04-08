@@ -1,0 +1,16 @@
+.root {
+  display: block;
+  border: 0;
+  background: var(--nf-color-hairline);
+  margin: 0;
+}
+
+.horizontal {
+  inline-size: 100%;
+  block-size: var(--nf-space-px);
+}
+
+.vertical {
+  inline-size: var(--nf-space-px);
+  block-size: 100%;
+}

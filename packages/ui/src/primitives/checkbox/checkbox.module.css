@@ -1,0 +1,20 @@
+.root {
+  inline-size: var(--nf-space-4);
+  block-size: var(--nf-space-4);
+  margin: 0;
+  accent-color: var(--nf-color-accent);
+  border: var(--nf-space-px) solid var(--nf-color-border-strong);
+  border-radius: var(--nf-radius-xs);
+  background: var(--nf-color-bg-elevated);
+  cursor: pointer;
+}
+
+.root:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.root:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

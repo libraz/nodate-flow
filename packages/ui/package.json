@@ -20,7 +20,22 @@
     "./a11y/visually-hidden": "./src/a11y/visually-hidden.tsx",
     "./a11y/live-region": "./src/a11y/live-region.tsx",
     "./icon": "./src/icon.tsx",
-    "./lib/cx": "./src/lib/cx.ts"
+    "./lib/cx": "./src/lib/cx.ts",
+    "./primitives": "./src/primitives/index.ts",
+    "./primitives/button": "./src/primitives/button/button.tsx",
+    "./primitives/input": "./src/primitives/input/input.tsx",
+    "./primitives/textarea": "./src/primitives/textarea/textarea.tsx",
+    "./primitives/select": "./src/primitives/select/select.tsx",
+    "./primitives/checkbox": "./src/primitives/checkbox/checkbox.tsx",
+    "./primitives/radio": "./src/primitives/radio/radio.tsx",
+    "./primitives/switch": "./src/primitives/switch/switch.tsx",
+    "./primitives/card": "./src/primitives/card/card.tsx",
+    "./primitives/badge": "./src/primitives/badge/badge.tsx",
+    "./primitives/avatar": "./src/primitives/avatar/avatar.tsx",
+    "./primitives/separator": "./src/primitives/separator/separator.tsx",
+    "./primitives/skeleton": "./src/primitives/skeleton/skeleton.tsx",
+    "./primitives/spinner": "./src/primitives/spinner/spinner.tsx",
+    "./primitives/form-field": "./src/primitives/form-field/form-field.tsx"
   },
   "scripts": {
     "typecheck": "tsc -b",
