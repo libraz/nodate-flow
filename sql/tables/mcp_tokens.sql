@@ -8,6 +8,7 @@ CREATE TABLE mcp_tokens (
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id (token owner)',
+  agent_id INT UNSIGNED NULL COMMENT 'Internal FK to ai_agents.id when the token acts on behalf of an AI agent (2.MCP-2)',
 
   name VARCHAR(255) NOT NULL COMMENT 'Human-readable label',
   token_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'SHA-256 hex of the bearer token',
@@ -28,5 +29,6 @@ CREATE TABLE mcp_tokens (
   KEY idx_mcp_tokens_workspace_id_user_id (workspace_id, user_id),
 
   CONSTRAINT fk_mcp_tokens_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_mcp_tokens_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  CONSTRAINT fk_mcp_tokens_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_mcp_tokens_agent FOREIGN KEY (agent_id) REFERENCES ai_agents(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='MCP personal access tokens';

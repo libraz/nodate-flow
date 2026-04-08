@@ -8,40 +8,21 @@ package generated
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	types "github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 )
 
-const upsertTaskEmbedding = `-- name: UpsertTaskEmbedding :exec
-INSERT INTO task_embeddings (task_id, model, dim, vector, content_hash, embedded_at)
-VALUES (?, ?, ?, STRING_TO_VECTOR(?), ?, UTC_TIMESTAMP(3))
-ON DUPLICATE KEY UPDATE
-  dim = VALUES(dim),
-  vector = VALUES(vector),
-  content_hash = VALUES(content_hash),
-  embedded_at = VALUES(embedded_at)
+const deleteTaskEmbeddingsForTask = `-- name: DeleteTaskEmbeddingsForTask :exec
+DELETE FROM task_embeddings
+WHERE task_id = ?
 `
 
-type UpsertTaskEmbeddingParams struct {
-	TaskID      uint32 `json:"-"`
-	Model       string `json:"model"`
-	Dim         uint16 `json:"dim"`
-	Vector      []byte `json:"vector"`
-	ContentHash string `json:"contentHash"`
-}
-
-// Insert or replace the embedding row for (task_id, model). The caller is
-// responsible for L2-normalizing vector before calling this query. The
-// content_hash lets callers skip re-embedding when the input text is
-// unchanged.
-func (q *Queries) UpsertTaskEmbedding(ctx context.Context, arg UpsertTaskEmbeddingParams) error {
-	_, err := q.db.ExecContext(ctx, upsertTaskEmbedding,
-		arg.TaskID,
-		arg.Model,
-		arg.Dim,
-		arg.Vector,
-		arg.ContentHash,
-	)
+// Remove every embedding row for a task across all models. ON DELETE
+// CASCADE already handles task deletion; this query is for the
+// re-embed-on-edit flow when a workspace switches to a different model.
+func (q *Queries) DeleteTaskEmbeddingsForTask(ctx context.Context, taskID uint32) error {
+	_, err := q.db.ExecContext(ctx, deleteTaskEmbeddingsForTask, taskID)
 	return err
 }
 
@@ -58,11 +39,20 @@ type GetTaskEmbeddingParams struct {
 	Model  string `json:"model"`
 }
 
+type GetTaskEmbeddingRow struct {
+	TaskID      uint32      `json:"-"`
+	Model       string      `json:"model"`
+	Dim         uint16      `json:"dim"`
+	Vector      interface{} `json:"vector"`
+	ContentHash string      `json:"contentHash"`
+	EmbeddedAt  time.Time   `json:"embeddedAt"`
+}
+
 // Fetch the embedding row for a single (task_id, model) pair. Returns
 // sql.ErrNoRows if the task has never been embedded with the given model.
-func (q *Queries) GetTaskEmbedding(ctx context.Context, arg GetTaskEmbeddingParams) (TaskEmbedding, error) {
+func (q *Queries) GetTaskEmbedding(ctx context.Context, arg GetTaskEmbeddingParams) (GetTaskEmbeddingRow, error) {
 	row := q.db.QueryRowContext(ctx, getTaskEmbedding, arg.TaskID, arg.Model)
-	var i TaskEmbedding
+	var i GetTaskEmbeddingRow
 	err := row.Scan(
 		&i.TaskID,
 		&i.Model,
@@ -72,6 +62,75 @@ func (q *Queries) GetTaskEmbedding(ctx context.Context, arg GetTaskEmbeddingPara
 		&i.EmbeddedAt,
 	)
 	return i, err
+}
+
+const listCandidateTaskEmbeddings = `-- name: ListCandidateTaskEmbeddings :many
+SELECT
+  t.id,
+  t.public_id,
+  t.title,
+  VECTOR_TO_STRING(te.vector) AS vector
+FROM task_embeddings te
+INNER JOIN tasks t
+  ON t.id = te.task_id
+  AND t.enabled = TRUE
+WHERE t.workspace_id = ?
+  AND te.model = ?
+  AND te.task_id <> ?
+ORDER BY t.id DESC
+LIMIT ?
+`
+
+type ListCandidateTaskEmbeddingsParams struct {
+	WorkspaceID uint32 `json:"-"`
+	Model       string `json:"model"`
+	TaskID      uint32 `json:"-"`
+	Limit       int32  `json:"limit"`
+}
+
+type ListCandidateTaskEmbeddingsRow struct {
+	ID       uint32         `json:"-"`
+	PublicID types.PublicID `json:"publicId"`
+	Title    string         `json:"title"`
+	Vector   interface{}    `json:"vector"`
+}
+
+// Return all task_embeddings for (workspace_id, model), excluding a given
+// task_id (so self-similarity is filtered out). Cosine similarity is
+// computed in Go because MySQL 9.1 Community does not expose
+// VEC_DISTANCE_COSINE; the caller dot-products the L2-normalized vectors
+// and applies the duplicate_threshold_high / low cutoffs from ai_settings.
+func (q *Queries) ListCandidateTaskEmbeddings(ctx context.Context, arg ListCandidateTaskEmbeddingsParams) ([]ListCandidateTaskEmbeddingsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listCandidateTaskEmbeddings,
+		arg.WorkspaceID,
+		arg.Model,
+		arg.TaskID,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListCandidateTaskEmbeddingsRow{}
+	for rows.Next() {
+		var i ListCandidateTaskEmbeddingsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicID,
+			&i.Title,
+			&i.Vector,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listStaleTaskEmbeddings = `-- name: ListStaleTaskEmbeddings :many
@@ -103,11 +162,12 @@ type ListStaleTaskEmbeddingsRow struct {
 	PublicID      types.PublicID `json:"publicId"`
 	Title         string         `json:"title"`
 	Description   sql.NullString `json:"description"`
-	UpdatedAtUnix interface{}    `json:"updatedAtUnix"`
+	UpdatedAtUnix int64          `json:"updatedAtUnix"`
 }
 
 // List tasks whose embedding is missing or older than tasks.updated_at for
 // the given (workspace_id, model). Used by the background re-embed worker.
+// LEFT JOIN so tasks with no row at all are returned as "stale".
 func (q *Queries) ListStaleTaskEmbeddings(ctx context.Context, arg ListStaleTaskEmbeddingsParams) ([]ListStaleTaskEmbeddingsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listStaleTaskEmbeddings, arg.Model, arg.WorkspaceID, arg.Limit)
 	if err != nil {
@@ -137,73 +197,51 @@ func (q *Queries) ListStaleTaskEmbeddings(ctx context.Context, arg ListStaleTask
 	return items, nil
 }
 
-const listCandidateTaskEmbeddings = `-- name: ListCandidateTaskEmbeddings :many
-SELECT
-  t.id,
-  t.public_id,
-  t.title,
-  VECTOR_TO_STRING(te.vector) AS vector
-FROM task_embeddings te
-INNER JOIN tasks t
-  ON t.id = te.task_id
-  AND t.enabled = TRUE
-WHERE t.workspace_id = ?
-  AND te.model = ?
-  AND te.task_id <> ?
-ORDER BY t.id DESC
-LIMIT ?
+const upsertTaskEmbedding = `-- name: UpsertTaskEmbedding :exec
+
+INSERT INTO task_embeddings (task_id, model, dim, vector, content_hash, embedded_at)
+VALUES (?, ?, ?, STRING_TO_VECTOR(?), ?, NOW(3))
+ON DUPLICATE KEY UPDATE
+  dim = VALUES(dim),
+  vector = VALUES(vector),
+  content_hash = VALUES(content_hash),
+  embedded_at = VALUES(embedded_at)
 `
 
-type ListCandidateTaskEmbeddingsParams struct {
-	WorkspaceID uint32 `json:"-"`
-	Model       string `json:"model"`
-	TaskID      uint32 `json:"-"`
-	Limit       int32  `json:"limit"`
+type UpsertTaskEmbeddingParams struct {
+	TaskID         uint32      `json:"-"`
+	Model          string      `json:"model"`
+	Dim            uint16      `json:"dim"`
+	StringToVector interface{} `json:"stringToVector"`
+	ContentHash    string      `json:"contentHash"`
 }
 
-type ListCandidateTaskEmbeddingsRow struct {
-	ID       uint32         `json:"-"`
-	PublicID types.PublicID `json:"publicId"`
-	Title    string         `json:"title"`
-	Vector   []byte         `json:"vector"`
-}
-
-// Return candidate embeddings for in-Go cosine ranking.
-func (q *Queries) ListCandidateTaskEmbeddings(ctx context.Context, arg ListCandidateTaskEmbeddingsParams) ([]ListCandidateTaskEmbeddingsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listCandidateTaskEmbeddings,
-		arg.WorkspaceID,
-		arg.Model,
+// ============================================================================
+// task_embeddings queries (ADR 0003)
+//
+// Internal plumbing: task_embeddings has no workspace_id / public_id of its
+// own; workspace scoping is reached via the FK to tasks(id). Every query
+// below joins or filters through tasks so the workspace boundary still holds.
+//
+// VECTOR columns are read/written as []byte. The Go embedding client
+// L2-normalizes vectors before INSERT and serializes them with
+// STRING_TO_VECTOR / the native binary protocol. Cosine similarity is
+// computed in Go (dot product on normalized vectors), because MySQL 9.1
+// Community Edition does not expose VEC_DISTANCE_COSINE (HeatWave-only in
+// 9.1; a native distance function is expected in 9.2+). The query layer
+// therefore returns candidate rows and the application does the ranking.
+// ============================================================================
+// Insert or replace the embedding row for (task_id, model). The caller is
+// responsible for L2-normalizing `vector` before calling this query. The
+// content_hash lets callers skip re-embedding when the input text is
+// unchanged.
+func (q *Queries) UpsertTaskEmbedding(ctx context.Context, arg UpsertTaskEmbeddingParams) error {
+	_, err := q.db.ExecContext(ctx, upsertTaskEmbedding,
 		arg.TaskID,
-		arg.Limit,
+		arg.Model,
+		arg.Dim,
+		arg.StringToVector,
+		arg.ContentHash,
 	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListCandidateTaskEmbeddingsRow{}
-	for rows.Next() {
-		var i ListCandidateTaskEmbeddingsRow
-		if err := rows.Scan(&i.ID, &i.PublicID, &i.Title, &i.Vector); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const deleteTaskEmbeddingsForTask = `-- name: DeleteTaskEmbeddingsForTask :exec
-DELETE FROM task_embeddings
-WHERE task_id = ?
-`
-
-// Remove every embedding row for a task across all models.
-func (q *Queries) DeleteTaskEmbeddingsForTask(ctx context.Context, taskID uint32) error {
-	_, err := q.db.ExecContext(ctx, deleteTaskEmbeddingsForTask, taskID)
 	return err
 }

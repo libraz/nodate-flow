@@ -40,7 +40,7 @@ func AddActor(deps Deps) func(context.Context, *AddTaskActorInput) (*AddTaskActo
 			PublicID:    pub,
 			WorkspaceID: ws.ID,
 			TaskID:      task.ID,
-			UserID:      uid,
+			UserID:      sql.NullInt32{Int32: int32(uid), Valid: true},
 			Role:        generated.TaskActorsRole(in.Body.Role),
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)

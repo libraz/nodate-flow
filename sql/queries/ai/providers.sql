@@ -39,6 +39,17 @@ WHERE workspace_id = ?
 ORDER BY created_at DESC, public_id DESC
 LIMIT ? OFFSET ?;
 
+-- name: FindDefaultProviderIDForWorkspace :one
+-- Return the internal id of the most recently created enabled provider
+-- for a workspace. Used by the ai_invocations logger (2.MCP-2) when the
+-- orchestrator does not track which provider handled the call.
+SELECT id
+FROM ai_providers
+WHERE workspace_id = ?
+  AND enabled = TRUE
+ORDER BY created_at DESC, id DESC
+LIMIT 1;
+
 -- name: FindProviderForDecrypt :one
 -- INTERNAL USE ONLY. Returns api_key_ciphertext for the providers package
 -- to decrypt before calling the upstream LLM. Must NOT be called from

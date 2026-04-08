@@ -61,18 +61,18 @@ type ListInboxParams struct {
 
 type ListInboxRow struct {
 	WorkspaceID       uint32          `json:"-"`
-	WorkspacePublicID types.PublicID  `json:"workspacePublicId"`
+	WorkspacePublicID []byte          `json:"workspacePublicId"`
 	PublicID          types.PublicID  `json:"publicId"`
-	TaskPublicID sql.NullString  `json:"taskPublicId"`
-	TaskTitle    sql.NullString  `json:"taskTitle"`
-	Source       SignalsSource   `json:"source"`
-	Kind         string          `json:"kind"`
-	ExternalID   sql.NullString  `json:"externalId"`
-	PayloadJson  json.RawMessage `json:"payloadJson"`
-	ReceivedAt   time.Time       `json:"receivedAt"`
-	UpdatedAt    sql.NullTime    `json:"updatedAt"`
-	CreatedAt    time.Time       `json:"createdAt"`
-	Total        interface{}     `json:"total"`
+	TaskPublicID      sql.NullString  `json:"taskPublicId"`
+	TaskTitle         sql.NullString  `json:"taskTitle"`
+	Source            SignalsSource   `json:"source"`
+	Kind              string          `json:"kind"`
+	ExternalID        sql.NullString  `json:"externalId"`
+	PayloadJson       json.RawMessage `json:"payloadJson"`
+	ReceivedAt        time.Time       `json:"receivedAt"`
+	UpdatedAt         sql.NullTime    `json:"updatedAt"`
+	CreatedAt         time.Time       `json:"createdAt"`
+	Total             interface{}     `json:"total"`
 }
 
 // List a workspace's inbox via v_inbox.
@@ -145,18 +145,18 @@ type ListInboxForUserParams struct {
 
 type ListInboxForUserRow struct {
 	WorkspaceID       uint32          `json:"-"`
-	WorkspacePublicID types.PublicID  `json:"workspacePublicId"`
+	WorkspacePublicID []byte          `json:"workspacePublicId"`
 	PublicID          types.PublicID  `json:"publicId"`
-	TaskPublicID sql.NullString  `json:"taskPublicId"`
-	TaskTitle    sql.NullString  `json:"taskTitle"`
-	Source       SignalsSource   `json:"source"`
-	Kind         string          `json:"kind"`
-	ExternalID   sql.NullString  `json:"externalId"`
-	PayloadJson  json.RawMessage `json:"payloadJson"`
-	ReceivedAt   time.Time       `json:"receivedAt"`
-	UpdatedAt    sql.NullTime    `json:"updatedAt"`
-	CreatedAt    time.Time       `json:"createdAt"`
-	Total        interface{}     `json:"total"`
+	TaskPublicID      sql.NullString  `json:"taskPublicId"`
+	TaskTitle         sql.NullString  `json:"taskTitle"`
+	Source            SignalsSource   `json:"source"`
+	Kind              string          `json:"kind"`
+	ExternalID        sql.NullString  `json:"externalId"`
+	PayloadJson       json.RawMessage `json:"payloadJson"`
+	ReceivedAt        time.Time       `json:"receivedAt"`
+	UpdatedAt         sql.NullTime    `json:"updatedAt"`
+	CreatedAt         time.Time       `json:"createdAt"`
+	Total             interface{}     `json:"total"`
 }
 
 // List inbox items across every workspace the actor is an active member of.
@@ -171,6 +171,7 @@ func (q *Queries) ListInboxForUser(ctx context.Context, arg ListInboxForUserPara
 		var i ListInboxForUserRow
 		if err := rows.Scan(
 			&i.WorkspaceID,
+			&i.WorkspacePublicID,
 			&i.PublicID,
 			&i.TaskPublicID,
 			&i.TaskTitle,

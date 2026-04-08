@@ -85,7 +85,7 @@ func (c *Client) EmbedTask(ctx context.Context, taskID uint32, title, descriptio
 		TaskID:      taskID,
 		Model:       model,
 		Dim:         uint16(len(raw)),
-		Vector:      []byte(Encode(raw)),
+		StringToVector: Encode(raw),
 		ContentHash: hash,
 	})
 }

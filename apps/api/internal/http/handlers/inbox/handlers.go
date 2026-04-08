@@ -6,6 +6,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
@@ -75,7 +77,7 @@ func List(deps Deps) func(context.Context, *ListInboxInput) (*ListInboxOutput, e
 			for _, r := range rows {
 				out.Body.Items = append(out.Body.Items, InboxItem{
 					ID:          r.PublicID.String(),
-					WorkspaceID: r.WorkspacePublicID.String(),
+					WorkspaceID: bytesToUUIDString(r.WorkspacePublicID),
 					TaskID:      nullStr(r.TaskPublicID),
 					TaskTitle:   nullStr(r.TaskTitle),
 					Source:      string(r.Source),
@@ -103,7 +105,7 @@ func List(deps Deps) func(context.Context, *ListInboxInput) (*ListInboxOutput, e
 		for _, r := range rows {
 			out.Body.Items = append(out.Body.Items, InboxItem{
 				ID:          r.PublicID.String(),
-				WorkspaceID: r.WorkspacePublicID.String(),
+				WorkspaceID: bytesToUUIDString(r.WorkspacePublicID),
 				TaskID:      nullStr(r.TaskPublicID),
 				TaskTitle:   nullStr(r.TaskTitle),
 				Source:      string(r.Source),
@@ -178,4 +180,15 @@ func Snooze(deps Deps) func(context.Context, *SnoozeInboxInput) (*SnoozeInboxOut
 		out.Body.Ok = true
 		return out, nil
 	}
+}
+
+// bytesToUUIDString converts a raw BINARY(16) public_id column into a
+// canonical UUID v7 string. Empty or non-16-byte input returns "".
+func bytesToUUIDString(b []byte) string {
+	if len(b) != 16 {
+		return ""
+	}
+	var u uuid.UUID
+	copy(u[:], b)
+	return u.String()
 }

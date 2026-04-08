@@ -14,12 +14,174 @@ import (
 	types "github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 )
 
+const listAiInvocationsForTask = `-- name: ListAiInvocationsForTask :many
+SELECT
+  public_id,
+  purpose,
+  model,
+  prompt_redacted,
+  response_redacted,
+  tokens_input,
+  tokens_output,
+  cost_estimate,
+  status,
+  error_code,
+  invoked_at
+FROM ai_invocations
+WHERE workspace_id = ?
+  AND task_id = ?
+ORDER BY invoked_at DESC, id DESC
+LIMIT ? OFFSET ?
+`
+
+type ListAiInvocationsForTaskParams struct {
+	WorkspaceID uint32        `json:"-"`
+	TaskID      sql.NullInt32 `json:"-"`
+	Limit       int32         `json:"limit"`
+	Offset      int32         `json:"offset"`
+}
+
+type ListAiInvocationsForTaskRow struct {
+	PublicID         types.PublicID      `json:"publicId"`
+	Purpose          string              `json:"purpose"`
+	Model            string              `json:"model"`
+	PromptRedacted   string              `json:"promptRedacted"`
+	ResponseRedacted sql.NullString      `json:"responseRedacted"`
+	TokensInput      sql.NullInt32       `json:"tokensInput"`
+	TokensOutput     sql.NullInt32       `json:"tokensOutput"`
+	CostEstimate     sql.NullString      `json:"costEstimate"`
+	Status           AiInvocationsStatus `json:"status"`
+	ErrorCode        sql.NullString      `json:"errorCode"`
+	InvokedAt        time.Time           `json:"invokedAt"`
+}
+
+// Recent redacted LLM call records scoped to a single task. Used by
+// the task detail AI reasoning panel (2.WEB-2). workspace_id is
+// included so tenant isolation is enforced at the query level.
+func (q *Queries) ListAiInvocationsForTask(ctx context.Context, arg ListAiInvocationsForTaskParams) ([]ListAiInvocationsForTaskRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAiInvocationsForTask,
+		arg.WorkspaceID,
+		arg.TaskID,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAiInvocationsForTaskRow{}
+	for rows.Next() {
+		var i ListAiInvocationsForTaskRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.Purpose,
+			&i.Model,
+			&i.PromptRedacted,
+			&i.ResponseRedacted,
+			&i.TokensInput,
+			&i.TokensOutput,
+			&i.CostEstimate,
+			&i.Status,
+			&i.ErrorCode,
+			&i.InvokedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAiInvocationsForWorkspace = `-- name: ListAiInvocationsForWorkspace :many
+SELECT
+  public_id,
+  purpose,
+  model,
+  prompt_redacted,
+  response_redacted,
+  tokens_input,
+  tokens_output,
+  cost_estimate,
+  status,
+  error_code,
+  invoked_at
+FROM ai_invocations
+WHERE workspace_id = ?
+ORDER BY invoked_at DESC, id DESC
+LIMIT ? OFFSET ?
+`
+
+type ListAiInvocationsForWorkspaceParams struct {
+	WorkspaceID uint32 `json:"-"`
+	Limit       int32  `json:"limit"`
+	Offset      int32  `json:"offset"`
+}
+
+type ListAiInvocationsForWorkspaceRow struct {
+	PublicID         types.PublicID      `json:"publicId"`
+	Purpose          string              `json:"purpose"`
+	Model            string              `json:"model"`
+	PromptRedacted   string              `json:"promptRedacted"`
+	ResponseRedacted sql.NullString      `json:"responseRedacted"`
+	TokensInput      sql.NullInt32       `json:"tokensInput"`
+	TokensOutput     sql.NullInt32       `json:"tokensOutput"`
+	CostEstimate     sql.NullString      `json:"costEstimate"`
+	Status           AiInvocationsStatus `json:"status"`
+	ErrorCode        sql.NullString      `json:"errorCode"`
+	InvokedAt        time.Time           `json:"invokedAt"`
+}
+
+// Recent redacted LLM call records for a workspace, newest first. Used
+// by the AI activity panel. All columns here are already redacted at
+// write time by the orchestrator; safe to surface at the API boundary.
+func (q *Queries) ListAiInvocationsForWorkspace(ctx context.Context, arg ListAiInvocationsForWorkspaceParams) ([]ListAiInvocationsForWorkspaceRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAiInvocationsForWorkspace, arg.WorkspaceID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAiInvocationsForWorkspaceRow{}
+	for rows.Next() {
+		var i ListAiInvocationsForWorkspaceRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.Purpose,
+			&i.Model,
+			&i.PromptRedacted,
+			&i.ResponseRedacted,
+			&i.TokensInput,
+			&i.TokensOutput,
+			&i.CostEstimate,
+			&i.Status,
+			&i.ErrorCode,
+			&i.InvokedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const logAiInvocation = `-- name: LogAiInvocation :execlastid
 INSERT INTO ai_invocations (
   public_id,
   workspace_id,
   provider_id,
   user_id,
+  agent_id,
   task_id,
   purpose,
   model,
@@ -31,7 +193,7 @@ INSERT INTO ai_invocations (
   status,
   error_code,
   invoked_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type LogAiInvocationParams struct {
@@ -39,6 +201,7 @@ type LogAiInvocationParams struct {
 	WorkspaceID      uint32              `json:"-"`
 	ProviderID       uint32              `json:"-"`
 	UserID           sql.NullInt32       `json:"-"`
+	AgentID          sql.NullInt32       `json:"agentId"`
 	TaskID           sql.NullInt32       `json:"-"`
 	Purpose          string              `json:"purpose"`
 	Model            string              `json:"model"`
@@ -60,6 +223,7 @@ func (q *Queries) LogAiInvocation(ctx context.Context, arg LogAiInvocationParams
 		arg.WorkspaceID,
 		arg.ProviderID,
 		arg.UserID,
+		arg.AgentID,
 		arg.TaskID,
 		arg.Purpose,
 		arg.Model,
@@ -130,156 +294,26 @@ func (q *Queries) LogMcpInvocation(ctx context.Context, arg LogMcpInvocationPara
 	return result.LastInsertId()
 }
 
-const listAiInvocationsForWorkspace = `-- name: ListAiInvocationsForWorkspace :many
-SELECT
-  public_id,
-  purpose,
-  model,
-  prompt_redacted,
-  response_redacted,
-  tokens_input,
-  tokens_output,
-  cost_estimate,
-  status,
-  error_code,
-  invoked_at
+const sumAiCostForAgentSince = `-- name: SumAiCostForAgentSince :one
+SELECT CAST(COALESCE(ROUND(SUM(cost_estimate) * 100), 0) AS SIGNED) AS total_cents
 FROM ai_invocations
-WHERE workspace_id = ?
-ORDER BY invoked_at DESC, id DESC
-LIMIT ? OFFSET ?
+WHERE agent_id = ?
+  AND invoked_at >= ?
 `
 
-type ListAiInvocationsForWorkspaceParams struct {
-	WorkspaceID uint32 `json:"-"`
-	Limit       int32  `json:"limit"`
-	Offset      int32  `json:"offset"`
+type SumAiCostForAgentSinceParams struct {
+	AgentID   sql.NullInt32 `json:"agentId"`
+	InvokedAt time.Time     `json:"invokedAt"`
 }
 
-type ListAiInvocationsForWorkspaceRow struct {
-	PublicID         types.PublicID             `json:"publicId"`
-	Purpose          string                     `json:"purpose"`
-	Model            string                     `json:"model"`
-	PromptRedacted   string                     `json:"promptRedacted"`
-	ResponseRedacted sql.NullString             `json:"responseRedacted"`
-	TokensInput      sql.NullInt32              `json:"tokensInput"`
-	TokensOutput     sql.NullInt32              `json:"tokensOutput"`
-	CostEstimate     sql.NullString             `json:"costEstimate"`
-	Status           AiInvocationsStatus        `json:"status"`
-	ErrorCode        sql.NullString             `json:"errorCode"`
-	InvokedAt        time.Time                  `json:"invokedAt"`
-}
-
-// Recent redacted LLM call records for a workspace, newest first.
-func (q *Queries) ListAiInvocationsForWorkspace(ctx context.Context, arg ListAiInvocationsForWorkspaceParams) ([]ListAiInvocationsForWorkspaceRow, error) {
-	rows, err := q.db.QueryContext(ctx, listAiInvocationsForWorkspace, arg.WorkspaceID, arg.Limit, arg.Offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListAiInvocationsForWorkspaceRow{}
-	for rows.Next() {
-		var i ListAiInvocationsForWorkspaceRow
-		if err := rows.Scan(
-			&i.PublicID,
-			&i.Purpose,
-			&i.Model,
-			&i.PromptRedacted,
-			&i.ResponseRedacted,
-			&i.TokensInput,
-			&i.TokensOutput,
-			&i.CostEstimate,
-			&i.Status,
-			&i.ErrorCode,
-			&i.InvokedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listAiInvocationsForTask = `-- name: ListAiInvocationsForTask :many
-SELECT
-  public_id,
-  purpose,
-  model,
-  prompt_redacted,
-  response_redacted,
-  tokens_input,
-  tokens_output,
-  cost_estimate,
-  status,
-  error_code,
-  invoked_at
-FROM ai_invocations
-WHERE workspace_id = ?
-  AND task_id = ?
-ORDER BY invoked_at DESC, id DESC
-LIMIT ? OFFSET ?
-`
-
-type ListAiInvocationsForTaskParams struct {
-	WorkspaceID uint32 `json:"-"`
-	TaskID      sql.NullInt32 `json:"-"`
-	Limit       int32  `json:"limit"`
-	Offset      int32  `json:"offset"`
-}
-
-type ListAiInvocationsForTaskRow struct {
-	PublicID         types.PublicID      `json:"publicId"`
-	Purpose          string              `json:"purpose"`
-	Model            string              `json:"model"`
-	PromptRedacted   string              `json:"promptRedacted"`
-	ResponseRedacted sql.NullString      `json:"responseRedacted"`
-	TokensInput      sql.NullInt32       `json:"tokensInput"`
-	TokensOutput     sql.NullInt32       `json:"tokensOutput"`
-	CostEstimate     sql.NullString      `json:"costEstimate"`
-	Status           AiInvocationsStatus `json:"status"`
-	ErrorCode        sql.NullString      `json:"errorCode"`
-	InvokedAt        time.Time           `json:"invokedAt"`
-}
-
-// Recent redacted LLM call records scoped to a single task.
-func (q *Queries) ListAiInvocationsForTask(ctx context.Context, arg ListAiInvocationsForTaskParams) ([]ListAiInvocationsForTaskRow, error) {
-	rows, err := q.db.QueryContext(ctx, listAiInvocationsForTask, arg.WorkspaceID, arg.TaskID, arg.Limit, arg.Offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListAiInvocationsForTaskRow{}
-	for rows.Next() {
-		var i ListAiInvocationsForTaskRow
-		if err := rows.Scan(
-			&i.PublicID,
-			&i.Purpose,
-			&i.Model,
-			&i.PromptRedacted,
-			&i.ResponseRedacted,
-			&i.TokensInput,
-			&i.TokensOutput,
-			&i.CostEstimate,
-			&i.Status,
-			&i.ErrorCode,
-			&i.InvokedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+// Sum the estimated cost (cents) of LLM calls attributed to a given AI
+// agent since a lower bound. Used by 2.MCP-2 agentguard to enforce the
+// agent's monthly cost cap.
+func (q *Queries) SumAiCostForAgentSince(ctx context.Context, arg SumAiCostForAgentSinceParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, sumAiCostForAgentSince, arg.AgentID, arg.InvokedAt)
+	var total_cents int64
+	err := row.Scan(&total_cents)
+	return total_cents, err
 }
 
 const sumAiCostTodayForWorkspace = `-- name: SumAiCostTodayForWorkspace :one

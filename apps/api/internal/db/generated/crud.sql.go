@@ -293,7 +293,7 @@ type ListTasksForProjectRow struct {
 	SortWeight              int32             `json:"sortWeight"`
 	UpdatedAt               sql.NullTime      `json:"updatedAt"`
 	CreatedAt               time.Time         `json:"createdAt"`
-	PrimaryAssigneePublicID sql.NullString    `json:"primaryAssigneePublicId"`
+	PrimaryAssigneePublicID []byte            `json:"primaryAssigneePublicId"`
 	AssigneeCount           int64             `json:"assigneeCount"`
 	Total                   interface{}       `json:"total"`
 }
@@ -388,7 +388,7 @@ type ListTasksForWorkspaceRow struct {
 	SortWeight              int32             `json:"sortWeight"`
 	UpdatedAt               sql.NullTime      `json:"updatedAt"`
 	CreatedAt               time.Time         `json:"createdAt"`
-	PrimaryAssigneePublicID sql.NullString    `json:"primaryAssigneePublicId"`
+	PrimaryAssigneePublicID []byte            `json:"primaryAssigneePublicId"`
 	AssigneeCount           int64             `json:"assigneeCount"`
 	Total                   interface{}       `json:"total"`
 }
@@ -443,21 +443,20 @@ WHERE workspace_id = ?
   AND enabled = TRUE
 `
 
-// TransitionTaskStateParams carries arguments for TransitionTaskState.
 type TransitionTaskStateParams struct {
-	DerivedState    TasksDerivedState `json:"derivedState"`
-	DerivedStateStr string            `json:"derivedStateStr"`
-	WorkspaceID     uint32            `json:"-"`
-	PublicID        types.PublicID    `json:"publicId"`
+	DerivedState TasksDerivedState `json:"derivedState"`
+	Column2      interface{}       `json:"column2"`
+	WorkspaceID  uint32            `json:"-"`
+	PublicID     types.PublicID    `json:"publicId"`
 }
 
-// TransitionTaskState updates the task's derived_state. This is the only
-// path allowed to mutate derived_state and MUST be called inside the same
-// transaction as the events append.
+// Write the new derived_state computed by the transition handler. This is
+// the only path allowed to mutate derived_state and must be called inside
+// the same transaction as the events append.
 func (q *Queries) TransitionTaskState(ctx context.Context, arg TransitionTaskStateParams) error {
 	_, err := q.db.ExecContext(ctx, transitionTaskState,
 		arg.DerivedState,
-		arg.DerivedStateStr,
+		arg.Column2,
 		arg.WorkspaceID,
 		arg.PublicID,
 	)

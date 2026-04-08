@@ -74,7 +74,7 @@ func ListPrioritySuggestions(deps Deps) func(context.Context, *ListPrioritySugge
 				Title:           r.Title,
 				State:           state,
 				CurrentPriority: r.Priority,
-				HasAssignee:     r.PrimaryAssigneePublicID.Valid,
+				HasAssignee:     len(r.PrimaryAssigneePublicID) > 0,
 				Now:             now,
 			}
 			if r.UpdatedAt.Valid {

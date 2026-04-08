@@ -109,10 +109,10 @@ func Transition(deps Deps) func(context.Context, *TransitionTaskInput) (*Transit
 
 		qtx := generated.New(tx)
 		if err := qtx.TransitionTaskState(ctx, generated.TransitionTaskStateParams{
-			DerivedState:    nextDerived,
-			DerivedStateStr: string(nextDerived),
-			WorkspaceID:     ws.ID,
-			PublicID:        types.FromUUID(task.PublicID),
+			DerivedState: nextDerived,
+			Column2:      string(nextDerived),
+			WorkspaceID:  ws.ID,
+			PublicID:     types.FromUUID(task.PublicID),
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}

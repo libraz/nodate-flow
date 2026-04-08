@@ -57,16 +57,19 @@ func Metrics(deps Deps) func(context.Context, *AiMetricsInput) (*AiMetricsOutput
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		decided := row.Applied + row.Dismissed
+		proposed := totalAsInt64(row.Proposed)
+		applied := totalAsInt64(row.Applied)
+		dismissed := totalAsInt64(row.Dismissed)
+		decided := applied + dismissed
 		var rate float64
 		if decided > 0 {
-			rate = float64(row.Applied) / float64(decided)
+			rate = float64(applied) / float64(decided)
 		}
 		return &AiMetricsOutput{Body: AiMetricsOutputBody{
 			WindowDays:     window,
-			Proposed:       row.Proposed,
-			Applied:        row.Applied,
-			Dismissed:      row.Dismissed,
+			Proposed:       proposed,
+			Applied:        applied,
+			Dismissed:      dismissed,
 			AcceptanceRate: rate,
 		}}, nil
 	}

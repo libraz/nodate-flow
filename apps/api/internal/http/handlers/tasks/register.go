@@ -130,6 +130,20 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 	}, RemoveActor(deps))
 
 	huma.Register(api, huma.Operation{
+		OperationID: "tasks-agents-list",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/agents",
+		Summary:     "List AI agent actors on a task",
+	}, ListAgentActors(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-agents-add",
+		Method:      http.MethodPost,
+		Path:        "/tasks/{id}/agents",
+		Summary:     "Attach an AI agent to a task",
+	}, AddAgentActor(deps))
+
+	huma.Register(api, huma.Operation{
 		OperationID: "tasks-comments-add",
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/comments",

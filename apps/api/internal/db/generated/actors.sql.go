@@ -27,7 +27,7 @@ type AddActorParams struct {
 	PublicID    types.PublicID `json:"publicId"`
 	WorkspaceID uint32         `json:"-"`
 	TaskID      uint32         `json:"-"`
-	UserID      uint32         `json:"-"`
+	UserID      sql.NullInt32  `json:"-"`
 	Role        TaskActorsRole `json:"role"`
 }
 
@@ -44,6 +44,63 @@ func (q *Queries) AddActor(ctx context.Context, arg AddActorParams) (int64, erro
 		return 0, err
 	}
 	return result.LastInsertId()
+}
+
+const addAgentActor = `-- name: AddAgentActor :execlastid
+INSERT INTO task_actors (
+  public_id,
+  workspace_id,
+  task_id,
+  agent_id,
+  kind,
+  role
+) VALUES (?, ?, ?, ?, 'agent', ?)
+`
+
+type AddAgentActorParams struct {
+	PublicID    types.PublicID `json:"publicId"`
+	WorkspaceID uint32         `json:"-"`
+	TaskID      uint32         `json:"-"`
+	AgentID     sql.NullInt32  `json:"agentId"`
+	Role        TaskActorsRole `json:"role"`
+}
+
+// Attach an AI agent to a task in the given role (2.MCP-2).
+func (q *Queries) AddAgentActor(ctx context.Context, arg AddAgentActorParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, addAgentActor,
+		arg.PublicID,
+		arg.WorkspaceID,
+		arg.TaskID,
+		arg.AgentID,
+		arg.Role,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
+
+const findAgentIDByPublicIDForWorkspace = `-- name: FindAgentIDByPublicIDForWorkspace :one
+SELECT id
+FROM ai_agents
+WHERE workspace_id = ?
+  AND public_id = ?
+  AND enabled = TRUE
+LIMIT 1
+`
+
+type FindAgentIDByPublicIDForWorkspaceParams struct {
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+// Resolve an ai_agents public id to its internal id, scoped to the
+// workspace. Used by task actor handlers to bind by public id.
+func (q *Queries) FindAgentIDByPublicIDForWorkspace(ctx context.Context, arg FindAgentIDByPublicIDForWorkspaceParams) (uint32, error) {
+	row := q.db.QueryRowContext(ctx, findAgentIDByPublicIDForWorkspace, arg.WorkspaceID, arg.PublicID)
+	var id uint32
+	err := row.Scan(&id)
+	return id, err
 }
 
 const listActorsForTask = `-- name: ListActorsForTask :many
@@ -107,6 +164,80 @@ func (q *Queries) ListActorsForTask(ctx context.Context, arg ListActorsForTaskPa
 			&i.Email,
 			&i.DisplayName,
 			&i.AvatarUrl,
+			&i.Role,
+			&i.UpdatedAt,
+			&i.CreatedAt,
+			&i.Total,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAgentActorsForTask = `-- name: ListAgentActorsForTask :many
+SELECT
+  ta.public_id,
+  a.public_id AS agent_public_id,
+  a.name      AS agent_name,
+  ta.role,
+  ta.updated_at,
+  ta.created_at,
+  COUNT(*) OVER() AS total
+FROM task_actors ta
+INNER JOIN tasks t     ON t.id = ta.task_id  AND t.enabled = TRUE
+INNER JOIN ai_agents a ON a.id = ta.agent_id AND a.enabled = TRUE
+WHERE ta.workspace_id = ?
+  AND t.public_id = ?
+  AND ta.kind = 'agent'
+  AND ta.enabled = TRUE
+ORDER BY ta.created_at ASC, ta.public_id ASC
+LIMIT ? OFFSET ?
+`
+
+type ListAgentActorsForTaskParams struct {
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+	Limit       int32          `json:"limit"`
+	Offset      int32          `json:"offset"`
+}
+
+type ListAgentActorsForTaskRow struct {
+	PublicID      types.PublicID `json:"publicId"`
+	AgentPublicID types.PublicID `json:"agentPublicId"`
+	AgentName     string         `json:"agentName"`
+	Role          TaskActorsRole `json:"role"`
+	UpdatedAt     sql.NullTime   `json:"updatedAt"`
+	CreatedAt     time.Time      `json:"createdAt"`
+	Total         interface{}    `json:"total"`
+}
+
+// List AI agent actors on a task joined with the agent definition.
+func (q *Queries) ListAgentActorsForTask(ctx context.Context, arg ListAgentActorsForTaskParams) ([]ListAgentActorsForTaskRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAgentActorsForTask,
+		arg.WorkspaceID,
+		arg.PublicID,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAgentActorsForTaskRow{}
+	for rows.Next() {
+		var i ListAgentActorsForTaskRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.AgentPublicID,
+			&i.AgentName,
 			&i.Role,
 			&i.UpdatedAt,
 			&i.CreatedAt,

@@ -80,7 +80,7 @@ func deterministicFallback(ctx context.Context, deps TriageDeps, wsID uint32, li
 			Source:      string(r.Source),
 			Kind:        r.Kind,
 			ReceivedAt:  r.ReceivedAt,
-			HasTask:     r.TaskPublicID.Valid,
+			HasTask:     r.TaskPublicID.Valid && r.TaskPublicID.String != "",
 			Now:         now,
 		})
 	}

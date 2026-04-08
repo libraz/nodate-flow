@@ -20,7 +20,7 @@
 -- content_hash lets callers skip re-embedding when the input text is
 -- unchanged.
 INSERT INTO task_embeddings (task_id, model, dim, vector, content_hash, embedded_at)
-VALUES (?, ?, ?, STRING_TO_VECTOR(?), ?, UTC_TIMESTAMP(3))
+VALUES (?, ?, ?, STRING_TO_VECTOR(?), ?, NOW(3))
 ON DUPLICATE KEY UPDATE
   dim = VALUES(dim),
   vector = VALUES(vector),

@@ -13,6 +13,7 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/embed"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/nlquery"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
@@ -143,6 +144,33 @@ func registerTools(h *Handler) {
 		run: runProposePriority,
 	})
 	h.register(tool{
+		name:          "propose_steps",
+		description:   "Ask the workspace LLM to break an existing task into concrete execution steps.",
+		requiredScope: "read:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"taskId": stringSchema("Task public id (UUID v7)."),
+		}, []string{"taskId"}),
+		run: runProposeSteps,
+	})
+	h.register(tool{
+		name:          "apply_steps",
+		description:   "Create the given steps as child tasks under an existing parent task.",
+		requiredScope: "write:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"parentTaskId": stringSchema("Parent task public id (UUID v7)."),
+			"steps": map[string]any{
+				"type":        "array",
+				"description": "Step definitions to create as child tasks.",
+				"items": objectSchema(map[string]any{
+					"title":       stringSchema("Step title."),
+					"description": stringSchema("Step description (optional)."),
+					"priority":    intSchema("Step priority 0..4 (optional)."),
+				}, []string{"title"}),
+			},
+		}, []string{"parentTaskId", "steps"}),
+		run: runApplySteps,
+	})
+	h.register(tool{
 		name:          "propose_duplicates",
 		description:   "Return likely-duplicate tasks for a given task by embedding similarity (ADR 0003).",
 		requiredScope: "read:workspace",
@@ -150,6 +178,15 @@ func registerTools(h *Handler) {
 			"taskId": stringSchema("Task public id (UUID v7)."),
 		}, []string{"taskId"}),
 		run: runProposeDuplicates,
+	})
+	h.register(tool{
+		name:          "propose_lens",
+		description:   "Compile a natural-language query into a validated Lens view JSON.",
+		requiredScope: "read:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"prompt": stringSchema("Natural-language description of the desired view."),
+		}, []string{"prompt"}),
+		run: runProposeLens,
 	})
 }
 
@@ -667,7 +704,7 @@ func runProposeDuplicates(ctx context.Context, deps Deps, s *session, raw json.R
 	if err != nil {
 		return map[string]any{"candidates": []any{}, "model": model}, nil
 	}
-	srcVec, err := embed.Decode(src.Vector)
+	srcVec, err := embed.Decode(toBytes(src.Vector))
 	if err != nil || len(srcVec) == 0 {
 		return map[string]any{"candidates": []any{}, "model": model}, nil
 	}
@@ -689,7 +726,7 @@ func runProposeDuplicates(ctx context.Context, deps Deps, s *session, raw json.R
 	}
 	ranked := make([]cand, 0, len(rows))
 	for _, r := range rows {
-		v, derr := embed.Decode(r.Vector)
+		v, derr := embed.Decode(toBytes(r.Vector))
 		if derr != nil || len(v) != len(srcVec) {
 			continue
 		}
@@ -724,6 +761,128 @@ func runProposeDuplicates(ctx context.Context, deps Deps, s *session, raw json.R
 	return map[string]any{"candidates": out, "model": model}, nil
 }
 
+// runProposeSteps asks the workspace LLM to break an existing task
+// into concrete execution steps. It reuses ProposeTasksFrom by
+// feeding the task's title + description back in as the source
+// signal, which keeps the prompt path and cost guard identical to
+// propose_tasks_from.
+func runProposeSteps(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	var in struct {
+		TaskID string `json:"taskId"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+	pub, err := types.Parse(in.TaskID)
+	if err != nil {
+		return nil, apierrors.New(apierrors.WsTaskNotFound)
+	}
+	row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
+		WorkspaceID: s.workspaceID,
+		PublicID:    pub,
+	})
+	if err != nil {
+		if stderrors.Is(err, sql.ErrNoRows) {
+			return nil, apierrors.New(apierrors.WsTaskNotFound)
+		}
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	if deps.AI == nil {
+		return nil, apierrors.New(apierrors.AiProviderNotConfigured)
+	}
+	source := "Break this task into concrete execution steps.\n\nTitle: " + row.Title
+	if row.Description.Valid && row.Description.String != "" {
+		source += "\n\nDescription:\n" + row.Description.String
+	}
+	steps, err := deps.AI.ProposeTasksFrom(ctx, s.workspaceID, source)
+	if err != nil {
+		return nil, mapAiError(err)
+	}
+	out := make([]map[string]any, 0, len(steps))
+	for _, st := range steps {
+		out = append(out, map[string]any{
+			"title":       st.Title,
+			"description": st.Description,
+			"priority":    st.Priority,
+		})
+	}
+	return map[string]any{"parentTaskId": row.PublicID.String(), "steps": out}, nil
+}
+
+// runApplySteps creates the given steps as child tasks under an
+// existing parent task. Each step becomes a new tasks row with
+// parent_task_id set to the parent's internal id. Returns the list of
+// created child public ids.
+func runApplySteps(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	var in struct {
+		ParentTaskID string `json:"parentTaskId"`
+		Steps        []struct {
+			Title       string `json:"title"`
+			Description string `json:"description"`
+			Priority    int32  `json:"priority"`
+		} `json:"steps"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	if len(in.Steps) == 0 {
+		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+	}
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+	parentInternal, parentPub, err := resolveTask(ctx, deps, s, in.ParentTaskID)
+	if err != nil {
+		return nil, err
+	}
+	var parentProjectID uint32
+	if err := deps.DB.QueryRowContext(ctx,
+		`SELECT project_id FROM tasks WHERE id = ? AND workspace_id = ? LIMIT 1`,
+		parentInternal, s.workspaceID,
+	).Scan(&parentProjectID); err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	created := make([]string, 0, len(in.Steps))
+	for _, st := range in.Steps {
+		if st.Title == "" {
+			return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+		}
+		pub := newPublicID()
+		desc := sql.NullString{String: st.Description, Valid: st.Description != ""}
+		childID, err := deps.Queries.CreateTask(ctx, generated.CreateTaskParams{
+			PublicID:        pub,
+			WorkspaceID:     s.workspaceID,
+			ProjectID:       parentProjectID,
+			ParentTaskID:    sql.NullInt32{Int32: int32(parentInternal), Valid: true},
+			CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
+			Title:           st.Title,
+			Description:     desc,
+			Priority:        st.Priority,
+		})
+		if err != nil {
+			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		}
+		actor := int64(s.userID)
+		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+			Type:        eventbus.TaskCreated,
+			WorkspaceID: s.workspaceID,
+			ActorUserID: &actor,
+			TaskID:      &childID,
+			Payload: map[string]any{
+				"taskId":       pub.String(),
+				"title":        st.Title,
+				"parentTaskId": parentPub.String(),
+				"via":          "mcp:apply_steps",
+			},
+		})
+		created = append(created, pub.String())
+	}
+	return map[string]any{"created": created}, nil
+}
+
 // mapAiError maps ai package sentinel errors to the appropriate API
 // error spec for the MCP boundary.
 func mapAiError(err error) error {
@@ -736,5 +895,44 @@ func mapAiError(err error) error {
 		return apierrors.New(apierrors.AiResponseParseFailed)
 	}
 	return apierrors.Wrap(apierrors.AiProviderUpstreamCallFailed, err)
+}
+
+// toBytes coerces an interface{} column (returned by sqlc for VECTOR
+// columns read back through STRING_TO_VECTOR) into a []byte, or nil
+// when the underlying value is neither []byte nor string.
+func toBytes(v any) []byte {
+	switch x := v.(type) {
+	case []byte:
+		return x
+	case string:
+		return []byte(x)
+	}
+	return nil
+}
+
+// runProposeLens compiles a prose prompt into a validated Lens via
+// the NL query compiler. When no compiler is wired (e.g., no AI mock
+// or provider configured) it returns AI.PROVIDER.NOT_CONFIGURED.
+func runProposeLens(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	var in struct {
+		Prompt string `json:"prompt"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+	if deps.NlQuery == nil {
+		return nil, apierrors.New(apierrors.AiProviderNotConfigured)
+	}
+	lens, err := deps.NlQuery.Compile(ctx, in.Prompt)
+	if err != nil {
+		if stderrors.Is(err, nlquery.ErrUnparseable) {
+			return nil, apierrors.New(apierrors.AiResponseParseFailed)
+		}
+		return nil, apierrors.Wrap(apierrors.AiProviderUpstreamCallFailed, err)
+	}
+	return map[string]any{"lens": lens}, nil
 }
 

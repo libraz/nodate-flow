@@ -24,7 +24,10 @@ import (
 type session struct {
 	userID      uint32
 	workspaceID uint32
-	scopes      []string
+	// agentID is the internal ai_agents.id when this MCP token acts on
+	// behalf of an AI agent. Zero means a human-owned token.
+	agentID uint32
+	scopes  []string
 }
 
 func (s *session) hasScope(required string) bool {
@@ -65,9 +68,14 @@ func (h *Handler) authenticate(ctx context.Context, tok string) (*session, error
 		return nil, apierrors.New(apierrors.McpTokenExpired)
 	}
 	scopes := parseScopes(row.ScopesJson)
+	var agentID uint32
+	if row.AgentID.Valid {
+		agentID = uint32(row.AgentID.Int32)
+	}
 	return &session{
 		userID:      row.UserID,
 		workspaceID: row.WorkspaceID,
+		agentID:     agentID,
 		scopes:      scopes,
 	}, nil
 }

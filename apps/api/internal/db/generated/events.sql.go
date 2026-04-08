@@ -54,6 +54,38 @@ func (q *Queries) AppendEvent(ctx context.Context, arg AppendEventParams) (int64
 	return result.LastInsertId()
 }
 
+const countAiSuggestionOutcomesForWorkspace = `-- name: CountAiSuggestionOutcomesForWorkspace :one
+SELECT
+  COALESCE(SUM(CASE WHEN type = 'ai.suggestion.proposed'  THEN 1 ELSE 0 END), 0) AS proposed,
+  COALESCE(SUM(CASE WHEN type = 'ai.suggestion.applied'   THEN 1 ELSE 0 END), 0) AS applied,
+  COALESCE(SUM(CASE WHEN type = 'ai.suggestion.dismissed' THEN 1 ELSE 0 END), 0) AS dismissed
+FROM events
+WHERE workspace_id = ?
+  AND occurred_at >= ?
+  AND type IN ('ai.suggestion.proposed', 'ai.suggestion.applied', 'ai.suggestion.dismissed')
+`
+
+type CountAiSuggestionOutcomesForWorkspaceParams struct {
+	WorkspaceID uint32    `json:"-"`
+	OccurredAt  time.Time `json:"occurredAt"`
+}
+
+type CountAiSuggestionOutcomesForWorkspaceRow struct {
+	Proposed  interface{} `json:"proposed"`
+	Applied   interface{} `json:"applied"`
+	Dismissed interface{} `json:"dismissed"`
+}
+
+// Count ai.suggestion.{proposed,applied,dismissed} events for a workspace
+// within the given time window. Used by the AI metrics endpoint
+// (2.OBS-1) to compute acceptance rate.
+func (q *Queries) CountAiSuggestionOutcomesForWorkspace(ctx context.Context, arg CountAiSuggestionOutcomesForWorkspaceParams) (CountAiSuggestionOutcomesForWorkspaceRow, error) {
+	row := q.db.QueryRowContext(ctx, countAiSuggestionOutcomesForWorkspace, arg.WorkspaceID, arg.OccurredAt)
+	var i CountAiSuggestionOutcomesForWorkspaceRow
+	err := row.Scan(&i.Proposed, &i.Applied, &i.Dismissed)
+	return i, err
+}
+
 const listEventsForProject = `-- name: ListEventsForProject :many
 SELECT
   v.public_id,
@@ -91,7 +123,9 @@ type ListEventsForProjectRow struct {
 	Total             interface{}     `json:"total"`
 }
 
-// List a project's timeline via v_task_timeline.
+// List a project's timeline via v_task_timeline. Filters events whose
+// owning task lives in the given project (events with no task_id are
+// excluded by virtue of project_public_id being NULL).
 func (q *Queries) ListEventsForProject(ctx context.Context, arg ListEventsForProjectParams) ([]ListEventsForProjectRow, error) {
 	rows, err := q.db.QueryContext(ctx, listEventsForProject,
 		arg.WorkspaceID,
@@ -117,57 +151,6 @@ func (q *Queries) ListEventsForProject(ctx context.Context, arg ListEventsForPro
 			&i.OccurredAt,
 			&i.Total,
 		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listPendingAiSuggestions = `-- name: ListPendingAiSuggestions :many
-SELECT
-  e.public_id,
-  e.occurred_at,
-  e.payload_json
-FROM events e
-WHERE e.workspace_id = ?
-  AND e.type = 'ai.suggestion.proposed'
-  AND NOT EXISTS (
-    SELECT 1 FROM events e2
-    WHERE e2.workspace_id = e.workspace_id
-      AND e2.type IN ('ai.suggestion.applied', 'ai.suggestion.dismissed')
-      AND e2.id > e.id
-      AND JSON_EXTRACT(e2.payload_json, '$.inbox_item_id') = JSON_EXTRACT(e.payload_json, '$.inbox_item_id')
-  )
-ORDER BY e.occurred_at DESC
-LIMIT 100
-`
-
-// ListPendingAiSuggestionsRow is a single pending suggestion row.
-type ListPendingAiSuggestionsRow struct {
-	PublicID    types.PublicID  `json:"publicId"`
-	OccurredAt  time.Time       `json:"occurredAt"`
-	PayloadJson json.RawMessage `json:"payloadJson"`
-}
-
-// ListPendingAiSuggestions returns ai.suggestion.proposed events that
-// have no later applied/dismissed event for the same inbox_item_id.
-func (q *Queries) ListPendingAiSuggestions(ctx context.Context, workspaceID uint32) ([]ListPendingAiSuggestionsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listPendingAiSuggestions, workspaceID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListPendingAiSuggestionsRow{}
-	for rows.Next() {
-		var i ListPendingAiSuggestionsRow
-		if err := rows.Scan(&i.PublicID, &i.OccurredAt, &i.PayloadJson); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -254,37 +237,6 @@ func (q *Queries) ListEventsForTask(ctx context.Context, arg ListEventsForTaskPa
 	return items, nil
 }
 
-const countAiSuggestionOutcomesForWorkspace = `-- name: CountAiSuggestionOutcomesForWorkspace :one
-SELECT
-  COALESCE(SUM(CASE WHEN type = 'ai.suggestion.proposed'  THEN 1 ELSE 0 END), 0) AS proposed,
-  COALESCE(SUM(CASE WHEN type = 'ai.suggestion.applied'   THEN 1 ELSE 0 END), 0) AS applied,
-  COALESCE(SUM(CASE WHEN type = 'ai.suggestion.dismissed' THEN 1 ELSE 0 END), 0) AS dismissed
-FROM events
-WHERE workspace_id = ?
-  AND occurred_at >= ?
-  AND type IN ('ai.suggestion.proposed', 'ai.suggestion.applied', 'ai.suggestion.dismissed')
-`
-
-type CountAiSuggestionOutcomesForWorkspaceParams struct {
-	WorkspaceID uint32    `json:"-"`
-	OccurredAt  time.Time `json:"occurredAt"`
-}
-
-type CountAiSuggestionOutcomesForWorkspaceRow struct {
-	Proposed  int64 `json:"proposed"`
-	Applied   int64 `json:"applied"`
-	Dismissed int64 `json:"dismissed"`
-}
-
-// Count ai.suggestion.{proposed,applied,dismissed} events for a workspace
-// within the given time window.
-func (q *Queries) CountAiSuggestionOutcomesForWorkspace(ctx context.Context, arg CountAiSuggestionOutcomesForWorkspaceParams) (CountAiSuggestionOutcomesForWorkspaceRow, error) {
-	row := q.db.QueryRowContext(ctx, countAiSuggestionOutcomesForWorkspace, arg.WorkspaceID, arg.OccurredAt)
-	var i CountAiSuggestionOutcomesForWorkspaceRow
-	err := row.Scan(&i.Proposed, &i.Applied, &i.Dismissed)
-	return i, err
-}
-
 const listEventsForWorkspace = `-- name: ListEventsForWorkspace :many
 SELECT
   v.public_id,
@@ -338,6 +290,58 @@ func (q *Queries) ListEventsForWorkspace(ctx context.Context, arg ListEventsForW
 			&i.OccurredAt,
 			&i.Total,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPendingAiSuggestions = `-- name: ListPendingAiSuggestions :many
+SELECT
+  e.public_id,
+  e.occurred_at,
+  e.payload_json
+FROM events e
+WHERE e.workspace_id = ?
+  AND e.type = 'ai.suggestion.proposed'
+  AND NOT EXISTS (
+    SELECT 1 FROM events e2
+    WHERE e2.workspace_id = e.workspace_id
+      AND e2.type IN ('ai.suggestion.applied', 'ai.suggestion.dismissed')
+      AND e2.id > e.id
+      AND JSON_EXTRACT(e2.payload_json, '$.inbox_item_id') = JSON_EXTRACT(e.payload_json, '$.inbox_item_id')
+  )
+ORDER BY e.occurred_at DESC
+LIMIT 100
+`
+
+type ListPendingAiSuggestionsRow struct {
+	PublicID    types.PublicID  `json:"publicId"`
+	OccurredAt  time.Time       `json:"occurredAt"`
+	PayloadJson json.RawMessage `json:"payloadJson"`
+}
+
+// List pending AI suggestions for a workspace. A suggestion is "pending"
+// when an ai.suggestion.proposed event exists with no later
+// ai.suggestion.applied / ai.suggestion.dismissed event for the same
+// inbox_item_id (compared via JSON_EXTRACT on payload_json).
+func (q *Queries) ListPendingAiSuggestions(ctx context.Context, workspaceID uint32) ([]ListPendingAiSuggestionsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listPendingAiSuggestions, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPendingAiSuggestionsRow{}
+	for rows.Next() {
+		var i ListPendingAiSuggestionsRow
+		if err := rows.Scan(&i.PublicID, &i.OccurredAt, &i.PayloadJson); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

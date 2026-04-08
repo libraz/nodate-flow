@@ -12,6 +12,7 @@ package router
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	aihandlers "github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/ai"
 	authhandlers "github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/inbox"
@@ -185,14 +187,21 @@ func BuildResult(deps Deps) Result {
 			})
 		})
 		aiOrch = &ai.Orchestrator{
-			Resolver: resolver,
-			Guard:    ai.NewCostGuard(budget, 0),
-			DB:       deps.DB,
-			Queries:  deps.Queries,
+			Resolver:  resolver,
+			Guard:     ai.NewCostGuard(budget, 0),
+			DB:        deps.DB,
+			Queries:   deps.Queries,
+			LogInvoke: newDBInvocationLogger(deps.Queries),
 		}
 	}
 
-	// /auth/refresh, /auth/logout, /me, /workspaces{,list}.
+	// /auth/refresh and /auth/logout authenticate via the nf_rt httpOnly
+	// cookie, not the Bearer access token, so they must sit outside the
+	// authMW group — otherwise a page reload (which starts with no access
+	// token in memory) can never rotate the refresh token.
+	registerPublicAuthCookieRoutes(api, authDeps)
+
+	// /me, /workspaces{,list}.
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
 		subAPI := newSubAPI(sub)
@@ -416,7 +425,7 @@ func BuildResult(deps Deps) Result {
 	})
 
 	// MCP server uses the orchestrator built above.
-	r.Handle("/mcp", mcp.NewHandler(mcp.Deps{DB: deps.DB, Queries: deps.Queries, AI: aiOrch, Embedder: embedClient}))
+	r.Handle("/mcp", mcp.NewHandler(mcp.Deps{DB: deps.DB, Queries: deps.Queries, AI: aiOrch, Embedder: embedClient, NlQuery: nlQueryCompiler}))
 
 	// Workspace-scoped AI inbox triage. Registered in
 	// its own group so the auth + workspace-member middleware applies
@@ -471,8 +480,12 @@ func registerPublicAuthRoutes(api huma.API, deps authhandlers.Deps) {
 	}, authhandlers.OIDCGoogleCallback(deps))
 }
 
-// registerProtectedAuthRoutes wires the bearer-protected auth endpoints.
-func registerProtectedAuthRoutes(api huma.API, deps authhandlers.Deps) {
+// registerPublicAuthCookieRoutes wires the auth endpoints that
+// authenticate via the nf_rt httpOnly refresh cookie rather than the
+// Bearer access JWT. They must not be behind authMW, otherwise a page
+// reload (which starts with an empty in-memory access token) can never
+// reach /auth/refresh to rotate the session.
+func registerPublicAuthCookieRoutes(api huma.API, deps authhandlers.Deps) {
 	huma.Register(api, huma.Operation{
 		OperationID: "auth-refresh",
 		Method:      http.MethodPost,
@@ -485,6 +498,10 @@ func registerProtectedAuthRoutes(api huma.API, deps authhandlers.Deps) {
 		Path:        "/auth/logout",
 		Summary:     "Revoke a session",
 	}, authhandlers.Logout(deps))
+}
+
+// registerProtectedAuthRoutes wires the bearer-protected auth endpoints.
+func registerProtectedAuthRoutes(api huma.API, deps authhandlers.Deps) {
 	huma.Register(api, huma.Operation{
 		OperationID: "me",
 		Method:      http.MethodGet,
@@ -497,6 +514,71 @@ func registerProtectedAuthRoutes(api huma.API, deps authhandlers.Deps) {
 		Path:        "/me",
 		Summary:     "Patch the authenticated user's profile",
 	}, authhandlers.PatchMe(deps))
+}
+
+// newDBInvocationLogger returns an ai.InvocationLogger that persists
+// redacted records into ai_invocations. When the workspace has no
+// enabled provider the record is dropped silently — LogInvoke is a
+// best-effort audit path and must never break a user-visible AI
+// response.
+func newDBInvocationLogger(q *generated.Queries) ai.InvocationLogger {
+	return func(ctx context.Context, rec ai.InvocationRecord) {
+		if q == nil || rec.WorkspaceID == 0 {
+			return
+		}
+		providerID, err := q.FindDefaultProviderIDForWorkspace(ctx, rec.WorkspaceID)
+		if err != nil {
+			return
+		}
+		var userID sql.NullInt32
+		var agentID sql.NullInt32
+		if rec.AgentID != 0 {
+			agentID = sql.NullInt32{Int32: int32(rec.AgentID), Valid: true}
+		}
+		var response sql.NullString
+		if rec.ResponseRedacted != "" {
+			response = sql.NullString{String: rec.ResponseRedacted, Valid: true}
+		}
+		var tIn, tOut sql.NullInt32
+		if rec.TokensInput > 0 {
+			tIn = sql.NullInt32{Int32: int32(rec.TokensInput), Valid: true}
+		}
+		if rec.TokensOutput > 0 {
+			tOut = sql.NullInt32{Int32: int32(rec.TokensOutput), Valid: true}
+		}
+		var cost sql.NullString
+		if rec.CostCents > 0 {
+			cost = sql.NullString{String: fmt.Sprintf("%d.%06d", rec.CostCents/100, (rec.CostCents%100)*10000), Valid: true}
+		}
+		status := generated.AiInvocationsStatusOk
+		if rec.Status == "error" {
+			status = generated.AiInvocationsStatusError
+		} else if rec.Status == "blocked" {
+			status = generated.AiInvocationsStatusBlocked
+		}
+		var ec sql.NullString
+		if rec.ErrorCode != "" {
+			ec = sql.NullString{String: rec.ErrorCode, Valid: true}
+		}
+		_, _ = q.LogAiInvocation(ctx, generated.LogAiInvocationParams{
+			PublicID:         types.New(),
+			WorkspaceID:      rec.WorkspaceID,
+			ProviderID:       providerID,
+			UserID:           userID,
+			AgentID:          agentID,
+			TaskID:           sql.NullInt32{},
+			Purpose:          rec.Purpose,
+			Model:            rec.Model,
+			PromptRedacted:   rec.PromptRedacted,
+			ResponseRedacted: response,
+			TokensInput:      tIn,
+			TokensOutput:     tOut,
+			CostEstimate:     cost,
+			Status:           status,
+			ErrorCode:        ec,
+			InvokedAt:        time.Now().UTC(),
+		})
+	}
 }
 
 // passthroughDB adapts *sql.DB to middleware.ACLDB.

@@ -25,7 +25,9 @@ import (
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/agentguard"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/embed"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/nlquery"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
@@ -41,6 +43,9 @@ type Deps struct {
 	// Embedder is the optional task embedding client. When nil,
 	// propose_duplicates returns AI.PROVIDER.NOT_CONFIGURED.
 	Embedder *embed.Client
+	// NlQuery is the optional natural-language-to-Lens compiler. When
+	// nil, the propose_lens tool returns AI.PROVIDER.NOT_CONFIGURED.
+	NlQuery *nlquery.Compiler
 }
 
 // Handler implements http.Handler for the /mcp endpoint.
@@ -138,12 +143,52 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 		writeRPCError(w, req.ID, apierrors.McpScopeInsufficient, "scope "+t.requiredScope+" required")
 		return
 	}
+	// 2.MCP-2 agent guard: when the session is backed by an AI agent
+	// token, run agentguard.Decide to enforce enabled / paused /
+	// allowed-scopes. Monthly cost-cap enforcement here is still a
+	// placeholder — ai_invocations.agent_id is a follow-up, so we
+	// pass 0 spend and nil cap until that column lands.
+	if s.agentID != 0 {
+		agent, aerr := h.loadAgentGuardSnapshot(r.Context(), s.agentID)
+		if aerr != nil {
+			h.audit(r.Context(), s, params.Name, params.Arguments, nil,
+				generated.McpInvocationsStatusError, apierrors.McpToolExecutionFailed.Code, 0)
+			writeRPCError(w, req.ID, apierrors.McpToolExecutionFailed, aerr.Error())
+			return
+		}
+		spent, serr := h.loadAgentMonthSpendCents(r.Context(), s.agentID)
+		if serr != nil {
+			h.audit(r.Context(), s, params.Name, params.Arguments, nil,
+				generated.McpInvocationsStatusError, apierrors.McpToolExecutionFailed.Code, 0)
+			writeRPCError(w, req.ID, apierrors.McpToolExecutionFailed, serr.Error())
+			return
+		}
+		decision := agentguard.Decide(agent, agentguard.Request{
+			ToolName:        params.Name,
+			RequiredScope:   t.requiredScope,
+			SpentCentsMonth: spent,
+		})
+		if decision.Outcome != agentguard.OutcomeAllow {
+			spec := apierrors.McpScopeInsufficient
+			if decision.Outcome == agentguard.OutcomePause {
+				spec = apierrors.AiCostGuardExceeded
+			}
+			h.audit(r.Context(), s, params.Name, params.Arguments, nil,
+				generated.McpInvocationsStatusDenied, spec.Code, 0)
+			writeRPCError(w, req.ID, spec, "agent guard: "+decision.Reason)
+			return
+		}
+	}
 	args := params.Arguments
 	if len(args) == 0 {
 		args = json.RawMessage("{}")
 	}
 	start := time.Now()
-	result, toolErr := t.run(r.Context(), h.deps, s, args)
+	runCtx := r.Context()
+	if s.agentID != 0 {
+		runCtx = ai.WithAgentID(runCtx, s.agentID)
+	}
+	result, toolErr := t.run(runCtx, h.deps, s, args)
 	dur := int32(time.Since(start).Milliseconds())
 	if toolErr != nil {
 		var ae *apierrors.APIError
@@ -212,6 +257,59 @@ func writeRPCError(w http.ResponseWriter, id json.RawMessage, spec *apierrors.Sp
 			Data:    map[string]any{"code": spec.Code},
 		},
 	})
+}
+
+// loadAgentGuardSnapshot fetches the minimal ai_agents row that
+// agentguard.Decide needs, via raw SQL to avoid a sqlc regen on this
+// slice. Returns a zero Agent (not enabled) if the row is missing so
+// Decide will pause the caller.
+func (h *Handler) loadAgentGuardSnapshot(ctx context.Context, agentID uint32) (agentguard.Agent, error) {
+	const q = `SELECT enabled, paused, allowed_scopes_json, monthly_cost_cap_cents FROM ai_agents WHERE id = ? LIMIT 1`
+	var (
+		enabled       bool
+		paused        bool
+		scopesJSON    sql.NullString
+		monthlyCapRaw sql.NullInt64
+	)
+	if err := h.deps.DB.QueryRowContext(ctx, q, agentID).Scan(&enabled, &paused, &scopesJSON, &monthlyCapRaw); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return agentguard.Agent{Enabled: false}, nil
+		}
+		return agentguard.Agent{}, err
+	}
+	var scopes []string
+	if scopesJSON.Valid && scopesJSON.String != "" {
+		_ = json.Unmarshal([]byte(scopesJSON.String), &scopes)
+	}
+	var cap *int64
+	if monthlyCapRaw.Valid {
+		v := monthlyCapRaw.Int64
+		cap = &v
+	}
+	return agentguard.Agent{
+		Enabled:             enabled,
+		Paused:              paused,
+		AllowedScopes:       scopes,
+		MonthlyCostCapCents: cap,
+	}, nil
+}
+
+// loadAgentMonthSpendCents returns the sum of cost_estimate (in cents)
+// for ai_invocations attributed to agentID since the first day of the
+// current UTC month. Used by the 2.MCP-2 dispatch guard.
+func (h *Handler) loadAgentMonthSpendCents(ctx context.Context, agentID uint32) (int64, error) {
+	const q = `SELECT CAST(COALESCE(ROUND(SUM(cost_estimate) * 100), 0) AS SIGNED)
+	             FROM ai_invocations WHERE agent_id = ? AND invoked_at >= ?`
+	now := time.Now().UTC()
+	since := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	var cents int64
+	if err := h.deps.DB.QueryRowContext(ctx, q, agentID, since).Scan(&cents); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return cents, nil
 }
 
 func bearerFromHeader(h string) (string, bool) {

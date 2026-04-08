@@ -57,6 +57,19 @@ func nullBytesToUUIDPtr(s sql.NullString) *string {
 	return &out
 }
 
+// rawBytesToUUIDPtr is the []byte variant for columns that sqlc exposes
+// as a raw BINARY(16) slice rather than sql.NullString. Returns nil
+// when the slice is empty or not exactly 16 bytes.
+func rawBytesToUUIDPtr(b []byte) *string {
+	if len(b) != 16 {
+		return nil
+	}
+	var u uuid.UUID
+	copy(u[:], b)
+	out := u.String()
+	return &out
+}
+
 func rowToTaskListItemFromProject(r generated.ListTasksForProjectRow) TaskListItem {
 	return TaskListItem{
 		ID:                r.PublicID.String(),
@@ -70,7 +83,7 @@ func rowToTaskListItemFromProject(r generated.ListTasksForProjectRow) TaskListIt
 		StartedOn:         nullDate(r.StartedOn),
 		CompletedAt:       nullTime(r.CompletedAt),
 		SortWeight:        r.SortWeight,
-		PrimaryAssigneeID: nullBytesToUUIDPtr(r.PrimaryAssigneePublicID),
+		PrimaryAssigneeID: rawBytesToUUIDPtr(r.PrimaryAssigneePublicID),
 		AssigneeCount:     r.AssigneeCount,
 		UpdatedAt:         nullTime(r.UpdatedAt),
 		CreatedAt:         r.CreatedAt,
@@ -90,7 +103,7 @@ func rowToTaskListItemFromWorkspace(r generated.ListTasksForWorkspaceRow) TaskLi
 		StartedOn:         nullDate(r.StartedOn),
 		CompletedAt:       nullTime(r.CompletedAt),
 		SortWeight:        r.SortWeight,
-		PrimaryAssigneeID: nullBytesToUUIDPtr(r.PrimaryAssigneePublicID),
+		PrimaryAssigneeID: rawBytesToUUIDPtr(r.PrimaryAssigneePublicID),
 		AssigneeCount:     r.AssigneeCount,
 		UpdatedAt:         nullTime(r.UpdatedAt),
 		CreatedAt:         r.CreatedAt,

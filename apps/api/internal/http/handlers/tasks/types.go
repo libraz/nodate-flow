@@ -410,6 +410,53 @@ type RemoveTaskActorOutput struct {
 	Body RemoveTaskActorBody
 }
 
+// TaskAgentActor is the public DTO for an AI agent attached to a task
+// via task_actors (kind='agent'). Shape is deliberately distinct from
+// TaskActor so the frontend can render agents differently. (2.MCP-2)
+type TaskAgentActor struct {
+	ID        string    `json:"id"`
+	AgentID   string    `json:"agentId"`
+	AgentName string    `json:"agentName"`
+	Role      string    `json:"role"`
+	UpdatedAt time.Time `json:"updatedAt,omitempty"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+// AddTaskAgentActorBody is the JSON body for POST /tasks/{id}/agents.
+type AddTaskAgentActorBody struct {
+	AgentID string `json:"agentId" doc:"AI agent public id (UUID v7)"`
+	Role    string `json:"role" enum:"assignee,reviewer,watcher,approver"`
+}
+
+// AddTaskAgentActorInput is the request for POST /tasks/{id}/agents.
+type AddTaskAgentActorInput struct {
+	ID   string `path:"id"`
+	Body AddTaskAgentActorBody
+}
+
+// AddTaskAgentActorOutput is the response for POST /tasks/{id}/agents.
+type AddTaskAgentActorOutput struct {
+	Body TaskAgentActor
+}
+
+// ListTaskAgentActorsInput is the query for GET /tasks/{id}/agents.
+type ListTaskAgentActorsInput struct {
+	ID     string `path:"id"`
+	Limit  int32  `query:"limit" minimum:"1" maximum:"200" default:"100"`
+	Offset int32  `query:"offset" minimum:"0" default:"0"`
+}
+
+// ListTaskAgentActorsBody is the response payload for GET /tasks/{id}/agents.
+type ListTaskAgentActorsBody struct {
+	Total  int64            `json:"total"`
+	Agents []TaskAgentActor `json:"agents"`
+}
+
+// ListTaskAgentActorsOutput is the response for GET /tasks/{id}/agents.
+type ListTaskAgentActorsOutput struct {
+	Body ListTaskAgentActorsBody
+}
+
 // ---- Comments I/O ----------------------------------------------------------
 
 // AddTaskCommentBody is the JSON body for POST /tasks/{id}/comments.

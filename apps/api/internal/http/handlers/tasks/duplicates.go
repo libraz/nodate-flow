@@ -89,7 +89,7 @@ func ListDuplicates(deps Deps) func(context.Context, *ListDuplicatesInput) (*Lis
 			return emptyDuplicates(model), nil
 		}
 
-		srcVec, err := embed.Decode(src.Vector)
+		srcVec, err := embed.Decode(vectorBytes(src.Vector))
 		if err != nil || len(srcVec) == 0 {
 			return emptyDuplicates(model), nil
 		}
@@ -107,7 +107,7 @@ func ListDuplicates(deps Deps) func(context.Context, *ListDuplicatesInput) (*Lis
 		out := emptyDuplicates(model)
 		out.Body.Source = task.PublicID.String()
 		for _, r := range rows {
-			v, derr := embed.Decode(r.Vector)
+			v, derr := embed.Decode(vectorBytes(r.Vector))
 			if derr != nil || len(v) != len(srcVec) {
 				continue
 			}
@@ -161,5 +161,18 @@ func resolveThresholds(ctx context.Context, q *generated.Queries, wsID uint32) (
 		model = defaultEmbedModel
 	}
 	return model, high, low
+}
+
+// vectorBytes coerces an interface{} VECTOR column to []byte. sqlc
+// exposes STRING_TO_VECTOR-wrapped VECTOR reads as interface{}; the
+// underlying value is []byte (MySQL binary protocol) or string.
+func vectorBytes(v any) []byte {
+	switch x := v.(type) {
+	case []byte:
+		return x
+	case string:
+		return []byte(x)
+	}
+	return nil
 }
 

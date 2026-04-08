@@ -19,6 +19,7 @@ SELECT
   m.public_id   AS token_public_id,
   m.workspace_id,
   m.user_id,
+  m.agent_id,
   m.scopes_json,
   m.expires_at,
   u.public_id   AS user_public_id,
@@ -37,6 +38,7 @@ type FindUserForMcpTokenRow struct {
 	TokenPublicID types.PublicID  `json:"tokenPublicId"`
 	WorkspaceID   uint32          `json:"-"`
 	UserID        uint32          `json:"-"`
+	AgentID       sql.NullInt32   `json:"agentId"`
 	ScopesJson    json.RawMessage `json:"scopesJson"`
 	ExpiresAt     sql.NullTime    `json:"expiresAt"`
 	UserPublicID  types.PublicID  `json:"userPublicId"`
@@ -54,6 +56,7 @@ func (q *Queries) FindUserForMcpToken(ctx context.Context, tokenHash string) (Fi
 		&i.TokenPublicID,
 		&i.WorkspaceID,
 		&i.UserID,
+		&i.AgentID,
 		&i.ScopesJson,
 		&i.ExpiresAt,
 		&i.UserPublicID,

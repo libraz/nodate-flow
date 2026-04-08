@@ -6,6 +6,7 @@ INSERT INTO ai_invocations (
   workspace_id,
   provider_id,
   user_id,
+  agent_id,
   task_id,
   purpose,
   model,
@@ -17,7 +18,7 @@ INSERT INTO ai_invocations (
   status,
   error_code,
   invoked_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: ListAiInvocationsForWorkspace :many
 -- Recent redacted LLM call records for a workspace, newest first. Used
@@ -69,4 +70,13 @@ LIMIT ? OFFSET ?;
 SELECT CAST(COALESCE(ROUND(SUM(cost_estimate) * 100), 0) AS SIGNED) AS total_cents
 FROM ai_invocations
 WHERE workspace_id = ?
+  AND invoked_at >= ?;
+
+-- name: SumAiCostForAgentSince :one
+-- Sum the estimated cost (cents) of LLM calls attributed to a given AI
+-- agent since a lower bound. Used by 2.MCP-2 agentguard to enforce the
+-- agent's monthly cost cap.
+SELECT CAST(COALESCE(ROUND(SUM(cost_estimate) * 100), 0) AS SIGNED) AS total_cents
+FROM ai_invocations
+WHERE agent_id = ?
   AND invoked_at >= ?;

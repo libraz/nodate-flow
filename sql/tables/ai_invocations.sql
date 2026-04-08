@@ -9,6 +9,7 @@ CREATE TABLE ai_invocations (
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   provider_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to ai_providers.id',
   user_id INT UNSIGNED NULL COMMENT 'Internal FK to users.id (if user-initiated)',
+  agent_id INT UNSIGNED NULL COMMENT 'Internal FK to ai_agents.id when the call was made on behalf of an AI agent (2.MCP-2)',
   task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id if applicable',
 
   purpose VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Logical call purpose (e.g., propose_tasks)',
@@ -31,9 +32,11 @@ CREATE TABLE ai_invocations (
   UNIQUE KEY uniq_ai_invocations_public_id (public_id),
   KEY idx_ai_invocations_workspace_id_invoked_at (workspace_id, invoked_at),
   KEY idx_ai_invocations_workspace_id_provider_id (workspace_id, provider_id),
+  KEY idx_ai_invocations_agent_id_invoked_at (agent_id, invoked_at),
 
   CONSTRAINT fk_ai_invocations_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_ai_invocations_provider FOREIGN KEY (provider_id) REFERENCES ai_providers(id) ON DELETE CASCADE,
   CONSTRAINT fk_ai_invocations_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_ai_invocations_agent FOREIGN KEY (agent_id) REFERENCES ai_agents(id) ON DELETE SET NULL,
   CONSTRAINT fk_ai_invocations_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='LLM invocation audit';

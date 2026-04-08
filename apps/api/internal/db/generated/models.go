@@ -279,6 +279,48 @@ func (ns NullSignalsSource) Value() (driver.Value, error) {
 	return string(ns.SignalsSource), nil
 }
 
+type TaskActorsKind string
+
+const (
+	TaskActorsKindUser  TaskActorsKind = "user"
+	TaskActorsKindAgent TaskActorsKind = "agent"
+)
+
+func (e *TaskActorsKind) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = TaskActorsKind(s)
+	case string:
+		*e = TaskActorsKind(s)
+	default:
+		return fmt.Errorf("unsupported scan type for TaskActorsKind: %T", src)
+	}
+	return nil
+}
+
+type NullTaskActorsKind struct {
+	TaskActorsKind TaskActorsKind `json:"taskActorsKind"`
+	Valid          bool           `json:"valid"` // Valid is true if TaskActorsKind is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullTaskActorsKind) Scan(value interface{}) error {
+	if value == nil {
+		ns.TaskActorsKind, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.TaskActorsKind.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullTaskActorsKind) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.TaskActorsKind), nil
+}
+
 type TaskActorsRole string
 
 const (
@@ -568,6 +610,14 @@ type AiAgent struct {
 	MaxOutputTokens sql.NullInt32 `json:"maxOutputTokens"`
 	// Allowed tool list as JSON array
 	ToolsJson json.RawMessage `json:"toolsJson"`
+	// Allowed MCP scope list as JSON array (null = inherit from token)
+	AllowedScopesJson json.RawMessage `json:"allowedScopesJson"`
+	// Monthly spend cap in USD cents (null = no cap)
+	MonthlyCostCapCents sql.NullInt32 `json:"monthlyCostCapCents"`
+	// Optional cron expression for scheduled runs
+	CronExpr sql.NullString `json:"cronExpr"`
+	// Manually or automatically paused (e.g., cost cap exceeded)
+	Paused bool `json:"paused"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
@@ -590,6 +640,8 @@ type AiInvocation struct {
 	ProviderID uint32 `json:"-"`
 	// Internal FK to users.id (if user-initiated)
 	UserID sql.NullInt32 `json:"-"`
+	// Internal FK to ai_agents.id when the call was made on behalf of an AI agent (2.MCP-2)
+	AgentID sql.NullInt32 `json:"agentId"`
 	// Internal FK to tasks.id if applicable
 	TaskID sql.NullInt32 `json:"-"`
 	// Logical call purpose (e.g., propose_tasks)
@@ -688,6 +740,24 @@ type AiProvider struct {
 	Enabled   bool         `json:"enabled"`
 	UpdatedAt sql.NullTime `json:"updatedAt"`
 	CreatedAt time.Time    `json:"createdAt"`
+}
+
+// Per-workspace AI configuration (ADR 0003)
+type AiSetting struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Embedding model key (resolved by ai/embed registry)
+	EmbedModel string `json:"embedModel"`
+	// Daily embed cost cap in cents (separate bucket from chat budget)
+	EmbedBudgetCentsDay uint32 `json:"embedBudgetCentsDay"`
+	// Cosine sim >= this -> duplicate candidate
+	DuplicateThresholdHigh string `json:"duplicateThresholdHigh"`
+	// Cosine sim in [low, high) -> related task
+	DuplicateThresholdLow string       `json:"duplicateThresholdLow"`
+	UpdatedAt             sql.NullTime `json:"updatedAt"`
+	CreatedAt             time.Time    `json:"createdAt"`
 }
 
 // Task file attachments metadata
@@ -946,6 +1016,8 @@ type McpToken struct {
 	WorkspaceID uint32 `json:"-"`
 	// Internal FK to users.id (token owner)
 	UserID uint32 `json:"-"`
+	// Internal FK to ai_agents.id when the token acts on behalf of an AI agent (2.MCP-2)
+	AgentID sql.NullInt32 `json:"agentId"`
 	// Human-readable label
 	Name string `json:"name"`
 	// SHA-256 hex of the bearer token
@@ -1170,8 +1242,12 @@ type TaskActor struct {
 	WorkspaceID uint32 `json:"-"`
 	// Internal FK to tasks.id
 	TaskID uint32 `json:"-"`
-	// Internal FK to users.id
-	UserID uint32 `json:"-"`
+	// Internal FK to users.id (null when this row is an AI agent actor)
+	UserID sql.NullInt32 `json:"-"`
+	// Internal FK to ai_agents.id (null when this row is a human actor)
+	AgentID sql.NullInt32 `json:"agentId"`
+	// Actor kind — user or AI agent (2.MCP-2)
+	Kind TaskActorsKind `json:"kind"`
 	// Actor role on the task
 	Role TaskActorsRole `json:"role"`
 	// Display order
@@ -1236,6 +1312,22 @@ type TaskDependency struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
+// Task embedding vectors for duplicate detection (ADR 0003)
+type TaskEmbedding struct {
+	// Internal FK to tasks.id
+	TaskID uint32 `json:"-"`
+	// Embedding model key, e.g. mock-768
+	Model string `json:"model"`
+	// Vector dimensionality (redundant with type today)
+	Dim uint16 `json:"dim"`
+	// L2-normalized embedding vector
+	Vector interface{} `json:"vector"`
+	// SHA-256 hex of embedded text
+	ContentHash string `json:"contentHash"`
+	// Last embed time
+	EmbeddedAt time.Time `json:"embeddedAt"`
+}
+
 // Global user accounts
 type User struct {
 	// Internal PK, never exposed
@@ -1281,17 +1373,18 @@ type VAuditRecent struct {
 }
 
 type VInbox struct {
-	WorkspaceID  uint32          `json:"-"`
-	PublicID     types.PublicID  `json:"publicId"`
-	TaskPublicID sql.NullString  `json:"taskPublicId"`
-	TaskTitle    sql.NullString  `json:"taskTitle"`
-	Source       SignalsSource   `json:"source"`
-	Kind         string          `json:"kind"`
-	ExternalID   sql.NullString  `json:"externalId"`
-	PayloadJson  json.RawMessage `json:"payloadJson"`
-	ReceivedAt   time.Time       `json:"receivedAt"`
-	UpdatedAt    sql.NullTime    `json:"updatedAt"`
-	CreatedAt    time.Time       `json:"createdAt"`
+	WorkspaceID       uint32          `json:"-"`
+	WorkspacePublicID []byte          `json:"workspacePublicId"`
+	PublicID          types.PublicID  `json:"publicId"`
+	TaskPublicID      sql.NullString  `json:"taskPublicId"`
+	TaskTitle         sql.NullString  `json:"taskTitle"`
+	Source            SignalsSource   `json:"source"`
+	Kind              string          `json:"kind"`
+	ExternalID        sql.NullString  `json:"externalId"`
+	PayloadJson       json.RawMessage `json:"payloadJson"`
+	ReceivedAt        time.Time       `json:"receivedAt"`
+	UpdatedAt         sql.NullTime    `json:"updatedAt"`
+	CreatedAt         time.Time       `json:"createdAt"`
 }
 
 type VMyTask struct {
@@ -1339,6 +1432,7 @@ type VProjectStat struct {
 
 type VTaskDetail struct {
 	WorkspaceID              uint32            `json:"-"`
+	WorkspacePublicID        []byte            `json:"workspacePublicId"`
 	PublicID                 types.PublicID    `json:"publicId"`
 	ProjectPublicID          []byte            `json:"projectPublicId"`
 	ProjectName              string            `json:"projectName"`
@@ -1361,26 +1455,30 @@ type VTaskDetail struct {
 }
 
 type VTaskList struct {
-	WorkspaceID        uint32            `json:"-"`
-	PublicID           types.PublicID    `json:"publicId"`
-	ProjectPublicID    []byte            `json:"projectPublicId"`
-	ProjectName        string            `json:"projectName"`
-	ParentTaskPublicID sql.NullString    `json:"parentTaskPublicId"`
-	Title              string            `json:"title"`
-	DerivedState       TasksDerivedState `json:"derivedState"`
-	Priority           int32             `json:"priority"`
-	DueOn              sql.NullTime      `json:"dueOn"`
-	StartedOn          sql.NullTime      `json:"startedOn"`
-	CompletedAt        sql.NullTime      `json:"completedAt"`
-	SortWeight         int32             `json:"sortWeight"`
-	UpdatedAt          sql.NullTime      `json:"updatedAt"`
-	CreatedAt          time.Time         `json:"createdAt"`
+	WorkspaceID             uint32            `json:"-"`
+	PublicID                types.PublicID    `json:"publicId"`
+	ProjectPublicID         []byte            `json:"projectPublicId"`
+	ProjectName             string            `json:"projectName"`
+	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
+	Title                   string            `json:"title"`
+	DerivedState            TasksDerivedState `json:"derivedState"`
+	Priority                int32             `json:"priority"`
+	DueOn                   sql.NullTime      `json:"dueOn"`
+	StartedOn               sql.NullTime      `json:"startedOn"`
+	CompletedAt             sql.NullTime      `json:"completedAt"`
+	SortWeight              int32             `json:"sortWeight"`
+	UpdatedAt               sql.NullTime      `json:"updatedAt"`
+	CreatedAt               time.Time         `json:"createdAt"`
+	PrimaryAssigneePublicID []byte            `json:"primaryAssigneePublicId"`
+	AssigneeCount           int64             `json:"assigneeCount"`
 }
 
 type VTaskTimeline struct {
 	WorkspaceID       uint32          `json:"-"`
+	EventID           uint32          `json:"eventId"`
 	PublicID          types.PublicID  `json:"publicId"`
 	TaskPublicID      sql.NullString  `json:"taskPublicId"`
+	ProjectPublicID   sql.NullString  `json:"projectPublicId"`
 	ActorUserPublicID sql.NullString  `json:"actorUserPublicId"`
 	ActorDisplayName  sql.NullString  `json:"actorDisplayName"`
 	Type              string          `json:"type"`
@@ -1438,42 +1536,6 @@ type Workspace struct {
 	Enabled   bool         `json:"enabled"`
 	UpdatedAt sql.NullTime `json:"updatedAt"`
 	CreatedAt time.Time    `json:"createdAt"`
-}
-
-// Per-workspace AI configuration (ADR 0003)
-type AiSetting struct {
-	// Internal PK, never exposed
-	ID uint32 `json:"-"`
-	// Internal FK to workspaces.id
-	WorkspaceID uint32 `json:"-"`
-	// Embedding model key (resolved by ai/embed registry)
-	EmbedModel string `json:"embedModel"`
-	// Daily embed cost cap in cents (separate bucket from chat budget)
-	EmbedBudgetCentsDay uint32 `json:"embedBudgetCentsDay"`
-	// Cosine sim >= this -> duplicate candidate (DECIMAL(4,3) as string)
-	DuplicateThresholdHigh string `json:"duplicateThresholdHigh"`
-	// Cosine sim in [low, high) -> related task (DECIMAL(4,3) as string)
-	DuplicateThresholdLow string       `json:"duplicateThresholdLow"`
-	UpdatedAt             sql.NullTime `json:"updatedAt"`
-	CreatedAt             time.Time    `json:"createdAt"`
-}
-
-// Task embedding vectors for duplicate detection (ADR 0003).
-// VECTOR(768) is read/written as []byte; the Go embedding client
-// L2-normalizes before insert and cosine similarity is computed in Go.
-type TaskEmbedding struct {
-	// Internal FK to tasks.id
-	TaskID uint32 `json:"-"`
-	// Embedding model key, e.g. mock-768
-	Model string `json:"model"`
-	// Vector dimensionality (redundant with type today)
-	Dim uint16 `json:"dim"`
-	// L2-normalized embedding vector (MySQL VECTOR serialized bytes)
-	Vector []byte `json:"vector"`
-	// SHA-256 hex of embedded text
-	ContentHash string `json:"contentHash"`
-	// Last embed time
-	EmbeddedAt time.Time `json:"embeddedAt"`
 }
 
 // Workspace membership

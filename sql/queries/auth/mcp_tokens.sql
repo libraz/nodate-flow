@@ -6,6 +6,7 @@ SELECT
   m.public_id   AS token_public_id,
   m.workspace_id,
   m.user_id,
+  m.agent_id,
   m.scopes_json,
   m.expires_at,
   u.public_id   AS user_public_id,

@@ -87,6 +87,7 @@ type InvocationLogger func(ctx context.Context, rec InvocationRecord)
 // rows are append-only; status is one of "ok", "error".
 type InvocationRecord struct {
 	WorkspaceID      uint32
+	AgentID          uint32 // non-zero when the call was made on behalf of an AI agent (2.MCP-2)
 	Purpose          string
 	Model            string
 	PromptRedacted   string
@@ -254,6 +255,7 @@ func (o *Orchestrator) logSuccess(ctx context.Context, workspaceID uint32, purpo
 	}
 	o.LogInvoke(ctx, InvocationRecord{
 		WorkspaceID:      workspaceID,
+		AgentID:          AgentIDFromContext(ctx),
 		Purpose:          purpose,
 		Model:            req.Model,
 		PromptRedacted:   Redact(strings.TrimSpace(req.System + "\n" + req.Prompt)),
@@ -271,6 +273,7 @@ func (o *Orchestrator) logFailure(ctx context.Context, workspaceID uint32, purpo
 	}
 	o.LogInvoke(ctx, InvocationRecord{
 		WorkspaceID:    workspaceID,
+		AgentID:        AgentIDFromContext(ctx),
 		Purpose:        purpose,
 		Model:          req.Model,
 		PromptRedacted: Redact(strings.TrimSpace(req.System + "\n" + req.Prompt)),

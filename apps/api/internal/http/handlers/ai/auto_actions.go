@@ -79,7 +79,7 @@ func ListAutoActions(deps Deps) func(context.Context, *ListAutoActionsInput) (*L
 			sig := autoactions.Signals{
 				State:         autoactions.State(r.DerivedState),
 				AssigneeCount: r.AssigneeCount,
-				HasAssignee:   r.PrimaryAssigneePublicID.Valid,
+				HasAssignee:   len(r.PrimaryAssigneePublicID) > 0,
 				Now:           now,
 			}
 			if r.UpdatedAt.Valid {

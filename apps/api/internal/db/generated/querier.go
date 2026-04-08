@@ -13,6 +13,8 @@ import (
 type Querier interface {
 	// Attach a user to a task in the given role.
 	AddActor(ctx context.Context, arg AddActorParams) (int64, error)
+	// Attach an AI agent to a task in the given role (2.MCP-2).
+	AddAgentActor(ctx context.Context, arg AddAgentActorParams) (int64, error)
 	// Insert metadata for a newly uploaded attachment.
 	AddAttachment(ctx context.Context, arg AddAttachmentParams) (int64, error)
 	// Append a comment to a task.
@@ -34,6 +36,10 @@ type Querier interface {
 	ArchiveInboxItem(ctx context.Context, arg ArchiveInboxItemParams) error
 	// Link an existing signal to a task by public_id.
 	AttachSignalToTask(ctx context.Context, arg AttachSignalToTaskParams) error
+	// Count ai.suggestion.{proposed,applied,dismissed} events for a workspace
+	// within the given time window. Used by the AI metrics endpoint
+	// (2.OBS-1) to compute acceptance rate.
+	CountAiSuggestionOutcomesForWorkspace(ctx context.Context, arg CountAiSuggestionOutcomesForWorkspaceParams) (CountAiSuggestionOutcomesForWorkspaceRow, error)
 	// Insert a new reusable agent configuration.
 	CreateAgent(ctx context.Context, arg CreateAgentParams) (int64, error)
 	// Insert a new identity row (local password or OIDC binding) for a user.
@@ -74,6 +80,10 @@ type Querier interface {
 	DeleteDependency(ctx context.Context, arg DeleteDependencyParams) error
 	// Soft-delete a provider.
 	DeleteProvider(ctx context.Context, arg DeleteProviderParams) error
+	// Remove every embedding row for a task across all models. ON DELETE
+	// CASCADE already handles task deletion; this query is for the
+	// re-embed-on-edit flow when a workspace switches to a different model.
+	DeleteTaskEmbeddingsForTask(ctx context.Context, taskID uint32) error
 	// Soft-disable a project.
 	DisableProject(ctx context.Context, arg DisableProjectParams) error
 	// Soft-disable a task.
@@ -82,6 +92,13 @@ type Querier interface {
 	DisableWorkspace(ctx context.Context, publicID types.PublicID) error
 	// Edit a comment body and stamp edited_at.
 	EditComment(ctx context.Context, arg EditCommentParams) error
+	// Resolve an ai_agents public id to its internal id, scoped to the
+	// workspace. Used by task actor handlers to bind by public id.
+	FindAgentIDByPublicIDForWorkspace(ctx context.Context, arg FindAgentIDByPublicIDForWorkspaceParams) (uint32, error)
+	// Return the internal id of the most recently created enabled provider
+	// for a workspace. Used by the ai_invocations logger (2.MCP-2) when the
+	// orchestrator does not track which provider handled the call.
+	FindDefaultProviderIDForWorkspace(ctx context.Context, workspaceID uint32) (uint32, error)
 	// Resolve an identity by (provider, subject) pair for OIDC login flows.
 	FindIdentityByProviderSubject(ctx context.Context, arg FindIdentityByProviderSubjectParams) (FindIdentityByProviderSubjectRow, error)
 	// Resolve a local-password identity by user email for the login pipeline.
@@ -127,34 +144,56 @@ type Querier interface {
 	FindWorkspaceBySlug(ctx context.Context, slug string) (FindWorkspaceBySlugRow, error)
 	// Resolve a workspace membership by (workspace_id, user_id).
 	FindWorkspaceMemberByUserId(ctx context.Context, arg FindWorkspaceMemberByUserIdParams) (FindWorkspaceMemberByUserIdRow, error)
+	// ============================================================================
+	// ai_settings queries (ADR 0003)
+	// Per-workspace AI knobs: embed model, daily embed budget, and the
+	// duplicate-detection similarity thresholds.
+	// ============================================================================
+	// Fetch the ai_settings row for a workspace. Returns sql.ErrNoRows when the
+	// workspace has never written a row; the caller should fall back to the
+	// column defaults (mock-768 / 100 cents/day / 0.870 / 0.750).
+	GetAiSettings(ctx context.Context, workspaceID uint32) (AiSetting, error)
+	// Fetch the embedding row for a single (task_id, model) pair. Returns
+	// sql.ErrNoRows if the task has never been embedded with the given model.
+	GetTaskEmbedding(ctx context.Context, arg GetTaskEmbeddingParams) (GetTaskEmbeddingRow, error)
 	// Insert an inbound signal (manual or webhook).
 	InsertSignal(ctx context.Context, arg InsertSignalParams) (int64, error)
 	// List actors on a task joined with user display fields.
 	ListActorsForTask(ctx context.Context, arg ListActorsForTaskParams) ([]ListActorsForTaskRow, error)
-	// Count ai.suggestion.{proposed,applied,dismissed} events for a workspace.
-	CountAiSuggestionOutcomesForWorkspace(ctx context.Context, arg CountAiSuggestionOutcomesForWorkspaceParams) (CountAiSuggestionOutcomesForWorkspaceRow, error)
-	// Recent redacted LLM call records scoped to a single task.
-	ListAiInvocationsForTask(ctx context.Context, arg ListAiInvocationsForTaskParams) ([]ListAiInvocationsForTaskRow, error)
-	// Recent redacted LLM call records for a workspace, newest first.
-	ListAiInvocationsForWorkspace(ctx context.Context, arg ListAiInvocationsForWorkspaceParams) ([]ListAiInvocationsForWorkspaceRow, error)
+	// List AI agent actors on a task joined with the agent definition.
+	ListAgentActorsForTask(ctx context.Context, arg ListAgentActorsForTaskParams) ([]ListAgentActorsForTaskRow, error)
 	// List a workspace's agents joined with the underlying model.
 	ListAgentsForWorkspace(ctx context.Context, arg ListAgentsForWorkspaceParams) ([]ListAgentsForWorkspaceRow, error)
+	// Recent redacted LLM call records scoped to a single task. Used by
+	// the task detail AI reasoning panel (2.WEB-2). workspace_id is
+	// included so tenant isolation is enforced at the query level.
+	ListAiInvocationsForTask(ctx context.Context, arg ListAiInvocationsForTaskParams) ([]ListAiInvocationsForTaskRow, error)
+	// Recent redacted LLM call records for a workspace, newest first. Used
+	// by the AI activity panel. All columns here are already redacted at
+	// write time by the orchestrator; safe to surface at the API boundary.
+	ListAiInvocationsForWorkspace(ctx context.Context, arg ListAiInvocationsForWorkspaceParams) ([]ListAiInvocationsForWorkspaceRow, error)
 	// List attachments on a task with uploader display fields.
 	ListAttachmentsForTask(ctx context.Context, arg ListAttachmentsForTaskParams) ([]ListAttachmentsForTaskRow, error)
+	// Return all task_embeddings for (workspace_id, model), excluding a given
+	// task_id (so self-similarity is filtered out). Cosine similarity is
+	// computed in Go because MySQL 9.1 Community does not expose
+	// VEC_DISTANCE_COSINE; the caller dot-products the L2-normalized vectors
+	// and applies the duplicate_threshold_high / low cutoffs from ai_settings.
+	ListCandidateTaskEmbeddings(ctx context.Context, arg ListCandidateTaskEmbeddingsParams) ([]ListCandidateTaskEmbeddingsRow, error)
 	// List comments on a task joined with author display fields.
 	ListCommentsForTask(ctx context.Context, arg ListCommentsForTaskParams) ([]ListCommentsForTaskRow, error)
 	// List a task's constraints. The task is resolved by public_id outside.
 	ListConstraintsForTask(ctx context.Context, arg ListConstraintsForTaskParams) ([]ListConstraintsForTaskRow, error)
 	// List outgoing dependencies of a task. Returns the target task public_id.
 	ListDependenciesForTask(ctx context.Context, arg ListDependenciesForTaskParams) ([]ListDependenciesForTaskRow, error)
-	// List a project's timeline via v_task_timeline.
+	// List a project's timeline via v_task_timeline. Filters events whose
+	// owning task lives in the given project (events with no task_id are
+	// excluded by virtue of project_public_id being NULL).
 	ListEventsForProject(ctx context.Context, arg ListEventsForProjectParams) ([]ListEventsForProjectRow, error)
 	// List a task's timeline via v_task_timeline.
 	ListEventsForTask(ctx context.Context, arg ListEventsForTaskParams) ([]ListEventsForTaskRow, error)
 	// List the workspace-wide event timeline via v_task_timeline.
 	ListEventsForWorkspace(ctx context.Context, arg ListEventsForWorkspaceParams) ([]ListEventsForWorkspaceRow, error)
-	// List pending AI suggestions (proposed without a later applied/dismissed) for a workspace.
-	ListPendingAiSuggestions(ctx context.Context, workspaceID uint32) ([]ListPendingAiSuggestionsRow, error)
 	// List a workspace's inbox via v_inbox.
 	ListInbox(ctx context.Context, arg ListInboxParams) ([]ListInboxRow, error)
 	// List inbox items across every workspace the actor is an active member of.
@@ -167,6 +206,11 @@ type Querier interface {
 	ListMyTasks(ctx context.Context, arg ListMyTasksParams) ([]ListMyTasksRow, error)
 	// List a user's PATs in a workspace, masked (no token_hash).
 	ListPatsForUser(ctx context.Context, arg ListPatsForUserParams) ([]ListPatsForUserRow, error)
+	// List pending AI suggestions for a workspace. A suggestion is "pending"
+	// when an ai.suggestion.proposed event exists with no later
+	// ai.suggestion.applied / ai.suggestion.dismissed event for the same
+	// inbox_item_id (compared via JSON_EXTRACT on payload_json).
+	ListPendingAiSuggestions(ctx context.Context, workspaceID uint32) ([]ListPendingAiSuggestionsRow, error)
 	// List members of a project joined with user display fields.
 	ListProjectMembers(ctx context.Context, arg ListProjectMembersParams) ([]ListProjectMembersRow, error)
 	// List projects in a workspace via v_projects.
@@ -179,6 +223,10 @@ type Querier interface {
 	ListSessionsForUser(ctx context.Context, arg ListSessionsForUserParams) ([]ListSessionsForUserRow, error)
 	// List signals attached to a task via v_inbox.
 	ListSignalsForTask(ctx context.Context, arg ListSignalsForTaskParams) ([]ListSignalsForTaskRow, error)
+	// List tasks whose embedding is missing or older than tasks.updated_at for
+	// the given (workspace_id, model). Used by the background re-embed worker.
+	// LEFT JOIN so tasks with no row at all are returned as "stale".
+	ListStaleTaskEmbeddings(ctx context.Context, arg ListStaleTaskEmbeddingsParams) ([]ListStaleTaskEmbeddingsRow, error)
 	// List tasks in a project via v_task_list with window-function pagination.
 	ListTasksForProject(ctx context.Context, arg ListTasksForProjectParams) ([]ListTasksForProjectRow, error)
 	// List tasks across an entire workspace via v_task_list.
@@ -226,10 +274,18 @@ type Querier interface {
 	// Snooze a signal by pushing its received_at forward. Minimal impl;
 	// a dedicated snoozed_until_at column may be added later on.
 	SnoozeInboxItem(ctx context.Context, arg SnoozeInboxItemParams) error
+	// Sum the estimated cost (cents) of LLM calls attributed to a given AI
+	// agent since a lower bound. Used by 2.MCP-2 agentguard to enforce the
+	// agent's monthly cost cap.
+	SumAiCostForAgentSince(ctx context.Context, arg SumAiCostForAgentSinceParams) (int64, error)
 	// Sum the estimated cost (in whole cents) of LLM calls made today for a
 	// workspace. cost_estimate is stored as DECIMAL(10,6) USD; multiply by 100
 	// and round to produce a cent-scale integer suitable for CostGuard.
 	SumAiCostTodayForWorkspace(ctx context.Context, arg SumAiCostTodayForWorkspaceParams) (int64, error)
+	// Write the new derived_state computed by the transition handler. This is
+	// the only path allowed to mutate derived_state and must be called inside
+	// the same transaction as the events append.
+	TransitionTaskState(ctx context.Context, arg TransitionTaskStateParams) error
 	// Bump failed login counter and optionally apply a lockout deadline.
 	UpdateIdentityFailedAttempts(ctx context.Context, arg UpdateIdentityFailedAttemptsParams) error
 	// Change a member's role.
@@ -242,8 +298,6 @@ type Querier interface {
 	UpdateProjectFull(ctx context.Context, arg UpdateProjectFullParams) error
 	// Rotate a provider's API key. Caller passes new ciphertext + prefix + suffix.
 	UpdateProviderKey(ctx context.Context, arg UpdateProviderKeyParams) error
-	// Write the new derived_state computed by the transition handler.
-	TransitionTaskState(ctx context.Context, arg TransitionTaskStateParams) error
 	// Update mutable task fields. derived_state is intentionally NOT writable.
 	UpdateTask(ctx context.Context, arg UpdateTaskParams) error
 	// Stamp last successful login time on a user account.
@@ -252,20 +306,29 @@ type Querier interface {
 	UpdateWorkspace(ctx context.Context, arg UpdateWorkspaceParams) error
 	// Update workspace name and slug by public_id.
 	UpdateWorkspaceFull(ctx context.Context, arg UpdateWorkspaceFullParams) error
-	// Fetch the ai_settings row for a workspace.
-	GetAiSettings(ctx context.Context, workspaceID uint32) (AiSetting, error)
-	// Create or update the ai_settings row for a workspace.
+	// Create or update the ai_settings row for a workspace. The UNIQUE KEY on
+	// workspace_id makes this idempotent.
 	UpsertAiSettings(ctx context.Context, arg UpsertAiSettingsParams) error
-	// Insert or replace the embedding row for (task_id, model).
+	// ============================================================================
+	// task_embeddings queries (ADR 0003)
+	//
+	// Internal plumbing: task_embeddings has no workspace_id / public_id of its
+	// own; workspace scoping is reached via the FK to tasks(id). Every query
+	// below joins or filters through tasks so the workspace boundary still holds.
+	//
+	// VECTOR columns are read/written as []byte. The Go embedding client
+	// L2-normalizes vectors before INSERT and serializes them with
+	// STRING_TO_VECTOR / the native binary protocol. Cosine similarity is
+	// computed in Go (dot product on normalized vectors), because MySQL 9.1
+	// Community Edition does not expose VEC_DISTANCE_COSINE (HeatWave-only in
+	// 9.1; a native distance function is expected in 9.2+). The query layer
+	// therefore returns candidate rows and the application does the ranking.
+	// ============================================================================
+	// Insert or replace the embedding row for (task_id, model). The caller is
+	// responsible for L2-normalizing `vector` before calling this query. The
+	// content_hash lets callers skip re-embedding when the input text is
+	// unchanged.
 	UpsertTaskEmbedding(ctx context.Context, arg UpsertTaskEmbeddingParams) error
-	// Fetch the embedding row for a single (task_id, model) pair.
-	GetTaskEmbedding(ctx context.Context, arg GetTaskEmbeddingParams) (TaskEmbedding, error)
-	// List tasks whose embedding is missing or older than tasks.updated_at.
-	ListStaleTaskEmbeddings(ctx context.Context, arg ListStaleTaskEmbeddingsParams) ([]ListStaleTaskEmbeddingsRow, error)
-	// Return candidate embeddings for in-Go cosine ranking.
-	ListCandidateTaskEmbeddings(ctx context.Context, arg ListCandidateTaskEmbeddingsParams) ([]ListCandidateTaskEmbeddingsRow, error)
-	// Remove every embedding row for a task across all models.
-	DeleteTaskEmbeddingsForTask(ctx context.Context, taskID uint32) error
 }
 
 var _ Querier = (*Queries)(nil)

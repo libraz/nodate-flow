@@ -84,6 +84,25 @@ func (q *Queries) DeleteProvider(ctx context.Context, arg DeleteProviderParams) 
 	return err
 }
 
+const findDefaultProviderIDForWorkspace = `-- name: FindDefaultProviderIDForWorkspace :one
+SELECT id
+FROM ai_providers
+WHERE workspace_id = ?
+  AND enabled = TRUE
+ORDER BY created_at DESC, id DESC
+LIMIT 1
+`
+
+// Return the internal id of the most recently created enabled provider
+// for a workspace. Used by the ai_invocations logger (2.MCP-2) when the
+// orchestrator does not track which provider handled the call.
+func (q *Queries) FindDefaultProviderIDForWorkspace(ctx context.Context, workspaceID uint32) (uint32, error) {
+	row := q.db.QueryRowContext(ctx, findDefaultProviderIDForWorkspace, workspaceID)
+	var id uint32
+	err := row.Scan(&id)
+	return id, err
+}
+
 const findProviderForDecrypt = `-- name: FindProviderForDecrypt :one
 SELECT
   id,

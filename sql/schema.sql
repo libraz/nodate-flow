@@ -50,6 +50,10 @@ CREATE TABLE ai_agents (
   temperature SMALLINT UNSIGNED NOT NULL DEFAULT 100 COMMENT 'Sampling temperature x100 (e.g., 100 = 1.00)',
   max_output_tokens INT UNSIGNED NULL COMMENT 'Per-call output cap (null = model default)',
   tools_json JSON NULL COMMENT 'Allowed tool list as JSON array',
+  allowed_scopes_json JSON NULL COMMENT 'Allowed MCP scope list as JSON array (null = inherit from token)',
+  monthly_cost_cap_cents INT UNSIGNED NULL COMMENT 'Monthly spend cap in USD cents (null = no cap)',
+  cron_expr VARCHAR(128) NULL COMMENT 'Optional cron expression for scheduled runs',
+  paused BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Manually or automatically paused (e.g., cost cap exceeded)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
@@ -77,6 +81,7 @@ CREATE TABLE ai_invocations (
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   provider_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to ai_providers.id',
   user_id INT UNSIGNED NULL COMMENT 'Internal FK to users.id (if user-initiated)',
+  agent_id INT UNSIGNED NULL COMMENT 'Internal FK to ai_agents.id when the call was made on behalf of an AI agent (2.MCP-2)',
   task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id if applicable',
 
   purpose VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Logical call purpose (e.g., propose_tasks)',
@@ -99,10 +104,12 @@ CREATE TABLE ai_invocations (
   UNIQUE KEY uniq_ai_invocations_public_id (public_id),
   KEY idx_ai_invocations_workspace_id_invoked_at (workspace_id, invoked_at),
   KEY idx_ai_invocations_workspace_id_provider_id (workspace_id, provider_id),
+  KEY idx_ai_invocations_agent_id_invoked_at (agent_id, invoked_at),
 
   CONSTRAINT fk_ai_invocations_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_ai_invocations_provider FOREIGN KEY (provider_id) REFERENCES ai_providers(id) ON DELETE CASCADE,
   CONSTRAINT fk_ai_invocations_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_ai_invocations_agent FOREIGN KEY (agent_id) REFERENCES ai_agents(id) ON DELETE SET NULL,
   CONSTRAINT fk_ai_invocations_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='LLM invocation audit';
 
@@ -477,6 +484,7 @@ CREATE TABLE mcp_tokens (
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id (token owner)',
+  agent_id INT UNSIGNED NULL COMMENT 'Internal FK to ai_agents.id when the token acts on behalf of an AI agent (2.MCP-2)',
 
   name VARCHAR(255) NOT NULL COMMENT 'Human-readable label',
   token_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'SHA-256 hex of the bearer token',
@@ -497,7 +505,8 @@ CREATE TABLE mcp_tokens (
   KEY idx_mcp_tokens_workspace_id_user_id (workspace_id, user_id),
 
   CONSTRAINT fk_mcp_tokens_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_mcp_tokens_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  CONSTRAINT fk_mcp_tokens_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_mcp_tokens_agent FOREIGN KEY (agent_id) REFERENCES ai_agents(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='MCP personal access tokens';
 
 -- >>> personal_access_tokens.sql
@@ -670,7 +679,9 @@ CREATE TABLE task_actors (
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   task_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to tasks.id',
-  user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
+  user_id INT UNSIGNED NULL COMMENT 'Internal FK to users.id (null when this row is an AI agent actor)',
+  agent_id INT UNSIGNED NULL COMMENT 'Internal FK to ai_agents.id (null when this row is a human actor)',
+  kind ENUM('user','agent') NOT NULL DEFAULT 'user' COMMENT 'Actor kind — user or AI agent (2.MCP-2)',
 
   role ENUM('assignee','reviewer','watcher','approver') NOT NULL DEFAULT 'assignee' COMMENT 'Actor role on the task',
 
@@ -682,11 +693,18 @@ CREATE TABLE task_actors (
 
   UNIQUE KEY uniq_task_actors_public_id (public_id),
   UNIQUE KEY uniq_task_actors_task_id_user_id_role (task_id, user_id, role),
+  UNIQUE KEY uniq_task_actors_task_id_agent_id_role (task_id, agent_id, role),
   KEY idx_task_actors_workspace_id_user_id (workspace_id, user_id),
+  KEY idx_task_actors_workspace_id_agent_id (workspace_id, agent_id),
 
   CONSTRAINT fk_task_actors_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_task_actors_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-  CONSTRAINT fk_task_actors_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  CONSTRAINT fk_task_actors_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_task_actors_agent FOREIGN KEY (agent_id) REFERENCES ai_agents(id) ON DELETE CASCADE,
+  CONSTRAINT chk_task_actors_kind_target CHECK (
+    (kind = 'user'  AND user_id  IS NOT NULL AND agent_id IS NULL) OR
+    (kind = 'agent' AND agent_id IS NOT NULL AND user_id  IS NULL)
+  )
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Task actors (assignees/reviewers/...)';
 
 -- >>> task_constraints.sql
