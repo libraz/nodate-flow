@@ -41,10 +41,34 @@ func queryTimeline(
 	baseArgs []any,
 	kinds []string,
 	actorPublicID []byte,
+	callerUserID uint32,
 	limit, offset int32,
 ) ([]timelineRow, int64, error) {
 	where := append([]string{}, baseWhere...)
 	args := append([]any{}, baseArgs...)
+
+	// 4-layer ACL visibility predicate (defense-in-depth). An event is
+	// visible to the caller if any of the following hold:
+	//   - the event has no associated task (workspace-root event), OR
+	//   - the associated task has no project (workspace-scoped task and
+	//     the caller is already guaranteed a workspace member by the
+	//     route middleware), OR
+	//   - the associated task's project is one the caller is a project
+	//     member of.
+	// This mirrors the per-task ACL enforced by RequireTaskAccess so the
+	// workspace timeline cannot leak task titles/payloads for projects
+	// the caller cannot otherwise access.
+	where = append(where, `(
+  v.task_public_id IS NULL
+  OR v.project_public_id IS NULL
+  OR v.project_public_id IN (
+    SELECT p.public_id
+    FROM project_members pm
+    INNER JOIN projects p ON p.id = pm.project_id AND p.enabled = TRUE
+    WHERE pm.user_id = ? AND pm.enabled = TRUE
+  )
+)`)
+	args = append(args, callerUserID)
 
 	if len(kinds) > 0 {
 		placeholders := make([]string, 0, len(kinds))
@@ -165,10 +189,11 @@ func ListForTask(deps Deps) func(context.Context, *ListTimelineForTaskInput) (*L
 			return emptyOutput(), nil
 		}
 		taskPubBytes, _ := task.PublicID.MarshalBinary()
+		userID, _ := middleware.ActorFromContext(ctx)
 		rows, total, err := queryTimeline(ctx, deps.DB,
 			[]string{"v.workspace_id = ?", "v.task_public_id = ?"},
 			[]any{ws.ID, taskPubBytes},
-			in.Kind, actorPub, limit, in.Offset)
+			in.Kind, actorPub, userID, limit, in.Offset)
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
@@ -198,10 +223,11 @@ func ListForProject(deps Deps) func(context.Context, *ListTimelineForProjectInpu
 			return emptyOutput(), nil
 		}
 		prjPubBytes, _ := prj.PublicID.MarshalBinary()
+		userID, _ := middleware.ActorFromContext(ctx)
 		rows, total, err := queryTimeline(ctx, deps.DB,
 			[]string{"v.workspace_id = ?", "v.project_public_id = ?"},
 			[]any{ws.ID, prjPubBytes},
-			in.Kind, actorPub, limit, in.Offset)
+			in.Kind, actorPub, userID, limit, in.Offset)
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
@@ -225,10 +251,11 @@ func ListForWorkspace(deps Deps) func(context.Context, *ListTimelineForWorkspace
 		if err != nil {
 			return emptyOutput(), nil
 		}
+		userID, _ := middleware.ActorFromContext(ctx)
 		rows, total, err := queryTimeline(ctx, deps.DB,
 			[]string{"v.workspace_id = ?"},
 			[]any{ws.ID},
-			in.Kind, actorPub, limit, in.Offset)
+			in.Kind, actorPub, userID, limit, in.Offset)
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
