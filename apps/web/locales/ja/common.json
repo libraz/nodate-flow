@@ -12,7 +12,7 @@
     "language": "言語",
     "primary": "メインナビゲーション",
     "inbox": "受信トレイ",
-    "today": "今日",
+    "today": "今日のタスク",
     "calendar": "カレンダー",
     "projects": "プロジェクト",
     "workspaces": "ワークスペース",
@@ -73,7 +73,7 @@
     "skipToContent": "本文へスキップ"
   },
   "today": {
-    "title": "今日",
+    "title": "今日のタスク",
     "subtitle": "あなたが担当しているタスクを期日で横断表示します。",
     "empty": "担当タスクはありません。",
     "loading": "担当タスクを読み込み中…",

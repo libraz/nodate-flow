@@ -12,7 +12,7 @@
     "language": "Language",
     "primary": "Primary navigation",
     "inbox": "Inbox",
-    "today": "Today",
+    "today": "My tasks",
     "calendar": "Calendar",
     "projects": "Projects",
     "workspaces": "Workspaces",
@@ -73,7 +73,7 @@
     "skipToContent": "Skip to content"
   },
   "today": {
-    "title": "Today",
+    "title": "My tasks",
     "subtitle": "Tasks assigned to you across all workspaces, grouped by due date.",
     "empty": "Nothing assigned to you.",
     "loading": "Loading your tasks…",
