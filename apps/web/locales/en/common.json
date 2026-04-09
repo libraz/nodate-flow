@@ -121,6 +121,12 @@
     "description": "The page you're looking for doesn't exist.",
     "back_home": "Back to home"
   },
+  "fatal": {
+    "title": "Something went wrong",
+    "description": "An unexpected error occurred while rendering this page.",
+    "retry": "Retry",
+    "back_home": "Back to home"
+  },
   "workspaces": {
     "title": "Workspaces",
     "new": "New workspace",

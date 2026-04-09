@@ -16,6 +16,7 @@ import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
+import AuthCard from '../components/auth/auth-card';
 import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../features/auth/auth-errors';
 import {
   type AuthUser,
@@ -38,35 +39,6 @@ function buildSchema() {
       .email('auth.validation.email_invalid'),
     password: z.string().min(8, 'auth.validation.password_min'),
   });
-}
-
-function CenteredCard({ children }: { children: ReactElement }): ReactElement {
-  return (
-    <main
-      style={{
-        minBlockSize: '100dvh',
-        display: 'grid',
-        placeItems: 'center',
-        padding: 'var(--nf-space-6, 2rem)',
-        background: 'var(--nf-color-bg, var(--color-bg))',
-      }}
-    >
-      <section
-        style={{
-          inlineSize: 'min(28rem, 100%)',
-          background: 'var(--nf-color-bg-elevated, var(--color-surface))',
-          border: 'var(--nf-space-px, 1px) solid var(--nf-color-border, var(--color-hairline))',
-          borderRadius: 'var(--nf-radius-lg, 0.75rem)',
-          padding: 'var(--nf-space-6, 2rem)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-5, 1.5rem)',
-        }}
-      >
-        {children}
-      </section>
-    </main>
-  );
 }
 
 function LoginPage(): ReactElement {
@@ -182,7 +154,7 @@ function LoginPage(): ReactElement {
 
   if (challengeToken != null) {
     return (
-      <CenteredCard>
+      <AuthCard>
         <form
           onSubmit={(e) => {
             void handleTotpSubmit(e);
@@ -276,12 +248,12 @@ function LoginPage(): ReactElement {
             {t('auth.login.totp_cancel')}
           </Button>
         </form>
-      </CenteredCard>
+      </AuthCard>
     );
   }
 
   return (
-    <CenteredCard>
+    <AuthCard>
       <form
         onSubmit={(e) => {
           void handleSubmit(e);
@@ -362,7 +334,7 @@ function LoginPage(): ReactElement {
           {t('auth.login.no_account')} <Link to="/signup">{t('auth.login.signup_link')}</Link>
         </p>
       </form>
-    </CenteredCard>
+    </AuthCard>
   );
 }
 

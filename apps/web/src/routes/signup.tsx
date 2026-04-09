@@ -16,6 +16,7 @@ import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
+import AuthCard from '../components/auth/auth-card';
 import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../features/auth/auth-errors';
 import {
   type AuthUser,
@@ -40,35 +41,6 @@ function buildSchema() {
     password: z.string().min(8, 'auth.validation.password_min'),
     displayName: z.string().min(1, 'auth.validation.name_required'),
   });
-}
-
-function CenteredCard({ children }: { children: ReactElement }): ReactElement {
-  return (
-    <main
-      style={{
-        minBlockSize: '100dvh',
-        display: 'grid',
-        placeItems: 'center',
-        padding: 'var(--nf-space-6, 2rem)',
-        background: 'var(--nf-color-bg, var(--color-bg))',
-      }}
-    >
-      <section
-        style={{
-          inlineSize: 'min(28rem, 100%)',
-          background: 'var(--nf-color-bg-elevated, var(--color-surface))',
-          border: 'var(--nf-space-px, 1px) solid var(--nf-color-border, var(--color-hairline))',
-          borderRadius: 'var(--nf-radius-lg, 0.75rem)',
-          padding: 'var(--nf-space-6, 2rem)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-5, 1.5rem)',
-        }}
-      >
-        {children}
-      </section>
-    </main>
-  );
 }
 
 function SignupPage(): ReactElement {
@@ -141,7 +113,7 @@ function SignupPage(): ReactElement {
   };
 
   return (
-    <CenteredCard>
+    <AuthCard>
       <form
         onSubmit={(e) => {
           void handleSubmit(e);
@@ -240,7 +212,7 @@ function SignupPage(): ReactElement {
           {t('auth.signup.have_account')} <Link to="/login">{t('auth.signup.login_link')}</Link>
         </p>
       </form>
-    </CenteredCard>
+    </AuthCard>
   );
 }
 

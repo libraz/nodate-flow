@@ -4,9 +4,11 @@
 
 import Card from '@nodate-flow/ui/primitives/card';
 import Tabs, { type TabItem } from '@nodate-flow/ui/primitives/tabs';
+import { Link } from '@tanstack/react-router';
 import { type ReactElement, Suspense, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useProjectsQuery } from '../projects/api';
 import { useWorkspaceQuery } from './api';
 import WorkspaceMembersTable from './workspace-members-table';
 
@@ -14,13 +16,100 @@ export interface WorkspaceDetailProps {
   id: string;
 }
 
-function OverviewPanel(): ReactElement {
+function OverviewPanel({ workspaceId }: { workspaceId: string }): ReactElement {
   const { t } = useTranslation('common');
+  const { data: projects } = useProjectsQuery(workspaceId);
+  const active = projects.filter((p) => !p.isArchived);
+
+  if (active.length === 0) {
+    return (
+      <Card style={{ padding: '1.5rem' }}>
+        <p
+          style={{
+            margin: 0,
+            padding: '2rem 1rem',
+            textAlign: 'center',
+            color: 'var(--nf-color-fg-muted, var(--color-muted))',
+            border: '1px dashed var(--nf-color-border, var(--color-border))',
+            borderRadius: '0.5rem',
+            background: 'var(--nf-color-bg-sunken, transparent)',
+          }}
+        >
+          {t('workspaces.detail.overview_empty')}
+        </p>
+      </Card>
+    );
+  }
+
   return (
-    <Card style={{ padding: '1.5rem' }}>
-      <p style={{ margin: 0, color: 'var(--color-muted)' }}>
-        {t('workspaces.detail.overview_empty')}
-      </p>
+    <Card style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <h2
+        style={{
+          margin: 0,
+          fontSize: '0.8125rem',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+          color: 'var(--color-muted)',
+        }}
+      >
+        {t('workspaces.nav.projects')} ({active.length})
+      </h2>
+      <ul
+        style={{
+          listStyle: 'none',
+          margin: 0,
+          padding: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.375rem',
+        }}
+      >
+        {active.slice(0, 8).map((p) => (
+          <li key={p.id}>
+            <Link
+              to="/projects/$projectId"
+              params={{ projectId: p.id }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                padding: '0.6rem 0.75rem',
+                borderRadius: '0.5rem',
+                background: 'var(--color-surface, rgba(127,127,127,0.05))',
+                color: 'inherit',
+                textDecoration: 'none',
+              }}
+            >
+              <span
+                aria-hidden
+                style={{
+                  inlineSize: '0.6rem',
+                  blockSize: '0.6rem',
+                  borderRadius: '999px',
+                  background: p.color ?? 'var(--color-muted)',
+                  flexShrink: 0,
+                }}
+              />
+              <span style={{ fontWeight: 500 }}>{p.name}</span>
+              {p.description ? (
+                <span
+                  style={{
+                    color: 'var(--color-muted)',
+                    fontSize: '0.8125rem',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    flex: 1,
+                    minWidth: 0,
+                  }}
+                >
+                  {p.description}
+                </span>
+              ) : null}
+            </Link>
+          </li>
+        ))}
+      </ul>
     </Card>
   );
 }
@@ -39,7 +128,7 @@ export default function WorkspaceDetail({ id }: WorkspaceDetailProps): ReactElem
       label: t('workspaces.detail.tabs.overview'),
       content: (
         <Suspense fallback={null}>
-          <OverviewPanel />
+          <OverviewPanel workspaceId={id} />
         </Suspense>
       ),
     },

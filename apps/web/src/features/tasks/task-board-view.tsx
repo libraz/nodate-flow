@@ -127,8 +127,8 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
       style={{
         display: 'grid',
         gridAutoFlow: 'column',
-        gridAutoColumns: 'minmax(16rem, 1fr)',
-        gridTemplateColumns: `repeat(${TASK_STATES.length}, minmax(16rem, 1fr))`,
+        gridAutoColumns: 'minmax(12rem, 1fr)',
+        gridTemplateColumns: `repeat(${TASK_STATES.length}, minmax(12rem, 1fr))`,
         gap: '1rem',
         overflowX: 'auto',
         paddingBlockEnd: '1rem',
@@ -196,10 +196,13 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
                 <p
                   style={{
                     margin: 0,
-                    padding: '1rem',
+                    padding: '1.25rem 0.75rem',
                     textAlign: 'center',
-                    color: 'var(--color-muted)',
-                    fontSize: '0.875rem',
+                    color: 'var(--nf-color-fg-muted, var(--color-muted))',
+                    fontSize: '0.8125rem',
+                    border: '1px dashed var(--nf-color-border, var(--color-border))',
+                    borderRadius: '0.5rem',
+                    background: 'var(--nf-color-bg-sunken, transparent)',
                   }}
                 >
                   {t('tasks.board.empty_column')}
