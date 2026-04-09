@@ -101,13 +101,28 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
     if (!current) return;
     const fromState = current.derivedState as TaskDerivedState;
     if (fromState === toState) return;
-    const name = transitionForDrop(fromState, toState);
-    if (!name) {
+    const resolution = transitionForDrop(fromState, toState);
+    if (!resolution) {
       toaster.show({ tone: 'warning', message: t('tasks.errors.illegal_transition') });
       return;
     }
+    // When the lenient resolver routes the drop to a column other than the
+    // one the user dropped onto (e.g. dropping a `done` card on `open` lands
+    // it in `waiting`), tell the user where it actually went so the card
+    // jumping columns isn't a surprise.
+    if (resolution.landingState !== toState) {
+      toaster.show({
+        tone: 'info',
+        message: t('tasks.board.moved_to', { state: t(STATE_KEY[resolution.landingState]) }),
+      });
+    }
     transition.mutate(
-      { id: taskId, transition: name, projectId, optimisticState: toState },
+      {
+        id: taskId,
+        transition: resolution.transition,
+        projectId,
+        optimisticState: resolution.landingState,
+      },
       {
         onError: () => {
           toaster.show({ tone: 'warning', message: t('tasks.errors.move_failed') });

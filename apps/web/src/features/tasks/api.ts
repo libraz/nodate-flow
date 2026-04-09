@@ -125,36 +125,71 @@ export const TRANSITIONS_BY_STATE: Record<TaskDerivedState, readonly TransitionN
   waiting: ['submit', 'block', 'cancel'],
   review: ['complete', 'reopen', 'cancel'],
   done: ['reopen'],
-  cancelled: [],
+  cancelled: ['reopen'],
 };
+
+/**
+ * Resolution of a board drag-and-drop drop onto a target column.
+ *
+ * `transition` is the single state-machine verb the API will accept and
+ * `landingState` is the state the task will actually be in afterwards. The
+ * landing state can differ from the column the user dropped onto when we
+ * leniently resolve a "go back" drop (e.g. dragging a `done` card onto the
+ * `open` column resolves to `reopen`, which actually lands in `waiting`).
+ * Callers should drive the optimistic cache update from `landingState`, not
+ * the drop target, and may want to inform the user when the two differ.
+ */
+export interface DropResolution {
+  transition: TransitionName;
+  landingState: TaskDerivedState;
+}
 
 /**
  * Map a board column drop onto a state machine transition, or `null` if the
  * drop is illegal. See task spec F7.
+ *
+ * Mirrors apps/api/internal/http/handlers/tasks/transitions.go#nextState as
+ * the canonical truth table. Adjacent legal steps resolve exactly. "Go back"
+ * drops that don't have a direct verb (done/cancelled/review onto an earlier
+ * column) are leniently resolved to the closest legal `reopen` so the user
+ * isn't forced into the side panel just to undo a state change.
  */
 export function transitionForDrop(
   from: TaskDerivedState,
   to: TaskDerivedState,
-): TransitionName | null {
+): DropResolution | null {
   if (from === to) return null;
   switch (to) {
     case 'waiting':
-      if (from === 'open') return 'start';
-      if (from === 'review') return 'unblock';
-      if (from === 'done' || from === 'cancelled') return 'reopen';
+      if (from === 'open') return { transition: 'start', landingState: 'waiting' };
+      if (from === 'review') return { transition: 'reopen', landingState: 'waiting' };
+      if (from === 'done') return { transition: 'reopen', landingState: 'waiting' };
+      // Lenient: dragging a cancelled card "back" toward waiting reopens it,
+      // which the backend lands in `open`.
+      if (from === 'cancelled') return { transition: 'reopen', landingState: 'open' };
       return null;
     case 'review':
-      if (from === 'waiting') return 'submit';
+      if (from === 'waiting') return { transition: 'submit', landingState: 'review' };
       return null;
     case 'done':
-      if (from === 'review' || from === 'waiting') return 'complete';
+      if (from === 'open') return { transition: 'complete', landingState: 'done' };
+      if (from === 'review') return { transition: 'complete', landingState: 'done' };
       return null;
     case 'open':
-      if (from === 'cancelled') return 'reopen';
-      if (from === 'waiting') return 'block';
+      if (from === 'waiting') return { transition: 'block', landingState: 'open' };
+      if (from === 'cancelled') return { transition: 'reopen', landingState: 'open' };
+      // Lenient go-back: done/review dropped on open both reopen, landing in
+      // waiting (the only legal target for `reopen` from those states).
+      if (from === 'done') return { transition: 'reopen', landingState: 'waiting' };
+      if (from === 'review') return { transition: 'reopen', landingState: 'waiting' };
       return null;
     case 'cancelled':
-      return 'cancel';
+      if (from === 'open' || from === 'waiting' || from === 'review') {
+        return { transition: 'cancel', landingState: 'cancelled' };
+      }
+      // done → cancelled is not reachable in one step on the backend; the
+      // user must reopen first, so we reject it locally.
+      return null;
     default:
       return null;
   }
