@@ -7,8 +7,8 @@
 
 import Button from '@nodate-flow/ui/primitives/button';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
-import { Outlet, createLazyFileRoute, getRouteApi } from '@tanstack/react-router';
-import { type ReactElement, Suspense, useState } from 'react';
+import { Outlet, createLazyFileRoute, getRouteApi, useNavigate } from '@tanstack/react-router';
+import { type ReactElement, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useProjectQuery } from '../features/projects/api';
@@ -21,8 +21,25 @@ const routeApi = getRouteApi('/_authenticated/projects/$projectId/tasks');
 function TasksSectionLayout(): ReactElement {
   const { t } = useTranslation('common');
   const { projectId } = routeApi.useParams();
+  const search = routeApi.useSearch();
+  const navigate = useNavigate();
   const { data: project } = useProjectQuery(projectId);
   const [createOpen, setCreateOpen] = useState(false);
+
+  // Deep-link: `?new=1` opens the create-task dialog on arrival
+  // (palette / dock / today empty state). Strip the param afterwards so
+  // the dialog does not re-open on back navigation.
+  useEffect(() => {
+    if (search.new) {
+      setCreateOpen(true);
+      void navigate({
+        to: '/projects/$projectId/tasks',
+        params: { projectId },
+        search: {},
+        replace: true,
+      });
+    }
+  }, [search.new, navigate, projectId]);
 
   return (
     <section

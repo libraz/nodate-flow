@@ -30,10 +30,11 @@ interface CommandItem {
   label: string;
   group: string;
   href: string;
+  search?: Record<string, unknown>;
 }
 
 interface InnerProps {
-  onSelect: (href: string) => void;
+  onSelect: (item: Pick<CommandItem, 'href' | 'search'>) => void;
 }
 
 function normalize(s: string): string {
@@ -112,14 +113,20 @@ function PaletteBody({ onSelect }: InnerProps): ReactElement {
     const wsGroup = t('dock.command_palette.group_workspaces');
     const taskGroup = t('dock.command_palette.group_tasks');
     const projectGroup = t('dock.command_palette.group_projects');
-    const actions: CommandItem[] = [
-      {
-        id: 'action:create_task',
-        label: t('dock.command_palette.create_task'),
-        group: actionsGroup,
-        href: '/inbox',
-      },
-    ];
+    // One "Create new task" entry per project so the user lands in the
+    // right TaskCreateDialog context instead of a dead-end /inbox page.
+    // If no projects exist yet, omit the action entirely rather than
+    // showing a button that goes nowhere useful.
+    const actions: CommandItem[] = projectResults.map((p) => ({
+      id: `action:create_task:${p.id}`,
+      label:
+        projectResults.length === 1
+          ? t('dock.command_palette.create_task')
+          : `${t('dock.command_palette.create_task')} · ${p.name}`,
+      group: actionsGroup,
+      href: `/projects/${p.id}/tasks`,
+      search: { new: true },
+    }));
     const nav: CommandItem[] = [
       { id: 'nav:home', label: t('dock.command_palette.home'), group: navGroup, href: '/' },
       { id: 'nav:today', label: t('nav.today'), group: navGroup, href: '/today' },
@@ -182,7 +189,7 @@ function PaletteBody({ onSelect }: InnerProps): ReactElement {
     } else if (e.key === 'Enter') {
       e.preventDefault();
       const picked = filtered[active];
-      if (picked) onSelect(picked.href);
+      if (picked) onSelect(picked);
     }
   };
 
@@ -236,7 +243,7 @@ function PaletteBody({ onSelect }: InnerProps): ReactElement {
                       <button
                         type="button"
                         aria-current={isActive ? 'true' : undefined}
-                        onClick={() => onSelect(it.href)}
+                        onClick={() => onSelect(it)}
                         onMouseEnter={() => {
                           const idx = filtered.findIndex((f) => f.id === it.id);
                           if (idx >= 0) setActive(idx);
@@ -313,9 +320,15 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps): 
   const { t } = useTranslation('common');
   const navigate = useNavigate();
 
-  const handleSelect = (href: string): void => {
+  const handleSelect = (item: { href: string; search?: Record<string, unknown> }): void => {
     onClose();
-    void navigate({ to: href });
+    // `to` is typed as a specific literal union in TanStack Router, but
+    // here we are building hrefs dynamically from workspace / project /
+    // task ids, so a cast is unavoidable.
+    void navigate({
+      to: item.href as never,
+      ...(item.search ? { search: item.search as never } : {}),
+    });
   };
 
   return (

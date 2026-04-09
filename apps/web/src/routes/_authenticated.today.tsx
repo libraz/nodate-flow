@@ -14,6 +14,7 @@ import { Link, createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { OPEN_COMMAND_PALETTE_EVENT } from '../components/layout/glass-dock';
 import { sdk } from '../lib/sdk';
 
 type AssignedTask = components['schemas']['MyTaskListItem'];
@@ -140,8 +141,11 @@ function TodayRoute(): ReactElement {
           }}
         >
           <p style={{ margin: 0 }}>{t('today.empty')}</p>
-          <Link
-            to="/inbox"
+          <button
+            type="button"
+            onClick={() => {
+              window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT));
+            }}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -149,13 +153,14 @@ function TodayRoute(): ReactElement {
               borderRadius: '0.5rem',
               background: 'var(--nf-color-accent, var(--color-accent, #9b59b6))',
               color: 'var(--nf-color-accent-fg, white)',
-              textDecoration: 'none',
+              border: 'none',
+              cursor: 'pointer',
               fontSize: '0.875rem',
               fontWeight: 500,
             }}
           >
             {t('dock.command_palette.create_task')}
-          </Link>
+          </button>
         </div>
       ) : null}
 

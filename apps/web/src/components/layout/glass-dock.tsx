@@ -23,10 +23,13 @@ interface DockAction {
 // landing page. `quick_capture` still deep-links to the inbox, which is
 // where the capture surface lives.
 const ACTIONS: readonly DockAction[] = [
-  { key: 'new_task', icon: Plus, target: { kind: 'navigate', href: '/inbox' } },
+  { key: 'new_task', icon: Plus, target: { kind: 'palette' } },
   { key: 'quick_capture', icon: Zap, target: { kind: 'navigate', href: '/inbox' } },
   { key: 'ai_assist', icon: Sparkles, target: { kind: 'palette' } },
 ];
+
+/** Event name other components can dispatch to open the palette. */
+export const OPEN_COMMAND_PALETTE_EVENT = 'nf:open-command-palette';
 
 function actionLabelKey(
   key: DockAction['key'],
@@ -53,9 +56,14 @@ export default function GlassDock(): ReactElement {
         setPaletteOpen((prev) => !prev);
       }
     };
+    const openHandler = (): void => {
+      setPaletteOpen(true);
+    };
     window.addEventListener('keydown', handler);
+    window.addEventListener(OPEN_COMMAND_PALETTE_EVENT, openHandler);
     return () => {
       window.removeEventListener('keydown', handler);
+      window.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, openHandler);
     };
   }, []);
 
