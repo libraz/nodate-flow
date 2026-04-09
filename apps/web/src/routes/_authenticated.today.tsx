@@ -129,13 +129,33 @@ function TodayRoute(): ReactElement {
           style={{
             padding: '3rem 1rem',
             textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '1rem',
             color: 'var(--nf-color-fg-muted)',
             border: '1px dashed var(--nf-color-border)',
             borderRadius: '0.75rem',
             background: 'var(--nf-color-bg-sunken)',
           }}
         >
-          {t('today.empty')}
+          <p style={{ margin: 0 }}>{t('today.empty')}</p>
+          <Link
+            to="/inbox"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '0.5rem 1rem',
+              borderRadius: '0.5rem',
+              background: 'var(--nf-color-accent, var(--color-accent, #9b59b6))',
+              color: 'var(--nf-color-accent-fg, white)',
+              textDecoration: 'none',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+            }}
+          >
+            {t('dock.command_palette.create_task')}
+          </Link>
         </div>
       ) : null}
 

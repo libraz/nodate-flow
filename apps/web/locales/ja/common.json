@@ -55,7 +55,12 @@
       "group_workspaces": "ワークスペース",
       "group_tasks": "タスク",
       "group_projects": "プロジェクト",
-      "home": "ホーム"
+      "group_actions": "アクション",
+      "home": "ホーム",
+      "create_task": "新しいタスクを作成",
+      "hint_nav": "移動",
+      "hint_select": "選択",
+      "hint_close": "閉じる"
     }
   },
   "theme": {

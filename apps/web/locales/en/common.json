@@ -55,7 +55,12 @@
       "group_workspaces": "Workspaces",
       "group_tasks": "Tasks",
       "group_projects": "Projects",
-      "home": "Home"
+      "group_actions": "Actions",
+      "home": "Home",
+      "create_task": "Create new task",
+      "hint_nav": "Navigate",
+      "hint_select": "Select",
+      "hint_close": "Close"
     }
   },
   "theme": {

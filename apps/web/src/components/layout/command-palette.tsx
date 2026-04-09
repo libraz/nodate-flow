@@ -107,10 +107,19 @@ function PaletteBody({ onSelect }: InnerProps): ReactElement {
   }, [shouldSearchTasks, taskQueries]);
 
   const items = useMemo<CommandItem[]>(() => {
+    const actionsGroup = t('dock.command_palette.group_actions');
     const navGroup = t('dock.command_palette.group_navigation');
     const wsGroup = t('dock.command_palette.group_workspaces');
     const taskGroup = t('dock.command_palette.group_tasks');
     const projectGroup = t('dock.command_palette.group_projects');
+    const actions: CommandItem[] = [
+      {
+        id: 'action:create_task',
+        label: t('dock.command_palette.create_task'),
+        group: actionsGroup,
+        href: '/inbox',
+      },
+    ];
     const nav: CommandItem[] = [
       { id: 'nav:home', label: t('dock.command_palette.home'), group: navGroup, href: '/' },
       { id: 'nav:today', label: t('nav.today'), group: navGroup, href: '/today' },
@@ -136,7 +145,7 @@ function PaletteBody({ onSelect }: InnerProps): ReactElement {
       group: projectGroup,
       href: `/projects/${p.id}`,
     }));
-    return [...tasks, ...projects, ...nav, ...ws];
+    return [...actions, ...tasks, ...projects, ...nav, ...ws];
   }, [t, workspaces, taskResults, projectResults]);
 
   const filtered = useMemo<CommandItem[]>(() => {
@@ -255,9 +264,45 @@ function PaletteBody({ onSelect }: InnerProps): ReactElement {
           ))}
         </div>
       )}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.875rem',
+          paddingBlockStart: '0.5rem',
+          borderBlockStart: '1px solid var(--nf-color-border)',
+          fontSize: '0.6875rem',
+          color: 'var(--nf-color-fg-subtle, var(--color-muted))',
+        }}
+      >
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}>
+          <kbd style={kbdStyle}>↑</kbd>
+          <kbd style={kbdStyle}>↓</kbd>
+          {t('dock.command_palette.hint_nav')}
+        </span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}>
+          <kbd style={kbdStyle}>↵</kbd>
+          {t('dock.command_palette.hint_select')}
+        </span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}>
+          <kbd style={kbdStyle}>Esc</kbd>
+          {t('dock.command_palette.hint_close')}
+        </span>
+      </div>
     </div>
   );
 }
+
+const kbdStyle = {
+  fontFamily: 'var(--font-mono, monospace)',
+  fontSize: '0.6875rem',
+  padding: '0.0625rem 0.375rem',
+  borderRadius: '0.25rem',
+  border: '1px solid var(--nf-color-border)',
+  background: 'var(--nf-color-surface, transparent)',
+  color: 'var(--nf-color-fg, var(--color-fg))',
+  lineHeight: 1.4,
+} as const;
 
 export interface CommandPaletteProps {
   open: boolean;

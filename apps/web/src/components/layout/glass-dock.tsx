@@ -23,7 +23,7 @@ interface DockAction {
 // landing page. `quick_capture` still deep-links to the inbox, which is
 // where the capture surface lives.
 const ACTIONS: readonly DockAction[] = [
-  { key: 'new_task', icon: Plus, target: { kind: 'palette' } },
+  { key: 'new_task', icon: Plus, target: { kind: 'navigate', href: '/inbox' } },
   { key: 'quick_capture', icon: Zap, target: { kind: 'navigate', href: '/inbox' } },
   { key: 'ai_assist', icon: Sparkles, target: { kind: 'palette' } },
 ];
