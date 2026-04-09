@@ -63,7 +63,14 @@ function SettingsLayout(): ReactElement {
             key={item.key}
             to={item.to}
             className={cx('settings-subnav-link')}
-            activeProps={{ 'aria-current': 'page' }}
+            activeProps={{
+              'aria-current': 'page',
+              style: {
+                background: 'var(--nf-color-accent-subtle, rgba(155,89,182,0.12))',
+                color: 'var(--nf-color-accent, var(--color-accent, #9b59b6))',
+                fontWeight: 500,
+              },
+            }}
             style={{
               display: 'block',
               padding: '0.5rem 0.75rem',
