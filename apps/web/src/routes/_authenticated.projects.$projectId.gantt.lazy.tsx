@@ -99,20 +99,20 @@ function GanttView(): ReactElement {
 
   const { data: edges } = useProjectDependenciesQuery(projectId);
 
-  const { scheduled, unscheduled } = useMemo(() => {
+  const { scheduled, unscheduledTasks } = useMemo(() => {
     const sc: ScheduledTask[] = [];
-    let un = 0;
+    const un: TaskListItem[] = [];
     for (const task of tasks) {
       const start = task.startedOn ? parseDateOnly(task.startedOn) : null;
       const end = task.dueOn ? parseDateOnly(task.dueOn) : null;
       if (!start && !end) {
-        un += 1;
+        un.push(task);
         continue;
       }
       const s = start ?? end;
       const e = end ?? start;
       if (!s || !e) {
-        un += 1;
+        un.push(task);
         continue;
       }
       sc.push({ task, start: s, end: e });
@@ -123,8 +123,10 @@ function GanttView(): ReactElement {
       if (sa !== sb) return sa - sb;
       return b.task.priority - a.task.priority;
     });
-    return { scheduled: sc, unscheduled: un };
+    un.sort((a, b) => b.priority - a.priority);
+    return { scheduled: sc, unscheduledTasks: un };
   }, [tasks]);
+  const unscheduled = unscheduledTasks.length;
 
   const today = startOfDay(new Date());
 
@@ -480,23 +482,86 @@ function GanttView(): ReactElement {
       )}
 
       {unscheduled > 0 ? (
-        <div
+        <details
           style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.375rem',
-            paddingBlock: '0.25rem',
-            paddingInline: '0.625rem',
-            borderRadius: '999px',
+            alignSelf: 'stretch',
             border: '1px solid var(--nf-color-border)',
+            borderRadius: '0.5rem',
             background: 'var(--nf-color-bg-sunken)',
-            color: 'var(--nf-color-fg-muted)',
-            fontSize: '0.8125rem',
-            alignSelf: 'flex-start',
+            padding: '0.5rem 0.75rem',
           }}
         >
-          {t('gantt.unscheduled', { count: unscheduled })}
-        </div>
+          <summary
+            style={{
+              cursor: 'pointer',
+              fontSize: '0.8125rem',
+              color: 'var(--nf-color-fg-muted)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+          >
+            {t('gantt.unscheduled', { count: unscheduled })}
+          </summary>
+          <ul
+            style={{
+              listStyle: 'none',
+              margin: 0,
+              padding: 0,
+              paddingBlockStart: '0.625rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.25rem',
+            }}
+          >
+            {unscheduledTasks.map((task) => (
+              <li key={task.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void navigate({ to: '/tasks/$taskId', params: { taskId: task.id } });
+                  }}
+                  style={{
+                    inlineSize: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.375rem 0.5rem',
+                    borderRadius: '0.375rem',
+                    border: '1px solid transparent',
+                    background: 'transparent',
+                    color: 'var(--color-fg)',
+                    fontSize: '0.8125rem',
+                    textAlign: 'start',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span
+                    aria-hidden
+                    style={{
+                      inlineSize: '0.5rem',
+                      blockSize: '0.5rem',
+                      borderRadius: '999px',
+                      background: STATE_COLOR[task.derivedState] ?? 'var(--color-muted, #95a5a6)',
+                      flexShrink: 0,
+                    }}
+                  />
+                  <span
+                    style={{
+                      flex: 1,
+                      minInlineSize: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {task.title}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </details>
       ) : null}
     </section>
   );
