@@ -5,7 +5,8 @@
   "landing": {
     "wordmark": "nodate-flow",
     "hello": "Hello.",
-    "tagline": "Work flows. You observe."
+    "tagline": "Work flows. You observe.",
+    "shortcuts": "Shortcuts"
   },
   "nav": {
     "theme": "Theme",

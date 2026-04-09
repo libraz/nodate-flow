@@ -9,10 +9,11 @@
  * crashing the route into the root ErrorBoundary.
  */
 
-import { Link, Outlet, createFileRoute, notFound } from '@tanstack/react-router';
+import { Link, Outlet, createFileRoute, notFound, useChildMatches } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useProjectQuery } from '../features/projects/api';
 import { sdk } from '../lib/sdk';
 
 type ProjectSubNavKey = 'overview' | 'tasks' | 'gantt' | 'timeline';
@@ -51,6 +52,13 @@ function labelKeyFor(
 function ProjectLayout(): ReactElement {
   const { t } = useTranslation('common');
   const { projectId } = Route.useParams();
+  const { data: project } = useProjectQuery(projectId);
+  // On /projects/$id/ (overview) the detail component renders its own
+  // project-name heading. On the nested child routes (tasks/gantt/timeline)
+  // nothing else carries the project name, so show it here to keep
+  // context.
+  const childMatches = useChildMatches();
+  const onOverview = childMatches.length === 0;
   return (
     <section
       style={{
@@ -60,6 +68,17 @@ function ProjectLayout(): ReactElement {
         padding: 'clamp(1rem, 3vw, 2rem) clamp(1rem, 3vw, 2rem) 0',
       }}
     >
+      {onOverview ? null : (
+        <h1
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 'clamp(1.5rem, 2.5vw, 2rem)',
+            margin: 0,
+          }}
+        >
+          {project.name}
+        </h1>
+      )}
       <nav
         aria-label={t('projects.nav.label')}
         style={{

@@ -3,7 +3,7 @@
  * the route can sit under the _authenticated layout guard.
  */
 
-import { createFileRoute } from '@tanstack/react-router';
+import { Link, createFileRoute } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -192,6 +192,62 @@ function LandingPage(): ReactElement {
         >
           {t('landing.hello')}
         </p>
+        <nav
+          aria-label={t('landing.shortcuts')}
+          style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}
+        >
+          <Link
+            to="/today"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              paddingBlock: '0.625rem',
+              paddingInline: '1.25rem',
+              borderRadius: '999px',
+              background: 'var(--nf-color-accent, var(--color-accent, #9b59b6))',
+              color: 'var(--nf-color-accent-fg, white)',
+              textDecoration: 'none',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+            }}
+          >
+            {t('nav.today')}
+          </Link>
+          <Link
+            to="/calendar"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              paddingBlock: '0.625rem',
+              paddingInline: '1.25rem',
+              borderRadius: '999px',
+              border: '1px solid var(--nf-color-border, var(--color-hairline))',
+              color: 'var(--color-fg)',
+              textDecoration: 'none',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+            }}
+          >
+            {t('nav.calendar')}
+          </Link>
+          <Link
+            to="/workspaces"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              paddingBlock: '0.625rem',
+              paddingInline: '1.25rem',
+              borderRadius: '999px',
+              border: '1px solid var(--nf-color-border, var(--color-hairline))',
+              color: 'var(--color-fg)',
+              textDecoration: 'none',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+            }}
+          >
+            {t('nav.workspaces')}
+          </Link>
+        </nav>
       </section>
 
       <footer
