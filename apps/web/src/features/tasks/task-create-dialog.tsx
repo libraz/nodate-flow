@@ -1,8 +1,10 @@
 /**
  * TaskCreateDialog — modal form to create a new task in a project.
  *
- * Assignee is currently a raw user public-id input; F8 will replace it with
- * a Combobox actor picker once the actors list endpoint is plumbed.
+ * Assignee picker is deliberately omitted for now: the backend create
+ * endpoint does not accept an assignee in the body, so we can only
+ * attach actors via a follow-up POST /tasks/{id}/actors call. F8 will
+ * introduce a real actor picker once that wiring is in place.
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
@@ -60,7 +62,6 @@ export default function TaskCreateDialog({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TaskPriority>(2);
-  const [assignee, setAssignee] = useState('');
   const [dueOn, setDueOn] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
@@ -69,7 +70,6 @@ export default function TaskCreateDialog({
     setTitle('');
     setDescription('');
     setPriority(2);
-    setAssignee('');
     setDueOn('');
     setErrors({});
   };
@@ -108,8 +108,6 @@ export default function TaskCreateDialog({
         priority: parsed.data.priority as TaskPriority,
         ...(parsed.data.dueOn ? { dueOn: parsed.data.dueOn } : {}),
       });
-      // Assignee is intentionally not sent: backend create endpoint does not
-      // accept assignee in body. F8 will POST /tasks/{id}/actors after create.
       reset();
       onClose();
     } catch {
@@ -174,19 +172,6 @@ export default function TaskCreateDialog({
                 </option>
               ))}
             </Select>
-          )}
-        </FormField>
-
-        <FormField label={t('tasks.form.assignee')}>
-          {(control) => (
-            <Input
-              {...control}
-              value={assignee}
-              onChange={(e) => {
-                setAssignee(e.target.value);
-              }}
-              placeholder="user-uuid"
-            />
           )}
         </FormField>
 

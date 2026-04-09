@@ -35,7 +35,7 @@ function TasksSectionLayout(): ReactElement {
       void navigate({
         to: '/projects/$projectId/tasks',
         params: { projectId },
-        search: {},
+        search: (prev) => ({ ...prev, new: undefined }),
         replace: true,
       });
     }
