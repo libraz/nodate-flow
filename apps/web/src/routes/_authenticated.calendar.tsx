@@ -145,15 +145,6 @@ function CalendarRoute(): ReactElement {
     setCursor({ year: today.getFullYear(), month: today.getMonth() });
   };
 
-  const totalScheduled = useMemo(() => {
-    let n = 0;
-    for (const cell of cells) {
-      if (!cell.inMonth) continue;
-      n += byDate.get(cell.key)?.length ?? 0;
-    }
-    return n;
-  }, [cells, byDate]);
-
   return (
     <section
       style={{
@@ -212,10 +203,6 @@ function CalendarRoute(): ReactElement {
           </Button>
         </div>
       </div>
-
-      {totalScheduled === 0 ? (
-        <p style={{ margin: 0, color: 'var(--color-muted)' }}>{t('calendar.empty')}</p>
-      ) : null}
 
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <div

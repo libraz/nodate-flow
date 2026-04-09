@@ -125,7 +125,18 @@ function TodayRoute(): ReactElement {
       </header>
 
       {totalCount === 0 ? (
-        <p style={{ margin: 0, color: 'var(--color-muted)' }}>{t('today.empty')}</p>
+        <div
+          style={{
+            padding: '3rem 1rem',
+            textAlign: 'center',
+            color: 'var(--nf-color-fg-muted)',
+            border: '1px dashed var(--nf-color-border)',
+            borderRadius: '0.75rem',
+            background: 'var(--nf-color-bg-sunken)',
+          }}
+        >
+          {t('today.empty')}
+        </div>
       ) : null}
 
       {SECTION_ORDER.map((key) => {

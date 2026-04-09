@@ -174,7 +174,6 @@ export default function InboxList(): ReactElement {
           alignItems: 'flex-end',
           gap: '0.75rem',
           flexWrap: 'wrap',
-          justifyContent: 'space-between',
         }}
       >
         <label
@@ -261,16 +260,18 @@ export default function InboxList(): ReactElement {
       ) : null}
 
       {filteredItems.length === 0 ? (
-        <p
+        <div
           style={{
-            color: 'var(--color-muted)',
-            margin: 0,
-            padding: '2rem',
+            padding: '3rem 1rem',
             textAlign: 'center',
+            color: 'var(--nf-color-fg-muted)',
+            border: '1px dashed var(--nf-color-border)',
+            borderRadius: '0.75rem',
+            background: 'var(--nf-color-bg-sunken)',
           }}
         >
           {t('view.empty')}
-        </p>
+        </div>
       ) : (
         <ul
           style={{
