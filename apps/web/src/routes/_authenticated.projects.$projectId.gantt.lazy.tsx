@@ -90,7 +90,7 @@ function GanttView(): ReactElement {
     staleTime: 30_000,
     queryFn: async (): Promise<TaskListItem[]> => {
       const { data, error } = await sdk.GET('/tasks', {
-        params: { query: { projectId, limit: 500, offset: 0 } },
+        params: { query: { projectId, limit: 200, offset: 0 } },
       });
       if (error || !data) return [];
       return data.tasks ?? [];

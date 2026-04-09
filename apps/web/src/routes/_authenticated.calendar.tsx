@@ -92,7 +92,7 @@ function CalendarRoute(): ReactElement {
     staleTime: 30_000,
     queryFn: async (): Promise<AssignedTask[]> => {
       const { data, error } = await sdk.GET('/me/tasks', {
-        params: { query: { limit: 500, offset: 0 } },
+        params: { query: { limit: 200, offset: 0 } },
       });
       if (error || !data) return [];
       return data.tasks ?? [];
