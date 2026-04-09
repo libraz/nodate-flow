@@ -71,10 +71,13 @@ export default function EventFilterBar({
 }: EventFilterBarProps): ReactElement {
   const { t } = useTranslation('timeline');
 
-  const handleKindChange = (e: ChangeEvent<HTMLSelectElement>): void => {
-    const selected = Array.from(e.target.selectedOptions, (o) => o.value);
+  const selectedKinds = new Set(filters.kind ?? []);
+  const toggleKind = (kind: string): void => {
+    const next = new Set(selectedKinds);
+    if (next.has(kind)) next.delete(kind);
+    else next.add(kind);
     const { kind: Omit, ...rest } = filters;
-    onChange(selected.length > 0 ? { ...rest, kind: selected } : rest);
+    onChange(next.size > 0 ? { ...rest, kind: [...next] } : rest);
   };
 
   const handleActorChange = (ids: string[]): void => {
@@ -101,44 +104,51 @@ export default function EventFilterBar({
         padding: '0.5rem 0',
       }}
     >
-      <label
-        style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.75rem' }}
+      <div
+        role="group"
+        aria-label={t('filter.kind_label')}
+        style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', fontSize: '0.75rem' }}
       >
         <span style={{ color: 'var(--color-muted)' }}>{t('filter.kind_label')}</span>
-        <select
-          multiple
-          value={filters.kind ? [...filters.kind] : []}
-          onChange={handleKindChange}
-          aria-label={t('filter.kind_label')}
-          style={{
-            minInlineSize: '14rem',
-            minBlockSize: '6rem',
-            padding: '0.25rem',
-            borderRadius: '0.25rem',
-            border: '1px solid var(--color-border)',
-            background: 'var(--color-bg)',
-            color: 'var(--color-fg)',
-          }}
-        >
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem', maxInlineSize: '32rem' }}>
           {(() => {
             const seen = new Set<string>();
             const options: { kind: string; label: string }[] = [];
             for (const kind of TIMELINE_KINDS) {
-              const label = t(`event_kind.${kind.replace(/\./g, '_')}`, {
-                defaultValue: kind,
-              });
+              const label = t(`event_kind.${kind.replace(/\./g, '_')}`, { defaultValue: kind });
               if (seen.has(label)) continue;
               seen.add(label);
               options.push({ kind, label });
             }
-            return options.map((o) => (
-              <option key={o.kind} value={o.kind}>
-                {o.label}
-              </option>
-            ));
+            return options.map((o) => {
+              const active = selectedKinds.has(o.kind);
+              return (
+                <button
+                  key={o.kind}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => {
+                    toggleKind(o.kind);
+                  }}
+                  style={{
+                    padding: '0.25rem 0.625rem',
+                    borderRadius: '999px',
+                    border: `1px solid ${active ? 'var(--color-accent, #9b59b6)' : 'var(--color-border)'}`,
+                    background: active
+                      ? 'var(--color-accent-subtle, rgba(155,89,182,0.12))'
+                      : 'var(--color-surface, transparent)',
+                    color: active ? 'var(--color-accent, #9b59b6)' : 'var(--color-fg)',
+                    fontSize: '0.8125rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {o.label}
+                </button>
+              );
+            });
           })()}
-        </select>
-      </label>
+        </div>
+      </div>
 
       <div
         style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.75rem' }}
