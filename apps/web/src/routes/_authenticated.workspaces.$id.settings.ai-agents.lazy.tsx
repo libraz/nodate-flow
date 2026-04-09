@@ -48,9 +48,18 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
 
   if (data.agents.length === 0) {
     return (
-      <Card style={{ padding: '1rem' }}>
-        <p style={{ margin: 0, color: 'var(--color-muted)' }}>{t('agents.empty')}</p>
-      </Card>
+      <div
+        style={{
+          padding: '3rem 1rem',
+          textAlign: 'center',
+          color: 'var(--nf-color-fg-muted, var(--color-muted))',
+          border: '1px dashed var(--nf-color-border, var(--color-border))',
+          borderRadius: '0.75rem',
+          background: 'var(--nf-color-bg-sunken, transparent)',
+        }}
+      >
+        {t('agents.empty')}
+      </div>
     );
   }
 

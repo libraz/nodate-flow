@@ -94,9 +94,19 @@ export default function InvocationsList({
         </p>
       </header>
       {data.length === 0 ? (
-        <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+        <div
+          style={{
+            padding: '3rem 1rem',
+            textAlign: 'center',
+            color: 'var(--nf-color-fg-muted, var(--color-muted))',
+            border: '1px dashed var(--nf-color-border, var(--color-border))',
+            borderRadius: '0.75rem',
+            background: 'var(--nf-color-bg-sunken, transparent)',
+            fontSize: '0.875rem',
+          }}
+        >
           {t('ai_activity.empty')}
-        </p>
+        </div>
       ) : (
         <ul
           style={{
