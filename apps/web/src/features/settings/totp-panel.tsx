@@ -262,7 +262,12 @@ function EnabledPanel(): ReactElement {
           onSubmit={(e) => {
             void handleRegenerate(e);
           }}
-          style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.5rem',
+            maxInlineSize: '28rem',
+          }}
         >
           <FormField label={t('security.totp.recovery.regenerate_password_label')} required>
             {(control) => (
@@ -320,7 +325,12 @@ function DisableForm(): ReactElement {
       onSubmit={(e) => {
         void handleSubmit(e);
       }}
-      style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.75rem',
+        maxInlineSize: '28rem',
+      }}
     >
       <p style={{ margin: 0 }}>{t('security.totp.enabled_description')}</p>
       <FormField label={t('security.totp.password_label')} required>
