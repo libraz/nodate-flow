@@ -57,6 +57,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
     {
       id: 'title',
       accessorKey: 'title',
+      size: 320,
       header: () => t('tasks.columns.title'),
       cell: ({ row }) => (
         <button
@@ -81,6 +82,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
     {
       id: 'status',
       accessorKey: 'derivedState',
+      size: 90,
       header: () => t('tasks.columns.status'),
       cell: ({ row }) => {
         const state = row.original.derivedState as TaskDerivedState;
@@ -89,6 +91,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
     },
     {
       id: 'deps',
+      size: 60,
       header: () => t('tasks.columns.deps'),
       cell: ({ row }) => {
         const count = blockedByOpen.get(row.original.id) ?? 0;
@@ -111,6 +114,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
     },
     {
       id: 'assignee',
+      size: 110,
       header: () => t('tasks.columns.assignee'),
       cell: ({ row }) => {
         const pid = row.original.primaryAssigneeId;
@@ -133,12 +137,14 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
     {
       id: 'due',
       accessorKey: 'dueOn',
+      size: 100,
       header: () => t('tasks.columns.due'),
       cell: ({ row }) => <span>{row.original.dueOn ?? '—'}</span>,
     },
     {
       id: 'priority',
       accessorKey: 'priority',
+      size: 80,
       header: () => t('tasks.columns.priority'),
       cell: ({ row }) => {
         const p = (row.original.priority as TaskPriority) ?? 0;
@@ -148,6 +154,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
     {
       id: 'updated',
       accessorKey: 'updatedAt',
+      size: 110,
       header: () => t('tasks.columns.updated'),
       cell: ({ row }) => (
         <span>{row.original.updatedAt ? formatDate(row.original.updatedAt, locale) : '—'}</span>

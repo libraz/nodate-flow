@@ -235,7 +235,7 @@ function GanttView(): ReactElement {
           gap: '0.75rem',
         }}
       >
-        <h2 style={{ margin: 0, fontSize: '1.125rem' }}>{t('gantt.title')}</h2>
+        <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600 }}>{t('gantt.title')}</h1>
         <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
           <Button
             type="button"
@@ -262,7 +262,18 @@ function GanttView(): ReactElement {
       </header>
 
       {scheduled.length === 0 ? (
-        <p style={{ margin: 0, color: 'var(--color-muted)' }}>{t('gantt.empty')}</p>
+        <div
+          style={{
+            padding: '3rem 1rem',
+            textAlign: 'center',
+            color: 'var(--nf-color-fg-muted)',
+            border: '1px dashed var(--nf-color-border)',
+            borderRadius: '0.75rem',
+            background: 'var(--nf-color-bg-sunken)',
+          }}
+        >
+          {t('gantt.empty')}
+        </div>
       ) : (
         <div
           style={{
@@ -469,9 +480,23 @@ function GanttView(): ReactElement {
       )}
 
       {unscheduled > 0 ? (
-        <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.8125rem' }}>
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.375rem',
+            paddingBlock: '0.25rem',
+            paddingInline: '0.625rem',
+            borderRadius: '999px',
+            border: '1px solid var(--nf-color-border)',
+            background: 'var(--nf-color-bg-sunken)',
+            color: 'var(--nf-color-fg-muted)',
+            fontSize: '0.8125rem',
+            alignSelf: 'flex-start',
+          }}
+        >
           {t('gantt.unscheduled', { count: unscheduled })}
-        </p>
+        </div>
       ) : null}
     </section>
   );

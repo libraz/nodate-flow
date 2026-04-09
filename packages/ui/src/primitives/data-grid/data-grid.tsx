@@ -260,6 +260,7 @@ function DataGridInner<TData>(
                   aria-sort={ariaSort}
                   tabIndex={-1}
                   className={styles.headerCell}
+                  style={{ flex: `${header.getSize()} 1 0` }}
                   onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
                   onKeyDown={(e) => {
                     if (canSort && (e.key === 'Enter' || e.key === ' ')) {
@@ -318,6 +319,7 @@ function DataGridInner<TData>(
                         data-col-index={cIdx}
                         tabIndex={isFocused ? 0 : -1}
                         className={styles.cell}
+                        style={{ flex: `${cell.column.getSize()} 1 0` }}
                         onFocus={() => setFocused({ row: idx, col: cIdx })}
                         onKeyDown={(e) => onCellKeyDown(e, idx, cIdx)}
                       >

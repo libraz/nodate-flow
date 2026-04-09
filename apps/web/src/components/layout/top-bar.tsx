@@ -1,9 +1,9 @@
 import Icon from '@nodate-flow/ui/icon';
 import { cx } from '@nodate-flow/ui/lib/cx';
-import { useNavigate, useRouterState } from '@tanstack/react-router';
+import { useNavigate } from '@tanstack/react-router';
 
 import { LogOut, Moon, Search, Sun } from 'lucide-react';
-import { type ReactElement, Suspense, useMemo, useState } from 'react';
+import { type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import CommandPalette from './command-palette';
 
@@ -12,6 +12,7 @@ import { authStore } from '../../features/auth/auth-store';
 import { useWorkspacesQuery } from '../../features/workspaces/api';
 import { type SupportedLanguage, setLanguage } from '../../i18n';
 import { apiBaseUrl } from '../../lib/sdk';
+import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
 import { type ConcreteTheme, concreteThemes, useTheme } from '../../providers/theme-provider';
 import styles from './top-bar.module.css';
 
@@ -32,11 +33,7 @@ function WorkspaceSwitcher(): ReactElement {
   const { t } = useTranslation('common');
   const { data: workspaces } = useWorkspacesQuery();
   const navigate = useNavigate();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const currentId = useMemo<string>(() => {
-    const m = /^\/workspaces\/([^/]+)(?:\/|$)/.exec(pathname);
-    return m ? (m[1] ?? '') : '';
-  }, [pathname]);
+  const currentId = useCurrentWorkspaceId() ?? '';
 
   return (
     <select

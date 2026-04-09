@@ -1,7 +1,6 @@
 import Icon from '@nodate-flow/ui/icon';
 import { cx } from '@nodate-flow/ui/lib/cx';
-import { useQuery } from '@tanstack/react-query';
-import { Link, useRouterState } from '@tanstack/react-router';
+import { Link } from '@tanstack/react-router';
 import {
   Briefcase,
   CalendarDays,
@@ -13,11 +12,11 @@ import {
   type LucideIcon,
   Settings,
 } from 'lucide-react';
-import { type ReactElement, Suspense, useEffect, useMemo, useState } from 'react';
+import { type ReactElement, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { projectsKeys, useProjectsQuery } from '../../features/projects/api';
-import { sdk } from '../../lib/sdk';
+import { useProjectsQuery } from '../../features/projects/api';
+import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
 import styles from './sidebar.module.css';
 
 const STORAGE_KEY = 'nf.sidebar-collapsed';
@@ -54,40 +53,6 @@ function readInitialCollapsed(): boolean {
   } catch {
     return false;
   }
-}
-
-/**
- * Extracts the current workspace id from the URL. Handles both
- * `/workspaces/{id}/...` (direct) and `/projects/{pid}/...` (indirect,
- * resolved via a non-suspense project fetch). Returns `null` outside
- * workspace- or project-scoped routes, or while the project→workspace
- * lookup is still in flight.
- */
-function useCurrentWorkspaceId(): string | null {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const wsMatch = useMemo(() => /^\/workspaces\/([^/]+)(?:\/|$)/.exec(pathname), [pathname]);
-  const projectMatch = useMemo(() => /^\/projects\/([^/]+)(?:\/|$)/.exec(pathname), [pathname]);
-  const projectId = projectMatch ? (projectMatch[1] ?? null) : null;
-
-  // Resolve the workspace id from the project id when the user is on a
-  // project-scoped route. Non-suspense so the sidebar never blocks.
-  const projectQuery = useQuery({
-    queryKey: projectId ? projectsKeys.detail(projectId) : ['projects', 'detail', 'none'],
-    enabled: projectId !== null,
-    staleTime: 60_000,
-    queryFn: async (): Promise<{ workspaceId: string } | null> => {
-      if (!projectId) return null;
-      const { data, error } = await sdk.GET('/projects/{prjId}', {
-        params: { path: { prjId: projectId } },
-      });
-      if (error || !data) return null;
-      return { workspaceId: data.workspaceId };
-    },
-  });
-
-  if (wsMatch) return wsMatch[1] ?? null;
-  if (projectQuery.data) return projectQuery.data.workspaceId;
-  return null;
 }
 
 /**

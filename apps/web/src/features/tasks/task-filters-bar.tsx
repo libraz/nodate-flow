@@ -6,7 +6,7 @@
 
 import Combobox from '@nodate-flow/ui/primitives/combobox';
 import Input from '@nodate-flow/ui/primitives/input';
-import { type ChangeEvent, type ReactElement, Suspense } from 'react';
+import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useWorkspaceUsersQuery } from '../workspaces/api';
@@ -43,15 +43,20 @@ function AssigneePicker({
 }: AssigneePickerProps): ReactElement {
   const { data: users } = useWorkspaceUsersQuery(workspaceId);
   return (
-    <Combobox
-      aria-label={label}
-      placeholder={label}
-      value={selected}
-      options={[{ value: '', label }, ...users.map((u) => ({ value: u.id, label: u.displayName }))]}
-      onChange={(v) => {
-        setTaskFilterAssignee(projectId, v);
-      }}
-    />
+    <div style={{ inlineSize: '12rem' }}>
+      <Combobox
+        aria-label={label}
+        placeholder={label}
+        value={selected}
+        options={[
+          { value: '', label },
+          ...users.map((u) => ({ value: u.id, label: u.displayName })),
+        ]}
+        onChange={(v) => {
+          setTaskFilterAssignee(projectId, v);
+        }}
+      />
+    </div>
   );
 }
 
@@ -70,20 +75,13 @@ export default function TaskFiltersBar({
     cancelled: 'tasks.status.cancelled',
   };
 
-  const handleStatesChange = (e: ChangeEvent<HTMLSelectElement>): void => {
-    const next: TaskDerivedState[] = [];
-    for (const opt of e.target.selectedOptions) {
-      if (
-        opt.value === 'open' ||
-        opt.value === 'waiting' ||
-        opt.value === 'review' ||
-        opt.value === 'done' ||
-        opt.value === 'cancelled'
-      ) {
-        next.push(opt.value);
-      }
-    }
-    setTaskFilterStates(projectId, next);
+  const selectedStates = new Set(filters.states ?? []);
+
+  const toggleState = (state: TaskDerivedState): void => {
+    const next = new Set(selectedStates);
+    if (next.has(state)) next.delete(state);
+    else next.add(state);
+    setTaskFilterStates(projectId, [...next]);
   };
 
   const assigneeLabel = t('tasks.filters.assignee');
@@ -99,40 +97,61 @@ export default function TaskFiltersBar({
         flexWrap: 'wrap',
       }}
     >
-      <Input
-        type="search"
-        value={filters.search ?? ''}
-        onChange={(e) => {
-          setTaskFilterSearch(projectId, e.target.value);
-        }}
-        placeholder={t('tasks.filters.search_placeholder')}
-        aria-label={t('tasks.filters.search_placeholder')}
-        style={{ minInlineSize: '14rem' }}
-      />
-      <select
-        multiple
-        value={[...(filters.states ?? [])]}
-        onChange={handleStatesChange}
+      <div style={{ inlineSize: '18rem' }}>
+        <Input
+          type="search"
+          value={filters.search ?? ''}
+          onChange={(e) => {
+            setTaskFilterSearch(projectId, e.target.value);
+          }}
+          placeholder={t('tasks.filters.search_placeholder')}
+          aria-label={t('tasks.filters.search_placeholder')}
+        />
+      </div>
+      <div
+        role="group"
         aria-label={t('tasks.filters.status')}
-        style={{
-          minInlineSize: '12rem',
-          minBlockSize: '8rem',
-          padding: '0.25rem',
-          borderRadius: '0.25rem',
-          border: '1px solid var(--color-border)',
-          background: 'var(--color-bg)',
-          color: 'var(--color-fg)',
-        }}
+        style={{ display: 'inline-flex', gap: '0.375rem', flexWrap: 'wrap' }}
       >
-        {TASK_STATES.map((state) => (
-          <option key={state} value={state}>
-            {t(STATE_KEY[state])}
-          </option>
-        ))}
-      </select>
+        {TASK_STATES.map((state) => {
+          const active = selectedStates.has(state);
+          return (
+            <button
+              key={state}
+              type="button"
+              aria-pressed={active}
+              onClick={() => {
+                toggleState(state);
+              }}
+              style={{
+                paddingBlock: '0.25rem',
+                paddingInline: '0.625rem',
+                borderRadius: '999px',
+                border: '1px solid var(--nf-color-border)',
+                background: active
+                  ? 'var(--nf-color-accent-subtle, var(--nf-color-bg-sunken))'
+                  : 'transparent',
+                color: active
+                  ? 'var(--nf-color-accent, var(--nf-color-fg))'
+                  : 'var(--nf-color-fg-muted)',
+                font: 'inherit',
+                fontSize: '0.8125rem',
+                fontWeight: active ? 600 : 400,
+                cursor: 'pointer',
+              }}
+            >
+              {t(STATE_KEY[state])}
+            </button>
+          );
+        })}
+      </div>
       {workspaceId !== undefined ? (
         <Suspense
-          fallback={<Input disabled placeholder={assigneeLabel} aria-label={assigneeLabel} />}
+          fallback={
+            <div style={{ inlineSize: '12rem' }}>
+              <Input disabled placeholder={assigneeLabel} aria-label={assigneeLabel} />
+            </div>
+          }
         >
           <AssigneePicker
             projectId={projectId}
@@ -142,7 +161,9 @@ export default function TaskFiltersBar({
           />
         </Suspense>
       ) : (
-        <Input disabled placeholder={assigneeLabel} aria-label={assigneeLabel} />
+        <div style={{ inlineSize: '12rem' }}>
+          <Input disabled placeholder={assigneeLabel} aria-label={assigneeLabel} />
+        </div>
       )}
     </div>
   );
