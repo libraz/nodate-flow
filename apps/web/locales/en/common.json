@@ -1,6 +1,9 @@
 {
   "common": {
-    "loading": "Loading…"
+    "loading": "Loading…",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "confirm_title": "Are you sure?"
   },
   "landing": {
     "wordmark": "nodate-flow",
@@ -150,6 +153,7 @@
       "slug": "Slug",
       "description": "Description",
       "submit": "Save",
+      "submitting": "Saving…",
       "cancel": "Cancel"
     },
     "detail": {
@@ -230,6 +234,7 @@
       "description": "Description",
       "visibility": "Visibility",
       "submit": "Save",
+      "submitting": "Saving…",
       "cancel": "Cancel"
     },
     "visibility": {
@@ -327,7 +332,8 @@
     "filters": {
       "search_placeholder": "Search tasks…",
       "status": "Status",
-      "assignee": "Assignee"
+      "assignee": "Assignee",
+      "clear": "Clear filters"
     },
     "validation": {
       "title_required": "Title is required.",
@@ -343,10 +349,12 @@
     },
     "board": {
       "empty_column": "No tasks",
-      "drop_hint": "Drop here to move"
+      "drop_hint": "Drop here to move",
+      "moved_to": "Moved to {state}"
     },
     "assignee": {
-      "plus_n": "+{n, plural, one {# more} other {# more}}"
+      "plus_n": "+{n, plural, one {# more} other {# more}}",
+      "count": "{count, plural, one {# person} other {# people}}"
     },
     "detail": {
       "title_edit": "Edit title",
@@ -429,6 +437,7 @@
     "login": {
       "title": "Sign in",
       "submit": "Sign in",
+      "submitting": "Signing in…",
       "email": "Email",
       "password": "Password",
       "no_account": "Don't have an account?",
@@ -446,6 +455,7 @@
     "signup": {
       "title": "Create your account",
       "submit": "Create account",
+      "submitting": "Creating account…",
       "name": "Display name",
       "have_account": "Already have an account?",
       "login_link": "Sign in"

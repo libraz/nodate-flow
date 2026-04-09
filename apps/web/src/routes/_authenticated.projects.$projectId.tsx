@@ -98,9 +98,9 @@ function ProjectLayout(): ReactElement {
               'aria-current': 'page',
               'data-active': 'true',
               style: {
-                background: 'var(--color-surface)',
-                color: 'var(--color-fg)',
-                fontWeight: 600,
+                background: 'var(--nf-color-accent-subtle, rgba(155,89,182,0.12))',
+                color: 'var(--nf-color-accent, var(--color-accent, #9b59b6))',
+                fontWeight: 500,
               },
             }}
             style={{

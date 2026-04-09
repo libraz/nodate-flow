@@ -1,6 +1,7 @@
 {
   "view": {
     "title": "Inbox",
+    "subtitle": "Signals from connected sources land here for triage.",
     "empty": "Your inbox is empty"
   },
   "action": {

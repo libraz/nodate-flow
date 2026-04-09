@@ -1,6 +1,9 @@
 {
   "common": {
-    "loading": "読み込み中…"
+    "loading": "読み込み中…",
+    "confirm": "実行",
+    "cancel": "キャンセル",
+    "confirm_title": "本当に実行しますか？"
   },
   "landing": {
     "wordmark": "nodate-flow",
@@ -150,6 +153,7 @@
       "slug": "スラッグ",
       "description": "説明",
       "submit": "保存",
+      "submitting": "保存中…",
       "cancel": "キャンセル"
     },
     "detail": {
@@ -230,6 +234,7 @@
       "description": "説明",
       "visibility": "公開範囲",
       "submit": "保存",
+      "submitting": "保存中…",
       "cancel": "キャンセル"
     },
     "visibility": {
@@ -327,7 +332,8 @@
     "filters": {
       "search_placeholder": "タスクを検索…",
       "status": "ステータス",
-      "assignee": "担当者"
+      "assignee": "担当者",
+      "clear": "フィルタをクリア"
     },
     "validation": {
       "title_required": "タイトルを入力してください。",
@@ -343,10 +349,12 @@
     },
     "board": {
       "empty_column": "タスクなし",
-      "drop_hint": "ここにドロップして移動"
+      "drop_hint": "ここにドロップして移動",
+      "moved_to": "{state} に移動しました"
     },
     "assignee": {
-      "plus_n": "+他{n}件"
+      "plus_n": "+他{n}件",
+      "count": "{count}名"
     },
     "detail": {
       "title_edit": "タイトルを編集",
@@ -429,6 +437,7 @@
     "login": {
       "title": "サインイン",
       "submit": "サインイン",
+      "submitting": "サインイン中…",
       "email": "メールアドレス",
       "password": "パスワード",
       "no_account": "アカウントをお持ちでないですか？",
@@ -446,6 +455,7 @@
     "signup": {
       "title": "アカウントを作成",
       "submit": "アカウントを作成",
+      "submitting": "作成中…",
       "name": "表示名",
       "have_account": "すでにアカウントをお持ちですか？",
       "login_link": "サインイン"

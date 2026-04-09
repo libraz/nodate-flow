@@ -6,7 +6,7 @@
  */
 
 import DataGrid from '@nodate-flow/ui/primitives/data-grid';
-import { useNavigate } from '@tanstack/react-router';
+import { Link } from '@tanstack/react-router';
 import type { ColumnDef } from '@tanstack/react-table';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -46,7 +46,6 @@ function formatDate(iso: string, locale: string): string {
 
 export default function TaskListView({ projectId }: TaskListViewProps): ReactElement {
   const { t, i18n } = useTranslation('common');
-  const navigate = useNavigate();
   const filters = useTaskFilters(projectId);
   const { data: tasks } = useTasksQuery(projectId, filters);
   const { data: edges } = useProjectDependenciesQuery(projectId);
@@ -60,23 +59,17 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
       size: 320,
       header: () => t('tasks.columns.title'),
       cell: ({ row }) => (
-        <button
-          type="button"
-          onClick={() => {
-            void navigate({ to: '/tasks/$taskId', params: { taskId: row.original.id } });
-          }}
+        <Link
+          to="/tasks/$taskId"
+          params={{ taskId: row.original.id }}
           style={{
-            background: 'none',
-            border: 'none',
-            padding: 0,
-            cursor: 'pointer',
             color: 'var(--color-fg)',
-            font: 'inherit',
-            textAlign: 'start',
+            textDecoration: 'none',
+            fontWeight: 500,
           }}
         >
           {row.original.title}
-        </button>
+        </Link>
       ),
     },
     {
@@ -117,19 +110,31 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
       size: 110,
       header: () => t('tasks.columns.assignee'),
       cell: ({ row }) => {
-        const pid = row.original.primaryAssigneeId;
+        // The list payload carries only the assignee count + primary
+        // id (no display names). Showing a raw uuid slice is worse
+        // than useless; render a dot + count instead so the user can
+        // see "who" belongs in the task detail view.
         const count = row.original.assigneeCount;
-        if (!pid) return <span style={{ color: 'var(--color-muted)' }}>—</span>;
-        const shortId = pid.slice(0, 8);
-        const extra = count > 1 ? count - 1 : 0;
+        if (count === 0) return <span style={{ color: 'var(--color-muted)' }}>—</span>;
         return (
-          <span style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center' }}>
-            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{shortId}</span>
-            {extra > 0 ? (
-              <span style={{ color: 'var(--color-muted)' }}>
-                {t('tasks.assignee.plus_n', { n: extra })}
-              </span>
-            ) : null}
+          <span
+            style={{
+              display: 'inline-flex',
+              gap: '0.375rem',
+              alignItems: 'center',
+              color: 'var(--color-muted)',
+            }}
+          >
+            <span
+              aria-hidden
+              style={{
+                inlineSize: '0.5rem',
+                blockSize: '0.5rem',
+                borderRadius: '999px',
+                background: 'var(--nf-color-accent, #9b59b6)',
+              }}
+            />
+            {t('tasks.assignee.count', { count })}
           </span>
         );
       },

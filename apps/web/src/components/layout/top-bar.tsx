@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import CommandPalette from './command-palette';
 
 import AiCostMeter from '../../features/ai-providers/cost-meter';
-import { authStore } from '../../features/auth/auth-store';
+import { authStore, selectUser, useAuth } from '../../features/auth/auth-store';
 import { useWorkspacesQuery } from '../../features/workspaces/api';
 import { type SupportedLanguage, setLanguage } from '../../i18n';
 import { apiBaseUrl } from '../../lib/sdk';
@@ -20,6 +20,16 @@ function nextTheme(current: ConcreteTheme): ConcreteTheme {
   const idx = concreteThemes.indexOf(current);
   const next = concreteThemes[(idx + 1) % concreteThemes.length];
   return next ?? 'aurora-light';
+}
+
+/** Two-letter initials from a display name (falls back to "?"). */
+function initialsFrom(name: string | undefined): string {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  const first = parts[0]?.[0] ?? '';
+  const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : '';
+  return (first + last).toUpperCase() || '?';
 }
 
 /**
@@ -47,7 +57,9 @@ function WorkspaceSwitcher(): ReactElement {
         }
       }}
     >
-      <option value="">{t('topbar.workspace.none')}</option>
+      <option value="" disabled>
+        {t('topbar.workspace.none')}
+      </option>
       {workspaces.map((w) => (
         <option key={w.id} value={w.id}>
           {w.name}
@@ -63,6 +75,8 @@ export default function TopBar(): ReactElement {
   const navigate = useNavigate();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const isDark = resolved === 'aurora-dark' || resolved === 'dotline-dark';
+  const user = useAuth(selectUser);
+  const initials = initialsFrom(user?.displayName);
 
   const handleThemeToggle = (): void => {
     setPreference(nextTheme(resolved));
@@ -92,7 +106,8 @@ export default function TopBar(): ReactElement {
     <>
       <header className={styles.topBar}>
         <div className={styles.left}>
-          <span className={styles.brand}>nodate-flow</span>
+          {/* Brand is rendered in the sidebar; the top bar only carries
+              the workspace switcher to avoid a duplicate wordmark. */}
           <Suspense fallback={null}>
             <WorkspaceSwitcher />
           </Suspense>
@@ -143,8 +158,12 @@ export default function TopBar(): ReactElement {
           >
             <Icon icon={LogOut} decorative />
           </button>
-          <div className={styles.avatar} aria-hidden="true">
-            NF
+          <div
+            className={styles.avatar}
+            aria-label={user?.displayName ?? ''}
+            title={user?.displayName ?? ''}
+          >
+            {initials}
           </div>
         </div>
       </header>

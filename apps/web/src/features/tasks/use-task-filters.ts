@@ -55,6 +55,10 @@ export function setTaskFilterAssignee(projectId: string, assigneeId: string): vo
   setTaskFilters(projectId, { ...getTaskFilters(projectId), assigneeId });
 }
 
+export function resetTaskFilters(projectId: string): void {
+  setTaskFilters(projectId, emptyFilters());
+}
+
 export function useTaskFilters(projectId: string): TaskFilters {
   return useSyncExternalStore(
     subscribe,

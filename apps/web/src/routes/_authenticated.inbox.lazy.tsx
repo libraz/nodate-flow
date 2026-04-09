@@ -24,15 +24,18 @@ function InboxRoute(): ReactElement {
         inlineSize: '100%',
       }}
     >
-      <h1
-        style={{
-          margin: 0,
-          fontFamily: 'var(--font-display)',
-          fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
-        }}
-      >
-        {t('view.title')}
-      </h1>
+      <header style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <h1
+          style={{
+            margin: 0,
+            fontFamily: 'var(--font-display)',
+            fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
+          }}
+        >
+          {t('view.title')}
+        </h1>
+        <p style={{ margin: 0, color: 'var(--color-muted)' }}>{t('view.subtitle')}</p>
+      </header>
       <Suspense
         fallback={
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>

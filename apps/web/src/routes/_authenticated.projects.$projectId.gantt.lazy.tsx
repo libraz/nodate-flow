@@ -12,7 +12,7 @@ import type { components } from '@nodate-flow/sdk';
 import Button from '@nodate-flow/ui/primitives/button';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { createLazyFileRoute, getRouteApi, useNavigate } from '@tanstack/react-router';
+import { Link, createLazyFileRoute, getRouteApi } from '@tanstack/react-router';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { type ReactElement, Suspense, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -82,7 +82,6 @@ function GanttRoute(): ReactElement {
 function GanttView(): ReactElement {
   const { t } = useTranslation('common');
   const { projectId } = routeApi.useParams();
-  const navigate = useNavigate();
   const [offsetDays, setOffsetDays] = useState(0);
 
   const { data: tasks } = useSuspenseQuery({
@@ -300,12 +299,10 @@ function GanttView(): ReactElement {
               }}
             />
             {scheduled.map(({ task }) => (
-              <button
+              <Link
                 key={task.id}
-                type="button"
-                onClick={() => {
-                  void navigate({ to: '/tasks/$taskId', params: { taskId: task.id } });
-                }}
+                to="/tasks/$taskId"
+                params={{ taskId: task.id }}
                 title={task.title}
                 style={{
                   display: 'flex',
@@ -314,12 +311,9 @@ function GanttView(): ReactElement {
                   inlineSize: '100%',
                   blockSize: ROW_HEIGHT + ROW_GAP,
                   paddingInline: '0.625rem',
-                  border: 'none',
-                  background: 'transparent',
                   textAlign: 'start',
                   color: 'inherit',
-                  font: 'inherit',
-                  cursor: 'pointer',
+                  textDecoration: 'none',
                   overflow: 'hidden',
                 }}
               >
@@ -343,7 +337,7 @@ function GanttView(): ReactElement {
                 >
                   {task.title}
                 </span>
-              </button>
+              </Link>
             ))}
           </div>
 
@@ -516,11 +510,9 @@ function GanttView(): ReactElement {
           >
             {unscheduledTasks.map((task) => (
               <li key={task.id}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void navigate({ to: '/tasks/$taskId', params: { taskId: task.id } });
-                  }}
+                <Link
+                  to="/tasks/$taskId"
+                  params={{ taskId: task.id }}
                   style={{
                     inlineSize: '100%',
                     display: 'flex',
@@ -528,12 +520,9 @@ function GanttView(): ReactElement {
                     gap: '0.5rem',
                     padding: '0.375rem 0.5rem',
                     borderRadius: '0.375rem',
-                    border: '1px solid transparent',
-                    background: 'transparent',
                     color: 'var(--color-fg)',
                     fontSize: '0.8125rem',
-                    textAlign: 'start',
-                    cursor: 'pointer',
+                    textDecoration: 'none',
                   }}
                 >
                   <span
@@ -557,7 +546,7 @@ function GanttView(): ReactElement {
                   >
                     {task.title}
                   </span>
-                </button>
+                </Link>
               </li>
             ))}
           </ul>

@@ -1,6 +1,6 @@
 import Icon from '@nodate-flow/ui/icon';
 import { cx } from '@nodate-flow/ui/lib/cx';
-import { Link } from '@tanstack/react-router';
+import { Link, useRouterState } from '@tanstack/react-router';
 import {
   Briefcase,
   CalendarDays,
@@ -89,6 +89,7 @@ export default function Sidebar(): ReactElement {
   const { t } = useTranslation('common');
   const [collapsed, setCollapsed] = useState<boolean>(() => readInitialCollapsed());
   const currentWorkspaceId = useCurrentWorkspaceId();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
     try {
@@ -130,11 +131,19 @@ export default function Sidebar(): ReactElement {
       <nav className={styles.nav} aria-label={t('nav.primary')}>
         {NAV_ITEMS.map((item) => {
           const label = t(labelKeyFor(item.key));
+          // Settings and Workspaces should stay highlighted on any
+          // nested child route (e.g. /settings/security,
+          // /workspaces/$id/projects), but the Settings link targets
+          // /settings/profile specifically so the default exact match
+          // fails on siblings. Fall back to a pathname-prefix check.
+          const sectionActive =
+            (item.key === 'settings' && pathname.startsWith('/settings')) ||
+            (item.key === 'workspaces' && pathname.startsWith('/workspaces'));
           const node = (
             <Link
               key={item.key}
               to={item.to}
-              className={styles.item}
+              className={cx(styles.item, sectionActive && styles.itemActive)}
               activeProps={{ className: cx(styles.item, styles.itemActive) }}
             >
               <Icon icon={item.icon} decorative />

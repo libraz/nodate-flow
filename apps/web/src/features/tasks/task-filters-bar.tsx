@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { useWorkspaceUsersQuery } from '../workspaces/api';
 import { TASK_STATES, type TaskDerivedState } from './api';
 import {
+  resetTaskFilters,
   setTaskFilterAssignee,
   setTaskFilterSearch,
   setTaskFilterStates,
@@ -85,6 +86,10 @@ export default function TaskFiltersBar({
   };
 
   const assigneeLabel = t('tasks.filters.assignee');
+  const hasActiveFilter =
+    (filters.search && filters.search.length > 0) ||
+    (filters.states && filters.states.length > 0) ||
+    (filters.assigneeId && filters.assigneeId.length > 0);
 
   return (
     <div
@@ -165,6 +170,27 @@ export default function TaskFiltersBar({
           <Input disabled placeholder={assigneeLabel} aria-label={assigneeLabel} />
         </div>
       )}
+      {hasActiveFilter ? (
+        <button
+          type="button"
+          onClick={() => {
+            resetTaskFilters(projectId);
+          }}
+          style={{
+            marginInlineStart: 'auto',
+            background: 'none',
+            border: 'none',
+            padding: '0.25rem 0.5rem',
+            color: 'var(--nf-color-fg-muted)',
+            cursor: 'pointer',
+            font: 'inherit',
+            fontSize: '0.8125rem',
+            textDecoration: 'underline',
+          }}
+        >
+          {t('tasks.filters.clear')}
+        </button>
+      ) : null}
     </div>
   );
 }

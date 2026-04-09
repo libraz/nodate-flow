@@ -44,13 +44,24 @@ export default function WorkspaceCreateDialog({
 
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
+  const [slugTouched, setSlugTouched] = useState(false);
   const [description, setDescription] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
 
+  // Derive a slug-safe string from a display name: lowercase, spaces +
+  // punctuation → '-', collapse repeats, trim leading/trailing dashes.
+  const slugify = (s: string): string =>
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 64);
+
   const reset = (): void => {
     setName('');
     setSlug('');
+    setSlugTouched(false);
     setDescription('');
     setErrors({});
   };
@@ -115,7 +126,12 @@ export default function WorkspaceCreateDialog({
               {...control}
               value={name}
               onChange={(e) => {
-                setName(e.target.value);
+                const nextName = e.target.value;
+                setName(nextName);
+                // Mirror the name into slug while the user hasn't
+                // manually edited the slug field. As soon as they
+                // touch it, we stop overriding.
+                if (!slugTouched) setSlug(slugify(nextName));
               }}
               autoFocus
             />
@@ -132,6 +148,7 @@ export default function WorkspaceCreateDialog({
               {...control}
               value={slug}
               onChange={(e) => {
+                setSlugTouched(true);
                 setSlug(e.target.value);
               }}
             />
@@ -159,7 +176,7 @@ export default function WorkspaceCreateDialog({
             {t('workspaces.form.cancel')}
           </Button>
           <Button type="submit" variant="primary" disabled={submitting}>
-            {t('workspaces.form.submit')}
+            {submitting ? t('workspaces.form.submitting') : t('workspaces.form.submit')}
           </Button>
         </div>
       </form>

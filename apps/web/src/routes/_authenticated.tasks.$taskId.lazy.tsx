@@ -19,12 +19,13 @@ import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import Spinner from '@nodate-flow/ui/primitives/spinner';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import { createLazyFileRoute, getRouteApi } from '@tanstack/react-router';
+import { Link, createLazyFileRoute, getRouteApi } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import Markdown from '../components/markdown/markdown';
 import StateGraph from '../features/constraints/state-graph';
+import { useProjectQuery } from '../features/projects/api';
 import {
   TRANSITIONS_BY_STATE,
   type TaskDerivedState,
@@ -45,7 +46,7 @@ import {
 import DependenciesSection from '../features/tasks/dependencies-section';
 import { useTaskTimelineQuery } from '../features/timeline/api';
 import TaskMiniTimeline from '../features/timeline/task-mini-timeline';
-import { useWorkspaceMembersQuery } from '../features/workspaces/api';
+import { useWorkspaceMembersQuery, useWorkspaceQuery } from '../features/workspaces/api';
 
 const routeApi = getRouteApi('/_authenticated/tasks/$taskId');
 
@@ -841,6 +842,46 @@ function InferStateSection({ taskId }: { taskId: string }): ReactElement {
   );
 }
 
+function TaskBreadcrumb({
+  workspaceId,
+  projectId,
+}: {
+  workspaceId: string;
+  projectId: string;
+}): ReactElement {
+  const { data: workspace } = useWorkspaceQuery(workspaceId);
+  const { data: project } = useProjectQuery(projectId);
+  return (
+    <nav
+      aria-label="breadcrumb"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.375rem',
+        fontSize: '0.8125rem',
+        color: 'var(--color-muted)',
+        flexWrap: 'wrap',
+      }}
+    >
+      <Link
+        to="/workspaces/$id"
+        params={{ id: workspaceId }}
+        style={{ color: 'inherit', textDecoration: 'none' }}
+      >
+        {workspace.name}
+      </Link>
+      <span aria-hidden>›</span>
+      <Link
+        to="/projects/$projectId/tasks"
+        params={{ projectId }}
+        style={{ color: 'inherit', textDecoration: 'none' }}
+      >
+        {project.name}
+      </Link>
+    </nav>
+  );
+}
+
 function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
   const { data: task } = useTaskQuery(id);
   const state = task.derivedState as TaskDerivedState;
@@ -856,6 +897,9 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
       }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minInlineSize: 0 }}>
+        <Suspense fallback={null}>
+          <TaskBreadcrumb workspaceId={task.workspaceId} projectId={task.projectId} />
+        </Suspense>
         <TitleEditor id={id} initial={task.title} />
         <Card style={{ padding: '1rem' }}>
           <DescriptionEditor id={id} initial={task.description ?? ''} />

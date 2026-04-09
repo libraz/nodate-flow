@@ -7,7 +7,7 @@
 
 import Button from '@nodate-flow/ui/primitives/button';
 import DataGrid from '@nodate-flow/ui/primitives/data-grid';
-import { useNavigate } from '@tanstack/react-router';
+import { Link } from '@tanstack/react-router';
 import type { ColumnDef } from '@tanstack/react-table';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +25,6 @@ function formatDate(iso: string, locale: string): string {
 
 export default function WorkspaceList(): ReactElement {
   const { t, i18n } = useTranslation('common');
-  const navigate = useNavigate();
   const { data: workspaces } = useWorkspacesQuery();
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -37,23 +36,17 @@ export default function WorkspaceList(): ReactElement {
       accessorKey: 'name',
       header: () => t('workspaces.columns.name'),
       cell: ({ row }) => (
-        <button
-          type="button"
-          onClick={() => {
-            void navigate({ to: '/workspaces/$id', params: { id: row.original.id } });
-          }}
+        <Link
+          to="/workspaces/$id"
+          params={{ id: row.original.id }}
           style={{
-            background: 'none',
-            border: 'none',
-            padding: 0,
-            cursor: 'pointer',
             color: 'var(--color-fg)',
-            font: 'inherit',
-            textAlign: 'start',
+            textDecoration: 'none',
+            fontWeight: 500,
           }}
         >
           {row.original.name}
-        </button>
+        </Link>
       ),
     },
     {

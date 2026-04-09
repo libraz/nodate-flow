@@ -46,13 +46,22 @@ export default function ProjectCreateDialog({
 
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
+  const [slugTouched, setSlugTouched] = useState(false);
   const [description, setDescription] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
 
+  const slugify = (s: string): string =>
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 64);
+
   const reset = (): void => {
     setName('');
     setSlug('');
+    setSlugTouched(false);
     setDescription('');
     setErrors({});
   };
@@ -120,7 +129,9 @@ export default function ProjectCreateDialog({
               {...control}
               value={name}
               onChange={(e) => {
-                setName(e.target.value);
+                const nextName = e.target.value;
+                setName(nextName);
+                if (!slugTouched) setSlug(slugify(nextName));
               }}
               autoFocus
             />
@@ -137,6 +148,7 @@ export default function ProjectCreateDialog({
               {...control}
               value={slug}
               onChange={(e) => {
+                setSlugTouched(true);
                 setSlug(e.target.value);
               }}
             />
@@ -164,7 +176,7 @@ export default function ProjectCreateDialog({
             {t('projects.form.cancel')}
           </Button>
           <Button type="submit" variant="primary" disabled={submitting}>
-            {t('projects.form.submit')}
+            {submitting ? t('projects.form.submitting') : t('projects.form.submit')}
           </Button>
         </div>
       </form>

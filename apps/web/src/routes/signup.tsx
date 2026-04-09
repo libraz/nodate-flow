@@ -141,6 +141,7 @@ function SignupPage(): ReactElement {
               {...control}
               type="text"
               autoComplete="name"
+              autoFocus
               value={displayName}
               onChange={(e) => {
                 setDisplayName(e.target.value);
@@ -199,7 +200,7 @@ function SignupPage(): ReactElement {
         ) : null}
 
         <Button type="submit" variant="primary" disabled={submitting}>
-          {t('auth.signup.submit')}
+          {submitting ? t('auth.signup.submitting') : t('auth.signup.submit')}
         </Button>
 
         <p

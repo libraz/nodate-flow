@@ -281,6 +281,7 @@ function LoginPage(): ReactElement {
               {...control}
               type="email"
               autoComplete="email"
+              autoFocus
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
@@ -321,7 +322,7 @@ function LoginPage(): ReactElement {
         ) : null}
 
         <Button type="submit" variant="primary" disabled={submitting}>
-          {t('auth.login.submit')}
+          {submitting ? t('auth.login.submitting') : t('auth.login.submit')}
         </Button>
 
         <p
