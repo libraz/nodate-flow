@@ -4,8 +4,7 @@
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
-import { useVirtualizer } from '@tanstack/react-virtual';
-import { type ReactElement, useRef, useState } from 'react';
+import { type ReactElement, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -42,6 +41,14 @@ interface InnerProps {
   workspaceId?: string;
 }
 
+function dayKey(ts: number): string {
+  const d = new Date(ts * 1000);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function TimelineInner({
   events,
   total,
@@ -49,21 +56,35 @@ function TimelineInner({
   onChange,
   workspaceId,
 }: InnerProps): ReactElement {
-  const { t } = useTranslation('timeline');
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const { t, i18n } = useTranslation('timeline');
+  const locale = i18n.resolvedLanguage ?? 'en';
 
-  const virtualizer = useVirtualizer({
-    count: events.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => 96,
-    overscan: 5,
-    measureElement: (el) => el.getBoundingClientRect().height,
-  });
-
-  const virtualRows = virtualizer.getVirtualItems();
-  // happy-dom has no layout; fall back to rendering all rows for tests.
-  const useFallback = virtualRows.length === 0 && events.length > 0;
-  const totalSize = useFallback ? events.length * 80 : virtualizer.getTotalSize();
+  /** Group events by local-time day, preserving server order. */
+  const groups = useMemo<{ key: string; label: string; items: TimelineEvent[] }[]>(() => {
+    const fmt = new Intl.DateTimeFormat(locale, {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      weekday: 'short',
+    });
+    const todayKey = dayKey(Math.floor(Date.now() / 1000));
+    const yesterdayKey = dayKey(Math.floor(Date.now() / 1000) - 86_400);
+    const out: { key: string; label: string; items: TimelineEvent[] }[] = [];
+    for (const ev of events) {
+      const key = dayKey(ev.occurredAt);
+      let group = out[out.length - 1];
+      if (!group || group.key !== key) {
+        let label: string;
+        if (key === todayKey) label = t('view.today', { defaultValue: 'Today' });
+        else if (key === yesterdayKey) label = t('view.yesterday', { defaultValue: 'Yesterday' });
+        else label = fmt.format(new Date(ev.occurredAt * 1000));
+        group = { key, label, items: [] };
+        out.push(group);
+      }
+      group.items.push(ev);
+    }
+    return out;
+  }, [events, locale, t]);
 
   const limit = filters.limit ?? 50;
   const offset = filters.offset ?? 0;
@@ -84,47 +105,73 @@ function TimelineInner({
       />
 
       {events.length === 0 ? (
-        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-muted)' }}>
+        <div
+          style={{
+            padding: '3rem 1rem',
+            textAlign: 'center',
+            color: 'var(--nf-color-fg-muted, var(--color-muted))',
+            border: '1px dashed var(--nf-color-border, var(--color-border))',
+            borderRadius: '0.75rem',
+            background: 'var(--nf-color-bg-sunken, transparent)',
+          }}
+        >
           {t('view.empty')}
         </div>
       ) : (
         <div
-          ref={scrollRef}
           style={{
+            maxBlockSize: '40rem',
             overflowY: 'auto',
-            maxBlockSize: '32rem',
-            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1.25rem',
+            paddingInlineEnd: '0.5rem',
           }}
         >
-          <div style={{ blockSize: totalSize, position: 'relative' }}>
-            {useFallback
-              ? events.map((ev) => (
-                  <div key={ev.id} style={{ padding: '0.25rem 0' }}>
-                    <EventCard event={ev} />
-                  </div>
-                ))
-              : virtualRows.map((vr) => {
-                  const ev = events[vr.index];
-                  if (!ev) return null;
-                  return (
-                    <div
-                      key={ev.id}
-                      data-index={vr.index}
-                      ref={virtualizer.measureElement}
-                      style={{
-                        position: 'absolute',
-                        insetBlockStart: 0,
-                        insetInlineStart: 0,
-                        inlineSize: '100%',
-                        transform: `translateY(${vr.start}px)`,
-                        padding: '0.25rem 0',
-                      }}
-                    >
-                      <EventCard event={ev} />
-                    </div>
-                  );
-                })}
-          </div>
+          {groups.map((g) => (
+            <section key={g.key} aria-label={g.label}>
+              <h3
+                style={{
+                  position: 'sticky',
+                  insetBlockStart: 0,
+                  zIndex: 2,
+                  margin: 0,
+                  padding: '0.375rem 0.75rem',
+                  fontSize: '0.75rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  color: 'var(--color-muted)',
+                  background: 'var(--nf-color-bg, var(--color-bg))',
+                  borderBlockEnd: '1px solid var(--color-border)',
+                }}
+              >
+                {g.label} · {g.items.length}
+              </h3>
+              <div
+                style={{
+                  position: 'relative',
+                  paddingInlineStart: '0.5rem',
+                  paddingBlockStart: '0.25rem',
+                }}
+              >
+                {/* vertical rail */}
+                <div
+                  aria-hidden
+                  style={{
+                    position: 'absolute',
+                    insetInlineStart: 'calc(0.5rem + 0.875rem - 1px)',
+                    insetBlockStart: 0,
+                    insetBlockEnd: 0,
+                    inlineSize: '2px',
+                    background: 'var(--color-border)',
+                  }}
+                />
+                {g.items.map((ev) => (
+                  <EventCard key={ev.id} event={ev} />
+                ))}
+              </div>
+            </section>
+          ))}
         </div>
       )}
 

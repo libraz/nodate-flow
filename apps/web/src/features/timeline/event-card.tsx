@@ -5,7 +5,6 @@
  */
 
 import Avatar from '@nodate-flow/ui/primitives/avatar';
-import Card from '@nodate-flow/ui/primitives/card';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -99,62 +98,91 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
   const tag = eventSourceTag(event.type, event.payload);
 
   return (
-    <Card
+    <div
       style={{
-        padding: '0.75rem',
-        display: 'flex',
-        gap: '0.75rem',
-        alignItems: 'flex-start',
+        position: 'relative',
+        display: 'grid',
+        gridTemplateColumns: 'auto 1fr',
+        columnGap: '0.875rem',
+        paddingInlineStart: '0.25rem',
+        paddingBlock: '0.625rem',
       }}
     >
+      {/* rail dot */}
       <div
         aria-hidden
         style={{
-          inlineSize: '0.25rem',
-          alignSelf: 'stretch',
-          background: tag.color,
-          borderRadius: '0.125rem',
+          gridColumn: '1 / 2',
+          gridRow: '1 / span 2',
+          position: 'relative',
+          inlineSize: '1.75rem',
+          display: 'flex',
+          justifyContent: 'center',
         }}
-      />
-      <Avatar alt={actorLabel} initials={initials} size="sm" />
+      >
+        <div
+          style={{
+            inlineSize: '1.75rem',
+            blockSize: '1.75rem',
+            borderRadius: '999px',
+            background: 'var(--color-bg)',
+            border: `2px solid ${tag.color}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1,
+          }}
+        >
+          <Avatar alt={actorLabel} initials={initials} size="sm" />
+        </div>
+      </div>
+
       <div
         style={{
-          flex: 1,
+          gridColumn: '2 / 3',
           minInlineSize: 0,
           display: 'flex',
           flexDirection: 'column',
           gap: '0.25rem',
         }}
       >
-        <div style={{ color: 'var(--color-fg)', lineHeight: 1.4, wordBreak: 'break-word' }}>
-          {translated}
-        </div>
         <div
           style={{
-            color: 'var(--color-muted)',
-            fontSize: '0.75rem',
             display: 'flex',
+            alignItems: 'baseline',
             gap: '0.5rem',
-            alignItems: 'center',
+            flexWrap: 'wrap',
           }}
         >
+          <span style={{ color: 'var(--color-fg)', lineHeight: 1.4, wordBreak: 'break-word' }}>
+            {translated}
+          </span>
           <span
             style={{
               padding: '0 0.375rem',
               borderRadius: '0.25rem',
               border: `1px solid ${tag.color}`,
               color: tag.color,
-              fontSize: '0.65rem',
+              fontSize: '0.625rem',
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
             }}
           >
             {tag.label}
           </span>
-          {formatRelative(event.occurredAt, locale)}
+          <span
+            style={{
+              marginInlineStart: 'auto',
+              color: 'var(--color-muted)',
+              fontSize: '0.75rem',
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            {formatRelative(event.occurredAt, locale)}
+          </span>
         </div>
         {payloadVisible ? (
-          <details style={{ marginBlockStart: '0.25rem' }}>
+          <details>
             <summary
               style={{ cursor: 'pointer', color: 'var(--color-muted)', fontSize: '0.75rem' }}
             >
@@ -164,7 +192,7 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
               style={{
                 marginBlockStart: '0.25rem',
                 padding: '0.5rem',
-                background: 'var(--color-surface-2, var(--color-bg))',
+                background: 'var(--color-surface-2, var(--color-surface))',
                 borderRadius: '0.25rem',
                 fontSize: '0.7rem',
                 overflowX: 'auto',
@@ -175,6 +203,6 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
           </details>
         ) : null}
       </div>
-    </Card>
+    </div>
   );
 }

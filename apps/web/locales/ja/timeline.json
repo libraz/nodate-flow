@@ -3,7 +3,9 @@
     "title": "タイムライン",
     "empty": "イベントはまだありません。",
     "loading": "タイムラインを読み込み中…",
-    "load_more": "さらに読み込む"
+    "load_more": "さらに読み込む",
+    "today": "今日",
+    "yesterday": "昨日"
   },
   "filter": {
     "kind_all": "すべてのイベント種別",

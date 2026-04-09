@@ -3,7 +3,9 @@
     "title": "Timeline",
     "empty": "No events yet.",
     "loading": "Loading timeline…",
-    "load_more": "Load more"
+    "load_more": "Load more",
+    "today": "Today",
+    "yesterday": "Yesterday"
   },
   "filter": {
     "kind_all": "All event types",
