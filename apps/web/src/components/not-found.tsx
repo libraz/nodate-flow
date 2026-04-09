@@ -1,8 +1,8 @@
 /**
  * Branded "not found" component used by both the root route's
  * `notFoundComponent` and the authenticated layout's
- * `notFoundComponent`. Renders a minimal centered call-to-action that
- * links back to the app home.
+ * `notFoundComponent`. Renders a large gradient 404 mark, a short
+ * description, and a back-home button.
  *
  * The authenticated layout wraps this in `<AppShell>` so deep-link 404s
  * land inside the normal sidebar/topbar chrome instead of replacing the
@@ -23,15 +23,61 @@ export default function NotFound(): ReactElement {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '1rem',
-        padding: '2rem',
-        fontFamily: 'var(--font-body)',
-        color: 'var(--color-fg)',
+        gap: '1.25rem',
+        padding: '3rem 2rem',
+        textAlign: 'center',
       }}
     >
-      <h1 style={{ fontFamily: 'var(--font-display)', margin: 0 }}>{t('not_found.title')}</h1>
-      <p style={{ margin: 0, color: 'var(--color-muted)' }}>{t('not_found.description')}</p>
-      <Link to="/" style={{ color: 'var(--color-fg)' }}>
+      <div
+        aria-hidden
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 'clamp(5rem, 14vw, 9rem)',
+          lineHeight: 1,
+          fontWeight: 700,
+          backgroundImage: 'var(--nf-gradient-wordmark)',
+          backgroundClip: 'text',
+          // biome-ignore lint/style/useNamingConvention: vendor prefix
+          WebkitBackgroundClip: 'text',
+          color: 'transparent',
+          // biome-ignore lint/style/useNamingConvention: vendor prefix
+          WebkitTextFillColor: 'transparent',
+        }}
+      >
+        {t('not_found.code', { defaultValue: '404' })}
+      </div>
+      <h1
+        style={{
+          fontFamily: 'var(--font-display)',
+          margin: 0,
+          fontSize: '1.5rem',
+          color: 'var(--color-fg)',
+        }}
+      >
+        {t('not_found.title')}
+      </h1>
+      <p
+        style={{
+          margin: 0,
+          maxInlineSize: '28rem',
+          color: 'var(--color-muted)',
+        }}
+      >
+        {t('not_found.description')}
+      </p>
+      <Link
+        to="/"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          padding: '0.5rem 1.25rem',
+          borderRadius: '0.5rem',
+          background: 'var(--nf-color-accent, var(--color-accent, #9b59b6))',
+          color: 'var(--nf-color-accent-fg, white)',
+          textDecoration: 'none',
+          fontWeight: 500,
+        }}
+      >
         {t('not_found.back_home')}
       </Link>
     </section>

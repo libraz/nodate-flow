@@ -117,8 +117,9 @@
     }
   },
   "not_found": {
+    "code": "404",
     "title": "Page not found",
-    "description": "The page you're looking for doesn't exist.",
+    "description": "The page you're looking for doesn't exist or has been moved.",
     "back_home": "Back to home"
   },
   "fatal": {
