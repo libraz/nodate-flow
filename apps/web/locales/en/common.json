@@ -232,7 +232,10 @@
     },
     "detail": {
       "description_empty": "No description for this project yet.",
-      "overview_empty": "No activity to show for this project yet.",
+      "overview_empty": "No tasks in this project yet.",
+      "active_tasks": "Active tasks",
+      "progress": "Progress {pct}%",
+      "view_all_tasks": "View all tasks",
       "tabs": {
         "overview": "Overview",
         "members": "Members",

@@ -232,7 +232,10 @@
     },
     "detail": {
       "description_empty": "このプロジェクトにはまだ説明がありません。",
-      "overview_empty": "このプロジェクトにはまだ表示できるアクティビティがありません。",
+      "overview_empty": "このプロジェクトにはまだタスクがありません。",
+      "active_tasks": "進行中のタスク",
+      "progress": "進捗 {pct}%",
+      "view_all_tasks": "すべてのタスクを表示",
       "tabs": {
         "overview": "概要",
         "members": "メンバー",

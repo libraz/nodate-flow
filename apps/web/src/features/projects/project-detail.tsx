@@ -8,12 +8,15 @@ import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import Tabs, { type TabItem } from '@nodate-flow/ui/primitives/tabs';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import { useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { type TaskDerivedState, useTasksQuery } from '../tasks/api';
 import { useDisableProject, useProjectQuery, useUpdateProject } from './api';
 import ProjectMembersTable from './project-members-table';
+
+const STATE_ORDER: readonly TaskDerivedState[] = ['open', 'waiting', 'review', 'done', 'cancelled'];
 
 export interface ProjectDetailProps {
   id: string;
@@ -96,13 +99,131 @@ function SettingsPanel({ id }: { id: string }): ReactElement {
   );
 }
 
-function OverviewPanel(_props: { id: string }): ReactElement {
+function OverviewPanel({ id }: { id: string }): ReactElement {
   const { t } = useTranslation('common');
+  const { data: tasks } = useTasksQuery(id);
+
+  if (tasks.length === 0) {
+    return (
+      <Card style={{ padding: '1.5rem' }}>
+        <p
+          style={{
+            margin: 0,
+            padding: '2rem 1rem',
+            textAlign: 'center',
+            color: 'var(--nf-color-fg-muted, var(--color-muted))',
+            border: '1px dashed var(--nf-color-border, var(--color-border))',
+            borderRadius: '0.5rem',
+            background: 'var(--nf-color-bg-sunken, transparent)',
+          }}
+        >
+          {t('projects.detail.overview_empty')}
+        </p>
+      </Card>
+    );
+  }
+
+  const counts: Record<TaskDerivedState, number> = {
+    open: 0,
+    waiting: 0,
+    review: 0,
+    done: 0,
+    cancelled: 0,
+  };
+  for (const task of tasks) {
+    const state = task.derivedState as TaskDerivedState;
+    if (state in counts) counts[state] += 1;
+  }
+  const active = counts.open + counts.waiting + counts.review;
+  const total = tasks.length;
+  const pct = total > 0 ? Math.round((counts.done / total) * 100) : 0;
+
   return (
-    <Card style={{ padding: '1.5rem' }}>
-      <p style={{ margin: 0, color: 'var(--color-muted)' }}>
-        {t('projects.detail.overview_empty')}
-      </p>
+    <Card style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: '2rem', fontWeight: 600, lineHeight: 1 }}>{active}</div>
+          <div style={{ fontSize: '0.8125rem', color: 'var(--color-muted)' }}>
+            {t('projects.detail.active_tasks')}
+          </div>
+        </div>
+        <div
+          style={{
+            marginInlineStart: 'auto',
+            fontSize: '0.875rem',
+            color: 'var(--color-muted)',
+          }}
+        >
+          {t('projects.detail.progress', { pct })}
+        </div>
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          blockSize: '0.5rem',
+          borderRadius: '999px',
+          overflow: 'hidden',
+          background: 'var(--color-surface, rgba(127,127,127,0.08))',
+        }}
+      >
+        {STATE_ORDER.map((s) =>
+          counts[s] > 0 ? (
+            <div
+              key={s}
+              title={`${t(`tasks.status.${s}`)}: ${counts[s]}`}
+              style={{
+                flex: `${counts[s]} 1 0`,
+                background: `var(--color-state-${s}, var(--color-muted))`,
+              }}
+            />
+          ) : null,
+        )}
+      </div>
+      <ul
+        style={{
+          listStyle: 'none',
+          margin: 0,
+          padding: 0,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(8rem, 1fr))',
+          gap: '0.5rem',
+        }}
+      >
+        {STATE_ORDER.map((s) => (
+          <li
+            key={s}
+            style={{
+              padding: '0.5rem 0.75rem',
+              borderRadius: '0.5rem',
+              background: 'var(--color-surface, rgba(127,127,127,0.05))',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.125rem',
+            }}
+          >
+            <span style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}>
+              {t(`tasks.status.${s}`)}
+            </span>
+            <span
+              style={{ fontSize: '1.25rem', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}
+            >
+              {counts[s]}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <Link
+        to="/projects/$projectId/tasks"
+        params={{ projectId: id }}
+        style={{
+          alignSelf: 'flex-start',
+          fontSize: '0.875rem',
+          color: 'var(--color-accent, #9b59b6)',
+          textDecoration: 'none',
+        }}
+      >
+        {t('projects.detail.view_all_tasks')} →
+      </Link>
     </Card>
   );
 }
