@@ -247,6 +247,96 @@ func (q *Queries) ListMyTasks(ctx context.Context, arg ListMyTasksParams) ([]Lis
 	return items, nil
 }
 
+const listMyTasksGlobal = `-- name: ListMyTasksGlobal :many
+SELECT
+  v.public_id,
+  w.public_id AS workspace_public_id,
+  w.name AS workspace_name,
+  v.project_public_id,
+  v.project_name,
+  v.title,
+  v.derived_state,
+  v.priority,
+  v.due_on,
+  v.actor_role,
+  v.updated_at,
+  v.created_at,
+  COUNT(*) OVER() AS total
+FROM v_my_tasks v
+INNER JOIN workspaces w
+  ON w.id = v.workspace_id AND w.enabled = TRUE
+WHERE v.user_public_id = ?
+ORDER BY v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
+LIMIT ? OFFSET ?
+`
+
+type ListMyTasksGlobalParams struct {
+	UserPublicID types.PublicID `json:"userPublicId"`
+	Limit        int32          `json:"limit"`
+	Offset       int32          `json:"offset"`
+}
+
+type ListMyTasksGlobalRow struct {
+	PublicID          types.PublicID    `json:"publicId"`
+	WorkspacePublicID types.PublicID    `json:"workspacePublicId"`
+	WorkspaceName     string            `json:"workspaceName"`
+	ProjectPublicID   []byte            `json:"projectPublicId"`
+	ProjectName       string            `json:"projectName"`
+	Title             string            `json:"title"`
+	DerivedState      TasksDerivedState `json:"derivedState"`
+	Priority          int32             `json:"priority"`
+	DueOn             sql.NullTime      `json:"dueOn"`
+	ActorRole         TaskActorsRole    `json:"actorRole"`
+	UpdatedAt         sql.NullTime      `json:"updatedAt"`
+	CreatedAt         time.Time         `json:"createdAt"`
+	Total             interface{}       `json:"total"`
+}
+
+// Cross-workspace variant of ListMyTasks: returns every task where the
+// user is attached as an actor across every workspace they belong to,
+// joined with the workspace row so the caller gets workspace context
+// per row without a second round-trip. Powers GET /me/tasks.
+func (q *Queries) ListMyTasksGlobal(ctx context.Context, arg ListMyTasksGlobalParams) ([]ListMyTasksGlobalRow, error) {
+	rows, err := q.db.QueryContext(ctx, listMyTasksGlobal,
+		arg.UserPublicID,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMyTasksGlobalRow{}
+	for rows.Next() {
+		var i ListMyTasksGlobalRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.WorkspacePublicID,
+			&i.WorkspaceName,
+			&i.ProjectPublicID,
+			&i.ProjectName,
+			&i.Title,
+			&i.DerivedState,
+			&i.Priority,
+			&i.DueOn,
+			&i.ActorRole,
+			&i.UpdatedAt,
+			&i.CreatedAt,
+			&i.Total,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTasksForProject = `-- name: ListTasksForProject :many
 SELECT
   v.public_id,

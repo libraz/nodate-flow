@@ -228,6 +228,42 @@ type ListTasksOutput struct {
 	Body ListTasksBody
 }
 
+// MyTaskListItem is the public DTO for a single row in the
+// cross-workspace /me/tasks response. It carries workspace context
+// on each row so the caller can group/filter client-side without a
+// second round-trip per workspace.
+type MyTaskListItem struct {
+	ID            string     `json:"id"`
+	WorkspaceID   string     `json:"workspaceId"`
+	WorkspaceName string     `json:"workspaceName"`
+	ProjectID     string     `json:"projectId"`
+	ProjectName   string     `json:"projectName,omitempty"`
+	Title         string     `json:"title"`
+	DerivedState  string     `json:"derivedState"`
+	Priority      int32      `json:"priority"`
+	DueOn         string     `json:"dueOn,omitempty"`
+	ActorRole     string     `json:"actorRole"`
+	UpdatedAt     *time.Time `json:"updatedAt,omitempty"`
+	CreatedAt     time.Time  `json:"createdAt"`
+}
+
+// ListMyTasksInput is the query for GET /me/tasks.
+type ListMyTasksInput struct {
+	Limit  int32 `query:"limit" minimum:"1" maximum:"500" default:"200"`
+	Offset int32 `query:"offset" minimum:"0" default:"0"`
+}
+
+// ListMyTasksBody is the response payload for GET /me/tasks.
+type ListMyTasksBody struct {
+	Total int64            `json:"total"`
+	Tasks []MyTaskListItem `json:"tasks"`
+}
+
+// ListMyTasksOutput is the response for GET /me/tasks.
+type ListMyTasksOutput struct {
+	Body ListMyTasksBody
+}
+
 // GetTaskInput is the path for GET /tasks/{id}.
 type GetTaskInput struct {
 	ID string `path:"id"`
@@ -361,6 +397,34 @@ type RemoveTaskDependencyBody struct {
 // RemoveTaskDependencyOutput is the response for DELETE /tasks/{id}/dependencies/{depId}.
 type RemoveTaskDependencyOutput struct {
 	Body RemoveTaskDependencyBody
+}
+
+// TaskDependencyEdge is a directional edge entry returned by
+// GET /tasks/{id}/dependencies. The "other" task is the one at the
+// non-current end of the edge (target for outgoing, source for incoming).
+type TaskDependencyEdge struct {
+	ID                    string    `json:"id"`
+	Kind                  string    `json:"kind"`
+	OtherTaskID           string    `json:"otherTaskId"`
+	OtherTaskTitle        string    `json:"otherTaskTitle"`
+	OtherTaskDerivedState string    `json:"otherTaskDerivedState"`
+	CreatedAt             time.Time `json:"createdAt"`
+}
+
+// ListTaskDependenciesInput is the path for GET /tasks/{id}/dependencies.
+type ListTaskDependenciesInput struct {
+	ID string `path:"id"`
+}
+
+// ListTaskDependenciesBody is the response payload for GET /tasks/{id}/dependencies.
+type ListTaskDependenciesBody struct {
+	Outgoing []TaskDependencyEdge `json:"outgoing"`
+	Incoming []TaskDependencyEdge `json:"incoming"`
+}
+
+// ListTaskDependenciesOutput is the response for GET /tasks/{id}/dependencies.
+type ListTaskDependenciesOutput struct {
+	Body ListTaskDependenciesBody
 }
 
 // ---- Actors I/O ------------------------------------------------------------

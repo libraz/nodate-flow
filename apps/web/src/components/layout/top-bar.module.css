@@ -13,16 +13,40 @@
 .left {
   display: flex;
   align-items: center;
-  gap: var(--nf-space-2);
+  gap: var(--nf-space-3);
+  min-inline-size: 0;
+}
+
+.brand {
   font-family: var(--nf-font-mono);
   font-size: var(--nf-text-xs);
   color: var(--nf-color-fg-muted);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  min-inline-size: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.workspaceSelect {
+  min-inline-size: 0;
+  max-inline-size: 14rem;
+  padding-block: var(--nf-space-1);
+  padding-inline: var(--nf-space-2);
+  font: inherit;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg);
+  background: var(--nf-color-surface, transparent);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-sm);
+  cursor: pointer;
+}
+
+.workspaceSelect:hover {
+  background: var(--nf-color-surface-hover);
+}
+
+.workspaceSelect:focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: var(--nf-focus-ring-offset);
 }
 
 .center {

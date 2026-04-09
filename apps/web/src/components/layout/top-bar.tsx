@@ -1,14 +1,15 @@
 import Icon from '@nodate-flow/ui/icon';
 import { cx } from '@nodate-flow/ui/lib/cx';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useRouterState } from '@tanstack/react-router';
 
 import { LogOut, Moon, Search, Sun } from 'lucide-react';
-import { type ReactElement, useState } from 'react';
+import { type ReactElement, Suspense, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import CommandPalette from './command-palette';
 
 import AiCostMeter from '../../features/ai-providers/cost-meter';
 import { authStore } from '../../features/auth/auth-store';
+import { useWorkspacesQuery } from '../../features/workspaces/api';
 import { type SupportedLanguage, setLanguage } from '../../i18n';
 import { apiBaseUrl } from '../../lib/sdk';
 import { type ConcreteTheme, concreteThemes, useTheme } from '../../providers/theme-provider';
@@ -18,6 +19,45 @@ function nextTheme(current: ConcreteTheme): ConcreteTheme {
   const idx = concreteThemes.indexOf(current);
   const next = concreteThemes[(idx + 1) % concreteThemes.length];
   return next ?? 'aurora-light';
+}
+
+/**
+ * WorkspaceSwitcher — native `<select>` dropdown in the topbar left
+ * slot. Navigates to the chosen workspace. Highlights the current
+ * workspace when the URL is under `/workspaces/{id}`. Suspends on
+ * first fetch; wrapped in a Suspense with a tiny label fallback so
+ * the rest of the topbar renders immediately.
+ */
+function WorkspaceSwitcher(): ReactElement {
+  const { t } = useTranslation('common');
+  const { data: workspaces } = useWorkspacesQuery();
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const currentId = useMemo<string>(() => {
+    const m = /^\/workspaces\/([^/]+)(?:\/|$)/.exec(pathname);
+    return m ? (m[1] ?? '') : '';
+  }, [pathname]);
+
+  return (
+    <select
+      aria-label={t('topbar.workspace.switcher')}
+      className={styles.workspaceSelect}
+      value={currentId}
+      onChange={(e) => {
+        const id = e.target.value;
+        if (id) {
+          void navigate({ to: '/workspaces/$id', params: { id } });
+        }
+      }}
+    >
+      <option value="">{t('topbar.workspace.none')}</option>
+      {workspaces.map((w) => (
+        <option key={w.id} value={w.id}>
+          {w.name}
+        </option>
+      ))}
+    </select>
+  );
 }
 
 export default function TopBar(): ReactElement {
@@ -54,7 +94,12 @@ export default function TopBar(): ReactElement {
   return (
     <>
       <header className={styles.topBar}>
-        <div className={styles.left}>nodate-flow</div>
+        <div className={styles.left}>
+          <span className={styles.brand}>nodate-flow</span>
+          <Suspense fallback={null}>
+            <WorkspaceSwitcher />
+          </Suspense>
+        </div>
         <div className={styles.center}>
           <div className={styles.search}>
             <button

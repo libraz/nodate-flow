@@ -218,6 +218,8 @@ type Querier interface {
 	ListConstraintsForTask(ctx context.Context, arg ListConstraintsForTaskParams) ([]ListConstraintsForTaskRow, error)
 	// List outgoing dependencies of a task. Returns the target task public_id.
 	ListDependenciesForTask(ctx context.Context, arg ListDependenciesForTaskParams) ([]ListDependenciesForTaskRow, error)
+	// List incoming dependencies of a task (edges pointing AT this task).
+	ListIncomingDependenciesForTask(ctx context.Context, arg ListIncomingDependenciesForTaskParams) ([]ListIncomingDependenciesForTaskRow, error)
 	// Outgoing dependencies of a task with the referenced task's
 	// public_id + current derived_state. The engine builds a
 	// map[public_id]state from this rowset.
@@ -240,6 +242,11 @@ type Querier interface {
 	ListModelsForProvider(ctx context.Context, arg ListModelsForProviderParams) ([]ListModelsForProviderRow, error)
 	// Tasks where the given user is attached as an actor, via v_my_tasks.
 	ListMyTasks(ctx context.Context, arg ListMyTasksParams) ([]ListMyTasksRow, error)
+	// Cross-workspace variant of ListMyTasks: returns every task where the
+	// user is attached as an actor across every workspace they belong to,
+	// joined with the workspace row so the caller gets workspace context
+	// per row without a second round-trip. Powers GET /me/tasks.
+	ListMyTasksGlobal(ctx context.Context, arg ListMyTasksGlobalParams) ([]ListMyTasksGlobalRow, error)
 	// List every enabled non-paused agent whose event_trigger_types
 	// contains the given event kind. Driven by the eventbus notify hook
 	// so the fan-out from a single eventbus.Append to N agents is one

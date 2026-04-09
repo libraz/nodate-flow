@@ -13,13 +13,19 @@
     "primary": "メインナビゲーション",
     "inbox": "受信トレイ",
     "today": "今日",
+    "calendar": "カレンダー",
     "projects": "プロジェクト",
     "workspaces": "ワークスペース",
+    "workspaceProjects": "このワークスペースのプロジェクト",
     "settings": "設定",
     "collapse": "サイドバーを折りたたむ",
     "expand": "サイドバーを展開する"
   },
   "topbar": {
+    "workspace": {
+      "switcher": "ワークスペースを切り替え",
+      "none": "ワークスペースを選択"
+    },
     "search": {
       "placeholder": "タスク・プロジェクト・メンバーを検索…"
     },
@@ -68,7 +74,47 @@
   },
   "today": {
     "title": "今日",
-    "empty": "今日のタスクはありません。"
+    "subtitle": "あなたが担当しているタスクを期日で横断表示します。",
+    "empty": "担当タスクはありません。",
+    "loading": "担当タスクを読み込み中…",
+    "error": "担当タスクを読み込めませんでした。",
+    "sections": {
+      "overdue": "期限超過",
+      "today": "今日",
+      "tomorrow": "明日",
+      "thisWeek": "今週",
+      "later": "今後",
+      "noDue": "期日なし"
+    },
+    "in_workspace": "{workspace}",
+    "no_due_label": "期日なし"
+  },
+  "gantt": {
+    "title": "ガントチャート",
+    "prev": "前へ",
+    "next": "次へ",
+    "today": "今日",
+    "empty": "このプロジェクトには予定のあるタスクがまだありません。",
+    "unscheduled": "{count, plural, other {未スケジュール # 件}}"
+  },
+  "calendar": {
+    "title": "カレンダー",
+    "subtitle": "全ワークスペースの期日付きタスクを月単位で表示します。",
+    "prev": "前の月",
+    "next": "次の月",
+    "today": "今日",
+    "empty": "今月に予定されているタスクはありません。",
+    "noDue": "期日なし",
+    "more": "+{count} 件",
+    "weekday": {
+      "mon": "月",
+      "tue": "火",
+      "wed": "水",
+      "thu": "木",
+      "fri": "金",
+      "sat": "土",
+      "sun": "日"
+    }
   },
   "not_found": {
     "title": "ページが見つかりません",
@@ -150,6 +196,7 @@
       "label": "プロジェクトセクション",
       "overview": "概要",
       "tasks": "タスク",
+      "gantt": "ガント",
       "timeline": "タイムライン"
     },
     "empty": "プロジェクトがまだありません。最初のプロジェクトを作成しましょう。",
@@ -307,6 +354,28 @@
         "empty": "関連するタスクは見つかりませんでした。",
         "duplicate": "重複の可能性",
         "related": "関連"
+      },
+      "dependencies": {
+        "title": "依存関係",
+        "blocks": "ブロックしている",
+        "blockedBy": "ブロックされている",
+        "relates": "関連",
+        "empty": "依存関係はまだありません。",
+        "add": "依存を追加",
+        "addCancel": "キャンセル",
+        "remove": "削除",
+        "removeNamed": "{title} への依存を削除",
+        "kindLabel": "種別",
+        "kind": {
+          "blocks": "ブロックしている",
+          "blockedBy": "ブロックされている",
+          "relates": "関連"
+        },
+        "search": "タスクを検索…",
+        "searchEmpty": "一致するタスクはありません。",
+        "searchHint": "このワークスペース内のタスク名で検索します。",
+        "addError": "依存の追加に失敗しました。",
+        "removeError": "依存の削除に失敗しました。"
       },
       "infer_state": {
         "title": "次の推奨アクション",

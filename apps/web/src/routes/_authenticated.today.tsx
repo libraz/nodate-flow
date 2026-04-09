@@ -1,15 +1,104 @@
 /**
- * /today — minimal "Today" view. Placeholder until the real today-feed
- * feature ships; renders a heading and an empty state so the sidebar
- * Today entry has a real destination.
+ * /today — "Today" view. Cross-workspace list of tasks where the
+ * authenticated user is attached as an actor, grouped by due date
+ * (overdue / today / tomorrow / this week / later / no due).
+ *
+ * Backed by the single `GET /me/tasks` aggregate endpoint so the web
+ * client no longer fans out one request per workspace. Each row
+ * already carries workspace id + name for grouping/display.
  */
 
-import { createFileRoute } from '@tanstack/react-router';
-import type { ReactElement } from 'react';
+import type { components } from '@nodate-flow/sdk';
+import { useSuspenseQuery } from '@tanstack/react-query';
+import { Link, createFileRoute } from '@tanstack/react-router';
+import { type ReactElement, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { sdk } from '../lib/sdk';
+
+type AssignedTask = components['schemas']['MyTaskListItem'];
+
+type SectionKey = 'overdue' | 'today' | 'tomorrow' | 'thisWeek' | 'later' | 'noDue';
+
+const SECTION_ORDER: readonly SectionKey[] = [
+  'overdue',
+  'today',
+  'tomorrow',
+  'thisWeek',
+  'later',
+  'noDue',
+];
+
+/** Local-time YYYY-MM-DD for the start of `d`. */
+function dateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function classifyDue(dueOn: string | undefined, todayKey: string): SectionKey {
+  if (!dueOn) return 'noDue';
+  if (dueOn < todayKey) return 'overdue';
+  if (dueOn === todayKey) return 'today';
+  // tomorrow = todayKey + 1 day
+  const t = new Date(`${todayKey}T00:00:00`);
+  const tomorrow = new Date(t);
+  tomorrow.setDate(t.getDate() + 1);
+  if (dueOn === dateKey(tomorrow)) return 'tomorrow';
+  const weekEnd = new Date(t);
+  weekEnd.setDate(t.getDate() + 7);
+  if (dueOn <= dateKey(weekEnd)) return 'thisWeek';
+  return 'later';
+}
 
 function TodayRoute(): ReactElement {
   const { t } = useTranslation('common');
+
+  const { data: tasks } = useSuspenseQuery({
+    queryKey: ['me', 'tasks'] as const,
+    staleTime: 30_000,
+    queryFn: async (): Promise<AssignedTask[]> => {
+      const { data, error } = await sdk.GET('/me/tasks', {
+        params: { query: { limit: 200, offset: 0 } },
+      });
+      if (error || !data) return [];
+      return data.tasks ?? [];
+    },
+  });
+
+  const sections = useMemo<Record<SectionKey, AssignedTask[]>>(() => {
+    const empty: Record<SectionKey, AssignedTask[]> = {
+      overdue: [],
+      today: [],
+      tomorrow: [],
+      thisWeek: [],
+      later: [],
+      noDue: [],
+    };
+    const todayKey = dateKey(new Date());
+    for (const task of tasks) {
+      // Hide closed states from the daily focus view.
+      if (task.derivedState === 'done' || task.derivedState === 'cancelled') continue;
+      empty[classifyDue(task.dueOn, todayKey)].push(task);
+    }
+    // Sort each section: overdue ascending (oldest first), no_due by
+    // priority desc, others ascending by due date then priority desc.
+    const byDueAsc = (a: AssignedTask, b: AssignedTask): number => {
+      const ad = a.dueOn ?? '';
+      const bd = b.dueOn ?? '';
+      if (ad !== bd) return ad < bd ? -1 : 1;
+      return b.priority - a.priority;
+    };
+    const byPriorityDesc = (a: AssignedTask, b: AssignedTask): number => b.priority - a.priority;
+    for (const key of SECTION_ORDER) {
+      empty[key].sort(key === 'noDue' ? byPriorityDesc : byDueAsc);
+    }
+    return empty;
+  }, [tasks]);
+
+  const totalCount = SECTION_ORDER.reduce((sum, k) => sum + sections[k].length, 0);
+
   return (
     <section
       style={{
@@ -22,16 +111,114 @@ function TodayRoute(): ReactElement {
         inlineSize: '100%',
       }}
     >
-      <h1
-        style={{
-          margin: 0,
-          fontFamily: 'var(--font-display)',
-          fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
-        }}
-      >
-        {t('today.title')}
-      </h1>
-      <p style={{ margin: 0, color: 'var(--color-muted)' }}>{t('today.empty')}</p>
+      <header style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <h1
+          style={{
+            margin: 0,
+            fontFamily: 'var(--font-display)',
+            fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
+          }}
+        >
+          {t('today.title')}
+        </h1>
+        <p style={{ margin: 0, color: 'var(--color-muted)' }}>{t('today.subtitle')}</p>
+      </header>
+
+      {totalCount === 0 ? (
+        <p style={{ margin: 0, color: 'var(--color-muted)' }}>{t('today.empty')}</p>
+      ) : null}
+
+      {SECTION_ORDER.map((key) => {
+        const items = sections[key];
+        if (items.length === 0) return null;
+        const isOverdue = key === 'overdue';
+        return (
+          <section
+            key={key}
+            aria-label={t(`today.sections.${key}`)}
+            style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
+          >
+            <h2
+              style={{
+                margin: 0,
+                fontSize: '0.85rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                color: isOverdue ? 'var(--nf-color-danger, #c0392b)' : 'var(--color-muted)',
+              }}
+            >
+              {t(`today.sections.${key}`)} ({items.length})
+            </h2>
+            <ul
+              style={{
+                listStyle: 'none',
+                margin: 0,
+                padding: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.25rem',
+              }}
+            >
+              {items.map((task) => (
+                <li
+                  key={task.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    padding: '0.6rem 0.75rem',
+                    borderRadius: '0.5rem',
+                    background: isOverdue
+                      ? 'var(--nf-color-danger-subtle, rgba(192,57,43,0.08))'
+                      : 'var(--color-surface, rgba(127,127,127,0.05))',
+                    borderInlineStart: isOverdue
+                      ? '3px solid var(--nf-color-danger, #c0392b)'
+                      : '3px solid transparent',
+                  }}
+                >
+                  <Link
+                    to="/tasks/$taskId"
+                    params={{ taskId: task.id }}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      color: 'inherit',
+                      textDecoration: 'none',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {task.title}
+                  </Link>
+                  <span
+                    style={{
+                      fontSize: '0.75rem',
+                      color: 'var(--color-muted)',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {task.projectName
+                      ? `${task.workspaceName} · ${task.projectName}`
+                      : task.workspaceName}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '0.75rem',
+                      color: 'var(--color-muted)',
+                      whiteSpace: 'nowrap',
+                      minWidth: '5.5rem',
+                      textAlign: 'right',
+                    }}
+                  >
+                    {task.dueOn ?? t('today.no_due_label')}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        );
+      })}
     </section>
   );
 }

@@ -1,0 +1,113 @@
+.md {
+  color: inherit;
+  font: inherit;
+  line-height: 1.55;
+  word-wrap: break-word;
+}
+
+.md > :first-child {
+  margin-block-start: 0;
+}
+.md > :last-child {
+  margin-block-end: 0;
+}
+
+.md p {
+  margin-block: 0.5em;
+}
+
+.md h1,
+.md h2,
+.md h3,
+.md h4 {
+  margin-block: 1em 0.4em;
+  font-weight: var(--nf-weight-semibold, 600);
+  line-height: 1.3;
+}
+.md h1 {
+  font-size: 1.35em;
+}
+.md h2 {
+  font-size: 1.2em;
+}
+.md h3 {
+  font-size: 1.08em;
+}
+.md h4 {
+  font-size: 1em;
+}
+
+.md ul,
+.md ol {
+  margin-block: 0.5em;
+  padding-inline-start: 1.5em;
+}
+.md li {
+  margin-block: 0.15em;
+}
+.md li > input[type="checkbox"] {
+  margin-inline-end: 0.4em;
+}
+
+.md a {
+  color: var(--nf-color-link, var(--nf-color-accent, #4f6cff));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.md a:hover {
+  text-decoration-thickness: 2px;
+}
+
+.md code {
+  font-family: var(--nf-font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 0.9em;
+  padding: 0.1em 0.35em;
+  border-radius: 0.25em;
+  background: var(--nf-color-surface-hover, rgba(127, 127, 127, 0.12));
+}
+.md pre {
+  margin-block: 0.75em;
+  padding: 0.75em 0.9em;
+  border-radius: 0.5em;
+  background: var(--nf-color-surface-hover, rgba(127, 127, 127, 0.12));
+  overflow-x: auto;
+}
+.md pre code {
+  padding: 0;
+  background: transparent;
+  font-size: 0.875em;
+}
+
+.md blockquote {
+  margin-block: 0.75em;
+  padding-inline-start: 0.9em;
+  border-inline-start: 3px solid var(--nf-color-border, rgba(127, 127, 127, 0.3));
+  color: var(--nf-color-fg-muted, #666);
+}
+
+.md hr {
+  border: 0;
+  border-block-start: 1px solid var(--nf-color-border, rgba(127, 127, 127, 0.3));
+  margin-block: 1em;
+}
+
+.md table {
+  border-collapse: collapse;
+  margin-block: 0.75em;
+  font-size: 0.95em;
+}
+.md th,
+.md td {
+  border: 1px solid var(--nf-color-border, rgba(127, 127, 127, 0.3));
+  padding: 0.35em 0.6em;
+  text-align: start;
+}
+.md th {
+  background: var(--nf-color-surface-hover, rgba(127, 127, 127, 0.08));
+  font-weight: var(--nf-weight-semibold, 600);
+}
+
+.md img {
+  max-inline-size: 100%;
+  height: auto;
+}

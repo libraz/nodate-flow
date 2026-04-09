@@ -23,6 +23,7 @@ import { createLazyFileRoute, getRouteApi } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import Markdown from '../components/markdown/markdown';
 import StateGraph from '../features/constraints/state-graph';
 import {
   TRANSITIONS_BY_STATE,
@@ -41,6 +42,7 @@ import {
   useTransitionTask,
   useUpdateTask,
 } from '../features/tasks/api';
+import DependenciesSection from '../features/tasks/dependencies-section';
 import { useTaskTimelineQuery } from '../features/timeline/api';
 import TaskMiniTimeline from '../features/timeline/task-mini-timeline';
 import { useWorkspaceMembersQuery } from '../features/workspaces/api';
@@ -194,29 +196,31 @@ function DescriptionEditor({
   const update = useUpdateTask();
 
   if (!editing) {
+    const enterEdit = (): void => {
+      setValue(initial);
+      setEditing(true);
+    };
     return (
-      <button
-        type="button"
-        onClick={() => {
-          setValue(initial);
-          setEditing(true);
-        }}
-        aria-label={t('tasks.detail.description_edit')}
-        style={{
-          background: 'none',
-          border: 'none',
-          padding: 0,
-          cursor: 'pointer',
-          color: initial.length > 0 ? 'var(--color-fg)' : 'var(--color-muted)',
-          font: 'inherit',
-          textAlign: 'start',
-          whiteSpace: 'pre-wrap',
-          minBlockSize: '3rem',
-          inlineSize: '100%',
-        }}
-      >
-        {initial.length > 0 ? initial : t('tasks.detail.description_empty')}
-      </button>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div
+          style={{
+            color: initial.length > 0 ? 'var(--color-fg)' : 'var(--color-muted)',
+            minBlockSize: '3rem',
+            inlineSize: '100%',
+          }}
+        >
+          {initial.length > 0 ? (
+            <Markdown>{initial}</Markdown>
+          ) : (
+            t('tasks.detail.description_empty')
+          )}
+        </div>
+        <div>
+          <Button type="button" variant="ghost" onClick={enterEdit}>
+            {t('tasks.detail.description_edit')}
+          </Button>
+        </div>
+      </div>
     );
   }
 
@@ -320,7 +324,7 @@ function CommentsFeed({ taskId }: { taskId: string }): ReactElement {
                     {formatDate(c.createdAt, locale)}
                   </span>
                 </header>
-                <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{c.body}</p>
+                <Markdown>{c.body}</Markdown>
               </Card>
             </li>
           ))}
@@ -856,6 +860,10 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
         <Card style={{ padding: '1rem' }}>
           <DescriptionEditor id={id} initial={task.description ?? ''} />
         </Card>
+        <Separator />
+        <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
+          <DependenciesSection taskId={id} workspaceId={task.workspaceId} />
+        </Suspense>
         <Separator />
         <Suspense fallback={<Skeleton style={{ blockSize: '8rem', inlineSize: '100%' }} />}>
           <CommentsFeed taskId={id} />

@@ -8,8 +8,10 @@
 import type { components } from '@nodate-flow/sdk';
 import {
   type UseMutationResult,
+  type UseQueryResult,
   type UseSuspenseQueryResult,
   useMutation,
+  useQuery,
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
@@ -60,7 +62,15 @@ export const tasksKeys = {
   duplicates: (id: string) => [...tasksKeys.all, 'detail', id, 'duplicates'] as const,
   inferState: (id: string) => [...tasksKeys.all, 'detail', id, 'infer-state'] as const,
   aiInvocations: (id: string) => [...tasksKeys.all, 'detail', id, 'ai-invocations'] as const,
+  dependencies: (id: string) => [...tasksKeys.all, 'detail', id, 'dependencies'] as const,
 };
+
+export type TaskDependencyEdge = components['schemas']['TaskDependencyEdge'];
+export type TaskDependencyKind = 'blocks' | 'relates' | 'duplicates' | 'subtask_of';
+export interface TaskDependenciesResult {
+  outgoing: TaskDependencyEdge[];
+  incoming: TaskDependencyEdge[];
+}
 
 export type TaskAiInvocation = components['schemas']['TaskAiInvocation'];
 
@@ -468,6 +478,98 @@ export function useTransitionTask(): UseMutationResult<Task, TaskApiError, Trans
       } else {
         void qc.invalidateQueries({ queryKey: [...tasksKeys.all, 'list'] });
       }
+    },
+  });
+}
+
+export function useTaskDependenciesQuery(
+  taskId: string,
+): UseSuspenseQueryResult<TaskDependenciesResult> {
+  return useSuspenseQuery({
+    queryKey: tasksKeys.dependencies(taskId),
+    queryFn: async (): Promise<TaskDependenciesResult> => {
+      const { data, error } = await sdk.GET('/tasks/{id}/dependencies', {
+        params: { path: { id: taskId } },
+      });
+      if (error || !data) throw toError(error, 'Failed to load task dependencies');
+      return {
+        outgoing: data.outgoing ?? [],
+        incoming: data.incoming ?? [],
+      };
+    },
+  });
+}
+
+export interface AddDependencyArgs {
+  taskId: string;
+  toTaskId: string;
+  kind: TaskDependencyKind;
+}
+
+export function useAddTaskDependency(): UseMutationResult<void, TaskApiError, AddDependencyArgs> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskId, toTaskId, kind }: AddDependencyArgs): Promise<void> => {
+      const { error } = await sdk.POST('/tasks/{id}/dependencies', {
+        params: { path: { id: taskId } },
+        body: { toTaskId, kind },
+      });
+      if (error) throw toError(error, 'Failed to add task dependency');
+    },
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: tasksKeys.dependencies(vars.taskId) });
+      void qc.invalidateQueries({ queryKey: tasksKeys.detail(vars.taskId) });
+      void qc.invalidateQueries({ queryKey: [...timelineKeys.all, 'task', vars.taskId] });
+    },
+  });
+}
+
+export interface RemoveDependencyArgs {
+  taskId: string;
+  depId: string;
+}
+
+export function useRemoveTaskDependency(): UseMutationResult<
+  void,
+  TaskApiError,
+  RemoveDependencyArgs
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskId, depId }: RemoveDependencyArgs): Promise<void> => {
+      const { error } = await sdk.DELETE('/tasks/{id}/dependencies/{depId}', {
+        params: { path: { id: taskId, depId } },
+      });
+      if (error) throw toError(error, 'Failed to remove task dependency');
+    },
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: tasksKeys.dependencies(vars.taskId) });
+      void qc.invalidateQueries({ queryKey: tasksKeys.detail(vars.taskId) });
+      void qc.invalidateQueries({ queryKey: [...timelineKeys.all, 'task', vars.taskId] });
+    },
+  });
+}
+
+/**
+ * Search tasks within a workspace by title substring. Used by the
+ * dependency picker to find a target task. Returns a small page; the
+ * caller is expected to debounce input.
+ */
+export function useTaskSearch(
+  workspaceId: string,
+  query: string,
+  enabled: boolean,
+): UseQueryResult<TaskListItem[]> {
+  return useQuery({
+    queryKey: [...tasksKeys.all, 'search', workspaceId, query],
+    enabled: enabled && workspaceId.length > 0 && query.trim().length > 0,
+    staleTime: 10_000,
+    queryFn: async (): Promise<TaskListItem[]> => {
+      const { data, error } = await sdk.GET('/tasks', {
+        params: { query: { workspaceId, q: query.trim(), limit: 20, offset: 0 } },
+      });
+      if (error || !data) return [];
+      return data.tasks ?? [];
     },
   });
 }

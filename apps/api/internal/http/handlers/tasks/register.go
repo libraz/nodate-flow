@@ -25,6 +25,13 @@ func RegisterCollection(api huma.API, deps Deps) {
 		Path:        "/tasks",
 		Summary:     "List tasks for a project or workspace",
 	}, List(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "me-tasks-list",
+		Method:      http.MethodGet,
+		Path:        "/me/tasks",
+		Summary:     "List tasks assigned to the authenticated user across every workspace",
+	}, ListMyTasks(deps))
 }
 
 // RegisterTaskScoped wires the per-task routes that operate on a single
@@ -107,6 +114,13 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Path:        "/tasks/{id}/constraints/{cid}",
 		Summary:     "Remove a constraint from a task",
 	}, RemoveConstraint(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-dependencies-list",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/dependencies",
+		Summary:     "List incoming and outgoing dependency edges for a task",
+	}, ListDependencies(deps))
 
 	huma.Register(api, huma.Operation{
 		OperationID: "tasks-dependencies-add",

@@ -13,13 +13,19 @@
     "primary": "Primary navigation",
     "inbox": "Inbox",
     "today": "Today",
+    "calendar": "Calendar",
     "projects": "Projects",
     "workspaces": "Workspaces",
+    "workspaceProjects": "Projects in this workspace",
     "settings": "Settings",
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar"
   },
   "topbar": {
+    "workspace": {
+      "switcher": "Switch workspace",
+      "none": "Select a workspace"
+    },
     "search": {
       "placeholder": "Search tasks, projects, people..."
     },
@@ -68,7 +74,47 @@
   },
   "today": {
     "title": "Today",
-    "empty": "No tasks for today."
+    "subtitle": "Tasks assigned to you across all workspaces, grouped by due date.",
+    "empty": "Nothing assigned to you.",
+    "loading": "Loading your tasks…",
+    "error": "Failed to load your tasks.",
+    "sections": {
+      "overdue": "Overdue",
+      "today": "Today",
+      "tomorrow": "Tomorrow",
+      "thisWeek": "This week",
+      "later": "Later",
+      "noDue": "No due date"
+    },
+    "in_workspace": "{workspace}",
+    "no_due_label": "No due date"
+  },
+  "gantt": {
+    "title": "Gantt",
+    "prev": "Earlier",
+    "next": "Later",
+    "today": "Today",
+    "empty": "No scheduled tasks in this project yet.",
+    "unscheduled": "{count, plural, one {# unscheduled task} other {# unscheduled tasks}}"
+  },
+  "calendar": {
+    "title": "Calendar",
+    "subtitle": "Tasks with a due date across every workspace, on a monthly grid.",
+    "prev": "Previous month",
+    "next": "Next month",
+    "today": "Today",
+    "empty": "No scheduled tasks this month.",
+    "noDue": "No due date",
+    "more": "+{count} more",
+    "weekday": {
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri",
+      "sat": "Sat",
+      "sun": "Sun"
+    }
   },
   "not_found": {
     "title": "Page not found",
@@ -150,6 +196,7 @@
       "label": "Project sections",
       "overview": "Overview",
       "tasks": "Tasks",
+      "gantt": "Gantt",
       "timeline": "Timeline"
     },
     "empty": "No projects yet. Create your first one to get started.",
@@ -307,6 +354,28 @@
         "empty": "No related tasks found.",
         "duplicate": "Likely duplicate",
         "related": "Related"
+      },
+      "dependencies": {
+        "title": "Dependencies",
+        "blocks": "Blocks",
+        "blockedBy": "Blocked by",
+        "relates": "Relates to",
+        "empty": "No dependencies yet.",
+        "add": "Add dependency",
+        "addCancel": "Cancel",
+        "remove": "Remove",
+        "removeNamed": "Remove dependency on {title}",
+        "kindLabel": "Type",
+        "kind": {
+          "blocks": "Blocks",
+          "blockedBy": "Blocked by",
+          "relates": "Relates to"
+        },
+        "search": "Search tasks…",
+        "searchEmpty": "No matches.",
+        "searchHint": "Type to search tasks in this workspace.",
+        "addError": "Failed to add dependency.",
+        "removeError": "Failed to remove dependency."
       },
       "infer_state": {
         "title": "Suggested next step",

@@ -140,3 +140,30 @@ WHERE v.workspace_id = ?
   AND v.user_public_id = ?
 ORDER BY v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
+
+-- name: ListMyTasksGlobal :many
+-- Cross-workspace variant: tasks where the given user is attached as an
+-- actor across every workspace they belong to, joined with the workspace
+-- row so the caller gets workspace_public_id / name for grouping. Used by
+-- GET /me/tasks to power the cross-workspace "Today" / Calendar views in
+-- the web client without fanning out one request per workspace.
+SELECT
+  v.public_id,
+  w.public_id AS workspace_public_id,
+  w.name AS workspace_name,
+  v.project_public_id,
+  v.project_name,
+  v.title,
+  v.derived_state,
+  v.priority,
+  v.due_on,
+  v.actor_role,
+  v.updated_at,
+  v.created_at,
+  COUNT(*) OVER() AS total
+FROM v_my_tasks v
+INNER JOIN workspaces w
+  ON w.id = v.workspace_id AND w.enabled = TRUE
+WHERE v.user_public_id = ?
+ORDER BY v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
+LIMIT ? OFFSET ?;

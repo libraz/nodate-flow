@@ -29,6 +29,27 @@ WHERE td.workspace_id = ?
 ORDER BY td.created_at ASC, td.public_id ASC
 LIMIT ? OFFSET ?;
 
+-- name: ListIncomingDependenciesForTask :many
+-- List incoming dependencies of a task (edges that point AT this task).
+SELECT
+  td.public_id,
+  td.kind,
+  ft.public_id AS from_task_public_id,
+  ft.title    AS from_task_title,
+  ft.derived_state AS from_task_derived_state,
+  tt.public_id AS to_task_public_id,
+  td.updated_at,
+  td.created_at,
+  COUNT(*) OVER() AS total
+FROM task_dependencies td
+INNER JOIN tasks ft ON ft.id = td.from_task_id AND ft.enabled = TRUE
+INNER JOIN tasks tt ON tt.id = td.to_task_id   AND tt.enabled = TRUE
+WHERE td.workspace_id = ?
+  AND tt.public_id = ?
+  AND td.enabled = TRUE
+ORDER BY td.created_at ASC, td.public_id ASC
+LIMIT ? OFFSET ?;
+
 -- name: DeleteDependency :exec
 -- Soft-delete a dependency edge.
 UPDATE task_dependencies

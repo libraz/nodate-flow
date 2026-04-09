@@ -312,6 +312,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List tasks assigned to the authenticated user across every workspace */
+        get: operations["me-tasks-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/totp": {
         parameters: {
             query?: never;
@@ -723,7 +740,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** List incoming and outgoing dependency edges for a task */
+        get: operations["tasks-dependencies-list"];
         put?: never;
         /** Add a dependency edge from a task */
         post: operations["tasks-dependencies-add"];
@@ -2024,6 +2042,16 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ListMyTasksBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            tasks: components["schemas"]["MyTaskListItem"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
         ListPrioritySuggestionsOutputBody: {
             /**
              * Format: uri
@@ -2144,6 +2172,15 @@ export interface components {
             nextCursor: string | null;
             /** Format: int64 */
             total: number;
+        };
+        ListTaskDependenciesBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            incoming: components["schemas"]["TaskDependencyEdge"][] | null;
+            outgoing: components["schemas"]["TaskDependencyEdge"][] | null;
         };
         ListTasksBody: {
             /**
@@ -2284,6 +2321,23 @@ export interface components {
             name: string;
             providerId: string;
             providerKind: string;
+        };
+        MyTaskListItem: {
+            actorRole: string;
+            /** Format: date-time */
+            createdAt: string;
+            derivedState: string;
+            dueOn?: string;
+            id: string;
+            /** Format: int32 */
+            priority: number;
+            projectId: string;
+            projectName?: string;
+            title: string;
+            /** Format: date-time */
+            updatedAt?: string;
+            workspaceId: string;
+            workspaceName: string;
         };
         OIDCStartOutputBody: {
             /**
@@ -2772,6 +2826,15 @@ export interface components {
             toTaskTitle: string;
             /** Format: date-time */
             updatedAt?: string;
+        };
+        TaskDependencyEdge: {
+            /** Format: date-time */
+            createdAt: string;
+            id: string;
+            kind: string;
+            otherTaskDerivedState: string;
+            otherTaskId: string;
+            otherTaskTitle: string;
         };
         TaskListItem: {
             /** Format: int64 */
@@ -3708,6 +3771,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RevokeSessionOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "me-tasks-list": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListMyTasksBody"];
                 };
             };
             /** @description Error */
@@ -4909,6 +5004,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RemoveTaskConstraintBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-dependencies-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListTaskDependenciesBody"];
                 };
             };
             /** @description Error */

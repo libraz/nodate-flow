@@ -12,6 +12,65 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/middleware"
 )
 
+// ListDependencies handles GET /tasks/{id}/dependencies. Returns both
+// outgoing edges (this task → other) and incoming edges (other → this).
+func ListDependencies(deps Deps) func(context.Context, *ListTaskDependenciesInput) (*ListTaskDependenciesOutput, error) {
+	return func(ctx context.Context, _ *ListTaskDependenciesInput) (*ListTaskDependenciesOutput, error) {
+		ws, ok := middleware.WorkspaceFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsTaskNotFound)
+		}
+		task, ok := middleware.TaskFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsTaskNotFound)
+		}
+		out := &ListTaskDependenciesOutput{}
+		out.Body.Outgoing = []TaskDependencyEdge{}
+		out.Body.Incoming = []TaskDependencyEdge{}
+
+		outRows, err := deps.Queries.ListDependenciesForTask(ctx, generated.ListDependenciesForTaskParams{
+			WorkspaceID: ws.ID,
+			PublicID:    types.FromUUID(task.PublicID),
+			Limit:       200,
+			Offset:      0,
+		})
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		for _, r := range outRows {
+			out.Body.Outgoing = append(out.Body.Outgoing, TaskDependencyEdge{
+				ID:                    r.PublicID.String(),
+				Kind:                  string(r.Kind),
+				OtherTaskID:           r.ToTaskPublicID.String(),
+				OtherTaskTitle:        r.ToTaskTitle,
+				OtherTaskDerivedState: string(r.ToTaskDerivedState),
+				CreatedAt:             r.CreatedAt,
+			})
+		}
+
+		inRows, err := deps.Queries.ListIncomingDependenciesForTask(ctx, generated.ListIncomingDependenciesForTaskParams{
+			WorkspaceID: ws.ID,
+			PublicID:    types.FromUUID(task.PublicID),
+			Limit:       200,
+			Offset:      0,
+		})
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		for _, r := range inRows {
+			out.Body.Incoming = append(out.Body.Incoming, TaskDependencyEdge{
+				ID:                    r.PublicID.String(),
+				Kind:                  string(r.Kind),
+				OtherTaskID:           r.FromTaskPublicID.String(),
+				OtherTaskTitle:        r.FromTaskTitle,
+				OtherTaskDerivedState: string(r.FromTaskDerivedState),
+				CreatedAt:             r.CreatedAt,
+			})
+		}
+		return out, nil
+	}
+}
+
 // AddDependency handles POST /tasks/{id}/dependencies.
 func AddDependency(deps Deps) func(context.Context, *AddTaskDependencyInput) (*AddTaskDependencyOutput, error) {
 	return func(ctx context.Context, in *AddTaskDependencyInput) (*AddTaskDependencyOutput, error) {
