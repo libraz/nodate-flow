@@ -7,9 +7,17 @@ import { createLazyFileRoute, getRouteApi } from '@tanstack/react-router';
 import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useProjectQuery } from '../features/projects/api';
 import TimelineView from '../features/timeline/timeline-view';
 
 const routeApi = getRouteApi('/_authenticated/projects/$projectId/timeline');
+
+function ProjectTimelineInner({ projectId }: { projectId: string }): ReactElement {
+  const { data: project } = useProjectQuery(projectId);
+  return (
+    <TimelineView scope={{ kind: 'project', id: projectId }} workspaceId={project.workspaceId} />
+  );
+}
 
 function ProjectTimelineRoute(): ReactElement {
   const { projectId } = routeApi.useParams();
@@ -22,7 +30,7 @@ function ProjectTimelineRoute(): ReactElement {
         </div>
       }
     >
-      <TimelineView scope={{ kind: 'project', id: projectId }} />
+      <ProjectTimelineInner projectId={projectId} />
     </Suspense>
   );
 }
