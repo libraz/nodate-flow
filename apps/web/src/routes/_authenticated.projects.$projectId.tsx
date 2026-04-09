@@ -15,27 +15,34 @@ import { useTranslation } from 'react-i18next';
 
 import { sdk } from '../lib/sdk';
 
-type ProjectSubNavKey = 'overview' | 'tasks' | 'timeline';
+type ProjectSubNavKey = 'overview' | 'tasks' | 'gantt' | 'timeline';
 
 interface ProjectSubNavItem {
   key: ProjectSubNavKey;
-  to: '/projects/$projectId' | '/projects/$projectId/tasks' | '/projects/$projectId/timeline';
+  to:
+    | '/projects/$projectId'
+    | '/projects/$projectId/tasks'
+    | '/projects/$projectId/gantt'
+    | '/projects/$projectId/timeline';
 }
 
 const PROJECT_SUB_NAV: readonly ProjectSubNavItem[] = [
   { key: 'overview', to: '/projects/$projectId' },
   { key: 'tasks', to: '/projects/$projectId/tasks' },
+  { key: 'gantt', to: '/projects/$projectId/gantt' },
   { key: 'timeline', to: '/projects/$projectId/timeline' },
 ];
 
 function labelKeyFor(
   key: ProjectSubNavKey,
-): 'projects.nav.overview' | 'projects.nav.tasks' | 'projects.nav.timeline' {
+): 'projects.nav.overview' | 'projects.nav.tasks' | 'projects.nav.gantt' | 'projects.nav.timeline' {
   switch (key) {
     case 'overview':
       return 'projects.nav.overview';
     case 'tasks':
       return 'projects.nav.tasks';
+    case 'gantt':
+      return 'projects.nav.gantt';
     case 'timeline':
       return 'projects.nav.timeline';
   }
