@@ -11,6 +11,7 @@ import { Link, Outlet, createFileRoute, notFound, useChildMatches } from '@tanst
 import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useWorkspaceQuery } from '../features/workspaces/api';
 import WorkspaceDetail from '../features/workspaces/workspace-detail';
 import { sdk } from '../lib/sdk';
 
@@ -56,6 +57,10 @@ function WorkspaceDetailRoute(): ReactElement {
   const { id } = Route.useParams();
   const childMatches = useChildMatches();
   const hasChildRoute = childMatches.length > 0;
+  // WorkspaceDetail renders its own <h1> on the overview. On child
+  // routes (projects / timeline / settings) nothing carries the
+  // workspace name, so show it here for context.
+  const { data: workspace } = useWorkspaceQuery(id);
 
   return (
     <section
@@ -66,6 +71,17 @@ function WorkspaceDetailRoute(): ReactElement {
         padding: 'clamp(1.5rem, 4vw, 2.5rem)',
       }}
     >
+      {hasChildRoute ? (
+        <h1
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 'clamp(1.5rem, 2.5vw, 2rem)',
+            margin: 0,
+          }}
+        >
+          {workspace.name}
+        </h1>
+      ) : null}
       <nav
         aria-label={t('workspaces.nav.label')}
         style={{

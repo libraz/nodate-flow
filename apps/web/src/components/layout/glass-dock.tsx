@@ -22,9 +22,13 @@ interface DockAction {
 // a project / task / workspace instead of being bounced to a random
 // landing page. `quick_capture` still deep-links to the inbox, which is
 // where the capture surface lives.
+// `quick_capture` used to navigate to /inbox, but the inbox is a
+// signal-backed view with no capture form — a pure dead end. Until a
+// real quick-capture surface lands it opens the command palette so the
+// user can at least search or jump to "Create new task".
 const ACTIONS: readonly DockAction[] = [
   { key: 'new_task', icon: Plus, target: { kind: 'palette' } },
-  { key: 'quick_capture', icon: Zap, target: { kind: 'navigate', href: '/inbox' } },
+  { key: 'quick_capture', icon: Zap, target: { kind: 'palette' } },
   { key: 'ai_assist', icon: Sparkles, target: { kind: 'palette' } },
 ];
 
