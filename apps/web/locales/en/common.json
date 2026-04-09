@@ -104,7 +104,14 @@
     "next": "Later",
     "today": "Today",
     "empty": "No scheduled tasks in this project yet.",
-    "unscheduled": "{count, plural, one {# unscheduled task} other {# unscheduled tasks}}"
+    "unscheduled": "{count, plural, one {# unscheduled task} other {# unscheduled tasks}}",
+    "zoom_in": "Zoom in",
+    "zoom_out": "Zoom out",
+    "zoom_day": "Day",
+    "zoom_week": "Week",
+    "zoom_month": "Month",
+    "critical_path": "Critical path",
+    "critical_path_none": "No critical path found."
   },
   "calendar": {
     "title": "Calendar",

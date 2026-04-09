@@ -104,7 +104,14 @@
     "next": "次へ",
     "today": "今日",
     "empty": "このプロジェクトには予定のあるタスクがまだありません。",
-    "unscheduled": "{count, plural, other {未スケジュール # 件}}"
+    "unscheduled": "{count, plural, other {未スケジュール # 件}}",
+    "zoom_in": "拡大",
+    "zoom_out": "縮小",
+    "zoom_day": "日",
+    "zoom_week": "週",
+    "zoom_month": "月",
+    "critical_path": "クリティカルパス",
+    "critical_path_none": "クリティカルパスが見つかりません。"
   },
   "calendar": {
     "title": "カレンダー",

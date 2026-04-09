@@ -1,11 +1,15 @@
 /**
  * /projects/$projectId/gantt — lightweight self-rendered Gantt view.
  *
- * Read-only observation view per docs/requirements.md §1.5: no drag,
- * resize, critical-path, or zoom. Bars are drawn as plain SVG between
+ * Read-only observation view. Bars are drawn as plain SVG between
  * `started_on` and `due_on`. Tasks missing both dates are listed as
  * "unscheduled" and excluded from the chart. Click a bar or row label
  * to drill into the task detail panel.
+ *
+ * Features:
+ * - Zoom: day / week / month presets + step zoom in/out
+ * - Critical path: longest dependency chain highlighted in red
+ * - Dependency arrows: blocks edges with arrowheads
  */
 
 import type { components } from '@nodate-flow/sdk';
@@ -13,8 +17,8 @@ import Button from '@nodate-flow/ui/primitives/button';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { Link, createLazyFileRoute, getRouteApi } from '@tanstack/react-router';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { type ReactElement, Suspense, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react';
+import { type ReactElement, Suspense, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useProjectDependenciesQuery } from '../features/projects/api';
@@ -35,8 +39,14 @@ const STATE_COLOR: Record<string, string> = {
 const ROW_HEIGHT = 28;
 const ROW_GAP = 4;
 const HEADER_HEIGHT = 36;
-const DAY_WIDTH = 24;
 const LABEL_WIDTH = 220;
+
+/** Zoom presets: pixel width per day. */
+const ZOOM_LEVELS = [4, 6, 8, 12, 18, 24, 36, 48, 64] as const;
+const ZOOM_PRESET_DAY = 6; // index → 48px
+const ZOOM_PRESET_WEEK = 4; // index → 18px
+const ZOOM_PRESET_MONTH = 1; // index → 6px
+const ZOOM_DEFAULT = 5; // index → 24px (current default)
 
 function startOfDay(d: Date): Date {
   const x = new Date(d);
@@ -71,6 +81,94 @@ interface ScheduledTask {
   end: Date;
 }
 
+interface DependencyEdge {
+  id: string;
+  kind: string;
+  fromTaskId: string;
+  toTaskId: string;
+  fromTaskDerivedState?: string;
+}
+
+/**
+ * Compute the critical path: the longest chain of `blocks` edges
+ * weighted by bar duration (in days). Returns the set of task IDs
+ * on the critical path.
+ */
+function computeCriticalPath(
+  scheduled: readonly ScheduledTask[],
+  edges: readonly DependencyEdge[],
+): Set<string> {
+  const taskMap = new Map<string, ScheduledTask>();
+  for (const s of scheduled) taskMap.set(s.task.id, s);
+
+  // Build adjacency: blocker → [blocked]
+  const adj = new Map<string, string[]>();
+  const inDegree = new Map<string, number>();
+  for (const s of scheduled) {
+    adj.set(s.task.id, []);
+    inDegree.set(s.task.id, 0);
+  }
+  for (const edge of edges) {
+    if (edge.kind !== 'blocks') continue;
+    if (!taskMap.has(edge.fromTaskId) || !taskMap.has(edge.toTaskId)) continue;
+    adj.get(edge.fromTaskId)?.push(edge.toTaskId);
+    inDegree.set(edge.toTaskId, (inDegree.get(edge.toTaskId) ?? 0) + 1);
+  }
+
+  // Longest-path via topological order (DAG assumed)
+  const dist = new Map<string, number>();
+  const prev = new Map<string, string | null>();
+  for (const s of scheduled) {
+    const dur = Math.max(1, diffDays(s.start, s.end) + 1);
+    dist.set(s.task.id, dur);
+    prev.set(s.task.id, null);
+  }
+
+  // Kahn's algorithm for topo sort
+  const queue: string[] = [];
+  for (const [id, deg] of inDegree) {
+    if (deg === 0) queue.push(id);
+  }
+  const order: string[] = [];
+  while (queue.length > 0) {
+    const u = queue.shift();
+    if (!u) break;
+    order.push(u);
+    for (const v of adj.get(u) ?? []) {
+      const vTask = taskMap.get(v);
+      const vDur = vTask ? Math.max(1, diffDays(vTask.start, vTask.end) + 1) : 1;
+      const newDist = (dist.get(u) ?? 0) + vDur;
+      if (newDist > (dist.get(v) ?? 0)) {
+        dist.set(v, newDist);
+        prev.set(v, u);
+      }
+      const d = (inDegree.get(v) ?? 1) - 1;
+      inDegree.set(v, d);
+      if (d === 0) queue.push(v);
+    }
+  }
+
+  // Find the endpoint with the longest distance
+  let maxDist = 0;
+  let endId: string | null = null;
+  for (const [id, d] of dist) {
+    if (d > maxDist) {
+      maxDist = d;
+      endId = id;
+    }
+  }
+
+  // Only show critical path if it spans at least 2 tasks
+  const path = new Set<string>();
+  let cur = endId;
+  while (cur !== null) {
+    path.add(cur);
+    cur = prev.get(cur) ?? null;
+  }
+  if (path.size < 2) return new Set();
+  return path;
+}
+
 function GanttRoute(): ReactElement {
   return (
     <Suspense fallback={<Skeleton style={{ blockSize: '20rem', inlineSize: '100%' }} />}>
@@ -83,6 +181,17 @@ function GanttView(): ReactElement {
   const { t } = useTranslation('common');
   const { projectId } = routeApi.useParams();
   const [offsetDays, setOffsetDays] = useState(0);
+  const [zoomIdx, setZoomIdx] = useState(ZOOM_DEFAULT);
+  const [showCriticalPath, setShowCriticalPath] = useState(true);
+
+  const dayWidth = ZOOM_LEVELS[zoomIdx] ?? 24;
+
+  const zoomIn = useCallback(() => {
+    setZoomIdx((i) => Math.min(ZOOM_LEVELS.length - 1, i + 1));
+  }, []);
+  const zoomOut = useCallback(() => {
+    setZoomIdx((i) => Math.max(0, i - 1));
+  }, []);
 
   const { data: tasks } = useSuspenseQuery({
     queryKey: ['tasks', 'list', projectId, 'gantt'] as const,
@@ -127,6 +236,11 @@ function GanttView(): ReactElement {
   }, [tasks]);
   const unscheduled = unscheduledTasks.length;
 
+  const criticalPathIds = useMemo(
+    () => (showCriticalPath ? computeCriticalPath(scheduled, edges) : new Set<string>()),
+    [scheduled, edges, showCriticalPath],
+  );
+
   const today = startOfDay(new Date());
 
   const range = useMemo(() => {
@@ -146,8 +260,9 @@ function GanttView(): ReactElement {
 
   const totalDays = Math.max(7, diffDays(range.start, range.end) + 1);
   const viewStart = addDays(range.start, offsetDays);
-  const visibleDays = Math.min(totalDays, 42); // ~6 weeks visible
-  const chartWidth = visibleDays * DAY_WIDTH;
+  // Visible days adapts to zoom: show more at smaller scales
+  const visibleDays = Math.min(totalDays, Math.max(14, Math.round(960 / dayWidth)));
+  const chartWidth = visibleDays * dayWidth;
   const chartHeight = HEADER_HEIGHT + scheduled.length * (ROW_HEIGHT + ROW_GAP);
 
   const todayOffset = diffDays(viewStart, today);
@@ -162,14 +277,14 @@ function GanttView(): ReactElement {
   const barPositions = useMemo(() => {
     const map = new Map<string, { x1: number; x2: number; y: number }>();
     scheduled.forEach(({ task, start, end }, idx) => {
-      const startX = diffDays(viewStart, start) * DAY_WIDTH;
-      const endX = (diffDays(viewStart, end) + 1) * DAY_WIDTH;
+      const startX = diffDays(viewStart, start) * dayWidth;
+      const endX = (diffDays(viewStart, end) + 1) * dayWidth;
       const y =
         HEADER_HEIGHT + idx * (ROW_HEIGHT + ROW_GAP) + ROW_GAP / 2 + (ROW_HEIGHT - ROW_GAP) / 2;
       map.set(task.id, { x1: startX, x2: endX, y });
     });
     return map;
-  }, [scheduled, viewStart]);
+  }, [scheduled, viewStart, dayWidth]);
 
   /**
    * Dependency arrows to draw: for every `blocks` edge where both
@@ -182,6 +297,7 @@ function GanttView(): ReactElement {
       id: string;
       path: string;
       danger: boolean;
+      critical: boolean;
     }[] = [];
     for (const edge of edges) {
       if (edge.kind !== 'blocks') continue;
@@ -193,15 +309,15 @@ function GanttView(): ReactElement {
       const sy = from.y;
       const tx = to.x1;
       const ty = to.y;
-      // Orthogonal elbow: right 8px from source, vertical, left into target.
       const midX = Math.max(sx + 8, tx - 8);
       const path = `M ${sx} ${sy} L ${midX} ${sy} L ${midX} ${ty} L ${tx} ${ty}`;
       const danger =
         edge.fromTaskDerivedState !== 'done' && edge.fromTaskDerivedState !== 'cancelled';
-      arrows.push({ id: edge.id, path, danger });
+      const critical = criticalPathIds.has(edge.fromTaskId) && criticalPathIds.has(edge.toTaskId);
+      arrows.push({ id: edge.id, path, danger, critical });
     }
     return arrows;
-  }, [edges, barPositions]);
+  }, [edges, barPositions, criticalPathIds]);
 
   // Build day cells (for header + grid lines).
   const dayCells: { date: Date; x: number; isMonthStart: boolean; isWeekend: boolean }[] = [];
@@ -209,11 +325,16 @@ function GanttView(): ReactElement {
     const d = addDays(viewStart, i);
     dayCells.push({
       date: d,
-      x: i * DAY_WIDTH,
+      x: i * dayWidth,
       isMonthStart: d.getDate() === 1,
       isWeekend: d.getDay() === 0 || d.getDay() === 6,
     });
   }
+
+  // Show day number in header only when there's enough room
+  const showDayLabel = dayWidth >= 12;
+  // Show month label at month boundaries when zoomed enough
+  const showMonthLabel = dayWidth >= 6;
 
   const goPrev = (): void => {
     setOffsetDays((o) => Math.max(0, o - 7));
@@ -234,31 +355,114 @@ function GanttView(): ReactElement {
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: '0.75rem',
+          flexWrap: 'wrap',
         }}
       >
         <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600 }}>{t('gantt.title')}</h1>
-        <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            aria-label={t('gantt.prev')}
-            onClick={goPrev}
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Navigation */}
+          <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label={t('gantt.prev')}
+              onClick={goPrev}
+            >
+              <ChevronLeft size={16} aria-hidden />
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={goToday}>
+              {t('gantt.today')}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label={t('gantt.next')}
+              onClick={goNext}
+            >
+              <ChevronRight size={16} aria-hidden />
+            </Button>
+          </div>
+
+          {/* Zoom controls */}
+          <div
+            style={{
+              display: 'flex',
+              gap: '0.125rem',
+              alignItems: 'center',
+              borderInlineStart: '1px solid var(--color-border)',
+              paddingInlineStart: '0.5rem',
+            }}
           >
-            <ChevronLeft size={16} aria-hidden />
-          </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={goToday}>
-            {t('gantt.today')}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            aria-label={t('gantt.next')}
-            onClick={goNext}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label={t('gantt.zoom_out')}
+              onClick={zoomOut}
+              disabled={zoomIdx === 0}
+            >
+              <Minus size={14} aria-hidden />
+            </Button>
+            <Button
+              type="button"
+              variant={zoomIdx === ZOOM_PRESET_MONTH ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setZoomIdx(ZOOM_PRESET_MONTH)}
+            >
+              {t('gantt.zoom_month')}
+            </Button>
+            <Button
+              type="button"
+              variant={zoomIdx === ZOOM_PRESET_WEEK ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setZoomIdx(ZOOM_PRESET_WEEK)}
+            >
+              {t('gantt.zoom_week')}
+            </Button>
+            <Button
+              type="button"
+              variant={zoomIdx === ZOOM_PRESET_DAY ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setZoomIdx(ZOOM_PRESET_DAY)}
+            >
+              {t('gantt.zoom_day')}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label={t('gantt.zoom_in')}
+              onClick={zoomIn}
+              disabled={zoomIdx === ZOOM_LEVELS.length - 1}
+            >
+              <Plus size={14} aria-hidden />
+            </Button>
+          </div>
+
+          {/* Critical path toggle */}
+          <label
+            style={{
+              display: 'flex',
+              gap: '0.375rem',
+              alignItems: 'center',
+              fontSize: '0.8125rem',
+              color: 'var(--color-muted)',
+              cursor: 'pointer',
+              borderInlineStart: '1px solid var(--color-border)',
+              paddingInlineStart: '0.5rem',
+              userSelect: 'none',
+            }}
           >
-            <ChevronRight size={16} aria-hidden />
-          </Button>
+            <input
+              type="checkbox"
+              checked={showCriticalPath}
+              onChange={(e) => setShowCriticalPath(e.target.checked)}
+              style={{ accentColor: 'var(--nf-color-danger, #c0392b)' }}
+            />
+            {t('gantt.critical_path')}
+          </label>
         </div>
       </header>
 
@@ -382,7 +586,7 @@ function GanttView(): ReactElement {
                     <rect
                       x={c.x}
                       y={HEADER_HEIGHT}
-                      width={DAY_WIDTH}
+                      width={dayWidth}
                       height={chartHeight - HEADER_HEIGHT}
                       fill="rgba(127,127,127,0.06)"
                     />
@@ -395,16 +599,18 @@ function GanttView(): ReactElement {
                     stroke="rgba(127,127,127,0.12)"
                     strokeWidth={c.isMonthStart ? 1.5 : 0.5}
                   />
-                  <text
-                    x={c.x + DAY_WIDTH / 2}
-                    y={HEADER_HEIGHT - 6}
-                    textAnchor="middle"
-                    fontSize="10"
-                    fill="var(--color-muted)"
-                  >
-                    {c.date.getDate()}
-                  </text>
-                  {c.isMonthStart ? (
+                  {showDayLabel ? (
+                    <text
+                      x={c.x + dayWidth / 2}
+                      y={HEADER_HEIGHT - 6}
+                      textAnchor="middle"
+                      fontSize="10"
+                      fill="var(--color-muted)"
+                    >
+                      {c.date.getDate()}
+                    </text>
+                  ) : null}
+                  {c.isMonthStart && showMonthLabel ? (
                     <text x={c.x + 4} y={14} fontSize="10" fontWeight="600" fill="var(--color-fg)">
                       {`${c.date.getFullYear()}/${c.date.getMonth() + 1}`}
                     </text>
@@ -415,9 +621,9 @@ function GanttView(): ReactElement {
               {/* Today vertical line */}
               {showTodayLine ? (
                 <line
-                  x1={todayOffset * DAY_WIDTH + DAY_WIDTH / 2}
+                  x1={todayOffset * dayWidth + dayWidth / 2}
                   y1={HEADER_HEIGHT}
-                  x2={todayOffset * DAY_WIDTH + DAY_WIDTH / 2}
+                  x2={todayOffset * dayWidth + dayWidth / 2}
                   y2={chartHeight}
                   stroke="var(--color-accent, #9b59b6)"
                   strokeWidth={1.5}
@@ -427,16 +633,32 @@ function GanttView(): ReactElement {
 
               {/* Bars */}
               {scheduled.map(({ task, start, end }, idx) => {
-                const startX = diffDays(viewStart, start) * DAY_WIDTH;
-                const endX = (diffDays(viewStart, end) + 1) * DAY_WIDTH;
+                const startX = diffDays(viewStart, start) * dayWidth;
+                const endX = (diffDays(viewStart, end) + 1) * dayWidth;
                 const visStart = Math.max(0, startX);
                 const visEnd = Math.min(chartWidth, endX);
                 if (visEnd <= 0 || visStart >= chartWidth) return null;
                 const w = Math.max(2, visEnd - visStart);
                 const y = HEADER_HEIGHT + idx * (ROW_HEIGHT + ROW_GAP) + ROW_GAP / 2;
                 const fill = STATE_COLOR[task.derivedState] ?? 'var(--color-muted)';
+                const isCritical = criticalPathIds.has(task.id);
                 return (
                   <g key={task.id}>
+                    {isCritical ? (
+                      <rect
+                        x={visStart - 2}
+                        y={y - 2}
+                        width={w + 4}
+                        height={ROW_HEIGHT - ROW_GAP + 4}
+                        rx={6}
+                        ry={6}
+                        fill="none"
+                        stroke="var(--nf-color-danger, #c0392b)"
+                        strokeWidth={2}
+                        strokeDasharray="4 2"
+                        opacity={0.7}
+                      />
+                    ) : null}
                     <rect
                       x={visStart}
                       y={y}
@@ -462,12 +684,20 @@ function GanttView(): ReactElement {
                   d={arrow.path}
                   fill="none"
                   stroke={
-                    arrow.danger ? 'var(--nf-color-danger, #c0392b)' : 'var(--color-muted, #95a5a6)'
+                    arrow.critical
+                      ? 'var(--nf-color-danger, #c0392b)'
+                      : arrow.danger
+                        ? 'var(--nf-color-danger, #c0392b)'
+                        : 'var(--color-muted, #95a5a6)'
                   }
-                  strokeWidth={1.25}
-                  strokeDasharray={arrow.danger ? undefined : '3 3'}
-                  markerEnd={arrow.danger ? 'url(#gantt-arrow-open)' : 'url(#gantt-arrow-done)'}
-                  opacity={arrow.danger ? 0.9 : 0.55}
+                  strokeWidth={arrow.critical ? 2.5 : 1.25}
+                  strokeDasharray={arrow.danger || arrow.critical ? undefined : '3 3'}
+                  markerEnd={
+                    arrow.danger || arrow.critical
+                      ? 'url(#gantt-arrow-open)'
+                      : 'url(#gantt-arrow-done)'
+                  }
+                  opacity={arrow.critical ? 1 : arrow.danger ? 0.9 : 0.55}
                 />
               ))}
             </svg>
