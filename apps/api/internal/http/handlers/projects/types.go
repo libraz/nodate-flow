@@ -130,6 +130,33 @@ type DisableProjectOutput struct {
 	Body DisableProjectBody
 }
 
+// ProjectDependencyEdge is one task_dependencies row scoped to a project.
+// Both endpoints are tasks that belong to the same project, so the web
+// client can render arrows between their corresponding rows / bars.
+type ProjectDependencyEdge struct {
+	ID                   string `json:"id"`
+	Kind                 string `json:"kind"`
+	FromTaskID           string `json:"fromTaskId"`
+	FromTaskDerivedState string `json:"fromTaskDerivedState"`
+	ToTaskID             string `json:"toTaskId"`
+	ToTaskDerivedState   string `json:"toTaskDerivedState"`
+}
+
+// ListProjectDependenciesInput is the path for GET /projects/{prjId}/dependencies.
+type ListProjectDependenciesInput struct {
+	PrjID string `path:"prjId"`
+}
+
+// ListProjectDependenciesBody is the response payload for GET /projects/{prjId}/dependencies.
+type ListProjectDependenciesBody struct {
+	Edges []ProjectDependencyEdge `json:"edges"`
+}
+
+// ListProjectDependenciesOutput is the response for GET /projects/{prjId}/dependencies.
+type ListProjectDependenciesOutput struct {
+	Body ListProjectDependenciesBody
+}
+
 // ListProjectMembersInput is the query for GET /projects/{prjId}/members.
 type ListProjectMembersInput struct {
 	PrjID  string `path:"prjId"`

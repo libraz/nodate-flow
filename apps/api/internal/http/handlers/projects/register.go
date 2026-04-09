@@ -52,6 +52,13 @@ func RegisterGlobal(api huma.API, deps Deps) {
 	}, Disable(deps))
 
 	huma.Register(api, huma.Operation{
+		OperationID: "projects-dependencies-list",
+		Method:      http.MethodGet,
+		Path:        "/projects/{prjId}/dependencies",
+		Summary:     "List every task dependency edge within a project",
+	}, ListDependencies(deps))
+
+	huma.Register(api, huma.Operation{
 		OperationID: "projects-members-list",
 		Method:      http.MethodGet,
 		Path:        "/projects/{prjId}/members",

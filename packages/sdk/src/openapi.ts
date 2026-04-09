@@ -435,6 +435,23 @@ export interface paths {
         patch: operations["projects-patch"];
         trace?: never;
     };
+    "/projects/{prjId}/dependencies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List every task dependency edge within a project */
+        get: operations["projects-dependencies-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{prjId}/members": {
         parameters: {
             query?: never;
@@ -2062,6 +2079,14 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ListProjectDependenciesBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            edges: components["schemas"]["ProjectDependencyEdge"][] | null;
+        };
         ListProjectMembersBody: {
             /**
              * Format: uri
@@ -2460,6 +2485,14 @@ export interface components {
             /** Format: date-time */
             updatedAt?: string;
             workspaceId: string;
+        };
+        ProjectDependencyEdge: {
+            fromTaskDerivedState: string;
+            fromTaskId: string;
+            id: string;
+            kind: string;
+            toTaskDerivedState: string;
+            toTaskId: string;
         };
         ProjectMember: {
             /**
@@ -4120,6 +4153,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Project"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "projects-dependencies-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                prjId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListProjectDependenciesBody"];
                 };
             };
             /** @description Error */

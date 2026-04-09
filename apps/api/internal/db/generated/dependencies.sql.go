@@ -183,6 +183,73 @@ func (q *Queries) ListIncomingDependenciesForTask(ctx context.Context, arg ListI
 	return items, nil
 }
 
+const listDependenciesForProject = `-- name: ListDependenciesForProject :many
+SELECT
+  td.public_id,
+  td.kind,
+  ft.public_id AS from_task_public_id,
+  ft.derived_state AS from_task_derived_state,
+  tt.public_id AS to_task_public_id,
+  tt.derived_state AS to_task_derived_state
+FROM task_dependencies td
+INNER JOIN tasks ft ON ft.id = td.from_task_id AND ft.enabled = TRUE
+INNER JOIN tasks tt ON tt.id = td.to_task_id   AND tt.enabled = TRUE
+INNER JOIN projects p ON p.id = ft.project_id AND p.enabled = TRUE
+WHERE td.workspace_id = ?
+  AND p.public_id = ?
+  AND ft.project_id = tt.project_id
+  AND td.enabled = TRUE
+ORDER BY td.created_at ASC, td.public_id ASC
+`
+
+type ListDependenciesForProjectParams struct {
+	WorkspaceID     uint32         `json:"-"`
+	ProjectPublicID types.PublicID `json:"projectPublicId"`
+}
+
+type ListDependenciesForProjectRow struct {
+	PublicID             types.PublicID       `json:"publicId"`
+	Kind                 TaskDependenciesKind `json:"kind"`
+	FromTaskPublicID     types.PublicID       `json:"fromTaskPublicId"`
+	FromTaskDerivedState TasksDerivedState    `json:"fromTaskDerivedState"`
+	ToTaskPublicID       types.PublicID       `json:"toTaskPublicId"`
+	ToTaskDerivedState   TasksDerivedState    `json:"toTaskDerivedState"`
+}
+
+// List every dependency edge where both endpoints belong to the project.
+func (q *Queries) ListDependenciesForProject(ctx context.Context, arg ListDependenciesForProjectParams) ([]ListDependenciesForProjectRow, error) {
+	rows, err := q.db.QueryContext(ctx, listDependenciesForProject,
+		arg.WorkspaceID,
+		arg.ProjectPublicID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDependenciesForProjectRow{}
+	for rows.Next() {
+		var i ListDependenciesForProjectRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.Kind,
+			&i.FromTaskPublicID,
+			&i.FromTaskDerivedState,
+			&i.ToTaskPublicID,
+			&i.ToTaskDerivedState,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 // List outgoing dependencies of a task. Returns the target task public_id.
 func (q *Queries) ListDependenciesForTask(ctx context.Context, arg ListDependenciesForTaskParams) ([]ListDependenciesForTaskRow, error) {
 	rows, err := q.db.QueryContext(ctx, listDependenciesForTask,

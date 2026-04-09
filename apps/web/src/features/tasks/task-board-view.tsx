@@ -13,6 +13,8 @@ import { useNavigate } from '@tanstack/react-router';
 import { type DragEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { computeBlockedByOpen, useProjectDependenciesQuery } from '../projects/api';
+
 import {
   TASK_STATES,
   type TaskDerivedState,
@@ -59,6 +61,8 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
   const navigate = useNavigate();
   const filters = useTaskFilters(projectId);
   const { data: tasks } = useTasksQuery(projectId, filters);
+  const { data: edges } = useProjectDependenciesQuery(projectId);
+  const blockedByOpen = computeBlockedByOpen(edges);
   const transition = useTransitionTask();
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -205,6 +209,7 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
                   <TaskCard
                     key={task.id}
                     task={task}
+                    blockedByOpenCount={blockedByOpen.get(task.id) ?? 0}
                     onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
                     onSelect={handleSelect}

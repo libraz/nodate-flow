@@ -1614,6 +1614,26 @@
         "required": ["total", "suggestions"],
         "type": "object"
       },
+      "ListProjectDependenciesBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListProjectDependenciesBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectDependencyEdge"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["edges"],
+        "type": "object"
+      },
       "ListProjectMembersBody": {
         "additionalProperties": false,
         "properties": {
@@ -2615,6 +2635,38 @@
           }
         },
         "required": ["id", "workspaceId", "slug", "name", "isArchived", "createdAt"],
+        "type": "object"
+      },
+      "ProjectDependencyEdge": {
+        "additionalProperties": false,
+        "properties": {
+          "fromTaskDerivedState": {
+            "type": "string"
+          },
+          "fromTaskId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "toTaskDerivedState": {
+            "type": "string"
+          },
+          "toTaskId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "fromTaskId",
+          "fromTaskDerivedState",
+          "toTaskId",
+          "toTaskDerivedState"
+        ],
         "type": "object"
       },
       "ProjectMember": {
@@ -5479,6 +5531,44 @@
           }
         },
         "summary": "Patch a project"
+      }
+    },
+    "/projects/{prjId}/dependencies": {
+      "get": {
+        "operationId": "projects-dependencies-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "prjId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListProjectDependenciesBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List every task dependency edge within a project"
       }
     },
     "/projects/{prjId}/members": {

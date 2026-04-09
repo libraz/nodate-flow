@@ -276,10 +276,14 @@
     "columns": {
       "title": "Title",
       "status": "Status",
+      "deps": "Deps",
       "assignee": "Assignee",
       "due": "Due",
       "priority": "Priority",
       "updated": "Updated"
+    },
+    "card": {
+      "blockedBy": "{count, plural, one {Blocked by # task} other {Blocked by # tasks}}"
     },
     "form": {
       "title": "Title",

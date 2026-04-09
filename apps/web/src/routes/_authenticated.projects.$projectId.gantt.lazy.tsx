@@ -17,6 +17,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { type ReactElement, Suspense, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useProjectDependenciesQuery } from '../features/projects/api';
 import { sdk } from '../lib/sdk';
 
 type TaskListItem = components['schemas']['TaskListItem'];
@@ -96,6 +97,8 @@ function GanttView(): ReactElement {
     },
   });
 
+  const { data: edges } = useProjectDependenciesQuery(projectId);
+
   const { scheduled, unscheduled } = useMemo(() => {
     const sc: ScheduledTask[] = [];
     let un = 0;
@@ -148,6 +151,56 @@ function GanttView(): ReactElement {
 
   const todayOffset = diffDays(viewStart, today);
   const showTodayLine = todayOffset >= 0 && todayOffset < visibleDays;
+
+  /**
+   * taskId → on-screen bar coordinates. `x1` is the bar's left edge
+   * (start), `x2` its right edge (end), `y` its vertical center. Used
+   * both by the bar loop and the dependency arrow layer so that the
+   * two stay pixel-aligned.
+   */
+  const barPositions = useMemo(() => {
+    const map = new Map<string, { x1: number; x2: number; y: number }>();
+    scheduled.forEach(({ task, start, end }, idx) => {
+      const startX = diffDays(viewStart, start) * DAY_WIDTH;
+      const endX = (diffDays(viewStart, end) + 1) * DAY_WIDTH;
+      const y =
+        HEADER_HEIGHT + idx * (ROW_HEIGHT + ROW_GAP) + ROW_GAP / 2 + (ROW_HEIGHT - ROW_GAP) / 2;
+      map.set(task.id, { x1: startX, x2: endX, y });
+    });
+    return map;
+  }, [scheduled, viewStart]);
+
+  /**
+   * Dependency arrows to draw: for every `blocks` edge where both
+   * endpoints are scheduled, draw an orthogonal path from the source
+   * bar's right edge to the target bar's left edge. Same-row edges
+   * are skipped (they'd overlap the bar itself).
+   */
+  const dependencyArrows = useMemo(() => {
+    const arrows: {
+      id: string;
+      path: string;
+      danger: boolean;
+    }[] = [];
+    for (const edge of edges) {
+      if (edge.kind !== 'blocks') continue;
+      const from = barPositions.get(edge.fromTaskId);
+      const to = barPositions.get(edge.toTaskId);
+      if (!from || !to) continue;
+      if (from.y === to.y) continue;
+      const sx = from.x2;
+      const sy = from.y;
+      const tx = to.x1;
+      const ty = to.y;
+      // Orthogonal elbow: right 8px from source, vertical, left into target.
+      const midX = Math.max(sx + 8, tx - 8);
+      const path = `M ${sx} ${sy} L ${midX} ${sy} L ${midX} ${ty} L ${tx} ${ty}`;
+      const danger =
+        edge.fromTaskDerivedState !== 'done' && edge.fromTaskDerivedState !== 'cancelled';
+      arrows.push({ id: edge.id, path, danger });
+    }
+    return arrows;
+  }, [edges, barPositions]);
 
   // Build day cells (for header + grid lines).
   const dayCells: { date: Date; x: number; isMonthStart: boolean; isWeekend: boolean }[] = [];
@@ -291,6 +344,30 @@ function GanttView(): ReactElement {
               style={{ display: 'block' }}
             >
               <title>{t('gantt.title')}</title>
+              <defs>
+                <marker
+                  id="gantt-arrow-open"
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="6"
+                  markerHeight="6"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--nf-color-danger, #c0392b)" />
+                </marker>
+                <marker
+                  id="gantt-arrow-done"
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="6"
+                  markerHeight="6"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--color-muted, #95a5a6)" />
+                </marker>
+              </defs>
               {/* Day grid + weekend shading */}
               {dayCells.map((c) => (
                 <g key={c.date.toISOString()}>
@@ -370,6 +447,22 @@ function GanttView(): ReactElement {
                   </g>
                 );
               })}
+
+              {/* Dependency arrows (drawn last so they sit over the bars) */}
+              {dependencyArrows.map((arrow) => (
+                <path
+                  key={arrow.id}
+                  d={arrow.path}
+                  fill="none"
+                  stroke={
+                    arrow.danger ? 'var(--nf-color-danger, #c0392b)' : 'var(--color-muted, #95a5a6)'
+                  }
+                  strokeWidth={1.25}
+                  strokeDasharray={arrow.danger ? undefined : '3 3'}
+                  markerEnd={arrow.danger ? 'url(#gantt-arrow-open)' : 'url(#gantt-arrow-done)'}
+                  opacity={arrow.danger ? 0.9 : 0.55}
+                />
+              ))}
             </svg>
           </div>
         </div>

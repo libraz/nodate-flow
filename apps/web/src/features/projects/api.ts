@@ -30,7 +30,10 @@ export const projectsKeys = {
   list: (workspaceId: string) => [...projectsKeys.all, 'list', workspaceId] as const,
   detail: (id: string) => [...projectsKeys.all, 'detail', id] as const,
   members: (id: string) => [...projectsKeys.all, 'detail', id, 'members'] as const,
+  dependencies: (id: string) => [...projectsKeys.all, 'detail', id, 'dependencies'] as const,
 };
+
+export type ProjectDependencyEdge = components['schemas']['ProjectDependencyEdge'];
 
 /** Lightweight error thrown when the SDK returns an error envelope. */
 export class ProjectApiError extends Error {
@@ -79,6 +82,37 @@ export function useProjectQuery(id: string): UseSuspenseQueryResult<Project> {
       return data;
     },
   });
+}
+
+export function useProjectDependenciesQuery(
+  id: string,
+): UseSuspenseQueryResult<ProjectDependencyEdge[]> {
+  return useSuspenseQuery({
+    queryKey: projectsKeys.dependencies(id),
+    staleTime: 30_000,
+    queryFn: async (): Promise<ProjectDependencyEdge[]> => {
+      const { data, error } = await sdk.GET('/projects/{prjId}/dependencies', {
+        params: { path: { prjId: id } },
+      });
+      if (error || !data) throw toError(error, 'Failed to load project dependencies');
+      return data.edges ?? [];
+    },
+  });
+}
+
+/**
+ * Given the raw edge list, compute for every task id how many `blocks`
+ * edges point AT it whose source task is not yet done. This is the
+ * "blocked by open" count that drives the lock badge on List / Board.
+ */
+export function computeBlockedByOpen(edges: readonly ProjectDependencyEdge[]): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const e of edges) {
+    if (e.kind !== 'blocks') continue;
+    if (e.fromTaskDerivedState === 'done' || e.fromTaskDerivedState === 'cancelled') continue;
+    m.set(e.toTaskId, (m.get(e.toTaskId) ?? 0) + 1);
+  }
+  return m;
 }
 
 export function useProjectMembersQuery(id: string): UseSuspenseQueryResult<ProjectMember[]> {

@@ -276,10 +276,14 @@
     "columns": {
       "title": "タイトル",
       "status": "ステータス",
+      "deps": "依存",
       "assignee": "担当者",
       "due": "期日",
       "priority": "優先度",
       "updated": "更新日"
+    },
+    "card": {
+      "blockedBy": "{count, plural, other {# 件のタスクにブロックされています}}"
     },
     "form": {
       "title": "タイトル",

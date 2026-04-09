@@ -50,6 +50,27 @@ WHERE td.workspace_id = ?
 ORDER BY td.created_at ASC, td.public_id ASC
 LIMIT ? OFFSET ?;
 
+-- name: ListDependenciesForProject :many
+-- List every task_dependencies edge where BOTH endpoints belong to the
+-- given project. Used by the Gantt chart (to draw dependency arrows)
+-- and by the List / Board views (to compute "blocked by open" badges).
+SELECT
+  td.public_id,
+  td.kind,
+  ft.public_id AS from_task_public_id,
+  ft.derived_state AS from_task_derived_state,
+  tt.public_id AS to_task_public_id,
+  tt.derived_state AS to_task_derived_state
+FROM task_dependencies td
+INNER JOIN tasks ft ON ft.id = td.from_task_id AND ft.enabled = TRUE
+INNER JOIN tasks tt ON tt.id = td.to_task_id   AND tt.enabled = TRUE
+INNER JOIN projects p ON p.id = ft.project_id AND p.enabled = TRUE
+WHERE td.workspace_id = ?
+  AND p.public_id = ?
+  AND ft.project_id = tt.project_id
+  AND td.enabled = TRUE
+ORDER BY td.created_at ASC, td.public_id ASC;
+
 -- name: DeleteDependency :exec
 -- Soft-delete a dependency edge.
 UPDATE task_dependencies

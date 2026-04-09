@@ -11,6 +11,8 @@ import type { ColumnDef } from '@tanstack/react-table';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { computeBlockedByOpen, useProjectDependenciesQuery } from '../projects/api';
+
 import { type TaskDerivedState, type TaskListItem, type TaskPriority, useTasksQuery } from './api';
 import { useTaskFilters } from './use-task-filters';
 
@@ -47,6 +49,8 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
   const navigate = useNavigate();
   const filters = useTaskFilters(projectId);
   const { data: tasks } = useTasksQuery(projectId, filters);
+  const { data: edges } = useProjectDependenciesQuery(projectId);
+  const blockedByOpen = computeBlockedByOpen(edges);
   const locale = i18n.resolvedLanguage ?? 'en';
 
   const columns: ColumnDef<TaskListItem, unknown>[] = [
@@ -81,6 +85,28 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
       cell: ({ row }) => {
         const state = row.original.derivedState as TaskDerivedState;
         return <span>{t(STATE_KEY[state] ?? 'tasks.status.open')}</span>;
+      },
+    },
+    {
+      id: 'deps',
+      header: () => t('tasks.columns.deps'),
+      cell: ({ row }) => {
+        const count = blockedByOpen.get(row.original.id) ?? 0;
+        if (count === 0) return <span style={{ color: 'var(--color-muted)' }}>—</span>;
+        return (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.25rem',
+              color: 'var(--nf-color-danger, #c0392b)',
+              fontVariantNumeric: 'tabular-nums',
+            }}
+            title={t('tasks.card.blockedBy', { count })}
+          >
+            {`\u{1F512} ${count}`}
+          </span>
+        );
       },
     },
     {

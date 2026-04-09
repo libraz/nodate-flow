@@ -216,6 +216,8 @@ type Querier interface {
 	ListCommentsForTask(ctx context.Context, arg ListCommentsForTaskParams) ([]ListCommentsForTaskRow, error)
 	// List a task's constraints. The task is resolved by public_id outside.
 	ListConstraintsForTask(ctx context.Context, arg ListConstraintsForTaskParams) ([]ListConstraintsForTaskRow, error)
+	// List every dependency edge where both endpoints belong to the project.
+	ListDependenciesForProject(ctx context.Context, arg ListDependenciesForProjectParams) ([]ListDependenciesForProjectRow, error)
 	// List outgoing dependencies of a task. Returns the target task public_id.
 	ListDependenciesForTask(ctx context.Context, arg ListDependenciesForTaskParams) ([]ListDependenciesForTaskRow, error)
 	// List incoming dependencies of a task (edges pointing AT this task).

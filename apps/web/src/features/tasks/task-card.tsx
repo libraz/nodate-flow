@@ -14,6 +14,8 @@ import type { TaskListItem, TaskPriority } from './api';
 
 export interface TaskCardProps {
   task: TaskListItem;
+  /** Count of open `blocks` edges pointing AT this task. 0 hides the badge. */
+  blockedByOpenCount?: number;
   onDragStart: (e: DragEvent<HTMLDivElement>, taskId: string) => void;
   onDragEnd: () => void;
   onSelect: (taskId: string) => void;
@@ -37,6 +39,7 @@ const PRIORITY_KEY: Record<TaskPriority, string> = {
 
 export default function TaskCard({
   task,
+  blockedByOpenCount = 0,
   onDragStart,
   onDragEnd,
   onSelect,
@@ -88,6 +91,15 @@ export default function TaskCard({
         {task.dueOn ? (
           <Badge tone="neutral" aria-label={t('tasks.columns.due')}>
             {task.dueOn}
+          </Badge>
+        ) : null}
+        {blockedByOpenCount > 0 ? (
+          <Badge
+            tone="danger"
+            aria-label={t('tasks.card.blockedBy', { count: blockedByOpenCount })}
+            title={t('tasks.card.blockedBy', { count: blockedByOpenCount })}
+          >
+            {`\u{1F512} ${blockedByOpenCount}`}
           </Badge>
         ) : null}
       </div>
