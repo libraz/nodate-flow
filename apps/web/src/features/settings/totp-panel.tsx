@@ -18,6 +18,7 @@ import QRCode from 'qrcode';
 import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { confirmAction } from '../../lib/confirm-action';
 import {
   type SettingsApiError,
   type TotpEnrollResponse,
@@ -227,7 +228,7 @@ function EnabledPanel(): ReactElement {
 
   const handleRegenerate = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
-    if (!window.confirm(t('security.totp.recovery.regenerate_confirm'))) return;
+    if (!(await confirmAction({ message: t('security.totp.recovery.regenerate_confirm') }))) return;
     setSubmitting(true);
     try {
       const result = await regenerate.mutateAsync(password);
@@ -302,7 +303,7 @@ function DisableForm(): ReactElement {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
-    if (!window.confirm(t('security.totp.disable_confirm'))) return;
+    if (!(await confirmAction({ message: t('security.totp.disable_confirm') }))) return;
     setSubmitting(true);
     try {
       await disable.mutateAsync(password);

@@ -12,6 +12,7 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { confirmAction } from '../../lib/confirm-action';
 import { type TaskDerivedState, useTasksQuery } from '../tasks/api';
 import { useDisableProject, useProjectQuery, useUpdateProject } from './api';
 import ProjectMembersTable from './project-members-table';
@@ -46,7 +47,7 @@ function SettingsPanel({ id }: { id: string }): ReactElement {
   };
 
   const handleDisable = async (): Promise<void> => {
-    if (!window.confirm(t('projects.settings.disable_confirm'))) return;
+    if (!(await confirmAction({ message: t('projects.settings.disable_confirm') }))) return;
     try {
       await disable.mutateAsync(id);
       void navigate({ to: '/workspaces' });

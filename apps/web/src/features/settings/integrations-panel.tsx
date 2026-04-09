@@ -8,6 +8,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { confirmAction } from '../../lib/confirm-action';
 import {
   type IntegrationProviderName,
   type ProviderStatus,
@@ -40,7 +41,12 @@ export default function IntegrationsPanel(): ReactElement {
   };
 
   const handleDisconnect = async (id: string, providerName: string): Promise<void> => {
-    if (!window.confirm(t('integrations.disconnect_confirm', { provider: providerName }))) return;
+    if (
+      !(await confirmAction({
+        message: t('integrations.disconnect_confirm', { provider: providerName }),
+      }))
+    )
+      return;
     try {
       await disconnect.mutateAsync(id);
       toaster.show({ tone: 'success', message: t('integrations.disconnected') });

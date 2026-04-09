@@ -9,6 +9,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { confirmAction } from '../../lib/confirm-action';
 import { useAiProvidersQuery, useDeleteAiProvider } from './api';
 import MaskedKey from './masked-key';
 import ProviderAddDialog from './provider-add-dialog';
@@ -46,8 +47,8 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
   const [rotateId, setRotateId] = useState<string | null>(null);
   const kindLabel = useKindLabel();
 
-  const handleDelete = (providerId: string): void => {
-    if (!window.confirm(t('providers.action.confirm_delete'))) return;
+  const handleDelete = async (providerId: string): Promise<void> => {
+    if (!(await confirmAction({ message: t('providers.action.confirm_delete') }))) return;
     del.mutate(providerId, {
       onSuccess: () => {
         toaster.show({ tone: 'success', message: t('providers.toast.deleted') });
@@ -132,7 +133,7 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
                     <Button
                       variant="danger"
                       onClick={() => {
-                        handleDelete(p.id);
+                        void handleDelete(p.id);
                       }}
                     >
                       {t('providers.action.delete')}

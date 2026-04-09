@@ -9,6 +9,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { confirmAction } from '../../lib/confirm-action';
 import { type McpTokenSummary, useMcpTokensQuery, useRevokeMcpToken } from './api';
 import TokenCreateDialog from './token-create-dialog';
 
@@ -31,7 +32,7 @@ export default function TokenList({ workspaceId }: TokenListProps): ReactElement
   const [createOpen, setCreateOpen] = useState(false);
 
   const handleRevoke = async (token: McpTokenSummary): Promise<void> => {
-    if (!window.confirm(t('workspace.mcp_tokens.revoke_confirm'))) return;
+    if (!(await confirmAction({ message: t('workspace.mcp_tokens.revoke_confirm') }))) return;
     try {
       await revoke.mutateAsync(token.id);
       toaster.show({ tone: 'success', message: t('workspace.mcp_tokens.revoked') });

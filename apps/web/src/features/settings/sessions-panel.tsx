@@ -10,6 +10,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { confirmAction } from '../../lib/confirm-action';
 import {
   type SessionSummary,
   useMySessionsQuery,
@@ -40,7 +41,7 @@ export default function SessionsPanel(): ReactElement {
   };
 
   const handleRevokeAll = async (): Promise<void> => {
-    if (!window.confirm(t('security.sessions.revoke_all_confirm'))) return;
+    if (!(await confirmAction({ message: t('security.sessions.revoke_all_confirm') }))) return;
     try {
       const { revoked } = await revokeAll.mutateAsync();
       toaster.show({
