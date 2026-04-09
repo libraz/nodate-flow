@@ -9,7 +9,17 @@
   },
   "filter": {
     "kind_all": "すべてのイベント種別",
-    "kind_label": "イベント種別",
+    "kind_label": "絞り込み",
+    "kind_group": {
+      "task": "タスク",
+      "comment": "コメント",
+      "attachment": "添付",
+      "member": "メンバー",
+      "dependency": "依存関係",
+      "constraint": "制約",
+      "transition": "遷移",
+      "signal": "シグナル"
+    },
     "actor_all": "すべての実行者",
     "actor_label": "実行者",
     "reset": "フィルターをリセット"

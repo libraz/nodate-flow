@@ -12,7 +12,33 @@ import { type ChangeEvent, type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useWorkspaceUsersQuery } from '../workspaces/api';
-import { TIMELINE_KINDS, type TimelineFilters } from './api';
+import type { TimelineFilters } from './api';
+
+/** Grouped kinds — drives the sectioned chip filter UI. */
+const KIND_GROUPS: readonly { key: string; kinds: readonly string[] }[] = [
+  { key: 'task', kinds: ['task.created', 'task.updated', 'task.disabled'] },
+  {
+    key: 'comment',
+    kinds: ['task.comment.added', 'task.comment.edited', 'task.comment.removed'],
+  },
+  { key: 'attachment', kinds: ['task.attachment.added', 'task.attachment.removed'] },
+  { key: 'member', kinds: ['task.actor.added', 'task.actor.removed'] },
+  { key: 'dependency', kinds: ['task.dependency.added', 'task.dependency.removed'] },
+  { key: 'constraint', kinds: ['task.constraint.added', 'task.constraint.removed'] },
+  {
+    key: 'transition',
+    kinds: [
+      'task.transition.start',
+      'task.transition.block',
+      'task.transition.unblock',
+      'task.transition.submit',
+      'task.transition.complete',
+      'task.transition.reopen',
+      'task.transition.cancel',
+    ],
+  },
+  { key: 'signal', kinds: ['signal.attached'] },
+];
 
 export interface EventFilterBarProps {
   filters: TimelineFilters;
@@ -94,89 +120,155 @@ export default function EventFilterBar({
 
   const actorLabel = t('filter.actor_label', { defaultValue: t('filter.actor_all') });
 
+  const labelFor = (kind: string): string =>
+    t(`event_kind.${kind.replace(/\./g, '_')}`, { defaultValue: kind });
+
+  const renderChip = (kind: string): ReactElement => {
+    const active = selectedKinds.has(kind);
+    return (
+      <button
+        key={kind}
+        type="button"
+        aria-pressed={active}
+        onClick={() => {
+          toggleKind(kind);
+        }}
+        style={{
+          padding: '0.25rem 0.625rem',
+          borderRadius: '999px',
+          border: `1px solid ${active ? 'var(--color-accent, #9b59b6)' : 'var(--color-border)'}`,
+          background: active
+            ? 'var(--color-accent-subtle, rgba(155,89,182,0.12))'
+            : 'var(--color-surface, transparent)',
+          color: active ? 'var(--color-accent, #9b59b6)' : 'var(--color-fg)',
+          fontSize: '0.8125rem',
+          cursor: 'pointer',
+        }}
+      >
+        {labelFor(kind)}
+      </button>
+    );
+  };
+
   return (
-    <div
+    <details
       style={{
-        display: 'flex',
-        gap: '0.75rem',
-        alignItems: 'flex-end',
-        flexWrap: 'wrap',
-        padding: '0.5rem 0',
+        border: '1px solid var(--color-border)',
+        borderRadius: '0.5rem',
+        padding: '0.5rem 0.75rem',
+        background: 'var(--color-surface, transparent)',
       }}
     >
-      <div
-        role="group"
-        aria-label={t('filter.kind_label')}
-        style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', fontSize: '0.75rem' }}
+      <summary
+        style={{
+          cursor: 'pointer',
+          fontSize: '0.8125rem',
+          color: 'var(--color-muted)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+        }}
       >
-        <span style={{ color: 'var(--color-muted)' }}>{t('filter.kind_label')}</span>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem', maxInlineSize: '32rem' }}>
-          {(() => {
-            const seen = new Set<string>();
-            const options: { kind: string; label: string }[] = [];
-            for (const kind of TIMELINE_KINDS) {
-              const label = t(`event_kind.${kind.replace(/\./g, '_')}`, { defaultValue: kind });
-              if (seen.has(label)) continue;
-              seen.add(label);
-              options.push({ kind, label });
-            }
-            return options.map((o) => {
-              const active = selectedKinds.has(o.kind);
-              return (
-                <button
-                  key={o.kind}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => {
-                    toggleKind(o.kind);
-                  }}
-                  style={{
-                    padding: '0.25rem 0.625rem',
-                    borderRadius: '999px',
-                    border: `1px solid ${active ? 'var(--color-accent, #9b59b6)' : 'var(--color-border)'}`,
-                    background: active
-                      ? 'var(--color-accent-subtle, rgba(155,89,182,0.12))'
-                      : 'var(--color-surface, transparent)',
-                    color: active ? 'var(--color-accent, #9b59b6)' : 'var(--color-fg)',
-                    fontSize: '0.8125rem',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {o.label}
-                </button>
-              );
-            });
-          })()}
+        {t('filter.kind_label')}
+        {selectedKinds.size > 0 || (filters.actor?.length ?? 0) > 0 ? (
+          <span
+            style={{
+              padding: '0 0.5rem',
+              borderRadius: '999px',
+              background: 'var(--color-accent-subtle, rgba(155,89,182,0.15))',
+              color: 'var(--color-accent, #9b59b6)',
+              fontSize: '0.6875rem',
+            }}
+          >
+            {selectedKinds.size + (filters.actor?.length ?? 0)}
+          </span>
+        ) : null}
+      </summary>
+
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.625rem',
+          paddingBlockStart: '0.75rem',
+        }}
+      >
+        {KIND_GROUPS.map((group) => (
+          <div
+            key={group.key}
+            role="group"
+            aria-label={t(`filter.kind_group.${group.key}`, { defaultValue: group.key })}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '7rem 1fr',
+              alignItems: 'center',
+              columnGap: '0.75rem',
+              rowGap: '0.25rem',
+            }}
+          >
+            <span
+              style={{
+                fontSize: '0.6875rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                color: 'var(--color-muted)',
+              }}
+            >
+              {t(`filter.kind_group.${group.key}`, { defaultValue: group.key })}
+            </span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem' }}>
+              {group.kinds.map((k) => renderChip(k))}
+            </div>
+          </div>
+        ))}
+
+        <div
+          role="group"
+          aria-label={actorLabel}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '7rem 1fr',
+            alignItems: 'center',
+            columnGap: '0.75rem',
+            marginBlockStart: '0.25rem',
+            paddingBlockStart: '0.625rem',
+            borderBlockStart: '1px solid var(--color-border)',
+          }}
+        >
+          <span
+            style={{
+              fontSize: '0.6875rem',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              color: 'var(--color-muted)',
+            }}
+          >
+            {actorLabel}
+          </span>
+          {workspaceId !== undefined ? (
+            <Suspense
+              fallback={
+                <Input disabled placeholder={t('filter.actor_all')} aria-label={actorLabel} />
+              }
+            >
+              <ActorPicker
+                workspaceId={workspaceId}
+                selected={filters.actor ?? []}
+                onSelect={handleActorChange}
+                label={actorLabel}
+              />
+            </Suspense>
+          ) : (
+            <Input disabled placeholder={t('filter.actor_all')} aria-label={actorLabel} />
+          )}
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <Button type="button" variant="ghost" onClick={handleReset}>
+            {t('filter.reset')}
+          </Button>
         </div>
       </div>
-
-      <div
-        style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.75rem' }}
-        role="group"
-        aria-label={actorLabel}
-      >
-        <span style={{ color: 'var(--color-muted)' }}>{actorLabel}</span>
-        {workspaceId !== undefined ? (
-          <Suspense
-            fallback={
-              <Input disabled placeholder={t('filter.actor_all')} aria-label={actorLabel} />
-            }
-          >
-            <ActorPicker
-              workspaceId={workspaceId}
-              selected={filters.actor ?? []}
-              onSelect={handleActorChange}
-              label={actorLabel}
-            />
-          </Suspense>
-        ) : (
-          <Input disabled placeholder={t('filter.actor_all')} aria-label={actorLabel} />
-        )}
-      </div>
-
-      <Button type="button" variant="ghost" onClick={handleReset}>
-        {t('filter.reset')}
-      </Button>
-    </div>
+    </details>
   );
 }

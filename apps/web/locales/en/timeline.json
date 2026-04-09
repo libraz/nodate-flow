@@ -9,7 +9,17 @@
   },
   "filter": {
     "kind_all": "All event types",
-    "kind_label": "Event type",
+    "kind_label": "Filters",
+    "kind_group": {
+      "task": "Task",
+      "comment": "Comment",
+      "attachment": "Attachment",
+      "member": "Member",
+      "dependency": "Dependency",
+      "constraint": "Constraint",
+      "transition": "Transition",
+      "signal": "Signal"
+    },
     "actor_all": "All actors",
     "actor_label": "Actor",
     "reset": "Reset filters"
