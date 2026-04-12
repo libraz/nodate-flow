@@ -73,7 +73,7 @@ build-web:
 
 # ---------- test ----------
 
-.PHONY: test test-api test-web test-e2e
+.PHONY: test test-api test-web test-e2e test-contract
 test: test-api test-web ## Run unit/integration tests (Go + TS)
 
 test-api: ## Go tests
@@ -84,6 +84,9 @@ test-web: ## Vitest
 
 test-e2e: ## Playwright E2E
 	cd apps/web && $(PKG_RUN) e2e
+
+test-contract: ## Schemathesis contract tests (requires running API)
+	./scripts/contract-test.sh
 
 # ---------- lint / format / typecheck ----------
 
