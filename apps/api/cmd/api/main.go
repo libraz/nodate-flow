@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime/debug"
+	"strings"
 	"syscall"
 	"time"
 
@@ -28,6 +30,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/router"
 	nflog "github.com/nodate-flow/nodate-flow/apps/api/internal/log"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/obs"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/stream"
 )
 
@@ -39,6 +42,29 @@ func main() {
 	if err != nil {
 		logger.Error("config load failed", "err", err)
 		os.Exit(1)
+	}
+
+	// OpenTelemetry tracing. When NF_OTEL_ENDPOINT is empty the provider
+	// is a no-op so the rest of the codebase can call otel.Tracer() freely.
+	traceShutdown, err := obs.InitTracer(context.Background(), obs.TracerConfig{
+		Endpoint:       cfg.OtelEndpoint,
+		ServiceName:    "nodate-flow-api",
+		ServiceVersion: resolveVersion(),
+		Insecure:       cfg.OtelInsecure,
+	})
+	if err != nil {
+		logger.Error("otel tracer init failed", "err", err)
+		os.Exit(1)
+	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := traceShutdown(ctx); err != nil {
+			logger.Error("otel tracer shutdown failed", "err", err)
+		}
+	}()
+	if cfg.OtelEndpoint != "" {
+		logger.Info("otel tracing enabled", "endpoint", cfg.OtelEndpoint)
 	}
 
 	if cfg.DbDsn == "" {
@@ -244,6 +270,7 @@ func main() {
 	// its access logs; tests build the router directly without it.
 	outer := chi.NewRouter()
 	outer.Use(nflog.RequestLogger(logger))
+	outer.Use(obs.TraceMiddleware())
 	outer.Use(buildCORS(cfg.CorsAllowedOrigins))
 	outer.Mount("/", inner)
 
@@ -368,4 +395,16 @@ func buildCORS(allowed []string) func(http.Handler) http.Handler {
 		AllowCredentials: allowCreds,
 		MaxAge:           600,
 	})
+}
+
+// resolveVersion returns NF_VERSION, the Go build main module version, or
+// "dev". Used for OTel service.version.
+func resolveVersion() string {
+	if v := strings.TrimSpace(os.Getenv("NF_VERSION")); v != "" {
+		return v
+	}
+	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		return info.Main.Version
+	}
+	return "dev"
 }

@@ -143,6 +143,14 @@ type Config struct {
 	// AgentRunsRetention is the minimum age a finished agent_runs
 	// row must reach before the purger deletes it.
 	AgentRunsRetention time.Duration `env:"NF_AGENT_RUNS_RETENTION" envDefault:"168h"`
+
+	// OtelEndpoint is the OTLP HTTP collector endpoint (e.g.
+	// "localhost:4318"). When empty, tracing is disabled and the server
+	// registers a no-op TracerProvider.
+	OtelEndpoint string `env:"NF_OTEL_ENDPOINT" envDefault:""`
+	// OtelInsecure disables TLS for the OTLP exporter connection.
+	// Useful for local development against a sidecar collector.
+	OtelInsecure bool `env:"NF_OTEL_INSECURE" envDefault:"true"`
 }
 
 // Load parses NF_* environment variables into a Config.
