@@ -11,6 +11,17 @@
     "tagline": "Work flows. You observe.",
     "shortcuts": "Shortcuts"
   },
+  "home": {
+    "greeting_name": "Hello, {name}.",
+    "quick_create": "New task",
+    "quick_search": "Search",
+    "stat_open": "Open tasks",
+    "stat_overdue": "Overdue",
+    "stat_due_today": "Due today",
+    "stat_done": "Completed",
+    "recent_tasks": "Your tasks",
+    "view_all_tasks": "View all tasks →"
+  },
   "nav": {
     "theme": "Theme",
     "language": "Language",
@@ -203,6 +214,7 @@
       "name_required": "Name is required.",
       "slug_required": "Slug is required.",
       "slug_format": "Slug may only contain lowercase letters, numbers, and hyphens.",
+      "slug_taken": "This slug is already taken. Please choose another.",
       "email_required": "Email is required.",
       "email_invalid": "Enter a valid email address."
     },
@@ -284,6 +296,7 @@
       "name_required": "Name is required.",
       "slug_required": "Slug is required.",
       "slug_format": "Slug may only contain lowercase letters, numbers, and hyphens.",
+      "slug_taken": "This slug is already taken in the workspace. Please choose another.",
       "user_id_required": "User ID is required."
     },
     "errors": {
@@ -484,5 +497,18 @@
       "password_min": "Password must be at least 8 characters.",
       "name_required": "Display name is required."
     }
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "section_navigation": "Navigation",
+    "section_tasks": "Tasks",
+    "section_general": "General",
+    "create_task": "Create task",
+    "focus_search": "Search",
+    "go_inbox": "Go to Inbox",
+    "go_today": "Go to My Tasks",
+    "go_workspaces": "Go to Workspaces",
+    "go_settings": "Go to Settings",
+    "show_help": "Show shortcuts"
   }
 }

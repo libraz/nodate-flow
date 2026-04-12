@@ -100,8 +100,16 @@ export default function WorkspaceCreateDialog({
       });
       reset();
       onClose();
-    } catch {
-      toaster.show({ tone: 'danger', message: t('workspaces.errors.create_failed') });
+    } catch (err) {
+      const code =
+        err && typeof err === 'object' && 'code' in err
+          ? (err as { code?: string }).code
+          : undefined;
+      if (code === 'WS.WORKSPACE.SLUG_ALREADY_TAKEN') {
+        setErrors((prev) => ({ ...prev, slug: 'workspaces.validation.slug_taken' }));
+      } else {
+        toaster.show({ tone: 'danger', message: t('workspaces.errors.create_failed') });
+      }
     } finally {
       setSubmitting(false);
     }

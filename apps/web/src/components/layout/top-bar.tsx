@@ -118,6 +118,7 @@ export default function TopBar(): ReactElement {
               type="button"
               className={styles.searchButton}
               aria-label={t('topbar.search.placeholder')}
+              data-search-trigger
               onClick={() => {
                 setPaletteOpen(true);
               }}

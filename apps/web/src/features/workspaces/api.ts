@@ -42,6 +42,11 @@ export class WorkspaceApiError extends Error {
   }
 }
 
+function extractCode(detail: string): string | undefined {
+  const m = detail.match(/^([A-Z][A-Z0-9_.]+):/);
+  return m ? m[1] : undefined;
+}
+
 function toError(err: unknown, fallback: string): WorkspaceApiError {
   if (err && typeof err === 'object') {
     const obj = err as { detail?: unknown; title?: unknown; type?: unknown };
@@ -49,7 +54,10 @@ function toError(err: unknown, fallback: string): WorkspaceApiError {
       (typeof obj.detail === 'string' && obj.detail) ||
       (typeof obj.title === 'string' && obj.title) ||
       fallback;
-    const code = typeof obj.type === 'string' ? obj.type : undefined;
+    const code =
+      (typeof obj.type === 'string' && obj.type) ||
+      (typeof obj.detail === 'string' && extractCode(obj.detail)) ||
+      undefined;
     return new WorkspaceApiError(code, message);
   }
   return new WorkspaceApiError(undefined, fallback);

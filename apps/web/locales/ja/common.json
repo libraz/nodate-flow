@@ -11,6 +11,17 @@
     "tagline": "仕事は流れる。あなたは見守る。",
     "shortcuts": "ショートカット"
   },
+  "home": {
+    "greeting_name": "こんにちは、{name} さん。",
+    "quick_create": "タスクを作成",
+    "quick_search": "検索",
+    "stat_open": "未完了タスク",
+    "stat_overdue": "期限超過",
+    "stat_due_today": "今日が期日",
+    "stat_done": "完了済み",
+    "recent_tasks": "担当タスク",
+    "view_all_tasks": "すべてのタスクを表示 →"
+  },
   "nav": {
     "theme": "テーマ",
     "language": "言語",
@@ -203,6 +214,7 @@
       "name_required": "名前を入力してください。",
       "slug_required": "スラッグを入力してください。",
       "slug_format": "スラッグには小文字・数字・ハイフンのみ使用できます。",
+      "slug_taken": "このスラッグは既に使用されています。別のスラッグを入力してください。",
       "email_required": "メールアドレスを入力してください。",
       "email_invalid": "有効なメールアドレスを入力してください。"
     },
@@ -284,6 +296,7 @@
       "name_required": "名前を入力してください。",
       "slug_required": "スラッグを入力してください。",
       "slug_format": "スラッグには小文字・数字・ハイフンのみ使用できます。",
+      "slug_taken": "このスラッグはワークスペース内で既に使用されています。別のスラッグを入力してください。",
       "user_id_required": "ユーザー ID を入力してください。"
     },
     "errors": {
@@ -484,5 +497,18 @@
       "password_min": "パスワードは 8 文字以上で入力してください。",
       "name_required": "表示名を入力してください。"
     }
+  },
+  "shortcuts": {
+    "title": "キーボードショートカット",
+    "section_navigation": "ナビゲーション",
+    "section_tasks": "タスク",
+    "section_general": "全般",
+    "create_task": "タスクを作成",
+    "focus_search": "検索",
+    "go_inbox": "受信トレイへ移動",
+    "go_today": "今日のタスクへ移動",
+    "go_workspaces": "ワークスペースへ移動",
+    "go_settings": "設定へ移動",
+    "show_help": "ショートカットを表示"
   }
 }

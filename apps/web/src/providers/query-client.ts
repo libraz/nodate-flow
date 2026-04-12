@@ -26,7 +26,7 @@ export function createQueryClient(): QueryClient {
         },
       },
       mutations: {
-        throwOnError: true,
+        throwOnError: false,
       },
     },
   });

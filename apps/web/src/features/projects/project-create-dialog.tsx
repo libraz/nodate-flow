@@ -103,8 +103,16 @@ export default function ProjectCreateDialog({
       });
       reset();
       onClose();
-    } catch {
-      toaster.show({ tone: 'danger', message: t('projects.errors.create_failed') });
+    } catch (err) {
+      const code =
+        err && typeof err === 'object' && 'code' in err
+          ? (err as { code?: string }).code
+          : undefined;
+      if (code === 'WS.PROJECT.SLUG_ALREADY_TAKEN') {
+        setErrors((prev) => ({ ...prev, slug: 'projects.validation.slug_taken' }));
+      } else {
+        toaster.show({ tone: 'danger', message: t('projects.errors.create_failed') });
+      }
     } finally {
       setSubmitting(false);
     }

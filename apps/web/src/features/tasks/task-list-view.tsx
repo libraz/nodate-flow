@@ -1,8 +1,9 @@
 /**
  * TaskListView — DataGrid view of tasks for a project.
  *
- * Columns: title, status, assignee (placeholder until F8 plumbs actors),
- * due date, priority, updated. Rows route to /tasks/$taskId.
+ * Columns: title, status, deps, assignee, due date, priority, updated.
+ * Features: column sorting (built into DataGrid), priority color indicators,
+ * status badges, overdue date highlighting.
  */
 
 import DataGrid from '@nodate-flow/ui/primitives/data-grid';
@@ -28,6 +29,14 @@ const PRIORITY_KEY: Record<TaskPriority, string> = {
   4: 'tasks.priority.urgent',
 };
 
+const PRIORITY_COLOR: Record<TaskPriority, string> = {
+  0: 'var(--color-muted)',
+  1: '#3498db',
+  2: '#e67e22',
+  3: '#e74c3c',
+  4: '#c0392b',
+};
+
 const STATE_KEY: Record<TaskDerivedState, string> = {
   open: 'tasks.status.open',
   waiting: 'tasks.status.waiting',
@@ -36,12 +45,27 @@ const STATE_KEY: Record<TaskDerivedState, string> = {
   cancelled: 'tasks.status.cancelled',
 };
 
+const STATE_COLOR: Record<TaskDerivedState, string> = {
+  open: '#3498db',
+  waiting: '#e67e22',
+  review: '#9b59b6',
+  done: '#27ae60',
+  cancelled: '#95a5a6',
+};
+
 function formatDate(iso: string, locale: string): string {
   try {
     return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(iso));
   } catch {
     return iso;
   }
+}
+
+function isOverdue(dueOn: string | undefined | null): boolean {
+  if (!dueOn) return false;
+  const now = new Date();
+  const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  return dueOn < todayKey;
 }
 
 export default function TaskListView({ projectId }: TaskListViewProps): ReactElement {
@@ -75,16 +99,39 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
     {
       id: 'status',
       accessorKey: 'derivedState',
-      size: 90,
+      size: 100,
       header: () => t('tasks.columns.status'),
       cell: ({ row }) => {
         const state = row.original.derivedState as TaskDerivedState;
-        return <span>{t(STATE_KEY[state] ?? 'tasks.status.open')}</span>;
+        const color = STATE_COLOR[state] ?? STATE_COLOR.open;
+        return (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.375rem',
+              fontSize: '0.8125rem',
+            }}
+          >
+            <span
+              aria-hidden
+              style={{
+                width: '0.5rem',
+                height: '0.5rem',
+                borderRadius: '999px',
+                background: color,
+                flexShrink: 0,
+              }}
+            />
+            {t(STATE_KEY[state] ?? 'tasks.status.open')}
+          </span>
+        );
       },
     },
     {
       id: 'deps',
       size: 60,
+      enableSorting: false,
       header: () => t('tasks.columns.deps'),
       cell: ({ row }) => {
         const count = blockedByOpen.get(row.original.id) ?? 0;
@@ -108,12 +155,9 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
     {
       id: 'assignee',
       size: 110,
+      enableSorting: false,
       header: () => t('tasks.columns.assignee'),
       cell: ({ row }) => {
-        // The list payload carries only the assignee count + primary
-        // id (no display names). Showing a raw uuid slice is worse
-        // than useless; render a dot + count instead so the user can
-        // see "who" belongs in the task detail view.
         const count = row.original.assigneeCount;
         if (count === 0) return <span style={{ color: 'var(--color-muted)' }}>—</span>;
         return (
@@ -144,16 +188,54 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
       accessorKey: 'dueOn',
       size: 100,
       header: () => t('tasks.columns.due'),
-      cell: ({ row }) => <span>{row.original.dueOn ?? '—'}</span>,
+      cell: ({ row }) => {
+        const dueOn = row.original.dueOn;
+        const overdue =
+          isOverdue(dueOn) &&
+          row.original.derivedState !== 'done' &&
+          row.original.derivedState !== 'cancelled';
+        return (
+          <span
+            style={{
+              color: overdue ? 'var(--nf-color-danger, #c0392b)' : undefined,
+              fontWeight: overdue ? 600 : undefined,
+            }}
+          >
+            {dueOn ?? '—'}
+          </span>
+        );
+      },
     },
     {
       id: 'priority',
       accessorKey: 'priority',
-      size: 80,
+      size: 90,
       header: () => t('tasks.columns.priority'),
       cell: ({ row }) => {
         const p = (row.original.priority as TaskPriority) ?? 0;
-        return <span>{t(PRIORITY_KEY[p] ?? 'tasks.priority.none')}</span>;
+        const color = PRIORITY_COLOR[p] ?? PRIORITY_COLOR[0];
+        return (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.375rem',
+              fontSize: '0.8125rem',
+            }}
+          >
+            <span
+              aria-hidden
+              style={{
+                width: '0.375rem',
+                height: '0.75rem',
+                borderRadius: '0.125rem',
+                background: color,
+                flexShrink: 0,
+              }}
+            />
+            {t(PRIORITY_KEY[p] ?? 'tasks.priority.none')}
+          </span>
+        );
       },
     },
     {
@@ -162,7 +244,9 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
       size: 110,
       header: () => t('tasks.columns.updated'),
       cell: ({ row }) => (
-        <span>{row.original.updatedAt ? formatDate(row.original.updatedAt, locale) : '—'}</span>
+        <span style={{ color: 'var(--color-muted)' }}>
+          {row.original.updatedAt ? formatDate(row.original.updatedAt, locale) : '—'}
+        </span>
       ),
     },
   ];

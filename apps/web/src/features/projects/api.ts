@@ -45,6 +45,11 @@ export class ProjectApiError extends Error {
   }
 }
 
+function extractCode(detail: string): string | undefined {
+  const m = detail.match(/^([A-Z][A-Z0-9_.]+):/);
+  return m ? m[1] : undefined;
+}
+
 function toError(err: unknown, fallback: string): ProjectApiError {
   if (err && typeof err === 'object') {
     const obj = err as { detail?: unknown; title?: unknown; type?: unknown };
@@ -52,7 +57,10 @@ function toError(err: unknown, fallback: string): ProjectApiError {
       (typeof obj.detail === 'string' && obj.detail) ||
       (typeof obj.title === 'string' && obj.title) ||
       fallback;
-    const code = typeof obj.type === 'string' ? obj.type : undefined;
+    const code =
+      (typeof obj.type === 'string' && obj.type) ||
+      (typeof obj.detail === 'string' && extractCode(obj.detail)) ||
+      undefined;
     return new ProjectApiError(code, message);
   }
   return new ProjectApiError(undefined, fallback);
