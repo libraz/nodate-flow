@@ -271,7 +271,13 @@ func main() {
 	outer := chi.NewRouter()
 	outer.Use(nflog.RequestLogger(logger))
 	outer.Use(obs.TraceMiddleware())
+	outer.Use(obs.MetricsMiddleware())
 	outer.Use(buildCORS(cfg.CorsAllowedOrigins))
+
+	// Prometheus metrics endpoint. Mounted before the application routes
+	// so it is not gated by auth middleware.
+	outer.Handle("/metrics", obs.MetricsHandler())
+
 	outer.Mount("/", inner)
 
 	// 4.AGENT-1: interval scheduler. Ticks every NF_AGENT_TICK_INTERVAL
