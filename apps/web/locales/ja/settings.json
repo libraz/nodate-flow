@@ -8,6 +8,7 @@
     "ai_agents": "AI エージェント",
     "ai_activity": "AI アクティビティ",
     "weekly_digest": "週次ダイジェスト",
+    "audit_log": "監査ログ",
     "security": "セキュリティ",
     "integrations": "連携"
   },
@@ -46,6 +47,39 @@
     "description": "このワークスペースで最近実行された LLM 呼び出しの読み取り専用監査です。プロンプトとレスポンスは記録時にマスクされます。",
     "empty": "LLM 呼び出しの記録はまだありません。",
     "error_code": "エラー: {code}"
+  },
+  "audit_log": {
+    "title": "監査ログ",
+    "description": "このワークスペースで実行された操作の読み取り専用ログです。メタデータは記録時にマスクされます。",
+    "empty": "監査エントリはまだ記録されていません。",
+    "unknown_actor": "システム",
+    "export_csv": "CSV エクスポート",
+    "column": {
+      "timestamp": "日時",
+      "action": "アクション",
+      "actor": "実行者",
+      "resource_type": "リソース種別",
+      "resource_id": "リソース ID",
+      "ip_address": "IP アドレス",
+      "metadata": "メタデータ"
+    },
+    "filter": {
+      "action": "アクション",
+      "resource_type": "リソース種別",
+      "actor_search": "実行者",
+      "actor_search_placeholder": "名前で検索\u2026",
+      "date_from": "開始日",
+      "date_to": "終了日",
+      "all_actions": "すべてのアクション",
+      "all_types": "すべての種別",
+      "clear": "フィルターをクリア"
+    },
+    "pagination": {
+      "label": "監査ログのページネーション",
+      "prev": "前へ",
+      "next": "次へ",
+      "page_of": "{total} ページ中 {current} ページ"
+    }
   },
   "sections_label": "ワークスペース設定セクション",
   "settings_sections_label": "設定セクション",
