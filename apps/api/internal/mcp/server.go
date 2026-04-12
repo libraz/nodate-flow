@@ -1,15 +1,19 @@
-// Package mcp implements the nodate-flow MCP server. It exposes a small
-// Streamable HTTP (JSON-RPC 2.0) transport at POST /mcp and a set of
-// tools scoped to a workspace. Tools are intentionally implemented as
-// direct sqlc calls in-process (Path A) rather than calling the HTTP
-// handlers of the REST API. Direct sqlc is not considered "raw SQL" for
-// the purposes of the DRY rule — the generated queries package is the
-// single source of truth for SQL.
+// Package mcp implements the nodate-flow MCP server. It exposes a
+// Streamable HTTP (JSON-RPC 2.0) transport at /mcp with two methods:
+//
+//   - POST: single JSON-RPC 2.0 request/response (tools/call, etc.)
+//   - GET:  SSE stream delivering real-time workspace event notifications
+//
+// Tools are intentionally implemented as direct sqlc calls in-process
+// (Path A) rather than calling the HTTP handlers of the REST API.
+// Direct sqlc is not considered "raw SQL" for the purposes of the DRY
+// rule — the generated queries package is the single source of truth
+// for SQL.
 //
 // Current tool set: list_projects, list_tasks, get_task, create_task,
 // update_task, add_comment, search_tasks, propose_tasks_from,
 // propose_priority, propose_steps. Per-token rate limiting is enforced
-// at 60 req/min. SSE streaming is deferred.
+// at 60 req/min.
 package mcp
 
 import (
@@ -50,11 +54,13 @@ type Deps struct {
 	NlQuery *nlquery.Compiler
 }
 
-// Handler implements http.Handler for the /mcp endpoint.
+// Handler implements http.Handler for the /mcp endpoint. It supports
+// both POST (JSON-RPC request/response) and GET (SSE event stream).
 type Handler struct {
 	deps  Deps
 	tools map[string]tool
 	rl    mcpRateLimiter
+	sse   *sseHub
 }
 
 // mcpRateLimiter is a per-token sliding window rate limiter for the MCP
@@ -114,18 +120,38 @@ func (rl *mcpRateLimiter) allow(token string) (bool, time.Duration) {
 }
 
 // NewHandler constructs the MCP HTTP handler with the default tool
-// set registered.
+// set registered and SSE hub initialised. Call [Handler.RegisterEventHook]
+// after construction to wire the eventbus notify hook.
 func NewHandler(deps Deps) *Handler {
-	h := &Handler{deps: deps, tools: map[string]tool{}, rl: newMCPRateLimiter()}
+	h := &Handler{
+		deps:  deps,
+		tools: map[string]tool{},
+		rl:    newMCPRateLimiter(),
+		sse:   newSSEHub(),
+	}
 	registerTools(h)
 	return h
 }
 
-// ServeHTTP is the Streamable HTTP entry point. GET returns 405 (SSE is
-// deferred). POST expects a single JSON-RPC 2.0 request frame.
+// RegisterEventHook returns the eventbus.NotifyHook that broadcasts
+// workspace events to connected SSE clients. The caller should pass
+// this to eventbus.AddNotifyHook.
+func (h *Handler) RegisterEventHook() func(ctx context.Context, workspaceID uint32, eventType string) {
+	return h.onWorkspaceEvent
+}
+
+// ServeHTTP is the Streamable HTTP entry point. GET opens an SSE
+// stream for workspace event notifications. POST expects a single
+// JSON-RPC 2.0 request frame.
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.Header().Set("Allow", "POST")
+	switch r.Method {
+	case http.MethodGet:
+		h.serveSSE(w, r)
+		return
+	case http.MethodPost:
+		// fall through to POST handling below
+	default:
+		w.Header().Set("Allow", "GET, POST")
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -173,7 +199,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				"version": "0.1.0",
 			},
 			"capabilities": map[string]any{
-				"tools": map[string]any{},
+				"tools":         map[string]any{},
+				"notifications": map[string]any{},
 			},
 		})
 	case "tools/list":
