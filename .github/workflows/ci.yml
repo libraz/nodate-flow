@@ -1,0 +1,135 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: "1.25.0"
+  BUN_VERSION: "latest"
+
+jobs:
+  # ---------- Job 1: Lint and typecheck (Go + TS in parallel steps) ----------
+  lint-and-typecheck:
+    name: Lint and typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: apps/api/go.sum
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install JS dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Biome check
+        run: bun run check
+
+      - name: TypeScript typecheck
+        run: bun run typecheck
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+          working-directory: apps/api
+
+      - name: Go vet
+        run: go vet ./...
+        working-directory: apps/api
+
+  # ---------- Job 2: Unit tests (Go short + Vitest) ----------
+  test-unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    needs: [lint-and-typecheck]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: apps/api/go.sum
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install JS dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Go test (short)
+        run: go test -short -race -count=1 ./...
+        working-directory: apps/api
+
+      - name: Vitest
+        run: bun run test
+        working-directory: apps/web
+
+  # ---------- Job 3: Integration tests (Go E2E + Playwright) ----------
+  test-integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    needs: [lint-and-typecheck]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: apps/api/go.sum
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install JS dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: bunx playwright install --with-deps chromium
+        working-directory: apps/web
+
+      - name: Go test (full, with testcontainers)
+        run: go test -race -count=1 -timeout=10m ./...
+        working-directory: apps/api
+
+      - name: Build web for E2E
+        run: bun run build
+        working-directory: apps/web
+
+      - name: Playwright E2E
+        run: bun run e2e
+        working-directory: apps/web
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 14
+
+  # ---------- Job 4: Security (main only, placeholder) ----------
+  security:
+    name: Security scan
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    needs: [test-unit, test-integration]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Placeholder
+        run: echo "Security scanning will be configured in a future iteration."
