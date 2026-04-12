@@ -82,6 +82,8 @@ type Querier interface {
 	// ============================================================================
 	// Insert a new LLM provider with encrypted API key.
 	CreateProvider(ctx context.Context, arg CreateProviderParams) (int64, error)
+	// Insert a new repository-to-workspace mapping.
+	CreateRepoMapping(ctx context.Context, arg CreateRepoMappingParams) (int64, error)
 	// Insert a new refresh-token session for a user.
 	CreateSession(ctx context.Context, arg CreateSessionParams) (int64, error)
 	// Insert a stub user for invitations: no identity row, display_name defaults to email.
@@ -109,6 +111,9 @@ type Querier interface {
 	DeleteOauthState(ctx context.Context, state string) error
 	// Soft-delete a provider.
 	DeleteProvider(ctx context.Context, arg DeleteProviderParams) error
+	// Soft-delete a mapping by setting enabled = FALSE. Scoped to the
+	// workspace and identified by public_id.
+	DeleteRepoMapping(ctx context.Context, arg DeleteRepoMappingParams) error
 	// Remove every embedding row for a task across all models. ON DELETE
 	// CASCADE already handles task deletion; this query is for the
 	// re-embed-on-edit flow when a workspace switches to a different model.
@@ -215,6 +220,10 @@ type Querier interface {
 	GetAttachmentByPublicID(ctx context.Context, arg GetAttachmentByPublicIDParams) (GetAttachmentByPublicIDRow, error)
 	// Fetch a single lens by its public_id.
 	GetLensByPublicID(ctx context.Context, arg GetLensByPublicIDParams) (GetLensByPublicIDRow, error)
+	// Look up the workspace mapping for a GitHub repository by its numeric
+	// repo ID. Used by the webhook handler to route incoming events to the
+	// correct workspace. Only returns enabled rows.
+	GetRepoMappingByRepoID(ctx context.Context, repoID uint64) (GetRepoMappingByRepoIDRow, error)
 	// Queries dedicated to the constraint engine (Phase 3, 3.ENG-2).
 	// Keyed off the internal task_id so the engine never has to know
 	// about public_id resolution. All workspace scoping is enforced by
@@ -320,6 +329,9 @@ type Querier interface {
 	ListProvidersForWorkspace(ctx context.Context, arg ListProvidersForWorkspaceParams) ([]ListProvidersForWorkspaceRow, error)
 	// List recent audit log entries for a workspace via v_audit_recent.
 	ListRecentAudit(ctx context.Context, arg ListRecentAuditParams) ([]ListRecentAuditRow, error)
+	// List all active repository mappings for a workspace. Returns metadata
+	// only (no internal IDs leak through the view layer).
+	ListRepoMappingsForWorkspace(ctx context.Context, workspaceID uint32) ([]ListRepoMappingsForWorkspaceRow, error)
 	// List a user's active sessions ordered by most recent first.
 	ListSessionsForUser(ctx context.Context, arg ListSessionsForUserParams) ([]ListSessionsForUserRow, error)
 	// List signals attached to a task via v_inbox.

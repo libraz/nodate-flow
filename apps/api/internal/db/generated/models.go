@@ -1433,6 +1433,36 @@ type ProjectMember struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
+// Maps GitHub repositories to workspaces for webhook routing
+type RepoWorkspaceMapping struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Internal FK to user_integrations.id (the GitHub OAuth connection)
+	IntegrationID uint32 `json:"integrationId"`
+	// GitHub owner/repo (e.g. nodate-flow/nodate-flow)
+	RepoFullName string `json:"repoFullName"`
+	// GitHub numeric repository ID for webhook lookup
+	RepoID uint64 `json:"repoId"`
+	// Optional FK to projects.id for routing issues/PRs
+	DefaultProjectID sql.NullInt32 `json:"defaultProjectId"`
+	// Sync GitHub issues as tasks
+	IsSyncIssues bool `json:"isSyncIssues"`
+	// Sync GitHub pull requests as tasks
+	IsSyncPullRequests bool `json:"isSyncPullRequests"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
 // Refresh-token backed sessions
 type Session struct {
 	// Internal PK, never exposed
