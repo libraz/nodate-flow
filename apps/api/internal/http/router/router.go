@@ -35,16 +35,16 @@ import (
 	authhandlers "github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/inbox"
 	integrationshandlers "github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/integrations"
-	integrationspkg "github.com/nodate-flow/nodate-flow/apps/api/internal/integrations"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/lenses"
-	"github.com/nodate-flow/nodate-flow/apps/api/internal/obs"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/projects"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/signals"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/tasks"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/timeline"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/workspaces"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/middleware"
+	integrationspkg "github.com/nodate-flow/nodate-flow/apps/api/internal/integrations"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/mcp"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/obs"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/storage"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/stream"
 )
@@ -161,6 +161,8 @@ func BuildResult(deps Deps) Result {
 	// handlers can record it on new sessions without re-parsing
 	// X-Forwarded-For themselves.
 	r.Use(middleware.ClientIP())
+	// Security response headers: CSP, HSTS, X-Content-Type-Options, etc.
+	r.Use(middleware.SecurityHeaders())
 	// Each huma.API needs its own huma.Config so it gets a fresh
 	// schema registry and its own *OpenAPI document; sharing one
 	// config between sub-APIs would point every group at the same
@@ -354,48 +356,48 @@ func BuildResult(deps Deps) Result {
 			Path:        "/workspaces/{wsId}/ai/metrics",
 			Summary:     "AI suggestion acceptance metrics over a trailing window",
 		}, aihandlers.Metrics(aiDeps))
-			huma.Register(subAPI, huma.Operation{
-				OperationID: "ai-agent-pause",
-				Method:      http.MethodPost,
-				Path:        "/workspaces/{wsId}/ai/agents/{agentId}/pause",
-				Summary:     "Toggle the kill switch on an AI agent (4.AGENT-3)",
-			}, aihandlers.PauseAgent(aiDeps))
-			huma.Register(subAPI, huma.Operation{
-				OperationID: "ai-agents-list",
-				Method:      http.MethodGet,
-				Path:        "/workspaces/{wsId}/ai/agents",
-				Summary:     "List AI agents for a workspace",
-			}, aihandlers.ListAgents(aiDeps))
-			huma.Register(subAPI, huma.Operation{
-				OperationID: "ai-agents-create",
-				Method:      http.MethodPost,
-				Path:        "/workspaces/{wsId}/ai/agents",
-				Summary:     "Create a new AI agent",
-			}, aihandlers.CreateAgent(aiDeps))
-			huma.Register(subAPI, huma.Operation{
-				OperationID: "ai-agent-schedule-update",
-				Method:      http.MethodPatch,
-				Path:        "/workspaces/{wsId}/ai/agents/{agentId}/schedule",
-				Summary:     "Update an AI agent's schedule_kind trigger mode",
-			}, aihandlers.UpdateAgentSchedule(aiDeps))
-			huma.Register(subAPI, huma.Operation{
-				OperationID: "ai-agent-event-triggers-update",
-				Method:      http.MethodPatch,
-				Path:        "/workspaces/{wsId}/ai/agents/{agentId}/event-triggers",
-				Summary:     "Replace an AI agent's event_trigger_types list",
-			}, aihandlers.UpdateAgentEventTriggers(aiDeps))
-			huma.Register(subAPI, huma.Operation{
-				OperationID: "ai-agent-trigger",
-				Method:      http.MethodPost,
-				Path:        "/workspaces/{wsId}/ai/agents/{agentId}/trigger",
-				Summary:     "Manually trigger one run of an AI agent",
-			}, aihandlers.TriggerAgent(aiDeps, deps.AgentQueue, deps.AgentRunner))
-			huma.Register(subAPI, huma.Operation{
-				OperationID: "ai-models-list",
-				Method:      http.MethodGet,
-				Path:        "/workspaces/{wsId}/ai/models",
-				Summary:     "List workspace AI models across all providers",
-			}, aihandlers.ListModels(aiDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "ai-agent-pause",
+			Method:      http.MethodPost,
+			Path:        "/workspaces/{wsId}/ai/agents/{agentId}/pause",
+			Summary:     "Toggle the kill switch on an AI agent (4.AGENT-3)",
+		}, aihandlers.PauseAgent(aiDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "ai-agents-list",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/ai/agents",
+			Summary:     "List AI agents for a workspace",
+		}, aihandlers.ListAgents(aiDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "ai-agents-create",
+			Method:      http.MethodPost,
+			Path:        "/workspaces/{wsId}/ai/agents",
+			Summary:     "Create a new AI agent",
+		}, aihandlers.CreateAgent(aiDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "ai-agent-schedule-update",
+			Method:      http.MethodPatch,
+			Path:        "/workspaces/{wsId}/ai/agents/{agentId}/schedule",
+			Summary:     "Update an AI agent's schedule_kind trigger mode",
+		}, aihandlers.UpdateAgentSchedule(aiDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "ai-agent-event-triggers-update",
+			Method:      http.MethodPatch,
+			Path:        "/workspaces/{wsId}/ai/agents/{agentId}/event-triggers",
+			Summary:     "Replace an AI agent's event_trigger_types list",
+		}, aihandlers.UpdateAgentEventTriggers(aiDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "ai-agent-trigger",
+			Method:      http.MethodPost,
+			Path:        "/workspaces/{wsId}/ai/agents/{agentId}/trigger",
+			Summary:     "Manually trigger one run of an AI agent",
+		}, aihandlers.TriggerAgent(aiDeps, deps.AgentQueue, deps.AgentRunner))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "ai-models-list",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/ai/models",
+			Summary:     "List workspace AI models across all providers",
+		}, aihandlers.ListModels(aiDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-priority-suggestions-list",
 			Method:      http.MethodGet,
