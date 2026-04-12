@@ -73,7 +73,7 @@ build-web:
 
 # ---------- test ----------
 
-.PHONY: test test-api test-web test-e2e test-contract
+.PHONY: test test-api test-web test-e2e test-contract lighthouse
 test: test-api test-web ## Run unit/integration tests (Go + TS)
 
 test-api: ## Go tests
@@ -87,6 +87,9 @@ test-e2e: ## Playwright E2E
 
 test-contract: ## Schemathesis contract tests (requires running API)
 	./scripts/contract-test.sh
+
+lighthouse: build-web ## Run Lighthouse CI (a11y 95+, perf 70+)
+	$(PKG_X) @lhci/cli autorun
 
 # ---------- lint / format / typecheck ----------
 
