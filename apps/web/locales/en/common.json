@@ -519,6 +519,11 @@
       "name_required": "Display name is required."
     }
   },
+  "realtime": {
+    "ai_suggestion": "New AI suggestion available",
+    "ai_invocation": "AI analysis completed",
+    "resync": "Connection restored — data refreshed"
+  },
   "shortcuts": {
     "title": "Keyboard shortcuts",
     "section_navigation": "Navigation",

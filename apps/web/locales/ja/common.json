@@ -519,6 +519,11 @@
       "name_required": "表示名を入力してください。"
     }
   },
+  "realtime": {
+    "ai_suggestion": "新しい AI 提案があります",
+    "ai_invocation": "AI 分析が完了しました",
+    "resync": "接続が復旧しました — データを更新しました"
+  },
   "shortcuts": {
     "title": "キーボードショートカット",
     "section_navigation": "ナビゲーション",

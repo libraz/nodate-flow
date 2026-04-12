@@ -17,9 +17,11 @@
  * hooks re-enable polling as a safety net.
  */
 
+import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
+import { i18n } from '../../i18n';
 import { apiBaseUrl } from '../../lib/sdk';
 import { authStore } from '../auth/auth-store';
 import { type StreamEvent, keysForEvent } from './event-to-keys';
@@ -66,6 +68,19 @@ export function useWorkspaceStream(workspaceId: string | undefined): void {
     const handleEvent = (evt: StreamEvent): void => {
       for (const key of keysForEvent(evt)) {
         void queryClient.invalidateQueries({ queryKey: key });
+      }
+
+      switch (evt.kind) {
+        case 'ai.suggestion.changed':
+          toaster.show({ tone: 'info', message: i18n.t('realtime.ai_suggestion') });
+          break;
+        case 'ai.invocation.written':
+          toaster.show({ tone: 'info', message: i18n.t('realtime.ai_invocation') });
+          break;
+        case 'resync':
+          toaster.show({ tone: 'warning', message: i18n.t('realtime.resync'), duration: 3_000 });
+          break;
+        // task.changed — intentionally no toast (too noisy)
       }
     };
 
