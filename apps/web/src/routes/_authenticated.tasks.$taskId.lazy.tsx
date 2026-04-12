@@ -24,6 +24,7 @@ import { type FormEvent, type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import Markdown from '../components/markdown/markdown';
+import ConstraintEditor from '../features/constraints/constraint-editor';
 import StateGraph from '../features/constraints/state-graph';
 import { useProjectQuery } from '../features/projects/api';
 import {
@@ -45,6 +46,7 @@ import {
 } from '../features/tasks/api';
 import DependenciesSection from '../features/tasks/dependencies-section';
 import { useTaskTimelineQuery } from '../features/timeline/api';
+import ReplayPanel from '../features/timeline/replay-panel';
 import TaskMiniTimeline from '../features/timeline/task-mini-timeline';
 import { useWorkspaceMembersQuery, useWorkspaceQuery } from '../features/workspaces/api';
 
@@ -596,6 +598,30 @@ function Sidebar({
           }
         >
           <StateGraphSection taskId={id} current={state} />
+        </Suspense>
+      </Card>
+
+      <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <Suspense
+          fallback={
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem' }}>
+              <Spinner label={t('common.loading')} />
+            </div>
+          }
+        >
+          <ConstraintEditor taskId={id} />
+        </Suspense>
+      </Card>
+
+      <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <Suspense
+          fallback={
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem' }}>
+              <Spinner label={t('common.loading')} />
+            </div>
+          }
+        >
+          <ReplayPanel taskId={id} />
         </Suspense>
       </Card>
 
