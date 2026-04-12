@@ -31,6 +31,7 @@
 }
 
 .headerCell {
+  position: relative;
   flex: 1 1 0;
   min-inline-size: 0;
   padding-block: var(--nf-space-2);
@@ -100,4 +101,36 @@
 .sortIndicator {
   margin-inline-start: var(--nf-space-1);
   color: var(--nf-color-fg-subtle);
+}
+
+/* --- Column resize handle --- */
+
+.resizeHandle {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  inline-size: 4px;
+  cursor: col-resize;
+  user-select: none;
+  touch-action: none;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.resizeHandle:hover {
+  background: var(--nf-color-border-strong);
+}
+
+.resizeHandle.resizing {
+  background: var(--nf-color-accent);
+}
+
+/* --- Column pinning (left) --- */
+
+.pinnedLeft {
+  background: var(--nf-color-bg-elevated);
+}
+
+.headerRow .pinnedLeft {
+  background: var(--nf-color-bg-sunken);
 }

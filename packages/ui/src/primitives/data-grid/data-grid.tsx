@@ -10,6 +10,7 @@
 
 import {
   type ColumnDef,
+  type ColumnPinningState,
   type OnChangeFn,
   type RowSelectionState,
   type SortingState,
@@ -57,6 +58,14 @@ export interface DataGridProps<TData> {
   rowSelection?: RowSelectionState;
   /** Called when row selection changes. */
   onRowSelectionChange?: (next: RowSelectionState) => void;
+  /** Enables column resizing via drag handles on header cell edges. */
+  enableColumnResizing?: boolean;
+  /** Enables column pinning. Pinned-left columns stay fixed during horizontal scroll. */
+  enableColumnPinning?: boolean;
+  /** Controlled column pinning state. */
+  columnPinning?: ColumnPinningState;
+  /** Called when column pinning changes. */
+  onColumnPinningChange?: (next: ColumnPinningState) => void;
   /** Optional accessible label. */
   'aria-label'?: string;
   /** Optional class on the scroll container. */
@@ -85,6 +94,10 @@ function DataGridInner<TData>(
     enableRowSelection = false,
     rowSelection,
     onRowSelectionChange,
+    enableColumnResizing = false,
+    enableColumnPinning = false,
+    columnPinning: controlledPinning,
+    onColumnPinningChange,
     className,
     style,
   } = props;
@@ -96,6 +109,17 @@ function DataGridInner<TData>(
   const [sorting, setSorting] = useState<SortingState>([]);
   const [internalSelection, setInternalSelection] = useState<RowSelectionState>({});
   const selection = rowSelection ?? internalSelection;
+  const [internalPinning, setInternalPinning] = useState<ColumnPinningState>({});
+  const pinning = controlledPinning ?? internalPinning;
+
+  const handlePinningChange: OnChangeFn<ColumnPinningState> = useCallback(
+    (updater) => {
+      const next = typeof updater === 'function' ? updater(pinning) : updater;
+      if (controlledPinning === undefined) setInternalPinning(next);
+      onColumnPinningChange?.(next);
+    },
+    [pinning, controlledPinning, onColumnPinningChange],
+  );
 
   const handleSelectionChange: OnChangeFn<RowSelectionState> = useCallback(
     (updater) => {
@@ -138,10 +162,14 @@ function DataGridInner<TData>(
   const table = useReactTable<TData>({
     data,
     columns: finalColumns,
-    state: { sorting, rowSelection: selection },
+    state: { sorting, rowSelection: selection, columnPinning: pinning },
     onSortingChange: setSorting,
     onRowSelectionChange: handleSelectionChange,
+    onColumnPinningChange: handlePinningChange,
     enableRowSelection,
+    enableColumnResizing,
+    columnResizeMode: 'onChange',
+    enableColumnPinning,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
   });
@@ -223,6 +251,31 @@ function DataGridInner<TData>(
 
   const headerGroups = table.getHeaderGroups();
 
+  /**
+   * When resizing is active, derive column widths from the table sizing state
+   * so the grid updates on every drag frame (`columnResizeMode: 'onChange'`).
+   */
+  const columnSizeVars: Record<string, string> | undefined = enableColumnResizing
+    ? (() => {
+        const headers = table.getFlatHeaders();
+        const vars: Record<string, string> = {};
+        for (const header of headers) {
+          vars[`--col-${header.id}-size`] = `${header.getSize()}px`;
+        }
+        return vars;
+      })()
+    : undefined;
+
+  /** Compute sticky inline-start offset for pinned-left headers / cells. */
+  const getPinnedOffset = (colIndex: number, headers: { getSize: () => number }[]): number => {
+    let offset = 0;
+    for (let i = 0; i < colIndex; i++) {
+      const h = headers[i];
+      if (h) offset += h.getSize();
+    }
+    return offset;
+  };
+
   const renderRows: { row: (typeof rows)[number] | undefined; idx: number; start: number }[] =
     useFallback
       ? rows.map((row, idx) => ({ row, idx, start: idx * estimateSize }))
@@ -236,7 +289,7 @@ function DataGridInner<TData>(
       aria-rowcount={rows.length + headerGroups.length}
       aria-colcount={colCount}
       className={cx(styles.root, className)}
-      style={style}
+      style={{ ...columnSizeVars, ...style } as CSSProperties}
       tabIndex={-1}
     >
       <div className={styles.table}>
@@ -252,6 +305,15 @@ function DataGridInner<TData>(
                     ? 'descending'
                     : 'none'
                 : undefined;
+              const isPinned = header.column.getIsPinned();
+              const headerStyle: CSSProperties = enableColumnResizing
+                ? { inlineSize: `var(--col-${header.id}-size)`, flex: 'none' }
+                : { flex: `${header.getSize()} 1 0` };
+              if (isPinned === 'left') {
+                headerStyle.position = 'sticky';
+                headerStyle.insetInlineStart = `${getPinnedOffset(hIdx, group.headers)}px`;
+                headerStyle.zIndex = 2;
+              }
               return (
                 <div
                   key={header.id}
@@ -259,8 +321,8 @@ function DataGridInner<TData>(
                   aria-colindex={hIdx + 1}
                   aria-sort={ariaSort}
                   tabIndex={-1}
-                  className={styles.headerCell}
-                  style={{ flex: `${header.getSize()} 1 0` }}
+                  className={cx(styles.headerCell, isPinned === 'left' && styles.pinnedLeft)}
+                  style={headerStyle}
                   onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
                   onKeyDown={(e) => {
                     if (canSort && (e.key === 'Enter' || e.key === ' ')) {
@@ -274,6 +336,19 @@ function DataGridInner<TData>(
                     : flexRender(header.column.columnDef.header, header.getContext())}
                   {sortDir === 'asc' && <span className={styles.sortIndicator}>▲</span>}
                   {sortDir === 'desc' && <span className={styles.sortIndicator}>▼</span>}
+                  {enableColumnResizing && header.column.getCanResize() && (
+                    <div
+                      className={cx(
+                        styles.resizeHandle,
+                        header.column.getIsResizing() && styles.resizing,
+                      )}
+                      onMouseDown={header.getResizeHandler()}
+                      onTouchStart={header.getResizeHandler()}
+                      onDoubleClick={() => header.column.resetSize()}
+                      role="separator"
+                      aria-orientation="vertical"
+                    />
+                  )}
                 </div>
               );
             })}
@@ -310,6 +385,18 @@ function DataGridInner<TData>(
                 >
                   {visibleCells.map((cell, cIdx) => {
                     const isFocused = focused.row === idx && focused.col === cIdx;
+                    const isPinned = cell.column.getIsPinned();
+                    const cellStyle: CSSProperties = enableColumnResizing
+                      ? { inlineSize: `var(--col-${cell.column.id}-size)`, flex: 'none' }
+                      : { flex: `${cell.column.getSize()} 1 0` };
+                    if (isPinned === 'left') {
+                      cellStyle.position = 'sticky';
+                      cellStyle.insetInlineStart = `${getPinnedOffset(
+                        cIdx,
+                        row.getVisibleCells().map((c) => c.column),
+                      )}px`;
+                      cellStyle.zIndex = 1;
+                    }
                     return (
                       <div
                         key={cell.id}
@@ -318,8 +405,8 @@ function DataGridInner<TData>(
                         data-row-index={idx}
                         data-col-index={cIdx}
                         tabIndex={isFocused ? 0 : -1}
-                        className={styles.cell}
-                        style={{ flex: `${cell.column.getSize()} 1 0` }}
+                        className={cx(styles.cell, isPinned === 'left' && styles.pinnedLeft)}
+                        style={cellStyle}
                         onFocus={() => setFocused({ row: idx, col: cIdx })}
                         onKeyDown={(e) => onCellKeyDown(e, idx, cIdx)}
                       >

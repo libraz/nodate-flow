@@ -1,4 +1,4 @@
-import type { ColumnDef, RowSelectionState } from '@tanstack/react-table';
+import type { ColumnDef, ColumnPinningState, RowSelectionState } from '@tanstack/react-table';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ReactElement, useState } from 'react';
@@ -123,5 +123,39 @@ describe.each(THEMES)('DataGrid [%s]', (theme) => {
     await user.click(checkbox);
     expect(onChange).toHaveBeenCalled();
     expect(checkbox.checked).toBe(true);
+  });
+
+  it('renders resize handles when enableColumnResizing is true', async () => {
+    const container = renderGrid({ enableColumnResizing: true });
+    const separators = container.querySelectorAll('[role="separator"]');
+    // Each of the 3 columns gets a resize handle
+    expect(separators.length).toBe(3);
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('does not render resize handles by default', () => {
+    const container = renderGrid();
+    const separators = container.querySelectorAll('[role="separator"]');
+    expect(separators.length).toBe(0);
+  });
+
+  it('sets column size CSS variables when enableColumnResizing is true', () => {
+    renderGrid({ enableColumnResizing: true });
+    const grid = screen.getByRole('grid', { name: 'people' });
+    const style = grid.getAttribute('style') ?? '';
+    // CSS custom properties for each column should be present
+    expect(style).toContain('--col-');
+    expect(style).toContain('-size');
+  });
+
+  it('applies pinnedLeft class when enableColumnPinning and columnPinning are set', async () => {
+    const pinning: ColumnPinningState = { left: ['id'] };
+    const container = renderGrid({ enableColumnPinning: true, columnPinning: pinning });
+    // The pinned header and body cells should have sticky positioning via inline style
+    const grid = screen.getByRole('grid', { name: 'people' });
+    const headers = grid.querySelectorAll('[role="columnheader"]');
+    const firstHeader = headers[0] as HTMLElement;
+    expect(firstHeader.style.position).toBe('sticky');
+    expect(await axe(container)).toHaveNoViolations();
   });
 });
