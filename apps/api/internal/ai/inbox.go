@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/providers"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
@@ -76,11 +77,14 @@ func (o *Orchestrator) ProposeInboxTriage(ctx context.Context, workspaceID uint3
 		System: proposeInboxTriageSystem,
 		Prompt: prompt,
 	}
+	wsIDStr := strconv.FormatUint(uint64(workspaceID), 10)
 	resp, err := prov.Complete(ctx, req)
 	if err != nil {
+		o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, 0)
 		o.logFailure(ctx, workspaceID, "propose_inbox_triage", req, err)
 		return nil, fmt.Errorf("ai: provider call failed: %w", err)
 	}
+	o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, resp.CostCents)
 	o.logSuccess(ctx, workspaceID, "propose_inbox_triage", req, resp)
 
 	suggestions, parseErr := parseInboxTriageSuggestions(resp.Text)

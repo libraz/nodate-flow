@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/providers"
@@ -44,6 +45,12 @@ func (f ProviderResolverFunc) Default(ctx context.Context, workspaceID uint32) (
 	return f(ctx, workspaceID)
 }
 
+// InvocationMetricsHook is called after every LLM provider call (success or
+// failure) with the provider name, model, workspace ID, and cost in cents.
+// It allows the obs package to record Prometheus metrics without creating
+// an import cycle (ai → obs → log → ai).
+type InvocationMetricsHook func(provider, model, workspaceID string, costCents int64)
+
 // Orchestrator wires a Provider source, the cost guard, and an invocation
 // logger. The HTTP and MCP layers depend on this struct rather than calling
 // providers.New directly so that depguard can keep crypto access fenced
@@ -52,6 +59,9 @@ type Orchestrator struct {
 	Resolver  ProviderResolver
 	Guard     *CostGuard
 	LogInvoke InvocationLogger
+	// OnInvocation is an optional hook called after each LLM call for
+	// metrics recording. Wired to obs.RecordAIInvocation at startup.
+	OnInvocation InvocationMetricsHook
 
 	// DB and Queries are optional dependencies used by
 	// orchestration methods that need to read project state (for
@@ -60,6 +70,13 @@ type Orchestrator struct {
 	// that only call ProposeTasksFrom / ProposePriority.
 	DB      EventDB
 	Queries InboxReader
+}
+
+// recordMetrics calls the OnInvocation hook if set.
+func (o *Orchestrator) recordMetrics(provider, model, wsID string, costCents int64) {
+	if o.OnInvocation != nil {
+		o.OnInvocation(provider, model, wsID, costCents)
+	}
 }
 
 // EventDB is the narrow surface ProposeInboxTriage needs to append a
@@ -128,11 +145,14 @@ func (o *Orchestrator) ProposeTasksFrom(ctx context.Context, workspaceID uint32,
 		System: proposeTasksSystem,
 		Prompt: signal,
 	}
+	wsIDStr := strconv.FormatUint(uint64(workspaceID), 10)
 	resp, err := prov.Complete(ctx, req)
 	if err != nil {
+		o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, 0)
 		o.logFailure(ctx, workspaceID, "propose_tasks_from", req, err)
 		return nil, fmt.Errorf("ai: provider call failed: %w", err)
 	}
+	o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, resp.CostCents)
 	o.logSuccess(ctx, workspaceID, "propose_tasks_from", req, resp)
 
 	tasks, parseErr := parseProposedTasks(resp.Text)
@@ -162,11 +182,14 @@ func (o *Orchestrator) ProposePriority(ctx context.Context, workspaceID uint32, 
 		System: proposePrioritySystem,
 		Prompt: taskSummary,
 	}
+	wsIDStr := strconv.FormatUint(uint64(workspaceID), 10)
 	resp, err := prov.Complete(ctx, req)
 	if err != nil {
+		o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, 0)
 		o.logFailure(ctx, workspaceID, "propose_priority", req, err)
 		return "", fmt.Errorf("ai: provider call failed: %w", err)
 	}
+	o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, resp.CostCents)
 	o.logSuccess(ctx, workspaceID, "propose_priority", req, resp)
 
 	var parsed struct {

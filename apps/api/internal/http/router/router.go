@@ -37,6 +37,7 @@ import (
 	integrationshandlers "github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/integrations"
 	integrationspkg "github.com/nodate-flow/nodate-flow/apps/api/internal/integrations"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/lenses"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/obs"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/projects"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/signals"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/tasks"
@@ -237,10 +238,11 @@ func BuildResult(deps Deps) Result {
 		mockResolver := providers.NewMockResolver(providers.NewMockProvider(""))
 		budget := ai.BudgetReaderFunc(func(_ context.Context, _ uint32) (int64, error) { return 0, nil })
 		aiOrch = &ai.Orchestrator{
-			Resolver: mockResolver,
-			Guard:    ai.NewCostGuard(budget, 0),
-			DB:       deps.DB,
-			Queries:  deps.Queries,
+			Resolver:     mockResolver,
+			Guard:        ai.NewCostGuard(budget, 0),
+			DB:           deps.DB,
+			Queries:      deps.Queries,
+			OnInvocation: obs.RecordAIInvocation,
 		}
 	case deps.Cipher != nil:
 		resolver := providers.NewWorkspaceResolver(deps.Queries, deps.Cipher)
@@ -251,11 +253,12 @@ func BuildResult(deps Deps) Result {
 			})
 		})
 		aiOrch = &ai.Orchestrator{
-			Resolver:  resolver,
-			Guard:     ai.NewCostGuard(budget, 0),
-			DB:        deps.DB,
-			Queries:   deps.Queries,
-			LogInvoke: newDBInvocationLogger(deps.Queries, deps.AiInvocationPublisher),
+			Resolver:     resolver,
+			Guard:        ai.NewCostGuard(budget, 0),
+			DB:           deps.DB,
+			Queries:      deps.Queries,
+			LogInvoke:    newDBInvocationLogger(deps.Queries, deps.AiInvocationPublisher),
+			OnInvocation: obs.RecordAIInvocation,
 		}
 	}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/providers"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
@@ -27,10 +28,11 @@ var ErrAgentPaused = errors.New("ai: agent is paused")
 // prompt + response are persisted via [InvocationLogger] alongside
 // every other LLM call site.
 type AgentExecutor struct {
-	Queries  *generated.Queries
-	Resolver ProviderResolver
-	Guard    *CostGuard
-	Log      InvocationLogger
+	Queries      *generated.Queries
+	Resolver     ProviderResolver
+	Guard        *CostGuard
+	Log          InvocationLogger
+	OnInvocation InvocationMetricsHook
 }
 
 // ExecuteAgent implements the agentruntime.AgentExecutor contract.
@@ -71,12 +73,19 @@ func (e *AgentExecutor) ExecuteAgent(ctx context.Context, workspaceID, agentID u
 		// manual triggers will populate Prompt in a later pass.
 		Prompt: "",
 	}
+	wsIDStr := strconv.FormatUint(uint64(workspaceID), 10)
 	resp, err := prov.Complete(ctx, req)
 	if err != nil {
+		if e.OnInvocation != nil {
+			e.OnInvocation(string(prov.Kind()), req.Model, wsIDStr, 0)
+		}
 		if o := (&Orchestrator{LogInvoke: e.Log}); o.LogInvoke != nil {
 			o.logFailure(ctx, workspaceID, "agent_tick", req, err)
 		}
 		return fmt.Errorf("ai: agent provider call failed: %w", err)
+	}
+	if e.OnInvocation != nil {
+		e.OnInvocation(string(prov.Kind()), req.Model, wsIDStr, resp.CostCents)
 	}
 	if o := (&Orchestrator{LogInvoke: e.Log}); o.LogInvoke != nil {
 		o.logSuccess(ctx, workspaceID, "agent_tick", req, resp)
