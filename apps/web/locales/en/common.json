@@ -402,6 +402,19 @@
       "drag_handle": "Drag to reorder",
       "failed": "Failed to save task order"
     },
+    "markdown_editor": {
+      "toolbar": "Formatting toolbar",
+      "bold": "Bold",
+      "italic": "Italic",
+      "heading": "Heading",
+      "list": "Bullet list",
+      "code": "Inline code",
+      "link": "Insert link",
+      "quote": "Block quote",
+      "preview": "Preview",
+      "write": "Write",
+      "preview_empty": "Nothing to preview"
+    },
     "detail": {
       "title_edit": "Edit title",
       "title_edit_named": "Edit title: {title}",

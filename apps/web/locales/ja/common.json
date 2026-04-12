@@ -402,6 +402,19 @@
       "drag_handle": "ドラッグして並び替え",
       "failed": "タスクの並び順の保存に失敗しました"
     },
+    "markdown_editor": {
+      "toolbar": "書式ツールバー",
+      "bold": "太字",
+      "italic": "斜体",
+      "heading": "見出し",
+      "list": "箇条書き",
+      "code": "インラインコード",
+      "link": "リンクを挿入",
+      "quote": "引用",
+      "preview": "プレビュー",
+      "write": "編集",
+      "preview_empty": "プレビューする内容がありません"
+    },
     "detail": {
       "title_edit": "タイトルを編集",
       "title_edit_named": "タイトルを編集: {title}",

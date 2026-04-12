@@ -45,6 +45,7 @@ import {
   useUpdateTask,
 } from '../features/tasks/api';
 import DependenciesSection from '../features/tasks/dependencies-section';
+import MarkdownEditor from '../features/tasks/markdown-editor';
 import { useTaskTimelineQuery } from '../features/timeline/api';
 import ReplayPanel from '../features/timeline/replay-panel';
 import TaskMiniTimeline from '../features/timeline/task-mini-timeline';
@@ -238,11 +239,9 @@ function DescriptionEditor({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-      <Textarea
+      <MarkdownEditor
         value={value}
-        onChange={(e) => {
-          setValue(e.target.value);
-        }}
+        onChange={setValue}
         rows={6}
         autoFocus
         aria-label={t('tasks.detail.description_edit')}
