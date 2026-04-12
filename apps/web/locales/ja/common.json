@@ -376,6 +376,16 @@
       "plus_n": "+他{n}件",
       "count": "{count}名"
     },
+    "bulk": {
+      "selected": "{count}件のタスクを選択中",
+      "set_priority": "優先度を設定",
+      "delete": "削除",
+      "clear": "選択解除",
+      "priority_updated": "優先度を更新しました。",
+      "update_failed": "タスクの更新に失敗しました。",
+      "deleted": "タスクを削除しました。",
+      "delete_failed": "タスクの削除に失敗しました。"
+    },
     "detail": {
       "title_edit": "タイトルを編集",
       "title_edit_named": "タイトルを編集: {title}",

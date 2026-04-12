@@ -376,6 +376,16 @@
       "plus_n": "+{n, plural, one {# more} other {# more}}",
       "count": "{count, plural, one {# person} other {# people}}"
     },
+    "bulk": {
+      "selected": "{count, plural, one {# task selected} other {# tasks selected}}",
+      "set_priority": "Set priority",
+      "delete": "Delete",
+      "clear": "Clear",
+      "priority_updated": "Priority updated.",
+      "update_failed": "Could not update tasks.",
+      "deleted": "Tasks deleted.",
+      "delete_failed": "Could not delete tasks."
+    },
     "detail": {
       "title_edit": "Edit title",
       "title_edit_named": "Edit title: {title}",

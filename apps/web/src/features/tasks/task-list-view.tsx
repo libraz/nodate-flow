@@ -2,19 +2,27 @@
  * TaskListView — DataGrid view of tasks for a project.
  *
  * Columns: title, status, deps, assignee, due date, priority, updated.
- * Features: column sorting (built into DataGrid), priority color indicators,
- * status badges, overdue date highlighting.
+ * Features: column sorting, priority color indicators, status badges,
+ * overdue date highlighting, row selection with bulk action toolbar.
  */
 
 import DataGrid from '@nodate-flow/ui/primitives/data-grid';
+import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { Link } from '@tanstack/react-router';
-import type { ColumnDef } from '@tanstack/react-table';
-import type { ReactElement } from 'react';
+import type { ColumnDef, RowSelectionState } from '@tanstack/react-table';
+import { type ReactElement, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { computeBlockedByOpen, useProjectDependenciesQuery } from '../projects/api';
 
-import { type TaskDerivedState, type TaskListItem, type TaskPriority, useTasksQuery } from './api';
+import {
+  type TaskDerivedState,
+  type TaskListItem,
+  type TaskPriority,
+  useDeleteTask,
+  useTasksQuery,
+  useUpdateTask,
+} from './api';
 import { useTaskFilters } from './use-task-filters';
 
 export interface TaskListViewProps {
@@ -68,6 +76,129 @@ function isOverdue(dueOn: string | undefined | null): boolean {
   return dueOn < todayKey;
 }
 
+/* ── Bulk action toolbar ────────────────────────────────────── */
+
+function BulkActionBar({
+  selectedIds,
+  onClear,
+}: {
+  selectedIds: string[];
+  onClear: () => void;
+}): ReactElement {
+  const { t } = useTranslation('common');
+  const updateTask = useUpdateTask();
+  const deleteTask = useDeleteTask();
+  const [busy, setBusy] = useState(false);
+
+  const handleBulkPriority = useCallback(
+    async (priority: TaskPriority) => {
+      setBusy(true);
+      try {
+        await Promise.all(
+          selectedIds.map((id) => updateTask.mutateAsync({ id, patch: { priority } })),
+        );
+        toaster.show({ tone: 'success', message: t('tasks.bulk.priority_updated') });
+        onClear();
+      } catch {
+        toaster.show({ tone: 'danger', message: t('tasks.bulk.update_failed') });
+      } finally {
+        setBusy(false);
+      }
+    },
+    [selectedIds, updateTask, onClear, t],
+  );
+
+  const handleBulkDelete = useCallback(async () => {
+    setBusy(true);
+    try {
+      await Promise.all(selectedIds.map((id) => deleteTask.mutateAsync(id)));
+      toaster.show({ tone: 'success', message: t('tasks.bulk.deleted') });
+      onClear();
+    } catch {
+      toaster.show({ tone: 'danger', message: t('tasks.bulk.delete_failed') });
+    } finally {
+      setBusy(false);
+    }
+  }, [selectedIds, deleteTask, onClear, t]);
+
+  const btnStyle: React.CSSProperties = {
+    padding: '0.375rem 0.75rem',
+    borderRadius: '0.375rem',
+    border: '1px solid var(--nf-color-border, var(--color-hairline))',
+    background: 'var(--color-surface, rgba(127,127,127,0.05))',
+    color: 'var(--color-fg)',
+    fontSize: '0.8125rem',
+    cursor: busy ? 'wait' : 'pointer',
+    opacity: busy ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.5rem',
+        padding: '0.5rem 0.75rem',
+        borderRadius: '0.5rem',
+        background: 'var(--nf-color-accent, var(--color-accent, #9b59b6))',
+        color: 'var(--nf-color-accent-fg, white)',
+        fontSize: '0.8125rem',
+        marginBottom: '0.5rem',
+      }}
+    >
+      <span style={{ fontWeight: 600 }}>
+        {t('tasks.bulk.selected', { count: selectedIds.length })}
+      </span>
+      <span style={{ flex: 1 }} />
+
+      <select
+        aria-label={t('tasks.bulk.set_priority')}
+        disabled={busy}
+        style={{
+          ...btnStyle,
+          appearance: 'auto',
+        }}
+        defaultValue=""
+        onChange={(e) => {
+          if (e.target.value) {
+            void handleBulkPriority(Number(e.target.value) as TaskPriority);
+            e.target.value = '';
+          }
+        }}
+      >
+        <option value="" disabled>
+          {t('tasks.bulk.set_priority')}
+        </option>
+        <option value="0">{t('tasks.priority.none')}</option>
+        <option value="1">{t('tasks.priority.low')}</option>
+        <option value="2">{t('tasks.priority.medium')}</option>
+        <option value="3">{t('tasks.priority.high')}</option>
+        <option value="4">{t('tasks.priority.urgent')}</option>
+      </select>
+
+      <button
+        type="button"
+        disabled={busy}
+        style={{ ...btnStyle, color: 'var(--nf-color-danger, #c0392b)' }}
+        onClick={() => void handleBulkDelete()}
+      >
+        {t('tasks.bulk.delete')}
+      </button>
+
+      <button
+        type="button"
+        disabled={busy}
+        style={{ ...btnStyle, border: 'none', background: 'transparent', color: 'inherit' }}
+        onClick={onClear}
+      >
+        {t('tasks.bulk.clear')}
+      </button>
+    </div>
+  );
+}
+
+/* ── Main list view ─────────────────────────────────────────── */
+
 export default function TaskListView({ projectId }: TaskListViewProps): ReactElement {
   const { t, i18n } = useTranslation('common');
   const filters = useTaskFilters(projectId);
@@ -75,6 +206,20 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
   const { data: edges } = useProjectDependenciesQuery(projectId);
   const blockedByOpen = computeBlockedByOpen(edges);
   const locale = i18n.resolvedLanguage ?? 'en';
+
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+
+  const selectedIds = Object.keys(rowSelection)
+    .filter((k) => rowSelection[k])
+    .map((idx) => {
+      const task = tasks[Number(idx)];
+      return task?.id ?? '';
+    })
+    .filter(Boolean);
+
+  const handleClearSelection = useCallback(() => {
+    setRowSelection({});
+  }, []);
 
   const columns: ColumnDef<TaskListItem, unknown>[] = [
     {
@@ -252,12 +397,20 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
   ];
 
   return (
-    <DataGrid<TaskListItem>
-      aria-label={t('tasks.title')}
-      columns={columns}
-      data={tasks}
-      emptyContent={t('tasks.empty')}
-      style={{ minBlockSize: '20rem' }}
-    />
+    <>
+      {selectedIds.length > 0 && (
+        <BulkActionBar selectedIds={selectedIds} onClear={handleClearSelection} />
+      )}
+      <DataGrid<TaskListItem>
+        aria-label={t('tasks.title')}
+        columns={columns}
+        data={tasks}
+        emptyContent={t('tasks.empty')}
+        enableRowSelection
+        rowSelection={rowSelection}
+        onRowSelectionChange={setRowSelection}
+        style={{ minBlockSize: '20rem' }}
+      />
+    </>
   );
 }
