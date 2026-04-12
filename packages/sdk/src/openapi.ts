@@ -716,6 +716,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/{id}/constraints/compile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Compile a natural-language prompt into a constraint DSL expression */
+        post: operations["tasks-constraints-compile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{id}/constraints/evaluate": {
         parameters: {
             query?: never;
@@ -727,6 +744,23 @@ export interface paths {
         put?: never;
         /** Run the Phase 3 constraint engine for a task and persist satisfied/failed markers */
         post: operations["tasks-constraints-evaluate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/constraints/explain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Explain a constraint DSL expression in human-readable form */
+        post: operations["tasks-constraints-explain"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1610,6 +1644,26 @@ export interface components {
             /** Format: int64 */
             otherSessionsRevoked: number;
         };
+        CompileConstraintBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Natural language description of the constraint */
+            prompt: string;
+        };
+        CompileConstraintOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description DSL expression */
+            expression: string;
+            /** @description Inferred constraint kind */
+            kind: string;
+        };
         CompileLensInputBody: {
             /**
              * Format: uri
@@ -1907,6 +1961,24 @@ export interface components {
              */
             readonly $schema?: string;
             outcomes: components["schemas"]["EvaluateConstraintsOutcome"][] | null;
+        };
+        ExplainConstraintBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description DSL expression to explain */
+            expression: string;
+        };
+        ExplainConstraintOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Human-readable explanation */
+            explanation: string;
         };
         HealthOutputBody: {
             /**
@@ -5018,6 +5090,41 @@ export interface operations {
             };
         };
     };
+    "tasks-constraints-compile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompileConstraintBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompileConstraintOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "tasks-constraints-evaluate": {
         parameters: {
             query?: never;
@@ -5036,6 +5143,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EvaluateConstraintsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-constraints-explain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExplainConstraintBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExplainConstraintOutputBody"];
                 };
             };
             /** @description Error */

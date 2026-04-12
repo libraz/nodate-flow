@@ -508,6 +508,47 @@
         "required": ["ok", "otherSessionsRevoked"],
         "type": "object"
       },
+      "CompileConstraintBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CompileConstraintBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "prompt": {
+            "description": "Natural language description of the constraint",
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["prompt"],
+        "type": "object"
+      },
+      "CompileConstraintOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CompileConstraintOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "expression": {
+            "description": "DSL expression",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Inferred constraint kind",
+            "type": "string"
+          }
+        },
+        "required": ["kind", "expression"],
+        "type": "object"
+      },
       "CompileLensInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -1198,6 +1239,43 @@
           }
         },
         "required": ["outcomes"],
+        "type": "object"
+      },
+      "ExplainConstraintBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ExplainConstraintBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "expression": {
+            "description": "DSL expression to explain",
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["expression"],
+        "type": "object"
+      },
+      "ExplainConstraintOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ExplainConstraintOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "explanation": {
+            "description": "Human-readable explanation",
+            "type": "string"
+          }
+        },
+        "required": ["explanation"],
         "type": "object"
       },
       "HealthOutputBody": {
@@ -6837,6 +6915,54 @@
         "summary": "Attach a constraint to a task"
       }
     },
+    "/tasks/{id}/constraints/compile": {
+      "post": {
+        "operationId": "tasks-constraints-compile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompileConstraintBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompileConstraintOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Compile a natural-language prompt into a constraint DSL expression"
+      }
+    },
     "/tasks/{id}/constraints/evaluate": {
       "post": {
         "operationId": "tasks-constraints-evaluate",
@@ -6873,6 +6999,54 @@
           }
         },
         "summary": "Run the Phase 3 constraint engine for a task and persist satisfied/failed markers"
+      }
+    },
+    "/tasks/{id}/constraints/explain": {
+      "post": {
+        "operationId": "tasks-constraints-explain",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExplainConstraintBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplainConstraintOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Explain a constraint DSL expression in human-readable form"
       }
     },
     "/tasks/{id}/constraints/{cid}": {
