@@ -30,6 +30,9 @@ export type { CardProps } from './card/card';
 export { default as Badge } from './badge/badge';
 export type { BadgeProps, BadgeTone } from './badge/badge';
 
+export { default as Chip } from './chip/chip';
+export type { ChipProps, ChipTone } from './chip/chip';
+
 export { default as Avatar } from './avatar/avatar';
 export type { AvatarProps, AvatarSize } from './avatar/avatar';
 

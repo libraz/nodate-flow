@@ -1,0 +1,64 @@
+.root {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  padding-inline: var(--nf-space-2);
+  padding-block: var(--nf-space-px);
+  border-radius: var(--nf-radius-pill);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  background: var(--nf-color-bg-sunken);
+  color: var(--nf-color-fg);
+  font-family: var(--nf-font-sans);
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-medium);
+  line-height: var(--nf-leading-tight);
+  cursor: default;
+}
+
+.dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: currentColor;
+  opacity: 0.5;
+  cursor: pointer;
+  font-size: inherit;
+  line-height: 1;
+}
+
+.dismiss:hover {
+  opacity: 1;
+}
+
+.success {
+  background: var(--nf-color-success);
+  border-color: var(--nf-color-success);
+  color: var(--nf-color-fg-on-accent);
+}
+
+.warning {
+  background: var(--nf-color-warning);
+  border-color: var(--nf-color-warning);
+  color: var(--nf-color-fg-on-accent);
+}
+
+.danger {
+  background: var(--nf-color-danger);
+  border-color: var(--nf-color-danger);
+  color: var(--nf-color-fg-on-accent);
+}
+
+.info {
+  background: var(--nf-color-info);
+  border-color: var(--nf-color-info);
+  color: var(--nf-color-fg-on-accent);
+}
+
+.accent {
+  background: var(--nf-color-accent-subtle);
+  border-color: var(--nf-color-accent);
+  color: var(--nf-color-fg);
+}

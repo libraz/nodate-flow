@@ -7,7 +7,7 @@
 
 import { useSyncExternalStore } from 'react';
 
-import type { TaskDerivedState, TaskFilters } from './api';
+import type { TaskDerivedState, TaskFilters, TaskPriority } from './api';
 
 type Store = Map<string, TaskFilters>;
 
@@ -53,6 +53,11 @@ export function setTaskFilterStates(projectId: string, states: readonly TaskDeri
 
 export function setTaskFilterAssignee(projectId: string, assigneeId: string): void {
   setTaskFilters(projectId, { ...getTaskFilters(projectId), assigneeId });
+}
+
+/** Set the priority filter for a project. */
+export function setTaskFilterPriority(projectId: string, priority: readonly TaskPriority[]): void {
+  setTaskFilters(projectId, { ...getTaskFilters(projectId), priority });
 }
 
 export function resetTaskFilters(projectId: string): void {

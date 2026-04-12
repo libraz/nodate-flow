@@ -45,10 +45,23 @@ export const TASK_STATES: readonly TaskDerivedState[] = [
 /** Backend priority is int32 0..4. */
 export type TaskPriority = 0 | 1 | 2 | 3 | 4;
 
+/** Ordered list of all priority levels for filter rendering. */
+export const TASK_PRIORITIES: readonly TaskPriority[] = [0, 1, 2, 3, 4] as const;
+
+/** i18n key map for each priority level. */
+export const PRIORITY_I18N_KEY: Record<TaskPriority, string> = {
+  0: 'tasks.priority.none',
+  1: 'tasks.priority.low',
+  2: 'tasks.priority.medium',
+  3: 'tasks.priority.high',
+  4: 'tasks.priority.urgent',
+};
+
 export interface TaskFilters {
   search?: string;
   states?: readonly TaskDerivedState[];
   assigneeId?: string;
+  priority?: readonly TaskPriority[];
 }
 
 /** Query key factory for the tasks feature. */
@@ -205,6 +218,7 @@ export function useTasksQuery(
       const search = filters?.search?.trim() ?? '';
       const states = filters?.states ?? [];
       const assignee = filters?.assigneeId?.trim() ?? '';
+      const priorities = filters?.priority ?? [];
       const query: {
         projectId: string;
         limit: number;
@@ -222,7 +236,13 @@ export function useTasksQuery(
       if (assignee.length > 0) query.assignee = assignee;
       const { data, error } = await sdk.GET('/tasks', { params: { query } });
       if (error || !data) throw toError(error, 'Failed to load tasks');
-      return data.tasks ?? [];
+      const tasks = data.tasks ?? [];
+      // Client-side priority filter (API does not support priority param yet)
+      if (priorities.length > 0) {
+        const allowed = new Set<number>(priorities);
+        return tasks.filter((t) => allowed.has(t.priority));
+      }
+      return tasks;
     },
   });
 }

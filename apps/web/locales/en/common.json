@@ -353,7 +353,12 @@
       "search_placeholder": "Search tasks…",
       "status": "Status",
       "assignee": "Assignee",
-      "clear": "Clear filters"
+      "priority": "Priority",
+      "clear": "Clear filters",
+      "chip_status": "Status: {value}",
+      "chip_assignee": "Assignee: {value}",
+      "chip_search": "Search: {value}",
+      "chip_priority": "Priority: {value}"
     },
     "validation": {
       "title_required": "Title is required.",
@@ -385,6 +390,12 @@
       "update_failed": "Could not update tasks.",
       "deleted": "Tasks deleted.",
       "delete_failed": "Could not delete tasks."
+    },
+    "inline": {
+      "edit_title": "Edit title",
+      "edit_priority": "Change priority",
+      "edit_due": "Change due date",
+      "save_failed": "Could not save changes. Please try again."
     },
     "detail": {
       "title_edit": "Edit title",

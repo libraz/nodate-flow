@@ -353,7 +353,12 @@
       "search_placeholder": "タスクを検索…",
       "status": "ステータス",
       "assignee": "担当者",
-      "clear": "フィルタをクリア"
+      "priority": "優先度",
+      "clear": "フィルタをクリア",
+      "chip_status": "ステータス: {value}",
+      "chip_assignee": "担当者: {value}",
+      "chip_search": "検索: {value}",
+      "chip_priority": "優先度: {value}"
     },
     "validation": {
       "title_required": "タイトルを入力してください。",
@@ -385,6 +390,12 @@
       "update_failed": "タスクの更新に失敗しました。",
       "deleted": "タスクを削除しました。",
       "delete_failed": "タスクの削除に失敗しました。"
+    },
+    "inline": {
+      "edit_title": "タイトルを編集",
+      "edit_priority": "優先度を変更",
+      "edit_due": "期日を変更",
+      "save_failed": "変更を保存できませんでした。もう一度お試しください。"
     },
     "detail": {
       "title_edit": "タイトルを編集",
