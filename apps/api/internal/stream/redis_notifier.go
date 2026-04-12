@@ -1,8 +1,4 @@
-//go:build redis
-
-// redis_notifier.go — Redis Pub/Sub backed [Notifier]. Built with
-// `-tags redis` after `go get github.com/redis/go-redis/v9`. Default
-// builds use the in-process notifier only.
+// redis_notifier.go — Redis Pub/Sub backed [Notifier].
 //
 // Fan-out shape:
 //

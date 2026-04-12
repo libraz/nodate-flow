@@ -1,10 +1,4 @@
-//go:build redis
-
 // Package sessionstore — Redis driver.
-//
-// Build with `-tags redis` after `go get github.com/redis/go-redis/v9`.
-// The default build tree does not depend on go-redis so the binary
-// can be compiled in a minimal environment.
 //
 // Keyspace:
 //

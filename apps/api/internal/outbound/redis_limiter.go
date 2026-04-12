@@ -1,8 +1,5 @@
-//go:build redis
-
 // redis_limiter.go — Redis-backed token bucket so a fleet of api
-// replicas can share a single egress budget per destination. Built
-// with `-tags redis` after `go get github.com/redis/go-redis/v9`.
+// replicas can share a single egress budget per destination.
 //
 // Implementation uses a Lua script for atomic token accounting; the
 // script is EVALSHA'd by the client after the first call. The state

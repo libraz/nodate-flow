@@ -1,5 +1,3 @@
-//go:build redis
-
 package stream
 
 import (
