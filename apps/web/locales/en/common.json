@@ -312,7 +312,8 @@
     "empty": "No tasks yet. Create your first one to get started.",
     "views": {
       "board": "Board",
-      "list": "List"
+      "list": "List",
+      "graph": "Graph"
     },
     "columns": {
       "title": "Title",

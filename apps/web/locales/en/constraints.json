@@ -44,6 +44,9 @@
   },
   "stateGraph": {
     "title": "State graph",
-    "legend": "Current state highlighted"
+    "legend": "Current state highlighted",
+    "projectTitle": "Task Dependency Graph",
+    "noTasks": "No tasks in this project",
+    "noDependencies": "No dependencies defined"
   }
 }

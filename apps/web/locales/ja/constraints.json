@@ -44,6 +44,9 @@
   },
   "stateGraph": {
     "title": "状態グラフ",
-    "legend": "現在の状態をハイライト"
+    "legend": "現在の状態をハイライト",
+    "projectTitle": "タスク依存関係グラフ",
+    "noTasks": "このプロジェクトにタスクはありません",
+    "noDependencies": "依存関係は定義されていません"
   }
 }

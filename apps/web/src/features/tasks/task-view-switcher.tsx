@@ -41,6 +41,17 @@ export default function TaskViewSwitcher(): ReactElement {
       >
         {t('tasks.views.list')}
       </Button>
+      <Button
+        type="button"
+        role="tab"
+        aria-selected={view === 'graph'}
+        variant={view === 'graph' ? 'primary' : 'ghost'}
+        onClick={() => {
+          setTaskView('graph');
+        }}
+      >
+        {t('tasks.views.graph')}
+      </Button>
     </div>
   );
 }
