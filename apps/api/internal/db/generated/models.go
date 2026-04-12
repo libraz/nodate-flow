@@ -278,6 +278,49 @@ func (ns NullMcpInvocationsStatus) Value() (driver.Value, error) {
 	return string(ns.McpInvocationsStatus), nil
 }
 
+type OauthStatesProvider string
+
+const (
+	OauthStatesProviderGithub         OauthStatesProvider = "github"
+	OauthStatesProviderSlack          OauthStatesProvider = "slack"
+	OauthStatesProviderGoogleCalendar OauthStatesProvider = "google_calendar"
+)
+
+func (e *OauthStatesProvider) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = OauthStatesProvider(s)
+	case string:
+		*e = OauthStatesProvider(s)
+	default:
+		return fmt.Errorf("unsupported scan type for OauthStatesProvider: %T", src)
+	}
+	return nil
+}
+
+type NullOauthStatesProvider struct {
+	OauthStatesProvider OauthStatesProvider `json:"oauthStatesProvider"`
+	Valid               bool                `json:"valid"` // Valid is true if OauthStatesProvider is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullOauthStatesProvider) Scan(value interface{}) error {
+	if value == nil {
+		ns.OauthStatesProvider, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.OauthStatesProvider.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullOauthStatesProvider) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.OauthStatesProvider), nil
+}
+
 type ProjectMembersRole string
 
 const (
@@ -586,6 +629,49 @@ func (ns NullTasksDerivedState) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.TasksDerivedState), nil
+}
+
+type UserIntegrationsProvider string
+
+const (
+	UserIntegrationsProviderGithub         UserIntegrationsProvider = "github"
+	UserIntegrationsProviderSlack          UserIntegrationsProvider = "slack"
+	UserIntegrationsProviderGoogleCalendar UserIntegrationsProvider = "google_calendar"
+)
+
+func (e *UserIntegrationsProvider) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = UserIntegrationsProvider(s)
+	case string:
+		*e = UserIntegrationsProvider(s)
+	default:
+		return fmt.Errorf("unsupported scan type for UserIntegrationsProvider: %T", src)
+	}
+	return nil
+}
+
+type NullUserIntegrationsProvider struct {
+	UserIntegrationsProvider UserIntegrationsProvider `json:"userIntegrationsProvider"`
+	Valid                    bool                     `json:"valid"` // Valid is true if UserIntegrationsProvider is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullUserIntegrationsProvider) Scan(value interface{}) error {
+	if value == nil {
+		ns.UserIntegrationsProvider, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.UserIntegrationsProvider.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullUserIntegrationsProvider) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.UserIntegrationsProvider), nil
 }
 
 type UsersThemePreference string
@@ -1020,7 +1106,7 @@ type Identity struct {
 	// Argon2id encoded hash, only for provider=local
 	PasswordHash sql.NullString `json:"passwordHash"`
 	// Encrypted TOTP secret (AES-256-GCM)
-	MfaSecretCiphertext []byte `json:"mfaSecretCiphertext"`
+	MfaSecretCiphertext sql.NullString `json:"mfaSecretCiphertext"`
 	// When the TOTP enrollment was confirmed by submitting a valid code
 	MfaConfirmedAt sql.NullTime `json:"mfaConfirmedAt"`
 	// Consecutive failed login attempts
@@ -1167,6 +1253,21 @@ type McpToken struct {
 	Enabled   bool         `json:"enabled"`
 	UpdatedAt sql.NullTime `json:"updatedAt"`
 	CreatedAt time.Time    `json:"createdAt"`
+}
+
+// Short-lived OAuth CSRF state tokens for personal integrations
+type OauthState struct {
+	// Random 32-byte token, hex-encoded
+	State string `json:"state"`
+	// Internal FK to users.id — the user who started the connect flow
+	UserID uint32 `json:"-"`
+	// Which provider this state belongs to
+	Provider OauthStatesProvider `json:"provider"`
+	// Optional client-supplied return URL to send the user to after the callback completes
+	RedirectTo sql.NullString `json:"redirectTo"`
+	// Hard expiry; callback handler rejects rows past this timestamp
+	ExpiresAt time.Time `json:"expiresAt"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 // User personal access tokens for REST/CLI
@@ -1492,6 +1593,55 @@ type User struct {
 	// Enabled flag
 	Enabled   bool         `json:"enabled"`
 	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
+// Personal OAuth integrations owned by an individual user
+type UserIntegration struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to users.id
+	UserID uint32 `json:"-"`
+	// OAuth provider kind
+	Provider UserIntegrationsProvider `json:"provider"`
+	// Provider subject (GH login, Slack user id, Google sub)
+	ExternalAccountID string `json:"externalAccountId"`
+	// Display-only label (email or @handle)
+	ExternalAccountLabel string `json:"externalAccountLabel"`
+	// Space-separated list of granted OAuth scopes
+	Scopes string `json:"scopes"`
+	// AES-256-GCM encrypted access token
+	AccessTokenCiphertext []byte `json:"accessTokenCiphertext"`
+	// AES-256-GCM encrypted refresh token (nullable: GitHub OAuth apps do not issue one)
+	RefreshTokenCiphertext sql.NullString `json:"refreshTokenCiphertext"`
+	// Access token expiry (providers that issue long-lived tokens leave this NULL)
+	AccessTokenExpiresAt sql.NullTime `json:"accessTokenExpiresAt"`
+	// When the user first authorised the app
+	ConnectedAt time.Time `json:"connectedAt"`
+	// Last successful token refresh
+	LastRefreshedAt sql.NullTime `json:"lastRefreshedAt"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
+// TOTP recovery codes
+type UserRecoveryCode struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// Internal FK to users.id
+	UserID uint32 `json:"-"`
+	// SHA-256 of the normalized recovery code
+	CodeHash []byte `json:"codeHash"`
+	// Set when the code is consumed at login
+	UsedAt    sql.NullTime `json:"usedAt"`
 	CreatedAt time.Time    `json:"createdAt"`
 }
 

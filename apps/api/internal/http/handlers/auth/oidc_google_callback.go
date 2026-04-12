@@ -43,9 +43,11 @@ func OIDCGoogleCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*O
 		switch {
 		case err == nil:
 			userID = ident.UserID
-			if err := deps.DB.QueryRowContext(ctx, `SELECT public_id FROM users WHERE id = ?`, userID).Scan(&userPub); err != nil {
+			pub, qerr := deps.Queries.FindUserPublicIdById(ctx, userID)
+			if qerr != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
+			userPub = pub
 		case errors.Is(err, sql.ErrNoRows):
 			// Auto-provision a new user.
 			userPub = types.New()

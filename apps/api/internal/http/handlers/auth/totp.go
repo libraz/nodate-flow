@@ -43,7 +43,7 @@ func TotpStatus(deps Deps) func(context.Context, *struct{}) (*TotpStatusOutput, 
 		}
 		out := &TotpStatusOutput{}
 		switch {
-		case len(row.MfaSecretCiphertext) == 0:
+		case len(row.MfaSecretCiphertext.String) == 0:
 			out.Body.Status = "disabled"
 		case !row.MfaConfirmedAt.Valid:
 			out.Body.Status = "pending"
@@ -83,7 +83,7 @@ func TotpEnroll(deps Deps) func(context.Context, *struct{}) (*TotpEnrollOutput, 
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		if err := deps.Queries.SetIdentityMfaSecret(ctx, generated.SetIdentityMfaSecretParams{
-			MfaSecretCiphertext: blob,
+			MfaSecretCiphertext: sql.NullString{String: string(blob), Valid: true},
 			ID:                  row.ID,
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -121,13 +121,13 @@ func TotpConfirm(deps Deps) func(context.Context, *TotpConfirmInput) (*TotpConfi
 		if err != nil {
 			return nil, err
 		}
-		if len(row.MfaSecretCiphertext) == 0 {
+		if len(row.MfaSecretCiphertext.String) == 0 {
 			return nil, httpErr(apierrors.AuthTotpNotEnrolled)
 		}
 		if row.MfaConfirmedAt.Valid {
 			return nil, httpErr(apierrors.AuthTotpAlreadyEnrolled)
 		}
-		secret, err := deps.Cipher.Decrypt(row.MfaSecretCiphertext)
+		secret, err := deps.Cipher.Decrypt([]byte(row.MfaSecretCiphertext.String))
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
@@ -229,7 +229,7 @@ func TotpDisable(deps Deps) func(context.Context, *TotpDisableInput) (*TotpDisab
 		if err != nil {
 			return nil, err
 		}
-		if len(row.MfaSecretCiphertext) == 0 {
+		if len(row.MfaSecretCiphertext.String) == 0 {
 			return nil, httpErr(apierrors.AuthTotpNotEnrolled)
 		}
 		if !row.PasswordHash.Valid {

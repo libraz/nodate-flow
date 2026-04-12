@@ -24,8 +24,8 @@ func ListDependencies(deps Deps) func(context.Context, *ListProjectDependenciesI
 			return nil, httpErr(apierrors.WsProjectNotFound)
 		}
 		rows, err := deps.Queries.ListDependenciesForProject(ctx, generated.ListDependenciesForProjectParams{
-			WorkspaceID:     ws.ID,
-			ProjectPublicID: types.FromUUID(prj.PublicID),
+			WorkspaceID: ws.ID,
+			PublicID:    types.FromUUID(prj.PublicID),
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)

@@ -7,7 +7,6 @@ package generated
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	types "github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 )
@@ -44,6 +43,18 @@ type Querier interface {
 	// Callers wrap this in BEGIN / COMMIT; SELECT ... FOR UPDATE SKIP LOCKED
 	// lets multiple workers race for rows without contention.
 	ClaimNextAgentRun(ctx context.Context) (ClaimNextAgentRunRow, error)
+	// Disable TOTP on a local identity.
+	ClearIdentityMfa(ctx context.Context, id uint32) error
+	// Mark a pending TOTP enrollment as confirmed by stamping
+	// mfa_confirmed_at. The caller must have already validated a code
+	// against the stored secret.
+	ConfirmIdentityMfa(ctx context.Context, id uint32) error
+	// Atomically look up and delete an OAuth state row. The caller MUST
+	// still check expires_at against CURRENT_TIMESTAMP before trusting
+	// the returned row.
+	ConsumeOauthState(ctx context.Context, state string) (ConsumeOauthStateRow, error)
+	// Count unused recovery codes for a user.
+	CountActiveRecoveryCodes(ctx context.Context, userID uint32) (int64, error)
 	// Count ai.suggestion.{proposed,applied,dismissed} events for a workspace
 	// within the given time window. Used by the AI metrics endpoint
 	// (2.OBS-1) to compute acceptance rate.
@@ -54,6 +65,8 @@ type Querier interface {
 	CreateIdentity(ctx context.Context, arg CreateIdentityParams) (int64, error)
 	// Insert a new MCP token. Plain token is shown to the user once.
 	CreateMcpToken(ctx context.Context, arg CreateMcpTokenParams) (int64, error)
+	// Insert a short-lived CSRF state row for the personal OAuth flow.
+	CreateOauthState(ctx context.Context, arg CreateOauthStateParams) error
 	// Insert a new personal access token. Plain token is shown to the user once.
 	CreatePat(ctx context.Context, arg CreatePatParams) (int64, error)
 	// Insert a new project in a workspace.
@@ -78,6 +91,8 @@ type Querier interface {
 	CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) (int64, error)
 	// Add a user to a workspace with the given role.
 	CreateWorkspaceMember(ctx context.Context, arg CreateWorkspaceMemberParams) (int64, error)
+	// Delete every recovery code (used or not) for a user.
+	DeleteAllRecoveryCodesForUser(ctx context.Context, userID uint32) error
 	// Soft-delete an attachment row. Object storage cleanup is async.
 	DeleteAttachment(ctx context.Context, arg DeleteAttachmentParams) error
 	// Soft-delete a comment.
@@ -86,12 +101,16 @@ type Querier interface {
 	DeleteConstraint(ctx context.Context, arg DeleteConstraintParams) error
 	// Soft-delete a dependency edge.
 	DeleteDependency(ctx context.Context, arg DeleteDependencyParams) error
+	// Explicit delete for the state row that :one above just returned.
+	DeleteOauthState(ctx context.Context, state string) error
 	// Soft-delete a provider.
 	DeleteProvider(ctx context.Context, arg DeleteProviderParams) error
 	// Remove every embedding row for a task across all models. ON DELETE
 	// CASCADE already handles task deletion; this query is for the
 	// re-embed-on-edit flow when a workspace switches to a different model.
 	DeleteTaskEmbeddingsForTask(ctx context.Context, taskID uint32) error
+	// Hard-delete a single integration row (user-scoped).
+	DeleteUserIntegration(ctx context.Context, arg DeleteUserIntegrationParams) error
 	// Soft-disable a project.
 	DisableProject(ctx context.Context, arg DisableProjectParams) error
 	// Soft-disable a task.
@@ -119,16 +138,14 @@ type Querier interface {
 	// Resolve an identity by (provider, subject) pair for OIDC login flows.
 	FindIdentityByProviderSubject(ctx context.Context, arg FindIdentityByProviderSubjectParams) (FindIdentityByProviderSubjectRow, error)
 	// Resolve a local-password identity by user email for the login pipeline.
-	// Joins identities with users on email and provider='local'.
+	// Joins identities with users on email and provider='local'. Also
+	// returns the TOTP columns so the login handler can decide whether
+	// to issue session tokens directly or return a totp-challenge.
 	FindLocalIdentityByEmail(ctx context.Context, email string) (FindLocalIdentityByEmailRow, error)
-	// Resolve a local-password identity by internal user id.
+	// Resolve a local-password identity by internal user id. Used by
+	// /me/password to verify the caller's current password and by the
+	// TOTP handlers to read / write mfa_secret_ciphertext.
 	FindLocalIdentityByUserId(ctx context.Context, userID uint32) (FindLocalIdentityByUserIdRow, error)
-	// Begin (or restart) TOTP enrollment.
-	SetIdentityMfaSecret(ctx context.Context, arg SetIdentityMfaSecretParams) error
-	// Mark a pending TOTP enrollment as confirmed.
-	ConfirmIdentityMfa(ctx context.Context, id uint32) error
-	// Disable TOTP on a local identity.
-	ClearIdentityMfa(ctx context.Context, id uint32) error
 	// Resolve an MCP token by its SHA-256 hash for bearer auth.
 	FindMcpTokenByHash(ctx context.Context, tokenHash string) (FindMcpTokenByHashRow, error)
 	// Resolve a PAT row from its SHA-256 hash for bearer auth.
@@ -150,6 +167,8 @@ type Querier interface {
 	FindSessionByRefreshHash(ctx context.Context, refreshHash string) (FindSessionByRefreshHashRow, error)
 	// Detail projection via v_task_detail. Workspace-scoped.
 	FindTaskByPublicId(ctx context.Context, arg FindTaskByPublicIdParams) (FindTaskByPublicIdRow, error)
+	// Resolve an unused recovery code by (user_id, hash).
+	FindUnusedRecoveryCode(ctx context.Context, arg FindUnusedRecoveryCodeParams) (uint32, error)
 	// Lookup a user by email for login. Returns internal id for the auth pipeline.
 	FindUserByEmail(ctx context.Context, email string) (FindUserByEmailRow, error)
 	// Lookup a user by email regardless of enabled flag (for invitation reuse).
@@ -159,10 +178,18 @@ type Querier interface {
 	// Resolve the owning user + workspace for an MCP bearer token by hash.
 	// Returns internal ids for the auth middleware.
 	FindUserForMcpToken(ctx context.Context, tokenHash string) (FindUserForMcpTokenRow, error)
+	// Resolve a single integration by its public id, user-scoped. Used
+	// by DELETE /me/integrations/{publicId}.
+	FindUserIntegrationByPublicId(ctx context.Context, arg FindUserIntegrationByPublicIdParams) (FindUserIntegrationByPublicIdRow, error)
+	// Resolve a user's integration for a specific provider. Returns the
+	// encrypted tokens so the caller can refresh or use them.
+	FindUserIntegrationByUserProvider(ctx context.Context, arg FindUserIntegrationByUserProviderParams) (FindUserIntegrationByUserProviderRow, error)
 	// Resolve the internal users.id for a public UUID, excluding disabled rows.
 	FindUserInternalIdByPublicId(ctx context.Context, publicID types.PublicID) (uint32, error)
 	// Fetch the minimal profile for the /me endpoint by internal id.
 	FindUserProfileById(ctx context.Context, id uint32) (FindUserProfileByIdRow, error)
+	// Resolve the public UUID for an internal users.id, excluding disabled rows.
+	FindUserPublicIdById(ctx context.Context, id uint32) (types.PublicID, error)
 	// Resolve a workspace by its UUID v7. Returns internal id for ACL.
 	FindWorkspaceByPublicId(ctx context.Context, publicID types.PublicID) (FindWorkspaceByPublicIdRow, error)
 	// Resolve a workspace by slug. Returns internal id for ACL.
@@ -188,6 +215,8 @@ type Querier interface {
 	// Fetch the embedding row for a single (task_id, model) pair. Returns
 	// sql.ErrNoRows if the task has never been embedded with the given model.
 	GetTaskEmbedding(ctx context.Context, arg GetTaskEmbeddingParams) (GetTaskEmbeddingRow, error)
+	// Insert a hashed recovery code for a user.
+	InsertRecoveryCode(ctx context.Context, arg InsertRecoveryCodeParams) error
 	// Insert an inbound signal (manual or webhook).
 	InsertSignal(ctx context.Context, arg InsertSignalParams) (int64, error)
 	// List actors on a task joined with user display fields.
@@ -214,14 +243,18 @@ type Querier interface {
 	ListCandidateTaskEmbeddings(ctx context.Context, arg ListCandidateTaskEmbeddingsParams) ([]ListCandidateTaskEmbeddingsRow, error)
 	// List comments on a task joined with author display fields.
 	ListCommentsForTask(ctx context.Context, arg ListCommentsForTaskParams) ([]ListCommentsForTaskRow, error)
+	// List enabled integrations whose access token will expire before
+	// the given cutoff AND still have a stored refresh token. Used by
+	// the background token refresher.
+	ListConnectionsExpiringBefore(ctx context.Context, accessTokenExpiresAt sql.NullTime) ([]ListConnectionsExpiringBeforeRow, error)
 	// List a task's constraints. The task is resolved by public_id outside.
 	ListConstraintsForTask(ctx context.Context, arg ListConstraintsForTaskParams) ([]ListConstraintsForTaskRow, error)
-	// List every dependency edge where both endpoints belong to the project.
+	// List every task_dependencies edge where BOTH endpoints belong to the
+	// given project. Used by the Gantt chart (to draw dependency arrows)
+	// and by the List / Board views (to compute "blocked by open" badges).
 	ListDependenciesForProject(ctx context.Context, arg ListDependenciesForProjectParams) ([]ListDependenciesForProjectRow, error)
 	// List outgoing dependencies of a task. Returns the target task public_id.
 	ListDependenciesForTask(ctx context.Context, arg ListDependenciesForTaskParams) ([]ListDependenciesForTaskRow, error)
-	// List incoming dependencies of a task (edges pointing AT this task).
-	ListIncomingDependenciesForTask(ctx context.Context, arg ListIncomingDependenciesForTaskParams) ([]ListIncomingDependenciesForTaskRow, error)
 	// Outgoing dependencies of a task with the referenced task's
 	// public_id + current derived_state. The engine builds a
 	// map[public_id]state from this rowset.
@@ -238,16 +271,19 @@ type Querier interface {
 	ListInbox(ctx context.Context, arg ListInboxParams) ([]ListInboxRow, error)
 	// List inbox items across every workspace the actor is an active member of.
 	ListInboxForUser(ctx context.Context, arg ListInboxForUserParams) ([]ListInboxForUserRow, error)
+	// List incoming dependencies of a task (edges that point AT this task).
+	ListIncomingDependenciesForTask(ctx context.Context, arg ListIncomingDependenciesForTaskParams) ([]ListIncomingDependenciesForTaskRow, error)
 	// List a user's MCP tokens in a workspace, masked.
 	ListMcpTokensForUser(ctx context.Context, arg ListMcpTokensForUserParams) ([]ListMcpTokensForUserRow, error)
 	// List models registered under a provider. Workspace-scoped.
 	ListModelsForProvider(ctx context.Context, arg ListModelsForProviderParams) ([]ListModelsForProviderRow, error)
 	// Tasks where the given user is attached as an actor, via v_my_tasks.
 	ListMyTasks(ctx context.Context, arg ListMyTasksParams) ([]ListMyTasksRow, error)
-	// Cross-workspace variant of ListMyTasks: returns every task where the
-	// user is attached as an actor across every workspace they belong to,
-	// joined with the workspace row so the caller gets workspace context
-	// per row without a second round-trip. Powers GET /me/tasks.
+	// Cross-workspace variant: tasks where the given user is attached as an
+	// actor across every workspace they belong to, joined with the workspace
+	// row so the caller gets workspace_public_id / name for grouping. Used by
+	// GET /me/tasks to power the cross-workspace "Today" / Calendar views in
+	// the web client without fanning out one request per workspace.
 	ListMyTasksGlobal(ctx context.Context, arg ListMyTasksGlobalParams) ([]ListMyTasksGlobalRow, error)
 	// List every enabled non-paused agent whose event_trigger_types
 	// contains the given event kind. Driven by the eventbus notify hook
@@ -297,6 +333,9 @@ type Querier interface {
 	ListTransitionEventsForReplay(ctx context.Context, arg ListTransitionEventsForReplayParams) ([]ListTransitionEventsForReplayRow, error)
 	// List signals in a workspace that have no task linkage yet.
 	ListUnattachedSignals(ctx context.Context, arg ListUnattachedSignalsParams) ([]ListUnattachedSignalsRow, error)
+	// List every active integration owned by a user. Tokens are NOT
+	// selected; only metadata used by the /me/integrations list view.
+	ListUserIntegrations(ctx context.Context, userID uint32) ([]ListUserIntegrationsRow, error)
 	// List members of a workspace via v_workspace_members.
 	ListWorkspaceMembers(ctx context.Context, arg ListWorkspaceMembersParams) ([]ListWorkspaceMembersRow, error)
 	// List workspaces a user belongs to.
@@ -309,6 +348,8 @@ type Querier interface {
 	LogMcpInvocation(ctx context.Context, arg LogMcpInvocationParams) (int64, error)
 	// Flip the row to claimed after ClaimNextAgentRun returns it.
 	MarkAgentRunClaimed(ctx context.Context, arg MarkAgentRunClaimedParams) error
+	// Stamp used_at on a recovery code by internal id.
+	MarkRecoveryCodeUsed(ctx context.Context, id uint32) error
 	// Worker failed; park the row with the error message. Retry policy
 	// lives in the application layer so different agents can have
 	// different budgets.
@@ -317,6 +358,9 @@ type Querier interface {
 	PatchMe(ctx context.Context, arg PatchMeParams) error
 	// Patch a workspace via COALESCE; NULL params leave existing columns untouched.
 	PatchWorkspace(ctx context.Context, arg PatchWorkspaceParams) error
+	// Garbage-collect oauth_states rows past their expires_at. Called
+	// opportunistically from the callback handler.
+	PurgeExpiredOauthStates(ctx context.Context) error
 	// Housekeeping: drop succeeded / failed rows older than the cutoff so
 	// the table does not grow unbounded. Run from a cron or a startup task.
 	PurgeFinishedAgentRuns(ctx context.Context, finishedAt sql.NullTime) error
@@ -347,6 +391,9 @@ type Querier interface {
 	RotateSessionRefreshHash(ctx context.Context, arg RotateSessionRefreshHashParams) error
 	// Mark a constraint as satisfied at the current time.
 	SatisfyConstraint(ctx context.Context, arg SatisfyConstraintParams) error
+	// Begin (or restart) TOTP enrollment by writing a fresh encrypted
+	// secret and clearing any previous confirmation timestamp.
+	SetIdentityMfaSecret(ctx context.Context, arg SetIdentityMfaSecretParams) error
 	// Snooze a signal by pushing its received_at forward. Minimal impl;
 	// a dedicated snoozed_until_at column may be added later on.
 	SnoozeInboxItem(ctx context.Context, arg SnoozeInboxItemParams) error
@@ -364,6 +411,8 @@ type Querier interface {
 	TransitionTaskState(ctx context.Context, arg TransitionTaskStateParams) error
 	// Update the schedule_kind on an existing agent.
 	UpdateAgentScheduleKind(ctx context.Context, arg UpdateAgentScheduleKindParams) error
+	// Replace stored tokens after a successful refresh.
+	UpdateConnectionTokens(ctx context.Context, arg UpdateConnectionTokensParams) error
 	// Bump failed login counter and optionally apply a lockout deadline.
 	UpdateIdentityFailedAttempts(ctx context.Context, arg UpdateIdentityFailedAttemptsParams) error
 	// Replace the Argon2id password hash on a local identity.
@@ -409,26 +458,10 @@ type Querier interface {
 	// content_hash lets callers skip re-embedding when the input text is
 	// unchanged.
 	UpsertTaskEmbedding(ctx context.Context, arg UpsertTaskEmbeddingParams) error
-
-	// --- TOTP recovery codes (recovery_codes.sql.go) ---
-	InsertRecoveryCode(ctx context.Context, arg InsertRecoveryCodeParams) error
-	DeleteAllRecoveryCodesForUser(ctx context.Context, userID uint32) error
-	CountActiveRecoveryCodes(ctx context.Context, userID uint32) (int64, error)
-	FindUnusedRecoveryCode(ctx context.Context, arg FindUnusedRecoveryCodeParams) (uint32, error)
-	MarkRecoveryCodeUsed(ctx context.Context, id uint32) error
-
-	// --- Personal OAuth integrations (integrations.sql.go) ---
-	ListUserIntegrations(ctx context.Context, userID uint32) ([]ListUserIntegrationsRow, error)
-	FindUserIntegrationByPublicId(ctx context.Context, arg FindUserIntegrationByPublicIdParams) (FindUserIntegrationByPublicIdRow, error)
-	FindUserIntegrationByUserProvider(ctx context.Context, arg FindUserIntegrationByUserProviderParams) (FindUserIntegrationByUserProviderRow, error)
+	// Insert or replace a user+provider integration. The uniq
+	// (user_id, provider) key guarantees only one active row per
+	// provider per user; on conflict we refresh every token column.
 	UpsertUserIntegration(ctx context.Context, arg UpsertUserIntegrationParams) (int64, error)
-	DeleteUserIntegration(ctx context.Context, arg DeleteUserIntegrationParams) error
-	ListConnectionsExpiringBefore(ctx context.Context, cutoff time.Time) ([]ListConnectionsExpiringBeforeRow, error)
-	UpdateConnectionTokens(ctx context.Context, arg UpdateConnectionTokensParams) error
-	CreateOauthState(ctx context.Context, arg CreateOauthStateParams) error
-	ConsumeOauthState(ctx context.Context, state string) (ConsumeOauthStateRow, error)
-	DeleteOauthState(ctx context.Context, state string) error
-	PurgeExpiredOauthStates(ctx context.Context) error
 }
 
 var _ Querier = (*Queries)(nil)

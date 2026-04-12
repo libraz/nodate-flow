@@ -174,6 +174,14 @@ WHERE public_id = ?
   AND enabled = TRUE
 LIMIT 1;
 
+-- name: FindUserPublicIdById :one
+-- Resolve the public UUID for an internal users.id, excluding disabled rows.
+SELECT public_id
+FROM users
+WHERE id = ?
+  AND enabled = TRUE
+LIMIT 1;
+
 -- name: FindUserProfileById :one
 -- Fetch the minimal profile for the /me endpoint by internal id.
 SELECT public_id, email, display_name, locale, theme_preference, avatar_url,

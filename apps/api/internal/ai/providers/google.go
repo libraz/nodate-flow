@@ -109,5 +109,6 @@ func (p *googleProvider) Complete(ctx context.Context, req Request) (*Response, 
 		Text:         text,
 		InputTokens:  gr.UsageMetadata.PromptTokenCount,
 		OutputTokens: gr.UsageMetadata.CandidatesTokenCount,
+		CostCents:    estimateCostCents(model, gr.UsageMetadata.PromptTokenCount, gr.UsageMetadata.CandidatesTokenCount),
 	}, nil
 }

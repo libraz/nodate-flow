@@ -13,73 +13,98 @@ import (
 	types "github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 )
 
-// UserIntegrationsProvider is the enum-backed provider kind for the
-// user_integrations and oauth_states tables. Kept as a plain string
-// alias (same treatment as the sqlc-generated enum types) so handler
-// code can compare against the package-level const values.
-type UserIntegrationsProvider string
-
-const (
-	UserIntegrationsProviderGithub         UserIntegrationsProvider = "github"
-	UserIntegrationsProviderSlack          UserIntegrationsProvider = "slack"
-	UserIntegrationsProviderGoogleCalendar UserIntegrationsProvider = "google_calendar"
-)
-
-const listUserIntegrations = `-- name: ListUserIntegrations :many
+const consumeOauthState = `-- name: ConsumeOauthState :one
 SELECT
-  public_id,
+  state,
+  user_id,
   provider,
-  external_account_id,
-  external_account_label,
-  scopes,
-  access_token_expires_at,
-  connected_at,
-  last_refreshed_at
-FROM user_integrations
-WHERE user_id = ?
-  AND enabled = TRUE
-ORDER BY connected_at DESC, id DESC
+  redirect_to,
+  expires_at
+FROM oauth_states
+WHERE state = ?
+LIMIT 1
 `
 
-type ListUserIntegrationsRow struct {
-	PublicID             types.PublicID           `json:"publicId"`
-	Provider             UserIntegrationsProvider `json:"provider"`
-	ExternalAccountID    string                   `json:"externalAccountId"`
-	ExternalAccountLabel string                   `json:"externalAccountLabel"`
-	Scopes               string                   `json:"scopes"`
-	AccessTokenExpiresAt sql.NullTime             `json:"accessTokenExpiresAt"`
-	ConnectedAt          time.Time                `json:"connectedAt"`
-	LastRefreshedAt      sql.NullTime             `json:"lastRefreshedAt"`
+type ConsumeOauthStateRow struct {
+	State      string              `json:"state"`
+	UserID     uint32              `json:"-"`
+	Provider   OauthStatesProvider `json:"provider"`
+	RedirectTo sql.NullString      `json:"redirectTo"`
+	ExpiresAt  time.Time           `json:"expiresAt"`
 }
 
-// List every active integration owned by a user.
-func (q *Queries) ListUserIntegrations(ctx context.Context, userID uint32) ([]ListUserIntegrationsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listUserIntegrations, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListUserIntegrationsRow{}
-	for rows.Next() {
-		var i ListUserIntegrationsRow
-		if err := rows.Scan(
-			&i.PublicID,
-			&i.Provider,
-			&i.ExternalAccountID,
-			&i.ExternalAccountLabel,
-			&i.Scopes,
-			&i.AccessTokenExpiresAt,
-			&i.ConnectedAt,
-			&i.LastRefreshedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	return items, rows.Err()
+// Atomically look up and delete an OAuth state row. The caller MUST
+// still check expires_at against CURRENT_TIMESTAMP before trusting
+// the returned row.
+func (q *Queries) ConsumeOauthState(ctx context.Context, state string) (ConsumeOauthStateRow, error) {
+	row := q.db.QueryRowContext(ctx, consumeOauthState, state)
+	var i ConsumeOauthStateRow
+	err := row.Scan(
+		&i.State,
+		&i.UserID,
+		&i.Provider,
+		&i.RedirectTo,
+		&i.ExpiresAt,
+	)
+	return i, err
+}
+
+const createOauthState = `-- name: CreateOauthState :exec
+INSERT INTO oauth_states (
+  state,
+  user_id,
+  provider,
+  redirect_to,
+  expires_at
+) VALUES (?, ?, ?, ?, ?)
+`
+
+type CreateOauthStateParams struct {
+	State      string              `json:"state"`
+	UserID     uint32              `json:"-"`
+	Provider   OauthStatesProvider `json:"provider"`
+	RedirectTo sql.NullString      `json:"redirectTo"`
+	ExpiresAt  time.Time           `json:"expiresAt"`
+}
+
+// Insert a short-lived CSRF state row for the personal OAuth flow.
+func (q *Queries) CreateOauthState(ctx context.Context, arg CreateOauthStateParams) error {
+	_, err := q.db.ExecContext(ctx, createOauthState,
+		arg.State,
+		arg.UserID,
+		arg.Provider,
+		arg.RedirectTo,
+		arg.ExpiresAt,
+	)
+	return err
+}
+
+const deleteOauthState = `-- name: DeleteOauthState :exec
+DELETE FROM oauth_states
+WHERE state = ?
+`
+
+// Explicit delete for the state row that :one above just returned.
+func (q *Queries) DeleteOauthState(ctx context.Context, state string) error {
+	_, err := q.db.ExecContext(ctx, deleteOauthState, state)
+	return err
+}
+
+const deleteUserIntegration = `-- name: DeleteUserIntegration :exec
+DELETE FROM user_integrations
+WHERE id = ?
+  AND user_id = ?
+`
+
+type DeleteUserIntegrationParams struct {
+	ID     uint32 `json:"-"`
+	UserID uint32 `json:"-"`
+}
+
+// Hard-delete a single integration row (user-scoped).
+func (q *Queries) DeleteUserIntegration(ctx context.Context, arg DeleteUserIntegrationParams) error {
+	_, err := q.db.ExecContext(ctx, deleteUserIntegration, arg.ID, arg.UserID)
+	return err
 }
 
 const findUserIntegrationByPublicId = `-- name: FindUserIntegrationByPublicId :one
@@ -109,11 +134,18 @@ type FindUserIntegrationByPublicIdRow struct {
 	ExternalAccountLabel string                   `json:"externalAccountLabel"`
 }
 
-// Resolve a single integration by its public id, user-scoped.
+// Resolve a single integration by its public id, user-scoped. Used
+// by DELETE /me/integrations/{publicId}.
 func (q *Queries) FindUserIntegrationByPublicId(ctx context.Context, arg FindUserIntegrationByPublicIdParams) (FindUserIntegrationByPublicIdRow, error) {
 	row := q.db.QueryRowContext(ctx, findUserIntegrationByPublicId, arg.PublicID, arg.UserID)
 	var i FindUserIntegrationByPublicIdRow
-	err := row.Scan(&i.ID, &i.PublicID, &i.UserID, &i.Provider, &i.ExternalAccountLabel)
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.UserID,
+		&i.Provider,
+		&i.ExternalAccountLabel,
+	)
 	return i, err
 }
 
@@ -140,16 +172,184 @@ type FindUserIntegrationByUserProviderRow struct {
 	ID                     uint32         `json:"-"`
 	PublicID               types.PublicID `json:"publicId"`
 	AccessTokenCiphertext  []byte         `json:"accessTokenCiphertext"`
-	RefreshTokenCiphertext []byte         `json:"refreshTokenCiphertext"`
+	RefreshTokenCiphertext sql.NullString `json:"refreshTokenCiphertext"`
 	AccessTokenExpiresAt   sql.NullTime   `json:"accessTokenExpiresAt"`
 }
 
-// Resolve a user's integration for a specific provider.
+// Resolve a user's integration for a specific provider. Returns the
+// encrypted tokens so the caller can refresh or use them.
 func (q *Queries) FindUserIntegrationByUserProvider(ctx context.Context, arg FindUserIntegrationByUserProviderParams) (FindUserIntegrationByUserProviderRow, error) {
 	row := q.db.QueryRowContext(ctx, findUserIntegrationByUserProvider, arg.UserID, arg.Provider)
 	var i FindUserIntegrationByUserProviderRow
-	err := row.Scan(&i.ID, &i.PublicID, &i.AccessTokenCiphertext, &i.RefreshTokenCiphertext, &i.AccessTokenExpiresAt)
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.AccessTokenCiphertext,
+		&i.RefreshTokenCiphertext,
+		&i.AccessTokenExpiresAt,
+	)
 	return i, err
+}
+
+const listConnectionsExpiringBefore = `-- name: ListConnectionsExpiringBefore :many
+SELECT
+  id,
+  user_id,
+  provider,
+  access_token_ciphertext,
+  refresh_token_ciphertext,
+  access_token_expires_at
+FROM user_integrations
+WHERE enabled = TRUE
+  AND access_token_expires_at IS NOT NULL
+  AND access_token_expires_at < ?
+  AND refresh_token_ciphertext IS NOT NULL
+  AND LENGTH(refresh_token_ciphertext) > 0
+ORDER BY access_token_expires_at ASC
+LIMIT 200
+`
+
+type ListConnectionsExpiringBeforeRow struct {
+	ID                     uint32                   `json:"-"`
+	UserID                 uint32                   `json:"-"`
+	Provider               UserIntegrationsProvider `json:"provider"`
+	AccessTokenCiphertext  []byte                   `json:"accessTokenCiphertext"`
+	RefreshTokenCiphertext sql.NullString           `json:"refreshTokenCiphertext"`
+	AccessTokenExpiresAt   sql.NullTime             `json:"accessTokenExpiresAt"`
+}
+
+// List enabled integrations whose access token will expire before
+// the given cutoff AND still have a stored refresh token. Used by
+// the background token refresher.
+func (q *Queries) ListConnectionsExpiringBefore(ctx context.Context, accessTokenExpiresAt sql.NullTime) ([]ListConnectionsExpiringBeforeRow, error) {
+	rows, err := q.db.QueryContext(ctx, listConnectionsExpiringBefore, accessTokenExpiresAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListConnectionsExpiringBeforeRow{}
+	for rows.Next() {
+		var i ListConnectionsExpiringBeforeRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Provider,
+			&i.AccessTokenCiphertext,
+			&i.RefreshTokenCiphertext,
+			&i.AccessTokenExpiresAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUserIntegrations = `-- name: ListUserIntegrations :many
+SELECT
+  public_id,
+  provider,
+  external_account_id,
+  external_account_label,
+  scopes,
+  access_token_expires_at,
+  connected_at,
+  last_refreshed_at
+FROM user_integrations
+WHERE user_id = ?
+  AND enabled = TRUE
+ORDER BY connected_at DESC, id DESC
+`
+
+type ListUserIntegrationsRow struct {
+	PublicID             types.PublicID           `json:"publicId"`
+	Provider             UserIntegrationsProvider `json:"provider"`
+	ExternalAccountID    string                   `json:"externalAccountId"`
+	ExternalAccountLabel string                   `json:"externalAccountLabel"`
+	Scopes               string                   `json:"scopes"`
+	AccessTokenExpiresAt sql.NullTime             `json:"accessTokenExpiresAt"`
+	ConnectedAt          time.Time                `json:"connectedAt"`
+	LastRefreshedAt      sql.NullTime             `json:"lastRefreshedAt"`
+}
+
+// List every active integration owned by a user. Tokens are NOT
+// selected; only metadata used by the /me/integrations list view.
+func (q *Queries) ListUserIntegrations(ctx context.Context, userID uint32) ([]ListUserIntegrationsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listUserIntegrations, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUserIntegrationsRow{}
+	for rows.Next() {
+		var i ListUserIntegrationsRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.Provider,
+			&i.ExternalAccountID,
+			&i.ExternalAccountLabel,
+			&i.Scopes,
+			&i.AccessTokenExpiresAt,
+			&i.ConnectedAt,
+			&i.LastRefreshedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const purgeExpiredOauthStates = `-- name: PurgeExpiredOauthStates :exec
+DELETE FROM oauth_states
+WHERE expires_at < CURRENT_TIMESTAMP
+`
+
+// Garbage-collect oauth_states rows past their expires_at. Called
+// opportunistically from the callback handler.
+func (q *Queries) PurgeExpiredOauthStates(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, purgeExpiredOauthStates)
+	return err
+}
+
+const updateConnectionTokens = `-- name: UpdateConnectionTokens :exec
+UPDATE user_integrations
+SET access_token_ciphertext = ?,
+    refresh_token_ciphertext = ?,
+    access_token_expires_at = ?,
+    last_refreshed_at = NOW(),
+    updated_at = NOW()
+WHERE id = ?
+`
+
+type UpdateConnectionTokensParams struct {
+	AccessTokenCiphertext  []byte         `json:"accessTokenCiphertext"`
+	RefreshTokenCiphertext sql.NullString `json:"refreshTokenCiphertext"`
+	AccessTokenExpiresAt   sql.NullTime   `json:"accessTokenExpiresAt"`
+	ID                     uint32         `json:"-"`
+}
+
+// Replace stored tokens after a successful refresh.
+func (q *Queries) UpdateConnectionTokens(ctx context.Context, arg UpdateConnectionTokensParams) error {
+	_, err := q.db.ExecContext(ctx, updateConnectionTokens,
+		arg.AccessTokenCiphertext,
+		arg.RefreshTokenCiphertext,
+		arg.AccessTokenExpiresAt,
+		arg.ID,
+	)
+	return err
 }
 
 const upsertUserIntegration = `-- name: UpsertUserIntegration :execlastid
@@ -183,11 +383,13 @@ type UpsertUserIntegrationParams struct {
 	ExternalAccountLabel   string                   `json:"externalAccountLabel"`
 	Scopes                 string                   `json:"scopes"`
 	AccessTokenCiphertext  []byte                   `json:"accessTokenCiphertext"`
-	RefreshTokenCiphertext []byte                   `json:"refreshTokenCiphertext"`
+	RefreshTokenCiphertext sql.NullString           `json:"refreshTokenCiphertext"`
 	AccessTokenExpiresAt   sql.NullTime             `json:"accessTokenExpiresAt"`
 }
 
-// Insert or replace a user+provider integration.
+// Insert or replace a user+provider integration. The uniq
+// (user_id, provider) key guarantees only one active row per
+// provider per user; on conflict we refresh every token column.
 func (q *Queries) UpsertUserIntegration(ctx context.Context, arg UpsertUserIntegrationParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, upsertUserIntegration,
 		arg.PublicID,
@@ -204,178 +406,4 @@ func (q *Queries) UpsertUserIntegration(ctx context.Context, arg UpsertUserInteg
 		return 0, err
 	}
 	return result.LastInsertId()
-}
-
-const deleteUserIntegration = `-- name: DeleteUserIntegration :exec
-DELETE FROM user_integrations
-WHERE id = ?
-  AND user_id = ?
-`
-
-type DeleteUserIntegrationParams struct {
-	ID     uint32 `json:"-"`
-	UserID uint32 `json:"-"`
-}
-
-// Hard-delete a single integration row (user-scoped).
-func (q *Queries) DeleteUserIntegration(ctx context.Context, arg DeleteUserIntegrationParams) error {
-	_, err := q.db.ExecContext(ctx, deleteUserIntegration, arg.ID, arg.UserID)
-	return err
-}
-
-const listConnectionsExpiringBefore = `-- name: ListConnectionsExpiringBefore :many
-SELECT
-  id,
-  user_id,
-  provider,
-  access_token_ciphertext,
-  refresh_token_ciphertext,
-  access_token_expires_at
-FROM user_integrations
-WHERE enabled = TRUE
-  AND access_token_expires_at IS NOT NULL
-  AND access_token_expires_at < ?
-  AND refresh_token_ciphertext IS NOT NULL
-  AND LENGTH(refresh_token_ciphertext) > 0
-ORDER BY access_token_expires_at ASC
-LIMIT 200
-`
-
-type ListConnectionsExpiringBeforeRow struct {
-	ID                     uint32                   `json:"-"`
-	UserID                 uint32                   `json:"-"`
-	Provider               UserIntegrationsProvider `json:"provider"`
-	AccessTokenCiphertext  []byte                   `json:"-"`
-	RefreshTokenCiphertext []byte                   `json:"-"`
-	AccessTokenExpiresAt   sql.NullTime             `json:"accessTokenExpiresAt"`
-}
-
-// List enabled integrations whose access token expires before the cutoff.
-func (q *Queries) ListConnectionsExpiringBefore(ctx context.Context, cutoff time.Time) ([]ListConnectionsExpiringBeforeRow, error) {
-	rows, err := q.db.QueryContext(ctx, listConnectionsExpiringBefore, cutoff)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListConnectionsExpiringBeforeRow{}
-	for rows.Next() {
-		var i ListConnectionsExpiringBeforeRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.UserID,
-			&i.Provider,
-			&i.AccessTokenCiphertext,
-			&i.RefreshTokenCiphertext,
-			&i.AccessTokenExpiresAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	return items, rows.Err()
-}
-
-const updateConnectionTokens = `-- name: UpdateConnectionTokens :exec
-UPDATE user_integrations
-SET access_token_ciphertext = ?,
-    refresh_token_ciphertext = ?,
-    access_token_expires_at = ?,
-    last_refreshed_at = NOW(),
-    updated_at = NOW()
-WHERE id = ?
-`
-
-type UpdateConnectionTokensParams struct {
-	AccessTokenCiphertext  []byte       `json:"-"`
-	RefreshTokenCiphertext []byte       `json:"-"`
-	AccessTokenExpiresAt   sql.NullTime `json:"accessTokenExpiresAt"`
-	ID                     uint32       `json:"-"`
-}
-
-// Replace stored tokens after a successful refresh.
-func (q *Queries) UpdateConnectionTokens(ctx context.Context, arg UpdateConnectionTokensParams) error {
-	_, err := q.db.ExecContext(ctx, updateConnectionTokens,
-		arg.AccessTokenCiphertext,
-		arg.RefreshTokenCiphertext,
-		arg.AccessTokenExpiresAt,
-		arg.ID,
-	)
-	return err
-}
-
-const createOauthState = `-- name: CreateOauthState :exec
-INSERT INTO oauth_states (
-  state,
-  user_id,
-  provider,
-  redirect_to,
-  expires_at
-) VALUES (?, ?, ?, ?, ?)
-`
-
-type CreateOauthStateParams struct {
-	State      string                   `json:"state"`
-	UserID     uint32                   `json:"-"`
-	Provider   UserIntegrationsProvider `json:"provider"`
-	RedirectTo sql.NullString           `json:"redirectTo"`
-	ExpiresAt  time.Time                `json:"expiresAt"`
-}
-
-// Insert a short-lived CSRF state row for the personal OAuth flow.
-func (q *Queries) CreateOauthState(ctx context.Context, arg CreateOauthStateParams) error {
-	_, err := q.db.ExecContext(ctx, createOauthState, arg.State, arg.UserID, arg.Provider, arg.RedirectTo, arg.ExpiresAt)
-	return err
-}
-
-const consumeOauthState = `-- name: ConsumeOauthState :one
-SELECT
-  state,
-  user_id,
-  provider,
-  redirect_to,
-  expires_at
-FROM oauth_states
-WHERE state = ?
-LIMIT 1
-`
-
-type ConsumeOauthStateRow struct {
-	State      string                   `json:"state"`
-	UserID     uint32                   `json:"-"`
-	Provider   UserIntegrationsProvider `json:"provider"`
-	RedirectTo sql.NullString           `json:"redirectTo"`
-	ExpiresAt  time.Time                `json:"expiresAt"`
-}
-
-// Look up an OAuth state row (caller must then call DeleteOauthState).
-func (q *Queries) ConsumeOauthState(ctx context.Context, state string) (ConsumeOauthStateRow, error) {
-	row := q.db.QueryRowContext(ctx, consumeOauthState, state)
-	var i ConsumeOauthStateRow
-	err := row.Scan(&i.State, &i.UserID, &i.Provider, &i.RedirectTo, &i.ExpiresAt)
-	return i, err
-}
-
-const deleteOauthState = `-- name: DeleteOauthState :exec
-DELETE FROM oauth_states
-WHERE state = ?
-`
-
-// Explicit delete for the state row that ConsumeOauthState returned.
-func (q *Queries) DeleteOauthState(ctx context.Context, state string) error {
-	_, err := q.db.ExecContext(ctx, deleteOauthState, state)
-	return err
-}
-
-const purgeExpiredOauthStates = `-- name: PurgeExpiredOauthStates :exec
-DELETE FROM oauth_states
-WHERE expires_at < CURRENT_TIMESTAMP
-`
-
-// Garbage-collect oauth_states rows past their expires_at.
-func (q *Queries) PurgeExpiredOauthStates(ctx context.Context) error {
-	_, err := q.db.ExecContext(ctx, purgeExpiredOauthStates)
-	return err
 }

@@ -67,6 +67,12 @@ services:
       NF_VERSION: ${NF_VERSION:-dev}
     ports:
       - "${NF_API_PORT:-8080}:8080"
+    healthcheck:
+      test: ["/healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
 
 volumes:
   mysql_data:

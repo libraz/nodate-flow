@@ -87,8 +87,8 @@ func LoadUserTokenSet(
 		return TokenSet{}, err
 	}
 	var refreshPlain []byte
-	if len(row.RefreshTokenCiphertext) > 0 {
-		refreshPlain, err = cipher.Decrypt(row.RefreshTokenCiphertext)
+	if row.RefreshTokenCiphertext.Valid && len(row.RefreshTokenCiphertext.String) > 0 {
+		refreshPlain, err = cipher.Decrypt([]byte(row.RefreshTokenCiphertext.String))
 		if err != nil {
 			return TokenSet{}, err
 		}
@@ -148,7 +148,7 @@ func LoadUserTokenSet(
 				"provider", provider, "user_id", userID, "err", encErr2)
 			return *refreshed, nil
 		}
-		newRefreshCipher = enc
+		newRefreshCipher = sql.NullString{String: string(enc), Valid: true}
 	}
 	var expires sql.NullTime
 	if !refreshed.ExpiresAt.IsZero() {

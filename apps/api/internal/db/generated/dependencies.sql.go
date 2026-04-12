@@ -64,6 +64,72 @@ func (q *Queries) DeleteDependency(ctx context.Context, arg DeleteDependencyPara
 	return err
 }
 
+const listDependenciesForProject = `-- name: ListDependenciesForProject :many
+SELECT
+  td.public_id,
+  td.kind,
+  ft.public_id AS from_task_public_id,
+  ft.derived_state AS from_task_derived_state,
+  tt.public_id AS to_task_public_id,
+  tt.derived_state AS to_task_derived_state
+FROM task_dependencies td
+INNER JOIN tasks ft ON ft.id = td.from_task_id AND ft.enabled = TRUE
+INNER JOIN tasks tt ON tt.id = td.to_task_id   AND tt.enabled = TRUE
+INNER JOIN projects p ON p.id = ft.project_id AND p.enabled = TRUE
+WHERE td.workspace_id = ?
+  AND p.public_id = ?
+  AND ft.project_id = tt.project_id
+  AND td.enabled = TRUE
+ORDER BY td.created_at ASC, td.public_id ASC
+`
+
+type ListDependenciesForProjectParams struct {
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+type ListDependenciesForProjectRow struct {
+	PublicID             types.PublicID       `json:"publicId"`
+	Kind                 TaskDependenciesKind `json:"kind"`
+	FromTaskPublicID     types.PublicID       `json:"fromTaskPublicId"`
+	FromTaskDerivedState TasksDerivedState    `json:"fromTaskDerivedState"`
+	ToTaskPublicID       types.PublicID       `json:"toTaskPublicId"`
+	ToTaskDerivedState   TasksDerivedState    `json:"toTaskDerivedState"`
+}
+
+// List every task_dependencies edge where BOTH endpoints belong to the
+// given project. Used by the Gantt chart (to draw dependency arrows)
+// and by the List / Board views (to compute "blocked by open" badges).
+func (q *Queries) ListDependenciesForProject(ctx context.Context, arg ListDependenciesForProjectParams) ([]ListDependenciesForProjectRow, error) {
+	rows, err := q.db.QueryContext(ctx, listDependenciesForProject, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDependenciesForProjectRow{}
+	for rows.Next() {
+		var i ListDependenciesForProjectRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.Kind,
+			&i.FromTaskPublicID,
+			&i.FromTaskDerivedState,
+			&i.ToTaskPublicID,
+			&i.ToTaskDerivedState,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDependenciesForTask = `-- name: ListDependenciesForTask :many
 SELECT
   td.public_id,
@@ -102,6 +168,45 @@ type ListDependenciesForTaskRow struct {
 	UpdatedAt          sql.NullTime         `json:"updatedAt"`
 	CreatedAt          time.Time            `json:"createdAt"`
 	Total              interface{}          `json:"total"`
+}
+
+// List outgoing dependencies of a task. Returns the target task public_id.
+func (q *Queries) ListDependenciesForTask(ctx context.Context, arg ListDependenciesForTaskParams) ([]ListDependenciesForTaskRow, error) {
+	rows, err := q.db.QueryContext(ctx, listDependenciesForTask,
+		arg.WorkspaceID,
+		arg.PublicID,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDependenciesForTaskRow{}
+	for rows.Next() {
+		var i ListDependenciesForTaskRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.Kind,
+			&i.FromTaskPublicID,
+			&i.ToTaskPublicID,
+			&i.ToTaskTitle,
+			&i.ToTaskDerivedState,
+			&i.UpdatedAt,
+			&i.CreatedAt,
+			&i.Total,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listIncomingDependenciesForTask = `-- name: ListIncomingDependenciesForTask :many
@@ -144,7 +249,7 @@ type ListIncomingDependenciesForTaskRow struct {
 	Total                interface{}          `json:"total"`
 }
 
-// List incoming dependencies of a task (edges pointing AT this task).
+// List incoming dependencies of a task (edges that point AT this task).
 func (q *Queries) ListIncomingDependenciesForTask(ctx context.Context, arg ListIncomingDependenciesForTaskParams) ([]ListIncomingDependenciesForTaskRow, error) {
 	rows, err := q.db.QueryContext(ctx, listIncomingDependenciesForTask,
 		arg.WorkspaceID,
@@ -166,112 +271,6 @@ func (q *Queries) ListIncomingDependenciesForTask(ctx context.Context, arg ListI
 			&i.FromTaskTitle,
 			&i.FromTaskDerivedState,
 			&i.ToTaskPublicID,
-			&i.UpdatedAt,
-			&i.CreatedAt,
-			&i.Total,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listDependenciesForProject = `-- name: ListDependenciesForProject :many
-SELECT
-  td.public_id,
-  td.kind,
-  ft.public_id AS from_task_public_id,
-  ft.derived_state AS from_task_derived_state,
-  tt.public_id AS to_task_public_id,
-  tt.derived_state AS to_task_derived_state
-FROM task_dependencies td
-INNER JOIN tasks ft ON ft.id = td.from_task_id AND ft.enabled = TRUE
-INNER JOIN tasks tt ON tt.id = td.to_task_id   AND tt.enabled = TRUE
-INNER JOIN projects p ON p.id = ft.project_id AND p.enabled = TRUE
-WHERE td.workspace_id = ?
-  AND p.public_id = ?
-  AND ft.project_id = tt.project_id
-  AND td.enabled = TRUE
-ORDER BY td.created_at ASC, td.public_id ASC
-`
-
-type ListDependenciesForProjectParams struct {
-	WorkspaceID     uint32         `json:"-"`
-	ProjectPublicID types.PublicID `json:"projectPublicId"`
-}
-
-type ListDependenciesForProjectRow struct {
-	PublicID             types.PublicID       `json:"publicId"`
-	Kind                 TaskDependenciesKind `json:"kind"`
-	FromTaskPublicID     types.PublicID       `json:"fromTaskPublicId"`
-	FromTaskDerivedState TasksDerivedState    `json:"fromTaskDerivedState"`
-	ToTaskPublicID       types.PublicID       `json:"toTaskPublicId"`
-	ToTaskDerivedState   TasksDerivedState    `json:"toTaskDerivedState"`
-}
-
-// List every dependency edge where both endpoints belong to the project.
-func (q *Queries) ListDependenciesForProject(ctx context.Context, arg ListDependenciesForProjectParams) ([]ListDependenciesForProjectRow, error) {
-	rows, err := q.db.QueryContext(ctx, listDependenciesForProject,
-		arg.WorkspaceID,
-		arg.ProjectPublicID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListDependenciesForProjectRow{}
-	for rows.Next() {
-		var i ListDependenciesForProjectRow
-		if err := rows.Scan(
-			&i.PublicID,
-			&i.Kind,
-			&i.FromTaskPublicID,
-			&i.FromTaskDerivedState,
-			&i.ToTaskPublicID,
-			&i.ToTaskDerivedState,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-// List outgoing dependencies of a task. Returns the target task public_id.
-func (q *Queries) ListDependenciesForTask(ctx context.Context, arg ListDependenciesForTaskParams) ([]ListDependenciesForTaskRow, error) {
-	rows, err := q.db.QueryContext(ctx, listDependenciesForTask,
-		arg.WorkspaceID,
-		arg.PublicID,
-		arg.Limit,
-		arg.Offset,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListDependenciesForTaskRow{}
-	for rows.Next() {
-		var i ListDependenciesForTaskRow
-		if err := rows.Scan(
-			&i.PublicID,
-			&i.Kind,
-			&i.FromTaskPublicID,
-			&i.ToTaskPublicID,
-			&i.ToTaskTitle,
-			&i.ToTaskDerivedState,
 			&i.UpdatedAt,
 			&i.CreatedAt,
 			&i.Total,

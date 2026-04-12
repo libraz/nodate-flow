@@ -292,16 +292,13 @@ type ListMyTasksGlobalRow struct {
 	Total             interface{}       `json:"total"`
 }
 
-// Cross-workspace variant of ListMyTasks: returns every task where the
-// user is attached as an actor across every workspace they belong to,
-// joined with the workspace row so the caller gets workspace context
-// per row without a second round-trip. Powers GET /me/tasks.
+// Cross-workspace variant: tasks where the given user is attached as an
+// actor across every workspace they belong to, joined with the workspace
+// row so the caller gets workspace_public_id / name for grouping. Used by
+// GET /me/tasks to power the cross-workspace "Today" / Calendar views in
+// the web client without fanning out one request per workspace.
 func (q *Queries) ListMyTasksGlobal(ctx context.Context, arg ListMyTasksGlobalParams) ([]ListMyTasksGlobalRow, error) {
-	rows, err := q.db.QueryContext(ctx, listMyTasksGlobal,
-		arg.UserPublicID,
-		arg.Limit,
-		arg.Offset,
-	)
+	rows, err := q.db.QueryContext(ctx, listMyTasksGlobal, arg.UserPublicID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}

@@ -110,5 +110,6 @@ func (p *openAIProvider) Complete(ctx context.Context, req Request) (*Response, 
 		Text:         text,
 		InputTokens:  or.Usage.PromptTokens,
 		OutputTokens: or.Usage.CompletionTokens,
+		CostCents:    estimateCostCents(model, or.Usage.PromptTokens, or.Usage.CompletionTokens),
 	}, nil
 }

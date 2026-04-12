@@ -9,19 +9,16 @@ import (
 	"context"
 )
 
-const insertRecoveryCode = `-- name: InsertRecoveryCode :exec
-INSERT INTO user_recovery_codes (user_id, code_hash) VALUES (?, ?)
+const countActiveRecoveryCodes = `-- name: CountActiveRecoveryCodes :one
+SELECT COUNT(*) FROM user_recovery_codes WHERE user_id = ? AND used_at IS NULL
 `
 
-type InsertRecoveryCodeParams struct {
-	UserID   uint32 `json:"-"`
-	CodeHash []byte `json:"-"`
-}
-
-// Insert a hashed recovery code for a user.
-func (q *Queries) InsertRecoveryCode(ctx context.Context, arg InsertRecoveryCodeParams) error {
-	_, err := q.db.ExecContext(ctx, insertRecoveryCode, arg.UserID, arg.CodeHash)
-	return err
+// Count unused recovery codes for a user.
+func (q *Queries) CountActiveRecoveryCodes(ctx context.Context, userID uint32) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countActiveRecoveryCodes, userID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
 }
 
 const deleteAllRecoveryCodesForUser = `-- name: DeleteAllRecoveryCodesForUser :exec
@@ -34,18 +31,6 @@ func (q *Queries) DeleteAllRecoveryCodesForUser(ctx context.Context, userID uint
 	return err
 }
 
-const countActiveRecoveryCodes = `-- name: CountActiveRecoveryCodes :one
-SELECT COUNT(*) FROM user_recovery_codes WHERE user_id = ? AND used_at IS NULL
-`
-
-// Count unused recovery codes for a user.
-func (q *Queries) CountActiveRecoveryCodes(ctx context.Context, userID uint32) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countActiveRecoveryCodes, userID)
-	var n int64
-	err := row.Scan(&n)
-	return n, err
-}
-
 const findUnusedRecoveryCode = `-- name: FindUnusedRecoveryCode :one
 SELECT id FROM user_recovery_codes
 WHERE user_id = ? AND code_hash = ? AND used_at IS NULL
@@ -54,7 +39,7 @@ LIMIT 1
 
 type FindUnusedRecoveryCodeParams struct {
 	UserID   uint32 `json:"-"`
-	CodeHash []byte `json:"-"`
+	CodeHash []byte `json:"codeHash"`
 }
 
 // Resolve an unused recovery code by (user_id, hash).
@@ -63,6 +48,21 @@ func (q *Queries) FindUnusedRecoveryCode(ctx context.Context, arg FindUnusedReco
 	var id uint32
 	err := row.Scan(&id)
 	return id, err
+}
+
+const insertRecoveryCode = `-- name: InsertRecoveryCode :exec
+INSERT INTO user_recovery_codes (user_id, code_hash) VALUES (?, ?)
+`
+
+type InsertRecoveryCodeParams struct {
+	UserID   uint32 `json:"-"`
+	CodeHash []byte `json:"codeHash"`
+}
+
+// Insert a hashed recovery code for a user.
+func (q *Queries) InsertRecoveryCode(ctx context.Context, arg InsertRecoveryCodeParams) error {
+	_, err := q.db.ExecContext(ctx, insertRecoveryCode, arg.UserID, arg.CodeHash)
+	return err
 }
 
 const markRecoveryCodeUsed = `-- name: MarkRecoveryCodeUsed :exec

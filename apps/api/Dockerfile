@@ -20,9 +20,17 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     cd apps/api && \
     CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api
 
+# Tiny health-check binary for distroless (no curl/wget available).
+# Exits 0 when GET /health returns 200, non-zero otherwise.
+COPY apps/api/cmd/healthcheck/main.go /tmp/healthcheck/main.go
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/healthcheck /tmp/healthcheck/main.go
+
 FROM gcr.io/distroless/static-debian12:nonroot
 WORKDIR /
 COPY --from=build /out/api /api
+COPY --from=build /out/healthcheck /healthcheck
 USER nonroot:nonroot
 EXPOSE 8080
 ENTRYPOINT ["/api"]

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/go-sql-driver/mysql"
+
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
@@ -46,7 +48,12 @@ func Patch(deps Deps) func(context.Context, *PatchProjectInput) (*PatchProjectOu
 			Description: newDesc,
 			PublicID:    types.FromUUID(prj.PublicID),
 		}); err != nil {
-			return nil, httpErr(apierrors.WsProjectSlugAlreadyTaken)
+			var mysqlErr *mysql.MySQLError
+			if errors.As(err, &mysqlErr) && mysqlErr.Number == mysqlErrDuplicateEntry &&
+				strings.Contains(mysqlErr.Message, "uniq_projects_workspace_id_slug") {
+				return nil, httpErr(apierrors.WsProjectSlugAlreadyTaken)
+			}
+			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
 		updated := rowToProjectFromFind(current)

@@ -51,7 +51,7 @@ func Login(deps Deps) func(context.Context, *LoginInput) (*LoginOutput, error) {
 		// tokens yet. Return a short-lived challenge instead; the
 		// client must finish at POST /auth/login/totp. last_login_at
 		// is deferred to that happy path.
-		if row.MfaConfirmedAt.Valid && len(row.MfaSecretCiphertext) > 0 {
+		if row.MfaConfirmedAt.Valid && len(row.MfaSecretCiphertext.String) > 0 {
 			challenge, _, cerr := deps.JWT.SignTotpChallenge(row.UserID)
 			if cerr != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
@@ -102,7 +102,7 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		if !ident.MfaConfirmedAt.Valid || len(ident.MfaSecretCiphertext) == 0 {
+		if !ident.MfaConfirmedAt.Valid || len(ident.MfaSecretCiphertext.String) == 0 {
 			// TOTP was disabled between /auth/login and here. Refuse
 			// the challenge so the client retries single-factor
 			// login instead of silently completing on stale state.
@@ -115,7 +115,7 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 			return nil, httpErr(apierrors.AuthTotpRecoveryCodeRequired)
 		}
 		if hasCode {
-			secret, derr := deps.Cipher.Decrypt(ident.MfaSecretCiphertext)
+			secret, derr := deps.Cipher.Decrypt([]byte(ident.MfaSecretCiphertext.String))
 			if derr != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}

@@ -7,7 +7,6 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth/sessionstore"
-	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
 )
 
@@ -40,8 +39,8 @@ func Refresh(deps Deps) func(context.Context, *RefreshInput) (*RefreshOutput, er
 		if err := deps.Sessions.RotateRefreshHash(ctx, hash, newHash, newExp); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		var pub types.PublicID
-		if err := deps.DB.QueryRowContext(ctx, `SELECT public_id FROM users WHERE id = ?`, sess.UserID).Scan(&pub); err != nil {
+		pub, qerr := deps.Queries.FindUserPublicIdById(ctx, sess.UserID)
+		if qerr != nil {
 			return nil, httpErr(apierrors.AuthSessionRevoked)
 		}
 		access, exp, err := deps.JWT.Sign(pub, sess.PublicID)

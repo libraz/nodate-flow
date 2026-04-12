@@ -149,7 +149,10 @@ func main() {
 		if cipher != nil && !cfg.AiMock {
 			resolver := providers.NewWorkspaceResolver(queries, cipher)
 			budget := ai.BudgetReaderFunc(func(ctx context.Context, wsID uint32) (int64, error) {
-				return 0, nil
+				return queries.SumAiCostTodayForWorkspace(ctx, generated.SumAiCostTodayForWorkspaceParams{
+					WorkspaceID: wsID,
+					InvokedAt:   time.Now().UTC().Truncate(24 * time.Hour),
+				})
 			})
 			executor = &ai.AgentExecutor{
 				Queries:  queries,

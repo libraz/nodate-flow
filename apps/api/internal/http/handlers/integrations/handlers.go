@@ -99,7 +99,7 @@ func Connect(deps Deps) func(context.Context, *ConnectIntegrationInput) (*Connec
 		if err := deps.Queries.CreateOauthState(ctx, generated.CreateOauthStateParams{
 			State:      state,
 			UserID:     uid,
-			Provider:   generated.UserIntegrationsProvider(in.Provider),
+			Provider:   generated.OauthStatesProvider(in.Provider),
 			RedirectTo: redirectTo,
 			ExpiresAt:  time.Now().Add(oauthStateTTL),
 		}); err != nil {
@@ -175,7 +175,7 @@ func Callback(deps Deps) func(context.Context, *OAuthCallbackInput) (*OAuthCallb
 			ExternalAccountLabel:   acc.Label,
 			Scopes:                 strings.Join(tokens.Scopes, " "),
 			AccessTokenCiphertext:  accessBlob,
-			RefreshTokenCiphertext: refreshBlob,
+			RefreshTokenCiphertext: sql.NullString{String: string(refreshBlob), Valid: len(refreshBlob) > 0},
 			AccessTokenExpiresAt:   expiresAt,
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -312,8 +312,8 @@ func revokeAtProvider(ctx context.Context, deps Deps, uid uint32, pubID types.Pu
 		}
 		tokens.AccessToken = string(plain)
 	}
-	if len(tokRow.RefreshTokenCiphertext) > 0 {
-		plain, err := deps.Cipher.Decrypt(tokRow.RefreshTokenCiphertext)
+	if tokRow.RefreshTokenCiphertext.Valid && len(tokRow.RefreshTokenCiphertext.String) > 0 {
+		plain, err := deps.Cipher.Decrypt([]byte(tokRow.RefreshTokenCiphertext.String))
 		if err != nil {
 			slog.WarnContext(ctx, "integrations: revoke refresh-token decrypt failed", "provider", providerName, "connection", pubID.String(), "error", err)
 			return

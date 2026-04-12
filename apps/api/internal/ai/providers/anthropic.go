@@ -113,5 +113,6 @@ func (p *anthropicProvider) Complete(ctx context.Context, req Request) (*Respons
 		Text:         text,
 		InputTokens:  ar.Usage.InputTokens,
 		OutputTokens: ar.Usage.OutputTokens,
+		CostCents:    estimateCostCents(model, ar.Usage.InputTokens, ar.Usage.OutputTokens),
 	}, nil
 }

@@ -15,7 +15,7 @@ import (
 // refresher needs. Declared as an interface so tests can substitute
 // an in-memory fake without pulling in the full sqlc surface.
 type RefresherQuerier interface {
-	ListConnectionsExpiringBefore(ctx context.Context, cutoff time.Time) ([]generated.ListConnectionsExpiringBeforeRow, error)
+	ListConnectionsExpiringBefore(ctx context.Context, cutoff sql.NullTime) ([]generated.ListConnectionsExpiringBeforeRow, error)
 	UpdateConnectionTokens(ctx context.Context, arg generated.UpdateConnectionTokensParams) error
 }
 
@@ -88,7 +88,7 @@ func (r *Refresher) Run(ctx context.Context) {
 // worker synchronously without spinning up the ticker loop.
 func (r *Refresher) RefreshOnce(ctx context.Context) error {
 	log := r.logger()
-	cutoff := time.Now().Add(r.leadTime())
+	cutoff := sql.NullTime{Time: time.Now().Add(r.leadTime()), Valid: true}
 	rows, err := r.Queries.ListConnectionsExpiringBefore(ctx, cutoff)
 	if err != nil {
 		return err
@@ -112,7 +112,10 @@ func (r *Refresher) refreshRow(ctx context.Context, row generated.ListConnection
 			"provider", row.Provider, "user_id", row.UserID, "err", err)
 		return
 	}
-	refreshPlain, err := r.Cipher.Decrypt(row.RefreshTokenCiphertext)
+	if !row.RefreshTokenCiphertext.Valid || len(row.RefreshTokenCiphertext.String) == 0 {
+		return
+	}
+	refreshPlain, err := r.Cipher.Decrypt([]byte(row.RefreshTokenCiphertext.String))
 	if err != nil {
 		log.Warn("integrations refresher: decrypt refresh token failed",
 			"provider", row.Provider, "user_id", row.UserID, "err", err)
@@ -148,7 +151,7 @@ func (r *Refresher) refreshRow(ctx context.Context, row generated.ListConnection
 				"provider", row.Provider, "user_id", row.UserID, "err", encErr)
 			return
 		}
-		newRefresh = enc
+		newRefresh = sql.NullString{String: string(enc), Valid: true}
 	}
 	var expires sql.NullTime
 	if !tok.ExpiresAt.IsZero() {
