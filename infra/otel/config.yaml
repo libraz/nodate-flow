@@ -1,5 +1,5 @@
 # OpenTelemetry Collector configuration for local development.
-# Run with: docker run --rm -p 4317:4317 -p 4318:4318 -v $(pwd)/infra/otel/config.yaml:/etc/otelcol/config.yaml otel/opentelemetry-collector-contrib:latest
+# Runs as a compose service; the API sends OTLP to otel-collector:4317.
 
 receivers:
   otlp:
@@ -18,9 +18,22 @@ exporters:
   debug:
     verbosity: detailed
 
+  # Expose an endpoint that Prometheus scrapes for OTLP-received metrics.
+  prometheus:
+    endpoint: 0.0.0.0:8889
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
 service:
+  extensions: [health_check]
   pipelines:
     traces:
       receivers: [otlp]
       processors: [batch]
       exporters: [debug]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [prometheus, debug]

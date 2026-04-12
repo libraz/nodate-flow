@@ -176,7 +176,7 @@ services:
     ports:
       - "${NF_API_PORT:-8080}:8080"
     healthcheck:
-      test: ["/healthcheck"]
+      test: ["CMD", "/healthcheck"]
       interval: 5s
       timeout: 3s
       retries: 10
