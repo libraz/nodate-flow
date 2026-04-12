@@ -401,6 +401,9 @@ type Querier interface {
 	RotateSessionRefreshHash(ctx context.Context, arg RotateSessionRefreshHashParams) error
 	// Mark a constraint as satisfied at the current time.
 	SatisfyConstraint(ctx context.Context, arg SatisfyConstraintParams) error
+	// Search tasks by title or description using LIKE. Workspace-scoped.
+	// The caller supplies the pattern already wrapped in '%…%'.
+	SearchTasks(ctx context.Context, arg SearchTasksParams) ([]SearchTasksRow, error)
 	// Begin (or restart) TOTP enrollment by writing a fresh encrypted
 	// secret and clearing any previous confirmation timestamp.
 	SetIdentityMfaSecret(ctx context.Context, arg SetIdentityMfaSecretParams) error

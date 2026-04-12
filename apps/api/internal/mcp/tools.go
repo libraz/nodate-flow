@@ -118,10 +118,12 @@ func registerTools(h *Handler) {
 	})
 	h.register(tool{
 		name:          "search_tasks",
-		description:   "Full-text search across tasks. NOT YET IMPLEMENTED.",
+		description:   "Search tasks by title or description within the workspace.",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"query": stringSchema("Search query."),
+			"query":  stringSchema("Search term (matched against title and description)."),
+			"limit":  intSchema("Max results (1-200, default 50)."),
+			"offset": intSchema("Pagination offset (default 0)."),
 		}, []string{"query"}),
 		run: runSearchTasks,
 	})
@@ -553,11 +555,43 @@ func runAddComment(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	return map[string]any{"id": cpub.String()}, nil
 }
 
-// runSearchTasks is deferred: the SearchTasks sqlc query does not
-// exist yet and adding it would expand the current scope.
-func runSearchTasks(_ context.Context, _ Deps, _ *session, _ json.RawMessage) (any, error) {
-	return nil, apierrors.Newf(apierrors.McpToolExecutionFailed,
-		"search_tasks: not implemented")
+// runSearchTasks searches tasks by title or description using LIKE.
+func runSearchTasks(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	var in struct {
+		Query  string `json:"query"`
+		Limit  int32  `json:"limit"`
+		Offset int32  `json:"offset"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+	if in.Query == "" {
+		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+	}
+	if in.Limit <= 0 || in.Limit > 200 {
+		in.Limit = 50
+	}
+
+	pattern := "%" + in.Query + "%"
+	rows, err := deps.Queries.SearchTasks(ctx, generated.SearchTasksParams{
+		WorkspaceID: s.workspaceID,
+		Title:       pattern,
+		Description: sql.NullString{String: pattern, Valid: true},
+		Limit:       in.Limit,
+		Offset:      in.Offset,
+	})
+	if err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+
+	items := make([]map[string]any, 0, len(rows))
+	for _, r := range rows {
+		items = append(items, taskListRowToMap(r.PublicID, r.Title, string(r.DerivedState), r.Priority, r.DueOn))
+	}
+	return map[string]any{"tasks": items}, nil
 }
 
 // runProposeTasksFrom asks the workspace's LLM provider to turn a free-text
