@@ -23,6 +23,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/agentruntime"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/embed"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/nlconstraint"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/nlquery"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/providers"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
@@ -214,11 +215,13 @@ func BuildResult(deps Deps) Result {
 	// follow-up.
 	var embedClient *embed.Client
 	var nlQueryCompiler *nlquery.Compiler
+	var nlConstraintCompiler *nlconstraint.Compiler
 	if deps.AiMock {
 		embedClient = embed.New(embed.NewMockProvider(), deps.Queries)
 		nlQueryCompiler = nlquery.New(nlquery.NewMockProvider())
+		nlConstraintCompiler = nlconstraint.New(nlconstraint.NewMockProvider())
 	}
-	taskDeps := tasks.Deps{DB: deps.DB, Queries: deps.Queries, Embedder: embedClient}
+	taskDeps := tasks.Deps{DB: deps.DB, Queries: deps.Queries, Embedder: embedClient, NlConstraint: nlConstraintCompiler}
 	tlDeps := timeline.Deps{DB: deps.DB, Queries: deps.Queries}
 	inboxDeps := inbox.Deps{DB: deps.DB, Queries: deps.Queries}
 	aiDeps := aihandlers.Deps{DB: deps.DB, Queries: deps.Queries, Cipher: deps.Cipher, NlQuery: nlQueryCompiler}

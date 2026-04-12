@@ -9,6 +9,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/embed"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/nlconstraint"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
 )
@@ -22,6 +23,10 @@ type Deps struct {
 	// embedding, which is fine currently and the weekly reindex cron
 	// will catch up.
 	Embedder *embed.Client
+	// NlConstraint is the natural-language-to-DSL compiler (3.AI-1).
+	// Optional: nil causes the compile endpoint to return
+	// AI.PROVIDER.NOT_CONFIGURED.
+	NlConstraint *nlconstraint.Compiler
 }
 
 func httpErr(spec *apierrors.Spec) error {
@@ -362,6 +367,47 @@ type RemoveTaskConstraintBody struct {
 // RemoveTaskConstraintOutput is the response for DELETE /tasks/{id}/constraints/{cid}.
 type RemoveTaskConstraintOutput struct {
 	Body RemoveTaskConstraintBody
+}
+
+// ---- NL Constraint Compile I/O --------------------------------------------
+
+// CompileConstraintBody is the JSON body for POST /tasks/{id}/constraints/compile.
+type CompileConstraintBody struct {
+	Prompt string `json:"prompt" required:"true" minLength:"1" doc:"Natural language description of the constraint"`
+}
+
+// CompileConstraintInput is the request for POST /tasks/{id}/constraints/compile.
+type CompileConstraintInput struct {
+	ID   string `path:"id"`
+	Body CompileConstraintBody
+}
+
+// CompileConstraintOutput is the response for POST /tasks/{id}/constraints/compile.
+type CompileConstraintOutput struct {
+	Body struct {
+		Kind       string `json:"kind" doc:"Inferred constraint kind"`
+		Expression string `json:"expression" doc:"DSL expression"`
+	}
+}
+
+// ---- Constraint Explain I/O -----------------------------------------------
+
+// ExplainConstraintBody is the JSON body for POST /tasks/{id}/constraints/explain.
+type ExplainConstraintBody struct {
+	Expression string `json:"expression" required:"true" minLength:"1" doc:"DSL expression to explain"`
+}
+
+// ExplainConstraintInput is the request for POST /tasks/{id}/constraints/explain.
+type ExplainConstraintInput struct {
+	ID   string `path:"id"`
+	Body ExplainConstraintBody
+}
+
+// ExplainConstraintOutput is the response for POST /tasks/{id}/constraints/explain.
+type ExplainConstraintOutput struct {
+	Body struct {
+		Explanation string `json:"explanation" doc:"Human-readable explanation"`
+	}
 }
 
 // ---- Dependencies I/O ------------------------------------------------------

@@ -109,6 +109,20 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 	}, EvaluateConstraints(deps))
 
 	huma.Register(api, huma.Operation{
+		OperationID: "tasks-constraints-compile",
+		Method:      http.MethodPost,
+		Path:        "/tasks/{id}/constraints/compile",
+		Summary:     "Compile a natural-language prompt into a constraint DSL expression",
+	}, CompileConstraint(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-constraints-explain",
+		Method:      http.MethodPost,
+		Path:        "/tasks/{id}/constraints/explain",
+		Summary:     "Explain a constraint DSL expression in human-readable form",
+	}, ExplainConstraint(deps))
+
+	huma.Register(api, huma.Operation{
 		OperationID: "tasks-constraints-remove",
 		Method:      http.MethodDelete,
 		Path:        "/tasks/{id}/constraints/{cid}",
