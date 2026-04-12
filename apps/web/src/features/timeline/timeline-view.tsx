@@ -4,7 +4,7 @@
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
-import { type ReactElement, useMemo, useState } from 'react';
+import { type ReactElement, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -59,6 +59,29 @@ function TimelineInner({
   const { t, i18n } = useTranslation('timeline');
   const locale = i18n.resolvedLanguage ?? 'en';
 
+  // Accumulate events across pages. When filters change (kind, actor)
+  // we reset; when only offset advances we append the new page.
+  const [accumulated, setAccumulated] = useState<TimelineEvent[]>([]);
+  const prevFiltersRef = useRef(filters);
+
+  useEffect(() => {
+    const prev = prevFiltersRef.current;
+    const filtersChanged =
+      prev.kind !== filters.kind || prev.actor !== filters.actor || prev.limit !== filters.limit;
+    if (filtersChanged || (filters.offset ?? 0) === 0) {
+      setAccumulated(events);
+    } else {
+      setAccumulated((acc) => {
+        const existingIds = new Set(acc.map((e) => e.id));
+        const newEvents = events.filter((e) => !existingIds.has(e.id));
+        return [...acc, ...newEvents];
+      });
+    }
+    prevFiltersRef.current = filters;
+  }, [events, filters]);
+
+  const allEvents = accumulated;
+
   /** Group events by local-time day, preserving server order. */
   const groups = useMemo<{ key: string; label: string; items: TimelineEvent[] }[]>(() => {
     const fmt = new Intl.DateTimeFormat(locale, {
@@ -70,7 +93,7 @@ function TimelineInner({
     const todayKey = dayKey(Math.floor(Date.now() / 1000));
     const yesterdayKey = dayKey(Math.floor(Date.now() / 1000) - 86_400);
     const out: { key: string; label: string; items: TimelineEvent[] }[] = [];
-    for (const ev of events) {
+    for (const ev of allEvents) {
       const key = dayKey(ev.occurredAt);
       let group = out[out.length - 1];
       if (!group || group.key !== key) {
@@ -84,16 +107,12 @@ function TimelineInner({
       group.items.push(ev);
     }
     return out;
-  }, [events, locale, t]);
+  }, [allEvents, locale, t]);
 
-  const limit = filters.limit ?? 50;
-  const offset = filters.offset ?? 0;
-  const hasMore = offset + events.length < total;
+  const hasMore = allEvents.length < total;
 
   const handleLoadMore = (): void => {
-    // TODO: proper infinite scroll accumulator. For now we just page forward
-    // (replaces the current page rather than appending).
-    onChange({ ...filters, offset: offset + limit });
+    onChange({ ...filters, offset: allEvents.length });
   };
 
   return (
@@ -104,7 +123,7 @@ function TimelineInner({
         {...(workspaceId !== undefined ? { workspaceId } : {})}
       />
 
-      {events.length === 0 ? (
+      {allEvents.length === 0 ? (
         <div
           style={{
             padding: '3rem 1rem',
