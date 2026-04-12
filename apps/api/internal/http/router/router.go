@@ -26,6 +26,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/nlconstraint"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/nlquery"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/providers"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth/sessionstore"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/crypto"
@@ -205,7 +206,8 @@ func BuildResult(deps Deps) Result {
 	if sessionStore == nil {
 		sessionStore = sessionstore.NewMySQLStore(deps.Queries)
 	}
-	authDeps := authhandlers.Deps{DB: deps.DB, Queries: deps.Queries, Sessions: sessionStore, JWT: deps.JWT, Cipher: deps.Cipher, CookieSecure: deps.CookieSecure, RegistrationOpen: deps.RegistrationOpen}
+	auditRec := audit.New(deps.Queries)
+	authDeps := authhandlers.Deps{DB: deps.DB, Queries: deps.Queries, Sessions: sessionStore, JWT: deps.JWT, Cipher: deps.Cipher, CookieSecure: deps.CookieSecure, RegistrationOpen: deps.RegistrationOpen, Audit: auditRec}
 	integrationsDeps := integrationshandlers.Deps{
 		DB:            deps.DB,
 		Queries:       deps.Queries,
@@ -238,8 +240,8 @@ func BuildResult(deps Deps) Result {
 		DB:      passthroughDB{deps.DB},
 	})
 	aclDB := passthroughDB{deps.DB}
-	wsDeps := workspaces.Deps{DB: deps.DB, Queries: deps.Queries}
-	prjDeps := projects.Deps{DB: deps.DB, Queries: deps.Queries}
+	wsDeps := workspaces.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
+	prjDeps := projects.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
 	// Write-time embedding client (ADR 0003). Currently only the mock
 	// provider is shipped; the real provider integration is a separate
 	// follow-up.
@@ -251,7 +253,7 @@ func BuildResult(deps Deps) Result {
 		nlQueryCompiler = nlquery.New(nlquery.NewMockProvider())
 		nlConstraintCompiler = nlconstraint.New(nlconstraint.NewMockProvider())
 	}
-	taskDeps := tasks.Deps{DB: deps.DB, Queries: deps.Queries, Embedder: embedClient, NlConstraint: nlConstraintCompiler, Storage: deps.Storage}
+	taskDeps := tasks.Deps{DB: deps.DB, Queries: deps.Queries, Embedder: embedClient, NlConstraint: nlConstraintCompiler, Storage: deps.Storage, Audit: auditRec}
 	tlDeps := timeline.Deps{DB: deps.DB, Queries: deps.Queries}
 	inboxDeps := inbox.Deps{DB: deps.DB, Queries: deps.Queries}
 	aiDeps := aihandlers.Deps{DB: deps.DB, Queries: deps.Queries, Cipher: deps.Cipher, NlQuery: nlQueryCompiler}
