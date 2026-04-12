@@ -2594,6 +2594,11 @@
             "minimum": 0,
             "type": "integer"
           },
+          "sortWeight": {
+            "description": "Display order weight. Lower values sort first.",
+            "format": "int32",
+            "type": "integer"
+          },
           "startOn": {
             "description": "YYYY-MM-DD or empty string to clear",
             "type": "string"
@@ -2952,6 +2957,65 @@
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
             "examples": ["https://example.com/schemas/RemoveWorkspaceMemberOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
+      "ReorderItem": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "Task public ID (UUID v7)",
+            "type": "string"
+          },
+          "sortWeight": {
+            "description": "New display order weight",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": ["id", "sortWeight"],
+        "type": "object"
+      },
+      "ReorderTasksBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ReorderTasksBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "description": "Tasks with new sort weights",
+            "items": {
+              "$ref": "#/components/schemas/ReorderItem"
+            },
+            "minItems": 1,
+            "type": ["array", "null"]
+          },
+          "projectId": {
+            "description": "Project public ID (UUID v7); all tasks must belong to this project",
+            "type": "string"
+          }
+        },
+        "required": ["projectId", "items"],
+        "type": "object"
+      },
+      "ReorderTasksOkBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ReorderTasksOkBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -6064,6 +6128,44 @@
           }
         },
         "summary": "Create a task"
+      }
+    },
+    "/tasks/reorder": {
+      "post": {
+        "operationId": "tasks-reorder",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReorderTasksBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReorderTasksOkBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Bulk-update sort weights for tasks within a project"
       }
     },
     "/tasks/{id}": {

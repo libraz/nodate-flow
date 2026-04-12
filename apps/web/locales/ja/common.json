@@ -398,6 +398,10 @@
       "edit_due": "期日を変更",
       "save_failed": "変更を保存できませんでした。もう一度お試しください。"
     },
+    "reorder": {
+      "drag_handle": "ドラッグして並び替え",
+      "failed": "タスクの並び順の保存に失敗しました"
+    },
     "detail": {
       "title_edit": "タイトルを編集",
       "title_edit_named": "タイトルを編集: {title}",

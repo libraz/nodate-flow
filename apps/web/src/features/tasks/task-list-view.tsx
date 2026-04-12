@@ -13,7 +13,7 @@ import Select from '@nodate-flow/ui/primitives/select';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { Link, useNavigate } from '@tanstack/react-router';
 import type { ColumnDef, RowSelectionState } from '@tanstack/react-table';
-import { type ReactElement, useCallback, useRef, useState } from 'react';
+import { type DragEvent, type ReactElement, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { computeBlockedByOpen, useProjectDependenciesQuery } from '../projects/api';
@@ -23,6 +23,7 @@ import {
   type TaskListItem,
   type TaskPriority,
   useDeleteTask,
+  useReorderTasks,
   useTasksQuery,
   useUpdateTask,
 } from './api';
@@ -490,10 +491,63 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
   const blockedByOpen = computeBlockedByOpen(edges);
   const locale = i18n.resolvedLanguage ?? 'en';
   const updateTask = useUpdateTask();
+  const reorderTasks = useReorderTasks();
   const navigate = useNavigate();
   const inlineEdit = useInlineEdit();
 
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+
+  /* ── DnD row reorder state ──────────────────────────────────── */
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dropIdx, setDropIdx] = useState<number | null>(null);
+
+  const handleDragStart = useCallback((e: DragEvent, idx: number) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(idx));
+    setDragIdx(idx);
+  }, []);
+
+  const handleDragOver = useCallback(
+    (e: DragEvent, idx: number) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (idx !== dropIdx) setDropIdx(idx);
+    },
+    [dropIdx],
+  );
+
+  const handleDragEnd = useCallback(() => {
+    setDragIdx(null);
+    setDropIdx(null);
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: DragEvent, targetIdx: number) => {
+      e.preventDefault();
+      const sourceIdx = Number(e.dataTransfer.getData('text/plain'));
+      setDragIdx(null);
+      setDropIdx(null);
+      if (Number.isNaN(sourceIdx) || sourceIdx === targetIdx) return;
+      if (tasks.length < 2) return;
+
+      // Build the new order by moving source to target position
+      const reordered = [...tasks];
+      const [moved] = reordered.splice(sourceIdx, 1);
+      if (!moved) return;
+      reordered.splice(targetIdx, 0, moved);
+
+      // Assign sequential sort weights (gap of 1000 for future inserts)
+      const items = reordered.map((task, i) => ({
+        id: task.id,
+        sortWeight: (i + 1) * 1000,
+      }));
+
+      void reorderTasks.mutateAsync({ projectId, items }).catch(() => {
+        toaster.show({ tone: 'danger', message: t('tasks.reorder.failed') });
+      });
+    },
+    [tasks, projectId, reorderTasks, t],
+  );
 
   const selectedIds = Object.keys(rowSelection)
     .filter((k) => rowSelection[k])
@@ -517,6 +571,37 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
   };
 
   const columns: ColumnDef<TaskListItem, unknown>[] = [
+    {
+      id: 'drag',
+      size: 32,
+      enableSorting: false,
+      header: () => null,
+      cell: ({ row }) => (
+        <span
+          draggable
+          aria-label={t('tasks.reorder.drag_handle')}
+          title={t('tasks.reorder.drag_handle')}
+          onDragStart={(e) => handleDragStart(e, row.index)}
+          onDragOver={(e) => handleDragOver(e, row.index)}
+          onDragEnd={handleDragEnd}
+          onDrop={(e) => handleDrop(e, row.index)}
+          style={{
+            cursor: 'grab',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '100%',
+            userSelect: 'none',
+            opacity: dragIdx === row.index ? 0.4 : 1,
+            color: 'var(--color-muted)',
+            fontSize: '0.75rem',
+            lineHeight: 1,
+          }}
+        >
+          ⠿
+        </span>
+      ),
+    },
     {
       id: 'title',
       accessorKey: 'title',

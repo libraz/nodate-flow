@@ -398,6 +398,10 @@
       "edit_due": "Change due date",
       "save_failed": "Could not save changes. Please try again."
     },
+    "reorder": {
+      "drag_handle": "Drag to reorder",
+      "failed": "Failed to save task order"
+    },
     "detail": {
       "title_edit": "Edit title",
       "title_edit_named": "Edit title: {title}",

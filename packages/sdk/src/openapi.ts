@@ -539,6 +539,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bulk-update sort weights for tasks within a project */
+        post: operations["tasks-reorder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{id}": {
         parameters: {
             query?: never;
@@ -2510,6 +2527,11 @@ export interface components {
             dueOn?: string;
             /** Format: int32 */
             priority?: number;
+            /**
+             * Format: int32
+             * @description Display order weight. Lower values sort first.
+             */
+            sortWeight?: number;
             /** @description YYYY-MM-DD or empty string to clear */
             startOn?: string;
             title?: string;
@@ -2652,6 +2674,34 @@ export interface components {
             ok: boolean;
         };
         RemoveWorkspaceMemberOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        ReorderItem: {
+            /** @description Task public ID (UUID v7) */
+            id: string;
+            /**
+             * Format: int32
+             * @description New display order weight
+             */
+            sortWeight: number;
+        };
+        ReorderTasksBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Tasks with new sort weights */
+            items: components["schemas"]["ReorderItem"][] | null;
+            /** @description Project public ID (UUID v7); all tasks must belong to this project */
+            projectId: string;
+        };
+        ReorderTasksOkBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
@@ -4503,6 +4553,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Task"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReorderTasksBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReorderTasksOkBody"];
                 };
             };
             /** @description Error */

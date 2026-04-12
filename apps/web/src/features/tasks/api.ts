@@ -605,11 +605,68 @@ export function useRemoveTaskDependency(): UseMutationResult<
   });
 }
 
+/* ── Reorder mutation ────────────────────────────────────────── */
+
+export interface ReorderItem {
+  id: string;
+  sortWeight: number;
+}
+
+export interface ReorderTasksArgs {
+  projectId: string;
+  items: ReorderItem[];
+}
+
 /**
- * Search tasks within a workspace by title substring. Used by the
- * dependency picker to find a target task. Returns a small page; the
- * caller is expected to debounce input.
+ * useReorderTasks — POST /tasks/reorder.
+ *
+ * Sends a batch of (taskId, sortWeight) pairs to persist list order.
+ * Performs optimistic reorder on the `tasks.list` cache so the UI is
+ * snappy, rolling back on failure.
  */
+export function useReorderTasks(): UseMutationResult<void, TaskApiError, ReorderTasksArgs> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ projectId, items }: ReorderTasksArgs): Promise<void> => {
+      const { error } = await sdk.POST('/tasks/reorder', {
+        body: { projectId, items },
+      });
+      if (error) throw toError(error, 'Failed to reorder tasks');
+    },
+    onMutate: async (vars) => {
+      await qc.cancelQueries({ queryKey: [...tasksKeys.all, 'list', vars.projectId] });
+      const snapshots = qc.getQueriesData<TaskListItem[]>({
+        queryKey: [...tasksKeys.all, 'list', vars.projectId],
+      });
+      // Optimistic: apply sort weights to cached lists
+      const weightMap = new Map(vars.items.map((i) => [i.id, i.sortWeight]));
+      for (const [key, value] of snapshots) {
+        if (!value) continue;
+        const updated = value
+          .map((task) => {
+            const w = weightMap.get(task.id);
+            return w != null ? { ...task, sortWeight: w } : task;
+          })
+          .sort((a, b) => a.sortWeight - b.sortWeight);
+        qc.setQueryData(key, updated);
+      }
+      return { snapshots };
+    },
+    onError: (_err, _vars, ctx) => {
+      const snap = ctx as
+        | { snapshots: [readonly unknown[], TaskListItem[] | undefined][] }
+        | undefined;
+      if (!snap) return;
+      for (const [key, value] of snap.snapshots) {
+        qc.setQueryData(key, value);
+      }
+    },
+    onSettled: (_data, _err, vars) => {
+      void qc.invalidateQueries({ queryKey: [...tasksKeys.all, 'list', vars.projectId] });
+    },
+  });
+}
+
 export function useTaskSearch(
   workspaceId: string,
   query: string,
