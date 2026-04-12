@@ -129,7 +129,7 @@ func registerTools(h *Handler) {
 	})
 	h.register(tool{
 		name:          "propose_tasks_from",
-		description:   "Ask the workspace LLM to propose tasks from free text. AI not wired yet.",
+		description:   "Ask the workspace LLM to propose tasks from free text. Requires a configured AI provider.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"source": stringSchema("Input text to propose tasks from."),
@@ -138,7 +138,7 @@ func registerTools(h *Handler) {
 	})
 	h.register(tool{
 		name:          "propose_priority",
-		description:   "Ask the workspace LLM to propose a priority for a task. AI not wired yet.",
+		description:   "Ask the workspace LLM to propose a priority for a task. Requires a configured AI provider.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"taskId": stringSchema("Task public id (UUID v7)."),

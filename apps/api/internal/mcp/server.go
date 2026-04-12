@@ -7,9 +7,9 @@
 // single source of truth for SQL.
 //
 // Current tool set: list_projects, list_tasks, get_task, create_task,
-// update_task, add_comment, search_tasks (stub), propose_tasks_from
-// (stub), propose_priority (stub). Rate limiting, SSE streaming, and
-// the full propose_* AI wiring are deferred.
+// update_task, add_comment, search_tasks, propose_tasks_from,
+// propose_priority, propose_steps. Rate limiting and SSE streaming are
+// deferred.
 package mcp
 
 import (
