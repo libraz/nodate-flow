@@ -8,6 +8,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
 )
@@ -16,6 +17,9 @@ import (
 type Deps struct {
 	DB      *sql.DB
 	Queries *generated.Queries
+	// Audit records audit log entries for workspace mutations.
+	// Optional: nil disables audit logging.
+	Audit *audit.Recorder
 }
 
 // httpErr converts an APIError Spec into a Huma status error so the

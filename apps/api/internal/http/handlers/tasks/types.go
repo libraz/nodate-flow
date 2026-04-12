@@ -10,6 +10,7 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/embed"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/nlconstraint"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/storage"
@@ -32,6 +33,9 @@ type Deps struct {
 	// uploads and downloads. Optional: nil causes the presign
 	// endpoints to return INTERNAL.NOT_CONFIGURED.
 	Storage *storage.Client
+	// Audit records audit log entries for task mutations.
+	// Optional: nil disables audit logging.
+	Audit *audit.Recorder
 }
 
 func httpErr(spec *apierrors.Spec) error {

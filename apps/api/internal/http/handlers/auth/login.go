@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
@@ -38,6 +39,12 @@ func Login(deps Deps) func(context.Context, *LoginInput) (*LoginOutput, error) {
 		ok, err := auth.VerifyPassword(row.PasswordHash.String, in.Body.Password)
 		if err != nil || !ok {
 			bumpFailed(ctx, deps, row)
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "auth.login_failed",
+				ActorID:      uint32(row.UserID),
+				ResourceType: "user",
+				Metadata:     map[string]any{"email": email},
+			})
 			if row.FailedAttempts+1 >= maxFailedBeforeLock {
 				return nil, httpErr(apierrors.AuthLoginRateLimitedAfterRetries)
 			}
@@ -65,6 +72,12 @@ func Login(deps Deps) func(context.Context, *LoginInput) (*LoginOutput, error) {
 		}
 
 		_ = deps.Queries.UpdateUserLastLoginAt(ctx, row.UserID)
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "auth.login",
+			ActorID:      uint32(row.UserID),
+			ResourceType: "user",
+			Metadata:     map[string]any{"email": email},
+		})
 		tokens, refresh, err := issueTokens(ctx, deps, row.UserID, row.UserPublicID, in.UserAgent, middleware.ClientIPFromContext(ctx))
 		if err != nil {
 			return nil, err

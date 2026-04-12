@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
@@ -249,6 +250,14 @@ WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 				"title":     in.Body.Title,
 			},
 		})
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "task.create",
+			ActorID:      actorID,
+			WorkspaceID:  prj.WorkspaceID,
+			ResourceType: "task",
+			ResourceID:   pub.String(),
+			Metadata:     map[string]any{"title": in.Body.Title, "projectId": in.Body.ProjectID},
+		})
 		if deps.Embedder != nil {
 			// Write-time embedding upsert (ADR 0003). Failures are swallowed
 			// so the task write still succeeds; the weekly reindex cron
@@ -486,6 +495,15 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		if actorID, ok := middleware.ActorFromContext(ctx); ok {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "task.update",
+				ActorID:      actorID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "task",
+				ResourceID:   task.PublicID.String(),
+			})
+		}
 		if deps.Embedder != nil && (in.Body.Title != nil || in.Body.Description != nil) {
 			_ = deps.Embedder.EmbedTask(ctx, task.ID, newTitle, nullStr(newDesc))
 		}
@@ -527,6 +545,15 @@ func Disable(deps Deps) func(context.Context, *DisableTaskInput) (*DisableTaskOu
 			PublicID:    types.FromUUID(task.PublicID),
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if actorID, ok := middleware.ActorFromContext(ctx); ok {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "task.delete",
+				ActorID:      actorID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "task",
+				ResourceID:   task.PublicID.String(),
+			})
 		}
 		taskInternal := int64(task.ID)
 		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{

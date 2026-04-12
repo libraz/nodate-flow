@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"net/http"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth/sessionstore"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/crypto"
@@ -30,6 +31,9 @@ type Deps struct {
 	// RegistrationOpen controls whether new user sign-up is allowed.
 	// When false, POST /auth/register returns 403.
 	RegistrationOpen bool
+	// Audit records audit log entries for sensitive auth operations.
+	// Optional: nil disables audit logging.
+	Audit *audit.Recorder
 }
 
 // RegisterInput is the body for POST /auth/register.

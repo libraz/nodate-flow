@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
 )
 
@@ -25,6 +26,11 @@ func Logout(deps Deps) func(context.Context, *LogoutInput) (*LogoutOutput, error
 		if err != nil {
 			return out, nil
 		}
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "auth.logout",
+			ActorID:      uint32(sess.UserID),
+			ResourceType: "session",
+		})
 		_ = deps.Sessions.Revoke(ctx, sess.UserID, sess.PublicID)
 		return out, nil
 	}
