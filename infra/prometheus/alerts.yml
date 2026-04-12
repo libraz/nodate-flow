@@ -1,0 +1,94 @@
+groups:
+  - name: nodate-flow-api
+    rules:
+      # HighErrorRate: 5xx error rate exceeds 5% of total requests over 5 minutes.
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(nf_http_requests_total{status=~"5.."}[5m]))
+            /
+            sum(rate(nf_http_requests_total[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High HTTP 5xx error rate"
+          description: >-
+            5xx error rate is {{ $value | humanizePercentage }} over the last 5 minutes
+            (threshold: 5%).
+
+      # HighP95Latency: HTTP p95 latency exceeds 2 seconds over 5 minutes.
+      - alert: HighP95Latency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(nf_http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP p95 latency"
+          description: >-
+            p95 latency is {{ $value | humanizeDuration }}
+            (threshold: 2s).
+
+      # HighP99Latency: HTTP p99 latency exceeds 5 seconds over 5 minutes.
+      - alert: HighP99Latency
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(nf_http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 5
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High HTTP p99 latency"
+          description: >-
+            p99 latency is {{ $value | humanizeDuration }}
+            (threshold: 5s).
+
+  - name: nodate-flow-ai
+    rules:
+      # AICostSpike: AI spending rate exceeds $10/hour.
+      - alert: AICostSpike
+        expr: |
+          sum(rate(nf_ai_cost_dollars_total[5m])) * 3600 > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AI cost spike detected"
+          description: >-
+            AI spending rate is ${{ $value | printf "%.2f" }}/hour
+            (threshold: $10/hour).
+
+      # HighAIErrorRate: AI invocation error rate exceeds 10% over 5 minutes.
+      - alert: HighAIErrorRate
+        expr: |
+          (
+            sum(rate(nf_ai_invocations_total{status=~"5.."}[5m]))
+            /
+            sum(rate(nf_ai_invocations_total[5m]))
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High AI invocation error rate"
+          description: >-
+            AI error rate is {{ $value | humanizePercentage }} over the last 5 minutes
+            (threshold: 10%).
+
+  - name: nodate-flow-infra
+    rules:
+      # ServiceDown: API target has been unreachable for 1 minute.
+      - alert: ServiceDown
+        expr: up{job="nodate-flow-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "nodate-flow API is down"
+          description: >-
+            The API server has been unreachable for more than 1 minute.
