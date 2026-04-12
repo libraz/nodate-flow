@@ -63,6 +63,8 @@ type Querier interface {
 	CreateAgent(ctx context.Context, arg CreateAgentParams) (int64, error)
 	// Insert a new identity row (local password or OIDC binding) for a user.
 	CreateIdentity(ctx context.Context, arg CreateIdentityParams) (int64, error)
+	// Insert a new saved lens (view).
+	CreateLens(ctx context.Context, arg CreateLensParams) (int64, error)
 	// Insert a new MCP token. Plain token is shown to the user once.
 	CreateMcpToken(ctx context.Context, arg CreateMcpTokenParams) (int64, error)
 	// Insert a short-lived CSRF state row for the personal OAuth flow.
@@ -101,6 +103,8 @@ type Querier interface {
 	DeleteConstraint(ctx context.Context, arg DeleteConstraintParams) error
 	// Soft-delete a dependency edge.
 	DeleteDependency(ctx context.Context, arg DeleteDependencyParams) error
+	// Soft-delete a lens.
+	DeleteLens(ctx context.Context, arg DeleteLensParams) error
 	// Explicit delete for the state row that :one above just returned.
 	DeleteOauthState(ctx context.Context, state string) error
 	// Soft-delete a provider.
@@ -207,6 +211,8 @@ type Querier interface {
 	// workspace has never written a row; the caller should fall back to the
 	// column defaults (mock-768 / 100 cents/day / 0.870 / 0.750).
 	GetAiSettings(ctx context.Context, workspaceID uint32) (AiSetting, error)
+	// Fetch a single lens by its public_id.
+	GetLensByPublicID(ctx context.Context, arg GetLensByPublicIDParams) (GetLensByPublicIDRow, error)
 	// Queries dedicated to the constraint engine (Phase 3, 3.ENG-2).
 	// Keyed off the internal task_id so the engine never has to know
 	// about public_id resolution. All workspace scoping is enforced by
@@ -273,6 +279,8 @@ type Querier interface {
 	ListInboxForUser(ctx context.Context, arg ListInboxForUserParams) ([]ListInboxForUserRow, error)
 	// List incoming dependencies of a task (edges that point AT this task).
 	ListIncomingDependenciesForTask(ctx context.Context, arg ListIncomingDependenciesForTaskParams) ([]ListIncomingDependenciesForTaskRow, error)
+	// List enabled lenses scoped to a workspace + project (or workspace-wide when project_id IS NULL).
+	ListLensesForProject(ctx context.Context, arg ListLensesForProjectParams) ([]ListLensesForProjectRow, error)
 	// List a user's MCP tokens in a workspace, masked.
 	ListMcpTokensForUser(ctx context.Context, arg ListMcpTokensForUserParams) ([]ListMcpTokensForUserRow, error)
 	// List models registered under a provider. Workspace-scoped.
@@ -417,6 +425,8 @@ type Querier interface {
 	UpdateIdentityFailedAttempts(ctx context.Context, arg UpdateIdentityFailedAttemptsParams) error
 	// Replace the Argon2id password hash on a local identity.
 	UpdateIdentityPasswordHash(ctx context.Context, arg UpdateIdentityPasswordHashParams) error
+	// Update a lens name and/or JSON body.
+	UpdateLens(ctx context.Context, arg UpdateLensParams) error
 	// Change a member's role.
 	UpdateMemberRole(ctx context.Context, arg UpdateMemberRoleParams) error
 	// Change a member's role keyed by user_id.

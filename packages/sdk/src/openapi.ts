@@ -1318,6 +1318,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{wsId}/lenses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List saved views for a workspace/project */
+        get: operations["lenses-list"];
+        put?: never;
+        /** Create a saved view (lens) */
+        post: operations["lenses-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/lenses/{lensId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fetch a saved view */
+        get: operations["lenses-get"];
+        put?: never;
+        post?: never;
+        /** Delete a saved view */
+        delete: operations["lenses-delete"];
+        options?: never;
+        head?: never;
+        /** Update a saved view */
+        patch: operations["lenses-update"];
+        trace?: never;
+    };
     "/workspaces/{wsId}/me/mcp-tokens": {
         parameters: {
             query?: never;
@@ -1770,6 +1807,20 @@ export interface components {
             /** @description Workspace public id (UUID v7) */
             workspaceId: string;
         };
+        CreateLensBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            filter: unknown;
+            groupBy?: string;
+            isDefault: boolean;
+            name: string;
+            /** @description Project public id; omit for workspace-wide */
+            projectId?: string;
+            sort: unknown;
+        };
         CreateMcpTokenInputBody: {
             /**
              * Format: uri
@@ -1849,6 +1900,14 @@ export interface components {
             iconUrl?: string;
             name: string;
             slug: string;
+        };
+        DeleteLensBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
         };
         DeleteMcpTokenOutputBody: {
             /**
@@ -2127,6 +2186,16 @@ export interface components {
              */
             readonly $schema?: string;
             invocations: components["schemas"]["AiInvocation"][] | null;
+        };
+        ListLensesBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            lenses: components["schemas"]["SavedLens"][] | null;
+            /** Format: int64 */
+            total: number;
         };
         ListMcpTokensOutputBody: {
             /**
@@ -2740,6 +2809,28 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        SavedLens: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: date-time */
+            createdAt: string;
+            creatorDisplayName: string;
+            creatorId: string;
+            filter: unknown;
+            groupBy: string | null;
+            /** @description Lens public id (UUID v7) */
+            id: string;
+            isDefault: boolean;
+            name: string;
+            sort: unknown;
+            /** Format: int32 */
+            sortWeight: number;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
         SessionSummary: {
             /**
              * Format: int64
@@ -3186,6 +3277,18 @@ export interface components {
              */
             readonly $schema?: string;
             ok: boolean;
+        };
+        UpdateLensBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            filter?: unknown;
+            groupBy?: string;
+            isDefault?: boolean;
+            name?: string;
+            sort?: unknown;
         };
         UpdateWorkspaceMemberRoleInputBody: {
             /**
@@ -6514,6 +6617,177 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InboxTriageOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "lenses-list": {
+        parameters: {
+            query?: {
+                /** @description Filter by project public id */
+                projectId?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListLensesBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "lenses-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLensBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedLens"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "lenses-get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                lensId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedLens"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "lenses-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                lensId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteLensBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "lenses-update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                lensId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLensBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedLens"];
                 };
             };
             /** @description Error */

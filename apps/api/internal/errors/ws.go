@@ -4,6 +4,10 @@ package errors
 
 // Error codes and specs.
 var (
+	// WS.LENS.NAME_ALREADY_TAKEN — A saved view with this name already exists
+	WsLensNameAlreadyTaken = &Spec{Code: "WS.LENS.NAME_ALREADY_TAKEN", Status: 409, Message: "A saved view with this name already exists"}
+	// WS.LENS.NOT_FOUND — Saved view not found
+	WsLensNotFound = &Spec{Code: "WS.LENS.NOT_FOUND", Status: 404, Message: "Saved view not found"}
 	// WS.MEMBER.NOT_FOUND — Workspace member not found
 	WsMemberNotFound = &Spec{Code: "WS.MEMBER.NOT_FOUND", Status: 404, Message: "Workspace member not found"}
 	// WS.MEMBER.ROLE_DENIED — Your role does not permit this action

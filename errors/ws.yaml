@@ -118,3 +118,20 @@ resources:
         message: "Workspace member not found"
         description: "Returned when the target user is not a member of the workspace."
         userAction: "Invite the user to the workspace first."
+
+  lens:
+    breadcrumb: "Workspace > Lens"
+    errors:
+      not_found:
+        code: WS.LENS.NOT_FOUND
+        status: 404
+        message: "Saved view not found"
+        description: "Returned when a lens with the given public_id does not exist or has been deleted."
+        userAction: "Verify the view ID, or refresh the list to see current saved views."
+
+      name_already_taken:
+        code: WS.LENS.NAME_ALREADY_TAKEN
+        status: 409
+        message: "A saved view with this name already exists"
+        description: "Returned when the requested lens name already exists within the same workspace/project scope."
+        userAction: "Choose a different name."

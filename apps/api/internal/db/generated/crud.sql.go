@@ -181,7 +181,7 @@ SELECT
 FROM v_my_tasks v
 WHERE v.workspace_id = ?
   AND v.user_public_id = ?
-ORDER BY v.sort_weight ASC, v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
+ORDER BY v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?
 `
 
@@ -266,7 +266,7 @@ FROM v_my_tasks v
 INNER JOIN workspaces w
   ON w.id = v.workspace_id AND w.enabled = TRUE
 WHERE v.user_public_id = ?
-ORDER BY v.sort_weight ASC, v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
+ORDER BY v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?
 `
 
@@ -606,10 +606,6 @@ type UpdateTaskSortWeightParams struct {
 // Update only the sort_weight for a single task within a workspace.
 // Used by the bulk reorder endpoint inside a transaction.
 func (q *Queries) UpdateTaskSortWeight(ctx context.Context, arg UpdateTaskSortWeightParams) error {
-	_, err := q.db.ExecContext(ctx, updateTaskSortWeight,
-		arg.SortWeight,
-		arg.ID,
-		arg.WorkspaceID,
-	)
+	_, err := q.db.ExecContext(ctx, updateTaskSortWeight, arg.SortWeight, arg.ID, arg.WorkspaceID)
 	return err
 }

@@ -1183,6 +1183,34 @@ type InstanceAuditLog struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
+// Saved task query views
+type Lense struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Internal FK to projects.id (NULL = workspace-wide)
+	ProjectID sql.NullInt32 `json:"-"`
+	// Internal FK to users.id
+	CreatorID uint32 `json:"creatorId"`
+	// Display name
+	Name string `json:"name"`
+	// Serialized Lens object (filter, sort, groupBy)
+	LensJson json.RawMessage `json:"lensJson"`
+	// Default lens for the scope
+	IsDefault bool `json:"isDefault"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
 // MCP tool invocation audit
 type McpInvocation struct {
 	// Internal PK, never exposed

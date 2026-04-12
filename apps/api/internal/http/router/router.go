@@ -36,6 +36,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/inbox"
 	integrationshandlers "github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/integrations"
 	integrationspkg "github.com/nodate-flow/nodate-flow/apps/api/internal/integrations"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/lenses"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/projects"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/signals"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/tasks"
@@ -330,6 +331,8 @@ func BuildResult(deps Deps) Result {
 			Path:        "/workspaces/{wsId}/projects",
 			Summary:     "List projects in a workspace",
 		}, projects.List(prjDeps))
+		lensDeps := lenses.Deps{DB: deps.DB, Queries: deps.Queries}
+		lenses.RegisterWorkspaceScoped(subAPI, lensDeps)
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-cost-today",
 			Method:      http.MethodGet,

@@ -11,6 +11,8 @@ import Input from '@nodate-flow/ui/primitives/input';
 import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import LensPicker from './lens-picker';
+
 import { useWorkspaceUsersQuery } from '../workspaces/api';
 import {
   PRIORITY_I18N_KEY,
@@ -262,6 +264,11 @@ export default function TaskFiltersBar({
           >
             {t('tasks.filters.clear')}
           </button>
+        ) : null}
+        {workspaceId !== undefined ? (
+          <Suspense fallback={null}>
+            <LensPicker workspaceId={workspaceId} projectId={projectId} />
+          </Suspense>
         ) : null}
       </div>
 

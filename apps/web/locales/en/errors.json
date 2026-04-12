@@ -81,6 +81,8 @@
   "VALIDATION.PATH.PARAM_INVALID": "A path parameter is invalid",
   "VALIDATION.QUERY.FIELD_INVALID": "A query parameter is invalid",
   "VALIDATION.QUERY.UNKNOWN_FIELD": "Unknown query parameter",
+  "WS.LENS.NAME_ALREADY_TAKEN": "A saved view with this name already exists",
+  "WS.LENS.NOT_FOUND": "Saved view not found",
   "WS.MEMBER.NOT_FOUND": "Workspace member not found",
   "WS.MEMBER.ROLE_DENIED": "Your role does not permit this action",
   "WS.PROJECT.ACCESS_DENIED": "You do not have access to this project",
