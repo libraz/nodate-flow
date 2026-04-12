@@ -483,6 +483,18 @@
         "cancel": "キャンセル"
       }
     },
+    "attachments": {
+      "title": "添付ファイル",
+      "empty": "添付ファイルはまだありません。",
+      "delete": "削除",
+      "delete_confirm": "この添付ファイルを削除してよろしいですか？",
+      "filename": "ファイル名",
+      "size": "サイズ",
+      "uploaded_by": "{name} がアップロード",
+      "add": "添付ファイルを追加",
+      "adding": "追加中…",
+      "deleting": "削除中…"
+    },
     "comments": {
       "title": "コメント",
       "add_placeholder": "コメントを入力…",
@@ -490,6 +502,21 @@
       "empty": "コメントはまだありません。",
       "edit": "編集",
       "delete": "削除"
+    },
+    "lens": {
+      "title": "保存済みビュー",
+      "save": "ビューを保存",
+      "name_placeholder": "ビュー名",
+      "create": "保存",
+      "creating": "保存中...",
+      "delete": "削除",
+      "delete_confirm": "この保存済みビューを削除しますか？",
+      "empty": "保存済みビューはありません",
+      "default_badge": "デフォルト",
+      "apply": "適用",
+      "load_failed": "保存済みビューの読み込みに失敗しました",
+      "save_failed": "ビューの保存に失敗しました",
+      "delete_failed": "ビューの削除に失敗しました"
     }
   },
   "auth": {

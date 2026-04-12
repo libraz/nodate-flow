@@ -23,12 +23,14 @@ export type Task = components['schemas']['Task'];
 export type TaskListItem = components['schemas']['TaskListItem'];
 export type TaskComment = components['schemas']['TaskComment'];
 export type TaskActor = components['schemas']['TaskActor'];
+export type TaskAttachment = components['schemas']['TaskAttachment'];
 export type CreateTaskInput = components['schemas']['CreateTaskBody'];
 export type PatchTaskInput = components['schemas']['PatchTaskBody'];
 export type TransitionInput = components['schemas']['TransitionTaskBody'];
 export type TransitionName = TransitionInput['transition'];
 export type AddCommentInput = components['schemas']['AddTaskCommentBody'];
 export type AddActorInput = components['schemas']['AddTaskActorBody'];
+export type AddAttachmentInput = components['schemas']['AddTaskAttachmentBody'];
 
 /** Backend `derived_state` enum (see sql/tables/tasks.sql). */
 export type TaskDerivedState = 'open' | 'waiting' | 'review' | 'done' | 'cancelled';
@@ -76,6 +78,7 @@ export const tasksKeys = {
   inferState: (id: string) => [...tasksKeys.all, 'detail', id, 'infer-state'] as const,
   aiInvocations: (id: string) => [...tasksKeys.all, 'detail', id, 'ai-invocations'] as const,
   dependencies: (id: string) => [...tasksKeys.all, 'detail', id, 'dependencies'] as const,
+  attachments: (id: string) => [...tasksKeys.all, 'detail', id, 'attachments'] as const,
 };
 
 export type TaskDependencyEdge = components['schemas']['TaskDependencyEdge'];
@@ -682,6 +685,70 @@ export function useTaskSearch(
       });
       if (error || !data) return [];
       return data.tasks ?? [];
+    },
+  });
+}
+
+/* ── Attachment hooks ───────────────────────────────────────── */
+
+/** Fetches all attachments for a task. */
+export function useListAttachments(taskPublicId: string): UseSuspenseQueryResult<TaskAttachment[]> {
+  return useSuspenseQuery({
+    queryKey: tasksKeys.attachments(taskPublicId),
+    queryFn: async (): Promise<TaskAttachment[]> => {
+      const { data, error } = await sdk.GET('/tasks/{id}/attachments', {
+        params: { path: { id: taskPublicId } },
+      });
+      if (error || !data) throw toError(error, 'Failed to load attachments');
+      return data.attachments ?? [];
+    },
+  });
+}
+
+export interface AddAttachmentArgs {
+  taskId: string;
+  input: AddAttachmentInput;
+}
+
+/** Registers attachment metadata on a task. */
+export function useAddAttachment(): UseMutationResult<
+  TaskAttachment,
+  TaskApiError,
+  AddAttachmentArgs
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskId, input }: AddAttachmentArgs): Promise<TaskAttachment> => {
+      const { data, error } = await sdk.POST('/tasks/{id}/attachments', {
+        params: { path: { id: taskId } },
+        body: input,
+      });
+      if (error || !data) throw toError(error, 'Failed to add attachment');
+      return data;
+    },
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: tasksKeys.attachments(vars.taskId) });
+    },
+  });
+}
+
+export interface DeleteAttachmentArgs {
+  taskId: string;
+  attachmentId: string;
+}
+
+/** Soft-deletes an attachment from a task. */
+export function useDeleteAttachment(): UseMutationResult<void, TaskApiError, DeleteAttachmentArgs> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskId, attachmentId }: DeleteAttachmentArgs): Promise<void> => {
+      const { error } = await sdk.DELETE('/tasks/{id}/attachments/{aid}', {
+        params: { path: { id: taskId, aid: attachmentId } },
+      });
+      if (error) throw toError(error, 'Failed to delete attachment');
+    },
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: tasksKeys.attachments(vars.taskId) });
     },
   });
 }

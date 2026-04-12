@@ -46,6 +46,7 @@ import {
 } from '../features/tasks/api';
 import DependenciesSection from '../features/tasks/dependencies-section';
 import MarkdownEditor from '../features/tasks/markdown-editor';
+import TaskAttachments from '../features/tasks/task-attachments';
 import { useTaskTimelineQuery } from '../features/timeline/api';
 import ReplayPanel from '../features/timeline/replay-panel';
 import TaskMiniTimeline from '../features/timeline/task-mini-timeline';
@@ -932,6 +933,10 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
         <Separator />
         <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
           <DependenciesSection taskId={id} workspaceId={task.workspaceId} />
+        </Suspense>
+        <Separator />
+        <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
+          <TaskAttachments taskId={id} />
         </Suspense>
         <Separator />
         <Suspense fallback={<Skeleton style={{ blockSize: '8rem', inlineSize: '100%' }} />}>
