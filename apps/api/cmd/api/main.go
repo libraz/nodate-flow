@@ -23,15 +23,16 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/providers"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/config"
-	"github.com/nodate-flow/nodate-flow/apps/api/internal/outbound"
-	"github.com/nodate-flow/nodate-flow/apps/api/internal/storage"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/crypto"
-	"github.com/nodate-flow/nodate-flow/apps/api/internal/integrations"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/router"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/integrations"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/integrations/email"
 	nflog "github.com/nodate-flow/nodate-flow/apps/api/internal/log"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/obs"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/outbound"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/storage"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/stream"
 )
 
@@ -251,6 +252,30 @@ func main() {
 	}
 	eventbus.AddNotifyHook(eventTrigger.NotifyHook())
 
+	// Outbound email transport. When NF_SMTP_HOST is set the sender
+	// relays through the configured SMTP server; otherwise a NoopSender
+	// is used so handlers can always call Send and check for
+	// email.ErrNotConfigured on the return path.
+	var emailSender email.Sender
+	if cfg.SmtpHost != "" {
+		s, serr := email.NewSMTPSender(email.SMTPConfig{
+			Host:     cfg.SmtpHost,
+			Port:     cfg.SmtpPort,
+			Username: cfg.SmtpUsername,
+			Password: cfg.SmtpPassword,
+			From:     cfg.SmtpFrom,
+		})
+		if serr != nil {
+			logger.Error("smtp sender init failed", "err", serr)
+			os.Exit(1)
+		}
+		emailSender = s
+		logger.Info("smtp email enabled", "host", cfg.SmtpHost, "port", cfg.SmtpPort)
+	} else {
+		emailSender = email.NoopSender{}
+		logger.Warn("smtp email disabled: NF_SMTP_HOST is not set")
+	}
+
 	integrationsRegistry := integrations.NewRegistry(
 		func() (integrations.Provider, error) {
 			return integrations.NewGithub(cfg.GithubClientID, cfg.GithubClientSecret)
@@ -279,24 +304,25 @@ func main() {
 	logger.Info("integrations refresher goroutine launched")
 
 	inner := router.Build(router.Deps{
-		DB:                 db,
-		Queries:            queries,
-		Sessions:           sessions,
-		JWT:                jwtIssuer,
-		Cipher:             cipher,
-		GhWebhookSecret:    cfg.GhWebhookSecret,
-		SlackSigningSecret: cfg.SlackSigningSecret,
-		GoogleChannelToken: cfg.GoogleChannelToken,
-		DefaultWorkspaceID: cfg.DefaultWorkspaceID,
-		CookieSecure:       cfg.CookieSecure,
-		RegistrationOpen:   cfg.RegistrationOpen,
-		AiMock:             cfg.AiMock,
+		DB:                    db,
+		Queries:               queries,
+		Sessions:              sessions,
+		JWT:                   jwtIssuer,
+		Cipher:                cipher,
+		GhWebhookSecret:       cfg.GhWebhookSecret,
+		SlackSigningSecret:    cfg.SlackSigningSecret,
+		GoogleChannelToken:    cfg.GoogleChannelToken,
+		DefaultWorkspaceID:    cfg.DefaultWorkspaceID,
+		CookieSecure:          cfg.CookieSecure,
+		RegistrationOpen:      cfg.RegistrationOpen,
+		AiMock:                cfg.AiMock,
 		StreamNotifier:        notifier,
 		StreamRemember:        streamRemember,
 		AiInvocationPublisher: aiInvocationPublisher,
 		AgentQueue:            agentQueue,
 		AgentRunner:           runner,
 		Storage:               storageClient,
+		EmailSender:           emailSender,
 		Integrations:          integrationsRegistry,
 		PublicBaseURL:         cfg.PublicBaseURL,
 		WebBaseURL:            cfg.WebBaseURL,

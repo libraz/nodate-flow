@@ -43,6 +43,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/workspaces"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/middleware"
 	integrationspkg "github.com/nodate-flow/nodate-flow/apps/api/internal/integrations"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/integrations/email"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/mcp"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/obs"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/storage"
@@ -125,6 +126,12 @@ type Deps struct {
 	// uploads / downloads. Nil in tests; presign endpoints return
 	// INTERNAL.UNEXPECTED.
 	Storage *storage.Client
+
+	// EmailSender is the outbound email transport. Nil or a NoopSender
+	// when SMTP is not configured; handlers should check for
+	// email.ErrNotConfigured on Send failures. Tests typically pass
+	// an email.MemorySender.
+	EmailSender email.Sender
 
 	// Integrations is the personal-OAuth provider registry (GitHub /
 	// Slack / Google Calendar). Nil in tests; the handlers degrade
