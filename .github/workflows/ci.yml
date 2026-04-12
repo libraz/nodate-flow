@@ -131,5 +131,38 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Placeholder
-        run: echo "Security scanning will be configured in a future iteration."
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: apps/api/go.sum
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@0.32.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+
+      - name: Semgrep SAST
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: auto
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Go vulnerability check
+        run: govulncheck ./...
+        working-directory: apps/api
+
+      - name: Install JS dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Bun dependency audit
+        run: bunx npm-audit --production
