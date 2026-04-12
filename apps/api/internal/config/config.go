@@ -27,10 +27,8 @@ type Config struct {
 	// Google Drive push notifications must echo back on every delivery.
 	GoogleChannelToken string `env:"NF_GOOGLE_CHANNEL_TOKEN" envDefault:""`
 	// DefaultWorkspaceID is the workspace public id (UUID v7) that
-	// inbound webhook signals are routed to while there is no per-repo
-	// workspace mapping yet.
-	//
-	// TODO: Replace with a real repo→workspace mapping table.
+	// inbound webhook signals are routed to as a fallback when the
+	// repo_workspace_mappings table has no entry for the repository.
 	DefaultWorkspaceID string `env:"NF_DEFAULT_WORKSPACE_ID" envDefault:""`
 
 	// PublicBaseURL is the externally-visible origin of the api used to
