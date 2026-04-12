@@ -204,7 +204,17 @@ func BuildResult(deps Deps) Result {
 		PublicBaseURL: deps.PublicBaseURL,
 		WebBaseURL:    deps.WebBaseURL,
 	}
-	registerPublicAuthRoutes(api, authDeps)
+	// Public auth endpoints (login / register) are behind a per-IP rate
+	// limiter to slow down brute-force and credential-stuffing attacks.
+	authRateLimiter := middleware.NewIPRateLimiter(middleware.RateLimitConfig{
+		MaxRequests: 5,
+		Window:      15 * time.Minute,
+	})
+	r.Group(func(sub chi.Router) {
+		sub.Use(authRateLimiter.Middleware())
+		authRateLimitedAPI := newSubAPI(sub)
+		registerPublicAuthRoutes(authRateLimitedAPI, authDeps)
+	})
 	huma.Register(api, huma.Operation{
 		OperationID: "oauth-integration-callback",
 		Method:      http.MethodGet,
