@@ -86,6 +86,9 @@ type Deps struct {
 	// leave it false so http://127.0.0.1 traffic works; the prod main
 	// wires it from cfg.CookieSecure.
 	CookieSecure bool
+	// RegistrationOpen controls whether POST /auth/register is allowed.
+	// When false the handler returns 403. Defaults to true.
+	RegistrationOpen bool
 	// AiMock toggles the deterministic in-memory AI provider used by
 	// development and tests. When true the orchestrator routes
 	// every workspace to a fixture-backed Provider regardless of the
@@ -195,7 +198,7 @@ func BuildResult(deps Deps) Result {
 	if sessionStore == nil {
 		sessionStore = sessionstore.NewMySQLStore(deps.Queries)
 	}
-	authDeps := authhandlers.Deps{DB: deps.DB, Queries: deps.Queries, Sessions: sessionStore, JWT: deps.JWT, Cipher: deps.Cipher, CookieSecure: deps.CookieSecure}
+	authDeps := authhandlers.Deps{DB: deps.DB, Queries: deps.Queries, Sessions: sessionStore, JWT: deps.JWT, Cipher: deps.Cipher, CookieSecure: deps.CookieSecure, RegistrationOpen: deps.RegistrationOpen}
 	integrationsDeps := integrationshandlers.Deps{
 		DB:            deps.DB,
 		Queries:       deps.Queries,

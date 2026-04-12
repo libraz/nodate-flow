@@ -19,6 +19,9 @@ import (
 // user account plus its initial session.
 func Register(deps Deps) func(context.Context, *RegisterInput) (*RegisterOutput, error) {
 	return func(ctx context.Context, in *RegisterInput) (*RegisterOutput, error) {
+		if !deps.RegistrationOpen {
+			return nil, httpErr(apierrors.AuthRegisterInstanceRegistrationDisabled)
+		}
 		email := strings.ToLower(strings.TrimSpace(in.Body.Email))
 		if len(in.Body.Password) < 8 {
 			return nil, httpErr(apierrors.AuthRegisterPasswordTooWeak)

@@ -27,6 +27,9 @@ type Deps struct {
 	// defaults to true in production; local http dev can disable it via
 	// NF_COOKIE_SECURE=false.
 	CookieSecure bool
+	// RegistrationOpen controls whether new user sign-up is allowed.
+	// When false, POST /auth/register returns 403.
+	RegistrationOpen bool
 }
 
 // RegisterInput is the body for POST /auth/register.

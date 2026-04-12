@@ -289,6 +289,7 @@ func main() {
 		GoogleChannelToken: cfg.GoogleChannelToken,
 		DefaultWorkspaceID: cfg.DefaultWorkspaceID,
 		CookieSecure:       cfg.CookieSecure,
+		RegistrationOpen:   cfg.RegistrationOpen,
 		AiMock:             cfg.AiMock,
 		StreamNotifier:        notifier,
 		StreamRemember:        streamRemember,
