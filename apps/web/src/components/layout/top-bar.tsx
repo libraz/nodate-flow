@@ -9,6 +9,7 @@ import CommandPalette from './command-palette';
 
 import AiCostMeter from '../../features/ai-providers/cost-meter';
 import { authStore, selectUser, useAuth } from '../../features/auth/auth-store';
+import NotificationBell from '../../features/notifications/notification-bell';
 import { useWorkspacesQuery } from '../../features/workspaces/api';
 import { type SupportedLanguage, setLanguage } from '../../i18n';
 import { apiBaseUrl } from '../../lib/sdk';
@@ -133,6 +134,9 @@ export default function TopBar(): ReactElement {
         </div>
         <div className={styles.right}>
           <AiCostMeter />
+          <Suspense fallback={null}>
+            <NotificationBell />
+          </Suspense>
           <button
             type="button"
             className={styles.iconButton}

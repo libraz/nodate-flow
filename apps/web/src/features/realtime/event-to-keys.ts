@@ -16,6 +16,7 @@ export type StreamKind =
   | 'task.changed'
   | 'ai.suggestion.changed'
   | 'ai.invocation.written'
+  | 'notification.changed'
   | 'resync';
 
 export interface StreamEvent {
@@ -47,6 +48,11 @@ export function keysForEvent(evt: StreamEvent): readonly (readonly unknown[])[] 
       return [['ai-suggestions', 'list', ws]];
     case 'ai.invocation.written':
       return [['ai-invocations', 'list', ws]];
+    case 'notification.changed':
+      return [
+        ['notifications', 'list'],
+        ['notifications', 'unread-count'],
+      ];
     case 'resync':
       return [
         ['auto-actions', 'list', ws],
@@ -55,6 +61,8 @@ export function keysForEvent(evt: StreamEvent): readonly (readonly unknown[])[] 
         ['weekly-digest', 'workspace', ws],
         ['ai-suggestions', 'list', ws],
         ['ai-invocations', 'list', ws],
+        ['notifications', 'list'],
+        ['notifications', 'unread-count'],
         ['tasks'],
       ];
   }

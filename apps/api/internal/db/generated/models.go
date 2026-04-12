@@ -278,6 +278,93 @@ func (ns NullMcpInvocationsStatus) Value() (driver.Value, error) {
 	return string(ns.McpInvocationsStatus), nil
 }
 
+type NotificationsChannel string
+
+const (
+	NotificationsChannelInApp NotificationsChannel = "in_app"
+	NotificationsChannelEmail NotificationsChannel = "email"
+	NotificationsChannelPush  NotificationsChannel = "push"
+)
+
+func (e *NotificationsChannel) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = NotificationsChannel(s)
+	case string:
+		*e = NotificationsChannel(s)
+	default:
+		return fmt.Errorf("unsupported scan type for NotificationsChannel: %T", src)
+	}
+	return nil
+}
+
+type NullNotificationsChannel struct {
+	NotificationsChannel NotificationsChannel `json:"notificationsChannel"`
+	Valid                bool                 `json:"valid"` // Valid is true if NotificationsChannel is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullNotificationsChannel) Scan(value interface{}) error {
+	if value == nil {
+		ns.NotificationsChannel, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.NotificationsChannel.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullNotificationsChannel) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.NotificationsChannel), nil
+}
+
+type NotificationsSeverity string
+
+const (
+	NotificationsSeverityLow    NotificationsSeverity = "low"
+	NotificationsSeverityNormal NotificationsSeverity = "normal"
+	NotificationsSeverityHigh   NotificationsSeverity = "high"
+	NotificationsSeverityUrgent NotificationsSeverity = "urgent"
+)
+
+func (e *NotificationsSeverity) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = NotificationsSeverity(s)
+	case string:
+		*e = NotificationsSeverity(s)
+	default:
+		return fmt.Errorf("unsupported scan type for NotificationsSeverity: %T", src)
+	}
+	return nil
+}
+
+type NullNotificationsSeverity struct {
+	NotificationsSeverity NotificationsSeverity `json:"notificationsSeverity"`
+	Valid                 bool                  `json:"valid"` // Valid is true if NotificationsSeverity is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullNotificationsSeverity) Scan(value interface{}) error {
+	if value == nil {
+		ns.NotificationsSeverity, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.NotificationsSeverity.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullNotificationsSeverity) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.NotificationsSeverity), nil
+}
+
 type OauthStatesProvider string
 
 const (
@@ -1055,7 +1142,7 @@ type AuditLog struct {
 	// Internal FK to workspaces.id
 	WorkspaceID uint32 `json:"-"`
 	// Actor user.id (null for system)
-	ActorUserID sql.NullInt32 `json:"actorUserId"`
+	ActorUserID sql.NullInt32 `json:"-"`
 	// Action identifier (e.g., ai_provider.create)
 	Action string `json:"action"`
 	// Target resource type
@@ -1117,7 +1204,7 @@ type Event struct {
 	// Internal FK to tasks.id when the event targets a task
 	TaskID sql.NullInt32 `json:"-"`
 	// Acting user.id (null for system/bot actions)
-	ActorUserID sql.NullInt32 `json:"actorUserId"`
+	ActorUserID sql.NullInt32 `json:"-"`
 	// Event type (e.g., task.created, signal.attached)
 	Type string `json:"type"`
 	// Event payload
@@ -1199,7 +1286,7 @@ type InstanceAuditLog struct {
 	// UUID v7, the only externally visible ID
 	PublicID types.PublicID `json:"publicId"`
 	// Actor user.id (null for system)
-	ActorUserID sql.NullInt32 `json:"actorUserId"`
+	ActorUserID sql.NullInt32 `json:"-"`
 	// Action identifier (e.g., instance_admin.grant)
 	Action string `json:"action"`
 	// Affected workspace.id when applicable
@@ -1316,6 +1403,48 @@ type McpToken struct {
 	LastUsedAt sql.NullTime `json:"lastUsedAt"`
 	// Explicit revocation time
 	RevokedAt sql.NullTime `json:"revokedAt"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
+// Per-user notification entries from eventbus fan-out
+type Notification struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Internal FK to users.id, the user who receives this notification
+	RecipientUserID uint32 `json:"-"`
+	// Internal FK to users.id, who triggered the event (null for system)
+	ActorUserID sql.NullInt32 `json:"-"`
+	// Matches eventbus event types (e.g. task.created, task.comment.added)
+	EventType string `json:"eventType"`
+	// Resource kind: task, project, comment, etc.
+	ResourceType string `json:"resourceType"`
+	// public_id of the affected resource (null for workspace-level events)
+	ResourcePublicID sql.NullString `json:"resourcePublicId"`
+	// Human-readable notification title (i18n key or pre-rendered)
+	Title string `json:"title"`
+	// Optional longer description
+	Body sql.NullString `json:"body"`
+	// AI-inferred or rule-based severity
+	Severity NotificationsSeverity `json:"severity"`
+	// Delivery channel
+	Channel NotificationsChannel `json:"channel"`
+	// When the user marked it read (null = unread)
+	ReadAt sql.NullTime `json:"readAt"`
+	// When the user archived it (null = active)
+	ArchivedAt sql.NullTime `json:"archivedAt"`
+	// When email/push was actually sent (null for in_app only)
+	DeliveredAt sql.NullTime `json:"deliveredAt"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/middleware"
@@ -54,6 +55,11 @@ func PatchMe(deps Deps) func(context.Context, *PatchMeInput) (*PatchMeOutput, er
 		if err := deps.Queries.PatchMe(ctx, params); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "user.update",
+			ActorID:      uid,
+			ResourceType: "user",
+		})
 
 		row, err := deps.Queries.FindUserProfileById(ctx, uid)
 		if err != nil {

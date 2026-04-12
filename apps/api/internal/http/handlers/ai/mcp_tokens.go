@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
@@ -92,6 +93,13 @@ func CreateMcpToken(deps Deps) func(context.Context, *CreateMcpTokenInput) (*Cre
 			out.Body.AgentID = &v
 		}
 		out.Body.CreatedAt = now.Unix()
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "mcp_token.create",
+			ActorID:      userID,
+			WorkspaceID:  ws.ID,
+			ResourceType: "mcp_token",
+			ResourceID:   pub.String(),
+		})
 		// Drop the plaintext from the local variable as soon as it has
 		// been copied into the response struct.
 		plain = ""
@@ -174,6 +182,13 @@ func DeleteMcpToken(deps Deps) func(context.Context, *DeleteMcpTokenInput) (*Del
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "mcp_token.delete",
+			ActorID:      userID,
+			WorkspaceID:  ws.ID,
+			ResourceType: "mcp_token",
+			ResourceID:   pub.String(),
+		})
 		out := &DeleteMcpTokenOutput{}
 		out.Body.Ok = true
 		return out, nil

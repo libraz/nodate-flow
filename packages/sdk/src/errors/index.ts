@@ -9,6 +9,7 @@ export * from "./integration-slack";
 export * from "./integrations";
 export * from "./internal";
 export * from "./mcp";
+export * from "./notification";
 export * from "./rate";
 export * from "./validation";
 export * from "./ws";

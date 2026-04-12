@@ -437,6 +437,23 @@
         "required": ["ok"],
         "type": "object"
       },
+      "ArchiveOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ArchiveOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
       "AuthTokens": {
         "additionalProperties": false,
         "properties": {
@@ -664,6 +681,24 @@
           "scopes",
           "connectedAt"
         ],
+        "type": "object"
+      },
+      "CountUnreadOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CountUnreadOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "unreadCount": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["unreadCount"],
         "type": "object"
       },
       "CreateAgentInputBody": {
@@ -1764,6 +1799,33 @@
         "required": ["total", "tasks"],
         "type": "object"
       },
+      "ListOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
+          "notifications": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationDTO"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "notifications", "nextCursor"],
+        "type": "object"
+      },
       "ListPrioritySuggestionsOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -2331,6 +2393,40 @@
         "required": ["ok"],
         "type": "object"
       },
+      "MarkAllReadOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/MarkAllReadOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
+      "MarkReadOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/MarkReadOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
       "McpTokenSummary": {
         "additionalProperties": false,
         "properties": {
@@ -2505,6 +2601,69 @@
           "derivedState",
           "priority",
           "actorRole",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "NotificationDTO": {
+        "additionalProperties": false,
+        "properties": {
+          "actorDisplayName": {
+            "type": "string"
+          },
+          "actorId": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "deliveredAt": {
+            "format": "int64",
+            "type": ["integer", "null"]
+          },
+          "eventType": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "readAt": {
+            "format": "int64",
+            "type": ["integer", "null"]
+          },
+          "resourceId": {
+            "type": "string"
+          },
+          "resourceType": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workspaceId",
+          "eventType",
+          "resourceType",
+          "title",
+          "severity",
+          "channel",
+          "readAt",
+          "deliveredAt",
           "createdAt"
         ],
         "type": "object"
@@ -5337,6 +5496,109 @@
         "summary": "Start a personal OAuth connect flow"
       }
     },
+    "/me/notifications": {
+      "get": {
+        "operationId": "notifications-list",
+        "parameters": [
+          {
+            "description": "Optional workspace public id to filter by",
+            "explode": false,
+            "in": "query",
+            "name": "workspaceId",
+            "schema": {
+              "description": "Optional workspace public id to filter by",
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List notifications for the caller"
+      }
+    },
+    "/me/notifications/unread-count": {
+      "get": {
+        "operationId": "notifications-unread-count",
+        "parameters": [
+          {
+            "description": "Optional workspace public id to filter by",
+            "explode": false,
+            "in": "query",
+            "name": "workspaceId",
+            "schema": {
+              "description": "Optional workspace public id to filter by",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CountUnreadOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Count unread notifications for the caller"
+      }
+    },
     "/me/password": {
       "post": {
         "operationId": "me-password-change",
@@ -5741,6 +6003,86 @@
           }
         },
         "summary": "Regenerate TOTP recovery codes after password reverification"
+      }
+    },
+    "/notifications/{notifId}/archive": {
+      "post": {
+        "operationId": "notifications-archive",
+        "parameters": [
+          {
+            "description": "Notification public id (UUID v7)",
+            "in": "path",
+            "name": "notifId",
+            "required": true,
+            "schema": {
+              "description": "Notification public id (UUID v7)",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArchiveOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Archive a notification"
+      }
+    },
+    "/notifications/{notifId}/read": {
+      "post": {
+        "operationId": "notifications-mark-read",
+        "parameters": [
+          {
+            "description": "Notification public id (UUID v7)",
+            "in": "path",
+            "name": "notifId",
+            "required": true,
+            "schema": {
+              "description": "Notification public id (UUID v7)",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarkReadOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Mark a notification as read"
       }
     },
     "/oauth/callback/{provider}": {
@@ -9888,6 +10230,46 @@
           }
         },
         "summary": "Change a member's role"
+      }
+    },
+    "/workspaces/{wsId}/notifications/read-all": {
+      "post": {
+        "operationId": "notifications-mark-all-read",
+        "parameters": [
+          {
+            "description": "Workspace public id (UUID v7)",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public id (UUID v7)",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarkAllReadOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Mark all notifications as read in a workspace"
       }
     },
     "/workspaces/{wsId}/projects": {

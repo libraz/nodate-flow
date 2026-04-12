@@ -38,6 +38,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/inbox"
 	integrationshandlers "github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/integrations"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/lenses"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/notifications"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/projects"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/signals"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/tasks"
@@ -276,7 +277,8 @@ func BuildResult(deps Deps) Result {
 	taskDeps := tasks.Deps{DB: deps.DB, Queries: deps.Queries, Embedder: embedClient, NlConstraint: nlConstraintCompiler, Storage: deps.Storage, Audit: auditRec}
 	tlDeps := timeline.Deps{DB: deps.DB, Queries: deps.Queries}
 	inboxDeps := inbox.Deps{DB: deps.DB, Queries: deps.Queries}
-	aiDeps := aihandlers.Deps{DB: deps.DB, Queries: deps.Queries, Cipher: deps.Cipher, NlQuery: nlQueryCompiler}
+	notifDeps := notifications.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
+	aiDeps := aihandlers.Deps{DB: deps.DB, Queries: deps.Queries, Cipher: deps.Cipher, NlQuery: nlQueryCompiler, Audit: auditRec}
 
 	// AI orchestrator. Built once and shared by the MCP server, the
 	// inbox triage handler, and any future AI endpoint. When
@@ -316,7 +318,19 @@ func BuildResult(deps Deps) Result {
 	// cookie, not the Bearer access token, so they must sit outside the
 	// authMW group — otherwise a page reload (which starts with no access
 	// token in memory) can never rotate the refresh token.
-	registerPublicAuthCookieRoutes(api, authDeps)
+	//
+	// A separate, more generous rate limiter protects these routes: refresh
+	// fires on every page load so the window must be wider than the strict
+	// login limiter above.
+	cookieAuthRateLimiter := middleware.NewIPRateLimiter(middleware.RateLimitConfig{
+		MaxRequests: 30,
+		Window:      15 * time.Minute,
+	})
+	r.Group(func(sub chi.Router) {
+		sub.Use(cookieAuthRateLimiter.Middleware())
+		cookieAuthAPI := newSubAPI(sub)
+		registerPublicAuthCookieRoutes(cookieAuthAPI, authDeps)
+	})
 
 	// /me, /workspaces{,list}.
 	r.Group(func(sub chi.Router) {
@@ -384,7 +398,7 @@ func BuildResult(deps Deps) Result {
 			Path:        "/workspaces/{wsId}/projects",
 			Summary:     "List projects in a workspace",
 		}, projects.List(prjDeps))
-		lensDeps := lenses.Deps{DB: deps.DB, Queries: deps.Queries}
+		lensDeps := lenses.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
 		lenses.RegisterWorkspaceScoped(subAPI, lensDeps)
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-cost-today",
@@ -492,6 +506,7 @@ func BuildResult(deps Deps) Result {
 			notifier = stream.NopNotifier{}
 		}
 		sub.Get("/workspaces/{wsId}/stream", stream.SSEHandler(notifier, deps.StreamRemember))
+		notifications.RegisterWorkspaceScoped(subAPI, notifDeps)
 	})
 
 	// Per-user MCP tokens (workspace member, not admin).
@@ -592,6 +607,7 @@ func BuildResult(deps Deps) Result {
 	signalDeps := signals.Deps{
 		DB:                 deps.DB,
 		Queries:            deps.Queries,
+		Audit:              auditRec,
 		GhWebhookSecret:    deps.GhWebhookSecret,
 		SlackSigningSecret: deps.SlackSigningSecret,
 		GoogleChannelToken: deps.GoogleChannelToken,
@@ -602,6 +618,7 @@ func BuildResult(deps Deps) Result {
 		subAPI := newSubAPI(sub)
 		signals.RegisterCollection(subAPI, signalDeps)
 		inbox.Register(subAPI, inboxDeps)
+		notifications.Register(subAPI, notifDeps)
 	})
 
 	// MCP server uses the orchestrator built above. The SSE event hook

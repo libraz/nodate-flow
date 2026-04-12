@@ -30,6 +30,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/integrations"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/integrations/email"
 	nflog "github.com/nodate-flow/nodate-flow/apps/api/internal/log"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/notification"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/obs"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/outbound"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/storage"
@@ -275,6 +276,12 @@ func main() {
 		emailSender = email.NoopSender{}
 		logger.Warn("smtp email disabled: NF_SMTP_HOST is not set")
 	}
+
+	// Notification fan-out: creates per-user notification rows whenever
+	// the eventbus fires a relevant event (task.created, task.comment.added,
+	// etc.). Email delivery is attempted when the SMTP sender is configured.
+	notifFanout := notification.NewFanout(db, queries, emailSender)
+	eventbus.AddNotifyHook(notifFanout.Hook())
 
 	integrationsRegistry := integrations.NewRegistry(
 		func() (integrations.Provider, error) {

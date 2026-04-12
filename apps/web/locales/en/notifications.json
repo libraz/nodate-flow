@@ -1,0 +1,26 @@
+{
+  "view": {
+    "title": "Notifications",
+    "empty": "No notifications",
+    "mark_all_read": "Mark all as read"
+  },
+  "action": {
+    "mark_read": "Mark as read",
+    "archive": "Archive"
+  },
+  "severity": {
+    "low": "Low",
+    "normal": "Normal",
+    "high": "High",
+    "urgent": "Urgent"
+  },
+  "badge": {
+    "unread": "{{count}} unread"
+  },
+  "toast": {
+    "marked_read": "Marked as read",
+    "all_marked_read": "All notifications marked as read",
+    "archived": "Notification archived",
+    "error": "Action failed"
+  }
+}

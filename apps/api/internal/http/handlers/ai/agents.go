@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/agentruntime"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
@@ -162,6 +163,16 @@ func UpdateAgentSchedule(deps Deps) func(context.Context, *UpdateAgentScheduleIn
 		if n == 0 {
 			return nil, httpErr(apierrors.AiAgentNotFound)
 		}
+		if actorID, ok := middleware.ActorFromContext(ctx); ok {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "ai_agent.update_schedule",
+				ActorID:      actorID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "ai_agent",
+				ResourceID:   agentPub.String(),
+				Metadata:     map[string]any{"scheduleKind": in.Body.ScheduleKind},
+			})
+		}
 		out := &UpdateAgentScheduleOutput{}
 		out.Body.Ok = true
 		return out, nil
@@ -251,6 +262,16 @@ func CreateAgent(deps Deps) func(context.Context, *CreateAgentInput) (*CreateAge
 					raw, insertID)
 			}
 		}
+		if actorID, ok := middleware.ActorFromContext(ctx); ok {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "ai_agent.create",
+				ActorID:      actorID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "ai_agent",
+				ResourceID:   pub.String(),
+				Metadata:     map[string]any{"name": in.Body.Name},
+			})
+		}
 		now := time.Now()
 		out := &CreateAgentOutput{Body: AgentSummary{
 			ID:           pub.String(),
@@ -318,6 +339,15 @@ func UpdateAgentEventTriggers(deps Deps) func(context.Context, *UpdateAgentEvent
 		n, _ := res.RowsAffected()
 		if n == 0 {
 			return nil, httpErr(apierrors.AiAgentNotFound)
+		}
+		if actorID, ok := middleware.ActorFromContext(ctx); ok {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "ai_agent.update_triggers",
+				ActorID:      actorID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "ai_agent",
+				ResourceID:   agentPub.String(),
+			})
 		}
 		out := &UpdateAgentEventTriggersOutput{}
 		out.Body.Ok = true

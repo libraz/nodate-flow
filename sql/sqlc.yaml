@@ -47,3 +47,7 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.provider_id"
             go_struct_tag: 'json:"-"'
+          - column: "*.recipient_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.actor_user_id"
+            go_struct_tag: 'json:"-"'

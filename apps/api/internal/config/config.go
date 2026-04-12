@@ -94,18 +94,18 @@ type Config struct {
 
 	// SessionStore selects the refresh-token session driver.
 	//   mysql (default) — wraps sqlc queries against the sessions table.
-	//   redis           — requires -tags redis and NF_REDIS_ADDR.
+	//   redis           — requires NF_REDIS_ADDR.
 	// Other subsystems (stream notifier, outbound rate limiter) follow
-	// the same env-switch pattern once their Redis drivers are wired.
+	// the same env-switch pattern.
 	SessionStore string `env:"NF_SESSION_STORE" envDefault:"mysql"`
 	// RedisAddr is the host:port for the Redis client shared by the
 	// redis-tagged drivers (sessionstore, stream, outbound).
 	RedisAddr string `env:"NF_REDIS_ADDR" envDefault:""`
 	// StreamBackend selects the SSE fan-out driver: "memory" (default)
-	// or "redis" (requires -tags redis).
+	// or "redis" (requires NF_REDIS_ADDR).
 	StreamBackend string `env:"NF_STREAM_BACKEND" envDefault:"memory"`
 	// OutboundBackend selects the egress rate limiter driver: "memory"
-	// (default) or "redis" (requires -tags redis).
+	// (default) or "redis" (requires NF_REDIS_ADDR).
 	OutboundBackend string `env:"NF_OUTBOUND_BACKEND" envDefault:"memory"`
 
 	// AgentTickInterval is the global period at which the agent

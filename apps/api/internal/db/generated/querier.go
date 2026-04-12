@@ -37,6 +37,8 @@ type Querier interface {
 	AppendInstanceAuditLog(ctx context.Context, arg AppendInstanceAuditLogParams) (int64, error)
 	// Archive a signal by soft-disabling it. The inbox view excludes disabled rows.
 	ArchiveInboxItem(ctx context.Context, arg ArchiveInboxItemParams) error
+	// Archive a single notification.
+	ArchiveNotification(ctx context.Context, arg ArchiveNotificationParams) error
 	// Link an existing signal to a task by public_id.
 	AttachSignalToTask(ctx context.Context, arg AttachSignalToTaskParams) error
 	// Pick the oldest pending run and mark it claimed in the same tx.
@@ -59,6 +61,10 @@ type Querier interface {
 	// within the given time window. Used by the AI metrics endpoint
 	// (2.OBS-1) to compute acceptance rate.
 	CountAiSuggestionOutcomesForWorkspace(ctx context.Context, arg CountAiSuggestionOutcomesForWorkspaceParams) (CountAiSuggestionOutcomesForWorkspaceRow, error)
+	// Count unread notifications for a user across all workspaces.
+	CountUnreadNotifications(ctx context.Context, recipientUserID uint32) (int64, error)
+	// Count unread notifications for a user within a specific workspace.
+	CountUnreadNotificationsForWorkspace(ctx context.Context, arg CountUnreadNotificationsForWorkspaceParams) (int64, error)
 	// Insert a new reusable agent configuration.
 	CreateAgent(ctx context.Context, arg CreateAgentParams) (int64, error)
 	// Insert a new identity row (local password or OIDC binding) for a user.
@@ -67,6 +73,8 @@ type Querier interface {
 	CreateLens(ctx context.Context, arg CreateLensParams) (int64, error)
 	// Insert a new MCP token. Plain token is shown to the user once.
 	CreateMcpToken(ctx context.Context, arg CreateMcpTokenParams) (int64, error)
+	// Create a single notification entry for a recipient.
+	CreateNotification(ctx context.Context, arg CreateNotificationParams) (int64, error)
 	// Insert a short-lived CSRF state row for the personal OAuth flow.
 	CreateOauthState(ctx context.Context, arg CreateOauthStateParams) error
 	// Insert a new personal access token. Plain token is shown to the user once.
@@ -304,6 +312,11 @@ type Querier interface {
 	// GET /me/tasks to power the cross-workspace "Today" / Calendar views in
 	// the web client without fanning out one request per workspace.
 	ListMyTasksGlobal(ctx context.Context, arg ListMyTasksGlobalParams) ([]ListMyTasksGlobalRow, error)
+	// List notifications for a user across all their workspaces, ordered newest first.
+	// Excludes archived and disabled notifications.
+	ListNotificationsForUser(ctx context.Context, arg ListNotificationsForUserParams) ([]ListNotificationsForUserRow, error)
+	// List notifications for a user within a specific workspace.
+	ListNotificationsForWorkspace(ctx context.Context, arg ListNotificationsForWorkspaceParams) ([]ListNotificationsForWorkspaceRow, error)
 	// List every enabled non-paused agent whose event_trigger_types
 	// contains the given event kind. Driven by the eventbus notify hook
 	// so the fan-out from a single eventbus.Append to N agents is one
@@ -370,6 +383,12 @@ type Querier interface {
 	LogMcpInvocation(ctx context.Context, arg LogMcpInvocationParams) (int64, error)
 	// Flip the row to claimed after ClaimNextAgentRun returns it.
 	MarkAgentRunClaimed(ctx context.Context, arg MarkAgentRunClaimedParams) error
+	// Mark all unread notifications as read for a user in a workspace.
+	MarkAllNotificationsRead(ctx context.Context, arg MarkAllNotificationsReadParams) error
+	// Mark a notification as delivered (email/push sent).
+	MarkNotificationDelivered(ctx context.Context, publicID types.PublicID) error
+	// Mark a single notification as read.
+	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) error
 	// Stamp used_at on a recovery code by internal id.
 	MarkRecoveryCodeUsed(ctx context.Context, id uint32) error
 	// Worker failed; park the row with the error message. Retry policy

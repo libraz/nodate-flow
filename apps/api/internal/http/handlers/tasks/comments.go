@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
@@ -48,6 +49,13 @@ func AddComment(deps Deps) func(context.Context, *AddTaskCommentInput) (*AddTask
 				"taskId":    task.PublicID.String(),
 				"commentId": pub.String(),
 			},
+		})
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "comment.create",
+			ActorID:      actorID,
+			WorkspaceID:  ws.ID,
+			ResourceType: "comment",
+			ResourceID:   pub.String(),
 		})
 		return &AddTaskCommentOutput{Body: TaskComment{
 			ID:        pub.String(),
@@ -151,6 +159,13 @@ func EditComment(deps Deps) func(context.Context, *EditTaskCommentInput) (*EditT
 				"commentId": cid.String(),
 			},
 		})
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "comment.update",
+			ActorID:      actorID,
+			WorkspaceID:  ws.ID,
+			ResourceType: "comment",
+			ResourceID:   cid.String(),
+		})
 		return &EditTaskCommentOutput{Body: TaskComment{
 			ID:       cid.String(),
 			Body:     in.Body.Body,
@@ -205,6 +220,13 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteTaskCommentInput) (*D
 				"taskId":    task.PublicID.String(),
 				"commentId": cid.String(),
 			},
+		})
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "comment.delete",
+			ActorID:      actorID,
+			WorkspaceID:  ws.ID,
+			ResourceType: "comment",
+			ResourceID:   cid.String(),
 		})
 		out := &DeleteTaskCommentOutput{}
 		out.Body.Ok = true

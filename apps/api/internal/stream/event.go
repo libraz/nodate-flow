@@ -44,6 +44,10 @@ const (
 	// invalidates the ai-invocations audit list.
 	KindAiInvocationWritten Kind = "ai.invocation.written"
 
+	// KindNotificationChanged fires on any notification-related event.
+	// The frontend invalidates the notification list and unread count.
+	KindNotificationChanged Kind = "notification.changed"
+
 	// KindResync is sent when the server has dropped events for a
 	// slow subscriber. The frontend reacts by invalidating every
 	// workspace-scoped query, which is the safe superset.
@@ -70,6 +74,8 @@ func KindForEventType(eventType string) (Kind, bool) {
 		return KindTaskChanged, true
 	case strings.HasPrefix(eventType, "ai.suggestion."):
 		return KindAiSuggestionChanged, true
+	case strings.HasPrefix(eventType, "notification."):
+		return KindNotificationChanged, true
 	}
 	return "", false
 }

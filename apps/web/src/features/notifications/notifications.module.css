@@ -1,0 +1,207 @@
+.bellWrapper {
+  position: relative;
+}
+
+.badge {
+  position: absolute;
+  inset-block-start: -0.25rem;
+  inset-inline-end: -0.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 1.125rem;
+  block-size: 1.125rem;
+  padding-inline: 0.25rem;
+  border-radius: var(--nf-radius-pill);
+  background: var(--nf-color-danger);
+  color: var(--nf-color-on-danger, #fff);
+  font-family: var(--nf-font-mono);
+  font-size: 0.625rem;
+  font-weight: var(--nf-weight-semibold);
+  line-height: 1;
+  pointer-events: none;
+}
+
+.dropdown {
+  position: absolute;
+  inset-block-start: calc(100% + var(--nf-space-2));
+  inset-inline-end: 0;
+  inline-size: 22rem;
+  max-block-size: 28rem;
+  overflow-y: auto;
+  background: var(--nf-color-bg-elevated);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  box-shadow: var(--nf-shadow-lg);
+  z-index: 50;
+}
+
+.dropdownHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-block: var(--nf-space-3);
+  padding-inline: var(--nf-space-4);
+  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
+}
+
+.dropdownTitle {
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+  margin: 0;
+}
+
+.markAllButton {
+  padding-block: var(--nf-space-1);
+  padding-inline: var(--nf-space-2);
+  font-family: var(--nf-font-sans);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-accent);
+  background: transparent;
+  border: none;
+  border-radius: var(--nf-radius-sm);
+  cursor: pointer;
+}
+
+.markAllButton:hover {
+  background: var(--nf-color-surface-hover);
+}
+
+.markAllButton:focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: var(--nf-focus-ring-offset);
+}
+
+.markAllButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.notifList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.notifItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nf-space-3);
+  padding-block: var(--nf-space-3);
+  padding-inline: var(--nf-space-4);
+  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
+  cursor: pointer;
+}
+
+.notifItem:hover {
+  background: var(--nf-color-surface-hover);
+}
+
+.notifItem:last-child {
+  border-block-end: none;
+}
+
+.unread {
+  background: var(--nf-color-accent-subtle);
+}
+
+.unreadDot {
+  flex-shrink: 0;
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  margin-block-start: 0.375rem;
+  border-radius: var(--nf-radius-pill);
+  background: var(--nf-color-accent);
+}
+
+.readDot {
+  flex-shrink: 0;
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  margin-block-start: 0.375rem;
+  border-radius: var(--nf-radius-pill);
+  background: transparent;
+}
+
+.notifContent {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.notifTitle {
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notifMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  margin-block-start: var(--nf-space-1);
+}
+
+.notifActor {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.notifTime {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.notifActions {
+  display: flex;
+  gap: var(--nf-space-1);
+  flex-shrink: 0;
+  opacity: 0;
+}
+
+.notifItem:hover .notifActions {
+  opacity: 1;
+}
+
+.actionButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  background: transparent;
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-sm);
+  color: var(--nf-color-fg-muted);
+  cursor: pointer;
+}
+
+.actionButton:hover {
+  background: var(--nf-color-surface-hover);
+  color: var(--nf-color-fg);
+}
+
+.actionButton:focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: var(--nf-focus-ring-offset);
+}
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-block: var(--nf-space-8);
+  padding-inline: var(--nf-space-4);
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}

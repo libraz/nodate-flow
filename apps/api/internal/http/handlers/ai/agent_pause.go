@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/eventbus"
@@ -65,6 +66,16 @@ func PauseAgent(deps Deps) func(context.Context, *PauseAgentInput) (*PauseAgentO
 				"paused":  in.Body.Paused,
 			},
 		})
+		if actorID, ok := middleware.ActorFromContext(ctx); ok {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "ai_agent.pause",
+				ActorID:      actorID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "ai_agent",
+				ResourceID:   agentPub.String(),
+				Metadata:     map[string]any{"paused": in.Body.Paused},
+			})
+		}
 		out := &PauseAgentOutput{}
 		out.Body.Ok = true
 		return out, nil

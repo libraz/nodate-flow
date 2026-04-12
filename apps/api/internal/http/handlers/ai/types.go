@@ -19,6 +19,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/nlquery"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
@@ -30,6 +31,8 @@ type Deps struct {
 	Queries  *generated.Queries
 	Cipher   *crypto.Cipher
 	NlQuery  *nlquery.Compiler
+	// Audit records audit log entries. Nil-safe.
+	Audit *audit.Recorder
 }
 
 func httpErr(spec *apierrors.Spec) error {

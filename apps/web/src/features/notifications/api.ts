@@ -1,0 +1,268 @@
+/**
+ * Notifications feature — query key factory, types, and hooks for
+ * notification list, unread count, mark-read, archive, and mark-all-read.
+ *
+ * Types are defined inline because the SDK may not yet include these
+ * endpoints. API calls use raw fetch via the shared base URL and auth
+ * store token.
+ */
+
+import {
+  type UseMutationResult,
+  type UseQueryResult,
+  type UseSuspenseQueryResult,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  useSuspenseQuery,
+} from '@tanstack/react-query';
+
+import { apiBaseUrl } from '../../lib/sdk';
+import { authStore } from '../auth/auth-store';
+
+/** Notification item returned by the API. Timestamps are unix seconds. */
+export interface NotificationItem {
+  id: string;
+  workspaceId: string;
+  actorId: string | null;
+  actorDisplayName: string | null;
+  eventType: string;
+  resourceType: string;
+  resourceId: string | null;
+  title: string;
+  body: string | null;
+  severity: 'low' | 'normal' | 'high' | 'urgent';
+  channel: string;
+  readAt: number | null;
+  deliveredAt: number | null;
+  createdAt: number;
+  total: number;
+}
+
+/** Unread count envelope from the API. */
+interface UnreadCountResponse {
+  unreadCount: number;
+}
+
+/** Query key factory for the notifications feature. */
+export const notificationKeys = {
+  all: ['notifications'] as const,
+  list: () => [...notificationKeys.all, 'list'] as const,
+  unreadCount: () => [...notificationKeys.all, 'unread-count'] as const,
+};
+
+/** Lightweight error thrown when an API call fails. */
+export class NotificationApiError extends Error {
+  readonly code: string | undefined;
+  constructor(code: string | undefined, message: string) {
+    super(message);
+    this.name = 'NotificationApiError';
+    this.code = code;
+  }
+}
+
+function toError(err: unknown, fallback: string): NotificationApiError {
+  if (err && typeof err === 'object') {
+    const obj = err as { detail?: unknown; title?: unknown; type?: unknown };
+    const message =
+      (typeof obj.detail === 'string' && obj.detail) ||
+      (typeof obj.title === 'string' && obj.title) ||
+      fallback;
+    const code = typeof obj.type === 'string' ? obj.type : undefined;
+    return new NotificationApiError(code, message);
+  }
+  return new NotificationApiError(undefined, fallback);
+}
+
+function authHeaders(): HeadersInit {
+  const token = authStore.getState().accessToken;
+  // biome-ignore lint/style/useNamingConvention: HTTP header name
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    ...init,
+    credentials: 'include',
+    headers: {
+      ...authHeaders(),
+      ...init?.headers,
+    },
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as unknown;
+    throw toError(body, `Request failed with status ${String(res.status)}`);
+  }
+  return (await res.json()) as T;
+}
+
+/** GET /me/notifications — suspense query for the notification list. */
+export function useNotificationsQuery(): UseSuspenseQueryResult<NotificationItem[]> {
+  return useSuspenseQuery({
+    queryKey: notificationKeys.list(),
+    queryFn: async (): Promise<NotificationItem[]> => {
+      const data = await fetchJson<{ items?: NotificationItem[] }>(
+        `${apiBaseUrl}/me/notifications?limit=50`,
+      );
+      return data.items ?? [];
+    },
+  });
+}
+
+/**
+ * GET /me/notifications/unread-count — non-suspense query for the
+ * badge count. Polls every 30 seconds as a fallback for missed SSE
+ * events.
+ */
+export function useUnreadCountQuery(): UseQueryResult<number> {
+  return useQuery({
+    queryKey: notificationKeys.unreadCount(),
+    queryFn: async (): Promise<number> => {
+      const data = await fetchJson<UnreadCountResponse>(
+        `${apiBaseUrl}/me/notifications/unread-count`,
+      );
+      return data.unreadCount;
+    },
+    refetchInterval: 30_000,
+  });
+}
+
+/** POST /notifications/{id}/read — optimistic mark-read. */
+export function useMarkNotificationRead(): UseMutationResult<void, NotificationApiError, string> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string): Promise<void> => {
+      await fetchJson<unknown>(`${apiBaseUrl}/notifications/${id}/read`, {
+        method: 'POST',
+      });
+    },
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: notificationKeys.list() });
+      await qc.cancelQueries({ queryKey: notificationKeys.unreadCount() });
+
+      const prevList = qc.getQueryData<NotificationItem[]>(notificationKeys.list());
+      const prevCount = qc.getQueryData<number>(notificationKeys.unreadCount());
+
+      if (prevList) {
+        const now = Math.floor(Date.now() / 1000);
+        qc.setQueryData(
+          notificationKeys.list(),
+          prevList.map((item) => (item.id === id ? { ...item, readAt: now } : item)),
+        );
+      }
+      if (prevCount !== undefined && prevCount > 0) {
+        qc.setQueryData(notificationKeys.unreadCount(), prevCount - 1);
+      }
+
+      return { prevList, prevCount };
+    },
+    onError: (_err, _id, ctx) => {
+      const snap = ctx as { prevList?: NotificationItem[]; prevCount?: number } | undefined;
+      if (!snap) return;
+      if (snap.prevList !== undefined) {
+        qc.setQueryData(notificationKeys.list(), snap.prevList);
+      }
+      if (snap.prevCount !== undefined) {
+        qc.setQueryData(notificationKeys.unreadCount(), snap.prevCount);
+      }
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: notificationKeys.list() });
+      void qc.invalidateQueries({ queryKey: notificationKeys.unreadCount() });
+    },
+  });
+}
+
+/** POST /notifications/{id}/archive — optimistic removal. */
+export function useArchiveNotification(): UseMutationResult<void, NotificationApiError, string> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string): Promise<void> => {
+      await fetchJson<unknown>(`${apiBaseUrl}/notifications/${id}/archive`, {
+        method: 'POST',
+      });
+    },
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: notificationKeys.list() });
+      await qc.cancelQueries({ queryKey: notificationKeys.unreadCount() });
+
+      const prevList = qc.getQueryData<NotificationItem[]>(notificationKeys.list());
+      const prevCount = qc.getQueryData<number>(notificationKeys.unreadCount());
+
+      if (prevList) {
+        const removed = prevList.find((item) => item.id === id);
+        qc.setQueryData(
+          notificationKeys.list(),
+          prevList.filter((item) => item.id !== id),
+        );
+        // Decrement unread count if the archived item was unread
+        if (removed && removed.readAt === null && prevCount !== undefined && prevCount > 0) {
+          qc.setQueryData(notificationKeys.unreadCount(), prevCount - 1);
+        }
+      }
+
+      return { prevList, prevCount };
+    },
+    onError: (_err, _id, ctx) => {
+      const snap = ctx as { prevList?: NotificationItem[]; prevCount?: number } | undefined;
+      if (!snap) return;
+      if (snap.prevList !== undefined) {
+        qc.setQueryData(notificationKeys.list(), snap.prevList);
+      }
+      if (snap.prevCount !== undefined) {
+        qc.setQueryData(notificationKeys.unreadCount(), snap.prevCount);
+      }
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: notificationKeys.list() });
+      void qc.invalidateQueries({ queryKey: notificationKeys.unreadCount() });
+    },
+  });
+}
+
+/** POST /workspaces/{wsId}/notifications/read-all — marks all read. */
+export function useMarkAllRead(
+  wsId: string | null,
+): UseMutationResult<void, NotificationApiError, void> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (): Promise<void> => {
+      if (!wsId) throw new NotificationApiError(undefined, 'No workspace selected');
+      await fetchJson<unknown>(`${apiBaseUrl}/workspaces/${wsId}/notifications/read-all`, {
+        method: 'POST',
+      });
+    },
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: notificationKeys.list() });
+      await qc.cancelQueries({ queryKey: notificationKeys.unreadCount() });
+
+      const prevList = qc.getQueryData<NotificationItem[]>(notificationKeys.list());
+      const prevCount = qc.getQueryData<number>(notificationKeys.unreadCount());
+
+      if (prevList) {
+        const now = Math.floor(Date.now() / 1000);
+        qc.setQueryData(
+          notificationKeys.list(),
+          prevList.map((item) => (item.readAt === null ? { ...item, readAt: now } : item)),
+        );
+      }
+      qc.setQueryData(notificationKeys.unreadCount(), 0);
+
+      return { prevList, prevCount };
+    },
+    onError: (_err, _vars, ctx) => {
+      const snap = ctx as { prevList?: NotificationItem[]; prevCount?: number } | undefined;
+      if (!snap) return;
+      if (snap.prevList !== undefined) {
+        qc.setQueryData(notificationKeys.list(), snap.prevList);
+      }
+      if (snap.prevCount !== undefined) {
+        qc.setQueryData(notificationKeys.unreadCount(), snap.prevCount);
+      }
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: notificationKeys.list() });
+      void qc.invalidateQueries({ queryKey: notificationKeys.unreadCount() });
+    },
+  });
+}

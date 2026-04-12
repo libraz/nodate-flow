@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
@@ -72,6 +73,17 @@ func CreateProvider(deps Deps) func(context.Context, *CreateProviderInput) (*Cre
 				slog.String("apiKeyPrefix", prefix),
 			)
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
+		if actorID, ok := middleware.ActorFromContext(ctx); ok {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "ai_provider.create",
+				ActorID:      actorID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "ai_provider",
+				ResourceID:   pub.String(),
+				Metadata:     map[string]any{"kind": in.Body.Kind, "name": in.Body.Name},
+			})
 		}
 
 		out := &CreateProviderOutput{Body: Provider{
@@ -162,6 +174,15 @@ func PatchProvider(deps Deps) func(context.Context, *PatchProviderInput) (*Patch
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		if actorID, ok := middleware.ActorFromContext(ctx); ok {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "ai_provider.update",
+				ActorID:      actorID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "ai_provider",
+				ResourceID:   pub.String(),
+			})
+		}
 		out := &PatchProviderOutput{}
 		out.Body.Ok = true
 		return out, nil
@@ -184,6 +205,15 @@ func DeleteProvider(deps Deps) func(context.Context, *DeleteProviderInput) (*Del
 			PublicID:    pub,
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if actorID, ok := middleware.ActorFromContext(ctx); ok {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "ai_provider.delete",
+				ActorID:      actorID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "ai_provider",
+				ResourceID:   pub.String(),
+			})
 		}
 		out := &DeleteProviderOutput{}
 		out.Body.Ok = true

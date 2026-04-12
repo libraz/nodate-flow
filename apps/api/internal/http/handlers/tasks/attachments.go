@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
@@ -53,6 +54,14 @@ func AddAttachment(deps Deps) func(context.Context, *AddTaskAttachmentInput) (*A
 				"attachmentId": pub.String(),
 				"filename":     in.Body.Filename,
 			},
+		})
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "attachment.create",
+			ActorID:      actorID,
+			WorkspaceID:  ws.ID,
+			ResourceType: "attachment",
+			ResourceID:   pub.String(),
+			Metadata:     map[string]any{"filename": in.Body.Filename},
 		})
 		return &AddTaskAttachmentOutput{Body: TaskAttachment{
 			ID:          pub.String(),
@@ -133,6 +142,15 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteTaskAttachmentInpu
 				"attachmentId": aid.String(),
 			},
 		})
+		if actorID, ok := middleware.ActorFromContext(ctx); ok {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "attachment.delete",
+				ActorID:      actorID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "attachment",
+				ResourceID:   aid.String(),
+			})
+		}
 		out := &DeleteTaskAttachmentOutput{}
 		out.Body.Ok = true
 		return out, nil

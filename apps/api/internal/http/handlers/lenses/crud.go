@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
@@ -64,6 +65,15 @@ func Create(deps Deps) func(context.Context, *CreateLensInput) (*CreateLensOutpu
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "lens.create",
+			ActorID:      actorID,
+			WorkspaceID:  ws.ID,
+			ResourceType: "lens",
+			ResourceID:   pub.String(),
+			Metadata:     map[string]any{"name": in.Body.Name},
+		})
 
 		return &CreateLensOutput{Body: SavedLens{
 			ID:        pub.String(),
@@ -220,6 +230,16 @@ func Update(deps Deps) func(context.Context, *UpdateLensInput) (*UpdateLensOutpu
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
+		if actorID, ok := middleware.ActorFromContext(ctx); ok {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "lens.update",
+				ActorID:      actorID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "lens",
+				ResourceID:   existing.PublicID.String(),
+			})
+		}
+
 		return &UpdateLensOutput{Body: SavedLens{
 			ID:                 existing.PublicID.String(),
 			CreatorID:          existing.CreatorPublicID.String(),
@@ -253,6 +273,17 @@ func Delete(deps Deps) func(context.Context, *DeleteLensInput) (*DeleteLensOutpu
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+
+		if actorID, ok := middleware.ActorFromContext(ctx); ok {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "lens.delete",
+				ActorID:      actorID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "lens",
+				ResourceID:   lid.String(),
+			})
+		}
+
 		out := &DeleteLensOutput{}
 		out.Body.Ok = true
 		return out, nil

@@ -119,6 +119,16 @@ resources:
         description: "Returned when the target user is not a member of the workspace."
         userAction: "Invite the user to the workspace first."
 
+  notification:
+    breadcrumb: "Workspace > Notification"
+    errors:
+      not_found:
+        code: WS.NOTIFICATION.NOT_FOUND
+        status: 404
+        message: "Notification not found"
+        description: "Returned when a notification with the given public_id does not exist or belongs to another user."
+        userAction: "Verify the notification ID."
+
   lens:
     breadcrumb: "Workspace > Lens"
     errors:

@@ -30,7 +30,7 @@ type AppendEventParams struct {
 	PublicID    types.PublicID  `json:"publicId"`
 	WorkspaceID uint32          `json:"-"`
 	TaskID      sql.NullInt32   `json:"-"`
-	ActorUserID sql.NullInt32   `json:"actorUserId"`
+	ActorUserID sql.NullInt32   `json:"-"`
 	Type        string          `json:"type"`
 	PayloadJson json.RawMessage `json:"payloadJson"`
 	OccurredAt  time.Time       `json:"occurredAt"`

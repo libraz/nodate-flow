@@ -32,7 +32,7 @@ INSERT INTO audit_logs (
 type AppendAuditLogParams struct {
 	PublicID         types.PublicID  `json:"publicId"`
 	WorkspaceID      uint32          `json:"-"`
-	ActorUserID      sql.NullInt32   `json:"actorUserId"`
+	ActorUserID      sql.NullInt32   `json:"-"`
 	Action           string          `json:"action"`
 	ResourceType     string          `json:"resourceType"`
 	ResourcePublicID sql.NullString  `json:"resourcePublicId"`
@@ -79,7 +79,7 @@ INSERT INTO instance_audit_logs (
 
 type AppendInstanceAuditLogParams struct {
 	PublicID               types.PublicID  `json:"publicId"`
-	ActorUserID            sql.NullInt32   `json:"actorUserId"`
+	ActorUserID            sql.NullInt32   `json:"-"`
 	Action                 string          `json:"action"`
 	TargetWorkspaceID      sql.NullInt32   `json:"targetWorkspaceId"`
 	TargetResourceType     sql.NullString  `json:"targetResourceType"`

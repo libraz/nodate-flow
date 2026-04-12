@@ -260,6 +260,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List notifications for the caller */
+        get: operations["notifications-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/notifications/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Count unread notifications for the caller */
+        get: operations["notifications-unread-count"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/password": {
         parameters: {
             query?: never;
@@ -393,6 +427,40 @@ export interface paths {
         put?: never;
         /** Regenerate TOTP recovery codes after password reverification */
         post: operations["me-totp-recovery-regenerate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/{notifId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive a notification */
+        post: operations["notifications-archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/{notifId}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark a notification as read */
+        post: operations["notifications-mark-read"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1460,6 +1528,23 @@ export interface paths {
         patch: operations["workspaces-members-update-role"];
         trace?: never;
     };
+    "/workspaces/{wsId}/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark all notifications as read in a workspace */
+        post: operations["notifications-mark-all-read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{wsId}/projects": {
         parameters: {
             query?: never;
@@ -1698,6 +1783,14 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        ArchiveOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
         AuthTokens: {
             /**
              * Format: uri
@@ -1800,6 +1893,15 @@ export interface components {
             /** @enum {string} */
             provider: "github" | "slack" | "google_calendar";
             scopes: string;
+        };
+        CountUnreadOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            unreadCount: number;
         };
         CreateAgentInputBody: {
             /**
@@ -2276,6 +2378,17 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ListOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            nextCursor: string | null;
+            notifications: components["schemas"]["NotificationDTO"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
         ListPrioritySuggestionsOutputBody: {
             /**
              * Format: uri
@@ -2513,6 +2626,22 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        MarkAllReadOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        MarkReadOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
         McpTokenSummary: {
             agentId?: string;
             /** Format: int64 */
@@ -2570,6 +2699,25 @@ export interface components {
             updatedAt?: string;
             workspaceId: string;
             workspaceName: string;
+        };
+        NotificationDTO: {
+            actorDisplayName?: string;
+            actorId?: string;
+            body?: string;
+            channel: string;
+            /** Format: int64 */
+            createdAt: number;
+            /** Format: int64 */
+            deliveredAt: number | null;
+            eventType: string;
+            id: string;
+            /** Format: int64 */
+            readAt: number | null;
+            resourceId?: string;
+            resourceType: string;
+            severity: string;
+            title: string;
+            workspaceId: string;
         };
         OIDCStartOutputBody: {
             /**
@@ -3998,6 +4146,72 @@ export interface operations {
             };
         };
     };
+    "notifications-list": {
+        parameters: {
+            query?: {
+                /** @description Optional workspace public id to filter by */
+                workspaceId?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "notifications-unread-count": {
+        parameters: {
+            query?: {
+                /** @description Optional workspace public id to filter by */
+                workspaceId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CountUnreadOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "me-password-change": {
         parameters: {
             query?: never;
@@ -4332,6 +4546,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TotpRegenerateRecoveryCodesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "notifications-archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Notification public id (UUID v7) */
+                notifId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArchiveOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "notifications-mark-read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Notification public id (UUID v7) */
+                notifId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarkReadOutputBody"];
                 };
             };
             /** @description Error */
@@ -7178,6 +7456,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkspaceMember"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "notifications-mark-all-read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public id (UUID v7) */
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarkAllReadOutputBody"];
                 };
             };
             /** @description Error */

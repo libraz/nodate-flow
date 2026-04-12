@@ -3,6 +3,7 @@ package projects
 import (
 	"context"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
@@ -26,6 +27,17 @@ func Disable(deps Deps) func(context.Context, *DisableProjectInput) (*DisablePro
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+
+		if actorID, ok := middleware.ActorFromContext(ctx); ok {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "project.delete",
+				ActorID:      actorID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "project",
+				ResourceID:   prj.PublicID.String(),
+			})
+		}
+
 		out := &DisableProjectOutput{}
 		out.Body.Ok = true
 		return out, nil

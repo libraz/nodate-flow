@@ -1,0 +1,26 @@
+{
+  "view": {
+    "title": "通知",
+    "empty": "通知はありません",
+    "mark_all_read": "すべて既読にする"
+  },
+  "action": {
+    "mark_read": "既読にする",
+    "archive": "アーカイブ"
+  },
+  "severity": {
+    "low": "低",
+    "normal": "通常",
+    "high": "高",
+    "urgent": "緊急"
+  },
+  "badge": {
+    "unread": "{{count}}件の未読"
+  },
+  "toast": {
+    "marked_read": "既読にしました",
+    "all_marked_read": "すべての通知を既読にしました",
+    "archived": "通知をアーカイブしました",
+    "error": "操作に失敗しました"
+  }
+}
