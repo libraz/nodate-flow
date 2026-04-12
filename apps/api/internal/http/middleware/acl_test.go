@@ -101,3 +101,54 @@ func TestProjectFromContext(t *testing.T) {
 		t.Fatalf("unexpected prj=%+v ok=%v", prj, ok)
 	}
 }
+
+func TestTaskVisibilityFilterAdmin(t *testing.T) {
+	t.Parallel()
+	frag, args := TaskVisibilityFilter(1, WorkspaceRoleAdmin)
+	if frag != "" {
+		t.Fatalf("expected empty fragment for admin, got %q", frag)
+	}
+	if len(args) != 0 {
+		t.Fatalf("expected no args for admin, got %v", args)
+	}
+}
+
+func TestTaskVisibilityFilterOwner(t *testing.T) {
+	t.Parallel()
+	frag, args := TaskVisibilityFilter(1, WorkspaceRoleOwner)
+	if frag != "" {
+		t.Fatalf("expected empty fragment for owner, got %q", frag)
+	}
+	if len(args) != 0 {
+		t.Fatalf("expected no args for owner, got %v", args)
+	}
+}
+
+func TestTaskVisibilityFilterMember(t *testing.T) {
+	t.Parallel()
+	frag, args := TaskVisibilityFilter(42, WorkspaceRoleMember)
+	if frag == "" {
+		t.Fatal("expected non-empty fragment for member")
+	}
+	if len(args) != 3 {
+		t.Fatalf("expected 3 args for member, got %d: %v", len(args), args)
+	}
+	// All three args should be the userID.
+	for i, a := range args {
+		uid, ok := a.(uint32)
+		if !ok || uid != 42 {
+			t.Fatalf("args[%d]=%v want uint32(42)", i, a)
+		}
+	}
+}
+
+func TestTaskVisibilityFilterGuest(t *testing.T) {
+	t.Parallel()
+	frag, args := TaskVisibilityFilter(99, WorkspaceRoleGuest)
+	if frag == "" {
+		t.Fatal("expected non-empty fragment for guest")
+	}
+	if len(args) != 3 {
+		t.Fatalf("expected 3 args for guest, got %d", len(args))
+	}
+}
