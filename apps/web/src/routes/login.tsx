@@ -1,23 +1,23 @@
 /**
- * /login — public page. Redirects to / when already authenticated.
+ * /login -- public page. Redirects to / when already authenticated.
  *
- * TODO(f3): switch to React Hook Form + @hookform/resolvers/zod once
- * those packages are added to apps/web. They are not currently in
- * package.json; the agent that wrote F3 cannot run `bun add`. Native
- * useState + zod safeParse is used in the meantime; the component
- * surface (FormField + Input + Button) is unchanged.
+ * Uses React Hook Form + Zod for client-side validation. The TOTP
+ * challenge step remains useState-based because it is a secondary
+ * step triggered by the server, not a user-filled form.
  */
 
+import { zodResolver } from '@hookform/resolvers/zod';
 import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { z } from 'zod';
 
 import AuthCard from '../components/auth/auth-card';
 import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../features/auth/auth-errors';
+import { type LoginFormValues, loginSchema } from '../features/auth/auth-schemas';
 import {
   type AuthUser,
   authStore,
@@ -26,81 +26,32 @@ import {
 } from '../features/auth/auth-store';
 import { sdk } from '../lib/sdk';
 
-interface FormErrors {
-  email?: string;
-  password?: string;
-}
-
-function buildSchema() {
-  return z.object({
-    email: z
-      .string()
-      .min(1, 'auth.validation.email_required')
-      .email('auth.validation.email_invalid'),
-    password: z.string().min(8, 'auth.validation.password_min'),
-  });
-}
-
 function LoginPage(): ReactElement {
   const { t } = useTranslation('common');
   const navigate = useNavigate();
   const isAuthenticated = useAuth(selectIsAuthenticated);
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState<FormErrors>({});
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: '', password: '' },
+  });
+
   const [serverError, setServerError] = useState<AuthErrorI18nKey | null>(null);
-  const [submitting, setSubmitting] = useState(false);
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
   const [totpCode, setTotpCode] = useState('');
   const [useRecovery, setUseRecovery] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState('');
+  const [totpSubmitting, setTotpSubmitting] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
       void navigate({ to: '/', replace: true });
     }
   }, [isAuthenticated, navigate]);
-
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
-    e.preventDefault();
-    setServerError(null);
-    const parsed = buildSchema().safeParse({ email, password });
-    if (!parsed.success) {
-      const next: FormErrors = {};
-      for (const issue of parsed.error.issues) {
-        const field = issue.path[0];
-        if (field === 'email') next.email = issue.message;
-        if (field === 'password') next.password = issue.message;
-      }
-      setErrors(next);
-      return;
-    }
-    setErrors({});
-    setSubmitting(true);
-    try {
-      const { data, error } = await sdk.POST('/auth/login', {
-        body: { email: parsed.data.email, password: parsed.data.password },
-      });
-      if (error || !data) {
-        setServerError(mapAuthError(error ?? null));
-        return;
-      }
-      if (data.step === 'totp_required') {
-        setChallengeToken(data.challengeToken ?? '');
-        return;
-      }
-      if (!data.accessToken) {
-        setServerError('auth.errors.generic');
-        return;
-      }
-      await completeSignIn(data.accessToken);
-    } catch (err) {
-      setServerError(mapAuthThrown(err));
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const completeSignIn = async (accessToken: string): Promise<void> => {
     authStore.getState().setAccessToken(accessToken);
@@ -120,12 +71,36 @@ function LoginPage(): ReactElement {
     void navigate({ to: '/', replace: true });
   };
 
+  const onSubmit = async (values: LoginFormValues): Promise<void> => {
+    setServerError(null);
+    try {
+      const { data, error } = await sdk.POST('/auth/login', {
+        body: { email: values.email, password: values.password },
+      });
+      if (error || !data) {
+        setServerError(mapAuthError(error ?? null));
+        return;
+      }
+      if (data.step === 'totp_required') {
+        setChallengeToken(data.challengeToken ?? '');
+        return;
+      }
+      if (!data.accessToken) {
+        setServerError('auth.errors.generic');
+        return;
+      }
+      await completeSignIn(data.accessToken);
+    } catch (err) {
+      setServerError(mapAuthThrown(err));
+    }
+  };
+
   const handleTotpSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     setServerError(null);
     if (challengeToken == null) return;
     if (useRecovery ? recoveryCode.trim().length < 10 : totpCode.length !== 6) return;
-    setSubmitting(true);
+    setTotpSubmitting(true);
     try {
       const { data, error } = await sdk.POST('/auth/login/totp', {
         body: useRecovery
@@ -140,7 +115,7 @@ function LoginPage(): ReactElement {
     } catch (err) {
       setServerError(mapAuthThrown(err));
     } finally {
-      setSubmitting(false);
+      setTotpSubmitting(false);
     }
   };
 
@@ -219,7 +194,7 @@ function LoginPage(): ReactElement {
               setUseRecovery((v) => !v);
               setServerError(null);
             }}
-            disabled={submitting}
+            disabled={totpSubmitting}
           >
             {useRecovery ? t('auth.login.totp_use_code') : t('auth.login.totp_use_recovery')}
           </Button>
@@ -239,12 +214,18 @@ function LoginPage(): ReactElement {
             type="submit"
             variant="primary"
             disabled={
-              submitting || (useRecovery ? recoveryCode.trim().length < 10 : totpCode.length !== 6)
+              totpSubmitting ||
+              (useRecovery ? recoveryCode.trim().length < 10 : totpCode.length !== 6)
             }
           >
             {useRecovery ? t('auth.login.recovery_submit') : t('auth.login.totp_submit')}
           </Button>
-          <Button type="button" variant="ghost" onClick={handleCancelTotp} disabled={submitting}>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handleCancelTotp}
+            disabled={totpSubmitting}
+          >
             {t('auth.login.totp_cancel')}
           </Button>
         </form>
@@ -256,7 +237,7 @@ function LoginPage(): ReactElement {
     <AuthCard>
       <form
         onSubmit={(e) => {
-          void handleSubmit(e);
+          void handleSubmit(onSubmit)(e);
         }}
         noValidate
         style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5, 1.5rem)' }}
@@ -274,38 +255,40 @@ function LoginPage(): ReactElement {
         <FormField
           label={t('auth.login.email')}
           required
-          {...(errors.email ? { error: t(errors.email) } : {})}
+          {...(errors.email?.message ? { error: t(errors.email.message) } : {})}
         >
-          {(control) => (
-            <Input
-              {...control}
-              type="email"
-              autoComplete="email"
-              autoFocus
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-              }}
-            />
-          )}
+          {(control) => {
+            const { ref, ...field } = register('email');
+            return (
+              <Input
+                {...control}
+                {...field}
+                ref={ref}
+                type="email"
+                autoComplete="email"
+                autoFocus
+              />
+            );
+          }}
         </FormField>
 
         <FormField
           label={t('auth.login.password')}
           required
-          {...(errors.password ? { error: t(errors.password) } : {})}
+          {...(errors.password?.message ? { error: t(errors.password.message) } : {})}
         >
-          {(control) => (
-            <Input
-              {...control}
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-              }}
-            />
-          )}
+          {(control) => {
+            const { ref, ...field } = register('password');
+            return (
+              <Input
+                {...control}
+                {...field}
+                ref={ref}
+                type="password"
+                autoComplete="current-password"
+              />
+            );
+          }}
         </FormField>
 
         {serverError ? (
@@ -321,8 +304,8 @@ function LoginPage(): ReactElement {
           </p>
         ) : null}
 
-        <Button type="submit" variant="primary" disabled={submitting}>
-          {submitting ? t('auth.login.submitting') : t('auth.login.submit')}
+        <Button type="submit" variant="primary" disabled={isSubmitting}>
+          {isSubmitting ? t('auth.login.submitting') : t('auth.login.submit')}
         </Button>
 
         <p

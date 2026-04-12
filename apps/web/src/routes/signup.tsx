@@ -1,23 +1,23 @@
 /**
- * /signup — public registration page. Posts to POST /auth/register.
+ * /signup -- public registration page. Posts to POST /auth/register.
  *
- * Note: the backend field is `displayName` (not `name`); the form label
- * uses `auth.signup.name` for brevity but binds to displayName.
- *
- * TODO(f3): switch to React Hook Form + zod resolver once those packages
- * are added to apps/web (see login.tsx).
+ * Uses React Hook Form + Zod for client-side validation. The backend
+ * field is `displayName` (not `name`); the form label uses
+ * `auth.signup.name` for brevity but binds to displayName.
  */
 
+import { zodResolver } from '@hookform/resolvers/zod';
 import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router';
-import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
+import { type ReactElement, useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { z } from 'zod';
 
 import AuthCard from '../components/auth/auth-card';
 import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../features/auth/auth-errors';
+import { type SignupFormValues, signupSchema } from '../features/auth/auth-schemas';
 import {
   type AuthUser,
   authStore,
@@ -26,34 +26,21 @@ import {
 } from '../features/auth/auth-store';
 import { sdk } from '../lib/sdk';
 
-interface FormErrors {
-  email?: string;
-  password?: string;
-  displayName?: string;
-}
-
-function buildSchema() {
-  return z.object({
-    email: z
-      .string()
-      .min(1, 'auth.validation.email_required')
-      .email('auth.validation.email_invalid'),
-    password: z.string().min(8, 'auth.validation.password_min'),
-    displayName: z.string().min(1, 'auth.validation.name_required'),
-  });
-}
-
 function SignupPage(): ReactElement {
   const { t } = useTranslation('common');
   const navigate = useNavigate();
   const isAuthenticated = useAuth(selectIsAuthenticated);
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [errors, setErrors] = useState<FormErrors>({});
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<SignupFormValues>({
+    resolver: zodResolver(signupSchema),
+    defaultValues: { email: '', password: '', displayName: '' },
+  });
+
   const [serverError, setServerError] = useState<AuthErrorI18nKey | null>(null);
-  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -61,29 +48,14 @@ function SignupPage(): ReactElement {
     }
   }, [isAuthenticated, navigate]);
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
-    e.preventDefault();
+  const onSubmit = async (values: SignupFormValues): Promise<void> => {
     setServerError(null);
-    const parsed = buildSchema().safeParse({ email, password, displayName });
-    if (!parsed.success) {
-      const next: FormErrors = {};
-      for (const issue of parsed.error.issues) {
-        const field = issue.path[0];
-        if (field === 'email') next.email = issue.message;
-        if (field === 'password') next.password = issue.message;
-        if (field === 'displayName') next.displayName = issue.message;
-      }
-      setErrors(next);
-      return;
-    }
-    setErrors({});
-    setSubmitting(true);
     try {
       const { data, error } = await sdk.POST('/auth/register', {
         body: {
-          email: parsed.data.email,
-          password: parsed.data.password,
-          displayName: parsed.data.displayName,
+          email: values.email,
+          password: values.password,
+          displayName: values.displayName,
         },
       });
       if (error || !data) {
@@ -107,8 +79,6 @@ function SignupPage(): ReactElement {
       void navigate({ to: '/', replace: true });
     } catch (err) {
       setServerError(mapAuthThrown(err));
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -116,7 +86,7 @@ function SignupPage(): ReactElement {
     <AuthCard>
       <form
         onSubmit={(e) => {
-          void handleSubmit(e);
+          void handleSubmit(onSubmit)(e);
         }}
         noValidate
         style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5, 1.5rem)' }}
@@ -134,56 +104,44 @@ function SignupPage(): ReactElement {
         <FormField
           label={t('auth.signup.name')}
           required
-          {...(errors.displayName ? { error: t(errors.displayName) } : {})}
+          {...(errors.displayName?.message ? { error: t(errors.displayName.message) } : {})}
         >
-          {(control) => (
-            <Input
-              {...control}
-              type="text"
-              autoComplete="name"
-              autoFocus
-              value={displayName}
-              onChange={(e) => {
-                setDisplayName(e.target.value);
-              }}
-            />
-          )}
+          {(control) => {
+            const { ref, ...field } = register('displayName');
+            return (
+              <Input {...control} {...field} ref={ref} type="text" autoComplete="name" autoFocus />
+            );
+          }}
         </FormField>
 
         <FormField
           label={t('auth.login.email')}
           required
-          {...(errors.email ? { error: t(errors.email) } : {})}
+          {...(errors.email?.message ? { error: t(errors.email.message) } : {})}
         >
-          {(control) => (
-            <Input
-              {...control}
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-              }}
-            />
-          )}
+          {(control) => {
+            const { ref, ...field } = register('email');
+            return <Input {...control} {...field} ref={ref} type="email" autoComplete="email" />;
+          }}
         </FormField>
 
         <FormField
           label={t('auth.login.password')}
           required
-          {...(errors.password ? { error: t(errors.password) } : {})}
+          {...(errors.password?.message ? { error: t(errors.password.message) } : {})}
         >
-          {(control) => (
-            <Input
-              {...control}
-              type="password"
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-              }}
-            />
-          )}
+          {(control) => {
+            const { ref, ...field } = register('password');
+            return (
+              <Input
+                {...control}
+                {...field}
+                ref={ref}
+                type="password"
+                autoComplete="new-password"
+              />
+            );
+          }}
         </FormField>
 
         {serverError ? (
@@ -199,8 +157,8 @@ function SignupPage(): ReactElement {
           </p>
         ) : null}
 
-        <Button type="submit" variant="primary" disabled={submitting}>
-          {submitting ? t('auth.signup.submitting') : t('auth.signup.submit')}
+        <Button type="submit" variant="primary" disabled={isSubmitting}>
+          {isSubmitting ? t('auth.signup.submitting') : t('auth.signup.submit')}
         </Button>
 
         <p
