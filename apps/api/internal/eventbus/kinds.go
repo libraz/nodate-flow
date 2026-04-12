@@ -162,6 +162,26 @@ const (
 	LensUnshared Kind = "lens.unshared"
 )
 
+// Page lifecycle events.
+const (
+	// PageCreated is appended when a new page is created.
+	PageCreated Kind = "page.created"
+	// PageUpdated is appended when a page is edited.
+	PageUpdated Kind = "page.updated"
+	// PageDisabled is appended when a page is soft-disabled (DELETE).
+	PageDisabled Kind = "page.disabled"
+)
+
+// Dashboard widget lifecycle events.
+const (
+	// DashboardWidgetCreated is appended when a new dashboard widget is created.
+	DashboardWidgetCreated Kind = "dashboard.widget.created"
+	// DashboardWidgetUpdated is appended when a dashboard widget is edited.
+	DashboardWidgetUpdated Kind = "dashboard.widget.updated"
+	// DashboardWidgetDisabled is appended when a dashboard widget is soft-disabled (DELETE).
+	DashboardWidgetDisabled Kind = "dashboard.widget.disabled"
+)
+
 // Export events.
 const (
 	// ExportRequested is appended when a user requests an export.

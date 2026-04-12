@@ -6,8 +6,10 @@ import enAiSuggestions from '../../locales/en/ai-suggestions.json';
 import enAi from '../../locales/en/ai.json';
 import enCommon from '../../locales/en/common.json';
 import enConstraints from '../../locales/en/constraints.json';
+import enDashboard from '../../locales/en/dashboard.json';
 import enErrors from '../../locales/en/errors.json';
 import enInbox from '../../locales/en/inbox.json';
+import enPages from '../../locales/en/pages.json';
 import enRelations from '../../locales/en/relations.json';
 import enSettings from '../../locales/en/settings.json';
 import enTimeline from '../../locales/en/timeline.json';
@@ -15,8 +17,10 @@ import jaAiSuggestions from '../../locales/ja/ai-suggestions.json';
 import jaAi from '../../locales/ja/ai.json';
 import jaCommon from '../../locales/ja/common.json';
 import jaConstraints from '../../locales/ja/constraints.json';
+import jaDashboard from '../../locales/ja/dashboard.json';
 import jaErrors from '../../locales/ja/errors.json';
 import jaInbox from '../../locales/ja/inbox.json';
+import jaPages from '../../locales/ja/pages.json';
 import jaRelations from '../../locales/ja/relations.json';
 import jaSettings from '../../locales/ja/settings.json';
 import jaTimeline from '../../locales/ja/timeline.json';
@@ -65,6 +69,8 @@ export function initI18n(): typeof i18n {
         'constraints',
         'errors',
         'relations',
+        'dashboard',
+        'pages',
       ],
       resources: {
         en: {
@@ -77,6 +83,8 @@ export function initI18n(): typeof i18n {
           constraints: enConstraints,
           errors: enErrors,
           relations: enRelations,
+          dashboard: enDashboard,
+          pages: enPages,
         },
         ja: {
           common: jaCommon,
@@ -88,6 +96,8 @@ export function initI18n(): typeof i18n {
           constraints: jaConstraints,
           errors: jaErrors,
           relations: jaRelations,
+          dashboard: jaDashboard,
+          pages: jaPages,
         },
       },
       interpolation: { escapeValue: false },

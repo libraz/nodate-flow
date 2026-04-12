@@ -1,0 +1,175 @@
+-- name: CreatePage :execlastid
+-- Insert a new wiki/documentation page.
+INSERT INTO pages (
+  public_id,
+  workspace_id,
+  project_id,
+  creator_id,
+  parent_page_id,
+  title,
+  body,
+  is_ai_generated
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: ListPagesForWorkspace :many
+-- List enabled root pages (no parent) for a workspace with creator info.
+SELECT
+  pg.public_id,
+  u.public_id AS creator_public_id,
+  u.display_name AS creator_display_name,
+  p.public_id AS project_public_id,
+  p.name AS project_name,
+  pg.title,
+  pg.is_ai_generated,
+  pg.sort_weight,
+  pg.updated_at,
+  pg.created_at,
+  COUNT(*) OVER() AS total
+FROM pages pg
+INNER JOIN users u ON u.id = pg.creator_id
+LEFT JOIN projects p ON p.id = pg.project_id
+WHERE pg.workspace_id = ?
+  AND pg.parent_page_id IS NULL
+  AND pg.enabled = TRUE
+ORDER BY pg.sort_weight ASC, pg.title ASC, pg.id ASC
+LIMIT ? OFFSET ?;
+
+-- name: ListChildPages :many
+-- List enabled child pages for a given parent page with creator info.
+SELECT
+  pg.public_id,
+  u.public_id AS creator_public_id,
+  u.display_name AS creator_display_name,
+  p.public_id AS project_public_id,
+  p.name AS project_name,
+  pg.title,
+  pg.is_ai_generated,
+  pg.sort_weight,
+  pg.updated_at,
+  pg.created_at,
+  COUNT(*) OVER() AS total
+FROM pages pg
+INNER JOIN users u ON u.id = pg.creator_id
+LEFT JOIN projects p ON p.id = pg.project_id
+WHERE pg.workspace_id = ?
+  AND pg.parent_page_id = ?
+  AND pg.enabled = TRUE
+ORDER BY pg.sort_weight ASC, pg.title ASC, pg.id ASC
+LIMIT ? OFFSET ?;
+
+-- name: ListPagesForProject :many
+-- List all enabled pages (any nesting level) scoped to a project with creator info.
+SELECT
+  pg.public_id,
+  u.public_id AS creator_public_id,
+  u.display_name AS creator_display_name,
+  parent.public_id AS parent_page_public_id,
+  pg.title,
+  pg.is_ai_generated,
+  pg.sort_weight,
+  pg.updated_at,
+  pg.created_at,
+  COUNT(*) OVER() AS total
+FROM pages pg
+INNER JOIN users u ON u.id = pg.creator_id
+LEFT JOIN pages parent ON parent.id = pg.parent_page_id
+WHERE pg.workspace_id = ?
+  AND pg.project_id = ?
+  AND pg.enabled = TRUE
+ORDER BY pg.sort_weight ASC, pg.title ASC, pg.id ASC
+LIMIT ? OFFSET ?;
+
+-- name: GetPageByPublicId :one
+-- Fetch a single page by workspace_id + public_id, including parent page info.
+SELECT
+  pg.id,
+  pg.public_id,
+  pg.workspace_id,
+  u.public_id AS creator_public_id,
+  u.display_name AS creator_display_name,
+  p.public_id AS project_public_id,
+  p.name AS project_name,
+  parent.public_id AS parent_page_public_id,
+  parent.title AS parent_page_title,
+  pg.title,
+  pg.body,
+  pg.is_ai_generated,
+  pg.sort_weight,
+  pg.notes,
+  pg.updated_at,
+  pg.created_at
+FROM pages pg
+INNER JOIN users u ON u.id = pg.creator_id
+LEFT JOIN projects p ON p.id = pg.project_id
+LEFT JOIN pages parent ON parent.id = pg.parent_page_id
+WHERE pg.workspace_id = ?
+  AND pg.public_id = ?
+  AND pg.enabled = TRUE
+LIMIT 1;
+
+-- name: UpdatePage :exec
+-- Update mutable page fields. Uses sqlc.narg for nullable columns.
+UPDATE pages
+SET title          = COALESCE(sqlc.narg('title'), title),
+    body           = COALESCE(sqlc.narg('body'), body),
+    project_id     = sqlc.narg('project_id'),
+    parent_page_id = sqlc.narg('parent_page_id')
+WHERE workspace_id = ?
+  AND public_id = ?
+  AND enabled = TRUE;
+
+-- name: DisablePage :exec
+-- Soft-delete a page.
+UPDATE pages
+SET enabled = FALSE
+WHERE workspace_id = ?
+  AND public_id = ?;
+
+-- name: CountChildPages :one
+-- Count enabled child pages for a given parent. Used to check before deletion.
+SELECT COUNT(*) AS child_count
+FROM pages
+WHERE workspace_id = ?
+  AND parent_page_id = ?
+  AND enabled = TRUE;
+
+-- name: GetPageDepth :one
+-- Compute nesting depth of a page by walking up to the root via recursive CTE.
+-- Returns 0 for root pages, 1 for direct children of root, etc.
+WITH RECURSIVE ancestors AS (
+  SELECT pages.id, pages.parent_page_id, 0 AS depth
+  FROM pages
+  WHERE pages.id = ?
+  UNION ALL
+  SELECT p.id, p.parent_page_id, a.depth + 1
+  FROM pages p
+  INNER JOIN ancestors a ON a.parent_page_id = p.id
+)
+SELECT MAX(depth) AS depth
+FROM ancestors
+LIMIT 1;
+
+-- name: SearchPages :many
+-- Search enabled pages by title pattern within a workspace.
+SELECT
+  pg.public_id,
+  u.public_id AS creator_public_id,
+  u.display_name AS creator_display_name,
+  p.public_id AS project_public_id,
+  p.name AS project_name,
+  parent.public_id AS parent_page_public_id,
+  pg.title,
+  pg.is_ai_generated,
+  pg.sort_weight,
+  pg.updated_at,
+  pg.created_at,
+  COUNT(*) OVER() AS total
+FROM pages pg
+INNER JOIN users u ON u.id = pg.creator_id
+LEFT JOIN projects p ON p.id = pg.project_id
+LEFT JOIN pages parent ON parent.id = pg.parent_page_id
+WHERE pg.workspace_id = ?
+  AND pg.title LIKE ?
+  AND pg.enabled = TRUE
+ORDER BY pg.sort_weight ASC, pg.title ASC, pg.id ASC
+LIMIT ? OFFSET ?;

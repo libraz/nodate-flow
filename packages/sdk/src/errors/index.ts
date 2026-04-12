@@ -11,6 +11,7 @@ export * from "./integrations";
 export * from "./internal";
 export * from "./mcp";
 export * from "./notification";
+export * from "./page";
 export * from "./rate";
 export * from "./relation";
 export * from "./timebox";

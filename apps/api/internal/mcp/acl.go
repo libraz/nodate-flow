@@ -151,4 +151,22 @@ func resolveTask(ctx context.Context, deps Deps, s *session, publicID string) (u
 	return id, pub, nil
 }
 
+// resolvePage resolves a page public id to its internal id and verifies
+// it belongs to the session workspace.
+func resolvePage(ctx context.Context, deps Deps, s *session, publicID string) (uint32, types.PublicID, error) {
+	pub, err := types.Parse(publicID)
+	if err != nil {
+		return 0, types.PublicID{}, apierrors.New(apierrors.PagePageNotFound)
+	}
+	const q = `SELECT id FROM pages WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE LIMIT 1`
+	var id uint32
+	if err := deps.DB.QueryRowContext(ctx, q, s.workspaceID, pub).Scan(&id); err != nil {
+		if stderrors.Is(err, sql.ErrNoRows) {
+			return 0, types.PublicID{}, apierrors.New(apierrors.PagePageNotFound)
+		}
+		return 0, types.PublicID{}, err
+	}
+	return id, pub, nil
+}
+
 func newPublicID() types.PublicID { return types.New() }

@@ -1,0 +1,253 @@
+/* Dashboard feature styles — logical properties only, design system tokens. */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-6);
+  padding: clamp(1.5rem, 4vw, 2.5rem);
+  block-size: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--nf-space-4);
+  flex-wrap: wrap;
+}
+
+.title {
+  font-family: var(--nf-font-display);
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+  margin: 0;
+  color: var(--nf-color-fg);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+}
+
+/* 12-column CSS Grid layout */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: var(--nf-space-4);
+  align-content: start;
+}
+
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Widget card */
+.widget {
+  display: flex;
+  flex-direction: column;
+  background: var(--nf-color-bg-elevated);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  box-shadow: var(--nf-shadow-sm);
+  overflow: hidden;
+  min-block-size: 10rem;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.widget:hover {
+  box-shadow: var(--nf-shadow-md);
+}
+
+.widget:focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: var(--nf-focus-ring-offset);
+}
+
+/* Edit mode variant */
+.widgetEditing {
+  border-style: dashed;
+  border-color: var(--nf-color-accent);
+  cursor: grab;
+}
+
+.widgetEditing:active {
+  cursor: grabbing;
+}
+
+.widgetDragging {
+  opacity: 0.6;
+  box-shadow: var(--nf-shadow-lg);
+}
+
+/* Widget header */
+.widgetHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  padding-block: var(--nf-space-3);
+  padding-inline: var(--nf-space-4);
+  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
+  flex-shrink: 0;
+}
+
+.widgetIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  color: var(--nf-color-accent);
+  flex-shrink: 0;
+}
+
+.widgetTitle {
+  flex: 1;
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.removeButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--nf-radius-sm);
+  background: transparent;
+  color: var(--nf-color-danger);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.1s ease;
+}
+
+.removeButton:hover {
+  background: var(--nf-color-danger-subtle);
+}
+
+.removeButton:focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: var(--nf-focus-ring-offset);
+}
+
+/* Widget body */
+.widgetBody {
+  flex: 1;
+  padding-block: var(--nf-space-4);
+  padding-inline: var(--nf-space-4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nf-space-2);
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+}
+
+.widgetBodyIcon {
+  color: var(--nf-color-fg-muted);
+  opacity: 0.5;
+}
+
+/* Resize handle (visual indicator in edit mode) */
+.resizeHandle {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline-end: 0;
+  inline-size: 1rem;
+  block-size: 1rem;
+  cursor: nwse-resize;
+  opacity: 0.4;
+  color: var(--nf-color-fg-muted);
+}
+
+/* Empty state */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nf-space-3);
+  padding-block: var(--nf-space-16);
+  padding-inline: var(--nf-space-4);
+  color: var(--nf-color-fg-muted);
+}
+
+.emptyTitle {
+  font-size: var(--nf-text-base);
+  font-weight: var(--nf-weight-medium);
+  margin: 0;
+}
+
+.emptyDescription {
+  font-size: var(--nf-text-sm);
+  margin: 0;
+}
+
+/* Add-widget dialog type grid */
+.typeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: var(--nf-space-3);
+}
+
+.typeCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--nf-space-2);
+  padding-block: var(--nf-space-4);
+  padding-inline: var(--nf-space-3);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-bg-elevated);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.typeCard:hover {
+  border-color: var(--nf-color-accent);
+  box-shadow: var(--nf-shadow-sm);
+}
+
+.typeCard:focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: var(--nf-focus-ring-offset);
+}
+
+.typeCardSelected {
+  border-color: var(--nf-color-accent);
+  background: var(--nf-color-accent-subtle);
+}
+
+.typeCardIcon {
+  color: var(--nf-color-accent);
+}
+
+.typeCardLabel {
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
+  text-align: center;
+}
+
+/* Dialog form layout */
+.dialogForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-5);
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nf-space-3);
+}

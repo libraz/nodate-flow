@@ -19,7 +19,6 @@ import {
   type LucideIcon,
   Plus,
   Search,
-  Sparkles,
 } from 'lucide-react';
 import { type ReactElement, Suspense, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -27,6 +26,7 @@ import { useTranslation } from 'react-i18next';
 import Icon from '@nodate-flow/ui/icon';
 import { OPEN_COMMAND_PALETTE_EVENT } from '../components/layout/glass-dock';
 import { selectUser, useAuth } from '../features/auth/auth-store';
+import DashboardView from '../features/dashboard/dashboard-view';
 import { useWorkspacesQuery } from '../features/workspaces/api';
 import { type SupportedLanguage, setLanguage, supportedLanguages } from '../i18n';
 import { sdk } from '../lib/sdk';
@@ -409,6 +409,15 @@ function themeLabelKey(
   }
 }
 
+/* ── Dashboard widgets (workspace-scoped) ─────────────────── */
+
+function HomeDashboard(): ReactElement {
+  const { data: workspaces } = useWorkspacesQuery();
+  const firstWs = workspaces[0];
+  if (!firstWs) return <></>;
+  return <DashboardView workspaceId={firstWs.id} />;
+}
+
 /* ── Main dashboard ────────────────────────────────────────── */
 
 function HomePage(): ReactElement {
@@ -559,6 +568,11 @@ function HomePage(): ReactElement {
           <WorkspaceLinks />
         </Suspense>
       </section>
+
+      {/* Dashboard widgets */}
+      <Suspense fallback={null}>
+        <HomeDashboard />
+      </Suspense>
 
       {/* Theme / language */}
       <footer

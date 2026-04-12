@@ -37,11 +37,13 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/eventbus"
 	aihandlers "github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/ai"
 	authhandlers "github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/auth"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/dashboard"
 	exporthandlers "github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/export"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/inbox"
 	integrationshandlers "github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/integrations"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/lenses"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/notifications"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/pages"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/projects"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/relations"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/signals"
@@ -415,6 +417,10 @@ func BuildResult(deps Deps) Result {
 		exporthandlers.RegisterWorkspaceScoped(subAPI, sub, exportDeps)
 		tbDeps := timeboxes.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
 		timeboxes.RegisterWorkspaceScoped(subAPI, tbDeps)
+		dashDeps := dashboard.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
+		dashboard.RegisterWorkspaceScoped(subAPI, dashDeps)
+		pageDeps := pages.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
+		pages.RegisterWorkspaceScoped(subAPI, pageDeps)
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-cost-today",
 			Method:      http.MethodGet,

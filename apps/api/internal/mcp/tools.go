@@ -242,6 +242,63 @@ func registerTools(h *Handler) {
 		}, []string{"taskId"}),
 		run: runProposeRelations,
 	})
+	h.register(tool{
+		name:          "list_pages",
+		description:   "List wiki pages for the current workspace. Returns root-level pages by default.",
+		requiredScope: "read:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"projectId":    stringSchema("Optional project public id (UUID v7) to scope pages."),
+			"parentPageId": stringSchema("Optional parent page public id (UUID v7) to list child pages."),
+		}, nil),
+		run: runListPages,
+	})
+	h.register(tool{
+		name:          "get_page",
+		description:   "Get a wiki page by ID, including its content.",
+		requiredScope: "read:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"pageId": stringSchema("Page public id (UUID v7)."),
+		}, []string{"pageId"}),
+		run: runGetPage,
+	})
+	h.register(tool{
+		name:          "create_page",
+		description:   "Create a new wiki page.",
+		requiredScope: "write:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"title":        stringSchema("Page title."),
+			"body":         stringSchema("Optional page body content."),
+			"parentPageId": stringSchema("Optional parent page public id (UUID v7)."),
+			"projectId":    stringSchema("Optional project public id (UUID v7)."),
+		}, []string{"title"}),
+		run: runCreatePage,
+	})
+	h.register(tool{
+		name:          "update_page",
+		description:   "Update a wiki page's title or content.",
+		requiredScope: "write:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"pageId": stringSchema("Page public id (UUID v7)."),
+			"title":  stringSchema("New title (optional)."),
+			"body":   stringSchema("New body content (optional)."),
+		}, []string{"pageId"}),
+		run: runUpdatePage,
+	})
+	h.register(tool{
+		name:          "generate_page",
+		description:   "Generate a wiki page using AI based on project or task context.",
+		requiredScope: "write:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"contextDescription": stringSchema("What the page should be about."),
+			"projectId":          stringSchema("Optional project public id (UUID v7)."),
+			"taskIds": map[string]any{
+				"type":        "array",
+				"description": "Optional task public ids (UUID v7) to include as context.",
+				"items":       stringSchema("Task public id (UUID v7)."),
+			},
+		}, []string{"contextDescription"}),
+		run: runGeneratePage,
+	})
 }
 
 // ----------------------------------------------------------------------------
@@ -1414,5 +1471,393 @@ func runProposeLens(ctx context.Context, deps Deps, s *session, raw json.RawMess
 		return nil, apierrors.Wrap(apierrors.AiProviderUpstreamCallFailed, err)
 	}
 	return map[string]any{"lens": lens}, nil
+}
+
+// ----------------------------------------------------------------------------
+// Page / Wiki tools
+// ----------------------------------------------------------------------------
+
+// pageListRowToMap converts a page list row to a map for JSON output.
+func pageListRowToMap(pub types.PublicID, title string, isAI bool, sortWeight int32, updatedAt sql.NullTime, createdAt time.Time) map[string]any {
+	m := map[string]any{
+		"id":            pub.String(),
+		"title":         title,
+		"isAiGenerated": isAI,
+		"sortWeight":    sortWeight,
+		"createdAt":     createdAt.Unix(),
+	}
+	if updatedAt.Valid {
+		m["updatedAt"] = updatedAt.Time.Unix()
+	}
+	return m
+}
+
+// runListPages lists wiki pages for the workspace. When parentPageId is
+// provided it lists child pages; when projectId is provided it lists
+// pages scoped to that project; otherwise it returns root-level pages.
+func runListPages(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	var in struct {
+		ProjectID    string `json:"projectId"`
+		ParentPageID string `json:"parentPageId"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+
+	items := []map[string]any{}
+
+	if in.ParentPageID != "" {
+		parentInternal, _, err := resolvePage(ctx, deps, s, in.ParentPageID)
+		if err != nil {
+			return nil, err
+		}
+		rows, err := deps.Queries.ListChildPages(ctx, generated.ListChildPagesParams{
+			WorkspaceID:  s.workspaceID,
+			ParentPageID: sql.NullInt32{Int32: int32(parentInternal), Valid: true},
+			Limit:        200,
+			Offset:       0,
+		})
+		if err != nil {
+			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		}
+		for _, r := range rows {
+			m := pageListRowToMap(r.PublicID, r.Title, r.IsAiGenerated, r.SortWeight, r.UpdatedAt, r.CreatedAt)
+			if r.ProjectName.Valid {
+				m["projectId"] = r.ProjectPublicID.String()
+				m["projectName"] = r.ProjectName.String
+			}
+			items = append(items, m)
+		}
+	} else if in.ProjectID != "" {
+		prjID, err := resolveProject(ctx, deps, s, in.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		rows, err := deps.Queries.ListPagesForProject(ctx, generated.ListPagesForProjectParams{
+			WorkspaceID: s.workspaceID,
+			ProjectID:   sql.NullInt32{Int32: int32(prjID), Valid: true},
+			Limit:       200,
+			Offset:      0,
+		})
+		if err != nil {
+			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		}
+		for _, r := range rows {
+			m := pageListRowToMap(r.PublicID, r.Title, r.IsAiGenerated, r.SortWeight, r.UpdatedAt, r.CreatedAt)
+			if r.ParentPagePublicID != (types.PublicID{}) {
+				m["parentPageId"] = r.ParentPagePublicID.String()
+			}
+			items = append(items, m)
+		}
+	} else {
+		rows, err := deps.Queries.ListPagesForWorkspace(ctx, generated.ListPagesForWorkspaceParams{
+			WorkspaceID: s.workspaceID,
+			Limit:       200,
+			Offset:      0,
+		})
+		if err != nil {
+			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		}
+		for _, r := range rows {
+			m := pageListRowToMap(r.PublicID, r.Title, r.IsAiGenerated, r.SortWeight, r.UpdatedAt, r.CreatedAt)
+			if r.ProjectName.Valid {
+				m["projectId"] = r.ProjectPublicID.String()
+				m["projectName"] = r.ProjectName.String
+			}
+			items = append(items, m)
+		}
+	}
+	return map[string]any{"pages": items}, nil
+}
+
+// runGetPage fetches a single wiki page by public id, including content.
+func runGetPage(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	var in struct {
+		PageID string `json:"pageId"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+	pub, err := types.Parse(in.PageID)
+	if err != nil {
+		return nil, apierrors.New(apierrors.PagePageNotFound)
+	}
+	row, err := deps.Queries.GetPageByPublicId(ctx, generated.GetPageByPublicIdParams{
+		WorkspaceID: s.workspaceID,
+		PublicID:    pub,
+	})
+	if err != nil {
+		if stderrors.Is(err, sql.ErrNoRows) {
+			return nil, apierrors.New(apierrors.PagePageNotFound)
+		}
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	out := map[string]any{
+		"id":            row.PublicID.String(),
+		"title":         row.Title,
+		"body":          row.Body,
+		"isAiGenerated": row.IsAiGenerated,
+		"sortWeight":    row.SortWeight,
+		"creatorId":     row.CreatorPublicID.String(),
+		"creatorName":   row.CreatorDisplayName,
+		"createdAt":     row.CreatedAt.Unix(),
+	}
+	if row.UpdatedAt.Valid {
+		out["updatedAt"] = row.UpdatedAt.Time.Unix()
+	}
+	if row.ProjectName.Valid {
+		out["projectId"] = row.ProjectPublicID.String()
+		out["projectName"] = row.ProjectName.String
+	}
+	if row.ParentPageTitle.Valid {
+		out["parentPageId"] = row.ParentPagePublicID.String()
+		out["parentPageTitle"] = row.ParentPageTitle.String
+	}
+	if row.Notes.Valid {
+		out["notes"] = row.Notes.String
+	}
+	return out, nil
+}
+
+// runCreatePage creates a new wiki page.
+func runCreatePage(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	var in struct {
+		Title        string `json:"title"`
+		Body         string `json:"body"`
+		ParentPageID string `json:"parentPageId"`
+		ProjectID    string `json:"projectId"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	if in.Title == "" {
+		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+	}
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+
+	var projectID sql.NullInt32
+	if in.ProjectID != "" {
+		prjID, err := resolveProject(ctx, deps, s, in.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		projectID = sql.NullInt32{Int32: int32(prjID), Valid: true}
+	}
+
+	var parentPageID sql.NullInt32
+	if in.ParentPageID != "" {
+		parentInternal, _, err := resolvePage(ctx, deps, s, in.ParentPageID)
+		if err != nil {
+			return nil, err
+		}
+		parentPageID = sql.NullInt32{Int32: int32(parentInternal), Valid: true}
+	}
+
+	pub := newPublicID()
+	pageID, err := deps.Queries.CreatePage(ctx, generated.CreatePageParams{
+		PublicID:      pub,
+		WorkspaceID:   s.workspaceID,
+		ProjectID:     projectID,
+		CreatorID:     s.userID,
+		ParentPageID:  parentPageID,
+		Title:         in.Title,
+		Body:          in.Body,
+		IsAiGenerated: false,
+	})
+	if err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+
+	actor := int64(s.userID)
+	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		Type:        eventbus.PageCreated,
+		WorkspaceID: s.workspaceID,
+		ActorUserID: &actor,
+		Payload: map[string]any{
+			"pageId": pub.String(),
+			"title":  in.Title,
+			"via":    "mcp",
+		},
+	})
+	_ = pageID // internal id not exposed
+	return map[string]any{"id": pub.String()}, nil
+}
+
+// runUpdatePage updates a wiki page's title or content.
+func runUpdatePage(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	var in struct {
+		PageID string  `json:"pageId"`
+		Title  *string `json:"title"`
+		Body   *string `json:"body"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+	pageInternal, pub, err := resolvePage(ctx, deps, s, in.PageID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch current project_id and parent_page_id to preserve them.
+	var projectID sql.NullInt32
+	var parentPageID sql.NullInt32
+	const qPage = `SELECT project_id, parent_page_id FROM pages WHERE id = ? AND workspace_id = ? LIMIT 1`
+	if err := deps.DB.QueryRowContext(ctx, qPage, pageInternal, s.workspaceID).Scan(&projectID, &parentPageID); err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+
+	// Build update params; COALESCE in SQL preserves existing values when NULL.
+	var titleParam sql.NullString
+	if in.Title != nil && *in.Title != "" {
+		titleParam = sql.NullString{String: *in.Title, Valid: true}
+	}
+	var bodyParam sql.NullString
+	if in.Body != nil {
+		bodyParam = sql.NullString{String: *in.Body, Valid: true}
+	}
+
+	if err := deps.Queries.UpdatePage(ctx, generated.UpdatePageParams{
+		Title:        titleParam,
+		Body:         bodyParam,
+		ProjectID:    projectID,
+		ParentPageID: parentPageID,
+		WorkspaceID:  s.workspaceID,
+		PublicID:     pub,
+	}); err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+
+	pageID64 := int64(pageInternal)
+	actor := int64(s.userID)
+	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		Type:        eventbus.PageUpdated,
+		WorkspaceID: s.workspaceID,
+		ActorUserID: &actor,
+		Payload: map[string]any{
+			"pageId": pub.String(),
+			"via":    "mcp",
+		},
+	})
+	_ = pageID64 // used only for the event; no page-specific event field yet
+	return map[string]any{"id": pub.String()}, nil
+}
+
+// runGeneratePage generates a wiki page using AI. When no AI provider
+// is configured, it creates a page with the context description as body
+// and marks is_ai_generated=false.
+func runGeneratePage(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	var in struct {
+		ContextDescription string   `json:"contextDescription"`
+		ProjectID          string   `json:"projectId"`
+		TaskIDs            []string `json:"taskIds"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	if in.ContextDescription == "" {
+		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+	}
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+
+	var projectID sql.NullInt32
+	if in.ProjectID != "" {
+		prjID, err := resolveProject(ctx, deps, s, in.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		projectID = sql.NullInt32{Int32: int32(prjID), Valid: true}
+	}
+
+	// Build context from task data if task ids are provided.
+	contextParts := []string{in.ContextDescription}
+	for _, tid := range in.TaskIDs {
+		tPub, err := types.Parse(tid)
+		if err != nil {
+			continue
+		}
+		tRow, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
+			WorkspaceID: s.workspaceID,
+			PublicID:    tPub,
+		})
+		if err != nil {
+			continue
+		}
+		taskCtx := "\n\nTask: " + tRow.Title
+		if tRow.Description.Valid && tRow.Description.String != "" {
+			taskCtx += "\nDescription: " + tRow.Description.String
+		}
+		contextParts = append(contextParts, taskCtx)
+	}
+
+	// Attempt AI generation.
+	title := "Generated: " + in.ContextDescription
+	if len(title) > 200 {
+		title = title[:200]
+	}
+	body := in.ContextDescription
+	isAI := false
+
+	if deps.AI != nil {
+		signal := "Generate a wiki page about the following topic.\n\n"
+		for _, part := range contextParts {
+			signal += part
+		}
+		proposed, err := deps.AI.ProposeTasksFrom(ctx, s.workspaceID, signal)
+		if err == nil && len(proposed) > 0 {
+			// Use the first proposed task's title and description as page
+			// content. ProposeTasksFrom is reused as the general-purpose
+			// LLM call; the response is repurposed here.
+			title = proposed[0].Title
+			body = proposed[0].Description
+			isAI = true
+		}
+		// On AI error, fall through to non-AI creation.
+	}
+
+	pub := newPublicID()
+	pageID, err := deps.Queries.CreatePage(ctx, generated.CreatePageParams{
+		PublicID:      pub,
+		WorkspaceID:   s.workspaceID,
+		ProjectID:     projectID,
+		CreatorID:     s.userID,
+		ParentPageID:  sql.NullInt32{},
+		Title:         title,
+		Body:          body,
+		IsAiGenerated: isAI,
+	})
+	if err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+
+	actor := int64(s.userID)
+	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		Type:        eventbus.PageCreated,
+		WorkspaceID: s.workspaceID,
+		ActorUserID: &actor,
+		Payload: map[string]any{
+			"pageId":        pub.String(),
+			"title":         title,
+			"isAiGenerated": isAI,
+			"via":           "mcp:generate_page",
+		},
+	})
+	_ = pageID // internal id not exposed
+	return map[string]any{
+		"id":            pub.String(),
+		"isAiGenerated": isAI,
+	}, nil
 }
 

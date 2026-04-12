@@ -63,6 +63,8 @@ type Querier interface {
 	// within the given time window. Used by the AI metrics endpoint
 	// (2.OBS-1) to compute acceptance rate.
 	CountAiSuggestionOutcomesForWorkspace(ctx context.Context, arg CountAiSuggestionOutcomesForWorkspaceParams) (CountAiSuggestionOutcomesForWorkspaceRow, error)
+	// Count enabled child pages for a given parent. Used to check before deletion.
+	CountChildPages(ctx context.Context, arg CountChildPagesParams) (int64, error)
 	// Count total and completed tasks in a timebox for progress tracking.
 	CountTasksForTimebox(ctx context.Context, timeboxID uint32) (CountTasksForTimeboxRow, error)
 	// Count unread notifications for a user across all workspaces.
@@ -81,6 +83,8 @@ type Querier interface {
 	CreateNotification(ctx context.Context, arg CreateNotificationParams) (int64, error)
 	// Insert a short-lived CSRF state row for the personal OAuth flow.
 	CreateOauthState(ctx context.Context, arg CreateOauthStateParams) error
+	// Insert a new wiki/documentation page.
+	CreatePage(ctx context.Context, arg CreatePageParams) (int64, error)
 	// Insert a new personal access token. Plain token is shown to the user once.
 	CreatePat(ctx context.Context, arg CreatePatParams) (int64, error)
 	// Insert a new project in a workspace.
@@ -109,6 +113,8 @@ type Querier interface {
 	CreateTimebox(ctx context.Context, arg CreateTimeboxParams) (int64, error)
 	CreateWebhookDelivery(ctx context.Context, arg CreateWebhookDeliveryParams) (int64, error)
 	CreateWebhookSubscription(ctx context.Context, arg CreateWebhookSubscriptionParams) (int64, error)
+	// Insert a new dashboard widget.
+	CreateWidget(ctx context.Context, arg CreateWidgetParams) (int64, error)
 	// Insert a new workspace. Slug uniqueness is enforced at the DB level.
 	CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) (int64, error)
 	// Add a user to a workspace with the given role.
@@ -139,12 +145,16 @@ type Querier interface {
 	// Hard-delete a single integration row (user-scoped).
 	DeleteUserIntegration(ctx context.Context, arg DeleteUserIntegrationParams) error
 	DeleteWebhookSubscription(ctx context.Context, arg DeleteWebhookSubscriptionParams) error
+	// Soft-delete a page.
+	DisablePage(ctx context.Context, arg DisablePageParams) error
 	// Soft-disable a project.
 	DisableProject(ctx context.Context, arg DisableProjectParams) error
 	// Soft-disable a task.
 	DisableTask(ctx context.Context, arg DisableTaskParams) error
 	// Soft-delete a timebox.
 	DisableTimebox(ctx context.Context, arg DisableTimeboxParams) error
+	// Soft-delete a widget.
+	DisableWidget(ctx context.Context, arg DisableWidgetParams) error
 	// Soft-disable a workspace. Cascade is handled by FK ON DELETE for hard purges.
 	DisableWorkspace(ctx context.Context, publicID types.PublicID) error
 	// Bulk-dismiss all pending suggestions involving a specific task.
@@ -254,6 +264,11 @@ type Querier interface {
 	GetAttachmentByPublicID(ctx context.Context, arg GetAttachmentByPublicIDParams) (GetAttachmentByPublicIDRow, error)
 	// Fetch a single lens by its public_id.
 	GetLensByPublicID(ctx context.Context, arg GetLensByPublicIDParams) (GetLensByPublicIDRow, error)
+	// Fetch a single page by workspace_id + public_id, including parent page info.
+	GetPageByPublicId(ctx context.Context, arg GetPageByPublicIdParams) (GetPageByPublicIdRow, error)
+	// Compute nesting depth of a page by walking up to the root via recursive CTE.
+	// Returns 0 for root pages, 1 for direct children of root, etc.
+	GetPageDepth(ctx context.Context, id uint32) (interface{}, error)
 	// Look up the workspace mapping for a GitHub repository by its numeric
 	// repo ID. Used by the webhook handler to route incoming events to the
 	// correct workspace. Only returns enabled rows.
@@ -271,6 +286,8 @@ type Querier interface {
 	// Fetch a single timebox by workspace_id + public_id.
 	GetTimeboxByPublicId(ctx context.Context, arg GetTimeboxByPublicIdParams) (GetTimeboxByPublicIdRow, error)
 	GetWebhookSubscription(ctx context.Context, arg GetWebhookSubscriptionParams) (GetWebhookSubscriptionRow, error)
+	// Fetch a single widget by workspace_id + public_id.
+	GetWidgetByPublicID(ctx context.Context, arg GetWidgetByPublicIDParams) (GetWidgetByPublicIDRow, error)
 	// Insert a hashed recovery code for a user.
 	InsertRecoveryCode(ctx context.Context, arg InsertRecoveryCodeParams) error
 	// Insert an inbound signal (manual or webhook).
@@ -300,6 +317,8 @@ type Querier interface {
 	// VEC_DISTANCE_COSINE; the caller dot-products the L2-normalized vectors
 	// and applies the duplicate_threshold_high / low cutoffs from ai_settings.
 	ListCandidateTaskEmbeddings(ctx context.Context, arg ListCandidateTaskEmbeddingsParams) ([]ListCandidateTaskEmbeddingsRow, error)
+	// List enabled child pages for a given parent page with creator info.
+	ListChildPages(ctx context.Context, arg ListChildPagesParams) ([]ListChildPagesRow, error)
 	// List comments on a task joined with author display fields.
 	ListCommentsForTask(ctx context.Context, arg ListCommentsForTaskParams) ([]ListCommentsForTaskRow, error)
 	// List enabled integrations whose access token will expire before
@@ -356,6 +375,10 @@ type Querier interface {
 	// so the fan-out from a single eventbus.Append to N agents is one
 	// round-trip per append (vs one per agent).
 	ListOnEventAgents(ctx context.Context, arg ListOnEventAgentsParams) ([]ListOnEventAgentsRow, error)
+	// List all enabled pages (any nesting level) scoped to a project with creator info.
+	ListPagesForProject(ctx context.Context, arg ListPagesForProjectParams) ([]ListPagesForProjectRow, error)
+	// List enabled root pages (no parent) for a workspace with creator info.
+	ListPagesForWorkspace(ctx context.Context, arg ListPagesForWorkspaceParams) ([]ListPagesForWorkspaceRow, error)
 	// List a user's PATs in a workspace, masked (no token_hash).
 	ListPatsForUser(ctx context.Context, arg ListPatsForUserParams) ([]ListPatsForUserRow, error)
 	// List pending AI suggestions for a workspace. A suggestion is "pending"
@@ -418,6 +441,8 @@ type Querier interface {
 	ListWebhookDeliveries(ctx context.Context, arg ListWebhookDeliveriesParams) ([]ListWebhookDeliveriesRow, error)
 	// List webhook subscriptions for a workspace with pagination.
 	ListWebhookSubscriptions(ctx context.Context, arg ListWebhookSubscriptionsParams) ([]ListWebhookSubscriptionsRow, error)
+	// List enabled widgets for a workspace with creator info, ordered by sort_weight.
+	ListWidgetsForWorkspace(ctx context.Context, arg ListWidgetsForWorkspaceParams) ([]ListWidgetsForWorkspaceRow, error)
 	// List members of a workspace via v_workspace_members.
 	ListWorkspaceMembers(ctx context.Context, arg ListWorkspaceMembersParams) ([]ListWorkspaceMembersRow, error)
 	// List workspaces a user belongs to.
@@ -491,6 +516,8 @@ type Querier interface {
 	RotateSessionRefreshHash(ctx context.Context, arg RotateSessionRefreshHashParams) error
 	// Mark a constraint as satisfied at the current time.
 	SatisfyConstraint(ctx context.Context, arg SatisfyConstraintParams) error
+	// Search enabled pages by title pattern within a workspace.
+	SearchPages(ctx context.Context, arg SearchPagesParams) ([]SearchPagesRow, error)
 	// Search tasks by title or description using LIKE. Workspace-scoped.
 	// The caller supplies the pattern already wrapped in '%…%'.
 	SearchTasks(ctx context.Context, arg SearchTasksParams) ([]SearchTasksRow, error)
@@ -535,6 +562,8 @@ type Querier interface {
 	UpdateMemberRole(ctx context.Context, arg UpdateMemberRoleParams) error
 	// Change a member's role keyed by user_id.
 	UpdateMemberRoleByUserId(ctx context.Context, arg UpdateMemberRoleByUserIdParams) error
+	// Update mutable page fields. Uses sqlc.narg for nullable columns.
+	UpdatePage(ctx context.Context, arg UpdatePageParams) error
 	// Update mutable project fields by public_id.
 	UpdateProject(ctx context.Context, arg UpdateProjectParams) error
 	// Update project name, slug and description by public_id.
@@ -552,6 +581,10 @@ type Querier interface {
 	UpdateTimeboxStatus(ctx context.Context, arg UpdateTimeboxStatusParams) error
 	// Stamp last successful login time on a user account.
 	UpdateUserLastLoginAt(ctx context.Context, id uint32) error
+	// Update mutable widget fields. Uses sqlc.narg for optional partial updates.
+	UpdateWidget(ctx context.Context, arg UpdateWidgetParams) error
+	// Reposition a single widget on the grid (called N times for batch reorder).
+	UpdateWidgetPosition(ctx context.Context, arg UpdateWidgetPositionParams) error
 	// Update mutable workspace fields by public_id.
 	UpdateWorkspace(ctx context.Context, arg UpdateWorkspaceParams) error
 	// Update workspace name and slug by public_id.

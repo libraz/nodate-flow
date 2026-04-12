@@ -32,6 +32,7 @@
     "projects": "プロジェクト",
     "workspaces": "ワークスペース",
     "workspaceProjects": "このワークスペースのプロジェクト",
+    "pages": "ページ",
     "settings": "設定",
     "collapse": "サイドバーを折りたたむ",
     "expand": "サイドバーを展開する"
@@ -322,7 +323,8 @@
     "views": {
       "board": "ボード",
       "list": "リスト",
-      "graph": "グラフ"
+      "graph": "グラフ",
+      "spreadsheet": "スプレッドシート"
     },
     "columns": {
       "title": "タイトル",
@@ -405,7 +407,16 @@
       "edit_title": "タイトルを編集",
       "edit_priority": "優先度を変更",
       "edit_due": "期日を変更",
+      "edit_status": "ステータスを変更",
       "save_failed": "変更を保存できませんでした。もう一度お試しください。"
+    },
+    "spreadsheet": {
+      "edit_cell": "セルを編集",
+      "bulk_actions": "一括操作",
+      "set_priority": "優先度を設定",
+      "set_assignee": "担当者を設定",
+      "set_due_date": "期限を設定",
+      "selected_count": "{count}件選択中"
     },
     "reorder": {
       "drag_handle": "ドラッグして並び替え",

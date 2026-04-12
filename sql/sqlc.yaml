@@ -63,3 +63,5 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.resolved_by"
             go_struct_tag: 'json:"-"'
+          - column: "*.parent_page_id"
+            go_struct_tag: 'json:"-"'

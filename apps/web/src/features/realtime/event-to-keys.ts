@@ -20,6 +20,8 @@ export type StreamKind =
   | 'timebox.changed'
   | 'relation.changed'
   | 'lens.changed'
+  | 'page.changed'
+  | 'dashboard.changed'
   | 'resync';
 
 export interface StreamEvent {
@@ -68,6 +70,10 @@ export function keysForEvent(evt: StreamEvent): readonly (readonly unknown[])[] 
       ];
     case 'lens.changed':
       return [['lenses', 'list', ws]];
+    case 'page.changed':
+      return [['pages', 'list', ws]];
+    case 'dashboard.changed':
+      return [['dashboard', 'list', ws]];
     case 'resync':
       return [
         ['auto-actions', 'list', ws],
@@ -83,6 +89,8 @@ export function keysForEvent(evt: StreamEvent): readonly (readonly unknown[])[] 
         ['relation-suggestions', 'list', ws],
         ['relation-suggestions', 'task'],
         ['lenses', 'list', ws],
+        ['pages', 'list', ws],
+        ['dashboard', 'list', ws],
         ['tasks'],
       ];
   }

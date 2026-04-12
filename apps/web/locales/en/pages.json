@@ -1,0 +1,26 @@
+{
+  "title": "Pages",
+  "create": "New page",
+  "edit": "Edit page",
+  "delete": "Delete page",
+  "empty": "No pages yet",
+  "empty_description": "Create a page to document your project.",
+  "page_title_label": "Title",
+  "page_body_label": "Content",
+  "parent_label": "Parent page",
+  "parent_none": "None (root page)",
+  "project_label": "Project",
+  "project_none": "Workspace-wide",
+  "confirm_delete": "Delete this page?",
+  "ai_generate": "Generate with AI",
+  "ai_generating": "Generating...",
+  "children": "Sub-pages",
+  "search_placeholder": "Search pages...",
+  "created_by": "Created by {name}",
+  "updated_at": "Updated {date}",
+  "tree": {
+    "root": "Root pages",
+    "expand": "Expand",
+    "collapse": "Collapse"
+  }
+}

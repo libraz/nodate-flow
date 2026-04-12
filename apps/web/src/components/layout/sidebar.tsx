@@ -7,6 +7,7 @@ import {
   CalendarRange,
   ChevronsLeft,
   ChevronsRight,
+  FileText,
   FolderKanban,
   Inbox,
   type LucideIcon,
@@ -23,16 +24,17 @@ const STORAGE_KEY = 'nf.sidebar-collapsed';
 const LEGACY_STORAGE_KEY = 'nf:sidebar-collapsed';
 
 interface NavItem {
-  key: 'inbox' | 'today' | 'calendar' | 'workspaces' | 'settings';
+  key: 'inbox' | 'today' | 'calendar' | 'pages' | 'workspaces' | 'settings';
   icon: LucideIcon;
   /** Destination route (TanStack Router path). */
-  to: '/workspaces' | '/inbox' | '/today' | '/calendar' | '/settings/profile';
+  to: '/workspaces' | '/inbox' | '/today' | '/calendar' | '/pages' | '/settings/profile';
 }
 
 const NAV_ITEMS: readonly NavItem[] = [
   { key: 'inbox', icon: Inbox, to: '/inbox' },
   { key: 'today', icon: CalendarDays, to: '/today' },
   { key: 'calendar', icon: CalendarRange, to: '/calendar' },
+  { key: 'pages', icon: FileText, to: '/pages' },
   { key: 'workspaces', icon: Briefcase, to: '/workspaces' },
   { key: 'settings', icon: Settings, to: '/settings/profile' },
 ];
@@ -105,7 +107,13 @@ export default function Sidebar(): ReactElement {
 
   const labelKeyFor = (
     key: NavItem['key'],
-  ): 'nav.inbox' | 'nav.today' | 'nav.calendar' | 'nav.workspaces' | 'nav.settings' => {
+  ):
+    | 'nav.inbox'
+    | 'nav.today'
+    | 'nav.calendar'
+    | 'nav.pages'
+    | 'nav.workspaces'
+    | 'nav.settings' => {
     switch (key) {
       case 'inbox':
         return 'nav.inbox';
@@ -113,6 +121,8 @@ export default function Sidebar(): ReactElement {
         return 'nav.today';
       case 'calendar':
         return 'nav.calendar';
+      case 'pages':
+        return 'nav.pages';
       case 'workspaces':
         return 'nav.workspaces';
       case 'settings':

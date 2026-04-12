@@ -1,0 +1,26 @@
+{
+  "title": "ページ",
+  "create": "新しいページ",
+  "edit": "ページを編集",
+  "delete": "ページを削除",
+  "empty": "ページがありません",
+  "empty_description": "ページを作成してプロジェクトのドキュメントを整理しましょう。",
+  "page_title_label": "タイトル",
+  "page_body_label": "コンテンツ",
+  "parent_label": "親ページ",
+  "parent_none": "なし（ルートページ）",
+  "project_label": "プロジェクト",
+  "project_none": "ワークスペース全体",
+  "confirm_delete": "このページを削除しますか？",
+  "ai_generate": "AIで生成",
+  "ai_generating": "生成中...",
+  "children": "サブページ",
+  "search_placeholder": "ページを検索...",
+  "created_by": "{name}が作成",
+  "updated_at": "更新: {date}",
+  "tree": {
+    "root": "ルートページ",
+    "expand": "展開",
+    "collapse": "折りたたむ"
+  }
+}

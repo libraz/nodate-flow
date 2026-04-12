@@ -60,6 +60,14 @@ const (
 	// workspace. The frontend invalidates lens lists.
 	KindLensChanged Kind = "lens.changed"
 
+	// KindPageChanged fires on any `page.*` append for the
+	// workspace. The frontend invalidates page lists and detail.
+	KindPageChanged Kind = "page.changed"
+
+	// KindDashboardChanged fires on any `dashboard.*` append for the
+	// workspace. The frontend invalidates dashboard widget lists.
+	KindDashboardChanged Kind = "dashboard.changed"
+
 	// KindResync is sent when the server has dropped events for a
 	// slow subscriber. The frontend reacts by invalidating every
 	// workspace-scoped query, which is the safe superset.
@@ -94,6 +102,10 @@ func KindForEventType(eventType string) (Kind, bool) {
 		return KindRelationChanged, true
 	case strings.HasPrefix(eventType, "lens."):
 		return KindLensChanged, true
+	case strings.HasPrefix(eventType, "page."):
+		return KindPageChanged, true
+	case strings.HasPrefix(eventType, "dashboard."):
+		return KindDashboardChanged, true
 	}
 	return "", false
 }

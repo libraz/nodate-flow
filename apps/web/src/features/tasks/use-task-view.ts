@@ -8,7 +8,7 @@
 
 import { useSyncExternalStore } from 'react';
 
-export type TaskView = 'board' | 'list' | 'graph';
+export type TaskView = 'board' | 'list' | 'graph' | 'spreadsheet';
 
 const STORAGE_KEY = 'nf:task-view';
 const DEFAULT_VIEW: TaskView = 'board';
@@ -19,7 +19,7 @@ function readView(): TaskView {
   if (typeof window === 'undefined') return DEFAULT_VIEW;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw === 'board' || raw === 'list' || raw === 'graph') return raw;
+    if (raw === 'board' || raw === 'list' || raw === 'graph' || raw === 'spreadsheet') return raw;
   } catch {
     // ignore (private mode etc.)
   }

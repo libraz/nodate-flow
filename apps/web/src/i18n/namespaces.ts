@@ -17,6 +17,8 @@ export const namespaces = [
   'mcp',
   'errors',
   'relations',
+  'dashboard',
+  'pages',
 ] as const;
 
 /** Union of all known i18n namespace names. */

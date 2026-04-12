@@ -32,6 +32,7 @@
     "projects": "Projects",
     "workspaces": "Workspaces",
     "workspaceProjects": "Projects in this workspace",
+    "pages": "Pages",
     "settings": "Settings",
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar"
@@ -322,7 +323,8 @@
     "views": {
       "board": "Board",
       "list": "List",
-      "graph": "Graph"
+      "graph": "Graph",
+      "spreadsheet": "Spreadsheet"
     },
     "columns": {
       "title": "Title",
@@ -405,7 +407,16 @@
       "edit_title": "Edit title",
       "edit_priority": "Change priority",
       "edit_due": "Change due date",
+      "edit_status": "Change status",
       "save_failed": "Could not save changes. Please try again."
+    },
+    "spreadsheet": {
+      "edit_cell": "Edit cell",
+      "bulk_actions": "Bulk actions",
+      "set_priority": "Set priority",
+      "set_assignee": "Set assignee",
+      "set_due_date": "Set due date",
+      "selected_count": "{count, plural, one {# selected} other {# selected}}"
     },
     "reorder": {
       "drag_handle": "Drag to reorder",

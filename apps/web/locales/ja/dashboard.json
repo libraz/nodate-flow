@@ -1,0 +1,24 @@
+{
+  "title": "ダッシュボード",
+  "add_widget": "ウィジェットを追加",
+  "edit_layout": "レイアウトを編集",
+  "done_editing": "完了",
+  "remove_widget": "ウィジェットを削除",
+  "widget_type": {
+    "task_summary": "タスクサマリー",
+    "burndown": "バーンダウン",
+    "signals_feed": "シグナルフィード",
+    "ai_suggestions": "AI サジェスチョン",
+    "overdue_tasks": "期限超過タスク",
+    "notification_feed": "通知"
+  },
+  "empty": "ウィジェットがありません",
+  "empty_description": "ウィジェットを追加してダッシュボードをカスタマイズしましょう。",
+  "confirm_remove": "このウィジェットを削除しますか？",
+  "widget_title_label": "ウィジェットタイトル",
+  "select_type": "ウィジェットタイプを選択",
+  "config": {
+    "timebox_label": "タイムボックス",
+    "project_label": "プロジェクト"
+  }
+}
