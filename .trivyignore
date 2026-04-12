@@ -1,0 +1,18 @@
+# Trivy Ignore List for nodate-flow
+# Each entry must include a reason for the ignore.
+# Format: CVE-ID  # reason
+#
+# Review this file periodically and remove entries when upstream fixes
+# are available or when the affected component is no longer used.
+#
+# ---------------------------------------------------------------------------
+# Development-only dependencies (not shipped in production images)
+# ---------------------------------------------------------------------------
+
+# No CVEs currently ignored. This file exists so Trivy picks it up
+# automatically and team members have a clear place to document
+# accepted risks.
+#
+# Example format (uncomment and replace when needed):
+# CVE-2024-XXXXX  # dev-only: affects vitest runner, not in production image
+# CVE-2024-YYYYY  # false positive: function is never called in our code path

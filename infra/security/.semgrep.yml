@@ -1,0 +1,204 @@
+rules:
+  # ---------------------------------------------------------------
+  # Hardcoded API key detection
+  # ---------------------------------------------------------------
+  - id: nodate-flow.hardcoded-anthropic-key
+    patterns:
+      - pattern: |
+          $X = "sk-ant-..."
+    message: >
+      Hardcoded Anthropic API key detected. Store keys in environment
+      variables (NF_* prefix) or Docker secrets, never in source code.
+    languages: [go, typescript, javascript]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: ["CWE-798"]
+      owasp: ["A07:2021"]
+
+  - id: nodate-flow.hardcoded-openai-key
+    patterns:
+      - pattern: |
+          $X = "sk-..."
+      - pattern-not: |
+          $X = "sk-ant-..."
+    message: >
+      Hardcoded OpenAI API key detected. Store keys in environment
+      variables (NF_* prefix) or Docker secrets, never in source code.
+    languages: [go, typescript, javascript]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: ["CWE-798"]
+      owasp: ["A07:2021"]
+
+  - id: nodate-flow.hardcoded-mcp-token
+    patterns:
+      - pattern: |
+          $X = "mcp_..."
+    message: >
+      Hardcoded MCP token detected. MCP tokens must be injected via
+      environment variables or secrets, never committed to source.
+    languages: [go, typescript, javascript]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: ["CWE-798"]
+      owasp: ["A07:2021"]
+
+  - id: nodate-flow.hardcoded-pat-token
+    patterns:
+      - pattern: |
+          $X = "pat_..."
+    message: >
+      Hardcoded personal access token detected. PATs must never appear
+      in source code.
+    languages: [go, typescript, javascript]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: ["CWE-798"]
+      owasp: ["A07:2021"]
+
+  # ---------------------------------------------------------------
+  # SQL injection: string concatenation with SQL keywords
+  # ---------------------------------------------------------------
+  - id: nodate-flow.go-sql-string-concat
+    patterns:
+      - pattern: |
+          $DB.$METHOD($CTX, "..." + $EXPR + "...", ...)
+      - metavariable-pattern:
+          metavariable: $METHOD
+          pattern: |
+            $M
+          patterns:
+            - pattern: Query
+            - pattern: QueryRow
+            - pattern: Exec
+            - pattern: QueryContext
+            - pattern: QueryRowContext
+            - pattern: ExecContext
+    fix: Use parameterized queries ($1, $2) instead of string concatenation.
+    message: >
+      SQL query built with string concatenation. This is a SQL injection
+      risk. Use parameterized queries with placeholders (?) and pass
+      values as arguments. nodate-flow uses sqlc for all queries.
+    languages: [go]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: ["CWE-89"]
+      owasp: ["A03:2021"]
+
+  - id: nodate-flow.go-sql-sprintf
+    patterns:
+      - pattern: |
+          $DB.$METHOD($CTX, fmt.Sprintf("...", ...), ...)
+      - metavariable-pattern:
+          metavariable: $METHOD
+          patterns:
+            - pattern: Query
+            - pattern: QueryRow
+            - pattern: Exec
+            - pattern: QueryContext
+            - pattern: QueryRowContext
+            - pattern: ExecContext
+    message: >
+      SQL query built with fmt.Sprintf. This is a SQL injection risk.
+      Use parameterized queries with placeholders (?) instead. All
+      queries in nodate-flow must go through sqlc.
+    languages: [go]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: ["CWE-89"]
+      owasp: ["A03:2021"]
+
+  - id: nodate-flow.ts-sql-template-literal
+    patterns:
+      - pattern: |
+          $DB.query(`...${$EXPR}...`)
+    message: >
+      SQL query built with template literal interpolation. This is a
+      SQL injection risk. Use parameterized queries instead.
+    languages: [typescript, javascript]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: ["CWE-89"]
+      owasp: ["A03:2021"]
+
+  # ---------------------------------------------------------------
+  # Missing error checks on crypto operations (Go)
+  # ---------------------------------------------------------------
+  - id: nodate-flow.go-crypto-unchecked-encrypt
+    patterns:
+      - pattern: |
+          $RESULT, _ = crypto.Encrypt(...)
+    message: >
+      Error from crypto.Encrypt is discarded. Crypto errors must always
+      be checked and propagated. A failed encryption could lead to
+      storing unencrypted data.
+    languages: [go]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: ["CWE-252"]
+      owasp: ["A02:2021"]
+
+  - id: nodate-flow.go-crypto-unchecked-decrypt
+    patterns:
+      - pattern: |
+          $RESULT, _ = crypto.Decrypt(...)
+    message: >
+      Error from crypto.Decrypt is discarded. Crypto errors must always
+      be checked. A failed decryption may indicate data corruption or
+      key mismatch.
+    languages: [go]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: ["CWE-252"]
+      owasp: ["A02:2021"]
+
+  - id: nodate-flow.go-aes-unchecked-newcipher
+    patterns:
+      - pattern: |
+          $BLOCK, _ = aes.NewCipher(...)
+    message: >
+      Error from aes.NewCipher is discarded. Always check errors from
+      cryptographic operations.
+    languages: [go]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: ["CWE-252"]
+      owasp: ["A02:2021"]
+
+  - id: nodate-flow.go-gcm-unchecked
+    patterns:
+      - pattern: |
+          $GCM, _ = cipher.NewGCM(...)
+    message: >
+      Error from cipher.NewGCM is discarded. Always check errors from
+      cryptographic operations.
+    languages: [go]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: ["CWE-252"]
+      owasp: ["A02:2021"]
+
+  - id: nodate-flow.go-rand-unchecked
+    patterns:
+      - pattern: |
+          _, _ = rand.Read(...)
+    message: >
+      Error from crypto/rand.Read is discarded. A failure to read
+      random bytes could lead to predictable nonces or keys.
+    languages: [go]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: ["CWE-252"]
+      owasp: ["A02:2021"]
