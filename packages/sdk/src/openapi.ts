@@ -1923,6 +1923,12 @@ export interface components {
             /** @description YYYY-MM-DD */
             startOn?: string;
             title: string;
+            /**
+             * @description Task visibility: public (workspace), project (project members), or private (task actors only)
+             * @default public
+             * @enum {string}
+             */
+            visibility: "public" | "project" | "private";
         };
         CreateWorkspaceInputBody: {
             /**
@@ -2647,6 +2653,11 @@ export interface components {
             /** @description YYYY-MM-DD or empty string to clear */
             startOn?: string;
             title?: string;
+            /**
+             * @description Task visibility: public (workspace), project (project members), or private (task actors only)
+             * @enum {string}
+             */
+            visibility?: "public" | "project" | "private";
         };
         PatchWorkspaceInputBody: {
             /**
@@ -3010,6 +3021,7 @@ export interface components {
             title: string;
             /** Format: date-time */
             updatedAt?: string;
+            visibility: string;
             /** Format: uuid */
             workspaceId: string;
         };
@@ -3176,6 +3188,7 @@ export interface components {
             title: string;
             /** Format: date-time */
             updatedAt?: string;
+            visibility: string;
         };
         TaskPrioritySuggestion: {
             /** Format: float */

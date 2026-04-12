@@ -958,6 +958,12 @@
             "maxLength": 500,
             "minLength": 1,
             "type": "string"
+          },
+          "visibility": {
+            "default": "public",
+            "description": "Task visibility: public (workspace), project (project members), or private (task actors only)",
+            "enum": ["public", "project", "private"],
+            "type": "string"
           }
         },
         "required": ["projectId", "title"],
@@ -2697,6 +2703,11 @@
             "maxLength": 500,
             "minLength": 1,
             "type": "string"
+          },
+          "visibility": {
+            "description": "Task visibility: public (workspace), project (project members), or private (task actors only)",
+            "enum": ["public", "project", "private"],
+            "type": "string"
           }
         },
         "type": "object"
@@ -3520,6 +3531,9 @@
             "format": "date-time",
             "type": "string"
           },
+          "visibility": {
+            "type": "string"
+          },
           "workspaceId": {
             "format": "uuid",
             "type": "string"
@@ -3530,6 +3544,7 @@
           "workspaceId",
           "projectId",
           "title",
+          "visibility",
           "derivedState",
           "priority",
           "constraintCount",
@@ -3959,12 +3974,16 @@
           "updatedAt": {
             "format": "date-time",
             "type": "string"
+          },
+          "visibility": {
+            "type": "string"
           }
         },
         "required": [
           "id",
           "projectId",
           "title",
+          "visibility",
           "derivedState",
           "priority",
           "sortWeight",
