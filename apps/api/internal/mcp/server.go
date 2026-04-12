@@ -268,13 +268,16 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 		return
 	}
 	resultJSON, _ := json.Marshal(result)
-	h.audit(r.Context(), s, params.Name, args, resultJSON,
+	// Redact secrets from the response text so MCP callers never see
+	// raw API keys, tokens, or passwords in tool output.
+	redactedResult := ai.RedactJSONFields(string(resultJSON))
+	h.audit(r.Context(), s, params.Name, args, json.RawMessage(redactedResult),
 		generated.McpInvocationsStatusOk, "", dur)
 	// MCP spec: result content is a list of content parts. We wrap the
 	// tool output as a single JSON text part.
 	writeRPCResult(w, req.ID, map[string]any{
 		"content": []map[string]any{
-			{"type": "text", "text": string(resultJSON)},
+			{"type": "text", "text": redactedResult},
 		},
 		"isError": false,
 	})
@@ -403,8 +406,6 @@ func (h *Handler) audit(
 	if h.deps.Queries == nil {
 		return
 	}
-	// Redaction is currently a no-op: we store the raw args / result JSON.
-	// Future: run through the redaction pipeline before persisting.
 	argsBlob := args
 	if len(argsBlob) == 0 {
 		argsBlob = json.RawMessage("{}")
@@ -416,10 +417,10 @@ func (h *Handler) audit(
 	// Compact to keep stored JSON minimal.
 	var buf bytes.Buffer
 	_ = json.Compact(&buf, argsBlob)
-	argsBlob = buf.Bytes()
+	argsBlob = json.RawMessage(ai.RedactJSONFields(buf.String()))
 	buf.Reset()
 	_ = json.Compact(&buf, resBlob)
-	resBlob = buf.Bytes()
+	resBlob = json.RawMessage(ai.RedactJSONFields(buf.String()))
 
 	var userID sql.NullInt32
 	if s != nil {
