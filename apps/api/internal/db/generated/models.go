@@ -452,6 +452,92 @@ func (ns NullProjectMembersRole) Value() (driver.Value, error) {
 	return string(ns.ProjectMembersRole), nil
 }
 
+type RelationSuggestionsStatus string
+
+const (
+	RelationSuggestionsStatusPending   RelationSuggestionsStatus = "pending"
+	RelationSuggestionsStatusAccepted  RelationSuggestionsStatus = "accepted"
+	RelationSuggestionsStatusDismissed RelationSuggestionsStatus = "dismissed"
+)
+
+func (e *RelationSuggestionsStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = RelationSuggestionsStatus(s)
+	case string:
+		*e = RelationSuggestionsStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for RelationSuggestionsStatus: %T", src)
+	}
+	return nil
+}
+
+type NullRelationSuggestionsStatus struct {
+	RelationSuggestionsStatus RelationSuggestionsStatus `json:"relationSuggestionsStatus"`
+	Valid                     bool                      `json:"valid"` // Valid is true if RelationSuggestionsStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullRelationSuggestionsStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.RelationSuggestionsStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.RelationSuggestionsStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullRelationSuggestionsStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.RelationSuggestionsStatus), nil
+}
+
+type RelationSuggestionsSuggestedKind string
+
+const (
+	RelationSuggestionsSuggestedKindBlocks     RelationSuggestionsSuggestedKind = "blocks"
+	RelationSuggestionsSuggestedKindRelates    RelationSuggestionsSuggestedKind = "relates"
+	RelationSuggestionsSuggestedKindDuplicates RelationSuggestionsSuggestedKind = "duplicates"
+)
+
+func (e *RelationSuggestionsSuggestedKind) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = RelationSuggestionsSuggestedKind(s)
+	case string:
+		*e = RelationSuggestionsSuggestedKind(s)
+	default:
+		return fmt.Errorf("unsupported scan type for RelationSuggestionsSuggestedKind: %T", src)
+	}
+	return nil
+}
+
+type NullRelationSuggestionsSuggestedKind struct {
+	RelationSuggestionsSuggestedKind RelationSuggestionsSuggestedKind `json:"relationSuggestionsSuggestedKind"`
+	Valid                            bool                             `json:"valid"` // Valid is true if RelationSuggestionsSuggestedKind is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullRelationSuggestionsSuggestedKind) Scan(value interface{}) error {
+	if value == nil {
+		ns.RelationSuggestionsSuggestedKind, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.RelationSuggestionsSuggestedKind.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullRelationSuggestionsSuggestedKind) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.RelationSuggestionsSuggestedKind), nil
+}
+
 type SignalsSource string
 
 const (
@@ -759,6 +845,50 @@ func (ns NullTasksVisibility) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.TasksVisibility), nil
+}
+
+type TimeboxesStatus string
+
+const (
+	TimeboxesStatusPlanned   TimeboxesStatus = "planned"
+	TimeboxesStatusActive    TimeboxesStatus = "active"
+	TimeboxesStatusCompleted TimeboxesStatus = "completed"
+	TimeboxesStatusCancelled TimeboxesStatus = "cancelled"
+)
+
+func (e *TimeboxesStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = TimeboxesStatus(s)
+	case string:
+		*e = TimeboxesStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for TimeboxesStatus: %T", src)
+	}
+	return nil
+}
+
+type NullTimeboxesStatus struct {
+	TimeboxesStatus TimeboxesStatus `json:"timeboxesStatus"`
+	Valid           bool            `json:"valid"` // Valid is true if TimeboxesStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullTimeboxesStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.TimeboxesStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.TimeboxesStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullTimeboxesStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.TimeboxesStatus), nil
 }
 
 type UserIntegrationsProvider string
@@ -1376,6 +1506,14 @@ type Lense struct {
 	LensJson json.RawMessage `json:"lensJson"`
 	// Default lens for the scope
 	IsDefault bool `json:"isDefault"`
+	// Whether the lens is publicly shared
+	IsPublic bool `json:"isPublic"`
+	// Random hex token for public share URL
+	PublicToken sql.NullString `json:"publicToken"`
+	// Timestamp when first shared publicly
+	SharedAt sql.NullTime `json:"sharedAt"`
+	// Timestamp of last AI safety check
+	SafetyCheckedAt sql.NullTime `json:"safetyCheckedAt"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
@@ -1607,6 +1745,31 @@ type ProjectMember struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
+// AI-suggested task relation candidates
+type RelationSuggestion struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Internal FK to tasks.id (trigger task)
+	SourceTaskID uint32 `json:"-"`
+	// Internal FK to tasks.id (suggested relation)
+	TargetTaskID uint32 `json:"-"`
+	// Suggested dependency kind
+	SuggestedKind RelationSuggestionsSuggestedKind `json:"suggestedKind"`
+	// Cosine similarity score (0.0000 to 1.0000)
+	Confidence string `json:"confidence"`
+	// Resolution status
+	Status RelationSuggestionsStatus `json:"status"`
+	// Internal FK to users.id (who resolved)
+	ResolvedBy sql.NullInt32 `json:"-"`
+	// When the suggestion was accepted or dismissed
+	ResolvedAt sql.NullTime `json:"resolvedAt"`
+	CreatedAt  time.Time    `json:"createdAt"`
+}
+
 // Maps GitHub repositories to workspaces for webhook routing
 type RepoWorkspaceMapping struct {
 	// Internal PK, never exposed
@@ -1831,6 +1994,60 @@ type TaskEmbedding struct {
 	ContentHash string `json:"contentHash"`
 	// Last embed time
 	EmbeddedAt time.Time `json:"embeddedAt"`
+}
+
+// Time-bounded work containers
+type Timebox struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Internal FK to projects.id (NULL = spans all projects)
+	ProjectID sql.NullInt32 `json:"-"`
+	// Internal FK to users.id
+	CreatorID uint32 `json:"-"`
+	// Display name (e.g., Sprint 12)
+	Name string `json:"name"`
+	// Optional description or goals
+	Description sql.NullString `json:"description"`
+	// Timebox start date
+	StartsOn time.Time `json:"startsOn"`
+	// Timebox end date (must be > starts_on)
+	EndsOn time.Time `json:"endsOn"`
+	// Lifecycle status
+	Status TimeboxesStatus `json:"status"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
+// Timebox-task associations
+type TimeboxTask struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Internal FK to timeboxes.id
+	TimeboxID uint32 `json:"-"`
+	// Internal FK to tasks.id
+	TaskID uint32 `json:"-"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
 }
 
 // Global user accounts

@@ -4,10 +4,16 @@ package errors
 
 // Error codes and specs.
 var (
+	// WS.LENS.ALREADY_PRIVATE — This saved view is already private
+	WsLensAlreadyPrivate = &Spec{Code: "WS.LENS.ALREADY_PRIVATE", Status: 409, Message: "This saved view is already private"}
+	// WS.LENS.ALREADY_PUBLIC — This saved view is already published
+	WsLensAlreadyPublic = &Spec{Code: "WS.LENS.ALREADY_PUBLIC", Status: 409, Message: "This saved view is already published"}
 	// WS.LENS.NAME_ALREADY_TAKEN — A saved view with this name already exists
 	WsLensNameAlreadyTaken = &Spec{Code: "WS.LENS.NAME_ALREADY_TAKEN", Status: 409, Message: "A saved view with this name already exists"}
 	// WS.LENS.NOT_FOUND — Saved view not found
 	WsLensNotFound = &Spec{Code: "WS.LENS.NOT_FOUND", Status: 404, Message: "Saved view not found"}
+	// WS.LENS.PUBLIC_TOKEN_INVALID — Public share link not found or expired
+	WsLensPublicTokenInvalid = &Spec{Code: "WS.LENS.PUBLIC_TOKEN_INVALID", Status: 404, Message: "Public share link not found or expired"}
 	// WS.MEMBER.NOT_FOUND — Workspace member not found
 	WsMemberNotFound = &Spec{Code: "WS.MEMBER.NOT_FOUND", Status: 404, Message: "Workspace member not found"}
 	// WS.MEMBER.ROLE_DENIED — Your role does not permit this action

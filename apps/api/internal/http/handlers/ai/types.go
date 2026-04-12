@@ -18,6 +18,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/nlcommand"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/nlquery"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/crypto"
@@ -31,6 +32,9 @@ type Deps struct {
 	Queries  *generated.Queries
 	Cipher   *crypto.Cipher
 	NlQuery  *nlquery.Compiler
+	// NlCommand resolves natural language commands into MCP tool calls.
+	// Nil when no AI provider is configured (NF_AI_MOCK=0 and no provider row).
+	NlCommand *nlcommand.Resolver
 	// Audit records audit log entries. Nil-safe.
 	Audit *audit.Recorder
 }

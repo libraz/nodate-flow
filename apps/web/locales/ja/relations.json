@@ -1,0 +1,21 @@
+{
+  "title": "関連タスク",
+  "suggestions": "提案",
+  "empty": "提案はありません",
+  "empty_description": "類似タスクが検出されると、関連タスクが自動的に提案されます。",
+  "kind": {
+    "blocks": "ブロック中",
+    "relates": "関連",
+    "duplicates": "重複"
+  },
+  "action": {
+    "accept": "承認",
+    "dismiss": "却下",
+    "dismiss_all": "すべて却下"
+  },
+  "confidence": "確信度: {{score}}%",
+  "toast": {
+    "accepted": "関連を承認しました",
+    "dismissed": "提案を却下しました"
+  }
+}

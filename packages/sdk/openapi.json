@@ -101,6 +101,24 @@
         "required": ["filename", "contentType", "byteSize", "storageKey"],
         "type": "object"
       },
+      "AddTaskBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AddTaskBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "taskId": {
+            "description": "Task public id (UUID v7)",
+            "type": "string"
+          }
+        },
+        "required": ["taskId"],
+        "type": "object"
+      },
       "AddTaskCommentBody": {
         "additionalProperties": false,
         "properties": {
@@ -163,6 +181,23 @@
           }
         },
         "required": ["toTaskId", "kind"],
+        "type": "object"
+      },
+      "AddTaskOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AddTaskOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
         "type": "object"
       },
       "AddWorkspaceMemberInputBody": {
@@ -762,30 +797,19 @@
             "readOnly": true,
             "type": "string"
           },
-          "externalId": {
-            "maxLength": 255,
+          "description": {
+            "description": "Human-readable description",
             "type": "string"
           },
-          "kind": {
-            "maxLength": 255,
-            "minLength": 1,
-            "type": "string"
+          "eventTypes": {
+            "description": "JSON array of event type patterns"
           },
-          "payload": {},
-          "source": {
-            "enum": ["manual", "github", "slack", "email", "webhook"],
-            "type": "string"
-          },
-          "taskId": {
-            "description": "Optional task public id to attach to",
-            "type": "string"
-          },
-          "workspaceId": {
-            "description": "Workspace public id (UUID v7)",
+          "url": {
+            "description": "Target URL for webhook delivery",
             "type": "string"
           }
         },
-        "required": ["workspaceId", "source", "kind"],
+        "required": ["url", "description", "eventTypes"],
         "type": "object"
       },
       "CreateLensBody": {
@@ -886,6 +910,23 @@
           }
         },
         "required": ["id", "name", "token", "tokenPrefix", "scopes", "createdAt"],
+        "type": "object"
+      },
+      "CreateOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "webhook": {
+            "$ref": "#/components/schemas/WebhookSubscriptionDetailDTO"
+          }
+        },
+        "required": ["webhook"],
         "type": "object"
       },
       "CreateProjectBody": {
@@ -1004,6 +1045,41 @@
         "required": ["projectId", "title"],
         "type": "object"
       },
+      "CreateTimeboxBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateTimeboxBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 4000,
+            "type": "string"
+          },
+          "endsOn": {
+            "description": "YYYY-MM-DD",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "projectId": {
+            "description": "Project public id; omit for workspace-wide",
+            "type": "string"
+          },
+          "startsOn": {
+            "description": "YYYY-MM-DD",
+            "type": "string"
+          }
+        },
+        "required": ["name", "startsOn", "endsOn"],
+        "type": "object"
+      },
       "CreateWorkspaceInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -1070,6 +1146,23 @@
         "required": ["ok"],
         "type": "object"
       },
+      "DeleteOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/DeleteOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
       "DeleteProviderOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -1110,6 +1203,23 @@
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
             "examples": ["https://example.com/schemas/DeleteTaskCommentBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
+      "DeleteTimeboxBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/DeleteTimeboxBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -1385,6 +1495,114 @@
         "required": ["explanation"],
         "type": "object"
       },
+      "ExportBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ExportBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "count": {
+            "description": "Number of exported rows",
+            "format": "int64",
+            "type": "integer"
+          },
+          "format": {
+            "description": "Export format used",
+            "type": "string"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/ExportedTask"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["format", "count", "tasks"],
+        "type": "object"
+      },
+      "ExportedTask": {
+        "additionalProperties": false,
+        "properties": {
+          "assigneeDisplayName": {
+            "type": "string"
+          },
+          "assigneeId": {
+            "description": "Assignee public id (UUID v7)",
+            "type": "string"
+          },
+          "completedAt": {
+            "description": "Completion time (unix seconds)",
+            "format": "int64",
+            "type": "integer"
+          },
+          "createdAt": {
+            "description": "Creation time (unix seconds)",
+            "format": "int64",
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "dueOn": {
+            "description": "Due date (YYYY-MM-DD)",
+            "type": "string"
+          },
+          "id": {
+            "description": "Task public id (UUID v7)",
+            "type": "string"
+          },
+          "priority": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "projectId": {
+            "description": "Project public id (UUID v7)",
+            "type": "string"
+          },
+          "projectName": {
+            "type": "string"
+          },
+          "startedOn": {
+            "description": "Started date (YYYY-MM-DD)",
+            "type": "string"
+          },
+          "status": {
+            "description": "Derived state (open, waiting, review, etc.)",
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "description": "Last update time (unix seconds)",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["id", "title", "status", "priority", "projectId", "projectName", "createdAt"],
+        "type": "object"
+      },
+      "GetOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/GetOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "webhook": {
+            "$ref": "#/components/schemas/WebhookSubscriptionDetailDTO"
+          }
+        },
+        "required": ["webhook"],
+        "type": "object"
+      },
       "HealthOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -1610,6 +1828,33 @@
         "required": ["total", "actions"],
         "type": "object"
       },
+      "ListDeliveriesOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListDeliveriesOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "deliveries": {
+            "items": {
+              "$ref": "#/components/schemas/WebhookDeliveryDTO"
+            },
+            "type": ["array", "null"]
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "deliveries", "nextCursor"],
+        "type": "object"
+      },
       "ListDuplicatesOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -1634,6 +1879,53 @@
           }
         },
         "required": ["source", "model", "candidates"],
+        "type": "object"
+      },
+      "ListForTaskBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListForTaskBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/SuggestionDTO"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["suggestions"],
+        "type": "object"
+      },
+      "ListForWorkspaceBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListForWorkspaceBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/SuggestionDTO"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "suggestions", "nextCursor"],
         "type": "object"
       },
       "ListInboxOutputBody": {
@@ -1812,18 +2104,18 @@
           "nextCursor": {
             "type": ["string", "null"]
           },
-          "notifications": {
-            "items": {
-              "$ref": "#/components/schemas/NotificationDTO"
-            },
-            "type": ["array", "null"]
-          },
           "total": {
             "format": "int64",
             "type": "integer"
+          },
+          "webhooks": {
+            "items": {
+              "$ref": "#/components/schemas/WebhookSubscriptionDTO"
+            },
+            "type": ["array", "null"]
           }
         },
-        "required": ["total", "notifications", "nextCursor"],
+        "required": ["total", "webhooks", "nextCursor"],
         "type": "object"
       },
       "ListPrioritySuggestionsOutputBody": {
@@ -2177,12 +2469,41 @@
             "readOnly": true,
             "type": "string"
           },
-          "nextCursor": {
-            "type": ["string", "null"]
+          "completedTasks": {
+            "format": "int64",
+            "type": "integer"
           },
           "tasks": {
             "items": {
-              "$ref": "#/components/schemas/TaskListItem"
+              "$ref": "#/components/schemas/TimeboxTaskDTO"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalTasks": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "tasks", "totalTasks", "completedTasks"],
+        "type": "object"
+      },
+      "ListTimeboxesBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListTimeboxesBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "timeboxes": {
+            "items": {
+              "$ref": "#/components/schemas/TimeboxDTO"
             },
             "type": ["array", "null"]
           },
@@ -2191,7 +2512,7 @@
             "type": "integer"
           }
         },
-        "required": ["total", "tasks", "nextCursor"],
+        "required": ["total", "timeboxes"],
         "type": "object"
       },
       "ListTimelineOutputBody": {
@@ -3168,6 +3489,50 @@
         "required": ["provider", "configured"],
         "type": "object"
       },
+      "PublicLens": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PublicLens.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "filter": {},
+          "groupBy": {
+            "type": ["string", "null"]
+          },
+          "id": {
+            "description": "Lens public id (UUID v7)",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sort": {}
+        },
+        "required": ["id", "name", "filter", "sort", "groupBy"],
+        "type": "object"
+      },
+      "PublishLensBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PublishLensBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "publicToken": {
+            "description": "32-char hex token for the public share URL",
+            "type": "string"
+          }
+        },
+        "required": ["publicToken"],
+        "type": "object"
+      },
       "RegisterInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -3258,6 +3623,23 @@
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
             "examples": ["https://example.com/schemas/RemoveTaskDependencyBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
+      "RemoveTaskOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/RemoveTaskOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -3368,6 +3750,90 @@
         "required": ["derivedState", "equivalent", "stored"],
         "type": "object"
       },
+      "ResolveBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ResolveBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "action": {
+            "description": "Action to take on the suggestion",
+            "enum": ["accept", "dismiss"],
+            "type": "string"
+          }
+        },
+        "required": ["action"],
+        "type": "object"
+      },
+      "ResolveCommandInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ResolveCommandInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "prompt": {
+            "description": "Natural language command",
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["prompt"],
+        "type": "object"
+      },
+      "ResolveCommandOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ResolveCommandOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "args": {
+            "additionalProperties": {},
+            "description": "Tool arguments",
+            "type": "object"
+          },
+          "confidence": {
+            "description": "Confidence score (0.0 to 1.0)",
+            "format": "double",
+            "type": "number"
+          },
+          "tool": {
+            "description": "Resolved MCP tool name",
+            "type": "string"
+          }
+        },
+        "required": ["tool", "args", "confidence"],
+        "type": "object"
+      },
+      "ResolveOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ResolveOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
       "RevokeAllOtherSessionsOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -3438,8 +3904,25 @@
           "isDefault": {
             "type": "boolean"
           },
+          "isPublic": {
+            "type": "boolean"
+          },
           "name": {
             "type": "string"
+          },
+          "publicToken": {
+            "description": "Share token; only returned to workspace members",
+            "type": "string"
+          },
+          "safetyCheckedAt": {
+            "description": "Unix seconds of last AI safety check",
+            "format": "int64",
+            "type": "integer"
+          },
+          "sharedAt": {
+            "description": "Unix seconds when first shared publicly",
+            "format": "int64",
+            "type": "integer"
           },
           "sort": {},
           "sortWeight": {
@@ -3460,6 +3943,7 @@
           "sort",
           "groupBy",
           "isDefault",
+          "isPublic",
           "sortWeight",
           "createdAt"
         ],
@@ -3612,6 +4096,61 @@
           }
         },
         "required": ["taskId", "title", "state", "transition", "confidence", "reason"],
+        "type": "object"
+      },
+      "SuggestionDTO": {
+        "additionalProperties": false,
+        "properties": {
+          "confidence": {
+            "description": "Cosine similarity score, e.g. 0.85",
+            "format": "double",
+            "type": "number"
+          },
+          "createdAt": {
+            "description": "Unix timestamp (seconds)",
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "description": "Suggestion public id (UUID v7)",
+            "type": "string"
+          },
+          "sourceTaskId": {
+            "description": "Source task public id (UUID v7)",
+            "type": "string"
+          },
+          "sourceTaskTitle": {
+            "description": "Source task title",
+            "type": "string"
+          },
+          "status": {
+            "description": "Resolution status (pending, accepted, dismissed)",
+            "type": "string"
+          },
+          "suggestedKind": {
+            "description": "Suggested relation kind (blocks, relates, duplicates)",
+            "type": "string"
+          },
+          "targetTaskId": {
+            "description": "Target task public id (UUID v7)",
+            "type": "string"
+          },
+          "targetTaskTitle": {
+            "description": "Target task title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "suggestedKind",
+          "confidence",
+          "status",
+          "sourceTaskId",
+          "sourceTaskTitle",
+          "targetTaskId",
+          "targetTaskTitle",
+          "createdAt"
+        ],
         "type": "object"
       },
       "Task": {
@@ -4216,6 +4755,139 @@
         "required": ["taskId", "title", "state", "dueOn", "kind", "daysUntilDue", "message"],
         "type": "object"
       },
+      "TestDeliveryOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/TestDeliveryOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "deliveryId": {
+            "type": "string"
+          }
+        },
+        "required": ["deliveryId"],
+        "type": "object"
+      },
+      "TimeboxDTO": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/TimeboxDTO.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "creatorDisplayName": {
+            "type": "string"
+          },
+          "creatorId": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "endsOn": {
+            "description": "YYYY-MM-DD",
+            "type": "string"
+          },
+          "id": {
+            "description": "Timebox public id (UUID v7)",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "projectName": {
+            "type": "string"
+          },
+          "startsOn": {
+            "description": "YYYY-MM-DD",
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "creatorId",
+          "creatorDisplayName",
+          "name",
+          "startsOn",
+          "endsOn",
+          "status",
+          "updatedAt",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "TimeboxTaskDTO": {
+        "additionalProperties": false,
+        "properties": {
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "derivedState": {
+            "type": "string"
+          },
+          "dueOn": {
+            "description": "YYYY-MM-DD or null",
+            "type": ["string", "null"]
+          },
+          "id": {
+            "description": "Task public id (UUID v7)",
+            "type": "string"
+          },
+          "priority": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "sortWeight": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "startedOn": {
+            "description": "YYYY-MM-DD or null",
+            "type": ["string", "null"]
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "derivedState",
+          "priority",
+          "dueOn",
+          "startedOn",
+          "sortWeight",
+          "updatedAt",
+          "createdAt"
+        ],
+        "type": "object"
+      },
       "TimelineEvent": {
         "additionalProperties": false,
         "properties": {
@@ -4241,6 +4913,41 @@
           }
         },
         "required": ["id", "type", "occurredAt"],
+        "type": "object"
+      },
+      "ToggleInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ToggleInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "isActive": {
+            "description": "Desired active state",
+            "type": "boolean"
+          }
+        },
+        "required": ["isActive"],
+        "type": "object"
+      },
+      "ToggleOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ToggleOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
         "type": "object"
       },
       "TotpConfirmInputBody": {
@@ -4468,6 +5175,23 @@
         "required": ["ok", "dedupeKey"],
         "type": "object"
       },
+      "UnpublishLensBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/UnpublishLensBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
       "UpdateAgentEventTriggersInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -4567,6 +5291,54 @@
         },
         "type": "object"
       },
+      "UpdateTimeboxBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/UpdateTimeboxBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 4000,
+            "type": "string"
+          },
+          "endsOn": {
+            "description": "YYYY-MM-DD",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "startsOn": {
+            "description": "YYYY-MM-DD",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "UpdateTimeboxStatusBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/UpdateTimeboxStatusBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "status": {
+            "description": "Target status: planned, active, completed, cancelled",
+            "type": "string"
+          }
+        },
+        "required": ["status"],
+        "type": "object"
+      },
       "UpdateWorkspaceMemberRoleInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -4583,6 +5355,146 @@
           }
         },
         "required": ["role"],
+        "type": "object"
+      },
+      "WebhookDeliveryDTO": {
+        "additionalProperties": false,
+        "properties": {
+          "attempts": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "deliveredAt": {
+            "format": "int64",
+            "type": ["integer", "null"]
+          },
+          "eventType": {
+            "type": "string"
+          },
+          "failedAt": {
+            "format": "int64",
+            "type": ["integer", "null"]
+          },
+          "httpStatus": {
+            "format": "int32",
+            "type": ["integer", "null"]
+          },
+          "id": {
+            "type": "string"
+          },
+          "maxAttempts": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "eventType",
+          "status",
+          "httpStatus",
+          "attempts",
+          "maxAttempts",
+          "deliveredAt",
+          "failedAt",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "WebhookSubscriptionDTO": {
+        "additionalProperties": false,
+        "properties": {
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "creatorDisplayName": {
+            "type": "string"
+          },
+          "creatorId": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "eventTypes": {},
+          "id": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": ["integer", "null"]
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "description",
+          "eventTypes",
+          "isActive",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "WebhookSubscriptionDetailDTO": {
+        "additionalProperties": false,
+        "properties": {
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "creatorDisplayName": {
+            "type": "string"
+          },
+          "creatorId": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "eventTypes": {},
+          "id": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "secret": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": ["integer", "null"]
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "secret",
+          "id",
+          "url",
+          "description",
+          "eventTypes",
+          "isActive",
+          "createdAt",
+          "updatedAt"
+        ],
         "type": "object"
       },
       "WeeklyDigestCounts": {
@@ -6543,6 +7455,98 @@
         "summary": "List events in a project's timeline"
       }
     },
+    "/public/lenses/{token}": {
+      "get": {
+        "operationId": "lenses-get-public",
+        "parameters": [
+          {
+            "description": "32-char hex share token",
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "description": "32-char hex share token",
+              "maxLength": 32,
+              "minLength": 32,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicLens"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Fetch a publicly shared lens (no auth required)"
+      }
+    },
+    "/relation-suggestions/{suggestionId}/resolve": {
+      "post": {
+        "operationId": "relation-suggestions-resolve",
+        "parameters": [
+          {
+            "description": "Suggestion public id (UUID v7)",
+            "in": "path",
+            "name": "suggestionId",
+            "required": true,
+            "schema": {
+              "description": "Suggestion public id (UUID v7)",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolveOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Accept or dismiss a relation suggestion"
+      }
+    },
     "/signals": {
       "post": {
         "operationId": "signals-create",
@@ -8090,6 +9094,58 @@
         "summary": "Propose the next likely state transition for a task"
       }
     },
+    "/tasks/{id}/relation-suggestions": {
+      "get": {
+        "operationId": "relation-suggestions-list-task",
+        "parameters": [
+          {
+            "description": "Task public id (UUID v7)",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Task public id (UUID v7)",
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListForTaskBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List pending relation suggestions for a task"
+      }
+    },
     "/tasks/{id}/replay": {
       "get": {
         "operationId": "tasks-replay",
@@ -9371,6 +10427,54 @@
         "summary": "Workspace-wide deterministic reminder engine proposals (2.AI-4)"
       }
     },
+    "/workspaces/{wsId}/ai/resolve-command": {
+      "post": {
+        "operationId": "ai-resolve-command",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveCommandInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolveCommandOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Resolve a natural-language command into an MCP tool invocation"
+      }
+    },
     "/workspaces/{wsId}/ai/state-suggestions": {
       "get": {
         "operationId": "ai-state-suggestions",
@@ -9561,6 +10665,81 @@
           }
         },
         "summary": "Deterministic weekly digest markdown for a workspace (2.AI-9)"
+      }
+    },
+    "/workspaces/{wsId}/export/tasks": {
+      "get": {
+        "description": "Export workspace tasks as a JSON array, optionally scoped by a saved lens.",
+        "operationId": "export-tasks",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Export format (csv or json)",
+            "explode": false,
+            "in": "query",
+            "name": "format",
+            "schema": {
+              "default": "csv",
+              "description": "Export format (csv or json)",
+              "enum": ["csv", "json"],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional lens public id to scope the export",
+            "explode": false,
+            "in": "query",
+            "name": "lensId",
+            "schema": {
+              "description": "Optional lens public id to scope the export",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of rows to export",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 5000,
+              "description": "Maximum number of rows to export",
+              "format": "int32",
+              "maximum": 10000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Export tasks as JSON"
       }
     },
     "/workspaces/{wsId}/inbox/triage": {
@@ -9870,6 +11049,98 @@
           }
         },
         "summary": "Update a saved view"
+      }
+    },
+    "/workspaces/{wsId}/lenses/{lensId}/publish": {
+      "post": {
+        "operationId": "lenses-publish",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "lensId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishLensBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Publish a lens publicly with a shareable token URL"
+      }
+    },
+    "/workspaces/{wsId}/lenses/{lensId}/unpublish": {
+      "post": {
+        "operationId": "lenses-unpublish",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "lensId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnpublishLensBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Revoke public access to a lens"
       }
     },
     "/workspaces/{wsId}/me/mcp-tokens": {
@@ -10379,6 +11650,553 @@
         "summary": "Create a project in a workspace"
       }
     },
+    "/workspaces/{wsId}/relation-suggestions": {
+      "get": {
+        "operationId": "relation-suggestions-list-workspace",
+        "parameters": [
+          {
+            "description": "Workspace public id (UUID v7)",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public id (UUID v7)",
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListForWorkspaceBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List pending relation suggestions for a workspace"
+      }
+    },
+    "/workspaces/{wsId}/timeboxes": {
+      "get": {
+        "operationId": "timeboxes-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListTimeboxesBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List timeboxes in a workspace"
+      },
+      "post": {
+        "operationId": "timeboxes-create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTimeboxBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeboxDTO"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create a timebox"
+      }
+    },
+    "/workspaces/{wsId}/timeboxes/{timeboxId}": {
+      "delete": {
+        "operationId": "timeboxes-delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "timeboxId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteTimeboxBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Soft-delete a timebox"
+      },
+      "get": {
+        "operationId": "timeboxes-get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "timeboxId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeboxDTO"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Fetch a timebox by id"
+      },
+      "patch": {
+        "operationId": "timeboxes-update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "timeboxId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTimeboxBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeboxDTO"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update a timebox"
+      }
+    },
+    "/workspaces/{wsId}/timeboxes/{timeboxId}/status": {
+      "post": {
+        "operationId": "timeboxes-update-status",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "timeboxId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTimeboxStatusBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeboxDTO"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Transition timebox status"
+      }
+    },
+    "/workspaces/{wsId}/timeboxes/{timeboxId}/tasks": {
+      "get": {
+        "operationId": "timeboxes-list-tasks",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "timeboxId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListTasksBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List tasks in a timebox with progress"
+      },
+      "post": {
+        "operationId": "timeboxes-add-task",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "timeboxId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddTaskBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddTaskOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Add a task to a timebox"
+      }
+    },
+    "/workspaces/{wsId}/timeboxes/{timeboxId}/tasks/{taskId}": {
+      "delete": {
+        "operationId": "timeboxes-remove-task",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "timeboxId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "taskId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoveTaskOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Remove a task from a timebox"
+      }
+    },
     "/workspaces/{wsId}/timeline": {
       "get": {
         "operationId": "workspaces-timeline-list",
@@ -10499,6 +12317,398 @@
           }
         },
         "summary": "List workspace users (minimal summary for actor pickers)"
+      }
+    },
+    "/workspaces/{wsId}/webhooks": {
+      "get": {
+        "operationId": "webhooks-list",
+        "parameters": [
+          {
+            "description": "Workspace public id (UUID v7)",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public id (UUID v7)",
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List webhook subscriptions"
+      },
+      "post": {
+        "operationId": "webhooks-create",
+        "parameters": [
+          {
+            "description": "Workspace public id (UUID v7)",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public id (UUID v7)",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create a webhook subscription"
+      }
+    },
+    "/workspaces/{wsId}/webhooks/{webhookId}": {
+      "delete": {
+        "operationId": "webhooks-delete",
+        "parameters": [
+          {
+            "description": "Workspace public id (UUID v7)",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public id (UUID v7)",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Webhook subscription public id (UUID v7)",
+            "in": "path",
+            "name": "webhookId",
+            "required": true,
+            "schema": {
+              "description": "Webhook subscription public id (UUID v7)",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Soft-delete a webhook subscription"
+      },
+      "get": {
+        "operationId": "webhooks-get",
+        "parameters": [
+          {
+            "description": "Workspace public id (UUID v7)",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public id (UUID v7)",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Webhook subscription public id (UUID v7)",
+            "in": "path",
+            "name": "webhookId",
+            "required": true,
+            "schema": {
+              "description": "Webhook subscription public id (UUID v7)",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get a webhook subscription (includes secret)"
+      }
+    },
+    "/workspaces/{wsId}/webhooks/{webhookId}/deliveries": {
+      "get": {
+        "operationId": "webhooks-deliveries-list",
+        "parameters": [
+          {
+            "description": "Workspace public id (UUID v7)",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public id (UUID v7)",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Webhook subscription public id (UUID v7)",
+            "in": "path",
+            "name": "webhookId",
+            "required": true,
+            "schema": {
+              "description": "Webhook subscription public id (UUID v7)",
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListDeliveriesOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List delivery log for a webhook subscription"
+      }
+    },
+    "/workspaces/{wsId}/webhooks/{webhookId}/test": {
+      "post": {
+        "operationId": "webhooks-test-delivery",
+        "parameters": [
+          {
+            "description": "Workspace public id (UUID v7)",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public id (UUID v7)",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Webhook subscription public id (UUID v7)",
+            "in": "path",
+            "name": "webhookId",
+            "required": true,
+            "schema": {
+              "description": "Webhook subscription public id (UUID v7)",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestDeliveryOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Send a test ping delivery"
+      }
+    },
+    "/workspaces/{wsId}/webhooks/{webhookId}/toggle": {
+      "patch": {
+        "operationId": "webhooks-toggle",
+        "parameters": [
+          {
+            "description": "Workspace public id (UUID v7)",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public id (UUID v7)",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Webhook subscription public id (UUID v7)",
+            "in": "path",
+            "name": "webhookId",
+            "required": true,
+            "schema": {
+              "description": "Webhook subscription public id (UUID v7)",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToggleInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToggleOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Activate or deactivate a webhook subscription"
       }
     }
   }

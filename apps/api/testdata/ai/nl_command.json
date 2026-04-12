@@ -1,0 +1,47 @@
+{
+  "create a task called fix login bug": {
+    "tool": "create_task",
+    "args": { "title": "Fix login bug" },
+    "confidence": 0.95
+  },
+  "show me all high priority tasks": {
+    "tool": "propose_lens",
+    "args": { "prompt": "high priority tasks" },
+    "confidence": 0.88
+  },
+  "search for authentication": {
+    "tool": "search_tasks",
+    "args": { "query": "authentication" },
+    "confidence": 0.92
+  },
+  "list all projects": {
+    "tool": "list_projects",
+    "args": {},
+    "confidence": 0.97
+  },
+  "add a comment saying looks good to task abc": {
+    "tool": "add_comment",
+    "args": { "taskId": "abc", "body": "looks good" },
+    "confidence": 0.9
+  },
+  "show tasks in my project": {
+    "tool": "list_tasks",
+    "args": {},
+    "confidence": 0.85
+  },
+  "update the title of task xyz to new title": {
+    "tool": "update_task",
+    "args": { "taskId": "xyz", "title": "new title" },
+    "confidence": 0.91
+  },
+  "fix login bug というタスクを作って": {
+    "tool": "create_task",
+    "args": { "title": "Fix login bug" },
+    "confidence": 0.93
+  },
+  "優先度の高いタスクを見せて": {
+    "tool": "propose_lens",
+    "args": { "prompt": "high priority tasks" },
+    "confidence": 0.86
+  }
+}

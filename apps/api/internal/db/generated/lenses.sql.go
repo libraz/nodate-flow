@@ -83,6 +83,10 @@ SELECT
   l.name,
   l.lens_json,
   l.is_default,
+  l.is_public,
+  l.public_token,
+  l.shared_at,
+  l.safety_checked_at,
   l.sort_weight,
   l.updated_at,
   l.created_at
@@ -106,6 +110,10 @@ type GetLensByPublicIDRow struct {
 	Name               string          `json:"name"`
 	LensJson           json.RawMessage `json:"lensJson"`
 	IsDefault          bool            `json:"isDefault"`
+	IsPublic           bool            `json:"isPublic"`
+	PublicToken        sql.NullString  `json:"publicToken"`
+	SharedAt           sql.NullTime    `json:"sharedAt"`
+	SafetyCheckedAt    sql.NullTime    `json:"safetyCheckedAt"`
 	SortWeight         int32           `json:"sortWeight"`
 	UpdatedAt          sql.NullTime    `json:"updatedAt"`
 	CreatedAt          time.Time       `json:"createdAt"`
@@ -123,6 +131,10 @@ func (q *Queries) GetLensByPublicID(ctx context.Context, arg GetLensByPublicIDPa
 		&i.Name,
 		&i.LensJson,
 		&i.IsDefault,
+		&i.IsPublic,
+		&i.PublicToken,
+		&i.SharedAt,
+		&i.SafetyCheckedAt,
 		&i.SortWeight,
 		&i.UpdatedAt,
 		&i.CreatedAt,
@@ -138,6 +150,10 @@ SELECT
   l.name,
   l.lens_json,
   l.is_default,
+  l.is_public,
+  l.public_token,
+  l.shared_at,
+  l.safety_checked_at,
   l.sort_weight,
   l.updated_at,
   l.created_at,
@@ -165,6 +181,10 @@ type ListLensesForProjectRow struct {
 	Name               string          `json:"name"`
 	LensJson           json.RawMessage `json:"lensJson"`
 	IsDefault          bool            `json:"isDefault"`
+	IsPublic           bool            `json:"isPublic"`
+	PublicToken        sql.NullString  `json:"publicToken"`
+	SharedAt           sql.NullTime    `json:"sharedAt"`
+	SafetyCheckedAt    sql.NullTime    `json:"safetyCheckedAt"`
 	SortWeight         int32           `json:"sortWeight"`
 	UpdatedAt          sql.NullTime    `json:"updatedAt"`
 	CreatedAt          time.Time       `json:"createdAt"`
@@ -193,6 +213,10 @@ func (q *Queries) ListLensesForProject(ctx context.Context, arg ListLensesForPro
 			&i.Name,
 			&i.LensJson,
 			&i.IsDefault,
+			&i.IsPublic,
+			&i.PublicToken,
+			&i.SharedAt,
+			&i.SafetyCheckedAt,
 			&i.SortWeight,
 			&i.UpdatedAt,
 			&i.CreatedAt,
@@ -209,6 +233,29 @@ func (q *Queries) ListLensesForProject(ctx context.Context, arg ListLensesForPro
 		return nil, err
 	}
 	return items, nil
+}
+
+const resolveLensProjectID = `-- name: ResolveLensProjectID :one
+SELECT
+  l.project_id
+FROM lenses l
+WHERE l.workspace_id = ?
+  AND l.public_id = ?
+  AND l.enabled = TRUE
+`
+
+type ResolveLensProjectIDParams struct {
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+// Resolve a lens public_id to its optional internal project_id.
+// Used by the export handler to decide workspace-wide vs project-scoped queries.
+func (q *Queries) ResolveLensProjectID(ctx context.Context, arg ResolveLensProjectIDParams) (sql.NullInt32, error) {
+	row := q.db.QueryRowContext(ctx, resolveLensProjectID, arg.WorkspaceID, arg.PublicID)
+	var project_id sql.NullInt32
+	err := row.Scan(&project_id)
+	return project_id, err
 }
 
 const updateLens = `-- name: UpdateLens :exec

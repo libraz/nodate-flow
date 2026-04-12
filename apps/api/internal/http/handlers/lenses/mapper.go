@@ -1,6 +1,7 @@
 package lenses
 
 import (
+	"database/sql"
 	"encoding/json"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
@@ -75,6 +76,10 @@ func rowToLensFromList(r generated.ListLensesForProjectRow) SavedLens {
 		Sort:               sort,
 		GroupBy:            groupBy,
 		IsDefault:          r.IsDefault,
+		IsPublic:           r.IsPublic,
+		PublicToken:        nullString(r.PublicToken),
+		SharedAt:           nullTimeUnix(r.SharedAt),
+		SafetyCheckedAt:    nullTimeUnix(r.SafetyCheckedAt),
 		SortWeight:         r.SortWeight,
 		UpdatedAt:          nullTime(r.UpdatedAt),
 		CreatedAt:          r.CreatedAt,
@@ -93,8 +98,44 @@ func rowToLensFromGet(r generated.GetLensByPublicIDRow) SavedLens {
 		Sort:               sort,
 		GroupBy:            groupBy,
 		IsDefault:          r.IsDefault,
+		IsPublic:           r.IsPublic,
+		PublicToken:        nullString(r.PublicToken),
+		SharedAt:           nullTimeUnix(r.SharedAt),
+		SafetyCheckedAt:    nullTimeUnix(r.SafetyCheckedAt),
 		SortWeight:         r.SortWeight,
 		UpdatedAt:          nullTime(r.UpdatedAt),
 		CreatedAt:          r.CreatedAt,
 	}
+}
+
+// rowToPublicLens maps a FindLensByPublicTokenRow to the PublicLens DTO.
+// Only exposes the lens definition; all workspace/creator metadata is omitted.
+func rowToPublicLens(r generated.FindLensByPublicTokenRow) PublicLens {
+	filter, sort, groupBy := parseLensJSON(r.LensJson)
+	return PublicLens{
+		ID:      r.PublicID.String(),
+		Name:    r.Name,
+		Filter:  filter,
+		Sort:    sort,
+		GroupBy: groupBy,
+	}
+}
+
+// nullTimeUnix converts a sql.NullTime to *int64 unix seconds. This is
+// the single conversion point for _at columns in this package, per the
+// api-types convention.
+func nullTimeUnix(t sql.NullTime) *int64 {
+	if !t.Valid {
+		return nil
+	}
+	v := t.Time.Unix()
+	return &v
+}
+
+// nullString converts a sql.NullString to *string.
+func nullString(s sql.NullString) *string {
+	if !s.Valid {
+		return nil
+	}
+	return &s.String
 }

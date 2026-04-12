@@ -35,9 +35,66 @@ type SavedLens struct {
 	Sort               json.RawMessage `json:"sort"`
 	GroupBy            *string         `json:"groupBy"`
 	IsDefault          bool            `json:"isDefault"`
+	IsPublic           bool            `json:"isPublic"`
+	PublicToken        *string         `json:"publicToken,omitempty" doc:"Share token; only returned to workspace members"`
+	SharedAt           *int64          `json:"sharedAt,omitempty" doc:"Unix seconds when first shared publicly"`
+	SafetyCheckedAt    *int64          `json:"safetyCheckedAt,omitempty" doc:"Unix seconds of last AI safety check"`
 	SortWeight         int32           `json:"sortWeight"`
 	UpdatedAt          *time.Time      `json:"updatedAt,omitempty"`
 	CreatedAt          time.Time       `json:"createdAt"`
+}
+
+// PublicLens is the read-only DTO returned by the unauthenticated
+// public share endpoint. It intentionally omits creator, workspace,
+// and internal metadata.
+type PublicLens struct {
+	ID      string          `json:"id" doc:"Lens public id (UUID v7)"`
+	Name    string          `json:"name"`
+	Filter  json.RawMessage `json:"filter"`
+	Sort    json.RawMessage `json:"sort"`
+	GroupBy *string         `json:"groupBy"`
+}
+
+// PublishLensInput is the input for POST /workspaces/{wsId}/lenses/{lensId}/publish.
+type PublishLensInput struct {
+	WsID   string `path:"wsId"`
+	LensID string `path:"lensId"`
+}
+
+// PublishLensOutput is the response for POST /workspaces/{wsId}/lenses/{lensId}/publish.
+type PublishLensOutput struct {
+	Body PublishLensBody
+}
+
+// PublishLensBody is the response body for publishing a lens.
+type PublishLensBody struct {
+	PublicToken string `json:"publicToken" doc:"32-char hex token for the public share URL"`
+}
+
+// UnpublishLensInput is the input for POST /workspaces/{wsId}/lenses/{lensId}/unpublish.
+type UnpublishLensInput struct {
+	WsID   string `path:"wsId"`
+	LensID string `path:"lensId"`
+}
+
+// UnpublishLensOutput is the response for POST /workspaces/{wsId}/lenses/{lensId}/unpublish.
+type UnpublishLensOutput struct {
+	Body UnpublishLensBody
+}
+
+// UnpublishLensBody is the response body for unpublishing a lens.
+type UnpublishLensBody struct {
+	Ok bool `json:"ok"`
+}
+
+// GetPublicLensInput is the input for GET /public/lenses/{token}.
+type GetPublicLensInput struct {
+	Token string `path:"token" minLength:"32" maxLength:"32" doc:"32-char hex share token"`
+}
+
+// GetPublicLensOutput is the response for GET /public/lenses/{token}.
+type GetPublicLensOutput struct {
+	Body PublicLens
 }
 
 // CreateLensBody is the request body for POST /workspaces/{wsId}/lenses.

@@ -1,0 +1,41 @@
+{
+  "title": "タイムボックス",
+  "create": "タイムボックスを作成",
+  "edit": "タイムボックスを編集",
+  "delete": "タイムボックスを削除",
+  "empty": "タイムボックスはまだありません",
+  "empty_description": "タイムボックスを作成して、スプリントやイテレーションを計画しましょう。",
+  "name_label": "名前",
+  "name_placeholder": "例: スプリント 12",
+  "description_label": "説明",
+  "starts_on_label": "開始日",
+  "ends_on_label": "終了日",
+  "status": {
+    "planned": "予定",
+    "active": "進行中",
+    "completed": "完了",
+    "cancelled": "キャンセル済み"
+  },
+  "action": {
+    "activate": "タイムボックスを開始",
+    "complete": "タイムボックスを完了",
+    "cancel": "タイムボックスをキャンセル",
+    "add_task": "タスクを追加",
+    "remove_task": "タスクを削除"
+  },
+  "progress": {
+    "title": "進捗",
+    "tasks_completed": "{{total}}件中{{completed}}件完了",
+    "burndown": "バーンダウン"
+  },
+  "toast": {
+    "created": "タイムボックスを作成しました",
+    "updated": "タイムボックスを更新しました",
+    "deleted": "タイムボックスを削除しました",
+    "activated": "タイムボックスを開始しました",
+    "completed": "タイムボックスを完了しました",
+    "task_added": "タスクをタイムボックスに追加しました",
+    "task_removed": "タスクをタイムボックスから削除しました"
+  },
+  "confirm_delete": "このタイムボックスを削除してもよろしいですか？"
+}

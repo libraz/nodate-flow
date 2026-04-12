@@ -75,7 +75,16 @@
       "create_task": "Create new task",
       "hint_nav": "Navigate",
       "hint_select": "Select",
-      "hint_close": "Close"
+      "hint_close": "Close",
+      "placeholder_command": "Type a command in natural language\u2026",
+      "group_command": "AI Command",
+      "resolving": "Resolving command\u2026",
+      "confidence": "Confidence: {score}%",
+      "confirm_execute": "Press Enter to execute",
+      "confirm_low": "Confirm: {tool}?",
+      "command_hint": "Type > for AI commands",
+      "no_workspace": "Select a workspace first to use AI commands.",
+      "error": "Could not resolve the command. Please try again."
     }
   },
   "theme": {

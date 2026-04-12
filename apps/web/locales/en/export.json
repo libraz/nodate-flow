@@ -1,0 +1,19 @@
+{
+  "title": "Export",
+  "button": "Export tasks",
+  "format_label": "Format",
+  "format": {
+    "csv": "CSV",
+    "json": "JSON"
+  },
+  "scope": {
+    "all": "All tasks",
+    "lens": "Current view"
+  },
+  "toast": {
+    "started": "Export started",
+    "completed": "Export completed",
+    "failed": "Export failed"
+  },
+  "download": "Download"
+}

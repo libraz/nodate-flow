@@ -44,4 +44,29 @@ func RegisterWorkspaceScoped(api huma.API, deps Deps) {
 		Path:        "/workspaces/{wsId}/lenses/{lensId}",
 		Summary:     "Delete a saved view",
 	}, Delete(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "lenses-publish",
+		Method:      http.MethodPost,
+		Path:        "/workspaces/{wsId}/lenses/{lensId}/publish",
+		Summary:     "Publish a lens publicly with a shareable token URL",
+	}, Publish(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "lenses-unpublish",
+		Method:      http.MethodPost,
+		Path:        "/workspaces/{wsId}/lenses/{lensId}/unpublish",
+		Summary:     "Revoke public access to a lens",
+	}, Unpublish(deps))
+}
+
+// RegisterPublic wires the unauthenticated public lens route. The
+// caller must attach per-IP rate limiting but NOT auth middleware.
+func RegisterPublic(api huma.API, deps Deps) {
+	huma.Register(api, huma.Operation{
+		OperationID: "lenses-get-public",
+		Method:      http.MethodGet,
+		Path:        "/public/lenses/{token}",
+		Summary:     "Fetch a publicly shared lens (no auth required)",
+	}, GetPublic(deps))
 }

@@ -75,7 +75,16 @@
       "create_task": "新しいタスクを作成",
       "hint_nav": "移動",
       "hint_select": "選択",
-      "hint_close": "閉じる"
+      "hint_close": "閉じる",
+      "placeholder_command": "自然言語でコマンドを入力\u2026",
+      "group_command": "AI コマンド",
+      "resolving": "コマンドを解析中\u2026",
+      "confidence": "信頼度: {score}%",
+      "confirm_execute": "Enter で実行",
+      "confirm_low": "確認: {tool} を実行しますか？",
+      "command_hint": "> で AI コマンドモード",
+      "no_workspace": "AI コマンドを使用するにはワークスペースを選択してください。",
+      "error": "コマンドを解析できませんでした。もう一度お試しください。"
     }
   },
   "theme": {

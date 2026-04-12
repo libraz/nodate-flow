@@ -23,6 +23,8 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/agentruntime"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/embed"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/nlcommand"
+	airelations "github.com/nodate-flow/nodate-flow/apps/api/internal/ai/relations"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/nlconstraint"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/nlquery"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/providers"
@@ -35,13 +37,16 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/eventbus"
 	aihandlers "github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/ai"
 	authhandlers "github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/auth"
+	exporthandlers "github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/export"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/inbox"
 	integrationshandlers "github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/integrations"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/lenses"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/notifications"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/projects"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/relations"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/signals"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/tasks"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/timeboxes"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/timeline"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/webhooks"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/workspaces"
@@ -260,11 +265,14 @@ func BuildResult(deps Deps) Result {
 	var embedClient *embed.Client
 	var nlQueryCompiler *nlquery.Compiler
 	var nlConstraintCompiler *nlconstraint.Compiler
+	var nlCommandResolver *nlcommand.Resolver
+	_ = nlCommandResolver // used by a handler being wired in a parallel branch
 	switch {
 	case deps.AiMock:
 		embedClient = embed.New(embed.NewMockProvider(), deps.Queries)
 		nlQueryCompiler = nlquery.New(nlquery.NewMockProvider())
 		nlConstraintCompiler = nlconstraint.New(nlconstraint.NewMockProvider())
+		nlCommandResolver = nlcommand.New(nlcommand.NewMockProvider(), nil)
 	case deps.EmbedOpenAIKey != "":
 		var opts []embed.OpenAIOption
 		if deps.EmbedModel != "" {
@@ -279,7 +287,9 @@ func BuildResult(deps Deps) Result {
 	tlDeps := timeline.Deps{DB: deps.DB, Queries: deps.Queries}
 	inboxDeps := inbox.Deps{DB: deps.DB, Queries: deps.Queries}
 	notifDeps := notifications.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
-	aiDeps := aihandlers.Deps{DB: deps.DB, Queries: deps.Queries, Cipher: deps.Cipher, NlQuery: nlQueryCompiler, Audit: auditRec}
+	// NOTE: relationDeps and exportDeps are declared inside chi groups
+	// where they are scoped to the right middleware. Do not hoist them.
+	aiDeps := aihandlers.Deps{DB: deps.DB, Queries: deps.Queries, Cipher: deps.Cipher, NlQuery: nlQueryCompiler, NlCommand: nlCommandResolver, Audit: auditRec}
 
 	// AI orchestrator. Built once and shared by the MCP server, the
 	// inbox triage handler, and any future AI endpoint. When
@@ -401,6 +411,10 @@ func BuildResult(deps Deps) Result {
 		}, projects.List(prjDeps))
 		lensDeps := lenses.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
 		lenses.RegisterWorkspaceScoped(subAPI, lensDeps)
+		exportDeps := exporthandlers.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
+		exporthandlers.RegisterWorkspaceScoped(subAPI, sub, exportDeps)
+		tbDeps := timeboxes.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
+		timeboxes.RegisterWorkspaceScoped(subAPI, tbDeps)
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-cost-today",
 			Method:      http.MethodGet,
@@ -497,6 +511,12 @@ func BuildResult(deps Deps) Result {
 			Path:        "/workspaces/{wsId}/ai/invocations",
 			Summary:     "List redacted LLM call audit rows for the AI reasoning panel",
 		}, aihandlers.ListInvocations(aiDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "ai-resolve-command",
+			Method:      http.MethodPost,
+			Path:        "/workspaces/{wsId}/ai/resolve-command",
+			Summary:     "Resolve a natural-language command into an MCP tool invocation",
+		}, aihandlers.ResolveCommand(aiDeps))
 
 		// Realtime SSE stream for this workspace. Not a Huma
 		// operation because the response is a long-lived
@@ -508,6 +528,8 @@ func BuildResult(deps Deps) Result {
 		}
 		sub.Get("/workspaces/{wsId}/stream", stream.SSEHandler(notifier, deps.StreamRemember))
 		notifications.RegisterWorkspaceScoped(subAPI, notifDeps)
+		relationDeps := relations.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
+		relations.RegisterWorkspaceScoped(subAPI, relationDeps)
 	})
 
 	// Per-user MCP tokens (workspace member, not admin).
@@ -596,6 +618,8 @@ func BuildResult(deps Deps) Result {
 		subAPI := newSubAPI(sub)
 		tasks.RegisterTaskScoped(subAPI, taskDeps)
 		timeline.RegisterTaskScoped(subAPI, tlDeps)
+		relationTaskDeps := relations.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
+		relations.RegisterTaskScoped(subAPI, relationTaskDeps)
 	})
 
 	// Workspace timeline.
@@ -622,6 +646,8 @@ func BuildResult(deps Deps) Result {
 		signals.RegisterCollection(subAPI, signalDeps)
 		inbox.Register(subAPI, inboxDeps)
 		notifications.Register(subAPI, notifDeps)
+		relationAuthDeps := relations.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
+		relations.RegisterAuthScoped(subAPI, relationAuthDeps)
 	})
 
 	// MCP server uses the orchestrator built above. The SSE event hook
@@ -630,6 +656,14 @@ func BuildResult(deps Deps) Result {
 	mcpHandler := mcp.NewHandler(mcp.Deps{DB: deps.DB, Queries: deps.Queries, AI: aiOrch, Embedder: embedClient, NlQuery: nlQueryCompiler})
 	eventbus.AddNotifyHook(mcpHandler.RegisterEventHook())
 	r.Handle("/mcp", mcpHandler)
+
+	// Relation auto-detect pipeline (INTEL-3). Fires on task.created
+	// and task.updated events, creates relation_suggestions via
+	// embedding similarity in a background goroutine.
+	if embedClient != nil {
+		relationPipeline := &airelations.Pipeline{DB: deps.DB, Queries: deps.Queries, Embedder: embedClient}
+		eventbus.AddNotifyHook(relationPipeline.Hook())
+	}
 
 	// Workspace-scoped AI inbox triage. Registered in
 	// its own group so the auth + workspace-member middleware applies
@@ -641,6 +675,18 @@ func BuildResult(deps Deps) Result {
 		triageDeps := inbox.TriageDeps{Deps: inboxDeps, AI: aiOrch}
 		inbox.RegisterTriage(subAPI, triageDeps)
 		inbox.RegisterAiSuggestions(subAPI, triageDeps)
+	})
+
+	// Public lens sharing (no auth, per-IP rate limited).
+	publicLensRateLimiter := middleware.NewIPRateLimiter(middleware.RateLimitConfig{
+		MaxRequests: 30,
+		Window:      15 * time.Minute,
+	})
+	r.Group(func(sub chi.Router) {
+		sub.Use(publicLensRateLimiter.Middleware())
+		publicLensAPI := newSubAPI(sub)
+		publicLensDeps := lenses.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
+		lenses.RegisterPublic(publicLensAPI, publicLensDeps)
 	})
 
 	// Public webhooks (verify their own signatures).

@@ -145,3 +145,24 @@ resources:
         message: "A saved view with this name already exists"
         description: "Returned when the requested lens name already exists within the same workspace/project scope."
         userAction: "Choose a different name."
+
+      already_public:
+        code: WS.LENS.ALREADY_PUBLIC
+        status: 409
+        message: "This saved view is already published"
+        description: "Returned when attempting to publish a lens that is already shared publicly."
+        userAction: "The view is already public. Use the existing share link."
+
+      already_private:
+        code: WS.LENS.ALREADY_PRIVATE
+        status: 409
+        message: "This saved view is already private"
+        description: "Returned when attempting to unpublish a lens that is not currently shared."
+        userAction: "The view is already private."
+
+      public_token_invalid:
+        code: WS.LENS.PUBLIC_TOKEN_INVALID
+        status: 404
+        message: "Public share link not found or expired"
+        description: "Returned when a public lens token does not match any published lens."
+        userAction: "Verify the share link is correct and the view is still published."

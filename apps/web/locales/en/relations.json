@@ -1,0 +1,21 @@
+{
+  "title": "Related tasks",
+  "suggestions": "Suggestions",
+  "empty": "No suggestions",
+  "empty_description": "Related tasks will be suggested automatically when similar tasks are detected.",
+  "kind": {
+    "blocks": "Blocks",
+    "relates": "Related to",
+    "duplicates": "Duplicate of"
+  },
+  "action": {
+    "accept": "Accept",
+    "dismiss": "Dismiss",
+    "dismiss_all": "Dismiss all"
+  },
+  "confidence": "Confidence: {{score}}%",
+  "toast": {
+    "accepted": "Relation accepted",
+    "dismissed": "Suggestion dismissed"
+  }
+}

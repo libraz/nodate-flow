@@ -190,6 +190,58 @@ func registerTools(h *Handler) {
 		}, []string{"prompt"}),
 		run: runProposeLens,
 	})
+	h.register(tool{
+		name:          "list_timeboxes",
+		description:   "List timeboxes (sprints / iterations) in the caller's workspace.",
+		requiredScope: "read:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"limit":  intSchema("Max number of rows (1..200)."),
+			"offset": intSchema("Row offset."),
+		}, nil),
+		run: runListTimeboxes,
+	})
+	h.register(tool{
+		name:          "create_timebox",
+		description:   "Create a new timebox (sprint / iteration) in the workspace.",
+		requiredScope: "write:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"name":        stringSchema("Timebox name."),
+			"startsOn":    stringSchema("Start date YYYY-MM-DD."),
+			"endsOn":      stringSchema("End date YYYY-MM-DD."),
+			"description": stringSchema("Optional description."),
+			"projectId":   stringSchema("Optional project public id (UUID v7) to scope the timebox."),
+		}, []string{"name", "startsOn", "endsOn"}),
+		run: runCreateTimebox,
+	})
+	h.register(tool{
+		name:          "add_task_to_timebox",
+		description:   "Add a task to a timebox.",
+		requiredScope: "write:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"timeboxId": stringSchema("Timebox public id (UUID v7)."),
+			"taskId":    stringSchema("Task public id (UUID v7)."),
+		}, []string{"timeboxId", "taskId"}),
+		run: runAddTaskToTimebox,
+	})
+	h.register(tool{
+		name:          "export_tasks",
+		description:   "Export tasks as JSON for MCP consumers. Optionally scoped to a project.",
+		requiredScope: "read:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"projectId": stringSchema("Optional project public id (UUID v7) to scope export."),
+			"limit":     intSchema("Max tasks to export (1..200, default 200)."),
+		}, nil),
+		run: runExportTasks,
+	})
+	h.register(tool{
+		name:          "propose_relations",
+		description:   "Given a task, find related or duplicate tasks by embedding similarity. Returns structured suggestions with kind.",
+		requiredScope: "read:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"taskId": stringSchema("Task public id (UUID v7)."),
+		}, []string{"taskId"}),
+		run: runProposeRelations,
+	})
 }
 
 // ----------------------------------------------------------------------------
@@ -942,6 +994,400 @@ func toBytes(v any) []byte {
 		return []byte(x)
 	}
 	return nil
+}
+
+// runListTimeboxes lists timeboxes in the caller's workspace.
+func runListTimeboxes(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	var in struct {
+		Limit  int32 `json:"limit"`
+		Offset int32 `json:"offset"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+	if in.Limit <= 0 || in.Limit > 200 {
+		in.Limit = 50
+	}
+	rows, err := deps.Queries.ListTimeboxesForWorkspace(ctx, generated.ListTimeboxesForWorkspaceParams{
+		WorkspaceID: s.workspaceID,
+		Limit:       in.Limit,
+		Offset:      in.Offset,
+	})
+	if err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	items := make([]map[string]any, 0, len(rows))
+	for _, r := range rows {
+		m := map[string]any{
+			"id":       r.PublicID.String(),
+			"name":     r.Name,
+			"startsOn": r.StartsOn.UTC().Format("2006-01-02"),
+			"endsOn":   r.EndsOn.UTC().Format("2006-01-02"),
+			"status":   string(r.Status),
+		}
+		if r.Description.Valid {
+			m["description"] = r.Description.String
+		}
+		if r.ProjectName.Valid {
+			m["projectId"]   = r.ProjectPublicID.String()
+			m["projectName"] = r.ProjectName.String
+		}
+		items = append(items, m)
+	}
+	return map[string]any{"timeboxes": items}, nil
+}
+
+// runCreateTimebox creates a new timebox in the workspace.
+func runCreateTimebox(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	var in struct {
+		Name        string `json:"name"`
+		StartsOn    string `json:"startsOn"`
+		EndsOn      string `json:"endsOn"`
+		Description string `json:"description"`
+		ProjectID   string `json:"projectId"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	if in.Name == "" || in.StartsOn == "" || in.EndsOn == "" {
+		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+	}
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+	starts, err := time.Parse("2006-01-02", in.StartsOn)
+	if err != nil {
+		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+	}
+	ends, err := time.Parse("2006-01-02", in.EndsOn)
+	if err != nil {
+		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+	}
+	if !ends.After(starts) {
+		return nil, apierrors.New(apierrors.TimeboxTimeboxInvalidDates)
+	}
+	var projectID sql.NullInt32
+	if in.ProjectID != "" {
+		prjID, err := resolveProject(ctx, deps, s, in.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		projectID = sql.NullInt32{Int32: int32(prjID), Valid: true}
+	}
+	pub := newPublicID()
+	desc := sql.NullString{String: in.Description, Valid: in.Description != ""}
+	timeboxID, err := deps.Queries.CreateTimebox(ctx, generated.CreateTimeboxParams{
+		PublicID:    pub,
+		WorkspaceID: s.workspaceID,
+		ProjectID:   projectID,
+		CreatorID:   s.userID,
+		Name:        in.Name,
+		Description: desc,
+		StartsOn:    starts,
+		EndsOn:      ends,
+	})
+	if err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	actor := int64(s.userID)
+	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		Type:        eventbus.TimeboxCreated,
+		WorkspaceID: s.workspaceID,
+		ActorUserID: &actor,
+		Payload: map[string]any{
+			"timeboxId": pub.String(),
+			"name":      in.Name,
+			"via":       "mcp",
+		},
+	})
+	_ = timeboxID // internal id not exposed
+	return map[string]any{"id": pub.String()}, nil
+}
+
+// runAddTaskToTimebox associates a task with a timebox by resolving
+// both public UUIDs to internal IDs.
+func runAddTaskToTimebox(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	var in struct {
+		TimeboxID string `json:"timeboxId"`
+		TaskID    string `json:"taskId"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	if in.TimeboxID == "" || in.TaskID == "" {
+		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+	}
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+	// Resolve timebox public_id -> internal id.
+	tbPub, err := types.Parse(in.TimeboxID)
+	if err != nil {
+		return nil, apierrors.New(apierrors.TimeboxTimeboxNotFound)
+	}
+	tbRow, err := deps.Queries.GetTimeboxByPublicId(ctx, generated.GetTimeboxByPublicIdParams{
+		WorkspaceID: s.workspaceID,
+		PublicID:    tbPub,
+	})
+	if err != nil {
+		if stderrors.Is(err, sql.ErrNoRows) {
+			return nil, apierrors.New(apierrors.TimeboxTimeboxNotFound)
+		}
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	// Resolve task public_id -> internal id.
+	taskInternal, taskPub, err := resolveTask(ctx, deps, s, in.TaskID)
+	if err != nil {
+		return nil, err
+	}
+	linkPub := newPublicID()
+	if err := deps.Queries.AddTaskToTimebox(ctx, generated.AddTaskToTimeboxParams{
+		PublicID:    linkPub,
+		WorkspaceID: s.workspaceID,
+		TimeboxID:   tbRow.ID,
+		TaskID:      taskInternal,
+	}); err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	taskID64 := int64(taskInternal)
+	actor := int64(s.userID)
+	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		Type:        eventbus.TimeboxTaskAdded,
+		WorkspaceID: s.workspaceID,
+		ActorUserID: &actor,
+		TaskID:      &taskID64,
+		Payload: map[string]any{
+			"timeboxId": tbPub.String(),
+			"taskId":    taskPub.String(),
+			"via":       "mcp",
+		},
+	})
+	return map[string]any{"ok": true}, nil
+}
+
+// runExportTasks exports tasks as JSON for MCP consumers. When
+// projectId is provided it scopes to that project using
+// ExportTasksForLens; otherwise it exports workspace-wide.
+func runExportTasks(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	var in struct {
+		ProjectID string `json:"projectId"`
+		Limit     int32  `json:"limit"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+	if in.Limit <= 0 || in.Limit > 200 {
+		in.Limit = 200
+	}
+	type exportRow struct {
+		PublicID            types.PublicID
+		Title               string
+		Description         sql.NullString
+		DerivedState        string
+		Priority            int32
+		DueOn               sql.NullTime
+		StartedOn           sql.NullTime
+		ProjectName         string
+		AssigneeDisplayName sql.NullString
+	}
+	var rows []exportRow
+	if in.ProjectID != "" {
+		prjID, err := resolveProject(ctx, deps, s, in.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		dbRows, err := deps.Queries.ExportTasksForLens(ctx, generated.ExportTasksForLensParams{
+			WorkspaceID: s.workspaceID,
+			ProjectID:   prjID,
+			Limit:       in.Limit,
+		})
+		if err != nil {
+			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		}
+		for _, r := range dbRows {
+			rows = append(rows, exportRow{
+				PublicID:            r.PublicID,
+				Title:               r.Title,
+				Description:         r.Description,
+				DerivedState:        string(r.DerivedState),
+				Priority:            r.Priority,
+				DueOn:               r.DueOn,
+				StartedOn:           r.StartedOn,
+				ProjectName:         r.ProjectName,
+				AssigneeDisplayName: r.AssigneeDisplayName,
+			})
+		}
+	} else {
+		dbRows, err := deps.Queries.ExportTasksForWorkspace(ctx, generated.ExportTasksForWorkspaceParams{
+			WorkspaceID: s.workspaceID,
+			Limit:       in.Limit,
+		})
+		if err != nil {
+			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		}
+		for _, r := range dbRows {
+			rows = append(rows, exportRow{
+				PublicID:            r.PublicID,
+				Title:               r.Title,
+				Description:         r.Description,
+				DerivedState:        string(r.DerivedState),
+				Priority:            r.Priority,
+				DueOn:               r.DueOn,
+				StartedOn:           r.StartedOn,
+				ProjectName:         r.ProjectName,
+				AssigneeDisplayName: r.AssigneeDisplayName,
+			})
+		}
+	}
+	items := make([]map[string]any, 0, len(rows))
+	for _, r := range rows {
+		m := map[string]any{
+			"id":          r.PublicID.String(),
+			"title":       r.Title,
+			"state":       r.DerivedState,
+			"priority":    r.Priority,
+			"projectName": r.ProjectName,
+		}
+		if r.Description.Valid {
+			m["description"] = r.Description.String
+		}
+		if r.DueOn.Valid {
+			m["dueOn"] = r.DueOn.Time.UTC().Format("2006-01-02")
+		}
+		if r.AssigneeDisplayName.Valid {
+			m["assignee"] = r.AssigneeDisplayName.String
+		}
+		items = append(items, m)
+	}
+	return map[string]any{"tasks": items}, nil
+}
+
+// runProposeRelations finds related or duplicate tasks for a given task
+// by embedding similarity, returning structured suggestions with a
+// suggestedKind field ("duplicate" or "related"). This is similar to
+// propose_duplicates but returns richer structured output.
+func runProposeRelations(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	var in struct {
+		TaskID string `json:"taskId"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+	if deps.Embedder == nil {
+		return nil, apierrors.New(apierrors.AiProviderNotConfigured)
+	}
+	taskInternal, pub, err := resolveTask(ctx, deps, s, in.TaskID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Resolve model + thresholds from ai_settings (ADR 0003 defaults).
+	model := "mock-768"
+	high := 0.870
+	low := 0.750
+	if settings, serr := deps.Queries.GetAiSettings(ctx, s.workspaceID); serr == nil {
+		if settings.EmbedModel != "" {
+			model = settings.EmbedModel
+		}
+		if v, perr := strconv.ParseFloat(settings.DuplicateThresholdHigh, 64); perr == nil {
+			high = v
+		}
+		if v, perr := strconv.ParseFloat(settings.DuplicateThresholdLow, 64); perr == nil {
+			low = v
+		}
+	}
+
+	src, err := deps.Queries.GetTaskEmbedding(ctx, generated.GetTaskEmbeddingParams{
+		TaskID: taskInternal,
+		Model:  model,
+	})
+	if stderrors.Is(err, sql.ErrNoRows) {
+		row, ferr := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
+			WorkspaceID: s.workspaceID,
+			PublicID:    pub,
+		})
+		if ferr != nil {
+			return map[string]any{"candidates": []any{}, "model": model}, nil
+		}
+		desc := ""
+		if row.Description.Valid {
+			desc = row.Description.String
+		}
+		if eerr := deps.Embedder.EmbedTask(ctx, taskInternal, row.Title, desc); eerr != nil {
+			return map[string]any{"candidates": []any{}, "model": model}, nil
+		}
+		src, err = deps.Queries.GetTaskEmbedding(ctx, generated.GetTaskEmbeddingParams{
+			TaskID: taskInternal,
+			Model:  model,
+		})
+	}
+	if err != nil {
+		return map[string]any{"candidates": []any{}, "model": model}, nil
+	}
+	srcVec, err := embed.Decode(toBytes(src.Vector))
+	if err != nil || len(srcVec) == 0 {
+		return map[string]any{"candidates": []any{}, "model": model}, nil
+	}
+
+	rows, err := deps.Queries.ListCandidateTaskEmbeddings(ctx, generated.ListCandidateTaskEmbeddingsParams{
+		WorkspaceID: s.workspaceID,
+		Model:       model,
+		TaskID:      taskInternal,
+		Limit:       200,
+	})
+	if err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	type cand struct {
+		id    string
+		title string
+		score float64
+		kind  string
+	}
+	ranked := make([]cand, 0, len(rows))
+	for _, r := range rows {
+		v, derr := embed.Decode(toBytes(r.Vector))
+		if derr != nil || len(v) != len(srcVec) {
+			continue
+		}
+		score := float64(embed.Cosine(srcVec, v))
+		if score < low {
+			continue
+		}
+		suggestedKind := "related"
+		if score >= high {
+			suggestedKind = "duplicate"
+		}
+		ranked = append(ranked, cand{
+			id:    r.PublicID.String(),
+			title: r.Title,
+			score: score,
+			kind:  suggestedKind,
+		})
+	}
+	sort.SliceStable(ranked, func(i, j int) bool { return ranked[i].score > ranked[j].score })
+	if len(ranked) > 20 {
+		ranked = ranked[:20]
+	}
+	out := make([]map[string]any, 0, len(ranked))
+	for _, c := range ranked {
+		out = append(out, map[string]any{
+			"taskId":        c.id,
+			"title":         c.title,
+			"score":         c.score,
+			"suggestedKind": c.kind,
+		})
+	}
+	return map[string]any{"candidates": out, "model": model}, nil
 }
 
 // runProposeLens compiles a prose prompt into a validated Lens via

@@ -127,6 +127,47 @@ const (
 	AiAgentRunFailed Kind = "ai.agent.run.failed"
 )
 
+// Timebox lifecycle events.
+const (
+	// TimeboxCreated is appended when a new timebox is created.
+	TimeboxCreated Kind = "timebox.created"
+	// TimeboxUpdated is appended when a timebox is edited.
+	TimeboxUpdated Kind = "timebox.updated"
+	// TimeboxActivated is appended when a timebox transitions to active.
+	TimeboxActivated Kind = "timebox.activated"
+	// TimeboxCompleted is appended when a timebox transitions to completed.
+	TimeboxCompleted Kind = "timebox.completed"
+	// TimeboxTaskAdded is appended when a task is added to a timebox.
+	TimeboxTaskAdded Kind = "timebox.task.added"
+	// TimeboxTaskRemoved is appended when a task is removed from a timebox.
+	TimeboxTaskRemoved Kind = "timebox.task.removed"
+)
+
+// Relation suggestion events.
+const (
+	// RelationSuggested is appended when the AI pipeline creates a
+	// new relation suggestion between two tasks.
+	RelationSuggested Kind = "relation.suggested"
+	// RelationAccepted is appended when a user accepts a suggestion.
+	RelationAccepted Kind = "relation.accepted"
+	// RelationDismissed is appended when a user dismisses a suggestion.
+	RelationDismissed Kind = "relation.dismissed"
+)
+
+// Lens sharing events.
+const (
+	// LensShared is appended when a lens is published publicly.
+	LensShared Kind = "lens.shared"
+	// LensUnshared is appended when a lens is taken private.
+	LensUnshared Kind = "lens.unshared"
+)
+
+// Export events.
+const (
+	// ExportRequested is appended when a user requests an export.
+	ExportRequested Kind = "export.requested"
+)
+
 // Legacy / compatibility kinds. These are kept so historical events
 // continue to round-trip even though new code should not emit them.
 const (

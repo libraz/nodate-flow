@@ -28,6 +28,8 @@ type Querier interface {
 	AddDependency(ctx context.Context, arg AddDependencyParams) (int64, error)
 	// Add a user to a project (must already be a workspace member).
 	AddProjectMember(ctx context.Context, arg AddProjectMemberParams) (int64, error)
+	// Associate a task with a timebox. Caller must resolve IDs beforehand.
+	AddTaskToTimebox(ctx context.Context, arg AddTaskToTimeboxParams) error
 	// Append a workspace-scoped audit row. metadata_json MUST be redacted.
 	AppendAuditLog(ctx context.Context, arg AppendAuditLogParams) (int64, error)
 	// Append a single event to the append-only event log. The events table has
@@ -61,6 +63,8 @@ type Querier interface {
 	// within the given time window. Used by the AI metrics endpoint
 	// (2.OBS-1) to compute acceptance rate.
 	CountAiSuggestionOutcomesForWorkspace(ctx context.Context, arg CountAiSuggestionOutcomesForWorkspaceParams) (CountAiSuggestionOutcomesForWorkspaceRow, error)
+	// Count total and completed tasks in a timebox for progress tracking.
+	CountTasksForTimebox(ctx context.Context, timeboxID uint32) (CountTasksForTimeboxRow, error)
 	// Count unread notifications for a user across all workspaces.
 	CountUnreadNotifications(ctx context.Context, recipientUserID uint32) (int64, error)
 	// Count unread notifications for a user within a specific workspace.
@@ -90,6 +94,8 @@ type Querier interface {
 	// ============================================================================
 	// Insert a new LLM provider with encrypted API key.
 	CreateProvider(ctx context.Context, arg CreateProviderParams) (int64, error)
+	// Insert an AI-generated relation suggestion between two tasks.
+	CreateRelationSuggestion(ctx context.Context, arg CreateRelationSuggestionParams) (int64, error)
 	// Insert a new repository-to-workspace mapping.
 	CreateRepoMapping(ctx context.Context, arg CreateRepoMappingParams) (int64, error)
 	// Insert a new refresh-token session for a user.
@@ -99,6 +105,8 @@ type Querier interface {
 	// Insert a new task. derived_state defaults to 'open' and must NOT be set
 	// directly here; the constraint engine and event bus mutate it.
 	CreateTask(ctx context.Context, arg CreateTaskParams) (int64, error)
+	// Insert a new timebox (sprint / iteration / cycle).
+	CreateTimebox(ctx context.Context, arg CreateTimeboxParams) (int64, error)
 	CreateWebhookDelivery(ctx context.Context, arg CreateWebhookDeliveryParams) (int64, error)
 	CreateWebhookSubscription(ctx context.Context, arg CreateWebhookSubscriptionParams) (int64, error)
 	// Insert a new workspace. Slug uniqueness is enforced at the DB level.
@@ -135,14 +143,24 @@ type Querier interface {
 	DisableProject(ctx context.Context, arg DisableProjectParams) error
 	// Soft-disable a task.
 	DisableTask(ctx context.Context, arg DisableTaskParams) error
+	// Soft-delete a timebox.
+	DisableTimebox(ctx context.Context, arg DisableTimeboxParams) error
 	// Soft-disable a workspace. Cascade is handled by FK ON DELETE for hard purges.
 	DisableWorkspace(ctx context.Context, publicID types.PublicID) error
+	// Bulk-dismiss all pending suggestions involving a specific task.
+	DismissAllForTask(ctx context.Context, arg DismissAllForTaskParams) error
 	// Edit a comment body and stamp edited_at.
 	EditComment(ctx context.Context, arg EditCommentParams) error
 	// Atomically enqueue a new run. The UNIQUE constraint on dedupe_key
 	// causes a second scheduler replica to get a duplicate-entry error,
 	// which callers translate to ErrDuplicate. No row is inserted on conflict.
 	EnqueueAgentRun(ctx context.Context, arg EnqueueAgentRunParams) (int64, error)
+	// Fetch tasks for export scoped to a workspace + project (lens-scoped).
+	// Lens filter/sort logic is applied in Go code; this provides the data set.
+	ExportTasksForLens(ctx context.Context, arg ExportTasksForLensParams) ([]ExportTasksForLensRow, error)
+	// Fetch tasks for CSV/JSON export across an entire workspace.
+	// Includes project name and primary assignee for human-readable output.
+	ExportTasksForWorkspace(ctx context.Context, arg ExportTasksForWorkspaceParams) ([]ExportTasksForWorkspaceRow, error)
 	// Mark a constraint as currently failing. Clears satisfied_at so the
 	// transition is visible in v_task_constraint_satisfaction.
 	FailConstraint(ctx context.Context, arg FailConstraintParams) error
@@ -157,6 +175,9 @@ type Querier interface {
 	FindDefaultProviderIDForWorkspace(ctx context.Context, workspaceID uint32) (uint32, error)
 	// Resolve an identity by (provider, subject) pair for OIDC login flows.
 	FindIdentityByProviderSubject(ctx context.Context, arg FindIdentityByProviderSubjectParams) (FindIdentityByProviderSubjectRow, error)
+	// Look up a publicly shared lens by its token. Used by unauthenticated
+	// public share endpoints. Only returns enabled + public lenses.
+	FindLensByPublicToken(ctx context.Context, publicToken sql.NullString) (FindLensByPublicTokenRow, error)
 	// Resolve a local-password identity by user email for the login pipeline.
 	// Joins identities with users on email and provider='local'. Also
 	// returns the TOTP columns so the login handler can decide whether
@@ -237,6 +258,8 @@ type Querier interface {
 	// repo ID. Used by the webhook handler to route incoming events to the
 	// correct workspace. Only returns enabled rows.
 	GetRepoMappingByRepoID(ctx context.Context, repoID uint64) (GetRepoMappingByRepoIDRow, error)
+	// Fetch a single suggestion by public_id with source/target task info.
+	GetSuggestionByPublicId(ctx context.Context, arg GetSuggestionByPublicIdParams) (GetSuggestionByPublicIdRow, error)
 	// Queries dedicated to the constraint engine (Phase 3, 3.ENG-2).
 	// Keyed off the internal task_id so the engine never has to know
 	// about public_id resolution. All workspace scoping is enforced by
@@ -245,6 +268,8 @@ type Querier interface {
 	// Fetch the embedding row for a single (task_id, model) pair. Returns
 	// sql.ErrNoRows if the task has never been embedded with the given model.
 	GetTaskEmbedding(ctx context.Context, arg GetTaskEmbeddingParams) (GetTaskEmbeddingRow, error)
+	// Fetch a single timebox by workspace_id + public_id.
+	GetTimeboxByPublicId(ctx context.Context, arg GetTimeboxByPublicIdParams) (GetTimeboxByPublicIdRow, error)
 	GetWebhookSubscription(ctx context.Context, arg GetWebhookSubscriptionParams) (GetWebhookSubscriptionRow, error)
 	// Insert a hashed recovery code for a user.
 	InsertRecoveryCode(ctx context.Context, arg InsertRecoveryCodeParams) error
@@ -338,6 +363,11 @@ type Querier interface {
 	// ai.suggestion.applied / ai.suggestion.dismissed event for the same
 	// inbox_item_id (compared via JSON_EXTRACT on payload_json).
 	ListPendingAiSuggestions(ctx context.Context, workspaceID uint32) ([]ListPendingAiSuggestionsRow, error)
+	// List pending suggestions where a task is either the source or target.
+	// Joins tasks for human-readable titles and public IDs.
+	ListPendingSuggestionsForTask(ctx context.Context, arg ListPendingSuggestionsForTaskParams) ([]ListPendingSuggestionsForTaskRow, error)
+	// List pending suggestions for a workspace with pagination.
+	ListPendingSuggestionsForWorkspace(ctx context.Context, arg ListPendingSuggestionsForWorkspaceParams) ([]ListPendingSuggestionsForWorkspaceRow, error)
 	// List members of a project joined with user display fields.
 	ListProjectMembers(ctx context.Context, arg ListProjectMembersParams) ([]ListProjectMembersRow, error)
 	// List the public_ids of every enabled project in a workspace for which
@@ -369,8 +399,12 @@ type Querier interface {
 	ListTaskConstraintsForEngine(ctx context.Context, taskID uint32) ([]ListTaskConstraintsForEngineRow, error)
 	// List tasks in a project via v_task_list with window-function pagination.
 	ListTasksForProject(ctx context.Context, arg ListTasksForProjectParams) ([]ListTasksForProjectRow, error)
+	// List tasks belonging to a timebox with pagination.
+	ListTasksForTimebox(ctx context.Context, arg ListTasksForTimeboxParams) ([]ListTasksForTimeboxRow, error)
 	// List tasks across an entire workspace via v_task_list.
 	ListTasksForWorkspace(ctx context.Context, arg ListTasksForWorkspaceParams) ([]ListTasksForWorkspaceRow, error)
+	// List enabled timeboxes for a workspace with creator info and pagination.
+	ListTimeboxesForWorkspace(ctx context.Context, arg ListTimeboxesForWorkspaceParams) ([]ListTimeboxesForWorkspaceRow, error)
 	// Ordered list of task.transition.* events for a single task,
 	// ascending by occurred_at + id. Used by the Phase 3 replay tool
 	// (3.ENG-1) to derive the expected derived_state from scratch.
@@ -431,12 +465,19 @@ type Querier interface {
 	RemoveProjectMember(ctx context.Context, arg RemoveProjectMemberParams) error
 	// Soft-remove a project member keyed by user_id.
 	RemoveProjectMemberByUserId(ctx context.Context, arg RemoveProjectMemberByUserIdParams) error
+	// Remove a task from a timebox.
+	RemoveTaskFromTimebox(ctx context.Context, arg RemoveTaskFromTimeboxParams) error
 	// Soft-remove a member from a workspace.
 	RemoveWorkspaceMember(ctx context.Context, arg RemoveWorkspaceMemberParams) error
 	// Soft-remove a member keyed by user_id.
 	RemoveWorkspaceMemberByUserId(ctx context.Context, arg RemoveWorkspaceMemberByUserIdParams) error
 	// Clear failed login counter and lockout after a successful authentication.
 	ResetIdentityFailedAttempts(ctx context.Context, id uint32) error
+	// Resolve a lens public_id to its optional internal project_id.
+	// Used by the export handler to decide workspace-wide vs project-scoped queries.
+	ResolveLensProjectID(ctx context.Context, arg ResolveLensProjectIDParams) (sql.NullInt32, error)
+	// Accept or dismiss a pending suggestion. Only transitions from 'pending'.
+	ResolveSuggestion(ctx context.Context, arg ResolveSuggestionParams) error
 	// Revoke every active session for a user except one identified by public_id.
 	// Used by "sign out of all other devices" in /settings/security.
 	RevokeAllSessionsForUserExcept(ctx context.Context, arg RevokeAllSessionsForUserExceptParams) error
@@ -456,6 +497,12 @@ type Querier interface {
 	// Begin (or restart) TOTP enrollment by writing a fresh encrypted
 	// secret and clearing any previous confirmation timestamp.
 	SetIdentityMfaSecret(ctx context.Context, arg SetIdentityMfaSecretParams) error
+	// Revoke public sharing on a lens. Clears the token.
+	// No-op if the lens is already private (WHERE is_public = TRUE guard).
+	SetLensPrivate(ctx context.Context, arg SetLensPrivateParams) error
+	// Enable public sharing on a lens. Generates a share URL token.
+	// No-op if the lens is already public (WHERE is_public = FALSE guard).
+	SetLensPublic(ctx context.Context, arg SetLensPublicParams) error
 	// Snooze a signal by pushing its received_at forward. Minimal impl;
 	// a dedicated snoozed_until_at column may be added later on.
 	SnoozeInboxItem(ctx context.Context, arg SnoozeInboxItemParams) error
@@ -482,6 +529,8 @@ type Querier interface {
 	UpdateIdentityPasswordHash(ctx context.Context, arg UpdateIdentityPasswordHashParams) error
 	// Update a lens name and/or JSON body.
 	UpdateLens(ctx context.Context, arg UpdateLensParams) error
+	// Record the timestamp of the latest AI safety check for a public lens.
+	UpdateLensSafetyCheck(ctx context.Context, id uint32) error
 	// Change a member's role.
 	UpdateMemberRole(ctx context.Context, arg UpdateMemberRoleParams) error
 	// Change a member's role keyed by user_id.
@@ -497,6 +546,10 @@ type Querier interface {
 	// Update only the sort_weight for a single task within a workspace.
 	// Used by the bulk reorder endpoint inside a transaction.
 	UpdateTaskSortWeight(ctx context.Context, arg UpdateTaskSortWeightParams) error
+	// Update mutable timebox fields.
+	UpdateTimebox(ctx context.Context, arg UpdateTimeboxParams) error
+	// Transition timebox lifecycle status.
+	UpdateTimeboxStatus(ctx context.Context, arg UpdateTimeboxStatusParams) error
 	// Stamp last successful login time on a user account.
 	UpdateUserLastLoginAt(ctx context.Context, id uint32) error
 	// Update mutable workspace fields by public_id.

@@ -1,0 +1,20 @@
+domain: relation
+breadcrumb: "Relation"
+
+resources:
+  suggestion:
+    breadcrumb: "Relation > Suggestion"
+    errors:
+      not_found:
+        code: RELATION.SUGGESTION.NOT_FOUND
+        status: 404
+        message: "Relation suggestion not found"
+        description: "Returned when a relation suggestion with the given public_id does not exist or has been deleted."
+        userAction: "Verify the suggestion ID, or refresh the list to see current suggestions."
+
+      already_resolved:
+        code: RELATION.SUGGESTION.ALREADY_RESOLVED
+        status: 409
+        message: "Relation suggestion has already been resolved"
+        description: "Returned when attempting to accept or dismiss a suggestion that has already been accepted or dismissed."
+        userAction: "No action needed; the suggestion has already been resolved."

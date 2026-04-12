@@ -1,0 +1,42 @@
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-5);
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.fieldLabel {
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+}
+
+.radioGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.radioOption {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg);
+  cursor: pointer;
+}
+
+.radioOption input[type='radio'] {
+  accent-color: var(--nf-color-accent);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nf-space-3);
+}

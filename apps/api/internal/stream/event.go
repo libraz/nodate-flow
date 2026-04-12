@@ -48,6 +48,18 @@ const (
 	// The frontend invalidates the notification list and unread count.
 	KindNotificationChanged Kind = "notification.changed"
 
+	// KindTimeboxChanged fires on any `timebox.*` append for the
+	// workspace. The frontend invalidates timebox lists and detail.
+	KindTimeboxChanged Kind = "timebox.changed"
+
+	// KindRelationChanged fires on any `relation.*` append for the
+	// workspace. The frontend invalidates relation suggestion lists.
+	KindRelationChanged Kind = "relation.changed"
+
+	// KindLensChanged fires on any `lens.*` append for the
+	// workspace. The frontend invalidates lens lists.
+	KindLensChanged Kind = "lens.changed"
+
 	// KindResync is sent when the server has dropped events for a
 	// slow subscriber. The frontend reacts by invalidating every
 	// workspace-scoped query, which is the safe superset.
@@ -76,6 +88,12 @@ func KindForEventType(eventType string) (Kind, bool) {
 		return KindAiSuggestionChanged, true
 	case strings.HasPrefix(eventType, "notification."):
 		return KindNotificationChanged, true
+	case strings.HasPrefix(eventType, "timebox."):
+		return KindTimeboxChanged, true
+	case strings.HasPrefix(eventType, "relation."):
+		return KindRelationChanged, true
+	case strings.HasPrefix(eventType, "lens."):
+		return KindLensChanged, true
 	}
 	return "", false
 }

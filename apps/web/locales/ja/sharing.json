@@ -1,0 +1,39 @@
+{
+  "title": "共有",
+  "publish": "公開する",
+  "unpublish": "非公開にする",
+  "public_link": "公開リンク",
+  "copy_link": "リンクをコピー",
+  "link_copied": "リンクをクリップボードにコピーしました",
+  "safety_check": {
+    "title": "安全性チェック",
+    "description": "公開前に機密データをスキャンしています...",
+    "passed": "機密データは見つかりませんでした",
+    "findings": "{{count}}件の潜在的な問題が見つかりました",
+    "findings_plural": "{{count}}件の潜在的な問題が見つかりました",
+    "proceed_anyway": "このまま公開する"
+  },
+  "confirm_publish": "リンクを知っている全員がこのビューにアクセスできるようになります。続行しますか？",
+  "confirm_unpublish": "公開アクセスが取り消されます。既存のリンクは無効になります。",
+  "toast": {
+    "published": "ビューを公開しました",
+    "unpublished": "ビューを非公開にしました"
+  },
+  "badge": "公開",
+  "badge_private": "非公開",
+  "error": {
+    "publish_failed": "ビューの公開に失敗しました",
+    "unpublish_failed": "ビューの非公開化に失敗しました"
+  },
+  "public_page": {
+    "loading": "ビューを読み込み中...",
+    "not_found": "この公開ビューは利用できません。",
+    "footer": "Powered by nodate-flow",
+    "col_title": "タイトル",
+    "col_status": "ステータス",
+    "col_priority": "優先度",
+    "col_due": "期日",
+    "col_assignee": "担当者",
+    "no_tasks": "このビューにはタスクがありません。"
+  }
+}

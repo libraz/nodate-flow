@@ -1,0 +1,41 @@
+{
+  "title": "Timeboxes",
+  "create": "Create timebox",
+  "edit": "Edit timebox",
+  "delete": "Delete timebox",
+  "empty": "No timeboxes yet",
+  "empty_description": "Create a timebox to plan your sprints and iterations.",
+  "name_label": "Name",
+  "name_placeholder": "e.g., Sprint 12",
+  "description_label": "Description",
+  "starts_on_label": "Start date",
+  "ends_on_label": "End date",
+  "status": {
+    "planned": "Planned",
+    "active": "Active",
+    "completed": "Completed",
+    "cancelled": "Cancelled"
+  },
+  "action": {
+    "activate": "Start timebox",
+    "complete": "Complete timebox",
+    "cancel": "Cancel timebox",
+    "add_task": "Add task",
+    "remove_task": "Remove task"
+  },
+  "progress": {
+    "title": "Progress",
+    "tasks_completed": "{{completed}} of {{total}} tasks completed",
+    "burndown": "Burndown"
+  },
+  "toast": {
+    "created": "Timebox created",
+    "updated": "Timebox updated",
+    "deleted": "Timebox deleted",
+    "activated": "Timebox started",
+    "completed": "Timebox completed",
+    "task_added": "Task added to timebox",
+    "task_removed": "Task removed from timebox"
+  },
+  "confirm_delete": "Are you sure you want to delete this timebox?"
+}

@@ -8,6 +8,7 @@ import enCommon from '../../locales/en/common.json';
 import enConstraints from '../../locales/en/constraints.json';
 import enErrors from '../../locales/en/errors.json';
 import enInbox from '../../locales/en/inbox.json';
+import enRelations from '../../locales/en/relations.json';
 import enSettings from '../../locales/en/settings.json';
 import enTimeline from '../../locales/en/timeline.json';
 import jaAiSuggestions from '../../locales/ja/ai-suggestions.json';
@@ -16,6 +17,7 @@ import jaCommon from '../../locales/ja/common.json';
 import jaConstraints from '../../locales/ja/constraints.json';
 import jaErrors from '../../locales/ja/errors.json';
 import jaInbox from '../../locales/ja/inbox.json';
+import jaRelations from '../../locales/ja/relations.json';
 import jaSettings from '../../locales/ja/settings.json';
 import jaTimeline from '../../locales/ja/timeline.json';
 import { defaultNamespace } from './namespaces';
@@ -62,6 +64,7 @@ export function initI18n(): typeof i18n {
         'ai-suggestions',
         'constraints',
         'errors',
+        'relations',
       ],
       resources: {
         en: {
@@ -73,6 +76,7 @@ export function initI18n(): typeof i18n {
           'ai-suggestions': enAiSuggestions,
           constraints: enConstraints,
           errors: enErrors,
+          relations: enRelations,
         },
         ja: {
           common: jaCommon,
@@ -83,6 +87,7 @@ export function initI18n(): typeof i18n {
           'ai-suggestions': jaAiSuggestions,
           constraints: jaConstraints,
           errors: jaErrors,
+          relations: jaRelations,
         },
       },
       interpolation: { escapeValue: false },

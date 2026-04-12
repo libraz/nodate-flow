@@ -1,9 +1,13 @@
 /**
- * CommandPalette — Cmd+K launcher.
+ * CommandPalette -- Cmd+K launcher.
  *
  * Minimal keyboard-first palette with a search input, static navigation
  * entries, and a dynamic workspace list. Arrow keys move selection, Enter
  * navigates, Escape closes (via the host Dialog).
+ *
+ * When the input starts with `>`, the palette switches to NL command
+ * mode: the user types a natural language command and the AI
+ * resolve-command endpoint translates it into a tool invocation.
  */
 
 import Dialog from '@nodate-flow/ui/primitives/dialog';
@@ -20,10 +24,13 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { ResolveCommandResult } from '../../features/nl-command/api';
+import { useResolveCommand } from '../../features/nl-command/api';
 import type { Project } from '../../features/projects/api';
 import type { TaskListItem } from '../../features/tasks/api';
 import { useWorkspacesQuery } from '../../features/workspaces/api';
 import { sdk } from '../../lib/sdk';
+import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
 
 interface CommandItem {
   id: string;
@@ -33,6 +40,8 @@ interface CommandItem {
   search?: Record<string, unknown>;
 }
 
+type PaletteMode = 'search' | 'command';
+
 interface InnerProps {
   onSelect: (item: Pick<CommandItem, 'href' | 'search'>) => void;
 }
@@ -41,24 +50,249 @@ function normalize(s: string): string {
   return s.toLowerCase();
 }
 
+/** Strips the leading `> ` prefix from a command-mode query. */
+function stripCommandPrefix(raw: string): string {
+  return raw.replace(/^>\s*/, '');
+}
+
+// ---------------------------------------------------------------------------
+// NL command mode sub-component
+// ---------------------------------------------------------------------------
+
+interface CommandModeBodyProps {
+  prompt: string;
+  wsId: string | null;
+  onSelect: InnerProps['onSelect'];
+}
+
+function CommandModeBody({ prompt, wsId, onSelect }: CommandModeBodyProps): ReactElement {
+  const { t } = useTranslation('common');
+  const resolveCommand = useResolveCommand(wsId);
+  const [result, setResult] = useState<ResolveCommandResult | null>(null);
+
+  // Track the last submitted prompt to avoid re-submitting on every render
+  const lastSubmittedRef = useRef<string>('');
+
+  const handleSubmit = (): void => {
+    if (!wsId || prompt.length === 0) return;
+    if (lastSubmittedRef.current === prompt && result) return;
+    lastSubmittedRef.current = prompt;
+    setResult(null);
+    resolveCommand.mutate(prompt, {
+      onSuccess: (data) => setResult(data),
+    });
+  };
+
+  const handleExecute = (): void => {
+    if (!result) return;
+    // Map resolved tool to a navigation action
+    const href = toolToHref(result);
+    if (href) {
+      onSelect(href);
+    }
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>): void => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (result) {
+        handleExecute();
+      } else if (!resolveCommand.isPending) {
+        handleSubmit();
+      }
+    }
+  };
+
+  if (!wsId) {
+    return (
+      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
+        {t('dock.command_palette.no_workspace')}
+      </p>
+    );
+  }
+
+  return (
+    // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard trap for command result
+    <div onKeyDown={handleKeyDown} tabIndex={0} style={{ outline: 'none' }}>
+      <div
+        style={{
+          fontSize: '0.6875rem',
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
+          color: 'var(--nf-color-fg-subtle)',
+          padding: '0.25rem 0.5rem',
+        }}
+      >
+        {t('dock.command_palette.group_command')}
+      </div>
+
+      {resolveCommand.isPending && (
+        <p
+          style={{
+            margin: 0,
+            padding: '0.5rem 0.75rem',
+            color: 'var(--nf-color-fg-muted)',
+            fontSize: '0.875rem',
+          }}
+          aria-live="polite"
+        >
+          {t('dock.command_palette.resolving')}
+        </p>
+      )}
+
+      {resolveCommand.isError && (
+        <p
+          style={{
+            margin: 0,
+            padding: '0.5rem 0.75rem',
+            color: 'var(--nf-color-danger)',
+            fontSize: '0.875rem',
+          }}
+          aria-live="assertive"
+        >
+          {t('dock.command_palette.error')}
+        </p>
+      )}
+
+      {!resolveCommand.isPending && !result && !resolveCommand.isError && (
+        <p
+          style={{
+            margin: 0,
+            padding: '0.5rem 0.75rem',
+            color: 'var(--nf-color-fg-muted)',
+            fontSize: '0.875rem',
+          }}
+        >
+          {prompt.length > 0
+            ? t('dock.command_palette.hint_select')
+            : t('dock.command_palette.placeholder_command')}
+        </p>
+      )}
+
+      {result && (
+        <div
+          style={{
+            padding: '0.5rem 0.75rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.5rem',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span
+              style={{
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                color: 'var(--nf-color-fg)',
+              }}
+            >
+              {result.tool}
+            </span>
+            <span
+              style={{
+                fontSize: '0.6875rem',
+                padding: '0.125rem 0.375rem',
+                borderRadius: '0.25rem',
+                background:
+                  result.confidence >= 0.8
+                    ? 'var(--nf-color-success-subtle, oklch(0.85 0.15 145))'
+                    : 'var(--nf-color-warning-subtle, oklch(0.85 0.15 85))',
+                color:
+                  result.confidence >= 0.8
+                    ? 'var(--nf-color-success-fg, oklch(0.35 0.15 145))'
+                    : 'var(--nf-color-warning-fg, oklch(0.35 0.15 85))',
+              }}
+            >
+              {t('dock.command_palette.confidence', {
+                score: String(Math.round(result.confidence * 100)),
+              })}
+            </span>
+          </div>
+
+          <pre
+            style={{
+              margin: 0,
+              fontSize: '0.75rem',
+              color: 'var(--nf-color-fg-muted)',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              fontFamily: 'var(--font-mono, monospace)',
+            }}
+          >
+            {JSON.stringify(result.args, null, 2)}
+          </pre>
+
+          <p
+            style={{
+              margin: 0,
+              fontSize: '0.8125rem',
+              color: 'var(--nf-color-fg)',
+            }}
+            aria-live="polite"
+          >
+            {result.confidence >= 0.8
+              ? t('dock.command_palette.confirm_execute')
+              : t('dock.command_palette.confirm_low', { tool: result.tool })}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tool -> navigation mapping
+// ---------------------------------------------------------------------------
+
+function toolToHref(result: ResolveCommandResult): Pick<CommandItem, 'href' | 'search'> | null {
+  const args = result.args;
+  switch (result.tool) {
+    case 'create_task': {
+      const projectId = typeof args.projectId === 'string' ? args.projectId : null;
+      if (projectId) {
+        return {
+          href: `/projects/${projectId}/tasks`,
+          search: { new: true, ...(typeof args.title === 'string' ? { title: args.title } : {}) },
+        };
+      }
+      return { href: '/today', search: { new: true } };
+    }
+    case 'navigate': {
+      const target = typeof args.path === 'string' ? args.path : '/';
+      return { href: target };
+    }
+    default:
+      return { href: '/' };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Search mode sub-component (extracted from PaletteBody)
+// ---------------------------------------------------------------------------
+
 function PaletteBody({ onSelect }: InnerProps): ReactElement {
   const { t } = useTranslation('common');
   const { data: workspaces } = useWorkspacesQuery();
+  const wsId = useCurrentWorkspaceId();
   const [query, setQuery] = useState('');
   const [debounced, setDebounced] = useState('');
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const mode: PaletteMode = query.startsWith('>') ? 'command' : 'search';
+  const commandPrompt = mode === 'command' ? stripCommandPrefix(query) : '';
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
   useEffect(() => {
+    if (mode === 'command') return;
     const id = window.setTimeout(() => setDebounced(query.trim()), 180);
     return () => window.clearTimeout(id);
-  }, [query]);
+  }, [query, mode]);
 
-  const shouldSearchTasks = debounced.length >= 2;
+  const shouldSearchTasks = mode === 'search' && debounced.length >= 2;
 
   const taskQueries = useQueries({
     queries: workspaces.map((w) => ({
@@ -156,10 +390,11 @@ function PaletteBody({ onSelect }: InnerProps): ReactElement {
   }, [t, workspaces, taskResults, projectResults]);
 
   const filtered = useMemo<CommandItem[]>(() => {
+    if (mode === 'command') return [];
     const q = normalize(query.trim());
     if (q === '') return items;
     return items.filter((it) => normalize(it.label).includes(q));
-  }, [items, query]);
+  }, [items, query, mode]);
 
   useEffect(() => {
     setActive(0);
@@ -180,6 +415,10 @@ function PaletteBody({ onSelect }: InnerProps): ReactElement {
   }, [filtered]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>): void => {
+    if (mode === 'command') {
+      // In command mode, Enter is handled by CommandModeBody
+      return;
+    }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setActive((i) => (filtered.length === 0 ? 0 : (i + 1) % filtered.length));
@@ -204,7 +443,11 @@ function PaletteBody({ onSelect }: InnerProps): ReactElement {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder={t('dock.command_palette.placeholder')}
+        placeholder={
+          mode === 'command'
+            ? t('dock.command_palette.placeholder_command')
+            : t('dock.command_palette.placeholder')
+        }
         aria-label={t('dock.command_palette.title')}
         style={{
           padding: '0.5rem 0.75rem',
@@ -215,62 +458,72 @@ function PaletteBody({ onSelect }: InnerProps): ReactElement {
           fontSize: '0.875rem',
         }}
       />
-      {filtered.length === 0 ? (
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
-          {t('dock.command_palette.empty')}
-        </p>
+
+      {mode === 'command' ? (
+        <CommandModeBody prompt={commandPrompt} wsId={wsId} onSelect={onSelect} />
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {grouped.map(([group, its]) => (
-            <div key={group}>
-              <div
-                style={{
-                  fontSize: '0.6875rem',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.04em',
-                  color: 'var(--nf-color-fg-subtle)',
-                  padding: '0.25rem 0.5rem',
-                }}
-              >
-                {group}
-              </div>
-              <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                {its.map((it) => {
-                  flatIdx += 1;
-                  const isActive = flatIdx === active;
-                  return (
-                    <li key={it.id}>
-                      <button
-                        type="button"
-                        aria-current={isActive ? 'true' : undefined}
-                        onClick={() => onSelect(it)}
-                        onMouseEnter={() => {
-                          const idx = filtered.findIndex((f) => f.id === it.id);
-                          if (idx >= 0) setActive(idx);
-                        }}
-                        style={{
-                          display: 'block',
-                          inlineSize: '100%',
-                          textAlign: 'start',
-                          padding: '0.5rem 0.75rem',
-                          borderRadius: '0.375rem',
-                          border: 'none',
-                          background: isActive ? 'var(--nf-color-surface-hover)' : 'transparent',
-                          color: 'var(--nf-color-fg)',
-                          cursor: 'pointer',
-                          fontSize: '0.875rem',
-                        }}
-                      >
-                        {it.label}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
+        <>
+          {filtered.length === 0 ? (
+            <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
+              {t('dock.command_palette.empty')}
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {grouped.map(([group, its]) => (
+                <div key={group}>
+                  <div
+                    style={{
+                      fontSize: '0.6875rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                      color: 'var(--nf-color-fg-subtle)',
+                      padding: '0.25rem 0.5rem',
+                    }}
+                  >
+                    {group}
+                  </div>
+                  <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                    {its.map((it) => {
+                      flatIdx += 1;
+                      const isActive = flatIdx === active;
+                      return (
+                        <li key={it.id}>
+                          <button
+                            type="button"
+                            aria-current={isActive ? 'true' : undefined}
+                            onClick={() => onSelect(it)}
+                            onMouseEnter={() => {
+                              const idx = filtered.findIndex((f) => f.id === it.id);
+                              if (idx >= 0) setActive(idx);
+                            }}
+                            style={{
+                              display: 'block',
+                              inlineSize: '100%',
+                              textAlign: 'start',
+                              padding: '0.5rem 0.75rem',
+                              borderRadius: '0.375rem',
+                              border: 'none',
+                              background: isActive
+                                ? 'var(--nf-color-surface-hover)'
+                                : 'transparent',
+                              color: 'var(--nf-color-fg)',
+                              cursor: 'pointer',
+                              fontSize: '0.875rem',
+                            }}
+                          >
+                            {it.label}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
+
       <div
         style={{
           display: 'flex',
@@ -295,6 +548,19 @@ function PaletteBody({ onSelect }: InnerProps): ReactElement {
           <kbd style={kbdStyle}>Esc</kbd>
           {t('dock.command_palette.hint_close')}
         </span>
+        {mode === 'search' && (
+          <span
+            style={{
+              marginInlineStart: 'auto',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.375rem',
+            }}
+          >
+            <kbd style={kbdStyle}>&gt;</kbd>
+            {t('dock.command_palette.command_hint')}
+          </span>
+        )}
       </div>
     </div>
   );

@@ -17,6 +17,9 @@ export type StreamKind =
   | 'ai.suggestion.changed'
   | 'ai.invocation.written'
   | 'notification.changed'
+  | 'timebox.changed'
+  | 'relation.changed'
+  | 'lens.changed'
   | 'resync';
 
 export interface StreamEvent {
@@ -53,6 +56,18 @@ export function keysForEvent(evt: StreamEvent): readonly (readonly unknown[])[] 
         ['notifications', 'list'],
         ['notifications', 'unread-count'],
       ];
+    case 'timebox.changed':
+      return [
+        ['timeboxes', 'list', ws],
+        ['timeboxes', 'detail'],
+      ];
+    case 'relation.changed':
+      return [
+        ['relation-suggestions', 'list', ws],
+        ['relation-suggestions', 'task'],
+      ];
+    case 'lens.changed':
+      return [['lenses', 'list', ws]];
     case 'resync':
       return [
         ['auto-actions', 'list', ws],
@@ -63,6 +78,11 @@ export function keysForEvent(evt: StreamEvent): readonly (readonly unknown[])[] 
         ['ai-invocations', 'list', ws],
         ['notifications', 'list'],
         ['notifications', 'unread-count'],
+        ['timeboxes', 'list', ws],
+        ['timeboxes', 'detail'],
+        ['relation-suggestions', 'list', ws],
+        ['relation-suggestions', 'task'],
+        ['lenses', 'list', ws],
         ['tasks'],
       ];
   }

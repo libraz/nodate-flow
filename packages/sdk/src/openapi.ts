@@ -572,6 +572,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/public/lenses/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fetch a publicly shared lens (no auth required) */
+        get: operations["lenses-get-public"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/relation-suggestions/{suggestionId}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept or dismiss a relation suggestion */
+        post: operations["relation-suggestions-resolve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/signals": {
         parameters: {
             query?: never;
@@ -972,6 +1006,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/{id}/relation-suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List pending relation suggestions for a task */
+        get: operations["relation-suggestions-list-task"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{id}/replay": {
         parameters: {
             query?: never;
@@ -1318,6 +1369,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{wsId}/ai/resolve-command": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve a natural-language command into an MCP tool invocation */
+        post: operations["ai-resolve-command"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{wsId}/ai/state-suggestions": {
         parameters: {
             query?: never;
@@ -1403,6 +1471,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{wsId}/export/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export tasks as JSON
+         * @description Export workspace tasks as a JSON array, optionally scoped by a saved lens.
+         */
+        get: operations["export-tasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{wsId}/inbox/triage": {
         parameters: {
             query?: never;
@@ -1455,6 +1543,40 @@ export interface paths {
         head?: never;
         /** Update a saved view */
         patch: operations["lenses-update"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/lenses/{lensId}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publish a lens publicly with a shareable token URL */
+        post: operations["lenses-publish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/lenses/{lensId}/unpublish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke public access to a lens */
+        post: operations["lenses-unpublish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/workspaces/{wsId}/me/mcp-tokens": {
@@ -1563,6 +1685,112 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{wsId}/relation-suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List pending relation suggestions for a workspace */
+        get: operations["relation-suggestions-list-workspace"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/timeboxes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List timeboxes in a workspace */
+        get: operations["timeboxes-list"];
+        put?: never;
+        /** Create a timebox */
+        post: operations["timeboxes-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/timeboxes/{timeboxId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fetch a timebox by id */
+        get: operations["timeboxes-get"];
+        put?: never;
+        post?: never;
+        /** Soft-delete a timebox */
+        delete: operations["timeboxes-delete"];
+        options?: never;
+        head?: never;
+        /** Update a timebox */
+        patch: operations["timeboxes-update"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/timeboxes/{timeboxId}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Transition timebox status */
+        post: operations["timeboxes-update-status"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/timeboxes/{timeboxId}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List tasks in a timebox with progress */
+        get: operations["timeboxes-list-tasks"];
+        put?: never;
+        /** Add a task to a timebox */
+        post: operations["timeboxes-add-task"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/timeboxes/{timeboxId}/tasks/{taskId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a task from a timebox */
+        delete: operations["timeboxes-remove-task"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{wsId}/timeline": {
         parameters: {
             query?: never;
@@ -1595,6 +1823,93 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/webhooks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List webhook subscriptions */
+        get: operations["webhooks-list"];
+        put?: never;
+        /** Create a webhook subscription */
+        post: operations["webhooks-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/webhooks/{webhookId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a webhook subscription (includes secret) */
+        get: operations["webhooks-get"];
+        put?: never;
+        post?: never;
+        /** Soft-delete a webhook subscription */
+        delete: operations["webhooks-delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/webhooks/{webhookId}/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List delivery log for a webhook subscription */
+        get: operations["webhooks-deliveries-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/webhooks/{webhookId}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send a test ping delivery */
+        post: operations["webhooks-test-delivery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/webhooks/{webhookId}/toggle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Activate or deactivate a webhook subscription */
+        patch: operations["webhooks-toggle"];
         trace?: never;
     };
 }
@@ -1646,6 +1961,15 @@ export interface components {
             filename: string;
             storageKey: string;
         };
+        AddTaskBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Task public id (UUID v7) */
+            taskId: string;
+        };
         AddTaskCommentBody: {
             /**
              * Format: uri
@@ -1674,6 +1998,14 @@ export interface components {
             kind: "blocks" | "relates" | "duplicates" | "subtask_of";
             /** @description Target task public id (UUID v7) */
             toTaskId: string;
+        };
+        AddTaskOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
         };
         AddWorkspaceMemberInputBody: {
             /**
@@ -1933,15 +2265,12 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            externalId?: string;
-            kind: string;
-            payload?: unknown;
-            /** @enum {string} */
-            source: "manual" | "github" | "slack" | "email" | "webhook";
-            /** @description Optional task public id to attach to */
-            taskId?: string;
-            /** @description Workspace public id (UUID v7) */
-            workspaceId: string;
+            /** @description Human-readable description */
+            description: string;
+            /** @description JSON array of event type patterns */
+            eventTypes: unknown;
+            /** @description Target URL for webhook delivery */
+            url: string;
         };
         CreateLensBody: {
             /**
@@ -1983,6 +2312,14 @@ export interface components {
             /** @description Plaintext bearer token, shown only once */
             token: string;
             tokenPrefix: string;
+        };
+        CreateOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            webhook: components["schemas"]["WebhookSubscriptionDetailDTO"];
         };
         CreateProjectBody: {
             /**
@@ -2032,6 +2369,21 @@ export interface components {
              */
             visibility: "public" | "project" | "private";
         };
+        CreateTimeboxBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            description?: string;
+            /** @description YYYY-MM-DD */
+            endsOn: string;
+            name: string;
+            /** @description Project public id; omit for workspace-wide */
+            projectId?: string;
+            /** @description YYYY-MM-DD */
+            startsOn: string;
+        };
         CreateWorkspaceInputBody: {
             /**
              * Format: uri
@@ -2059,6 +2411,14 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        DeleteOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
         DeleteProviderOutputBody: {
             /**
              * Format: uri
@@ -2076,6 +2436,14 @@ export interface components {
             ok: boolean;
         };
         DeleteTaskCommentBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        DeleteTimeboxBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
@@ -2207,6 +2575,64 @@ export interface components {
             /** @description Human-readable explanation */
             explanation: string;
         };
+        ExportBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description Number of exported rows
+             */
+            count: number;
+            /** @description Export format used */
+            format: string;
+            tasks: components["schemas"]["ExportedTask"][] | null;
+        };
+        ExportedTask: {
+            assigneeDisplayName?: string;
+            /** @description Assignee public id (UUID v7) */
+            assigneeId?: string;
+            /**
+             * Format: int64
+             * @description Completion time (unix seconds)
+             */
+            completedAt?: number;
+            /**
+             * Format: int64
+             * @description Creation time (unix seconds)
+             */
+            createdAt: number;
+            description?: string;
+            /** @description Due date (YYYY-MM-DD) */
+            dueOn?: string;
+            /** @description Task public id (UUID v7) */
+            id: string;
+            /** Format: int32 */
+            priority: number;
+            /** @description Project public id (UUID v7) */
+            projectId: string;
+            projectName: string;
+            /** @description Started date (YYYY-MM-DD) */
+            startedOn?: string;
+            /** @description Derived state (open, waiting, review, etc.) */
+            status: string;
+            title: string;
+            /**
+             * Format: int64
+             * @description Last update time (unix seconds)
+             */
+            updatedAt?: number;
+        };
+        GetOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            webhook: components["schemas"]["WebhookSubscriptionDetailDTO"];
+        };
         HealthOutputBody: {
             /**
              * Format: uri
@@ -2301,6 +2727,17 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ListDeliveriesOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            deliveries: components["schemas"]["WebhookDeliveryDTO"][] | null;
+            nextCursor: string | null;
+            /** Format: int64 */
+            total: number;
+        };
         ListDuplicatesOutputBody: {
             /**
              * Format: uri
@@ -2310,6 +2747,25 @@ export interface components {
             candidates: components["schemas"]["DuplicateCandidate"][] | null;
             model: string;
             source: string;
+        };
+        ListForTaskBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            suggestions: components["schemas"]["SuggestionDTO"][] | null;
+        };
+        ListForWorkspaceBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            nextCursor: string | null;
+            suggestions: components["schemas"]["SuggestionDTO"][] | null;
+            /** Format: int64 */
+            total: number;
         };
         ListInboxOutputBody: {
             /**
@@ -2385,9 +2841,9 @@ export interface components {
              */
             readonly $schema?: string;
             nextCursor: string | null;
-            notifications: components["schemas"]["NotificationDTO"][] | null;
             /** Format: int64 */
             total: number;
+            webhooks: components["schemas"]["WebhookSubscriptionDTO"][] | null;
         };
         ListPrioritySuggestionsOutputBody: {
             /**
@@ -2533,8 +2989,21 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            nextCursor: string | null;
-            tasks: components["schemas"]["TaskListItem"][] | null;
+            /** Format: int64 */
+            completedTasks: number;
+            tasks: components["schemas"]["TimeboxTaskDTO"][] | null;
+            /** Format: int64 */
+            total: number;
+            /** Format: int64 */
+            totalTasks: number;
+        };
+        ListTimeboxesBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            timeboxes: components["schemas"]["TimeboxDTO"][] | null;
             /** Format: int64 */
             total: number;
         };
@@ -2929,6 +3398,28 @@ export interface components {
             /** @enum {string} */
             provider: "github" | "slack" | "google_calendar";
         };
+        PublicLens: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            filter: unknown;
+            groupBy: string | null;
+            /** @description Lens public id (UUID v7) */
+            id: string;
+            name: string;
+            sort: unknown;
+        };
+        PublishLensBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description 32-char hex token for the public share URL */
+            publicToken: string;
+        };
         RegisterInputBody: {
             /**
              * Format: uri
@@ -2966,6 +3457,14 @@ export interface components {
             ok: boolean;
         };
         RemoveTaskDependencyBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        RemoveTaskOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
@@ -3019,6 +3518,53 @@ export interface components {
             equivalent: boolean;
             stored: string;
         };
+        ResolveBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * @description Action to take on the suggestion
+             * @enum {string}
+             */
+            action: "accept" | "dismiss";
+        };
+        ResolveCommandInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Natural language command */
+            prompt: string;
+        };
+        ResolveCommandOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Tool arguments */
+            args: {
+                [key: string]: unknown;
+            };
+            /**
+             * Format: double
+             * @description Confidence score (0.0 to 1.0)
+             */
+            confidence: number;
+            /** @description Resolved MCP tool name */
+            tool: string;
+        };
+        ResolveOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
         RevokeAllOtherSessionsOutputBody: {
             /**
              * Format: uri
@@ -3055,7 +3601,20 @@ export interface components {
             /** @description Lens public id (UUID v7) */
             id: string;
             isDefault: boolean;
+            isPublic: boolean;
             name: string;
+            /** @description Share token; only returned to workspace members */
+            publicToken?: string;
+            /**
+             * Format: int64
+             * @description Unix seconds of last AI safety check
+             */
+            safetyCheckedAt?: number;
+            /**
+             * Format: int64
+             * @description Unix seconds when first shared publicly
+             */
+            sharedAt?: number;
             sort: unknown;
             /** Format: int32 */
             sortWeight: number;
@@ -3134,6 +3693,32 @@ export interface components {
             taskId: string;
             title: string;
             transition: string;
+        };
+        SuggestionDTO: {
+            /**
+             * Format: double
+             * @description Cosine similarity score, e.g. 0.85
+             */
+            confidence: number;
+            /**
+             * Format: int64
+             * @description Unix timestamp (seconds)
+             */
+            createdAt: number;
+            /** @description Suggestion public id (UUID v7) */
+            id: string;
+            /** @description Source task public id (UUID v7) */
+            sourceTaskId: string;
+            /** @description Source task title */
+            sourceTaskTitle: string;
+            /** @description Resolution status (pending, accepted, dismissed) */
+            status: string;
+            /** @description Suggested relation kind (blocks, relates, duplicates) */
+            suggestedKind: string;
+            /** @description Target task public id (UUID v7) */
+            targetTaskId: string;
+            /** @description Target task title */
+            targetTaskTitle: string;
         };
         Task: {
             /**
@@ -3359,6 +3944,56 @@ export interface components {
             taskId: string;
             title: string;
         };
+        TestDeliveryOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            deliveryId: string;
+        };
+        TimeboxDTO: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            createdAt: number;
+            creatorDisplayName: string;
+            creatorId: string;
+            description?: string;
+            /** @description YYYY-MM-DD */
+            endsOn: string;
+            /** @description Timebox public id (UUID v7) */
+            id: string;
+            name: string;
+            projectId?: string;
+            projectName?: string;
+            /** @description YYYY-MM-DD */
+            startsOn: string;
+            status: string;
+            /** Format: int64 */
+            updatedAt: number;
+        };
+        TimeboxTaskDTO: {
+            /** Format: int64 */
+            createdAt: number;
+            derivedState: string;
+            /** @description YYYY-MM-DD or null */
+            dueOn: string | null;
+            /** @description Task public id (UUID v7) */
+            id: string;
+            /** Format: int32 */
+            priority: number;
+            /** Format: int32 */
+            sortWeight: number;
+            /** @description YYYY-MM-DD or null */
+            startedOn: string | null;
+            title: string;
+            /** Format: int64 */
+            updatedAt: number;
+        };
         TimelineEvent: {
             actorDisplayName?: string;
             actorUserId?: string;
@@ -3368,6 +4003,23 @@ export interface components {
             payload?: unknown;
             taskId?: string;
             type: string;
+        };
+        ToggleInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Desired active state */
+            isActive: boolean;
+        };
+        ToggleOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
         };
         TotpConfirmInputBody: {
             /**
@@ -3477,6 +4129,14 @@ export interface components {
             dedupeKey: string;
             ok: boolean;
         };
+        UnpublishLensBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
         UpdateAgentEventTriggersInputBody: {
             /**
              * Format: uri
@@ -3523,6 +4183,28 @@ export interface components {
             name?: string;
             sort?: unknown;
         };
+        UpdateTimeboxBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            description?: string;
+            /** @description YYYY-MM-DD */
+            endsOn?: string;
+            name?: string;
+            /** @description YYYY-MM-DD */
+            startsOn?: string;
+        };
+        UpdateTimeboxStatusBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Target status: planned, active, completed, cancelled */
+            status: string;
+        };
         UpdateWorkspaceMemberRoleInputBody: {
             /**
              * Format: uri
@@ -3531,6 +4213,50 @@ export interface components {
             readonly $schema?: string;
             /** @enum {string} */
             role: "owner" | "admin" | "member" | "guest";
+        };
+        WebhookDeliveryDTO: {
+            /** Format: int32 */
+            attempts: number;
+            /** Format: int64 */
+            createdAt: number;
+            /** Format: int64 */
+            deliveredAt: number | null;
+            eventType: string;
+            /** Format: int64 */
+            failedAt: number | null;
+            /** Format: int32 */
+            httpStatus: number | null;
+            id: string;
+            /** Format: int32 */
+            maxAttempts: number;
+            status: string;
+        };
+        WebhookSubscriptionDTO: {
+            /** Format: int64 */
+            createdAt: number;
+            creatorDisplayName?: string;
+            creatorId?: string;
+            description: string;
+            eventTypes: unknown;
+            id: string;
+            isActive: boolean;
+            /** Format: int64 */
+            updatedAt: number | null;
+            url: string;
+        };
+        WebhookSubscriptionDetailDTO: {
+            /** Format: int64 */
+            createdAt: number;
+            creatorDisplayName?: string;
+            creatorId?: string;
+            description: string;
+            eventTypes: unknown;
+            id: string;
+            isActive: boolean;
+            secret: string;
+            /** Format: int64 */
+            updatedAt: number | null;
+            url: string;
         };
         WeeklyDigestCounts: {
             /** Format: int64 */
@@ -4924,6 +5650,74 @@ export interface operations {
             };
         };
     };
+    "lenses-get-public": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 32-char hex share token */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicLens"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "relation-suggestions-resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Suggestion public id (UUID v7) */
+                suggestionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResolveOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "signals-create": {
         parameters: {
             query?: never;
@@ -5999,6 +6793,40 @@ export interface operations {
             };
         };
     };
+    "relation-suggestions-list-task": {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Task public id (UUID v7) */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListForTaskBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "tasks-replay": {
         parameters: {
             query?: never;
@@ -6872,6 +7700,41 @@ export interface operations {
             };
         };
     };
+    "ai-resolve-command": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveCommandInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResolveCommandOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "ai-state-suggestions": {
         parameters: {
             query?: never;
@@ -7012,6 +7875,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WeeklyDigestOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-tasks": {
+        parameters: {
+            query?: {
+                /** @description Export format (csv or json) */
+                format?: "csv" | "json";
+                /** @description Optional lens public id to scope the export */
+                lensId?: string;
+                /** @description Maximum number of rows to export */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportBody"];
                 };
             };
             /** @description Error */
@@ -7218,6 +8119,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SavedLens"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "lenses-publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                lensId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublishLensBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "lenses-unpublish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                lensId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnpublishLensBody"];
                 };
             };
             /** @description Error */
@@ -7570,6 +8535,350 @@ export interface operations {
             };
         };
     };
+    "relation-suggestions-list-workspace": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Workspace public id (UUID v7) */
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListForWorkspaceBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "timeboxes-list": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListTimeboxesBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "timeboxes-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTimeboxBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimeboxDTO"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "timeboxes-get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                timeboxId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimeboxDTO"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "timeboxes-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                timeboxId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteTimeboxBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "timeboxes-update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                timeboxId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTimeboxBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimeboxDTO"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "timeboxes-update-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                timeboxId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTimeboxStatusBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimeboxDTO"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "timeboxes-list-tasks": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                wsId: string;
+                timeboxId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListTasksBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "timeboxes-add-task": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                timeboxId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddTaskBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddTaskOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "timeboxes-remove-task": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                timeboxId: string;
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoveTaskOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "workspaces-timeline-list": {
         parameters: {
             query?: {
@@ -7626,6 +8935,254 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListWorkspaceUsersOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "webhooks-list": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Workspace public id (UUID v7) */
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "webhooks-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public id (UUID v7) */
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "webhooks-get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public id (UUID v7) */
+                wsId: string;
+                /** @description Webhook subscription public id (UUID v7) */
+                webhookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GetOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "webhooks-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public id (UUID v7) */
+                wsId: string;
+                /** @description Webhook subscription public id (UUID v7) */
+                webhookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "webhooks-deliveries-list": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Workspace public id (UUID v7) */
+                wsId: string;
+                /** @description Webhook subscription public id (UUID v7) */
+                webhookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListDeliveriesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "webhooks-test-delivery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public id (UUID v7) */
+                wsId: string;
+                /** @description Webhook subscription public id (UUID v7) */
+                webhookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestDeliveryOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "webhooks-toggle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public id (UUID v7) */
+                wsId: string;
+                /** @description Webhook subscription public id (UUID v7) */
+                webhookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ToggleInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToggleOutputBody"];
                 };
             };
             /** @description Error */

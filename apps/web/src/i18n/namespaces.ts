@@ -16,6 +16,7 @@ export const namespaces = [
   'ai-suggestions',
   'mcp',
   'errors',
+  'relations',
 ] as const;
 
 /** Union of all known i18n namespace names. */

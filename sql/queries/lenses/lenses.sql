@@ -20,6 +20,10 @@ SELECT
   l.name,
   l.lens_json,
   l.is_default,
+  l.is_public,
+  l.public_token,
+  l.shared_at,
+  l.safety_checked_at,
   l.sort_weight,
   l.updated_at,
   l.created_at,
@@ -42,6 +46,10 @@ SELECT
   l.name,
   l.lens_json,
   l.is_default,
+  l.is_public,
+  l.public_token,
+  l.shared_at,
+  l.safety_checked_at,
   l.sort_weight,
   l.updated_at,
   l.created_at
@@ -60,6 +68,16 @@ SET name = ?,
 WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
+
+-- name: ResolveLensProjectID :one
+-- Resolve a lens public_id to its optional internal project_id.
+-- Used by the export handler to decide workspace-wide vs project-scoped queries.
+SELECT
+  l.project_id
+FROM lenses l
+WHERE l.workspace_id = ?
+  AND l.public_id = ?
+  AND l.enabled = TRUE;
 
 -- name: DeleteLens :exec
 -- Soft-delete a lens.

@@ -1,0 +1,19 @@
+{
+  "title": "エクスポート",
+  "button": "タスクをエクスポート",
+  "format_label": "形式",
+  "format": {
+    "csv": "CSV",
+    "json": "JSON"
+  },
+  "scope": {
+    "all": "すべてのタスク",
+    "lens": "現在のビュー"
+  },
+  "toast": {
+    "started": "エクスポートを開始しました",
+    "completed": "エクスポートが完了しました",
+    "failed": "エクスポートに失敗しました"
+  },
+  "download": "ダウンロード"
+}

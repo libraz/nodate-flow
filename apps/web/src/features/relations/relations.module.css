@@ -1,0 +1,152 @@
+/* Relation suggestions — compact embeddable panel for task detail. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+}
+
+.count {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+  padding-block: var(--nf-space-2);
+  padding-inline: var(--nf-space-3);
+  border-radius: var(--nf-radius-sm);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  background: var(--nf-color-bg-elevated);
+}
+
+.row:hover {
+  background: var(--nf-color-surface-hover);
+}
+
+.taskLink {
+  flex: 1;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--nf-color-fg);
+  text-decoration: none;
+  font-size: var(--nf-text-sm);
+}
+
+.taskLink:hover {
+  text-decoration: underline;
+}
+
+.taskLink:focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: var(--nf-focus-ring-offset);
+  border-radius: var(--nf-radius-sm);
+}
+
+.kindBadge {
+  display: inline-flex;
+  align-items: center;
+  padding-block: var(--nf-space-px);
+  padding-inline: var(--nf-space-2);
+  border-radius: var(--nf-radius-sm);
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-medium);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.kindBlocks {
+  background: var(--nf-color-warning-subtle);
+  color: var(--nf-color-warning-fg);
+}
+
+.kindRelates {
+  background: var(--nf-color-info-subtle);
+  color: var(--nf-color-info-fg);
+}
+
+.kindDuplicates {
+  background: var(--nf-color-danger-subtle);
+  color: var(--nf-color-danger-fg);
+}
+
+.confidence {
+  font-family: var(--nf-font-mono);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.actions {
+  display: flex;
+  gap: var(--nf-space-1);
+  flex-shrink: 0;
+  opacity: 0;
+}
+
+.row:hover .actions,
+.row:focus-within .actions {
+  opacity: 1;
+}
+
+.actionButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  background: transparent;
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-sm);
+  color: var(--nf-color-fg-muted);
+  cursor: pointer;
+  font-size: var(--nf-text-xs);
+}
+
+.actionButton:hover {
+  background: var(--nf-color-surface-hover);
+  color: var(--nf-color-fg);
+}
+
+.actionButton:focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: var(--nf-focus-ring-offset);
+}
+
+.acceptButton:hover {
+  color: var(--nf-color-success-fg);
+  border-color: var(--nf-color-success-fg);
+}
+
+.dismissButton:hover {
+  color: var(--nf-color-danger-fg);
+  border-color: var(--nf-color-danger-fg);
+}
