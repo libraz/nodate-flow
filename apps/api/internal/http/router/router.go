@@ -134,6 +134,16 @@ type Deps struct {
 	// an email.MemorySender.
 	EmailSender email.Sender
 
+	// EmbedOpenAIKey is the plaintext OpenAI API key for the embedding
+	// pipeline. When non-empty, the router uses embed.OpenAIProvider
+	// instead of the mock. Empty in tests (mock is used).
+	EmbedOpenAIKey string
+	// EmbedModel overrides the default embedding model. Empty means
+	// text-embedding-3-small.
+	EmbedModel string
+	// EmbedBaseURL overrides the embeddings API base URL.
+	EmbedBaseURL string
+
 	// Integrations is the personal-OAuth provider registry (GitHub /
 	// Slack / Google Calendar). Nil in tests; the handlers degrade
 	// gracefully by returning INTEGRATION.OAUTH.PROVIDER_NOT_CONFIGURED.
@@ -242,16 +252,25 @@ func BuildResult(deps Deps) Result {
 	aclDB := passthroughDB{deps.DB}
 	wsDeps := workspaces.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
 	prjDeps := projects.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
-	// Write-time embedding client (ADR 0003). Currently only the mock
-	// provider is shipped; the real provider integration is a separate
-	// follow-up.
+	// Write-time embedding client (ADR 0003). Uses the OpenAI provider
+	// when NF_EMBED_OPENAI_KEY is set, otherwise the deterministic mock.
 	var embedClient *embed.Client
 	var nlQueryCompiler *nlquery.Compiler
 	var nlConstraintCompiler *nlconstraint.Compiler
-	if deps.AiMock {
+	switch {
+	case deps.AiMock:
 		embedClient = embed.New(embed.NewMockProvider(), deps.Queries)
 		nlQueryCompiler = nlquery.New(nlquery.NewMockProvider())
 		nlConstraintCompiler = nlconstraint.New(nlconstraint.NewMockProvider())
+	case deps.EmbedOpenAIKey != "":
+		var opts []embed.OpenAIOption
+		if deps.EmbedModel != "" {
+			opts = append(opts, embed.WithOpenAIModel(deps.EmbedModel))
+		}
+		if deps.EmbedBaseURL != "" {
+			opts = append(opts, embed.WithOpenAIBaseURL(deps.EmbedBaseURL))
+		}
+		embedClient = embed.New(embed.NewOpenAIProvider(deps.EmbedOpenAIKey, opts...), deps.Queries)
 	}
 	taskDeps := tasks.Deps{DB: deps.DB, Queries: deps.Queries, Embedder: embedClient, NlConstraint: nlConstraintCompiler, Storage: deps.Storage, Audit: auditRec}
 	tlDeps := timeline.Deps{DB: deps.DB, Queries: deps.Queries}

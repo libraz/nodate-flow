@@ -168,6 +168,19 @@ type Config struct {
 	// When false, the POST /auth/register endpoint returns 403.
 	RegistrationOpen bool `env:"NF_REGISTRATION_OPEN" envDefault:"true"`
 
+	// EmbedOpenAIKey is the plaintext OpenAI API key used by the
+	// task-embedding pipeline (text-embedding-3-small, 768 dims). When
+	// empty the embedding system falls back to the deterministic mock
+	// provider.
+	EmbedOpenAIKey string `env:"NF_EMBED_OPENAI_KEY" envDefault:""`
+	// EmbedModel overrides the default OpenAI embedding model
+	// (text-embedding-3-small). Use text-embedding-3-large for higher
+	// fidelity or an Azure/compatible endpoint's model name.
+	EmbedModel string `env:"NF_EMBED_MODEL" envDefault:""`
+	// EmbedBaseURL overrides the OpenAI Embeddings API base URL. Set
+	// this to use Azure OpenAI, LiteLLM, or any compatible endpoint.
+	EmbedBaseURL string `env:"NF_EMBED_BASE_URL" envDefault:""`
+
 	// S3Endpoint is the host:port of the S3-compatible object store
 	// (e.g. "minio:9000" or "s3.amazonaws.com"). When empty, file
 	// upload endpoints return INTERNAL.NOT_CONFIGURED.
