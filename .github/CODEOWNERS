@@ -1,0 +1,14 @@
+# Default owners
+* @libraz
+
+# Go backend
+apps/api/ @libraz
+sql/ @libraz
+
+# Frontend
+apps/web/ @libraz
+packages/ui/ @libraz
+
+# Infrastructure
+infra/ @libraz
+.github/ @libraz

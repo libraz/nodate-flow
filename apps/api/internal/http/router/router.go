@@ -12,6 +12,7 @@ package router
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -700,6 +701,17 @@ func BuildResult(deps Deps) Result {
 	r.Post("/webhooks/slack", signals.HandleSlackWebhook(signalDeps))
 	r.Post("/webhooks/google", signals.HandleGoogleWebhook(signalDeps))
 
+	// OpenAPI spec and Scalar API reference UI — public, no auth.
+	specJSON := buildOpenAPIJSON(apis)
+	r.Get("/openapi.json", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(specJSON) //nolint:errcheck // best-effort write to HTTP client
+	})
+	r.Get("/api-reference", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write([]byte(scalarHTML)) //nolint:errcheck // best-effort write to HTTP client
+	})
+
 	return Result{Handler: r, APIs: apis}
 }
 
@@ -903,6 +915,107 @@ func newDBInvocationLogger(q *generated.Queries, publish func(context.Context, u
 		}); err == nil && publish != nil {
 			publish(ctx, rec.WorkspaceID)
 		}
+	}
+}
+
+// scalarHTML is the self-contained HTML page that loads the Scalar API
+// reference UI from their CDN. It points at the co-located /openapi.json
+// route so the spec is always in sync with the running server.
+const scalarHTML = `<!DOCTYPE html>
+<html>
+<head>
+  <title>nodate-flow API Reference</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+</head>
+<body>
+  <script id="api-reference" data-url="/openapi.json"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+</body>
+</html>`
+
+// buildOpenAPIJSON merges the separate huma.API OpenAPI documents into a
+// single spec and returns the marshaled JSON bytes. This is the same
+// merge logic used by cmd/dump-openapi but executed at router build time
+// so the running server can serve the spec without a filesystem artifact.
+func buildOpenAPIJSON(apis []huma.API) []byte {
+	merged := mergeAPIs(apis)
+	buf, err := json.Marshal(merged)
+	if err != nil {
+		// Should never happen: Huma's OpenAPI types are always
+		// serializable. Fall back to a minimal valid document so
+		// /openapi.json never 500s.
+		return []byte(`{"openapi":"3.1.0","info":{"title":"nodate-flow","version":"0.0.0"},"paths":{}}`)
+	}
+	return buf
+}
+
+// mergeAPIs merges every sub-API's OpenAPI document into a single
+// OpenAPI 3.1 spec. The nodate-flow router splits operations across
+// multiple humachi.New instances so each middleware chain lives in its
+// own chi group, which means each group carries its own OpenAPI doc.
+func mergeAPIs(apis []huma.API) *huma.OpenAPI {
+	if len(apis) == 0 {
+		return &huma.OpenAPI{OpenAPI: "3.1.0"}
+	}
+	root := apis[0].OpenAPI()
+	if root.Paths == nil {
+		root.Paths = map[string]*huma.PathItem{}
+	}
+	if root.Components == nil {
+		root.Components = &huma.Components{}
+	}
+	for _, a := range apis[1:] {
+		spec := a.OpenAPI()
+		for path, item := range spec.Paths {
+			if existing, ok := root.Paths[path]; ok {
+				mergePathItem(existing, item)
+			} else {
+				root.Paths[path] = item
+			}
+		}
+		if spec.Components == nil {
+			continue
+		}
+		if spec.Components.Schemas != nil && root.Components.Schemas != nil {
+			rootMap := root.Components.Schemas.Map()
+			for name, schema := range spec.Components.Schemas.Map() {
+				if _, ok := rootMap[name]; ok {
+					continue
+				}
+				rootMap[name] = schema
+			}
+		}
+	}
+	return root
+}
+
+// mergePathItem copies operations from src into dst for HTTP verbs that
+// dst does not already define.
+func mergePathItem(dst, src *huma.PathItem) {
+	if dst.Get == nil {
+		dst.Get = src.Get
+	}
+	if dst.Put == nil {
+		dst.Put = src.Put
+	}
+	if dst.Post == nil {
+		dst.Post = src.Post
+	}
+	if dst.Delete == nil {
+		dst.Delete = src.Delete
+	}
+	if dst.Patch == nil {
+		dst.Patch = src.Patch
+	}
+	if dst.Head == nil {
+		dst.Head = src.Head
+	}
+	if dst.Options == nil {
+		dst.Options = src.Options
+	}
+	if dst.Trace == nil {
+		dst.Trace = src.Trace
 	}
 }
 

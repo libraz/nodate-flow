@@ -3,20 +3,21 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "workspaces": ["apps/*", "packages/*"],
   "scripts": {
     "check": "biome check .",
     "format": "biome format --write .",
     "lint": "biome lint .",
     "typecheck": "tsc -b",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "changeset publish",
     "postinstall": "simple-git-hooks",
     "prepare": "simple-git-hooks"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
+    "@changesets/cli": "^2.30.0",
     "@commitlint/cli": "19.5.0",
     "@commitlint/config-conventional": "19.5.0",
     "lint-staged": "15.2.10",

@@ -1,0 +1,85 @@
+name: Good First Issue
+description: A task suitable for new contributors
+title: "[good first issue] "
+labels: ["good first issue", "help wanted"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a good-first-issue. Please fill in enough detail
+        so that a new contributor can pick this up without prior context.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What needs to be done? Keep it concise.
+      placeholder: "Example: Add a loading skeleton to the task list view."
+    validations:
+      required: true
+
+  - type: textarea
+    id: background
+    attributes:
+      label: Background
+      description: >
+        Context and motivation. Why does this matter? Link to relevant
+        docs, issues, or code if helpful.
+      placeholder: |
+        The task list currently shows a blank area while data loads.
+        A skeleton improves perceived performance and matches our
+        design system patterns (see packages/ui/src/primitives/skeleton/).
+    validations:
+      required: true
+
+  - type: textarea
+    id: approach
+    attributes:
+      label: Suggested approach
+      description: >
+        Step-by-step guidance. Be specific enough that someone unfamiliar
+        with the codebase can follow along.
+      placeholder: |
+        1. Read `apps/web/src/features/tasks/task-list-view.tsx`
+        2. Add a Suspense fallback using `<Skeleton>` from `packages/ui`
+        3. Verify with `bun run dev` — the skeleton should appear during loading
+        4. Add a Vitest snapshot test
+    validations:
+      required: true
+
+  - type: textarea
+    id: files
+    attributes:
+      label: Relevant files
+      description: >
+        File paths or directories to look at. This helps newcomers
+        navigate the codebase.
+      placeholder: |
+        - apps/web/src/features/tasks/task-list-view.tsx
+        - packages/ui/src/primitives/skeleton/
+    validations:
+      required: false
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: How will we know this is done? List concrete checks.
+      placeholder: |
+        - [ ] Skeleton appears while task list is loading
+        - [ ] Skeleton disappears once data arrives
+        - [ ] Vitest snapshot test passes
+        - [ ] No accessibility regressions (vitest-axe)
+    validations:
+      required: true
+
+  - type: input
+    id: mentor
+    attributes:
+      label: Mentorship
+      description: >
+        Tag a maintainer who can help with questions (e.g., @username).
+        Leave blank if no specific mentor is available.
+      placeholder: "@username"
+    validations:
+      required: false
