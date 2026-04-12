@@ -17,6 +17,8 @@
 
 import { randomUUID } from 'node:crypto';
 
+import type { BrowserContext } from '@playwright/test';
+
 export const API_BASE_URL = process.env.NF_API_URL ?? 'http://localhost:8080';
 
 export interface TestTenant {
@@ -24,6 +26,8 @@ export interface TestTenant {
   password: string;
   displayName: string;
   accessToken: string;
+  /** Raw nf_rt refresh token extracted from the Set-Cookie header. */
+  refreshToken: string;
   userId: string;
   workspaceId: string;
   workspaceSlug: string;
@@ -67,6 +71,21 @@ async function postJson<T>(path: string, body: unknown, bearer?: string): Promis
 }
 
 /**
+ * Extracts the nf_rt refresh token value from a Set-Cookie header.
+ * The header may contain multiple cookie strings separated by commas
+ * or be returned as a single value; we look for the `nf_rt=...`
+ * segment.
+ */
+function extractRefreshToken(res: Response): string {
+  const raw = res.headers.get('set-cookie') ?? '';
+  const match = raw.match(/nf_rt=([^;]+)/);
+  if (!match) {
+    throw new Error(`POST /auth/register did not return nf_rt cookie. Set-Cookie: ${raw}`);
+  }
+  return match[1] as string;
+}
+
+/**
  * Creates a fresh tenant via the public REST API and returns the
  * credentials + identifiers needed by the test.
  */
@@ -76,12 +95,17 @@ export async function createTestTenant(): Promise<TestTenant> {
   const password = 'correct horse battery staple';
   const displayName = `E2E User ${suffix}`;
 
-  const reg = await postJson<RegisterResponse>('/auth/register', {
-    email,
-    password,
-    displayName,
-    locale: 'en',
+  // Register with raw fetch so we can capture the nf_rt Set-Cookie.
+  const regRes = await fetch(`${API_BASE_URL}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({ email, password, displayName, locale: 'en' }),
   });
+  if (!regRes.ok) {
+    throw new Error(`POST /auth/register -> ${regRes.status} ${await regRes.text()}`);
+  }
+  const reg = (await regRes.json()) as RegisterResponse;
+  const refreshToken = extractRefreshToken(regRes);
 
   const workspaceSlug = `ws-${suffix}`;
   const ws = await postJson<WorkspaceResponse>(
@@ -102,6 +126,7 @@ export async function createTestTenant(): Promise<TestTenant> {
     password,
     displayName,
     accessToken: reg.accessToken,
+    refreshToken,
     userId: reg.userId,
     workspaceId: ws.id,
     workspaceSlug: ws.slug,
@@ -143,4 +168,28 @@ export async function createTask(
     tenant.accessToken,
   );
   return res;
+}
+
+/**
+ * Injects the tenant's nf_rt refresh cookie into the browser context so
+ * the app's bootstrap flow (POST /auth/refresh) succeeds on the next
+ * navigation. This replaces the broken localStorage approach -- the auth
+ * store is in-memory only and the app re-establishes sessions exclusively
+ * via the httpOnly nf_rt cookie.
+ *
+ * Must be called BEFORE page.goto().
+ */
+export async function injectAuth(context: BrowserContext, tenant: TestTenant): Promise<void> {
+  const url = new URL(API_BASE_URL);
+  await context.addCookies([
+    {
+      name: 'nf_rt',
+      value: tenant.refreshToken,
+      domain: url.hostname,
+      path: '/auth',
+      httpOnly: true,
+      secure: url.protocol === 'https:',
+      sameSite: url.protocol === 'https:' ? 'None' : 'Lax',
+    },
+  ]);
 }

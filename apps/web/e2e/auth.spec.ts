@@ -16,7 +16,13 @@
 
 import { expect, test } from '@playwright/test';
 
-import { type TestTenant, cleanupTenant, createTask, createTestTenant } from './fixtures/tenant';
+import {
+  type TestTenant,
+  cleanupTenant,
+  createTask,
+  createTestTenant,
+  injectAuth,
+} from './fixtures/tenant';
 
 test.describe('auth smoke', () => {
   let tenant: TestTenant | null = null;
@@ -47,14 +53,13 @@ test.describe('auth smoke', () => {
     await expect(page).toHaveURL(/\/$/);
 
     // 3. Seed a task on the *fixture* tenant and verify its title shows
-    //    up when we navigate to that project's task list. We swap the
-    //    access token in localStorage so the UI sees the fixture tenant.
+    //    up when we navigate to that project's task list. We inject the
+    //    fixture tenant's nf_rt cookie so the bootstrap flow picks up
+    //    the correct session on the next navigation.
     const taskTitle = `Smoke task ${Date.now()}`;
     await createTask(tenant, taskTitle);
 
-    await page.evaluate((token) => {
-      window.localStorage.setItem('nf.auth.accessToken', token);
-    }, tenant.accessToken);
+    await injectAuth(page.context(), tenant);
 
     await page.goto(`/projects/${tenant.projectId}/tasks`);
     await expect(page.getByText(taskTitle)).toBeVisible({ timeout: 10_000 });

@@ -5,7 +5,7 @@
  * glass dock:
  *
  *   1. Create a fresh tenant with an overdue task via REST.
- *   2. Inject the tenant's access token into localStorage and
+ *   2. Inject the tenant's nf_rt cookie into the browser context and
  *      navigate to a workspace-scoped route so the dock knows which
  *      workspace to subscribe to.
  *   3. Open the glass dock and assert the initial overdue task
@@ -22,7 +22,13 @@
 
 import { expect, test } from '@playwright/test';
 
-import { API_BASE_URL, type TestTenant, cleanupTenant, createTestTenant } from './fixtures/tenant';
+import {
+  API_BASE_URL,
+  type TestTenant,
+  cleanupTenant,
+  createTestTenant,
+  injectAuth,
+} from './fixtures/tenant';
 
 interface TaskResponse {
   id: string;
@@ -72,12 +78,11 @@ test.describe('realtime stream', () => {
     const firstTitle = `Overdue A ${Date.now()}`;
     await createOverdueTask(tenant, firstTitle);
 
-    // Inject the REST-created tenant's access token so the web app
-    // boots already authenticated, then navigate to a workspace
-    // route so `useActiveWorkspaceId()` resolves.
-    await page.addInitScript((token) => {
-      window.localStorage.setItem('nf.auth.accessToken', token);
-    }, tenant.accessToken);
+    // Inject the REST-created tenant's nf_rt cookie so the app's
+    // bootstrap flow (POST /auth/refresh) authenticates on page load,
+    // then navigate to a workspace route so `useActiveWorkspaceId()`
+    // resolves.
+    await injectAuth(page.context(), tenant);
 
     await page.goto(`/workspaces/${tenant.workspaceId}/projects`);
 
