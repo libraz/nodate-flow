@@ -84,6 +84,12 @@ func main() {
 		os.Exit(1)
 	}
 	defer db.Close()
+
+	// Start background DB connection pool metrics collector. The channel
+	// is closed during graceful shutdown to stop the polling goroutine.
+	dbStatsDone := make(chan struct{})
+	obs.StartDBStatsCollector(db, dbStatsDone)
+
 	queries := generated.New(db)
 
 	// Cipher is optional at scaffold time: if NF_SECRET_KEY is unset the
@@ -181,9 +187,10 @@ func main() {
 				})
 			})
 			executor = &ai.AgentExecutor{
-				Queries:  queries,
-				Resolver: resolver,
-				Guard:    ai.NewCostGuard(budget, 0),
+				Queries:      queries,
+				Resolver:     resolver,
+				Guard:        ai.NewCostGuard(budget, 0),
+				OnInvocation: obs.RecordAIInvocation,
 			}
 			logger.Info("agent executor: workspace resolver")
 		} else {
@@ -370,6 +377,8 @@ func main() {
 	if agentPurger != nil {
 		agentPurger.Stop()
 	}
+
+	close(dbStatsDone)
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer shutdownCancel()
