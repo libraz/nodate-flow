@@ -3,14 +3,17 @@
  *
  * Columns: title, status, deps, assignee, due date, priority, updated.
  * Features: column sorting, priority color indicators, status badges,
- * overdue date highlighting, row selection with bulk action toolbar.
+ * overdue date highlighting, row selection with bulk action toolbar,
+ * inline editing for title (double-click), priority (click), and due date (click).
  */
 
 import DataGrid from '@nodate-flow/ui/primitives/data-grid';
+import Input from '@nodate-flow/ui/primitives/input';
+import Select from '@nodate-flow/ui/primitives/select';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import { Link } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import type { ColumnDef, RowSelectionState } from '@tanstack/react-table';
-import { type ReactElement, useCallback, useState } from 'react';
+import { type ReactElement, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { computeBlockedByOpen, useProjectDependenciesQuery } from '../projects/api';
@@ -23,6 +26,7 @@ import {
   useTasksQuery,
   useUpdateTask,
 } from './api';
+import { useInlineEdit } from './use-inline-edit';
 import { useTaskFilters } from './use-task-filters';
 
 export interface TaskListViewProps {
@@ -197,6 +201,285 @@ function BulkActionBar({
   );
 }
 
+/* ── Inline edit cells ─────────────────────────────────────── */
+
+function InlineTitleCell({
+  task,
+  editing,
+  onStartEdit,
+  onStopEdit,
+  onSave,
+  onNavigate,
+}: {
+  task: TaskListItem;
+  editing: boolean;
+  onStartEdit: () => void;
+  onStopEdit: () => void;
+  onSave: (title: string) => void;
+  onNavigate: () => void;
+}): ReactElement {
+  const { t } = useTranslation('common');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [draft, setDraft] = useState(task.title);
+
+  /* Reset draft when entering edit mode via a re-render. */
+  const prevEditing = useRef(false);
+  if (editing && !prevEditing.current) {
+    setDraft(task.title);
+  }
+  prevEditing.current = editing;
+
+  /* Auto-focus when switching to edit mode. */
+  if (editing && inputRef.current && document.activeElement !== inputRef.current) {
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }
+
+  if (editing) {
+    return (
+      <Input
+        ref={inputRef}
+        aria-label={t('tasks.inline.edit_title')}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            const trimmed = draft.trim();
+            if (trimmed.length > 0 && trimmed !== task.title) {
+              onSave(trimmed);
+            }
+            onStopEdit();
+          } else if (e.key === 'Escape') {
+            onStopEdit();
+          }
+        }}
+        onBlur={() => {
+          const trimmed = draft.trim();
+          if (trimmed.length > 0 && trimmed !== task.title) {
+            onSave(trimmed);
+          }
+          onStopEdit();
+        }}
+        style={{
+          width: '100%',
+          fontSize: 'inherit',
+          fontWeight: 500,
+          padding: '0.125rem 0.25rem',
+          margin: '-0.125rem -0.25rem',
+        }}
+      />
+    );
+  }
+
+  /* Distinguish single click (navigate) from double click (edit).
+     We delay navigation by 250ms; a double-click within that window
+     cancels the pending navigate and enters edit mode instead. */
+  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  return (
+    <Link
+      to="/tasks/$taskId"
+      params={{ taskId: task.id }}
+      onClick={(e) => {
+        e.preventDefault();
+        if (clickTimer.current !== null) return;
+        clickTimer.current = setTimeout(() => {
+          clickTimer.current = null;
+          onNavigate();
+        }, 250);
+      }}
+      onDoubleClick={() => {
+        if (clickTimer.current !== null) {
+          clearTimeout(clickTimer.current);
+          clickTimer.current = null;
+        }
+        onStartEdit();
+      }}
+      style={{
+        color: 'var(--color-fg)',
+        textDecoration: 'none',
+        fontWeight: 500,
+      }}
+    >
+      {task.title}
+    </Link>
+  );
+}
+
+function InlinePriorityCell({
+  task,
+  editing,
+  onStartEdit,
+  onStopEdit,
+  onSave,
+}: {
+  task: TaskListItem;
+  editing: boolean;
+  onStartEdit: () => void;
+  onStopEdit: () => void;
+  onSave: (priority: TaskPriority) => void;
+}): ReactElement {
+  const { t } = useTranslation('common');
+  const selectRef = useRef<HTMLSelectElement>(null);
+  const p = (task.priority as TaskPriority) ?? 0;
+  const color = PRIORITY_COLOR[p] ?? PRIORITY_COLOR[0];
+
+  /* Auto-focus and open when switching to edit mode. */
+  if (editing && selectRef.current && document.activeElement !== selectRef.current) {
+    requestAnimationFrame(() => selectRef.current?.focus());
+  }
+
+  if (editing) {
+    return (
+      <Select
+        ref={selectRef}
+        aria-label={t('tasks.inline.edit_priority')}
+        value={String(p)}
+        onChange={(e) => {
+          const next = Number(e.target.value) as TaskPriority;
+          if (next !== p) {
+            onSave(next);
+          }
+          onStopEdit();
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            onStopEdit();
+          }
+        }}
+        onBlur={() => onStopEdit()}
+        style={{
+          width: '100%',
+          fontSize: '0.8125rem',
+          padding: '0.125rem 0.25rem',
+          margin: '-0.125rem -0.25rem',
+        }}
+      >
+        <option value="0">{t('tasks.priority.none')}</option>
+        <option value="1">{t('tasks.priority.low')}</option>
+        <option value="2">{t('tasks.priority.medium')}</option>
+        <option value="3">{t('tasks.priority.high')}</option>
+        <option value="4">{t('tasks.priority.urgent')}</option>
+      </Select>
+    );
+  }
+
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      aria-label={t('tasks.inline.edit_priority')}
+      onClick={onStartEdit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onStartEdit();
+        }
+      }}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '0.375rem',
+        fontSize: '0.8125rem',
+        cursor: 'pointer',
+      }}
+    >
+      <span
+        aria-hidden
+        style={{
+          width: '0.375rem',
+          height: '0.75rem',
+          borderRadius: '0.125rem',
+          background: color,
+          flexShrink: 0,
+        }}
+      />
+      {t(PRIORITY_KEY[p] ?? 'tasks.priority.none')}
+    </span>
+  );
+}
+
+function InlineDueCell({
+  task,
+  editing,
+  onStartEdit,
+  onStopEdit,
+  onSave,
+}: {
+  task: TaskListItem;
+  editing: boolean;
+  onStartEdit: () => void;
+  onStopEdit: () => void;
+  onSave: (dueOn: string) => void;
+}): ReactElement {
+  const { t } = useTranslation('common');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dueOn = task.dueOn;
+  const overdue =
+    isOverdue(dueOn) && task.derivedState !== 'done' && task.derivedState !== 'cancelled';
+
+  /* Auto-focus when switching to edit mode. */
+  if (editing && inputRef.current && document.activeElement !== inputRef.current) {
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        type="date"
+        aria-label={t('tasks.inline.edit_due')}
+        defaultValue={dueOn ?? ''}
+        onChange={(e) => {
+          const val = e.target.value;
+          if (val !== (dueOn ?? '')) {
+            onSave(val);
+          }
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            onStopEdit();
+          } else if (e.key === 'Enter') {
+            onStopEdit();
+          }
+        }}
+        onBlur={() => onStopEdit()}
+        style={{
+          width: '100%',
+          fontSize: '0.8125rem',
+          padding: '0.125rem 0.25rem',
+          margin: '-0.125rem -0.25rem',
+          border: '1px solid var(--nf-color-border, var(--color-hairline))',
+          borderRadius: '0.25rem',
+          background: 'var(--color-surface, transparent)',
+          color: 'var(--color-fg)',
+        }}
+      />
+    );
+  }
+
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      aria-label={t('tasks.inline.edit_due')}
+      onClick={onStartEdit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onStartEdit();
+        }
+      }}
+      style={{
+        color: overdue ? 'var(--nf-color-danger, #c0392b)' : undefined,
+        fontWeight: overdue ? 600 : undefined,
+        cursor: 'pointer',
+      }}
+    >
+      {dueOn ?? '—'}
+    </span>
+  );
+}
+
 /* ── Main list view ─────────────────────────────────────────── */
 
 export default function TaskListView({ projectId }: TaskListViewProps): ReactElement {
@@ -206,6 +489,9 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
   const { data: edges } = useProjectDependenciesQuery(projectId);
   const blockedByOpen = computeBlockedByOpen(edges);
   const locale = i18n.resolvedLanguage ?? 'en';
+  const updateTask = useUpdateTask();
+  const navigate = useNavigate();
+  const inlineEdit = useInlineEdit();
 
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
@@ -221,6 +507,15 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
     setRowSelection({});
   }, []);
 
+  const handleInlineSave = (
+    id: string,
+    patch: { title?: string; priority?: TaskPriority; dueOn?: string },
+  ) => {
+    void updateTask.mutateAsync({ id, patch }).catch(() => {
+      toaster.show({ tone: 'danger', message: t('tasks.inline.save_failed') });
+    });
+  };
+
   const columns: ColumnDef<TaskListItem, unknown>[] = [
     {
       id: 'title',
@@ -228,17 +523,16 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
       size: 320,
       header: () => t('tasks.columns.title'),
       cell: ({ row }) => (
-        <Link
-          to="/tasks/$taskId"
-          params={{ taskId: row.original.id }}
-          style={{
-            color: 'var(--color-fg)',
-            textDecoration: 'none',
-            fontWeight: 500,
-          }}
-        >
-          {row.original.title}
-        </Link>
+        <InlineTitleCell
+          task={row.original}
+          editing={inlineEdit.isEditing(row.original.id, 'title')}
+          onStartEdit={() => inlineEdit.startEdit(row.original.id, 'title')}
+          onStopEdit={inlineEdit.stopEdit}
+          onSave={(title) => handleInlineSave(row.original.id, { title })}
+          onNavigate={() =>
+            void navigate({ to: '/tasks/$taskId', params: { taskId: row.original.id } })
+          }
+        />
       ),
     },
     {
@@ -333,55 +627,30 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
       accessorKey: 'dueOn',
       size: 100,
       header: () => t('tasks.columns.due'),
-      cell: ({ row }) => {
-        const dueOn = row.original.dueOn;
-        const overdue =
-          isOverdue(dueOn) &&
-          row.original.derivedState !== 'done' &&
-          row.original.derivedState !== 'cancelled';
-        return (
-          <span
-            style={{
-              color: overdue ? 'var(--nf-color-danger, #c0392b)' : undefined,
-              fontWeight: overdue ? 600 : undefined,
-            }}
-          >
-            {dueOn ?? '—'}
-          </span>
-        );
-      },
+      cell: ({ row }) => (
+        <InlineDueCell
+          task={row.original}
+          editing={inlineEdit.isEditing(row.original.id, 'due')}
+          onStartEdit={() => inlineEdit.startEdit(row.original.id, 'due')}
+          onStopEdit={inlineEdit.stopEdit}
+          onSave={(dueOn) => handleInlineSave(row.original.id, { dueOn })}
+        />
+      ),
     },
     {
       id: 'priority',
       accessorKey: 'priority',
       size: 90,
       header: () => t('tasks.columns.priority'),
-      cell: ({ row }) => {
-        const p = (row.original.priority as TaskPriority) ?? 0;
-        const color = PRIORITY_COLOR[p] ?? PRIORITY_COLOR[0];
-        return (
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.375rem',
-              fontSize: '0.8125rem',
-            }}
-          >
-            <span
-              aria-hidden
-              style={{
-                width: '0.375rem',
-                height: '0.75rem',
-                borderRadius: '0.125rem',
-                background: color,
-                flexShrink: 0,
-              }}
-            />
-            {t(PRIORITY_KEY[p] ?? 'tasks.priority.none')}
-          </span>
-        );
-      },
+      cell: ({ row }) => (
+        <InlinePriorityCell
+          task={row.original}
+          editing={inlineEdit.isEditing(row.original.id, 'priority')}
+          onStartEdit={() => inlineEdit.startEdit(row.original.id, 'priority')}
+          onStopEdit={inlineEdit.stopEdit}
+          onSave={(priority) => handleInlineSave(row.original.id, { priority })}
+        />
+      ),
     },
     {
       id: 'updated',
