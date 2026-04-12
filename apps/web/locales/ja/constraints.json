@@ -11,10 +11,18 @@
     "satisfied": "満たされた",
     "failed": "満たされない",
     "parseError": "パースエラー",
+    "nlPrompt": "制約を自然言語で記述\u2026",
+    "generate": "生成",
+    "generating": "生成中\u2026",
+    "explain": "説明",
+    "explaining": "説明中\u2026",
+    "explanation": "説明",
     "errors": {
       "addFailed": "制約の追加に失敗しました",
       "removeFailed": "制約の削除に失敗しました",
-      "evaluateFailed": "評価に失敗しました"
+      "evaluateFailed": "評価に失敗しました",
+      "compileFailed": "記述から制約を生成できませんでした。",
+      "explainFailed": "制約を説明できませんでした。"
     },
     "kinds": {
       "deadline": "期限",

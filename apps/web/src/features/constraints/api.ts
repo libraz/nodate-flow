@@ -68,6 +68,67 @@ export function useAddConstraint(): UseMutationResult<{ id: string }, Error, Add
   });
 }
 
+export interface CompileConstraintArgs {
+  taskId: string;
+  prompt: string;
+}
+
+export interface CompileConstraintResult {
+  kind: string;
+  expression: string;
+}
+
+/**
+ * useCompileConstraint — mutation that sends a natural-language prompt
+ * to the AI compile endpoint and returns the generated DSL kind + expression.
+ */
+export function useCompileConstraint(): UseMutationResult<
+  CompileConstraintResult,
+  Error,
+  CompileConstraintArgs
+> {
+  return useMutation<CompileConstraintResult, Error, CompileConstraintArgs>({
+    mutationFn: async ({ taskId, prompt }): Promise<CompileConstraintResult> => {
+      const { data, error } = await sdk.POST('/tasks/{id}/constraints/compile', {
+        params: { path: { id: taskId } },
+        body: { prompt },
+      });
+      if (error || !data) throw new Error('Failed to compile constraint');
+      return { kind: data.kind, expression: data.expression };
+    },
+  });
+}
+
+export interface ExplainConstraintArgs {
+  taskId: string;
+  expression: string;
+}
+
+export interface ExplainConstraintResult {
+  explanation: string;
+}
+
+/**
+ * useExplainConstraint — mutation that sends a DSL expression to the
+ * explain endpoint and returns a human-readable explanation.
+ */
+export function useExplainConstraint(): UseMutationResult<
+  ExplainConstraintResult,
+  Error,
+  ExplainConstraintArgs
+> {
+  return useMutation<ExplainConstraintResult, Error, ExplainConstraintArgs>({
+    mutationFn: async ({ taskId, expression }): Promise<ExplainConstraintResult> => {
+      const { data, error } = await sdk.POST('/tasks/{id}/constraints/explain', {
+        params: { path: { id: taskId } },
+        body: { expression },
+      });
+      if (error || !data) throw new Error('Failed to explain constraint');
+      return { explanation: data.explanation };
+    },
+  });
+}
+
 /**
  * useRemoveConstraint — manual intervention (4.WEB-3): drop a
  * constraint that the operator deems no longer relevant. This is the

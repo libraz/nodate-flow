@@ -11,10 +11,18 @@
     "satisfied": "satisfied",
     "failed": "failed",
     "parseError": "Parse error",
+    "nlPrompt": "Describe constraint in natural language\u2026",
+    "generate": "Generate",
+    "generating": "Generating\u2026",
+    "explain": "Explain",
+    "explaining": "Explaining\u2026",
+    "explanation": "Explanation",
     "errors": {
       "addFailed": "Failed to add constraint",
       "removeFailed": "Failed to remove constraint",
-      "evaluateFailed": "Failed to evaluate constraints"
+      "evaluateFailed": "Failed to evaluate constraints",
+      "compileFailed": "Failed to generate constraint from description.",
+      "explainFailed": "Failed to explain constraint."
     },
     "kinds": {
       "deadline": "Deadline",

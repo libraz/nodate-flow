@@ -9,6 +9,7 @@
 
 import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
+import Input from '@nodate-flow/ui/primitives/input';
 import Select from '@nodate-flow/ui/primitives/select';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { type FormEvent, type ReactElement, useState } from 'react';
@@ -18,7 +19,9 @@ import {
   type ConstraintKind,
   type ConstraintOutcome,
   useAddConstraint,
+  useCompileConstraint,
   useEvaluateConstraints,
+  useExplainConstraint,
   useRemoveConstraint,
 } from './api';
 
@@ -36,11 +39,15 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
   const { t } = useTranslation('constraints');
   const [kind, setKind] = useState<ConstraintKind>('custom');
   const [expression, setExpression] = useState('');
+  const [nlPrompt, setNlPrompt] = useState('');
+  const [explanation, setExplanation] = useState<string | null>(null);
   const [outcomes, setOutcomes] = useState<ConstraintOutcome[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const addMut = useAddConstraint();
   const evalMut = useEvaluateConstraints();
+  const compileMut = useCompileConstraint();
+  const explainMut = useExplainConstraint();
   const removeMut = useRemoveConstraint();
 
   const onRemove = (constraintId: string): void => {
@@ -78,9 +85,58 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
     );
   };
 
+  const handleCompile = (): void => {
+    setError(null);
+    setExplanation(null);
+    compileMut.mutate(
+      { taskId, prompt: nlPrompt },
+      {
+        onSuccess: (r) => {
+          const v = r.kind;
+          if (isKind(v)) setKind(v);
+          setExpression(r.expression);
+          setNlPrompt('');
+        },
+        onError: () => setError(t('editor.errors.compileFailed')),
+      },
+    );
+  };
+
+  const handleExplain = (): void => {
+    setError(null);
+    setExplanation(null);
+    explainMut.mutate(
+      { taskId, expression },
+      {
+        onSuccess: (r) => setExplanation(r.explanation),
+        onError: () => setError(t('editor.errors.explainFailed')),
+      },
+    );
+  };
+
   return (
     <section aria-label={t('editor.title')}>
       <h3>{t('editor.title')}</h3>
+      <div>
+        <FormField label={t('editor.nlPrompt')}>
+          {(control) => (
+            <Input
+              {...control}
+              value={nlPrompt}
+              placeholder={t('editor.nlPrompt')}
+              onChange={(e) => setNlPrompt(e.currentTarget.value)}
+            />
+          )}
+        </FormField>
+        <Button
+          type="button"
+          onClick={handleCompile}
+          disabled={compileMut.isPending || !nlPrompt.trim()}
+        >
+          {compileMut.isPending ? t('editor.generating') : t('editor.generate')}
+        </Button>
+      </div>
+
       <form onSubmit={onSubmit}>
         <FormField label={t('editor.kind')}>
           {(control) => (
@@ -119,8 +175,22 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
           <Button type="button" onClick={onEvaluate} disabled={evalMut.isPending}>
             {t('editor.evaluate')}
           </Button>
+          <Button
+            type="button"
+            onClick={handleExplain}
+            disabled={explainMut.isPending || !expression.trim()}
+          >
+            {explainMut.isPending ? t('editor.explaining') : t('editor.explain')}
+          </Button>
         </div>
       </form>
+
+      {explanation ? (
+        <div>
+          <h4>{t('editor.explanation')}</h4>
+          <p>{explanation}</p>
+        </div>
+      ) : null}
 
       {error ? <p role="alert">{error}</p> : null}
 
