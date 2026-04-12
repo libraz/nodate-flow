@@ -47,12 +47,12 @@ type Config struct {
 	// client id or secret is empty the corresponding provider is
 	// reported as unavailable and enrollment returns
 	// INTEGRATION.PROVIDER.NOT_CONFIGURED.
-	GithubClientID      string `env:"NF_GITHUB_CLIENT_ID"      envDefault:""`
-	GithubClientSecret  string `env:"NF_GITHUB_CLIENT_SECRET"  envDefault:""`
-	SlackClientID       string `env:"NF_SLACK_CLIENT_ID"       envDefault:""`
-	SlackClientSecret   string `env:"NF_SLACK_CLIENT_SECRET"   envDefault:""`
-	GoogleClientID      string `env:"NF_GOOGLE_CLIENT_ID"      envDefault:""`
-	GoogleClientSecret  string `env:"NF_GOOGLE_CLIENT_SECRET"  envDefault:""`
+	GithubClientID     string `env:"NF_GITHUB_CLIENT_ID"      envDefault:""`
+	GithubClientSecret string `env:"NF_GITHUB_CLIENT_SECRET"  envDefault:""`
+	SlackClientID      string `env:"NF_SLACK_CLIENT_ID"       envDefault:""`
+	SlackClientSecret  string `env:"NF_SLACK_CLIENT_SECRET"   envDefault:""`
+	GoogleClientID     string `env:"NF_GOOGLE_CLIENT_ID"      envDefault:""`
+	GoogleClientSecret string `env:"NF_GOOGLE_CLIENT_SECRET"  envDefault:""`
 
 	// CookieSecure toggles the Secure flag on the nf_rt refresh cookie
 	// and selects the paired SameSite mode (None when secure, Lax
@@ -151,6 +151,36 @@ type Config struct {
 	// OtelInsecure disables TLS for the OTLP exporter connection.
 	// Useful for local development against a sidecar collector.
 	OtelInsecure bool `env:"NF_OTEL_INSECURE" envDefault:"true"`
+
+	// SmtpHost is the SMTP server hostname. When empty, email
+	// notifications are disabled.
+	SmtpHost string `env:"NF_SMTP_HOST" envDefault:""`
+	// SmtpPort is the SMTP server port (typically 587 for STARTTLS).
+	SmtpPort int `env:"NF_SMTP_PORT" envDefault:"587"`
+	// SmtpUsername is the SASL login. Empty for unauthenticated relays.
+	SmtpUsername string `env:"NF_SMTP_USERNAME" envDefault:""`
+	// SmtpPassword is the SASL secret.
+	SmtpPassword string `env:"NF_SMTP_PASSWORD" envDefault:""`
+	// SmtpFrom is the default envelope sender address.
+	SmtpFrom string `env:"NF_SMTP_FROM" envDefault:"noreply@nodate-flow.local"`
+
+	// RegistrationOpen controls whether new user sign-up is allowed.
+	// When false, the POST /auth/register endpoint returns 403.
+	RegistrationOpen bool `env:"NF_REGISTRATION_OPEN" envDefault:"true"`
+
+	// S3Endpoint is the host:port of the S3-compatible object store
+	// (e.g. "minio:9000" or "s3.amazonaws.com"). When empty, file
+	// upload endpoints return INTERNAL.NOT_CONFIGURED.
+	S3Endpoint string `env:"NF_S3_ENDPOINT" envDefault:""`
+	// S3AccessKey is the access key for the S3-compatible store.
+	S3AccessKey string `env:"NF_S3_ACCESS_KEY" envDefault:""`
+	// S3SecretKey is the secret key for the S3-compatible store.
+	S3SecretKey string `env:"NF_S3_SECRET_KEY" envDefault:""`
+	// S3Bucket is the bucket name used for all uploads.
+	S3Bucket string `env:"NF_S3_BUCKET" envDefault:"nodate-flow"`
+	// S3UseSSL enables TLS for the S3 connection. Defaults to false
+	// for local MinIO; production deployments should set true.
+	S3UseSSL bool `env:"NF_S3_USE_SSL" envDefault:"false"`
 }
 
 // Load parses NF_* environment variables into a Config.

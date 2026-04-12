@@ -211,6 +211,8 @@ type Querier interface {
 	// workspace has never written a row; the caller should fall back to the
 	// column defaults (mock-768 / 100 cents/day / 0.870 / 0.750).
 	GetAiSettings(ctx context.Context, workspaceID uint32) (AiSetting, error)
+	// Fetch a single attachment by its public id within a workspace.
+	GetAttachmentByPublicID(ctx context.Context, arg GetAttachmentByPublicIDParams) (GetAttachmentByPublicIDRow, error)
 	// Fetch a single lens by its public_id.
 	GetLensByPublicID(ctx context.Context, arg GetLensByPublicIDParams) (GetLensByPublicIDRow, error)
 	// Queries dedicated to the constraint engine (Phase 3, 3.ENG-2).

@@ -1148,6 +1148,24 @@
         "required": ["ok"],
         "type": "object"
       },
+      "DownloadAttachmentOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/DownloadAttachmentOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "downloadUrl": {
+            "description": "Presigned GET URL with Content-Disposition: attachment",
+            "type": "string"
+          }
+        },
+        "required": ["downloadUrl"],
+        "type": "object"
+      },
       "DuplicateCandidate": {
         "additionalProperties": false,
         "properties": {
@@ -2746,6 +2764,64 @@
           }
         },
         "required": ["ok"],
+        "type": "object"
+      },
+      "PresignUploadBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PresignUploadBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "byteSize": {
+            "description": "File size in bytes",
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "contentType": {
+            "description": "MIME type",
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "filename": {
+            "description": "Original filename",
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["filename", "contentType", "byteSize"],
+        "type": "object"
+      },
+      "PresignUploadOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PresignUploadOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "attachmentId": {
+            "description": "Public ID of the created attachment row",
+            "type": "string"
+          },
+          "storageKey": {
+            "description": "Object key to confirm after upload",
+            "type": "string"
+          },
+          "uploadUrl": {
+            "description": "Presigned PUT URL",
+            "type": "string"
+          }
+        },
+        "required": ["uploadUrl", "storageKey", "attachmentId"],
         "type": "object"
       },
       "Project": {
@@ -6872,6 +6948,54 @@
         "summary": "Register an attachment metadata row on a task"
       }
     },
+    "/tasks/{id}/attachments/presign": {
+      "post": {
+        "operationId": "tasks-attachments-presign",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresignUploadBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresignUploadOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get a presigned PUT URL for uploading an attachment"
+      }
+    },
     "/tasks/{id}/attachments/{aid}": {
       "delete": {
         "operationId": "tasks-attachments-delete",
@@ -6916,6 +7040,52 @@
           }
         },
         "summary": "Soft-delete an attachment from a task"
+      }
+    },
+    "/tasks/{id}/attachments/{aid}/download": {
+      "get": {
+        "operationId": "tasks-attachments-download",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "aid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DownloadAttachmentOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get a presigned GET URL for downloading an attachment"
       }
     },
     "/tasks/{id}/comments": {

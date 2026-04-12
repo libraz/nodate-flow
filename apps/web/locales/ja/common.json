@@ -493,6 +493,10 @@
       "uploaded_by": "{name} がアップロード",
       "add": "添付ファイルを追加",
       "adding": "追加中…",
+      "upload": "ファイルをアップロード",
+      "uploading": "アップロード中…",
+      "upload_failed": "ファイルのアップロードに失敗しました。",
+      "download": "ダウンロード",
       "deleting": "削除中…"
     },
     "comments": {

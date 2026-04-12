@@ -493,6 +493,10 @@
       "uploaded_by": "Uploaded by {name}",
       "add": "Add attachment",
       "adding": "Adding…",
+      "upload": "Upload file",
+      "uploading": "Uploading…",
+      "upload_failed": "File upload failed.",
+      "download": "Download",
       "deleting": "Deleting…"
     },
     "comments": {

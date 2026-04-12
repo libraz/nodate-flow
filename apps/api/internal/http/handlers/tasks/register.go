@@ -228,11 +228,25 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 	}, AddAttachment(deps))
 
 	huma.Register(api, huma.Operation{
+		OperationID: "tasks-attachments-presign",
+		Method:      http.MethodPost,
+		Path:        "/tasks/{id}/attachments/presign",
+		Summary:     "Get a presigned PUT URL for uploading an attachment",
+	}, PresignUpload(deps))
+
+	huma.Register(api, huma.Operation{
 		OperationID: "tasks-attachments-list",
 		Method:      http.MethodGet,
 		Path:        "/tasks/{id}/attachments",
 		Summary:     "List attachments on a task",
 	}, ListAttachments(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-attachments-download",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/attachments/{aid}/download",
+		Summary:     "Get a presigned GET URL for downloading an attachment",
+	}, DownloadAttachment(deps))
 
 	huma.Register(api, huma.Operation{
 		OperationID: "tasks-attachments-delete",

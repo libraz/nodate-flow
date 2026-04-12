@@ -45,6 +45,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/workspaces"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/middleware"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/mcp"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/storage"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/stream"
 )
 
@@ -116,6 +117,11 @@ type Deps struct {
 	// handler to return AI.AGENT.RUNTIME_DISABLED so operators
 	// notice misconfiguration instead of a silent no-op.
 	AgentRunner agentruntime.Runner
+
+	// Storage is the S3-compatible object store client for file
+	// uploads / downloads. Nil in tests; presign endpoints return
+	// INTERNAL.UNEXPECTED.
+	Storage *storage.Client
 
 	// Integrations is the personal-OAuth provider registry (GitHub /
 	// Slack / Google Calendar). Nil in tests; the handlers degrade
@@ -223,7 +229,7 @@ func BuildResult(deps Deps) Result {
 		nlQueryCompiler = nlquery.New(nlquery.NewMockProvider())
 		nlConstraintCompiler = nlconstraint.New(nlconstraint.NewMockProvider())
 	}
-	taskDeps := tasks.Deps{DB: deps.DB, Queries: deps.Queries, Embedder: embedClient, NlConstraint: nlConstraintCompiler}
+	taskDeps := tasks.Deps{DB: deps.DB, Queries: deps.Queries, Embedder: embedClient, NlConstraint: nlConstraintCompiler, Storage: deps.Storage}
 	tlDeps := timeline.Deps{DB: deps.DB, Queries: deps.Queries}
 	inboxDeps := inbox.Deps{DB: deps.DB, Queries: deps.Queries}
 	aiDeps := aihandlers.Deps{DB: deps.DB, Queries: deps.Queries, Cipher: deps.Cipher, NlQuery: nlQueryCompiler}

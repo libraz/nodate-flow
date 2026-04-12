@@ -35,6 +35,22 @@ WHERE a.workspace_id = ?
 ORDER BY a.created_at DESC, a.public_id DESC
 LIMIT ? OFFSET ?;
 
+-- name: GetAttachmentByPublicID :one
+-- Fetch a single attachment by its public id within a workspace.
+SELECT
+  a.public_id,
+  a.filename,
+  a.content_type,
+  a.byte_size,
+  a.storage_key,
+  a.checksum_sha256,
+  a.updated_at,
+  a.created_at
+FROM attachments a
+WHERE a.workspace_id = ?
+  AND a.public_id = ?
+  AND a.enabled = TRUE;
+
 -- name: DeleteAttachment :exec
 -- Soft-delete an attachment row. Object storage cleanup is async.
 UPDATE attachments

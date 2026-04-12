@@ -76,6 +76,55 @@ func (q *Queries) DeleteAttachment(ctx context.Context, arg DeleteAttachmentPara
 	return err
 }
 
+const getAttachmentByPublicID = `-- name: GetAttachmentByPublicID :one
+SELECT
+  a.public_id,
+  a.filename,
+  a.content_type,
+  a.byte_size,
+  a.storage_key,
+  a.checksum_sha256,
+  a.updated_at,
+  a.created_at
+FROM attachments a
+WHERE a.workspace_id = ?
+  AND a.public_id = ?
+  AND a.enabled = TRUE
+`
+
+type GetAttachmentByPublicIDParams struct {
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+type GetAttachmentByPublicIDRow struct {
+	PublicID       types.PublicID `json:"publicId"`
+	Filename       string         `json:"filename"`
+	ContentType    string         `json:"contentType"`
+	ByteSize       uint64         `json:"byteSize"`
+	StorageKey     string         `json:"storageKey"`
+	ChecksumSha256 sql.NullString `json:"checksumSha256"`
+	UpdatedAt      sql.NullTime   `json:"updatedAt"`
+	CreatedAt      time.Time      `json:"createdAt"`
+}
+
+// Fetch a single attachment by its public id within a workspace.
+func (q *Queries) GetAttachmentByPublicID(ctx context.Context, arg GetAttachmentByPublicIDParams) (GetAttachmentByPublicIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getAttachmentByPublicID, arg.WorkspaceID, arg.PublicID)
+	var i GetAttachmentByPublicIDRow
+	err := row.Scan(
+		&i.PublicID,
+		&i.Filename,
+		&i.ContentType,
+		&i.ByteSize,
+		&i.StorageKey,
+		&i.ChecksumSha256,
+		&i.UpdatedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const listAttachmentsForTask = `-- name: ListAttachmentsForTask :many
 SELECT
   a.public_id,

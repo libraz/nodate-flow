@@ -1,18 +1,20 @@
 /**
- * TaskAttachments — lists attachment metadata for a task with delete support.
- *
- * Renders a compact list of files attached to the task. Each row shows the
- * filename, human-readable size, content type, and uploader name, plus a
- * delete button guarded by a confirmation dialog.
+ * TaskAttachments — file upload (presigned PUT), download, and delete for task attachments.
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
-import type { ReactElement } from 'react';
+import { type ChangeEvent, type ReactElement, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { confirmAction } from '../../lib/confirm-action';
-import { type TaskAttachment, useDeleteAttachment, useListAttachments } from './api';
+import {
+  type TaskAttachment,
+  fetchDownloadUrl,
+  useDeleteAttachment,
+  useListAttachments,
+  usePresignUpload,
+} from './api';
 
 interface TaskAttachmentsProps {
   taskId: string;
@@ -58,6 +60,15 @@ function AttachmentRow({
     }
   };
 
+  const handleDownload = async (): Promise<void> => {
+    try {
+      const url = await fetchDownloadUrl(taskId, attachment.id);
+      window.open(url, '_blank');
+    } catch {
+      toaster.show({ tone: 'danger', message: t('tasks.errors.update_failed') });
+    }
+  };
+
   return (
     <li
       style={{
@@ -98,6 +109,17 @@ function AttachmentRow({
         type="button"
         variant="ghost"
         size="sm"
+        aria-label={t('tasks.attachments.download')}
+        onClick={() => {
+          void handleDownload();
+        }}
+      >
+        {t('tasks.attachments.download')}
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
         aria-label={t('tasks.attachments.delete')}
         onClick={() => {
           void handleDelete();
@@ -112,15 +134,54 @@ function AttachmentRow({
   );
 }
 
-/** Attachment list panel for the task detail view. */
+/** Attachment list panel for the task detail view with file upload. */
 export default function TaskAttachments({ taskId }: TaskAttachmentsProps): ReactElement {
   const { t, i18n } = useTranslation('common');
   const { data: attachments } = useListAttachments(taskId);
   const locale = i18n.resolvedLanguage ?? 'en';
+  const presignUpload = usePresignUpload();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      await presignUpload.mutateAsync({ taskId, file });
+    } catch {
+      toaster.show({ tone: 'danger', message: t('tasks.attachments.upload_failed') });
+    }
+    // Reset the file input so the same file can be re-selected.
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-      <h2 style={{ margin: 0, fontSize: '1.125rem' }}>{t('tasks.attachments.title')}</h2>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <h2 style={{ margin: 0, fontSize: '1.125rem' }}>{t('tasks.attachments.title')}</h2>
+        <div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              void handleFileChange(e);
+            }}
+          />
+          <Button
+            type="button"
+            variant="default"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={presignUpload.isPending}
+          >
+            {presignUpload.isPending
+              ? t('tasks.attachments.uploading')
+              : t('tasks.attachments.upload')}
+          </Button>
+        </div>
+      </div>
       {attachments.length === 0 ? (
         <p style={{ color: 'var(--color-muted)', margin: 0 }}>{t('tasks.attachments.empty')}</p>
       ) : (

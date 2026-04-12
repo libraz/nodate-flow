@@ -31,6 +31,9 @@ export type TransitionName = TransitionInput['transition'];
 export type AddCommentInput = components['schemas']['AddTaskCommentBody'];
 export type AddActorInput = components['schemas']['AddTaskActorBody'];
 export type AddAttachmentInput = components['schemas']['AddTaskAttachmentBody'];
+export type PresignUploadInput = components['schemas']['PresignUploadBody'];
+export type PresignUploadResult = components['schemas']['PresignUploadOutputBody'];
+export type DownloadAttachmentResult = components['schemas']['DownloadAttachmentOutputBody'];
 
 /** Backend `derived_state` enum (see sql/tables/tasks.sql). */
 export type TaskDerivedState = 'open' | 'waiting' | 'review' | 'done' | 'cancelled';
@@ -730,6 +733,59 @@ export function useAddAttachment(): UseMutationResult<
       void qc.invalidateQueries({ queryKey: tasksKeys.attachments(vars.taskId) });
     },
   });
+}
+
+export interface PresignUploadArgs {
+  taskId: string;
+  file: File;
+}
+
+/** Requests a presigned PUT URL, uploads the file, and returns the result. */
+export function usePresignUpload(): UseMutationResult<
+  PresignUploadResult,
+  TaskApiError,
+  PresignUploadArgs
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskId, file }: PresignUploadArgs): Promise<PresignUploadResult> => {
+      const { data, error } = await sdk.POST('/tasks/{id}/attachments/presign', {
+        params: { path: { id: taskId } },
+        body: {
+          filename: file.name,
+          contentType: file.type || 'application/octet-stream',
+          byteSize: file.size,
+        },
+      });
+      if (error || !data) throw toError(error, 'Failed to presign upload');
+
+      const res = await fetch(data.uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      });
+      if (!res.ok) throw new TaskApiError('UPLOAD_FAILED', 'File upload failed');
+
+      return data;
+    },
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: tasksKeys.attachments(vars.taskId) });
+    },
+  });
+}
+
+export interface DownloadAttachmentArgs {
+  taskId: string;
+  attachmentId: string;
+}
+
+/** Gets a presigned download URL for an attachment. */
+export async function fetchDownloadUrl(taskId: string, attachmentId: string): Promise<string> {
+  const { data, error } = await sdk.GET('/tasks/{id}/attachments/{aid}/download', {
+    params: { path: { id: taskId, aid: attachmentId } },
+  });
+  if (error || !data) throw toError(error, 'Failed to get download URL');
+  return data.downloadUrl;
 }
 
 export interface DeleteAttachmentArgs {

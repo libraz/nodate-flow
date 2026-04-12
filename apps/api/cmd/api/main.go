@@ -24,6 +24,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/config"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/outbound"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/storage"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/integrations"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
@@ -101,6 +102,32 @@ func main() {
 		cipher = c
 	} else {
 		logger.Warn("ai cipher disabled", "err", cerr)
+	}
+
+	// S3-compatible object storage for file uploads. When NF_S3_ENDPOINT
+	// is empty the presign endpoints return INTERNAL.UNEXPECTED but the
+	// rest of the API still boots normally.
+	var storageClient *storage.Client
+	if cfg.S3Endpoint != "" {
+		sc, serr := storage.NewClient(storage.Config{
+			Endpoint:  cfg.S3Endpoint,
+			AccessKey: cfg.S3AccessKey,
+			SecretKey: cfg.S3SecretKey,
+			Bucket:    cfg.S3Bucket,
+			UseSSL:    cfg.S3UseSSL,
+		})
+		if serr != nil {
+			logger.Error("storage client init failed", "err", serr)
+			os.Exit(1)
+		}
+		if err := sc.EnsureBucket(context.Background()); err != nil {
+			logger.Error("storage bucket init failed", "err", err)
+			os.Exit(1)
+		}
+		storageClient = sc
+		logger.Info("s3 storage enabled", "endpoint", cfg.S3Endpoint, "bucket", cfg.S3Bucket)
+	} else {
+		logger.Warn("s3 storage disabled: NF_S3_ENDPOINT is not set")
 	}
 
 	// Per-provider egress rate limits (4.SEC-2). When NF_OUTBOUND_BACKEND=redis
@@ -268,6 +295,7 @@ func main() {
 		AiInvocationPublisher: aiInvocationPublisher,
 		AgentQueue:            agentQueue,
 		AgentRunner:           runner,
+		Storage:               storageClient,
 		Integrations:          integrationsRegistry,
 		PublicBaseURL:         cfg.PublicBaseURL,
 		WebBaseURL:            cfg.WebBaseURL,

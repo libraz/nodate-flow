@@ -12,6 +12,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/nlconstraint"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/storage"
 )
 
 // Deps is the dependency bundle passed to each handler in this package.
@@ -27,6 +28,10 @@ type Deps struct {
 	// Optional: nil causes the compile endpoint to return
 	// AI.PROVIDER.NOT_CONFIGURED.
 	NlConstraint *nlconstraint.Compiler
+	// Storage is the S3-compatible object store client for file
+	// uploads and downloads. Optional: nil causes the presign
+	// endpoints to return INTERNAL.NOT_CONFIGURED.
+	Storage *storage.Client
 }
 
 func httpErr(spec *apierrors.Spec) error {
@@ -729,4 +734,45 @@ type DeleteTaskAttachmentBody struct {
 // DeleteTaskAttachmentOutput is the response for DELETE /tasks/{id}/attachments/{aid}.
 type DeleteTaskAttachmentOutput struct {
 	Body DeleteTaskAttachmentBody
+}
+
+// PresignUploadBody is the JSON body for POST /tasks/{id}/attachments/presign.
+type PresignUploadBody struct {
+	Filename    string `json:"filename" minLength:"1" maxLength:"512" doc:"Original filename"`
+	ContentType string `json:"contentType" minLength:"1" maxLength:"255" doc:"MIME type"`
+	ByteSize    uint64 `json:"byteSize" minimum:"1" doc:"File size in bytes"`
+}
+
+// PresignUploadInput is the request for POST /tasks/{id}/attachments/presign.
+type PresignUploadInput struct {
+	ID   string `path:"id"`
+	Body PresignUploadBody
+}
+
+// PresignUploadOutputBody is the response body for presign upload.
+type PresignUploadOutputBody struct {
+	UploadURL    string `json:"uploadUrl" doc:"Presigned PUT URL"`
+	StorageKey   string `json:"storageKey" doc:"Object key to confirm after upload"`
+	AttachmentID string `json:"attachmentId" doc:"Public ID of the created attachment row"`
+}
+
+// PresignUploadOutput is the response for POST /tasks/{id}/attachments/presign.
+type PresignUploadOutput struct {
+	Body PresignUploadOutputBody
+}
+
+// DownloadAttachmentInput is the path for GET /tasks/{id}/attachments/{aid}/download.
+type DownloadAttachmentInput struct {
+	ID  string `path:"id"`
+	AID string `path:"aid"`
+}
+
+// DownloadAttachmentOutputBody is the response body for download.
+type DownloadAttachmentOutputBody struct {
+	DownloadURL string `json:"downloadUrl" doc:"Presigned GET URL with Content-Disposition: attachment"`
+}
+
+// DownloadAttachmentOutput is the response for GET /tasks/{id}/attachments/{aid}/download.
+type DownloadAttachmentOutput struct {
+	Body DownloadAttachmentOutputBody
 }

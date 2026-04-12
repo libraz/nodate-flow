@@ -663,6 +663,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/{id}/attachments/presign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Get a presigned PUT URL for uploading an attachment */
+        post: operations["tasks-attachments-presign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{id}/attachments/{aid}": {
         parameters: {
             query?: never;
@@ -675,6 +692,23 @@ export interface paths {
         post?: never;
         /** Soft-delete an attachment from a task */
         delete: operations["tasks-attachments-delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/attachments/{aid}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a presigned GET URL for downloading an attachment */
+        get: operations["tasks-attachments-download"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1973,6 +2007,15 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        DownloadAttachmentOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Presigned GET URL with Content-Disposition: attachment */
+            downloadUrl: string;
+        };
         DuplicateCandidate: {
             classification: string;
             /** Format: double */
@@ -2631,6 +2674,35 @@ export interface components {
              */
             readonly $schema?: string;
             ok: boolean;
+        };
+        PresignUploadBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description File size in bytes
+             */
+            byteSize: number;
+            /** @description MIME type */
+            contentType: string;
+            /** @description Original filename */
+            filename: string;
+        };
+        PresignUploadOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Public ID of the created attachment row */
+            attachmentId: string;
+            /** @description Object key to confirm after upload */
+            storageKey: string;
+            /** @description Presigned PUT URL */
+            uploadUrl: string;
         };
         Project: {
             color?: string;
@@ -5072,6 +5144,41 @@ export interface operations {
             };
         };
     };
+    "tasks-attachments-presign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PresignUploadBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PresignUploadOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "tasks-attachments-delete": {
         parameters: {
             query?: never;
@@ -5091,6 +5198,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeleteTaskAttachmentBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-attachments-download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                aid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DownloadAttachmentOutputBody"];
                 };
             };
             /** @description Error */
