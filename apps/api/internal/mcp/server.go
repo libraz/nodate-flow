@@ -8,8 +8,8 @@
 //
 // Current tool set: list_projects, list_tasks, get_task, create_task,
 // update_task, add_comment, search_tasks, propose_tasks_from,
-// propose_priority, propose_steps. Rate limiting and SSE streaming are
-// deferred.
+// propose_priority, propose_steps. Per-token rate limiting is enforced
+// at 60 req/min. SSE streaming is deferred.
 package mcp
 
 import (
@@ -21,7 +21,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai"
@@ -52,12 +54,69 @@ type Deps struct {
 type Handler struct {
 	deps  Deps
 	tools map[string]tool
+	rl    mcpRateLimiter
+}
+
+// mcpRateLimiter is a per-token sliding window rate limiter for the MCP
+// endpoint. It limits each MCP token to 60 requests per minute.
+type mcpRateLimiter struct {
+	mu      sync.Mutex
+	tokens  map[string]*tokenBucket
+	maxReqs int
+	window  time.Duration
+}
+
+type tokenBucket struct {
+	timestamps []time.Time
+}
+
+func newMCPRateLimiter() mcpRateLimiter {
+	return mcpRateLimiter{
+		tokens:  make(map[string]*tokenBucket),
+		maxReqs: 60,
+		window:  time.Minute,
+	}
+}
+
+// allow checks whether the token is within its rate limit. Returns true
+// if allowed, false if the limit is exceeded.
+func (rl *mcpRateLimiter) allow(token string) (bool, time.Duration) {
+	now := time.Now()
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	b, ok := rl.tokens[token]
+	if !ok {
+		b = &tokenBucket{}
+		rl.tokens[token] = b
+	}
+
+	cutoff := now.Add(-rl.window)
+	n := 0
+	for _, ts := range b.timestamps {
+		if ts.After(cutoff) {
+			b.timestamps[n] = ts
+			n++
+		}
+	}
+	b.timestamps = b.timestamps[:n]
+
+	if len(b.timestamps) >= rl.maxReqs {
+		retryAfter := b.timestamps[0].Add(rl.window).Sub(now)
+		if retryAfter < time.Second {
+			retryAfter = time.Second
+		}
+		return false, retryAfter
+	}
+
+	b.timestamps = append(b.timestamps, now)
+	return true, 0
 }
 
 // NewHandler constructs the MCP HTTP handler with the default tool
 // set registered.
 func NewHandler(deps Deps) *Handler {
-	h := &Handler{deps: deps, tools: map[string]tool{}}
+	h := &Handler{deps: deps, tools: map[string]tool{}, rl: newMCPRateLimiter()}
 	registerTools(h)
 	return h
 }
@@ -95,6 +154,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeRPCError(w, req.ID, apierrors.InternalUnexpected, "auth failed")
+		return
+	}
+
+	// Per-token rate limiting.
+	if allowed, retryAfter := h.rl.allow(tok); !allowed {
+		w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())))
+		writeRPCError(w, req.ID, apierrors.RateLimitExceeded, "rate limit exceeded")
 		return
 	}
 
