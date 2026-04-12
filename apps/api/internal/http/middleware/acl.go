@@ -390,9 +390,10 @@ func RequireWorkspaceRole(min WorkspaceRole) func(http.Handler) http.Handler {
 //     workspace or the path param is not a valid UUID.
 //   - 403 WS.PROJECT.ACCESS_DENIED otherwise.
 //
-// TODO: Layer 4 task visibility (public/project/private) is
-// enforced inside task handlers, not here. This middleware only covers
-// instance/workspace/project layers.
+// Layer 4 task visibility (public/project/private) is enforced by
+// [RequireTaskAccess] (single-task endpoints) and [TaskVisibilityFilter]
+// (list endpoints). This middleware only covers instance/workspace/project
+// layers.
 func RequireProjectMember(db ACLDB) func(http.Handler) http.Handler {
 	const prjQuery = `SELECT id FROM projects
 WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE LIMIT 1`
@@ -548,20 +549,42 @@ WHERE workspace_id = ? AND project_id = ? AND user_id = ? AND enabled = TRUE LIM
 	}
 }
 
+// TaskVisibility represents the Layer 4 task-level visibility setting.
+type TaskVisibility string
+
+// Task visibility constants.
+const (
+	// TaskVisibilityPublic means any workspace member can see the task.
+	TaskVisibilityPublic TaskVisibility = "public"
+	// TaskVisibilityProject means only members of the task's parent project
+	// (or workspace admins/owners) can see the task.
+	TaskVisibilityProject TaskVisibility = "project"
+	// TaskVisibilityPrivate means only users who are actors on the task
+	// (assignee, reviewer, watcher, approver, or creator) can see it.
+	// Workspace admins/owners are also granted access.
+	TaskVisibilityPrivate TaskVisibility = "private"
+)
+
 // RequireTaskAccess returns a middleware that resolves the task from the
 // {id} path parameter (a UUID v7), verifies the actor has access to the
 // owning workspace and project (with workspace owner/admin elevation),
-// and injects the task internal id into the request context via
-// [TaskFromContext]. It also injects workspace and project context for
-// downstream handlers.
+// enforces Layer 4 task visibility (public/project/private), and injects
+// the task internal id into the request context via [TaskFromContext].
+// It also injects workspace and project context for downstream handlers.
+//
+// Visibility rules (Layer 4):
+//   - public:  any workspace member can access the task.
+//   - project: the actor must be a project member (or ws admin/owner).
+//   - private: the actor must be a task actor (assignee, reviewer, watcher,
+//     approver) or the task creator. Workspace admins/owners bypass this.
 //
 // On failure it responds:
 //   - 404 WS.TASK.NOT_FOUND when the task does not exist or the path
 //     parameter is not a valid UUID.
 //   - 403 WS.TASK.ACCESS_DENIED when the actor cannot access the task's
-//     project / workspace.
+//     project / workspace, or when task visibility denies access.
 func RequireTaskAccess(db ACLDB) func(http.Handler) http.Handler {
-	const taskQuery = `SELECT id, workspace_id, project_id FROM tasks
+	const taskQuery = `SELECT id, workspace_id, project_id, visibility, created_by_user_id FROM tasks
 WHERE public_id = ? AND enabled = TRUE LIMIT 1`
 	const wsQuery = `SELECT public_id FROM workspaces
 WHERE id = ? AND enabled = TRUE LIMIT 1`
@@ -571,6 +594,8 @@ WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 WHERE id = ? AND enabled = TRUE LIMIT 1`
 	const prjMemQuery = `SELECT role FROM project_members
 WHERE workspace_id = ? AND project_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
+	const taskActorQuery = `SELECT 1 FROM task_actors
+WHERE task_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			userID, ok := ActorFromContext(r.Context())
@@ -586,7 +611,9 @@ WHERE workspace_id = ? AND project_id = ? AND user_id = ? AND enabled = TRUE LIM
 				return
 			}
 			var taskID, wsID, prjID uint32
-			if err := db.QueryRowContext(r.Context(), taskQuery, types.FromUUID(pub)).Scan(&taskID, &wsID, &prjID); err != nil {
+			var visibility string
+			var createdByUserID sql.NullInt32
+			if err := db.QueryRowContext(r.Context(), taskQuery, types.FromUUID(pub)).Scan(&taskID, &wsID, &prjID, &visibility, &createdByUserID); err != nil {
 				if errors.Is(err, sql.ErrNoRows) {
 					writeError(w, http.StatusNotFound, errCodeTaskNotFound, "Task not found")
 					return
@@ -614,6 +641,8 @@ WHERE workspace_id = ? AND project_id = ? AND user_id = ? AND enabled = TRUE LIM
 				return
 			}
 			wsRole := WorkspaceRole(wsRoleStr)
+
+			// Layer 3: project membership check.
 			var prjPubID types.PublicID
 			if err := db.QueryRowContext(r.Context(), prjQuery, prjID).Scan(&prjPubID); err != nil {
 				if errors.Is(err, sql.ErrNoRows) {
@@ -625,10 +654,12 @@ WHERE workspace_id = ? AND project_id = ? AND user_id = ? AND enabled = TRUE LIM
 			}
 			var prjRole ProjectRole
 			var prjRoleStr string
+			isProjectMember := false
 			err = db.QueryRowContext(r.Context(), prjMemQuery, wsID, prjID, userID).Scan(&prjRoleStr)
 			switch {
 			case err == nil:
 				prjRole = ProjectRole(prjRoleStr)
+				isProjectMember = true
 			case errors.Is(err, sql.ErrNoRows):
 				if !wsRole.AtLeast(WorkspaceRoleAdmin) {
 					writeError(w, http.StatusForbidden, errCodeTaskAccessDenied,
@@ -640,6 +671,35 @@ WHERE workspace_id = ? AND project_id = ? AND user_id = ? AND enabled = TRUE LIM
 				writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Internal error")
 				return
 			}
+
+			// Layer 4: task visibility enforcement.
+			isElevated := wsRole.AtLeast(WorkspaceRoleAdmin)
+			switch TaskVisibility(visibility) {
+			case TaskVisibilityPublic:
+				// Any workspace member can access -- already verified above.
+			case TaskVisibilityProject:
+				// Requires project membership or workspace admin/owner elevation.
+				if !isProjectMember && !isElevated {
+					// Return 404 to avoid leaking existence of private tasks.
+					writeError(w, http.StatusNotFound, errCodeTaskNotFound, "Task not found")
+					return
+				}
+			case TaskVisibilityPrivate:
+				// Requires being a task actor (or creator), unless ws admin/owner.
+				if !isElevated {
+					isCreator := createdByUserID.Valid && uint32(createdByUserID.Int32) == userID
+					if !isCreator {
+						var one int
+						actorErr := db.QueryRowContext(r.Context(), taskActorQuery, taskID, userID).Scan(&one)
+						if actorErr != nil {
+							// Return 404 to avoid leaking existence.
+							writeError(w, http.StatusNotFound, errCodeTaskNotFound, "Task not found")
+							return
+						}
+					}
+				}
+			}
+
 			ctx := context.WithValue(r.Context(), ctxKeyWorkspaceID, wsID)
 			ctx = context.WithValue(ctx, ctxKeyWorkspaceIDPublic, wsPubID.UUID())
 			ctx = context.WithValue(ctx, ctxKeyWorkspaceRole, wsRole)
@@ -651,6 +711,48 @@ WHERE workspace_id = ? AND project_id = ? AND user_id = ? AND enabled = TRUE LIM
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+// TaskVisibilityFilter returns a SQL WHERE fragment and associated bind
+// arguments that enforce Layer 4 task visibility in list queries. The
+// fragment references v_task_list columns and should be ANDed into an
+// existing WHERE clause.
+//
+// The userID is the actor's internal id. wsRole is the actor's workspace
+// role (from context). When the actor is a workspace admin or owner, no
+// additional filtering is applied (all tasks are visible regardless of
+// visibility setting).
+//
+// The returned fragment uses the v_task_list aliases:
+//   - v.visibility, v.project_id, v.task_internal_id, v.created_by_user_id
+func TaskVisibilityFilter(userID uint32, wsRole WorkspaceRole) (fragment string, args []any) {
+	if wsRole.AtLeast(WorkspaceRoleAdmin) {
+		// Admins/owners see everything.
+		return "", nil
+	}
+	// For non-elevated users, filter out tasks they cannot see:
+	// - public: always visible (workspace membership already checked)
+	// - project: visible if user is a project member
+	// - private: visible if user is a task actor or creator
+	const frag = `(
+    v.visibility = 'public'
+    OR (v.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = v.project_id
+        AND pm.user_id = ?
+        AND pm.enabled = TRUE
+    ))
+    OR (v.visibility = 'private' AND (
+      v.created_by_user_id = ?
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta
+        WHERE ta.task_id = v.task_internal_id
+          AND ta.user_id = ?
+          AND ta.enabled = TRUE
+      )
+    ))
+  )`
+	return frag, []any{userID, userID, userID}
 }
 
 // RequireProjectRole returns a middleware that asserts the actor's project

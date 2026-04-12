@@ -20,6 +20,7 @@ CREATE TABLE tasks (
   started_on DATE NULL COMMENT 'Started date',
   completed_at DATETIME NULL COMMENT 'Time derived_state transitioned to done',
 
+  visibility ENUM('public','project','private') NOT NULL DEFAULT 'public' COMMENT 'ACL Layer 4: public=workspace members, project=project members, private=task actors only',
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',

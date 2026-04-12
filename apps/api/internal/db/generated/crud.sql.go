@@ -24,21 +24,23 @@ INSERT INTO tasks (
   description,
   priority,
   due_on,
-  started_on
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  started_on,
+  visibility
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateTaskParams struct {
-	PublicID        types.PublicID `json:"publicId"`
-	WorkspaceID     uint32         `json:"-"`
-	ProjectID       uint32         `json:"-"`
-	ParentTaskID    sql.NullInt32  `json:"-"`
-	CreatedByUserID sql.NullInt32  `json:"createdByUserId"`
-	Title           string         `json:"title"`
-	Description     sql.NullString `json:"description"`
-	Priority        int32          `json:"priority"`
-	DueOn           sql.NullTime   `json:"dueOn"`
-	StartedOn       sql.NullTime   `json:"startedOn"`
+	PublicID        types.PublicID  `json:"publicId"`
+	WorkspaceID     uint32          `json:"-"`
+	ProjectID       uint32          `json:"-"`
+	ParentTaskID    sql.NullInt32   `json:"-"`
+	CreatedByUserID sql.NullInt32   `json:"createdByUserId"`
+	Title           string          `json:"title"`
+	Description     sql.NullString  `json:"description"`
+	Priority        int32           `json:"priority"`
+	DueOn           sql.NullTime    `json:"dueOn"`
+	StartedOn       sql.NullTime    `json:"startedOn"`
+	Visibility      TasksVisibility `json:"visibility"`
 }
 
 // Insert a new task. derived_state defaults to 'open' and must NOT be set
@@ -55,6 +57,7 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (int64, 
 		arg.Priority,
 		arg.DueOn,
 		arg.StartedOn,
+		arg.Visibility,
 	)
 	if err != nil {
 		return 0, err
@@ -90,6 +93,7 @@ SELECT
   v.created_by_user_public_id,
   v.title,
   v.description,
+  v.visibility,
   v.derived_state,
   v.priority,
   v.due_on,
@@ -122,6 +126,7 @@ type FindTaskByPublicIdRow struct {
 	CreatedByUserPublicID    sql.NullString    `json:"createdByUserPublicId"`
 	Title                    string            `json:"title"`
 	Description              sql.NullString    `json:"description"`
+	Visibility               TasksVisibility   `json:"visibility"`
 	DerivedState             TasksDerivedState `json:"derivedState"`
 	Priority                 int32             `json:"priority"`
 	DueOn                    sql.NullTime      `json:"dueOn"`
@@ -149,6 +154,7 @@ func (q *Queries) FindTaskByPublicId(ctx context.Context, arg FindTaskByPublicId
 		&i.CreatedByUserPublicID,
 		&i.Title,
 		&i.Description,
+		&i.Visibility,
 		&i.DerivedState,
 		&i.Priority,
 		&i.DueOn,
@@ -341,6 +347,7 @@ SELECT
   v.project_name,
   v.parent_task_public_id,
   v.title,
+  v.visibility,
   v.derived_state,
   v.priority,
   v.due_on,
@@ -372,6 +379,7 @@ type ListTasksForProjectRow struct {
 	ProjectName             string            `json:"projectName"`
 	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
 	Title                   string            `json:"title"`
+	Visibility              TasksVisibility   `json:"visibility"`
 	DerivedState            TasksDerivedState `json:"derivedState"`
 	Priority                int32             `json:"priority"`
 	DueOn                   sql.NullTime      `json:"dueOn"`
@@ -406,6 +414,7 @@ func (q *Queries) ListTasksForProject(ctx context.Context, arg ListTasksForProje
 			&i.ProjectName,
 			&i.ParentTaskPublicID,
 			&i.Title,
+			&i.Visibility,
 			&i.DerivedState,
 			&i.Priority,
 			&i.DueOn,
@@ -438,6 +447,7 @@ SELECT
   v.project_name,
   v.parent_task_public_id,
   v.title,
+  v.visibility,
   v.derived_state,
   v.priority,
   v.due_on,
@@ -467,6 +477,7 @@ type ListTasksForWorkspaceRow struct {
 	ProjectName             string            `json:"projectName"`
 	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
 	Title                   string            `json:"title"`
+	Visibility              TasksVisibility   `json:"visibility"`
 	DerivedState            TasksDerivedState `json:"derivedState"`
 	Priority                int32             `json:"priority"`
 	DueOn                   sql.NullTime      `json:"dueOn"`
@@ -496,6 +507,7 @@ func (q *Queries) ListTasksForWorkspace(ctx context.Context, arg ListTasksForWor
 			&i.ProjectName,
 			&i.ParentTaskPublicID,
 			&i.Title,
+			&i.Visibility,
 			&i.DerivedState,
 			&i.Priority,
 			&i.DueOn,
@@ -557,21 +569,23 @@ SET title = ?,
     priority = ?,
     due_on = ?,
     started_on = ?,
-    sort_weight = ?
+    sort_weight = ?,
+    visibility = ?
 WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE
 `
 
 type UpdateTaskParams struct {
-	Title       string         `json:"title"`
-	Description sql.NullString `json:"description"`
-	Priority    int32          `json:"priority"`
-	DueOn       sql.NullTime   `json:"dueOn"`
-	StartedOn   sql.NullTime   `json:"startedOn"`
-	SortWeight  int32          `json:"sortWeight"`
-	WorkspaceID uint32         `json:"-"`
-	PublicID    types.PublicID `json:"publicId"`
+	Title       string          `json:"title"`
+	Description sql.NullString  `json:"description"`
+	Priority    int32           `json:"priority"`
+	DueOn       sql.NullTime    `json:"dueOn"`
+	StartedOn   sql.NullTime    `json:"startedOn"`
+	SortWeight  int32           `json:"sortWeight"`
+	Visibility  TasksVisibility `json:"visibility"`
+	WorkspaceID uint32          `json:"-"`
+	PublicID    types.PublicID  `json:"publicId"`
 }
 
 // Update mutable task fields. derived_state is intentionally NOT writable.
@@ -583,6 +597,7 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) error {
 		arg.DueOn,
 		arg.StartedOn,
 		arg.SortWeight,
+		arg.Visibility,
 		arg.WorkspaceID,
 		arg.PublicID,
 	)

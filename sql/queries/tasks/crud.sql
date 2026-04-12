@@ -11,8 +11,9 @@ INSERT INTO tasks (
   description,
   priority,
   due_on,
-  started_on
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+  started_on,
+  visibility
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: FindTaskByPublicId :one
 -- Detail projection via v_task_detail. Workspace-scoped.
@@ -25,6 +26,7 @@ SELECT
   v.created_by_user_public_id,
   v.title,
   v.description,
+  v.visibility,
   v.derived_state,
   v.priority,
   v.due_on,
@@ -50,6 +52,7 @@ SELECT
   v.project_name,
   v.parent_task_public_id,
   v.title,
+  v.visibility,
   v.derived_state,
   v.priority,
   v.due_on,
@@ -75,6 +78,7 @@ SELECT
   v.project_name,
   v.parent_task_public_id,
   v.title,
+  v.visibility,
   v.derived_state,
   v.priority,
   v.due_on,
@@ -99,7 +103,8 @@ SET title = ?,
     priority = ?,
     due_on = ?,
     started_on = ?,
-    sort_weight = ?
+    sort_weight = ?,
+    visibility = ?
 WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;

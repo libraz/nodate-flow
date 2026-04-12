@@ -631,6 +631,49 @@ func (ns NullTasksDerivedState) Value() (driver.Value, error) {
 	return string(ns.TasksDerivedState), nil
 }
 
+type TasksVisibility string
+
+const (
+	TasksVisibilityPublic  TasksVisibility = "public"
+	TasksVisibilityProject TasksVisibility = "project"
+	TasksVisibilityPrivate TasksVisibility = "private"
+)
+
+func (e *TasksVisibility) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = TasksVisibility(s)
+	case string:
+		*e = TasksVisibility(s)
+	default:
+		return fmt.Errorf("unsupported scan type for TasksVisibility: %T", src)
+	}
+	return nil
+}
+
+type NullTasksVisibility struct {
+	TasksVisibility TasksVisibility `json:"tasksVisibility"`
+	Valid           bool            `json:"valid"` // Valid is true if TasksVisibility is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullTasksVisibility) Scan(value interface{}) error {
+	if value == nil {
+		ns.TasksVisibility, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.TasksVisibility.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullTasksVisibility) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.TasksVisibility), nil
+}
+
 type UserIntegrationsProvider string
 
 const (
@@ -1478,6 +1521,8 @@ type Task struct {
 	StartedOn sql.NullTime `json:"startedOn"`
 	// Time derived_state transitioned to done
 	CompletedAt sql.NullTime `json:"completedAt"`
+	// ACL Layer 4: public=workspace members, project=project members, private=task actors only
+	Visibility TasksVisibility `json:"visibility"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
@@ -1755,6 +1800,7 @@ type VTaskDetail struct {
 	CreatedByUserPublicID    sql.NullString    `json:"createdByUserPublicId"`
 	Title                    string            `json:"title"`
 	Description              sql.NullString    `json:"description"`
+	Visibility               TasksVisibility   `json:"visibility"`
 	DerivedState             TasksDerivedState `json:"derivedState"`
 	Priority                 int32             `json:"priority"`
 	DueOn                    sql.NullTime      `json:"dueOn"`
@@ -1771,11 +1817,15 @@ type VTaskDetail struct {
 
 type VTaskList struct {
 	WorkspaceID             uint32            `json:"-"`
+	TaskInternalID          uint32            `json:"taskInternalId"`
+	ProjectID               uint32            `json:"-"`
+	CreatedByUserID         sql.NullInt32     `json:"createdByUserId"`
 	PublicID                types.PublicID    `json:"publicId"`
 	ProjectPublicID         []byte            `json:"projectPublicId"`
 	ProjectName             string            `json:"projectName"`
 	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
 	Title                   string            `json:"title"`
+	Visibility              TasksVisibility   `json:"visibility"`
 	DerivedState            TasksDerivedState `json:"derivedState"`
 	Priority                int32             `json:"priority"`
 	DueOn                   sql.NullTime      `json:"dueOn"`

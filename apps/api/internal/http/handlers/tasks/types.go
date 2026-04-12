@@ -102,6 +102,7 @@ type Task struct {
 	CreatedByUserID          string    `json:"createdByUserId,omitempty"`
 	Title                    string    `json:"title"`
 	Description              string    `json:"description,omitempty"`
+	Visibility               string    `json:"visibility"`
 	DerivedState             string    `json:"derivedState"`
 	Priority                 int32     `json:"priority"`
 	DueOn                    string    `json:"dueOn,omitempty"`
@@ -123,6 +124,7 @@ type TaskListItem struct {
 	ProjectName        string    `json:"projectName,omitempty"`
 	ParentTaskID       string    `json:"parentTaskId,omitempty"`
 	Title              string    `json:"title"`
+	Visibility         string    `json:"visibility"`
 	DerivedState       string    `json:"derivedState"`
 	Priority           int32     `json:"priority"`
 	DueOn              string    `json:"dueOn,omitempty"`
@@ -207,6 +209,7 @@ type CreateTaskBody struct {
 	Priority    int32  `json:"priority,omitempty" minimum:"0" maximum:"4"`
 	DueOn       string `json:"dueOn,omitempty" doc:"YYYY-MM-DD"`
 	StartOn     string `json:"startOn,omitempty" doc:"YYYY-MM-DD"`
+	Visibility  string `json:"visibility,omitempty" enum:"public,project,private" default:"public" doc:"Task visibility: public (workspace), project (project members), or private (task actors only)"`
 }
 
 // CreateTaskInput is the request for POST /tasks.
@@ -296,6 +299,7 @@ type PatchTaskBody struct {
 	DueOn       *string `json:"dueOn,omitempty" doc:"YYYY-MM-DD or empty string to clear"`
 	StartOn     *string `json:"startOn,omitempty" doc:"YYYY-MM-DD or empty string to clear"`
 	SortWeight  *int32  `json:"sortWeight,omitempty" doc:"Display order weight. Lower values sort first."`
+	Visibility  *string `json:"visibility,omitempty" enum:"public,project,private" doc:"Task visibility: public (workspace), project (project members), or private (task actors only)"`
 }
 
 // PatchTaskInput is the request for PATCH /tasks/{id}.

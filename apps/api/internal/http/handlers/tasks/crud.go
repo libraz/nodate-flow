@@ -33,6 +33,17 @@ func hasListFilters(in *ListTasksInput) bool {
 	return in.Q != "" || len(in.State) > 0 || in.Assignee != ""
 }
 
+// needsDynamicQuery reports whether the request must go through the dynamic
+// SQL path. This is true when there are explicit filters, or when the actor
+// is not a workspace admin/owner (since non-elevated users need Layer 4
+// visibility filtering that the static sqlc queries cannot express).
+func needsDynamicQuery(in *ListTasksInput, wsRole middleware.WorkspaceRole) bool {
+	if hasListFilters(in) {
+		return true
+	}
+	return !wsRole.AtLeast(middleware.WorkspaceRoleAdmin)
+}
+
 // listTasksFiltered runs a dynamic SELECT against v_task_list applying the
 // optional q / state / assignee filters. It bypasses sqlc because sqlc
 // cannot express dynamic WHERE fragments. The shape of the returned rows
@@ -43,6 +54,8 @@ func listTasksFiltered(
 	db *sql.DB,
 	workspaceID uint32,
 	projectPublicID []byte,
+	actorID uint32,
+	wsRole middleware.WorkspaceRole,
 	in *ListTasksInput,
 ) ([]generated.ListTasksForWorkspaceRow, int64, error) {
 	var (
@@ -51,6 +64,12 @@ func listTasksFiltered(
 	)
 	where = append(where, "v.workspace_id = ?")
 	args = append(args, workspaceID)
+
+	// Apply Layer 4 task visibility filter.
+	if visFrag, visArgs := middleware.TaskVisibilityFilter(actorID, wsRole); visFrag != "" {
+		where = append(where, visFrag)
+		args = append(args, visArgs...)
+	}
 
 	if len(projectPublicID) > 0 {
 		where = append(where, "v.project_public_id = ?")
@@ -97,6 +116,7 @@ func listTasksFiltered(
   v.project_name,
   v.parent_task_public_id,
   v.title,
+  v.visibility,
   v.derived_state,
   v.priority,
   v.due_on,
@@ -132,6 +152,7 @@ LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
 			&r.ProjectName,
 			&r.ParentTaskPublicID,
 			&r.Title,
+			&r.Visibility,
 			&r.DerivedState,
 			&r.Priority,
 			&r.DueOn,
@@ -224,6 +245,10 @@ WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 
 		pub := types.New()
 		desc := sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""}
+		vis := generated.TasksVisibilityPublic
+		if in.Body.Visibility != "" {
+			vis = generated.TasksVisibility(in.Body.Visibility)
+		}
 		taskID, err := deps.Queries.CreateTask(ctx, generated.CreateTaskParams{
 			PublicID:        pub,
 			WorkspaceID:     prj.WorkspaceID,
@@ -235,6 +260,7 @@ WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 			Priority:        in.Body.Priority,
 			DueOn:           due,
 			StartedOn:       start,
+			Visibility:      vis,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -291,7 +317,7 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 		out := &ListTasksOutput{}
 		out.Body.Tasks = []TaskListItem{}
 
-		const wsMemQuery = `SELECT 1 FROM workspace_members
+		const wsMemQuery = `SELECT role FROM workspace_members
 WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 
 		if in.ProjectID != "" {
@@ -306,17 +332,18 @@ WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 				}
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
-			var one int
-			if err := deps.DB.QueryRowContext(ctx, wsMemQuery, prj.WorkspaceID, actorID).Scan(&one); err != nil {
+			var wsRoleStr string
+			if err := deps.DB.QueryRowContext(ctx, wsMemQuery, prj.WorkspaceID, actorID).Scan(&wsRoleStr); err != nil {
 				if errors.Is(err, sql.ErrNoRows) {
 					return nil, httpErr(apierrors.WsProjectAccessDenied)
 				}
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
+			wsRole := middleware.WorkspaceRole(wsRoleStr)
 			pubBytes := prjPub.UUID()
-			if hasListFilters(in) {
+			if needsDynamicQuery(in, wsRole) {
 				in.Limit = limit
-				frows, total, ferr := listTasksFiltered(ctx, deps.DB, prj.WorkspaceID, pubBytes[:], in)
+				frows, total, ferr := listTasksFiltered(ctx, deps.DB, prj.WorkspaceID, pubBytes[:], actorID, wsRole, in)
 				if ferr != nil {
 					if errors.Is(ferr, errInvalidAssignee) {
 						return out, nil
@@ -362,16 +389,17 @@ WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		var one int
-		if err := deps.DB.QueryRowContext(ctx, wsMemQuery, wsInternal, actorID).Scan(&one); err != nil {
+		var wsRoleStr2 string
+		if err := deps.DB.QueryRowContext(ctx, wsMemQuery, wsInternal, actorID).Scan(&wsRoleStr2); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		if hasListFilters(in) {
+		wsRole2 := middleware.WorkspaceRole(wsRoleStr2)
+		if needsDynamicQuery(in, wsRole2) {
 			in.Limit = limit
-			frows, total, ferr := listTasksFiltered(ctx, deps.DB, wsInternal, nil, in)
+			frows, total, ferr := listTasksFiltered(ctx, deps.DB, wsInternal, nil, actorID, wsRole2, in)
 			if ferr != nil {
 				if errors.Is(ferr, errInvalidAssignee) {
 					return out, nil
@@ -482,6 +510,10 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 		if in.Body.SortWeight != nil {
 			newSortWeight = *in.Body.SortWeight
 		}
+		newVisibility := current.Visibility
+		if in.Body.Visibility != nil {
+			newVisibility = generated.TasksVisibility(*in.Body.Visibility)
+		}
 
 		if err := deps.Queries.UpdateTask(ctx, generated.UpdateTaskParams{
 			Title:       newTitle,
@@ -490,6 +522,7 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			DueOn:       newDue,
 			StartedOn:   newStart,
 			SortWeight:  newSortWeight,
+			Visibility:  newVisibility,
 			WorkspaceID: ws.ID,
 			PublicID:    types.FromUUID(task.PublicID),
 		}); err != nil {

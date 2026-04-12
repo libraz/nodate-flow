@@ -3,11 +3,15 @@
 CREATE OR REPLACE VIEW v_task_list AS
 SELECT
   t.workspace_id,
+  t.id AS task_internal_id,
+  t.project_id,
+  t.created_by_user_id,
   t.public_id,
   p.public_id AS project_public_id,
   p.name AS project_name,
   pt.public_id AS parent_task_public_id,
   t.title,
+  t.visibility,
   t.derived_state,
   t.priority,
   t.due_on,
