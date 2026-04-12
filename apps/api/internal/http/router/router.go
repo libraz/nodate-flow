@@ -32,6 +32,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/eventbus"
 	aihandlers "github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/ai"
 	authhandlers "github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/inbox"
@@ -603,8 +604,12 @@ func BuildResult(deps Deps) Result {
 		inbox.Register(subAPI, inboxDeps)
 	})
 
-	// MCP server uses the orchestrator built above.
-	r.Handle("/mcp", mcp.NewHandler(mcp.Deps{DB: deps.DB, Queries: deps.Queries, AI: aiOrch, Embedder: embedClient, NlQuery: nlQueryCompiler}))
+	// MCP server uses the orchestrator built above. The SSE event hook
+	// is registered so workspace events are broadcast to connected MCP
+	// clients in real time.
+	mcpHandler := mcp.NewHandler(mcp.Deps{DB: deps.DB, Queries: deps.Queries, AI: aiOrch, Embedder: embedClient, NlQuery: nlQueryCompiler})
+	eventbus.AddNotifyHook(mcpHandler.RegisterEventHook())
+	r.Handle("/mcp", mcpHandler)
 
 	// Workspace-scoped AI inbox triage. Registered in
 	// its own group so the auth + workspace-member middleware applies
