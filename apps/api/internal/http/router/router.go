@@ -43,6 +43,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/signals"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/tasks"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/timeline"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/webhooks"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/handlers/workspaces"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/middleware"
 	integrationspkg "github.com/nodate-flow/nodate-flow/apps/api/internal/integrations"
@@ -554,6 +555,8 @@ func BuildResult(deps Deps) Result {
 			Summary:     "Create a project in a workspace",
 		}, projects.Create(prjDeps))
 		aihandlers.RegisterProviders(subAPI, aiDeps)
+		webhookDeps := webhooks.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
+		webhooks.Register(subAPI, webhookDeps)
 	})
 
 	// Workspace owner-only.

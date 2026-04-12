@@ -12,4 +12,5 @@ export * from "./mcp";
 export * from "./notification";
 export * from "./rate";
 export * from "./validation";
+export * from "./webhook";
 export * from "./ws";

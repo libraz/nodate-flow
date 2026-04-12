@@ -10,10 +10,10 @@ var (
 	WsLensNotFound = &Spec{Code: "WS.LENS.NOT_FOUND", Status: 404, Message: "Saved view not found"}
 	// WS.MEMBER.NOT_FOUND — Workspace member not found
 	WsMemberNotFound = &Spec{Code: "WS.MEMBER.NOT_FOUND", Status: 404, Message: "Workspace member not found"}
-	// WS.NOTIFICATION.NOT_FOUND — Notification not found
-	WsNotificationNotFound = &Spec{Code: "WS.NOTIFICATION.NOT_FOUND", Status: 404, Message: "Notification not found"}
 	// WS.MEMBER.ROLE_DENIED — Your role does not permit this action
 	WsMemberRoleDenied = &Spec{Code: "WS.MEMBER.ROLE_DENIED", Status: 403, Message: "Your role does not permit this action"}
+	// WS.NOTIFICATION.NOT_FOUND — Notification not found
+	WsNotificationNotFound = &Spec{Code: "WS.NOTIFICATION.NOT_FOUND", Status: 404, Message: "Notification not found"}
 	// WS.PROJECT.ACCESS_DENIED — You do not have access to this project
 	WsProjectAccessDenied = &Spec{Code: "WS.PROJECT.ACCESS_DENIED", Status: 403, Message: "You do not have access to this project"}
 	// WS.PROJECT.NOT_FOUND — Project not found

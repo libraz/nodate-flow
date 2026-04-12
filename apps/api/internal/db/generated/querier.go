@@ -99,6 +99,8 @@ type Querier interface {
 	// Insert a new task. derived_state defaults to 'open' and must NOT be set
 	// directly here; the constraint engine and event bus mutate it.
 	CreateTask(ctx context.Context, arg CreateTaskParams) (int64, error)
+	CreateWebhookDelivery(ctx context.Context, arg CreateWebhookDeliveryParams) (int64, error)
+	CreateWebhookSubscription(ctx context.Context, arg CreateWebhookSubscriptionParams) (int64, error)
 	// Insert a new workspace. Slug uniqueness is enforced at the DB level.
 	CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) (int64, error)
 	// Add a user to a workspace with the given role.
@@ -128,6 +130,7 @@ type Querier interface {
 	DeleteTaskEmbeddingsForTask(ctx context.Context, taskID uint32) error
 	// Hard-delete a single integration row (user-scoped).
 	DeleteUserIntegration(ctx context.Context, arg DeleteUserIntegrationParams) error
+	DeleteWebhookSubscription(ctx context.Context, arg DeleteWebhookSubscriptionParams) error
 	// Soft-disable a project.
 	DisableProject(ctx context.Context, arg DisableProjectParams) error
 	// Soft-disable a task.
@@ -167,6 +170,8 @@ type Querier interface {
 	FindMcpTokenByHash(ctx context.Context, tokenHash string) (FindMcpTokenByHashRow, error)
 	// Resolve a PAT row from its SHA-256 hash for bearer auth.
 	FindPatByHash(ctx context.Context, tokenHash string) (FindPatByHashRow, error)
+	// Find deliveries ready for (re)delivery. Used by the background worker.
+	FindPendingDeliveries(ctx context.Context, limit int32) ([]FindPendingDeliveriesRow, error)
 	// Resolve a project by its UUID v7 within a workspace. Returns internal id.
 	FindProjectByPublicId(ctx context.Context, arg FindProjectByPublicIdParams) (FindProjectByPublicIdRow, error)
 	// Resolve a project by its UUID v7 without workspace scope.
@@ -240,10 +245,14 @@ type Querier interface {
 	// Fetch the embedding row for a single (task_id, model) pair. Returns
 	// sql.ErrNoRows if the task has never been embedded with the given model.
 	GetTaskEmbedding(ctx context.Context, arg GetTaskEmbeddingParams) (GetTaskEmbeddingRow, error)
+	GetWebhookSubscription(ctx context.Context, arg GetWebhookSubscriptionParams) (GetWebhookSubscriptionRow, error)
 	// Insert a hashed recovery code for a user.
 	InsertRecoveryCode(ctx context.Context, arg InsertRecoveryCodeParams) error
 	// Insert an inbound signal (manual or webhook).
 	InsertSignal(ctx context.Context, arg InsertSignalParams) (int64, error)
+	// Find all active subscriptions in a workspace. Event type filtering
+	// is done in Go since JSON_CONTAINS is not sqlc-friendly.
+	ListActiveSubscriptionsForEvent(ctx context.Context, workspaceID uint32) ([]ListActiveSubscriptionsForEventRow, error)
 	// List actors on a task joined with user display fields.
 	ListActorsForTask(ctx context.Context, arg ListActorsForTaskParams) ([]ListActorsForTaskRow, error)
 	// List AI agent actors on a task joined with the agent definition.
@@ -371,6 +380,10 @@ type Querier interface {
 	// List every active integration owned by a user. Tokens are NOT
 	// selected; only metadata used by the /me/integrations list view.
 	ListUserIntegrations(ctx context.Context, userID uint32) ([]ListUserIntegrationsRow, error)
+	// List deliveries for a subscription with pagination.
+	ListWebhookDeliveries(ctx context.Context, arg ListWebhookDeliveriesParams) ([]ListWebhookDeliveriesRow, error)
+	// List webhook subscriptions for a workspace with pagination.
+	ListWebhookSubscriptions(ctx context.Context, arg ListWebhookSubscriptionsParams) ([]ListWebhookSubscriptionsRow, error)
 	// List members of a workspace via v_workspace_members.
 	ListWorkspaceMembers(ctx context.Context, arg ListWorkspaceMembersParams) ([]ListWorkspaceMembersRow, error)
 	// List workspaces a user belongs to.
@@ -385,6 +398,11 @@ type Querier interface {
 	MarkAgentRunClaimed(ctx context.Context, arg MarkAgentRunClaimedParams) error
 	// Mark all unread notifications as read for a user in a workspace.
 	MarkAllNotificationsRead(ctx context.Context, arg MarkAllNotificationsReadParams) error
+	// Mark a delivery as dead (all retries exhausted).
+	MarkDeliveryDead(ctx context.Context, arg MarkDeliveryDeadParams) error
+	MarkDeliveryDelivered(ctx context.Context, arg MarkDeliveryDeliveredParams) error
+	// Mark a delivery attempt as failed with retry scheduling.
+	MarkDeliveryFailed(ctx context.Context, arg MarkDeliveryFailedParams) error
 	// Mark a notification as delivered (email/push sent).
 	MarkNotificationDelivered(ctx context.Context, publicID types.PublicID) error
 	// Mark a single notification as read.
@@ -449,6 +467,7 @@ type Querier interface {
 	// workspace. cost_estimate is stored as DECIMAL(10,6) USD; multiply by 100
 	// and round to produce a cent-scale integer suitable for CostGuard.
 	SumAiCostTodayForWorkspace(ctx context.Context, arg SumAiCostTodayForWorkspaceParams) (int64, error)
+	ToggleWebhookSubscription(ctx context.Context, arg ToggleWebhookSubscriptionParams) error
 	// Write the new derived_state computed by the transition handler. This is
 	// the only path allowed to mutate derived_state and must be called inside
 	// the same transaction as the events append.

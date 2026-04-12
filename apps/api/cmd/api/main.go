@@ -35,6 +35,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/outbound"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/storage"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/stream"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/webhook"
 )
 
 func main() {
@@ -283,6 +284,11 @@ func main() {
 	notifFanout := notification.NewFanout(db, queries, emailSender)
 	eventbus.AddNotifyHook(notifFanout.Hook())
 
+	// Webhook delivery worker: creates delivery rows for matching
+	// subscriptions and periodically POSTs payloads with HMAC signatures.
+	webhookWorker := webhook.NewWorker(db, queries)
+	eventbus.AddNotifyHook(webhookWorker.Hook())
+
 	integrationsRegistry := integrations.NewRegistry(
 		func() (integrations.Provider, error) {
 			return integrations.NewGithub(cfg.GithubClientID, cfg.GithubClientSecret)
@@ -401,6 +407,8 @@ func main() {
 		logger.Warn("agent scheduler start failed", "err", err)
 	}
 
+	webhookWorker.Start(context.Background())
+
 	addr := ":" + cfg.Port
 	srv := &http.Server{
 		Addr:              addr,
@@ -434,6 +442,7 @@ func main() {
 	}
 
 	scheduler.Stop()
+	webhookWorker.Stop()
 	schedulerCancel()
 	refresherCancel()
 	if workerCancel != nil {

@@ -31,7 +31,7 @@ type CreateLensParams struct {
 	PublicID    types.PublicID  `json:"publicId"`
 	WorkspaceID uint32          `json:"-"`
 	ProjectID   sql.NullInt32   `json:"-"`
-	CreatorID   uint32          `json:"creatorId"`
+	CreatorID   uint32          `json:"-"`
 	Name        string          `json:"name"`
 	LensJson    json.RawMessage `json:"lensJson"`
 	IsDefault   bool            `json:"isDefault"`

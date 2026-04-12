@@ -849,6 +849,51 @@ func (ns NullUsersThemePreference) Value() (driver.Value, error) {
 	return string(ns.UsersThemePreference), nil
 }
 
+type WebhookDeliveriesStatus string
+
+const (
+	WebhookDeliveriesStatusPending    WebhookDeliveriesStatus = "pending"
+	WebhookDeliveriesStatusDelivering WebhookDeliveriesStatus = "delivering"
+	WebhookDeliveriesStatusDelivered  WebhookDeliveriesStatus = "delivered"
+	WebhookDeliveriesStatusFailed     WebhookDeliveriesStatus = "failed"
+	WebhookDeliveriesStatusDead       WebhookDeliveriesStatus = "dead"
+)
+
+func (e *WebhookDeliveriesStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = WebhookDeliveriesStatus(s)
+	case string:
+		*e = WebhookDeliveriesStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for WebhookDeliveriesStatus: %T", src)
+	}
+	return nil
+}
+
+type NullWebhookDeliveriesStatus struct {
+	WebhookDeliveriesStatus WebhookDeliveriesStatus `json:"webhookDeliveriesStatus"`
+	Valid                   bool                    `json:"valid"` // Valid is true if WebhookDeliveriesStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullWebhookDeliveriesStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.WebhookDeliveriesStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.WebhookDeliveriesStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullWebhookDeliveriesStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.WebhookDeliveriesStatus), nil
+}
+
 type WorkspaceMembersRole string
 
 const (
@@ -1324,7 +1369,7 @@ type Lense struct {
 	// Internal FK to projects.id (NULL = workspace-wide)
 	ProjectID sql.NullInt32 `json:"-"`
 	// Internal FK to users.id
-	CreatorID uint32 `json:"creatorId"`
+	CreatorID uint32 `json:"-"`
 	// Display name
 	Name string `json:"name"`
 	// Serialized Lens object (filter, sort, groupBy)
@@ -2036,6 +2081,78 @@ type VWorkspaceMember struct {
 	JoinedAt     sql.NullTime         `json:"joinedAt"`
 	UpdatedAt    sql.NullTime         `json:"updatedAt"`
 	CreatedAt    time.Time            `json:"createdAt"`
+}
+
+// Webhook delivery attempts and retry tracking
+type WebhookDelivery struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Internal FK to webhook_subscriptions.id
+	SubscriptionID uint32 `json:"-"`
+	// The event that triggered this delivery
+	EventType string `json:"eventType"`
+	// public_id of the source event
+	EventPublicID sql.NullString `json:"eventPublicId"`
+	// The JSON payload that was/will be sent
+	PayloadJson json.RawMessage `json:"payloadJson"`
+	// Delivery state
+	Status WebhookDeliveriesStatus `json:"status"`
+	// HTTP response status from the target
+	HttpStatus sql.NullInt16 `json:"httpStatus"`
+	// Truncated response body (first 4KB) for debugging
+	ResponseBody sql.NullString `json:"responseBody"`
+	// Number of delivery attempts so far
+	Attempts uint8 `json:"attempts"`
+	// Maximum retry attempts
+	MaxAttempts uint8 `json:"maxAttempts"`
+	// When to retry next (null when delivered or dead)
+	NextRetryAt sql.NullTime `json:"nextRetryAt"`
+	// When successfully delivered
+	DeliveredAt sql.NullTime `json:"deliveredAt"`
+	// When marked dead (all retries exhausted)
+	FailedAt sql.NullTime `json:"failedAt"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
+// Workspace-level webhook subscriptions
+type WebhookSubscription struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Internal FK to users.id, who created this subscription
+	CreatorID uint32 `json:"-"`
+	// Delivery endpoint URL
+	Url string `json:"url"`
+	// HMAC-SHA256 shared secret for signing deliveries
+	Secret string `json:"secret"`
+	// Human-readable description
+	Description string `json:"description"`
+	// JSON array of event type patterns to match (e.g. ["task.created","task.updated"])
+	EventTypes json.RawMessage `json:"eventTypes"`
+	// Whether deliveries are sent
+	IsActive bool `json:"isActive"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
 }
 
 // Tenant boundary

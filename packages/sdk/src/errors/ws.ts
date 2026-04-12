@@ -21,6 +21,11 @@ export const WsErrors = {
     status: 403,
     message: "Your role does not permit this action",
   },
+  WS_NOTIFICATION_NOT_FOUND: {
+    code: "WS.NOTIFICATION.NOT_FOUND",
+    status: 404,
+    message: "Notification not found",
+  },
   WS_PROJECT_ACCESS_DENIED: {
     code: "WS.PROJECT.ACCESS_DENIED",
     status: 403,
