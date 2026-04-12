@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-sql-driver/mysql"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
@@ -40,6 +41,16 @@ func Patch(deps Deps) func(context.Context, *PatchProjectInput) (*PatchProjectOu
 		newDesc := current.Description
 		if in.Body.Description != nil {
 			newDesc = sql.NullString{String: *in.Body.Description, Valid: *in.Body.Description != ""}
+		}
+
+		if actorID, ok := middleware.ActorFromContext(ctx); ok {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "project.update",
+				ActorID:      actorID,
+				WorkspaceID:  current.WorkspaceID,
+				ResourceType: "project",
+				ResourceID:   prj.PublicID.String(),
+			})
 		}
 
 		if err := deps.Queries.UpdateProjectFull(ctx, generated.UpdateProjectFullParams{

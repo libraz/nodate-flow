@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
@@ -15,6 +16,37 @@ import (
 
 const presignExpiry = 15 * time.Minute
 
+// maxFileSize is the per-file upload limit (100 MB).
+const maxFileSize = 100 * 1024 * 1024
+
+// allowedMIMEPrefixes lists safe MIME type prefixes for uploads.
+var allowedMIMEPrefixes = []string{
+	"image/",
+	"text/",
+	"application/pdf",
+	"application/json",
+	"application/xml",
+	"application/zip",
+	"application/gzip",
+	"application/x-tar",
+	"application/vnd.openxmlformats-officedocument",
+	"application/vnd.ms-",
+	"application/vnd.oasis.opendocument",
+	"application/octet-stream",
+	"video/",
+	"audio/",
+}
+
+func isAllowedContentType(ct string) bool {
+	ct = strings.ToLower(strings.TrimSpace(ct))
+	for _, prefix := range allowedMIMEPrefixes {
+		if strings.HasPrefix(ct, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 // PresignUpload handles POST /tasks/{id}/attachments/presign. It
 // creates an attachment metadata row and returns a presigned PUT URL
 // that the client uses to upload the file directly to object storage.
@@ -22,6 +54,12 @@ func PresignUpload(deps Deps) func(context.Context, *PresignUploadInput) (*Presi
 	return func(ctx context.Context, in *PresignUploadInput) (*PresignUploadOutput, error) {
 		if deps.Storage == nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if !isAllowedContentType(in.Body.ContentType) {
+			return nil, httpErr(apierrors.ValidationFileTypeNotAllowed)
+		}
+		if in.Body.ByteSize > maxFileSize {
+			return nil, httpErr(apierrors.ValidationFileTooLarge)
 		}
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {

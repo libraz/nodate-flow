@@ -21,6 +21,16 @@ export const ValidationErrors = {
     status: 400,
     message: "Request body could not be parsed",
   },
+  VALIDATION_FILE_TOO_LARGE: {
+    code: "VALIDATION.FILE.TOO_LARGE",
+    status: 413,
+    message: "File exceeds the maximum allowed size",
+  },
+  VALIDATION_FILE_TYPE_NOT_ALLOWED: {
+    code: "VALIDATION.FILE.TYPE_NOT_ALLOWED",
+    status: 415,
+    message: "File type is not allowed",
+  },
   VALIDATION_PATH_PARAM_INVALID: {
     code: "VALIDATION.PATH.PARAM_INVALID",
     status: 400,

@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-sql-driver/mysql"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
@@ -53,6 +54,17 @@ func Create(deps Deps) func(context.Context, *CreateProjectInput) (*CreateProjec
 				}
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
+		if userID, ok := middleware.ActorFromContext(ctx); ok {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "project.create",
+				ActorID:      userID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "project",
+				ResourceID:   pub.String(),
+				Metadata:     map[string]any{"slug": slug, "name": in.Body.Name},
+			})
 		}
 
 		// Auto-enroll the creator as a project lead so they can see the

@@ -12,6 +12,10 @@ var (
 	ValidationBodyFieldMissing = &Spec{Code: "VALIDATION.BODY.FIELD_MISSING", Status: 422, Message: "A required field is missing in the request body"}
 	// VALIDATION.BODY.UNPARSEABLE — Request body could not be parsed
 	ValidationBodyUnparseable = &Spec{Code: "VALIDATION.BODY.UNPARSEABLE", Status: 400, Message: "Request body could not be parsed"}
+	// VALIDATION.FILE.TOO_LARGE — File exceeds the maximum allowed size
+	ValidationFileTooLarge = &Spec{Code: "VALIDATION.FILE.TOO_LARGE", Status: 413, Message: "File exceeds the maximum allowed size"}
+	// VALIDATION.FILE.TYPE_NOT_ALLOWED — File type is not allowed
+	ValidationFileTypeNotAllowed = &Spec{Code: "VALIDATION.FILE.TYPE_NOT_ALLOWED", Status: 415, Message: "File type is not allowed"}
 	// VALIDATION.PATH.PARAM_INVALID — A path parameter is invalid
 	ValidationPathParamInvalid = &Spec{Code: "VALIDATION.PATH.PARAM_INVALID", Status: 400, Message: "A path parameter is invalid"}
 	// VALIDATION.QUERY.FIELD_INVALID — A query parameter is invalid

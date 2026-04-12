@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
@@ -57,6 +58,15 @@ func Create(deps Deps) func(context.Context, *CreateWorkspaceInput) (*CreateWork
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "workspace.create",
+			ActorID:      uid,
+			WorkspaceID:  uint32(wsID),
+			ResourceType: "workspace",
+			ResourceID:   pub.String(),
+			Metadata:     map[string]any{"slug": slug, "name": in.Body.Name},
+		})
 
 		out := &CreateWorkspaceOutput{Body: Workspace{
 			ID:          pub.String(),

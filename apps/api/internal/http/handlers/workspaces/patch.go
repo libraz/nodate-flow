@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
@@ -55,6 +56,16 @@ func Patch(deps Deps) func(context.Context, *PatchWorkspaceInput) (*PatchWorkspa
 
 		if err := deps.Queries.PatchWorkspace(ctx, params); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
+		if actorID, ok := middleware.ActorFromContext(ctx); ok {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "workspace.update",
+				ActorID:      actorID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "workspace",
+				ResourceID:   ws.PublicID.String(),
+			})
 		}
 
 		refreshed, err := deps.Queries.FindWorkspaceByPublicId(ctx, types.FromUUID(ws.PublicID))

@@ -50,6 +50,23 @@ resources:
         description: "Returned when an unknown query parameter is supplied and strict mode is enabled."
         userAction: "Remove the unknown query parameter."
 
+  file:
+    breadcrumb: "Validation > File"
+    errors:
+      type_not_allowed:
+        code: VALIDATION.FILE.TYPE_NOT_ALLOWED
+        status: 415
+        message: "File type is not allowed"
+        description: "Returned when the uploaded file's MIME type is not in the allowlist."
+        userAction: "Upload a file with an allowed type (images, documents, archives, text)."
+
+      too_large:
+        code: VALIDATION.FILE.TOO_LARGE
+        status: 413
+        message: "File exceeds the maximum allowed size"
+        description: "Returned when the uploaded file exceeds the per-file size limit."
+        userAction: "Reduce the file size and try again."
+
   path:
     breadcrumb: "Validation > Path"
     errors:
