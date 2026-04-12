@@ -27,6 +27,13 @@ func RegisterCollection(api huma.API, deps Deps) {
 	}, List(deps))
 
 	huma.Register(api, huma.Operation{
+		OperationID: "tasks-reorder",
+		Method:      http.MethodPost,
+		Path:        "/tasks/reorder",
+		Summary:     "Bulk-update sort weights for tasks within a project",
+	}, Reorder(deps))
+
+	huma.Register(api, huma.Operation{
 		OperationID: "me-tasks-list",
 		Method:      http.MethodGet,
 		Path:        "/me/tasks",

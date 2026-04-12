@@ -286,6 +286,7 @@ type PatchTaskBody struct {
 	Priority    *int32  `json:"priority,omitempty" minimum:"0" maximum:"4"`
 	DueOn       *string `json:"dueOn,omitempty" doc:"YYYY-MM-DD or empty string to clear"`
 	StartOn     *string `json:"startOn,omitempty" doc:"YYYY-MM-DD or empty string to clear"`
+	SortWeight  *int32  `json:"sortWeight,omitempty" doc:"Display order weight. Lower values sort first."`
 }
 
 // PatchTaskInput is the request for PATCH /tasks/{id}.
@@ -312,6 +313,36 @@ type DisableTaskBody struct {
 // DisableTaskOutput is the response for DELETE /tasks/{id}.
 type DisableTaskOutput struct {
 	Body DisableTaskBody
+}
+
+// ---- Reorder I/O -----------------------------------------------------------
+
+// ReorderItem is a single task with its new sort weight for the bulk
+// reorder endpoint.
+type ReorderItem struct {
+	ID         string `json:"id" required:"true" doc:"Task public ID (UUID v7)"`
+	SortWeight int32  `json:"sortWeight" required:"true" doc:"New display order weight"`
+}
+
+// ReorderTasksBody is the JSON body for POST /tasks/reorder.
+type ReorderTasksBody struct {
+	ProjectID string        `json:"projectId" required:"true" doc:"Project public ID (UUID v7); all tasks must belong to this project"`
+	Items     []ReorderItem `json:"items" required:"true" minItems:"1" doc:"Tasks with new sort weights"`
+}
+
+// ReorderTasksInput is the request for POST /tasks/reorder.
+type ReorderTasksInput struct {
+	Body ReorderTasksBody
+}
+
+// ReorderTasksOkBody is the response payload for POST /tasks/reorder.
+type ReorderTasksOkBody struct {
+	Ok bool `json:"ok"`
+}
+
+// ReorderTasksOutput is the response for POST /tasks/reorder.
+type ReorderTasksOutput struct {
+	Body ReorderTasksOkBody
 }
 
 // ---- Transitions I/O -------------------------------------------------------

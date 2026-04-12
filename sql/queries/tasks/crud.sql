@@ -64,7 +64,7 @@ SELECT
 FROM v_task_list v
 WHERE v.workspace_id = ?
   AND v.project_public_id = ?
-ORDER BY v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
+ORDER BY v.sort_weight ASC, v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
 
 -- name: ListTasksForWorkspace :many
@@ -88,7 +88,7 @@ SELECT
   COUNT(*) OVER() AS total
 FROM v_task_list v
 WHERE v.workspace_id = ?
-ORDER BY v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
+ORDER BY v.sort_weight ASC, v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
 
 -- name: UpdateTask :exec
@@ -98,9 +98,19 @@ SET title = ?,
     description = ?,
     priority = ?,
     due_on = ?,
-    started_on = ?
+    started_on = ?,
+    sort_weight = ?
 WHERE workspace_id = ?
   AND public_id = ?
+  AND enabled = TRUE;
+
+-- name: UpdateTaskSortWeight :exec
+-- Update only the sort_weight for a single task within a workspace.
+-- Used by the bulk reorder endpoint inside a transaction.
+UPDATE tasks
+SET sort_weight = ?
+WHERE id = ?
+  AND workspace_id = ?
   AND enabled = TRUE;
 
 -- name: TransitionTaskState :exec

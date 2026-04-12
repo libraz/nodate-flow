@@ -429,6 +429,9 @@ type Querier interface {
 	UpdateProviderKey(ctx context.Context, arg UpdateProviderKeyParams) error
 	// Update mutable task fields. derived_state is intentionally NOT writable.
 	UpdateTask(ctx context.Context, arg UpdateTaskParams) error
+	// Update only the sort_weight for a single task within a workspace.
+	// Used by the bulk reorder endpoint inside a transaction.
+	UpdateTaskSortWeight(ctx context.Context, arg UpdateTaskSortWeightParams) error
 	// Stamp last successful login time on a user account.
 	UpdateUserLastLoginAt(ctx context.Context, id uint32) error
 	// Update mutable workspace fields by public_id.

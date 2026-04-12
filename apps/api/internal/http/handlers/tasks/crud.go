@@ -109,7 +109,7 @@ func listTasksFiltered(
   COUNT(*) OVER() AS total
 FROM v_task_list v
 WHERE %s
-ORDER BY v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
+ORDER BY v.sort_weight ASC, v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
 
 	args = append(args, in.Limit, in.Offset)
@@ -469,6 +469,10 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			}
 			newStart = parsed
 		}
+		newSortWeight := current.SortWeight
+		if in.Body.SortWeight != nil {
+			newSortWeight = *in.Body.SortWeight
+		}
 
 		if err := deps.Queries.UpdateTask(ctx, generated.UpdateTaskParams{
 			Title:       newTitle,
@@ -476,6 +480,7 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			Priority:    newPriority,
 			DueOn:       newDue,
 			StartedOn:   newStart,
+			SortWeight:  newSortWeight,
 			WorkspaceID: ws.ID,
 			PublicID:    types.FromUUID(task.PublicID),
 		}); err != nil {

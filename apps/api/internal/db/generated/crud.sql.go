@@ -181,7 +181,7 @@ SELECT
 FROM v_my_tasks v
 WHERE v.workspace_id = ?
   AND v.user_public_id = ?
-ORDER BY v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
+ORDER BY v.sort_weight ASC, v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?
 `
 
@@ -266,7 +266,7 @@ FROM v_my_tasks v
 INNER JOIN workspaces w
   ON w.id = v.workspace_id AND w.enabled = TRUE
 WHERE v.user_public_id = ?
-ORDER BY v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
+ORDER BY v.sort_weight ASC, v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?
 `
 
@@ -355,7 +355,7 @@ SELECT
 FROM v_task_list v
 WHERE v.workspace_id = ?
   AND v.project_public_id = ?
-ORDER BY v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
+ORDER BY v.sort_weight ASC, v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?
 `
 
@@ -451,7 +451,7 @@ SELECT
   COUNT(*) OVER() AS total
 FROM v_task_list v
 WHERE v.workspace_id = ?
-ORDER BY v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
+ORDER BY v.sort_weight ASC, v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?
 `
 
@@ -556,7 +556,8 @@ SET title = ?,
     description = ?,
     priority = ?,
     due_on = ?,
-    started_on = ?
+    started_on = ?,
+    sort_weight = ?
 WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE
@@ -568,6 +569,7 @@ type UpdateTaskParams struct {
 	Priority    int32          `json:"priority"`
 	DueOn       sql.NullTime   `json:"dueOn"`
 	StartedOn   sql.NullTime   `json:"startedOn"`
+	SortWeight  int32          `json:"sortWeight"`
 	WorkspaceID uint32         `json:"-"`
 	PublicID    types.PublicID `json:"publicId"`
 }
@@ -580,8 +582,34 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) error {
 		arg.Priority,
 		arg.DueOn,
 		arg.StartedOn,
+		arg.SortWeight,
 		arg.WorkspaceID,
 		arg.PublicID,
+	)
+	return err
+}
+
+const updateTaskSortWeight = `-- name: UpdateTaskSortWeight :exec
+UPDATE tasks
+SET sort_weight = ?
+WHERE id = ?
+  AND workspace_id = ?
+  AND enabled = TRUE
+`
+
+type UpdateTaskSortWeightParams struct {
+	SortWeight  int32  `json:"sortWeight"`
+	ID          uint32 `json:"-"`
+	WorkspaceID uint32 `json:"-"`
+}
+
+// Update only the sort_weight for a single task within a workspace.
+// Used by the bulk reorder endpoint inside a transaction.
+func (q *Queries) UpdateTaskSortWeight(ctx context.Context, arg UpdateTaskSortWeightParams) error {
+	_, err := q.db.ExecContext(ctx, updateTaskSortWeight,
+		arg.SortWeight,
+		arg.ID,
+		arg.WorkspaceID,
 	)
 	return err
 }
