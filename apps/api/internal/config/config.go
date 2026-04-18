@@ -127,12 +127,12 @@ type Config struct {
 
 	// AgentRunner selects the Runner implementation the scheduler /
 	// worker pair dispatches to.
-	//   log          (default) — structured-log dispatch, no events.
-	//   orchestrator           — writes ai.agent.run.* events and
-	//                            delegates the LLM call to an
-	//                            AgentExecutor (nil until the ai
-	//                            package exposes one).
-	AgentRunner string `env:"NF_AGENT_RUNNER" envDefault:"log"`
+	//   orchestrator (default) — writes ai.agent.run.* events and
+	//                            delegates the LLM call to the
+	//                            AgentExecutor.
+	//   log                    — structured-log dispatch, no events.
+	//                            Useful for debugging or cost control.
+	AgentRunner string `env:"NF_AGENT_RUNNER" envDefault:"orchestrator"`
 
 	// AgentRunsPurgeInterval is how often the purger wakes up to
 	// delete completed agent_runs rows. Only active when

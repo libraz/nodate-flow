@@ -70,6 +70,12 @@ type Orchestrator struct {
 	// that only call ProposeTasksFrom / ProposePriority.
 	DB      EventDB
 	Queries InboxReader
+
+	// ProposalCache is an optional short-lived cache for LLM proposal
+	// results. When set, identical requests (smart create, inbox
+	// triage) within the TTL window return the cached result instead
+	// of making a redundant LLM call. Nil disables caching.
+	ProposalCache *ProposalCache
 }
 
 // recordMetrics calls the OnInvocation hook if set.

@@ -276,6 +276,7 @@ func BuildResult(deps Deps) Result {
 		nlQueryCompiler = nlquery.New(nlquery.NewMockProvider())
 		nlConstraintCompiler = nlconstraint.New(nlconstraint.NewMockProvider())
 		nlCommandResolver = nlcommand.New(nlcommand.NewMockProvider(), nil)
+		nlCommandResolver.Cache = nlcommand.NewCache(5 * time.Minute)
 	case deps.EmbedOpenAIKey != "":
 		var opts []embed.OpenAIOption
 		if deps.EmbedModel != "" {
@@ -313,6 +314,7 @@ func BuildResult(deps Deps) Result {
 				{Name: "list_projects", Description: "List projects in a workspace", InputSchema: map[string]any{"type": "object", "properties": map[string]any{}}},
 			}
 			nlCommandResolver = nlcommand.New(nlcommand.NewWorkspaceProvider(wsResolver, extractWS), tools)
+			nlCommandResolver.Cache = nlcommand.NewCache(5 * time.Minute)
 		}
 	}
 	taskDeps := tasks.Deps{DB: deps.DB, Queries: deps.Queries, Embedder: embedClient, NlConstraint: nlConstraintCompiler, Storage: deps.Storage, Audit: auditRec}
@@ -333,11 +335,12 @@ func BuildResult(deps Deps) Result {
 		mockResolver := providers.NewMockResolver(providers.NewMockProvider(""))
 		budget := ai.BudgetReaderFunc(func(_ context.Context, _ uint32) (int64, error) { return 0, nil })
 		aiOrch = &ai.Orchestrator{
-			Resolver:     mockResolver,
-			Guard:        ai.NewCostGuard(budget, 0),
-			DB:           deps.DB,
-			Queries:      deps.Queries,
-			OnInvocation: obs.RecordAIInvocation,
+			Resolver:      mockResolver,
+			Guard:         ai.NewCostGuard(budget, 0),
+			DB:            deps.DB,
+			Queries:       deps.Queries,
+			OnInvocation:  obs.RecordAIInvocation,
+			ProposalCache: ai.NewProposalCache(10 * time.Minute),
 		}
 	case deps.Cipher != nil:
 		resolver := providers.NewWorkspaceResolver(deps.Queries, deps.Cipher)
@@ -348,12 +351,13 @@ func BuildResult(deps Deps) Result {
 			})
 		})
 		aiOrch = &ai.Orchestrator{
-			Resolver:     resolver,
-			Guard:        ai.NewCostGuard(budget, 0),
-			DB:           deps.DB,
-			Queries:      deps.Queries,
-			LogInvoke:    newDBInvocationLogger(deps.Queries, deps.AiInvocationPublisher),
-			OnInvocation: obs.RecordAIInvocation,
+			Resolver:      resolver,
+			Guard:         ai.NewCostGuard(budget, 0),
+			DB:            deps.DB,
+			Queries:       deps.Queries,
+			LogInvoke:     newDBInvocationLogger(deps.Queries, deps.AiInvocationPublisher),
+			OnInvocation:  obs.RecordAIInvocation,
+			ProposalCache: ai.NewProposalCache(10 * time.Minute),
 		}
 	}
 

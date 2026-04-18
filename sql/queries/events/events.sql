@@ -109,3 +109,12 @@ FROM v_task_timeline v
 WHERE v.workspace_id = ?
 ORDER BY v.occurred_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
+
+-- name: HasRecentEventsForWorkspace :one
+-- Check if any events have occurred in the workspace since the given timestamp.
+-- Used by the agent runtime pre-flight check to skip LLM calls when idle.
+SELECT EXISTS(
+  SELECT 1 FROM events
+  WHERE workspace_id = ? AND occurred_at > ?
+  LIMIT 1
+) AS has_events;

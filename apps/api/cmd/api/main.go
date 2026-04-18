@@ -222,6 +222,7 @@ func main() {
 				Resolver:     resolver,
 				Guard:        ai.NewCostGuard(budget, 0),
 				OnInvocation: obs.RecordAIInvocation,
+				PreFlight:    &ai.PreFlight{Queries: queries},
 			}
 			logger.Info("agent executor: workspace resolver")
 		} else {

@@ -30,6 +30,7 @@ var allowedTools = map[string]struct{}{
 	"list_tasks":        {},
 	"list_projects":     {},
 	"smart_create_task": {},
+	"transition_task":   {},
 }
 
 // ToolCall is the validated result of resolving a natural language
@@ -56,10 +57,13 @@ type Provider interface {
 }
 
 // Resolver turns prose into a ToolCall via a Provider plus server-side
-// validation against the allowed tools whitelist.
+// validation against the allowed tools whitelist. Cache is optional;
+// when non-nil, identical normalized prompts reuse the previous LLM
+// result within the TTL window.
 type Resolver struct {
 	Provider Provider
 	Tools    []ToolSpec
+	Cache    *Cache
 }
 
 // New constructs a Resolver. Panics if provider is nil.
@@ -78,6 +82,12 @@ func (r *Resolver) Resolve(ctx context.Context, prompt string) (*ToolCall, error
 	if trimmed == "" {
 		return nil, ErrUnresolvable
 	}
+
+	cacheKey := Normalize(trimmed)
+	if cached := r.Cache.Get(cacheKey); cached != nil {
+		return cached, nil
+	}
+
 	raw, err := r.Provider.ResolveCommand(ctx, trimmed, r.Tools)
 	if err != nil {
 		return nil, err
@@ -86,6 +96,8 @@ func (r *Resolver) Resolve(ctx context.Context, prompt string) (*ToolCall, error
 	if verr != nil {
 		return nil, ErrUnresolvable
 	}
+
+	r.Cache.Put(cacheKey, tc)
 	return tc, nil
 }
 

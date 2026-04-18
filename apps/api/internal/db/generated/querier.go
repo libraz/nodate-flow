@@ -7,6 +7,7 @@ package generated
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	types "github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 )
@@ -262,6 +263,10 @@ type Querier interface {
 	GetAiSettings(ctx context.Context, workspaceID uint32) (AiSetting, error)
 	// Fetch a single attachment by its public id within a workspace.
 	GetAttachmentByPublicID(ctx context.Context, arg GetAttachmentByPublicIDParams) (GetAttachmentByPublicIDRow, error)
+	// Return the most recent succeeded run time for a given agent.
+	// Used by the agent pre-flight check to determine if new events have
+	// occurred since the last run.
+	GetLastSuccessfulAgentRun(ctx context.Context, arg GetLastSuccessfulAgentRunParams) (time.Time, error)
 	// Fetch a single lens by its public_id.
 	GetLensByPublicID(ctx context.Context, arg GetLensByPublicIDParams) (GetLensByPublicIDRow, error)
 	// Fetch a single page by workspace_id + public_id, including parent page info.
@@ -288,6 +293,9 @@ type Querier interface {
 	GetWebhookSubscription(ctx context.Context, arg GetWebhookSubscriptionParams) (GetWebhookSubscriptionRow, error)
 	// Fetch a single widget by workspace_id + public_id.
 	GetWidgetByPublicID(ctx context.Context, arg GetWidgetByPublicIDParams) (GetWidgetByPublicIDRow, error)
+	// Check if any events have occurred in the workspace since the given timestamp.
+	// Used by the agent runtime pre-flight check to skip LLM calls when idle.
+	HasRecentEventsForWorkspace(ctx context.Context, arg HasRecentEventsForWorkspaceParams) (bool, error)
 	// Insert a hashed recovery code for a user.
 	InsertRecoveryCode(ctx context.Context, arg InsertRecoveryCodeParams) error
 	// Insert an inbound signal (manual or webhook).

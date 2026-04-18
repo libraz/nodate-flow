@@ -88,7 +88,7 @@ resources:
         status: 503
         message: "AI agent runtime is not configured"
         description: "Returned when a trigger endpoint is reached but neither the scheduler queue nor a synchronous runner is wired on this replica."
-        userAction: "Set NF_AGENT_RUNNER on the api deployment to enable the agent runtime."
+        userAction: "NF_AGENT_RUNNER defaults to 'orchestrator'. Set it to 'log' only for debugging. Ensure a provider is configured."
 
   model:
     breadcrumb: "AI > Model"

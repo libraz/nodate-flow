@@ -155,6 +155,14 @@ func (o *Orchestrator) ProposeSmartCreate(
 		return nil, ErrNoProvider
 	}
 
+	// ---- cache check ----
+	cacheKey := ProposalCacheKey(workspaceID, "smart_create", title, description)
+	if cached, ok := o.ProposalCache.Get(cacheKey); ok {
+		if sp, _ := cached.(*SmartProposal); sp != nil {
+			return sp, nil
+		}
+	}
+
 	// ---- embed the new task text ----
 	taskText := composeText(title, description)
 	queryVec, err := embedClient.Embed(ctx, taskText)
@@ -239,6 +247,7 @@ func (o *Orchestrator) ProposeSmartCreate(
 	if err := json.Unmarshal([]byte(payload), &proposal); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrParse, err)
 	}
+	o.ProposalCache.Put(cacheKey, &proposal)
 	return &proposal, nil
 }
 

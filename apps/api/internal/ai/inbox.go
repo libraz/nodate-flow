@@ -73,6 +73,14 @@ func (o *Orchestrator) ProposeInboxTriage(ctx context.Context, workspaceID uint3
 		prompt = buildInboxTriagePrompt(rows)
 	}
 
+	// ---- cache check (keyed on the prompt which includes item IDs) ----
+	cacheKey := ProposalCacheKey(workspaceID, "inbox_triage", prompt)
+	if cached, ok := o.ProposalCache.Get(cacheKey); ok {
+		if s, _ := cached.([]InboxTriageSuggestion); s != nil {
+			return s, nil
+		}
+	}
+
 	req := providers.Request{
 		System: proposeInboxTriageSystem,
 		Prompt: prompt,
@@ -111,6 +119,7 @@ func (o *Orchestrator) ProposeInboxTriage(ctx context.Context, workspaceID uint3
 			})
 		}
 	}
+	o.ProposalCache.Put(cacheKey, suggestions)
 	return suggestions, nil
 }
 

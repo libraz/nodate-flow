@@ -60,3 +60,13 @@ WHERE id = ?;
 DELETE FROM agent_runs
 WHERE status IN ('succeeded', 'failed')
   AND finished_at < ?;
+
+-- name: GetLastSuccessfulAgentRun :one
+-- Return the most recent succeeded run time for a given agent.
+-- Used by the agent pre-flight check to determine if new events have
+-- occurred since the last run.
+SELECT scheduled_at
+FROM agent_runs
+WHERE workspace_id = ? AND agent_id = ? AND status = 'succeeded'
+ORDER BY scheduled_at DESC
+LIMIT 1;

@@ -33,6 +33,11 @@ type AgentExecutor struct {
 	Guard        *CostGuard
 	Log          InvocationLogger
 	OnInvocation InvocationMetricsHook
+	// PreFlight is an optional check that skips the LLM call when
+	// no new events have occurred since the agent's last successful
+	// run. When nil the check is bypassed and every tick invokes the
+	// provider.
+	PreFlight *PreFlight
 }
 
 // ExecuteAgent implements the agentruntime.AgentExecutor contract.
@@ -52,6 +57,12 @@ func (e *AgentExecutor) ExecuteAgent(ctx context.Context, workspaceID, agentID u
 	}
 	if row.Paused {
 		return ErrAgentPaused
+	}
+	// Pre-flight: skip LLM call if no new events since last successful run.
+	if e.PreFlight != nil {
+		if skip, _ := e.PreFlight.ShouldSkip(ctx, workspaceID, agentID); skip {
+			return nil
+		}
 	}
 	if e.Guard != nil {
 		if err := e.Guard.Check(ctx, workspaceID); err != nil {

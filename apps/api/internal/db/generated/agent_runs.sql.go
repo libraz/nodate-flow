@@ -111,6 +111,29 @@ func (q *Queries) EnqueueAgentRun(ctx context.Context, arg EnqueueAgentRunParams
 	return result.LastInsertId()
 }
 
+const getLastSuccessfulAgentRun = `-- name: GetLastSuccessfulAgentRun :one
+SELECT scheduled_at
+FROM agent_runs
+WHERE workspace_id = ? AND agent_id = ? AND status = 'succeeded'
+ORDER BY scheduled_at DESC
+LIMIT 1
+`
+
+type GetLastSuccessfulAgentRunParams struct {
+	WorkspaceID uint32 `json:"-"`
+	AgentID     uint32 `json:"agentId"`
+}
+
+// Return the most recent succeeded run time for a given agent.
+// Used by the agent pre-flight check to determine if new events have
+// occurred since the last run.
+func (q *Queries) GetLastSuccessfulAgentRun(ctx context.Context, arg GetLastSuccessfulAgentRunParams) (time.Time, error) {
+	row := q.db.QueryRowContext(ctx, getLastSuccessfulAgentRun, arg.WorkspaceID, arg.AgentID)
+	var scheduled_at time.Time
+	err := row.Scan(&scheduled_at)
+	return scheduled_at, err
+}
+
 const markAgentRunClaimed = `-- name: MarkAgentRunClaimed :exec
 UPDATE agent_runs
 SET status = 'claimed',

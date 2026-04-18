@@ -86,6 +86,28 @@ func (q *Queries) CountAiSuggestionOutcomesForWorkspace(ctx context.Context, arg
 	return i, err
 }
 
+const hasRecentEventsForWorkspace = `-- name: HasRecentEventsForWorkspace :one
+SELECT EXISTS(
+  SELECT 1 FROM events
+  WHERE workspace_id = ? AND occurred_at > ?
+  LIMIT 1
+) AS has_events
+`
+
+type HasRecentEventsForWorkspaceParams struct {
+	WorkspaceID uint32    `json:"-"`
+	OccurredAt  time.Time `json:"occurredAt"`
+}
+
+// Check if any events have occurred in the workspace since the given timestamp.
+// Used by the agent runtime pre-flight check to skip LLM calls when idle.
+func (q *Queries) HasRecentEventsForWorkspace(ctx context.Context, arg HasRecentEventsForWorkspaceParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, hasRecentEventsForWorkspace, arg.WorkspaceID, arg.OccurredAt)
+	var has_events bool
+	err := row.Scan(&has_events)
+	return has_events, err
+}
+
 const listEventsForProject = `-- name: ListEventsForProject :many
 SELECT
   v.public_id,

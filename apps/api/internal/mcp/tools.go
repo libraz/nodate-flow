@@ -108,6 +108,17 @@ func registerTools(h *Handler) {
 		run: runUpdateTask,
 	})
 	h.register(tool{
+		name:          "transition_task",
+		description:   "Apply a state machine transition to a task. Valid transitions: start, block, unblock, submit, complete, reopen, cancel.",
+		requiredScope: "write:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"taskId":     stringSchema("Task public id (UUID v7)."),
+			"transition": stringSchema("Transition name: start | block | unblock | submit | complete | reopen | cancel."),
+			"reason":     stringSchema("Optional reason for the transition."),
+		}, []string{"taskId", "transition"}),
+		run: runTransitionTask,
+	})
+	h.register(tool{
 		name:          "add_comment",
 		description:   "Append a comment to a task.",
 		requiredScope: "write:workspace",
@@ -630,6 +641,140 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		Payload:     map[string]any{"taskId": pub.String(), "via": "mcp"},
 	})
 	return map[string]any{"id": pub.String()}, nil
+}
+
+// mcpKnownTransitions is the set of transitions accepted by the
+// transition_task MCP tool. Mirrors the HTTP handler's knownTransitions.
+var mcpKnownTransitions = map[string]struct{}{
+	"start": {}, "block": {}, "unblock": {}, "submit": {},
+	"complete": {}, "reopen": {}, "cancel": {},
+}
+
+// mcpNextState mirrors the v1 state machine from the HTTP handler layer.
+// Duplicated here to avoid importing the handler package from MCP.
+func mcpNextState(current generated.TasksDerivedState, transition string) (generated.TasksDerivedState, bool) {
+	switch current {
+	case generated.TasksDerivedStateOpen:
+		switch transition {
+		case "start":
+			return generated.TasksDerivedStateWaiting, true
+		case "cancel":
+			return generated.TasksDerivedStateCancelled, true
+		case "complete":
+			return generated.TasksDerivedStateDone, true
+		}
+	case generated.TasksDerivedStateWaiting:
+		switch transition {
+		case "submit":
+			return generated.TasksDerivedStateReview, true
+		case "block":
+			return generated.TasksDerivedStateOpen, true
+		case "cancel":
+			return generated.TasksDerivedStateCancelled, true
+		}
+	case generated.TasksDerivedStateReview:
+		switch transition {
+		case "complete":
+			return generated.TasksDerivedStateDone, true
+		case "reopen":
+			return generated.TasksDerivedStateWaiting, true
+		case "cancel":
+			return generated.TasksDerivedStateCancelled, true
+		}
+	case generated.TasksDerivedStateDone:
+		if transition == "reopen" {
+			return generated.TasksDerivedStateWaiting, true
+		}
+	case generated.TasksDerivedStateCancelled:
+		if transition == "reopen" {
+			return generated.TasksDerivedStateOpen, true
+		}
+	}
+	return "", false
+}
+
+func runTransitionTask(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	var in struct {
+		TaskID     string  `json:"taskId"`
+		Transition string  `json:"transition"`
+		Reason     *string `json:"reason"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	if _, ok := mcpKnownTransitions[in.Transition]; !ok {
+		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+	}
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+	taskInternal, pub, err := resolveTask(ctx, deps, s, in.TaskID)
+	if err != nil {
+		return nil, err
+	}
+	current, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
+		WorkspaceID: s.workspaceID,
+		PublicID:    pub,
+	})
+	if err != nil {
+		if stderrors.Is(err, sql.ErrNoRows) {
+			return nil, apierrors.New(apierrors.McpToolExecutionFailed)
+		}
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	nextDerived, ok := mcpNextState(current.DerivedState, in.Transition)
+	if !ok {
+		return nil, apierrors.New(apierrors.WsTaskTransitionRejected)
+	}
+
+	tx, err := deps.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	qtx := generated.New(tx)
+	if err := qtx.TransitionTaskState(ctx, generated.TransitionTaskStateParams{
+		DerivedState: nextDerived,
+		Column2:      string(nextDerived),
+		WorkspaceID:  s.workspaceID,
+		PublicID:     pub,
+	}); err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+
+	taskID64 := int64(taskInternal)
+	actor := int64(s.userID)
+	reason := ""
+	if in.Reason != nil {
+		reason = *in.Reason
+	}
+	if err := eventbus.Append(ctx, tx, eventbus.Event{
+		Type:        eventbus.TaskTransition(in.Transition),
+		WorkspaceID: s.workspaceID,
+		ActorUserID: &actor,
+		TaskID:      &taskID64,
+		Payload: map[string]any{
+			"taskId":     pub.String(),
+			"transition": in.Transition,
+			"fromState":  string(current.DerivedState),
+			"toState":    string(nextDerived),
+			"reason":     reason,
+			"via":        "mcp",
+		},
+	}); err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	return map[string]any{
+		"id":         pub.String(),
+		"fromState":  string(current.DerivedState),
+		"toState":    string(nextDerived),
+		"transition": in.Transition,
+	}, nil
 }
 
 func runAddComment(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
