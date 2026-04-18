@@ -537,6 +537,18 @@
       "granularity_standard": "Standard",
       "granularity_fine": "Fine"
     },
+    "smart_create": {
+      "assist_button": "AI Assist",
+      "suggesting": "Analyzing past tasks\u2026",
+      "assignee_section": "Suggested assignees",
+      "subtask_section": "Suggested subtasks",
+      "confidence": "Match: {value}%",
+      "reason": "Reason: {reason}",
+      "apply": "Apply suggestions and create",
+      "no_suggestions": "No suggestions available.",
+      "error": "Could not generate suggestions. You can still create the task manually.",
+      "no_provider": "No AI provider configured for this workspace."
+    },
     "attachments": {
       "title": "Attachments",
       "empty": "No attachments yet.",
