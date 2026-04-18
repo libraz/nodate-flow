@@ -1,0 +1,267 @@
+package ai
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+
+	"github.com/danielgtaylor/huma/v2"
+
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
+	apierrors "github.com/nodate-flow/nodate-flow/apps/api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/http/middleware"
+)
+
+// --- DTOs ---
+
+// AutoActionRuleBody is the public representation of a single auto-action
+// rule. The kind field identifies which rule this row configures.
+type AutoActionRuleBody struct {
+	Kind       string  `json:"kind"`
+	Enabled    bool    `json:"enabled"`
+	Confidence float64 `json:"confidence"`
+	IdleHours  int     `json:"idleHours"`
+}
+
+// GetAutoActionRulesInput is the path-only input for
+// GET /workspaces/{wsId}/ai/auto-action-rules.
+type GetAutoActionRulesInput struct {
+	WsID string `path:"wsId"`
+}
+
+// GetAutoActionRulesOutput is the response for
+// GET /workspaces/{wsId}/ai/auto-action-rules.
+type GetAutoActionRulesOutput struct {
+	Body struct {
+		Rules []AutoActionRuleBody `json:"rules"`
+	}
+}
+
+// PatchAutoActionRulesInput is the body for
+// PATCH /workspaces/{wsId}/ai/auto-action-rules.
+type PatchAutoActionRulesInput struct {
+	WsID string `path:"wsId"`
+	Body struct {
+		Rules []PatchAutoActionRuleItem `json:"rules"`
+	}
+}
+
+// PatchAutoActionRuleItem represents a partial update to a single
+// auto-action rule. Only non-nil fields are applied.
+type PatchAutoActionRuleItem struct {
+	Kind       string   `json:"kind" enum:"escalate_overdue,assign_owner,nudge_assignee,close_stale_review"`
+	Enabled    *bool    `json:"enabled,omitempty"`
+	Confidence *float64 `json:"confidence,omitempty" minimum:"0" maximum:"1"`
+	IdleHours  *int     `json:"idleHours,omitempty" minimum:"0" maximum:"8760"`
+}
+
+// PatchAutoActionRulesOutput is the response for
+// PATCH /workspaces/{wsId}/ai/auto-action-rules.
+type PatchAutoActionRulesOutput struct {
+	Body struct {
+		Rules []AutoActionRuleBody `json:"rules"`
+	}
+}
+
+// --- default seed values ---
+
+type ruleDefault struct {
+	kind       string
+	enabled    bool
+	confidence string
+	idleHours  uint32
+}
+
+var defaultRules = []ruleDefault{
+	{kind: "escalate_overdue", enabled: true, confidence: "0.85", idleHours: 0},
+	{kind: "assign_owner", enabled: true, confidence: "0.75", idleHours: 24},
+	{kind: "nudge_assignee", enabled: true, confidence: "0.70", idleHours: 72},
+	{kind: "close_stale_review", enabled: true, confidence: "0.70", idleHours: 120},
+}
+
+// --- handlers ---
+
+// GetAutoActionRules returns the workspace's auto-action rules. When no
+// rules exist for the workspace, the four default rows are seeded via
+// INSERT IGNORE (UpsertAutoActionRule) before returning them.
+func GetAutoActionRules(deps Deps) func(context.Context, *GetAutoActionRulesInput) (*GetAutoActionRulesOutput, error) {
+	return func(ctx context.Context, _ *GetAutoActionRulesInput) (*GetAutoActionRulesOutput, error) {
+		ws, ok := middleware.WorkspaceFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsWorkspaceNotFound)
+		}
+
+		rows, err := deps.Queries.ListAutoActionRulesForWorkspace(ctx, ws.ID)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
+		// Seed defaults when no rows exist yet.
+		if len(rows) == 0 {
+			if err := seedDefaultRules(ctx, deps.Queries, ws.ID); err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			rows, err = deps.Queries.ListAutoActionRulesForWorkspace(ctx, ws.ID)
+			if err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+		}
+
+		out := &GetAutoActionRulesOutput{}
+		out.Body.Rules = mapRuleRows(rows)
+		return out, nil
+	}
+}
+
+// PatchAutoActionRules applies partial updates to one or more auto-action
+// rules. For each item the current rule (or default) is read, patch fields
+// are merged, and the result is upserted. The full list of all 4 rules is
+// returned after the update.
+func PatchAutoActionRules(deps Deps) func(context.Context, *PatchAutoActionRulesInput) (*PatchAutoActionRulesOutput, error) {
+	return func(ctx context.Context, in *PatchAutoActionRulesInput) (*PatchAutoActionRulesOutput, error) {
+		ws, ok := middleware.WorkspaceFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsWorkspaceNotFound)
+		}
+
+		// Read current rules into a map keyed by kind.
+		rows, err := deps.Queries.ListAutoActionRulesForWorkspace(ctx, ws.ID)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		existing := make(map[string]generated.AutoActionRule, len(rows))
+		for _, r := range rows {
+			existing[r.Kind] = r
+		}
+
+		// Apply each patch item.
+		for _, item := range in.Body.Rules {
+			params := resolveRuleParams(ws.ID, item, existing)
+			if err := deps.Queries.UpsertAutoActionRule(ctx, params); err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+		}
+
+		// Re-read and ensure all 4 defaults exist.
+		rows, err = deps.Queries.ListAutoActionRulesForWorkspace(ctx, ws.ID)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if len(rows) < len(defaultRules) {
+			if err := seedDefaultRules(ctx, deps.Queries, ws.ID); err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			rows, err = deps.Queries.ListAutoActionRulesForWorkspace(ctx, ws.ID)
+			if err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+		}
+
+		out := &PatchAutoActionRulesOutput{}
+		out.Body.Rules = mapRuleRows(rows)
+		return out, nil
+	}
+}
+
+// RegisterAutoActionRules wires the auto-action rules GET and PATCH
+// endpoints. The caller MUST attach RequireWorkspaceMember +
+// RequireWorkspaceRole(Admin) to the underlying chi router.
+func RegisterAutoActionRules(api huma.API, deps Deps) {
+	huma.Register(api, huma.Operation{
+		OperationID: "ai-auto-action-rules-list",
+		Method:      http.MethodGet,
+		Path:        "/workspaces/{wsId}/ai/auto-action-rules",
+		Summary:     "List auto-action rules for a workspace",
+	}, GetAutoActionRules(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "ai-auto-action-rules-update",
+		Method:      http.MethodPatch,
+		Path:        "/workspaces/{wsId}/ai/auto-action-rules",
+		Summary:     "Patch auto-action rules for a workspace",
+	}, PatchAutoActionRules(deps))
+}
+
+// --- helpers ---
+
+// seedDefaultRules inserts the 4 default auto-action rules for a
+// workspace. The upsert uses INSERT IGNORE semantics so existing rows
+// are not overwritten.
+func seedDefaultRules(ctx context.Context, q *generated.Queries, wsID uint32) error {
+	for _, d := range defaultRules {
+		if err := q.UpsertAutoActionRule(ctx, generated.UpsertAutoActionRuleParams{
+			PublicID:    types.New(),
+			WorkspaceID: wsID,
+			Kind:        d.kind,
+			Enabled:     d.enabled,
+			Confidence:  d.confidence,
+			IdleHours:   d.idleHours,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// resolveRuleParams builds the upsert params for a single patch item by
+// merging the patch fields with the existing row or the default values.
+func resolveRuleParams(wsID uint32, item PatchAutoActionRuleItem, existing map[string]generated.AutoActionRule) generated.UpsertAutoActionRuleParams {
+	params := generated.UpsertAutoActionRuleParams{
+		PublicID:    types.New(),
+		WorkspaceID: wsID,
+		Kind:        item.Kind,
+	}
+
+	// Start from existing row or defaults.
+	if row, ok := existing[item.Kind]; ok {
+		params.PublicID = row.PublicID
+		params.Enabled = row.Enabled
+		params.Confidence = row.Confidence
+		params.IdleHours = row.IdleHours
+	} else {
+		def := findDefault(item.Kind)
+		params.Enabled = def.enabled
+		params.Confidence = def.confidence
+		params.IdleHours = def.idleHours
+	}
+
+	// Apply patch fields.
+	if item.Enabled != nil {
+		params.Enabled = *item.Enabled
+	}
+	if item.Confidence != nil {
+		params.Confidence = fmt.Sprintf("%.2f", *item.Confidence)
+	}
+	if item.IdleHours != nil {
+		params.IdleHours = uint32(*item.IdleHours)
+	}
+
+	return params
+}
+
+// findDefault returns the default seed values for a given rule kind.
+func findDefault(kind string) ruleDefault {
+	for _, d := range defaultRules {
+		if d.kind == kind {
+			return d
+		}
+	}
+	// Fallback — should never happen given enum validation.
+	return ruleDefault{kind: kind, enabled: true, confidence: "0.70", idleHours: 0}
+}
+
+// mapRuleRows converts a slice of AutoActionRule DB rows into the API
+// response DTOs, converting the DECIMAL confidence string to float64.
+func mapRuleRows(rows []generated.AutoActionRule) []AutoActionRuleBody {
+	out := make([]AutoActionRuleBody, len(rows))
+	for i, r := range rows {
+		out[i] = AutoActionRuleBody{
+			Kind:       r.Kind,
+			Enabled:    r.Enabled,
+			Confidence: parseThreshold(r.Confidence),
+			IdleHours:  int(r.IdleHours),
+		}
+	}
+	return out
+}

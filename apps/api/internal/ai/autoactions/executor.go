@@ -12,13 +12,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
 )
 
-// ExecutorConfig controls the background auto-action loop.
+// ExecutorConfig controls the background auto-action loop. These values
+// are used as global fallback defaults; per-workspace overrides are read
+// from the ai_settings table on each tick.
 type ExecutorConfig struct {
 	// Interval between evaluation passes. Zero disables the executor.
 	Interval time.Duration
@@ -28,6 +31,15 @@ type ExecutorConfig struct {
 	ConfidenceThreshold float32
 	// DryRun logs what would be applied without mutating the database.
 	DryRun bool
+}
+
+// wsAutoActionConfig holds the per-workspace auto-action overrides read
+// from the ai_settings table. When no row exists, the executor uses the
+// global ExecutorConfig defaults.
+type wsAutoActionConfig struct {
+	enabled         bool
+	intervalMinutes uint32
+	threshold       float32
 }
 
 // Executor is the background worker that turns auto-action proposals
@@ -94,8 +106,18 @@ type taskRow struct {
 	hasAssignee  bool
 }
 
+const wsAutoActionQuery = `
+SELECT w.id,
+       COALESCE(a.auto_action_enabled, TRUE)          AS aa_enabled,
+       COALESCE(a.auto_action_interval_minutes, 5)     AS aa_interval,
+       COALESCE(a.auto_action_threshold, 0.80)          AS aa_threshold
+FROM workspaces w
+LEFT JOIN ai_settings a ON a.workspace_id = w.id
+WHERE w.enabled = TRUE
+`
+
 func (e *Executor) tick(ctx context.Context) {
-	rows, err := e.DB.QueryContext(ctx, "SELECT id FROM workspaces WHERE enabled = TRUE")
+	rows, err := e.DB.QueryContext(ctx, wsAutoActionQuery)
 	if err != nil {
 		e.Logger.Error("auto-action executor: list workspaces", "err", err)
 		return
@@ -103,26 +125,117 @@ func (e *Executor) tick(ctx context.Context) {
 	defer rows.Close()
 	for rows.Next() {
 		var wsID uint32
-		if err := rows.Scan(&wsID); err != nil {
+		var wsCfg wsAutoActionConfig
+		if err := rows.Scan(&wsID, &wsCfg.enabled, &wsCfg.intervalMinutes, &wsCfg.threshold); err != nil {
 			e.Logger.Error("auto-action executor: scan workspace", "err", err)
 			continue
 		}
-		e.processWorkspace(ctx, wsID)
+		if !wsCfg.enabled {
+			continue
+		}
+		// Use per-workspace threshold if configured, otherwise global.
+		threshold := e.Config.ConfidenceThreshold
+		if wsCfg.threshold > 0 {
+			threshold = wsCfg.threshold
+		}
+		e.processWorkspaceWithThreshold(ctx, wsID, threshold)
 	}
 }
 
-const taskQuery = `
+// taskQuery is now built dynamically in processWorkspaceWithThreshold
+// using the minimum idle threshold from the workspace's rule config.
+
+// rulesQuery fetches the per-workspace rule overrides. When no rows
+// exist, the executor falls back to DefaultRuleConfigs().
+const rulesQuery = `
+SELECT kind, enabled, confidence, idle_hours
+FROM auto_action_rules
+WHERE workspace_id = ?
+`
+
+// loadRuleConfigs reads per-workspace rule overrides from the DB and
+// returns a merged []RuleConfig. Rules not present in the DB use the
+// hardcoded defaults.
+func (e *Executor) loadRuleConfigs(ctx context.Context, wsID uint32) []RuleConfig {
+	rows, err := e.DB.QueryContext(ctx, rulesQuery, wsID)
+	if err != nil {
+		e.Logger.Error("auto-action executor: load rules", "ws", wsID, "err", err)
+		return DefaultRuleConfigs()
+	}
+	defer rows.Close()
+
+	overrides := make(map[Kind]RuleConfig)
+	for rows.Next() {
+		var kind string
+		var rc RuleConfig
+		var confidence string
+		if err := rows.Scan(&kind, &rc.Enabled, &confidence, &rc.IdleHours); err != nil {
+			e.Logger.Error("auto-action executor: scan rule", "ws", wsID, "err", err)
+			continue
+		}
+		rc.Kind = Kind(kind)
+		if v, parseErr := strconv.ParseFloat(confidence, 32); parseErr == nil {
+			rc.Confidence = float32(v)
+		}
+		overrides[rc.Kind] = rc
+	}
+
+	if len(overrides) == 0 {
+		return DefaultRuleConfigs()
+	}
+
+	// Merge: use override if present, else default.
+	defaults := DefaultRuleConfigs()
+	result := make([]RuleConfig, len(defaults))
+	for i, d := range defaults {
+		if o, ok := overrides[d.Kind]; ok {
+			result[i] = o
+		} else {
+			result[i] = d
+		}
+	}
+	return result
+}
+
+func (e *Executor) processWorkspaceWithThreshold(ctx context.Context, wsID uint32, threshold float32) {
+	rules := e.loadRuleConfigs(ctx, wsID)
+
+	// Compute minimum idle hours across enabled rules to optimize the
+	// task query filter. If no idle-based rule is enabled, only overdue
+	// tasks need scanning.
+	minIdleHours := uint32(0)
+	hasIdleRule := false
+	for _, r := range rules {
+		if !r.Enabled || r.IdleHours == 0 {
+			continue
+		}
+		if !hasIdleRule || r.IdleHours < minIdleHours {
+			minIdleHours = r.IdleHours
+			hasIdleRule = true
+		}
+	}
+
+	// Build the task query with the dynamic idle threshold.
+	idleInterval := "1 DAY" // fallback
+	if hasIdleRule && minIdleHours > 0 {
+		idleInterval = fmt.Sprintf("%d HOUR", minIdleHours)
+	}
+	dynamicTaskQuery := fmt.Sprintf(`
 SELECT t.id, t.public_id, t.workspace_id, t.title, t.derived_state,
        t.priority, t.due_on, t.updated_at, t.created_at,
        EXISTS(SELECT 1 FROM task_actors ta WHERE ta.task_id = t.id AND ta.kind = 'assignee') AS has_assignee
 FROM tasks t
 WHERE t.workspace_id = ? AND t.enabled = TRUE
   AND t.derived_state NOT IN ('done', 'cancelled')
+  AND (
+    (t.due_on IS NOT NULL AND t.due_on < CURDATE())
+    OR
+    COALESCE(t.updated_at, t.created_at) < NOW() - INTERVAL %s
+  )
 LIMIT 200
-`
+`, idleInterval)
 
-func (e *Executor) processWorkspace(ctx context.Context, wsID uint32) {
-	rows, err := e.DB.QueryContext(ctx, taskQuery, wsID)
+	rows, err := e.DB.QueryContext(ctx, dynamicTaskQuery, wsID)
 	if err != nil {
 		e.Logger.Error("auto-action executor: list tasks", "ws", wsID, "err", err)
 		return
@@ -155,8 +268,8 @@ func (e *Executor) processWorkspace(ctx context.Context, wsID uint32) {
 			sig.HasDueOn = true
 			sig.DueOn = r.dueOn.Time
 		}
-		act := Evaluate(sig)
-		if act == nil || act.Confidence < e.Config.ConfidenceThreshold {
+		act := EvaluateWithConfig(sig, rules)
+		if act == nil || act.Confidence < threshold {
 			continue
 		}
 		e.applyAction(ctx, r, act)

@@ -22,13 +22,14 @@ var ErrUnresolvable = errors.New("nlcommand: unresolvable")
 // natural language commands. Tools that require complex multi-step
 // flows (e.g. apply_steps, propose_duplicates) are excluded.
 var allowedTools = map[string]struct{}{
-	"create_task":   {},
-	"update_task":   {},
-	"search_tasks":  {},
-	"propose_lens":  {},
-	"add_comment":   {},
-	"list_tasks":    {},
-	"list_projects": {},
+	"create_task":       {},
+	"update_task":       {},
+	"search_tasks":      {},
+	"propose_lens":      {},
+	"add_comment":       {},
+	"list_tasks":        {},
+	"list_projects":     {},
+	"smart_create_task": {},
 }
 
 // ToolCall is the validated result of resolving a natural language

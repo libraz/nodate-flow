@@ -1,0 +1,14 @@
+{
+  "smart_create": {
+    "assist_button": "AI アシスト",
+    "suggesting": "過去のタスクを分析中...",
+    "assignee_section": "担当者の提案",
+    "subtask_section": "サブタスクの提案",
+    "confidence": "一致度 {value}%",
+    "reason": "根拠: {reason}",
+    "apply": "提案を適用して作成",
+    "no_suggestions": "提案がありません。",
+    "error": "提案を生成できませんでした。手動でタスクを作成できます。",
+    "no_provider": "このワークスペースに AI プロバイダが設定されていません。"
+  }
+}

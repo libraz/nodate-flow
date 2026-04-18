@@ -97,6 +97,7 @@ function TasksSectionLayout(): ReactElement {
 
       <TaskCreateDialog
         projectId={projectId}
+        workspaceId={project.workspaceId}
         open={createOpen}
         onClose={() => {
           setCreateOpen(false);

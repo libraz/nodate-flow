@@ -25,10 +25,10 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/agentruntime"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/embed"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/nlcommand"
-	airelations "github.com/nodate-flow/nodate-flow/apps/api/internal/ai/relations"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/nlconstraint"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/nlquery"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/providers"
+	airelations "github.com/nodate-flow/nodate-flow/apps/api/internal/ai/relations"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth/sessionstore"
@@ -554,6 +554,10 @@ func BuildResult(deps Deps) Result {
 			Summary:     "Resolve a natural-language command into an MCP tool invocation",
 		}, aihandlers.ResolveCommand(aiDeps))
 
+		// AI-powered smart task creation (propose + apply).
+		smartCreateDeps := tasks.SmartCreateDeps{DB: deps.DB, Queries: deps.Queries, AI: aiOrch, Embedder: embedClient, Audit: auditRec}
+		tasks.RegisterSmartCreate(subAPI, smartCreateDeps)
+
 		// Realtime SSE stream for this workspace. Not a Huma
 		// operation because the response is a long-lived
 		// text/event-stream that never fits the request/response DTO
@@ -613,6 +617,8 @@ func BuildResult(deps Deps) Result {
 			Summary:     "Create a project in a workspace",
 		}, projects.Create(prjDeps))
 		aihandlers.RegisterProviders(subAPI, aiDeps)
+		aihandlers.RegisterAutoActionSettings(subAPI, aiDeps)
+		aihandlers.RegisterAutoActionRules(subAPI, aiDeps)
 		webhookDeps := webhooks.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
 		webhooks.Register(subAPI, webhookDeps)
 	})

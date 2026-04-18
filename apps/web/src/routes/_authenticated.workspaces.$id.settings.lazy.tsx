@@ -17,6 +17,7 @@ type SubNavKey =
   | 'mcp_tokens'
   | 'ai_providers'
   | 'ai_agents'
+  | 'auto_actions'
   | 'ai_activity'
   | 'weekly_digest'
   | 'audit_log';
@@ -28,6 +29,7 @@ interface SubNavItem {
     | '/workspaces/$id/settings/mcp-tokens'
     | '/workspaces/$id/settings/ai-providers'
     | '/workspaces/$id/settings/ai-agents'
+    | '/workspaces/$id/settings/auto-actions'
     | '/workspaces/$id/settings/ai-activity'
     | '/workspaces/$id/settings/weekly-digest'
     | '/workspaces/$id/settings/audit-log';
@@ -38,6 +40,7 @@ const SUB_NAV: readonly SubNavItem[] = [
   { key: 'mcp_tokens', to: '/workspaces/$id/settings/mcp-tokens' },
   { key: 'ai_providers', to: '/workspaces/$id/settings/ai-providers' },
   { key: 'ai_agents', to: '/workspaces/$id/settings/ai-agents' },
+  { key: 'auto_actions', to: '/workspaces/$id/settings/auto-actions' },
   { key: 'ai_activity', to: '/workspaces/$id/settings/ai-activity' },
   { key: 'weekly_digest', to: '/workspaces/$id/settings/weekly-digest' },
   { key: 'audit_log', to: '/workspaces/$id/settings/audit-log' },
@@ -50,6 +53,7 @@ function labelKeyFor(
   | 'nav.mcp_tokens'
   | 'nav.ai_providers'
   | 'nav.ai_agents'
+  | 'nav.auto_actions'
   | 'nav.ai_activity'
   | 'nav.weekly_digest'
   | 'nav.audit_log' {
@@ -62,6 +66,8 @@ function labelKeyFor(
       return 'nav.ai_providers';
     case 'ai_agents':
       return 'nav.ai_agents';
+    case 'auto_actions':
+      return 'nav.auto_actions';
     case 'ai_activity':
       return 'nav.ai_activity';
     case 'weekly_digest':

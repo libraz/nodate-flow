@@ -10,7 +10,8 @@
     "weekly_digest": "週次ダイジェスト",
     "audit_log": "監査ログ",
     "security": "セキュリティ",
-    "integrations": "連携"
+    "integrations": "連携",
+    "auto_actions": "自動アクション"
   },
   "integrations": {
     "title": "連携",
@@ -301,6 +302,68 @@
       "errors": {
         "create_failed": "トークンを作成できませんでした。もう一度お試しください。",
         "revoke_failed": "トークンを失効できませんでした。もう一度お試しください。"
+      }
+    },
+    "auto_actions": {
+      "title": "自動アクション",
+      "description": "このワークスペースで nodate-flow がタスクを自律的に管理する方法を設定します。有効にすると、システムが定期的にタスクを評価し、期限超過のエスカレーションやレビューの自動クローズなどを実行します。",
+      "enabled": {
+        "label": "自動アクションを有効にする",
+        "description": "タスクへの自動アクションの適用を許可します。"
+      },
+      "interval": {
+        "label": "評価間隔",
+        "description": "タスクを確認しアクションを適用する頻度です。",
+        "minutes": "{count}分",
+        "disabled": "無効（0分）"
+      },
+      "threshold": {
+        "label": "確度しきい値",
+        "description": "アクションを自動適用するために必要な最小確度スコアです。低い値はより多くのアクションを適用し、高い値はより保守的です。",
+        "low": "積極的",
+        "medium": "バランス",
+        "high": "保守的"
+      },
+      "save": "保存",
+      "saving": "保存中…",
+      "saved": "自動アクション設定を更新しました",
+      "rules": {
+        "title": "ルール設定",
+        "description": "個別のルールを有効/無効にし、感度を調整します。",
+        "column": {
+          "rule": "ルール",
+          "enabled": "有効",
+          "confidence": "確度",
+          "idle_hours": "放置閾値（時間）"
+        },
+        "escalate_overdue": {
+          "label": "期限超過エスカレーション",
+          "description": "タスクが期限を過ぎた場合に優先度を引き上げます。"
+        },
+        "assign_owner": {
+          "label": "オーナー割当",
+          "description": "担当者がおらず放置されたタスクにオーナーの割当を提案します。"
+        },
+        "nudge_assignee": {
+          "label": "担当者ナッジ",
+          "description": "進捗のない担当済みタスクに対してリマインドを提案します。"
+        },
+        "close_stale_review": {
+          "label": "レビュー自動クローズ",
+          "description": "活動のないまま放置されたレビューをクローズします。"
+        },
+        "idle_na": "N/A（期限ベース）",
+        "save": "ルールを保存",
+        "saving": "保存中…",
+        "saved": "ルール設定を更新しました",
+        "errors": {
+          "load_failed": "ルール設定を読み込めませんでした。",
+          "update_failed": "ルール設定を更新できませんでした。もう一度お試しください。"
+        }
+      },
+      "errors": {
+        "load_failed": "自動アクション設定を読み込めませんでした。",
+        "update_failed": "自動アクション設定を更新できませんでした。もう一度お試しください。"
       }
     }
   }

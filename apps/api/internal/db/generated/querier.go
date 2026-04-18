@@ -311,6 +311,14 @@ type Querier interface {
 	ListAiInvocationsForWorkspace(ctx context.Context, arg ListAiInvocationsForWorkspaceParams) ([]ListAiInvocationsForWorkspaceRow, error)
 	// List attachments on a task with uploader display fields.
 	ListAttachmentsForTask(ctx context.Context, arg ListAttachmentsForTaskParams) ([]ListAttachmentsForTaskRow, error)
+	// ============================================================================
+	// auto_action_rules queries
+	// Per-workspace auto-action rule configuration. Each row defines a single
+	// rule kind (e.g. auto-close, auto-archive) with its own enabled flag,
+	// confidence threshold, and idle-hours delay.
+	// ============================================================================
+	// List all auto-action rules for a workspace, ordered by kind.
+	ListAutoActionRulesForWorkspace(ctx context.Context, workspaceID uint32) ([]AutoActionRule, error)
 	// Return all task_embeddings for (workspace_id, model), excluding a given
 	// task_id (so self-similarity is filtered out). Cosine similarity is
 	// computed in Go because MySQL 9.1 Community does not expose
@@ -426,6 +434,15 @@ type Querier interface {
 	ListTasksForTimebox(ctx context.Context, arg ListTasksForTimeboxParams) ([]ListTasksForTimeboxRow, error)
 	// List tasks across an entire workspace via v_task_list.
 	ListTasksForWorkspace(ctx context.Context, arg ListTasksForWorkspaceParams) ([]ListTasksForWorkspaceRow, error)
+	// ============================================================================
+	// smart-create queries
+	// Support LLM-powered task creation: retrieve similar tasks with their
+	// assignees so the AI can infer who should handle new work.
+	// ============================================================================
+	// Fetch tasks and their primary assignees for a set of task IDs.
+	// Used after cosine-ranking candidate embeddings in Go to enrich the
+	// top-N similar tasks with assignee information for the LLM prompt.
+	ListTasksWithAssigneesForSmartCreate(ctx context.Context, arg ListTasksWithAssigneesForSmartCreateParams) ([]ListTasksWithAssigneesForSmartCreateRow, error)
 	// List enabled timeboxes for a workspace with creator info and pagination.
 	ListTimeboxesForWorkspace(ctx context.Context, arg ListTimeboxesForWorkspaceParams) ([]ListTimeboxesForWorkspaceRow, error)
 	// Ordered list of task.transition.* events for a single task,
@@ -445,6 +462,10 @@ type Querier interface {
 	ListWidgetsForWorkspace(ctx context.Context, arg ListWidgetsForWorkspaceParams) ([]ListWidgetsForWorkspaceRow, error)
 	// List members of a workspace via v_workspace_members.
 	ListWorkspaceMembers(ctx context.Context, arg ListWorkspaceMembersParams) ([]ListWorkspaceMembersRow, error)
+	// List workspace members with display names for the LLM assignee prompt.
+	// Uses v_workspace_members view. Returns all enabled members so the LLM
+	// can suggest from the full pool.
+	ListWorkspaceMembersForSmartCreate(ctx context.Context, workspaceID uint32) ([]ListWorkspaceMembersForSmartCreateRow, error)
 	// List workspaces a user belongs to.
 	ListWorkspacesForUser(ctx context.Context, arg ListWorkspacesForUserParams) ([]ListWorkspacesForUserRow, error)
 	// Append a redacted record of an LLM call. Both prompt_redacted and
@@ -592,6 +613,9 @@ type Querier interface {
 	// Create or update the ai_settings row for a workspace. The UNIQUE KEY on
 	// workspace_id makes this idempotent.
 	UpsertAiSettings(ctx context.Context, arg UpsertAiSettingsParams) error
+	// Insert or update a single auto-action rule for a workspace.
+	// The UNIQUE KEY on (workspace_id, kind) makes this idempotent.
+	UpsertAutoActionRule(ctx context.Context, arg UpsertAutoActionRuleParams) error
 	// ============================================================================
 	// task_embeddings queries (ADR 0003)
 	//

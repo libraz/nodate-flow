@@ -10,7 +10,8 @@
     "weekly_digest": "Weekly digest",
     "audit_log": "Audit log",
     "security": "Security",
-    "integrations": "Integrations"
+    "integrations": "Integrations",
+    "auto_actions": "Auto-actions"
   },
   "integrations": {
     "title": "Integrations",
@@ -301,6 +302,68 @@
       "errors": {
         "create_failed": "Could not create the token. Please try again.",
         "revoke_failed": "Could not revoke the token. Please try again."
+      }
+    },
+    "auto_actions": {
+      "title": "Auto-actions",
+      "description": "Configure how nodate-flow autonomously manages tasks in this workspace. When enabled, the system periodically evaluates tasks and applies actions like escalating overdue items or closing stale reviews.",
+      "enabled": {
+        "label": "Enable auto-actions",
+        "description": "Allow the system to automatically apply actions to tasks."
+      },
+      "interval": {
+        "label": "Evaluation interval",
+        "description": "How often the system checks tasks and applies actions.",
+        "minutes": "{count, plural, one {# minute} other {# minutes}}",
+        "disabled": "Disabled (0 minutes)"
+      },
+      "threshold": {
+        "label": "Confidence threshold",
+        "description": "Minimum confidence score required for an action to be applied automatically. Lower values apply more actions; higher values are more conservative.",
+        "low": "Aggressive",
+        "medium": "Balanced",
+        "high": "Conservative"
+      },
+      "save": "Save",
+      "saving": "Saving...",
+      "saved": "Auto-action settings updated",
+      "rules": {
+        "title": "Rule configuration",
+        "description": "Enable or disable individual rules and adjust their sensitivity.",
+        "column": {
+          "rule": "Rule",
+          "enabled": "Enabled",
+          "confidence": "Confidence",
+          "idle_hours": "Idle threshold (hours)"
+        },
+        "escalate_overdue": {
+          "label": "Escalate overdue",
+          "description": "Bumps priority when a task passes its due date."
+        },
+        "assign_owner": {
+          "label": "Assign owner",
+          "description": "Suggests an owner when a task has no assignee and has been idle."
+        },
+        "nudge_assignee": {
+          "label": "Nudge assignee",
+          "description": "Suggests a nudge when an assigned task has no progress."
+        },
+        "close_stale_review": {
+          "label": "Close stale review",
+          "description": "Closes reviews that have been open without activity."
+        },
+        "idle_na": "N/A (uses due date)",
+        "save": "Save rules",
+        "saving": "Saving...",
+        "saved": "Rule settings updated",
+        "errors": {
+          "load_failed": "Could not load rule settings.",
+          "update_failed": "Could not update rule settings. Please try again."
+        }
+      },
+      "errors": {
+        "load_failed": "Could not load auto-action settings.",
+        "update_failed": "Could not update auto-action settings. Please try again."
       }
     }
   }

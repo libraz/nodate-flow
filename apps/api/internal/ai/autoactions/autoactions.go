@@ -74,20 +74,43 @@ type Action struct {
 	Reason     string  `json:"reason"`
 }
 
-// Idle thresholds per rule. Tuned to match the "backlog grooming"
-// rhythm documented in the plan and match the day-granularity
-// comparisons used elsewhere in the AI package.
-const (
-	assignOwnerIdleThreshold   = 1 * 24 * time.Hour
-	nudgeAssigneeIdleThreshold = 3 * 24 * time.Hour
-	staleReviewIdleThreshold   = 5 * 24 * time.Hour
-)
+// RuleConfig holds the per-rule knobs read from the auto_action_rules
+// table. The executor passes a slice of these to EvaluateWithConfig.
+type RuleConfig struct {
+	Kind       Kind
+	Enabled    bool
+	Confidence float32
+	IdleHours  uint32 // 0 for rules that use due_on (escalate_overdue)
+}
+
+// DefaultRuleConfigs returns the built-in rule configurations that
+// reproduce the original hardcoded behaviour. Callers that have no
+// persisted per-workspace overrides should pass this slice to
+// EvaluateWithConfig (and Evaluate does exactly that).
+func DefaultRuleConfigs() []RuleConfig {
+	return []RuleConfig{
+		{Kind: KindEscalateOverdue, Enabled: true, Confidence: 0.85, IdleHours: 0},
+		{Kind: KindAssignOwner, Enabled: true, Confidence: 0.75, IdleHours: 24},
+		{Kind: KindNudgeAssignee, Enabled: true, Confidence: 0.70, IdleHours: 72},
+		{Kind: KindCloseStaleReview, Enabled: true, Confidence: 0.70, IdleHours: 120},
+	}
+}
 
 // Evaluate runs the deterministic auto-action rules against Signals
-// and returns an Action or nil. Rules are checked in descending order
-// of urgency; the first match wins so each task yields at most one
-// action.
+// using the built-in default thresholds and returns an Action or nil.
+// It is a convenience wrapper around EvaluateWithConfig that preserves
+// backward compatibility.
 func Evaluate(s Signals) *Action {
+	return EvaluateWithConfig(s, DefaultRuleConfigs())
+}
+
+// EvaluateWithConfig runs the auto-action rules against Signals using
+// the caller-supplied per-rule configuration and returns an Action or
+// nil. Rules are checked in urgency order (escalate_overdue,
+// assign_owner, nudge_assignee, close_stale_review); the first match
+// wins so each task yields at most one action. Disabled rules are
+// skipped entirely.
+func EvaluateWithConfig(s Signals, rules []RuleConfig) *Action {
 	if s.State == StateDone || s.State == StateCancelled {
 		return nil
 	}
@@ -97,44 +120,62 @@ func Evaluate(s Signals) *Action {
 	idle := s.Now.Sub(s.UpdatedAt)
 	overdue := s.HasDueOn && s.Now.After(s.DueOn)
 
-	// Most urgent: anything past its due date.
-	if overdue && (s.State == StateOpen || s.State == StateWaiting || s.State == StateReview) {
-		return &Action{
-			Kind:       KindEscalateOverdue,
-			Confidence: 0.85,
-			Reason:     "past due date — escalate to an owner",
-		}
+	// Build a lookup so iteration order is controlled by the
+	// urgency sequence below, not by the caller's slice order.
+	cfgByKind := make(map[Kind]RuleConfig, len(rules))
+	for _, r := range rules {
+		cfgByKind[r.Kind] = r
 	}
 
-	switch s.State {
-	case StateOpen:
-		// No owner and the task has been sitting there for a day:
-		// the first action is to give it one.
-		if !s.HasAssignee && idle >= assignOwnerIdleThreshold {
-			return &Action{
-				Kind:       KindAssignOwner,
-				Confidence: 0.75,
-				Reason:     fmt.Sprintf("open task has no assignee after %d day(s)", idleDays(idle)),
+	// Urgency order: most urgent first.
+	order := []Kind{
+		KindEscalateOverdue,
+		KindAssignOwner,
+		KindNudgeAssignee,
+		KindCloseStaleReview,
+	}
+
+	for _, kind := range order {
+		rc, ok := cfgByKind[kind]
+		if !ok || !rc.Enabled {
+			continue
+		}
+		threshold := time.Duration(rc.IdleHours) * time.Hour
+
+		switch kind {
+		case KindEscalateOverdue:
+			if overdue && (s.State == StateOpen || s.State == StateWaiting || s.State == StateReview) {
+				return &Action{
+					Kind:       KindEscalateOverdue,
+					Confidence: rc.Confidence,
+					Reason:     "past due date — escalate to an owner",
+				}
+			}
+		case KindAssignOwner:
+			if s.State == StateOpen && !s.HasAssignee && idle >= threshold {
+				return &Action{
+					Kind:       KindAssignOwner,
+					Confidence: rc.Confidence,
+					Reason:     fmt.Sprintf("open task has no assignee after %d day(s)", idleDays(idle)),
+				}
+			}
+		case KindNudgeAssignee:
+			if s.State == StateOpen && s.HasAssignee && idle >= threshold {
+				return &Action{
+					Kind:       KindNudgeAssignee,
+					Confidence: rc.Confidence,
+					Reason:     fmt.Sprintf("assigned but idle for %d day(s)", idleDays(idle)),
+				}
+			}
+		case KindCloseStaleReview:
+			if s.State == StateReview && idle >= threshold {
+				return &Action{
+					Kind:       KindCloseStaleReview,
+					Confidence: rc.Confidence,
+					Reason:     fmt.Sprintf("review has been open for %d day(s)", idleDays(idle)),
+				}
 			}
 		}
-		// Has an owner but no progress: nudge them.
-		if s.HasAssignee && idle >= nudgeAssigneeIdleThreshold {
-			return &Action{
-				Kind:       KindNudgeAssignee,
-				Confidence: 0.70,
-				Reason:     fmt.Sprintf("assigned but idle for %d day(s)", idleDays(idle)),
-			}
-		}
-	case StateReview:
-		if idle >= staleReviewIdleThreshold {
-			return &Action{
-				Kind:       KindCloseStaleReview,
-				Confidence: 0.70,
-				Reason:     fmt.Sprintf("review has been open for %d day(s)", idleDays(idle)),
-			}
-		}
-	case StateWaiting, StateDone, StateCancelled:
-		// No auto action for plain waiting or terminal states.
 	}
 	return nil
 }

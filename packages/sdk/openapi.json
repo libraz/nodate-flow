@@ -455,6 +455,99 @@
         ],
         "type": "object"
       },
+      "ApplySmartInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ApplySmartInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "assigneeUserIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": ["array", "null"]
+          },
+          "description": {
+            "maxLength": 50000,
+            "type": "string"
+          },
+          "priority": {
+            "format": "int32",
+            "maximum": 4,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "projectId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "subtasks": {
+            "items": {
+              "$ref": "#/components/schemas/ApplySmartSubtask"
+            },
+            "type": ["array", "null"]
+          },
+          "title": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["projectId", "title", "priority"],
+        "type": "object"
+      },
+      "ApplySmartOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ApplySmartOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "subtaskIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": ["array", "null"]
+          },
+          "taskId": {
+            "type": "string"
+          }
+        },
+        "required": ["taskId", "subtaskIds"],
+        "type": "object"
+      },
+      "ApplySmartSubtask": {
+        "additionalProperties": false,
+        "properties": {
+          "assigneeUserId": {
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 50000,
+            "type": "string"
+          },
+          "priority": {
+            "format": "int32",
+            "maximum": 4,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["title", "priority"],
+        "type": "object"
+      },
       "ArchiveInboxOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -489,6 +582,26 @@
         "required": ["ok"],
         "type": "object"
       },
+      "AssigneeSuggestion": {
+        "additionalProperties": false,
+        "properties": {
+          "confidence": {
+            "format": "double",
+            "type": "number"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "userPublicId": {
+            "type": "string"
+          }
+        },
+        "required": ["userPublicId", "displayName", "confidence", "reason"],
+        "type": "object"
+      },
       "AuthTokens": {
         "additionalProperties": false,
         "properties": {
@@ -513,6 +626,52 @@
           }
         },
         "required": ["accessToken", "expiresAt", "userId"],
+        "type": "object"
+      },
+      "AutoActionRuleBody": {
+        "additionalProperties": false,
+        "properties": {
+          "confidence": {
+            "format": "double",
+            "type": "number"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "idleHours": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "kind": {
+            "type": "string"
+          }
+        },
+        "required": ["kind", "enabled", "confidence", "idleHours"],
+        "type": "object"
+      },
+      "AutoActionSettingsBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AutoActionSettingsBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "intervalMinutes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "threshold": {
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": ["enabled", "intervalMinutes", "threshold"],
         "type": "object"
       },
       "ChangePasswordInputBody": {
@@ -1727,6 +1886,26 @@
           }
         },
         "required": ["title", "prompt"],
+        "type": "object"
+      },
+      "GetAutoActionRulesOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/GetAutoActionRulesOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/AutoActionRuleBody"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["rules"],
         "type": "object"
       },
       "GetOutputBody": {
@@ -3412,6 +3591,100 @@
         ],
         "type": "object"
       },
+      "PatchAutoActionRuleItem": {
+        "additionalProperties": false,
+        "properties": {
+          "confidence": {
+            "format": "double",
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "idleHours": {
+            "format": "int64",
+            "maximum": 8760,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "kind": {
+            "enum": ["escalate_overdue", "assign_owner", "nudge_assignee", "close_stale_review"],
+            "type": "string"
+          }
+        },
+        "required": ["kind"],
+        "type": "object"
+      },
+      "PatchAutoActionRulesInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PatchAutoActionRulesInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/PatchAutoActionRuleItem"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["rules"],
+        "type": "object"
+      },
+      "PatchAutoActionRulesOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PatchAutoActionRulesOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/AutoActionRuleBody"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["rules"],
+        "type": "object"
+      },
+      "PatchAutoActionSettingsInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PatchAutoActionSettingsInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "intervalMinutes": {
+            "format": "int64",
+            "maximum": 1440,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "threshold": {
+            "format": "double",
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
       "PatchMeInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -3804,6 +4077,33 @@
           }
         },
         "required": ["id", "userId", "email", "displayName", "role", "createdAt"],
+        "type": "object"
+      },
+      "ProposeSmartInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ProposeSmartInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 50000,
+            "type": "string"
+          },
+          "projectId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["projectId", "title"],
         "type": "object"
       },
       "Provider": {
@@ -4422,6 +4722,32 @@
         "required": ["id", "source", "kind", "receivedAt", "createdAt"],
         "type": "object"
       },
+      "SmartProposal": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/SmartProposal.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "subtasks": {
+            "items": {
+              "$ref": "#/components/schemas/SubtaskProposal"
+            },
+            "type": ["array", "null"]
+          },
+          "suggestedAssignees": {
+            "items": {
+              "$ref": "#/components/schemas/AssigneeSuggestion"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["suggestedAssignees", "subtasks"],
+        "type": "object"
+      },
       "SnoozeInboxInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -4495,6 +4821,25 @@
           }
         },
         "required": ["taskId", "title", "state", "transition", "confidence", "reason"],
+        "type": "object"
+      },
+      "SubtaskProposal": {
+        "additionalProperties": false,
+        "properties": {
+          "assignee": {
+            "$ref": "#/components/schemas/AssigneeSuggestion"
+          },
+          "description": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": ["title", "description", "priority"],
         "type": "object"
       },
       "SuggestionDTO": {
@@ -10426,6 +10771,174 @@
         "summary": "Manually trigger one run of an AI agent"
       }
     },
+    "/workspaces/{wsId}/ai/auto-action-rules": {
+      "get": {
+        "operationId": "ai-auto-action-rules-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetAutoActionRulesOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List auto-action rules for a workspace"
+      },
+      "patch": {
+        "operationId": "ai-auto-action-rules-update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchAutoActionRulesInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatchAutoActionRulesOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Patch auto-action rules for a workspace"
+      }
+    },
+    "/workspaces/{wsId}/ai/auto-action-settings": {
+      "get": {
+        "operationId": "ai-auto-action-settings-get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoActionSettingsBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get auto-action executor settings for a workspace"
+      },
+      "patch": {
+        "operationId": "ai-auto-action-settings-update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchAutoActionSettingsInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoActionSettingsBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Patch auto-action executor settings for a workspace"
+      }
+    },
     "/workspaces/{wsId}/ai/auto-actions": {
       "get": {
         "operationId": "ai-auto-actions",
@@ -13039,6 +13552,102 @@
           }
         },
         "summary": "List pending relation suggestions for a workspace"
+      }
+    },
+    "/workspaces/{wsId}/tasks/apply-smart": {
+      "post": {
+        "operationId": "tasks-apply-smart",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplySmartInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplySmartOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Apply AI proposal — create parent task with subtasks and assignees"
+      }
+    },
+    "/workspaces/{wsId}/tasks/propose-smart": {
+      "post": {
+        "operationId": "tasks-propose-smart",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposeSmartInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmartProposal"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "AI-powered subtask decomposition and assignee suggestions"
       }
     },
     "/workspaces/{wsId}/timeboxes": {

@@ -1197,6 +1197,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{wsId}/ai/auto-action-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List auto-action rules for a workspace */
+        get: operations["ai-auto-action-rules-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch auto-action rules for a workspace */
+        patch: operations["ai-auto-action-rules-update"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/ai/auto-action-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get auto-action executor settings for a workspace */
+        get: operations["ai-auto-action-settings-get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch auto-action executor settings for a workspace */
+        patch: operations["ai-auto-action-settings-update"];
+        trace?: never;
+    };
     "/workspaces/{wsId}/ai/auto-actions": {
         parameters: {
             query?: never;
@@ -1844,6 +1880,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{wsId}/tasks/apply-smart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply AI proposal — create parent task with subtasks and assignees */
+        post: operations["tasks-apply-smart"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/tasks/propose-smart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** AI-powered subtask decomposition and assignee suggestions */
+        post: operations["tasks-propose-smart"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{wsId}/timeboxes": {
         parameters: {
             query?: never;
@@ -2249,6 +2319,36 @@ export interface components {
             /** Format: float */
             score: number;
         };
+        ApplySmartInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            assigneeUserIds?: string[] | null;
+            description?: string;
+            /** Format: int32 */
+            priority: number;
+            projectId: string;
+            subtasks?: components["schemas"]["ApplySmartSubtask"][] | null;
+            title: string;
+        };
+        ApplySmartOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            subtaskIds: string[] | null;
+            taskId: string;
+        };
+        ApplySmartSubtask: {
+            assigneeUserId?: string;
+            description?: string;
+            /** Format: int32 */
+            priority: number;
+            title: string;
+        };
         ArchiveInboxOutputBody: {
             /**
              * Format: uri
@@ -2265,6 +2365,13 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        AssigneeSuggestion: {
+            /** Format: double */
+            confidence: number;
+            displayName: string;
+            reason: string;
+            userPublicId: string;
+        };
         AuthTokens: {
             /**
              * Format: uri
@@ -2279,6 +2386,26 @@ export interface components {
             expiresAt: number;
             /** @description User public id (UUID v7) */
             userId: string;
+        };
+        AutoActionRuleBody: {
+            /** Format: double */
+            confidence: number;
+            enabled: boolean;
+            /** Format: int64 */
+            idleHours: number;
+            kind: string;
+        };
+        AutoActionSettingsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            enabled: boolean;
+            /** Format: int64 */
+            intervalMinutes: number;
+            /** Format: double */
+            threshold: number;
         };
         ChangePasswordInputBody: {
             /**
@@ -2828,6 +2955,14 @@ export interface components {
             prompt: string;
             /** @description Title for the generated page */
             title: string;
+        };
+        GetAutoActionRulesOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            rules: components["schemas"]["AutoActionRuleBody"][] | null;
         };
         GetOutputBody: {
             /**
@@ -3512,6 +3647,43 @@ export interface components {
              */
             updatedAt: number;
         };
+        PatchAutoActionRuleItem: {
+            /** Format: double */
+            confidence?: number;
+            enabled?: boolean;
+            /** Format: int64 */
+            idleHours?: number;
+            /** @enum {string} */
+            kind: "escalate_overdue" | "assign_owner" | "nudge_assignee" | "close_stale_review";
+        };
+        PatchAutoActionRulesInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            rules: components["schemas"]["PatchAutoActionRuleItem"][] | null;
+        };
+        PatchAutoActionRulesOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            rules: components["schemas"]["AutoActionRuleBody"][] | null;
+        };
+        PatchAutoActionSettingsInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            enabled?: boolean;
+            /** Format: int64 */
+            intervalMinutes?: number;
+            /** Format: double */
+            threshold?: number;
+        };
         PatchMeInputBody: {
             /**
              * Format: uri
@@ -3678,6 +3850,16 @@ export interface components {
             id: string;
             role: string;
             userId: string;
+        };
+        ProposeSmartInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            description?: string;
+            projectId: string;
+            title: string;
         };
         Provider: {
             /**
@@ -3976,6 +4158,15 @@ export interface components {
             source: string;
             taskId?: string;
         };
+        SmartProposal: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            subtasks: components["schemas"]["SubtaskProposal"][] | null;
+            suggestedAssignees: components["schemas"]["AssigneeSuggestion"][] | null;
+        };
         SnoozeInboxInputBody: {
             /**
              * Format: uri
@@ -4008,6 +4199,12 @@ export interface components {
             taskId: string;
             title: string;
             transition: string;
+        };
+        SubtaskProposal: {
+            assignee?: components["schemas"]["AssigneeSuggestion"];
+            description: string;
+            priority: string;
+            title: string;
         };
         SuggestionDTO: {
             /**
@@ -7693,6 +7890,138 @@ export interface operations {
             };
         };
     };
+    "ai-auto-action-rules-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GetAutoActionRulesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-auto-action-rules-update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchAutoActionRulesInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatchAutoActionRulesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-auto-action-settings-get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoActionSettingsBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-auto-action-settings-update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchAutoActionSettingsInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoActionSettingsBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "ai-auto-actions": {
         parameters: {
             query?: never;
@@ -9428,6 +9757,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListForWorkspaceBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-apply-smart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplySmartInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplySmartOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-propose-smart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposeSmartInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmartProposal"];
                 };
             };
             /** @description Error */

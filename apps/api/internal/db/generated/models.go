@@ -1304,7 +1304,7 @@ type AiProvider struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
-// Per-workspace AI configuration (ADR 0003)
+// Per-workspace AI configuration (ADR 0003): embeddings, duplicates, auto-actions
 type AiSetting struct {
 	// Internal PK, never exposed
 	ID uint32 `json:"-"`
@@ -1317,9 +1317,15 @@ type AiSetting struct {
 	// Cosine sim >= this -> duplicate candidate
 	DuplicateThresholdHigh string `json:"duplicateThresholdHigh"`
 	// Cosine sim in [low, high) -> related task
-	DuplicateThresholdLow string       `json:"duplicateThresholdLow"`
-	UpdatedAt             sql.NullTime `json:"updatedAt"`
-	CreatedAt             time.Time    `json:"createdAt"`
+	DuplicateThresholdLow string `json:"duplicateThresholdLow"`
+	// Whether the auto-action executor runs for this workspace
+	AutoActionEnabled bool `json:"autoActionEnabled"`
+	// How often the executor evaluates tasks (minutes); 0 disables
+	AutoActionIntervalMinutes uint32 `json:"autoActionIntervalMinutes"`
+	// Minimum confidence score for an action to be applied automatically
+	AutoActionThreshold string       `json:"autoActionThreshold"`
+	UpdatedAt           sql.NullTime `json:"updatedAt"`
+	CreatedAt           time.Time    `json:"createdAt"`
 }
 
 // Task file attachments metadata
@@ -1384,6 +1390,26 @@ type AuditLog struct {
 	Notes sql.NullString `json:"notes"`
 	// Enabled flag
 	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
+// Per-workspace auto-action rule overrides (kind, confidence, idle threshold)
+type AutoActionRule struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, used in API responses
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Rule kind: escalate_overdue | assign_owner | nudge_assignee | close_stale_review
+	Kind string `json:"kind"`
+	// Whether this rule fires during evaluation
+	Enabled bool `json:"enabled"`
+	// Confidence score emitted when this rule fires (0.00-1.00)
+	Confidence string `json:"confidence"`
+	// Idle threshold in hours. 0 for rules that use due_on (escalate_overdue)
+	IdleHours uint32       `json:"idleHours"`
 	UpdatedAt sql.NullTime `json:"updatedAt"`
 	CreatedAt time.Time    `json:"createdAt"`
 }

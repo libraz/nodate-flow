@@ -15,6 +15,9 @@ SELECT
   embed_budget_cents_day,
   duplicate_threshold_high,
   duplicate_threshold_low,
+  auto_action_enabled,
+  auto_action_interval_minutes,
+  auto_action_threshold,
   updated_at,
   created_at
 FROM ai_settings
@@ -29,10 +32,16 @@ INSERT INTO ai_settings (
   embed_model,
   embed_budget_cents_day,
   duplicate_threshold_high,
-  duplicate_threshold_low
-) VALUES (?, ?, ?, ?, ?)
+  duplicate_threshold_low,
+  auto_action_enabled,
+  auto_action_interval_minutes,
+  auto_action_threshold
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 ON DUPLICATE KEY UPDATE
   embed_model = VALUES(embed_model),
   embed_budget_cents_day = VALUES(embed_budget_cents_day),
   duplicate_threshold_high = VALUES(duplicate_threshold_high),
-  duplicate_threshold_low = VALUES(duplicate_threshold_low);
+  duplicate_threshold_low = VALUES(duplicate_threshold_low),
+  auto_action_enabled = VALUES(auto_action_enabled),
+  auto_action_interval_minutes = VALUES(auto_action_interval_minutes),
+  auto_action_threshold = VALUES(auto_action_threshold);

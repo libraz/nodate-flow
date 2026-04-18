@@ -18,6 +18,9 @@ SELECT
   embed_budget_cents_day,
   duplicate_threshold_high,
   duplicate_threshold_low,
+  auto_action_enabled,
+  auto_action_interval_minutes,
+  auto_action_threshold,
   updated_at,
   created_at
 FROM ai_settings
@@ -43,6 +46,9 @@ func (q *Queries) GetAiSettings(ctx context.Context, workspaceID uint32) (AiSett
 		&i.EmbedBudgetCentsDay,
 		&i.DuplicateThresholdHigh,
 		&i.DuplicateThresholdLow,
+		&i.AutoActionEnabled,
+		&i.AutoActionIntervalMinutes,
+		&i.AutoActionThreshold,
 		&i.UpdatedAt,
 		&i.CreatedAt,
 	)
@@ -55,21 +61,30 @@ INSERT INTO ai_settings (
   embed_model,
   embed_budget_cents_day,
   duplicate_threshold_high,
-  duplicate_threshold_low
-) VALUES (?, ?, ?, ?, ?)
+  duplicate_threshold_low,
+  auto_action_enabled,
+  auto_action_interval_minutes,
+  auto_action_threshold
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 ON DUPLICATE KEY UPDATE
   embed_model = VALUES(embed_model),
   embed_budget_cents_day = VALUES(embed_budget_cents_day),
   duplicate_threshold_high = VALUES(duplicate_threshold_high),
-  duplicate_threshold_low = VALUES(duplicate_threshold_low)
+  duplicate_threshold_low = VALUES(duplicate_threshold_low),
+  auto_action_enabled = VALUES(auto_action_enabled),
+  auto_action_interval_minutes = VALUES(auto_action_interval_minutes),
+  auto_action_threshold = VALUES(auto_action_threshold)
 `
 
 type UpsertAiSettingsParams struct {
-	WorkspaceID            uint32 `json:"-"`
-	EmbedModel             string `json:"embedModel"`
-	EmbedBudgetCentsDay    uint32 `json:"embedBudgetCentsDay"`
-	DuplicateThresholdHigh string `json:"duplicateThresholdHigh"`
-	DuplicateThresholdLow  string `json:"duplicateThresholdLow"`
+	WorkspaceID               uint32 `json:"-"`
+	EmbedModel                string `json:"embedModel"`
+	EmbedBudgetCentsDay       uint32 `json:"embedBudgetCentsDay"`
+	DuplicateThresholdHigh    string `json:"duplicateThresholdHigh"`
+	DuplicateThresholdLow     string `json:"duplicateThresholdLow"`
+	AutoActionEnabled         bool   `json:"autoActionEnabled"`
+	AutoActionIntervalMinutes uint32 `json:"autoActionIntervalMinutes"`
+	AutoActionThreshold       string `json:"autoActionThreshold"`
 }
 
 // Create or update the ai_settings row for a workspace. The UNIQUE KEY on
@@ -81,6 +96,9 @@ func (q *Queries) UpsertAiSettings(ctx context.Context, arg UpsertAiSettingsPara
 		arg.EmbedBudgetCentsDay,
 		arg.DuplicateThresholdHigh,
 		arg.DuplicateThresholdLow,
+		arg.AutoActionEnabled,
+		arg.AutoActionIntervalMinutes,
+		arg.AutoActionThreshold,
 	)
 	return err
 }

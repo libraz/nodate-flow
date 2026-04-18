@@ -10,6 +10,7 @@ import (
 
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/embed"
@@ -298,6 +299,17 @@ func registerTools(h *Handler) {
 			},
 		}, []string{"contextDescription"}),
 		run: runGeneratePage,
+	})
+	h.register(tool{
+		name:          "smart_create_task",
+		description:   "Create a task with AI-suggested subtask breakdown and assignees based on past ticket patterns.",
+		requiredScope: "write:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"projectId":   stringSchema("Project public id (UUID v7)."),
+			"title":       stringSchema("Task title."),
+			"description": stringSchema("Optional task description for better AI analysis."),
+		}, []string{"projectId", "title"}),
+		run: runSmartCreateTask,
 	})
 }
 
@@ -1859,5 +1871,167 @@ func runGeneratePage(ctx context.Context, deps Deps, s *session, raw json.RawMes
 		"id":            pub.String(),
 		"isAiGenerated": isAI,
 	}, nil
+}
+
+// runSmartCreateTask creates a parent task and AI-suggested subtasks with
+// assignee recommendations. It delegates to the AI orchestrator's
+// ProposeSmartCreate method to get a structured proposal, then persists
+// the parent task and each subtask as child tasks. When the proposal
+// includes assignee suggestions, the tool adds task actors for valid
+// workspace members.
+func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	var in struct {
+		ProjectID   string `json:"projectId"`
+		Title       string `json:"title"`
+		Description string `json:"description"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	if in.Title == "" {
+		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+	}
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+	prjID, err := resolveProject(ctx, deps, s, in.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	if deps.AI == nil {
+		return nil, apierrors.New(apierrors.AiProviderNotConfigured)
+	}
+	if deps.Embedder == nil {
+		return nil, apierrors.New(apierrors.AiProviderNotConfigured)
+	}
+
+	// Call the smart create orchestrator. The embed provider satisfies
+	// ai.EmbedClient and *generated.Queries satisfies SmartCreateReader.
+	proposal, err := deps.AI.ProposeSmartCreate(
+		ctx, s.workspaceID,
+		in.Title, in.Description,
+		deps.Embedder.Provider, deps.Queries,
+	)
+	if err != nil {
+		return nil, mapAiError(err)
+	}
+
+	// Create the parent task.
+	parentPub := newPublicID()
+	desc := sql.NullString{String: in.Description, Valid: in.Description != ""}
+	parentID, err := deps.Queries.CreateTask(ctx, generated.CreateTaskParams{
+		PublicID:        parentPub,
+		WorkspaceID:     s.workspaceID,
+		ProjectID:       prjID,
+		ParentTaskID:    sql.NullInt32{},
+		CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
+		Title:           in.Title,
+		Description:     desc,
+		Priority:        0,
+	})
+	if err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	actor := int64(s.userID)
+	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		Type:        eventbus.TaskCreated,
+		WorkspaceID: s.workspaceID,
+		ActorUserID: &actor,
+		TaskID:      &parentID,
+		Payload: map[string]any{
+			"taskId": parentPub.String(),
+			"title":  in.Title,
+			"via":    "mcp:smart_create_task",
+		},
+	})
+
+	// Build the response.
+	subtaskIDs := make([]string, 0, len(proposal.Subtasks))
+	for _, st := range proposal.Subtasks {
+		if st.Title == "" {
+			continue
+		}
+		childPub := newPublicID()
+		childDesc := sql.NullString{String: st.Description, Valid: st.Description != ""}
+		childID, cerr := deps.Queries.CreateTask(ctx, generated.CreateTaskParams{
+			PublicID:        childPub,
+			WorkspaceID:     s.workspaceID,
+			ProjectID:       prjID,
+			ParentTaskID:    sql.NullInt32{Int32: int32(parentID), Valid: true},
+			CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
+			Title:           st.Title,
+			Description:     childDesc,
+			Priority:        smartCreatePriorityToInt(st.Priority),
+		})
+		if cerr != nil {
+			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, cerr)
+		}
+		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+			Type:        eventbus.TaskCreated,
+			WorkspaceID: s.workspaceID,
+			ActorUserID: &actor,
+			TaskID:      &childID,
+			Payload: map[string]any{
+				"taskId":       childPub.String(),
+				"title":        st.Title,
+				"parentTaskId": parentPub.String(),
+				"via":          "mcp:smart_create_task",
+			},
+		})
+		subtaskIDs = append(subtaskIDs, childPub.String())
+	}
+
+	// Build assignee suggestions for the response (we do not auto-assign
+	// because the caller should review and confirm the suggestions).
+	assignees := make([]map[string]any, 0, len(proposal.SuggestedAssignees))
+	for _, a := range proposal.SuggestedAssignees {
+		assignees = append(assignees, map[string]any{
+			"userPublicId": a.UserPublicID,
+			"displayName":  a.DisplayName,
+			"confidence":   a.Confidence,
+			"reason":       a.Reason,
+		})
+	}
+
+	subtaskSuggestions := make([]map[string]any, 0, len(proposal.Subtasks))
+	for i, st := range proposal.Subtasks {
+		m := map[string]any{
+			"title":    st.Title,
+			"priority": st.Priority,
+		}
+		if i < len(subtaskIDs) {
+			m["id"] = subtaskIDs[i]
+		}
+		if st.Assignee != nil {
+			m["suggestedAssignee"] = map[string]any{
+				"userPublicId": st.Assignee.UserPublicID,
+				"displayName":  st.Assignee.DisplayName,
+				"confidence":   st.Assignee.Confidence,
+				"reason":       st.Assignee.Reason,
+			}
+		}
+		subtaskSuggestions = append(subtaskSuggestions, m)
+	}
+
+	return map[string]any{
+		"id":                 parentPub.String(),
+		"subtasks":           subtaskSuggestions,
+		"suggestedAssignees": assignees,
+	}, nil
+}
+
+// smartCreatePriorityToInt maps the LLM priority string to the DB int32
+// value used in the tasks table. Unknown values default to 0 (none).
+func smartCreatePriorityToInt(s string) int32 {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "low":
+		return 1
+	case "medium":
+		return 2
+	case "high":
+		return 3
+	default:
+		return 0
+	}
 }
 

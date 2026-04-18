@@ -1,0 +1,14 @@
+{
+  "smart_create": {
+    "assist_button": "AI Assist",
+    "suggesting": "Analyzing past tasks...",
+    "assignee_section": "Suggested assignees",
+    "subtask_section": "Suggested subtasks",
+    "confidence": "{value}% match",
+    "reason": "Based on: {reason}",
+    "apply": "Create with suggestions",
+    "no_suggestions": "No suggestions available.",
+    "error": "Could not generate suggestions. You can still create the task manually.",
+    "no_provider": "AI provider not configured for this workspace."
+  }
+}

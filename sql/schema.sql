@@ -12,6 +12,7 @@ DROP TABLE IF EXISTS `ai_providers`;
 DROP TABLE IF EXISTS `ai_settings`;
 DROP TABLE IF EXISTS `attachments`;
 DROP TABLE IF EXISTS `audit_logs`;
+DROP TABLE IF EXISTS `auto_action_rules`;
 DROP TABLE IF EXISTS `comments`;
 DROP TABLE IF EXISTS `dashboard_widgets`;
 DROP TABLE IF EXISTS `events`;
@@ -237,9 +238,10 @@ CREATE TABLE ai_providers (
 -- >>> ai_settings.sql
 -- ====================================
 -- ai_settings
--- Per-workspace AI configuration (ADR 0003).
--- Holds duplicate-detection thresholds and the embed-budget bucket that
--- the CostGuard tracks separately from the LLM chat budget.
+-- Per-workspace AI configuration (ADR 0003): embeddings, duplicates, auto-actions.
+-- Holds duplicate-detection thresholds, the embed-budget bucket that
+-- the CostGuard tracks separately from the LLM chat budget, and
+-- auto-action executor settings.
 --
 -- Settings are not user-facing entities, so no public_id: the row is
 -- addressed by its parent workspace.
@@ -253,13 +255,17 @@ CREATE TABLE ai_settings (
   duplicate_threshold_high DECIMAL(4,3) NOT NULL DEFAULT 0.870 COMMENT 'Cosine sim >= this -> duplicate candidate',
   duplicate_threshold_low  DECIMAL(4,3) NOT NULL DEFAULT 0.750 COMMENT 'Cosine sim in [low, high) -> related task',
 
+  auto_action_enabled          BOOLEAN      NOT NULL DEFAULT TRUE  COMMENT 'Whether the auto-action executor runs for this workspace',
+  auto_action_interval_minutes INT UNSIGNED NOT NULL DEFAULT 5     COMMENT 'How often the executor evaluates tasks (minutes); 0 disables',
+  auto_action_threshold        DECIMAL(3,2) NOT NULL DEFAULT 0.80  COMMENT 'Minimum confidence score for an action to be applied automatically',
+
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   UNIQUE KEY uniq_ai_settings_workspace (workspace_id),
 
   CONSTRAINT fk_ai_settings_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Per-workspace AI configuration (ADR 0003)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Per-workspace AI configuration (ADR 0003): embeddings, duplicates, auto-actions';
 
 -- >>> attachments.sql
 -- ====================================
@@ -329,6 +335,33 @@ CREATE TABLE audit_logs (
   CONSTRAINT fk_audit_logs_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_audit_logs_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Workspace audit log';
+
+-- >>> auto_action_rules.sql
+-- ====================================
+-- auto_action_rules
+-- Per-workspace auto-action rule configuration.
+-- Each row overrides the default confidence and idle threshold for a
+-- specific rule kind (e.g. escalate_overdue, assign_owner).
+-- The auto-action executor reads these rules together with ai_settings
+-- to decide which actions to propose or apply automatically.
+-- ====================================
+CREATE TABLE auto_action_rules (
+  id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id     BINARY(16)   NOT NULL COMMENT 'UUID v7, used in API responses',
+  workspace_id  INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  kind          VARCHAR(64)  NOT NULL COMMENT 'Rule kind: escalate_overdue | assign_owner | nudge_assignee | close_stale_review',
+  enabled       BOOLEAN      NOT NULL DEFAULT TRUE COMMENT 'Whether this rule fires during evaluation',
+  confidence    DECIMAL(3,2) NOT NULL COMMENT 'Confidence score emitted when this rule fires (0.00-1.00)',
+  idle_hours    INT UNSIGNED NOT NULL COMMENT 'Idle threshold in hours. 0 for rules that use due_on (escalate_overdue)',
+
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  UNIQUE KEY uniq_auto_action_rules_public_id (public_id),
+  UNIQUE KEY uniq_auto_action_rules_ws_kind (workspace_id, kind),
+
+  CONSTRAINT fk_auto_action_rules_ws FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Per-workspace auto-action rule overrides (kind, confidence, idle threshold)';
 
 -- >>> comments.sql
 -- ====================================

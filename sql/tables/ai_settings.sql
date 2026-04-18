@@ -1,8 +1,9 @@
 -- ====================================
 -- ai_settings
--- Per-workspace AI configuration (ADR 0003).
--- Holds duplicate-detection thresholds and the embed-budget bucket that
--- the CostGuard tracks separately from the LLM chat budget.
+-- Per-workspace AI configuration (ADR 0003): embeddings, duplicates, auto-actions.
+-- Holds duplicate-detection thresholds, the embed-budget bucket that
+-- the CostGuard tracks separately from the LLM chat budget, and
+-- auto-action executor settings.
 --
 -- Settings are not user-facing entities, so no public_id: the row is
 -- addressed by its parent workspace.
@@ -16,10 +17,14 @@ CREATE TABLE ai_settings (
   duplicate_threshold_high DECIMAL(4,3) NOT NULL DEFAULT 0.870 COMMENT 'Cosine sim >= this -> duplicate candidate',
   duplicate_threshold_low  DECIMAL(4,3) NOT NULL DEFAULT 0.750 COMMENT 'Cosine sim in [low, high) -> related task',
 
+  auto_action_enabled          BOOLEAN      NOT NULL DEFAULT TRUE  COMMENT 'Whether the auto-action executor runs for this workspace',
+  auto_action_interval_minutes INT UNSIGNED NOT NULL DEFAULT 5     COMMENT 'How often the executor evaluates tasks (minutes); 0 disables',
+  auto_action_threshold        DECIMAL(3,2) NOT NULL DEFAULT 0.80  COMMENT 'Minimum confidence score for an action to be applied automatically',
+
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   UNIQUE KEY uniq_ai_settings_workspace (workspace_id),
 
   CONSTRAINT fk_ai_settings_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Per-workspace AI configuration (ADR 0003)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Per-workspace AI configuration (ADR 0003): embeddings, duplicates, auto-actions';
