@@ -9,7 +9,10 @@ import CommandPalette from './command-palette';
 import styles from './glass-dock.module.css';
 
 type DockActionKey = 'new_task' | 'quick_capture' | 'ai_assist';
-type DockActionTarget = { kind: 'navigate'; href: string } | { kind: 'palette' };
+type DockActionTarget =
+  | { kind: 'navigate'; href: string }
+  | { kind: 'palette' }
+  | { kind: 'palette_command' };
 
 interface DockAction {
   key: DockActionKey;
@@ -17,19 +20,14 @@ interface DockAction {
   target: DockActionTarget;
 }
 
-// Dock actions. `new_task` and `ai_assist` don't have dedicated dialogs
-// yet — they open the command palette so the user can jump directly to
-// a project / task / workspace instead of being bounced to a random
-// landing page. `quick_capture` still deep-links to the inbox, which is
-// where the capture surface lives.
-// `quick_capture` used to navigate to /inbox, but the inbox is a
-// signal-backed view with no capture form — a pure dead end. Until a
-// real quick-capture surface lands it opens the command palette so the
-// user can at least search or jump to "Create new task".
+// Each dock button has a distinct behavior:
+// - `new_task` (Plus): opens the command palette (search / create actions)
+// - `quick_capture` (Zap): opens the command palette for quick search
+// - `ai_assist` (Sparkles): opens the palette in NL command mode ("> ")
 const ACTIONS: readonly DockAction[] = [
   { key: 'new_task', icon: Plus, target: { kind: 'palette' } },
   { key: 'quick_capture', icon: Zap, target: { kind: 'palette' } },
-  { key: 'ai_assist', icon: Sparkles, target: { kind: 'palette' } },
+  { key: 'ai_assist', icon: Sparkles, target: { kind: 'palette_command' } },
 ];
 
 /** Event name other components can dispatch to open the palette. */
@@ -52,6 +50,7 @@ export default function GlassDock(): ReactElement {
   const { t } = useTranslation('common');
   const navigate = useNavigate();
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [paletteCommandMode, setPaletteCommandMode] = useState(false);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent): void => {
@@ -73,6 +72,7 @@ export default function GlassDock(): ReactElement {
 
   const handleClose = (): void => {
     setPaletteOpen(false);
+    setPaletteCommandMode(false);
   };
 
   return (
@@ -81,7 +81,13 @@ export default function GlassDock(): ReactElement {
         {ACTIONS.map((action) => {
           const label = t(actionLabelKey(action.key));
           const handleClick = (): void => {
+            if (action.target.kind === 'palette_command') {
+              setPaletteCommandMode(true);
+              setPaletteOpen(true);
+              return;
+            }
             if (action.target.kind === 'palette') {
+              setPaletteCommandMode(false);
               setPaletteOpen(true);
               return;
             }
@@ -103,7 +109,11 @@ export default function GlassDock(): ReactElement {
         <span className={styles.divider} aria-hidden="true" />
         <span className={styles.shortcut}>Cmd+K</span>
       </div>
-      <CommandPalette open={paletteOpen} onClose={handleClose} />
+      <CommandPalette
+        open={paletteOpen}
+        onClose={handleClose}
+        initialCommandMode={paletteCommandMode}
+      />
     </>
   );
 }

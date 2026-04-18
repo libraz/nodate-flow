@@ -85,7 +85,8 @@
       "confirm_low": "Confirm: {tool}?",
       "command_hint": "Type > for AI commands",
       "no_workspace": "Select a workspace first to use AI commands.",
-      "error": "Could not resolve the command. Please try again."
+      "error": "Could not resolve the command. Please try again.",
+      "initial_command": "> "
     }
   },
   "theme": {
@@ -143,6 +144,10 @@
     "empty": "No scheduled tasks this month.",
     "noDue": "No due date",
     "more": "+{count} more",
+    "click_to_add": "Click to add task",
+    "drag_to_reschedule": "Drag to reschedule",
+    "reschedule_success": "Due date updated",
+    "reschedule_error": "Failed to update due date",
     "weekday": {
       "mon": "Mon",
       "tue": "Tue",
@@ -320,6 +325,10 @@
     "title": "Tasks",
     "new": "New task",
     "empty": "No tasks yet. Create your first one to get started.",
+    "title_placeholder": "Task title…",
+    "select_project": "Select project",
+    "create_error": "Failed to create task",
+    "created": "Task created",
     "views": {
       "board": "Board",
       "list": "List",
@@ -343,6 +352,7 @@
       "description": "Description",
       "priority": "Priority",
       "assignee": "Assignee",
+      "start": "Start date",
       "due": "Due date",
       "submit": "Create",
       "cancel": "Cancel"

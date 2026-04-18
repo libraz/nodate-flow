@@ -1,23 +1,40 @@
 /**
- * /calendar — monthly grid of cross-workspace tasks with a due date.
+ * /calendar — monthly grid of workspace tasks with a due date.
  *
- * Backed by `GET /me/tasks` (the same aggregate endpoint as /today).
+ * Fetches tasks from all user workspaces via `GET /tasks?workspaceId=...`.
  * Renders a 7-column grid for the current month with up to N tasks
- * per cell; overflow collapses to "+N more" but each cell stays
- * scrollable so the user can still drill in. Read-only — no drag.
+ * per cell; overflow collapses to "+N more". Supports drag-and-drop
+ * to reschedule tasks and clicking a date to open a quick-create form.
  */
 
 import type { components } from '@nodate-flow/sdk';
 import Button from '@nodate-flow/ui/primitives/button';
-import { useSuspenseQuery } from '@tanstack/react-query';
+import Dialog from '@nodate-flow/ui/primitives/dialog';
+import FormField from '@nodate-flow/ui/primitives/form-field';
+import Input from '@nodate-flow/ui/primitives/input';
+import Select from '@nodate-flow/ui/primitives/select';
+import Textarea from '@nodate-flow/ui/primitives/textarea';
+import { toaster } from '@nodate-flow/ui/primitives/toast';
+import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { type ReactElement, useMemo, useState } from 'react';
+import {
+  type DragEvent,
+  type FormEvent,
+  type ReactElement,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { Project } from '../features/projects/api';
+import type { TaskPriority } from '../features/tasks/api';
+import { useWorkspacesQuery } from '../features/workspaces/api';
 import { sdk } from '../lib/sdk';
 
-type AssignedTask = components['schemas']['MyTaskListItem'];
+type CalendarTask = components['schemas']['TaskListItem'] & { workspaceName?: string };
 
 const WEEKDAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
 
@@ -27,6 +44,16 @@ const STATE_COLOR: Record<string, string> = {
   review: 'var(--color-accent, #9b59b6)',
   done: 'var(--color-success, #27ae60)',
   cancelled: 'var(--color-muted, #95a5a6)',
+};
+
+const PRIORITIES: readonly TaskPriority[] = [0, 1, 2, 3, 4];
+
+const PRIORITY_KEY: Record<TaskPriority, string> = {
+  0: 'tasks.priority.none',
+  1: 'tasks.priority.low',
+  2: 'tasks.priority.medium',
+  3: 'tasks.priority.high',
+  4: 'tasks.priority.urgent',
 };
 
 /** Local-time YYYY-MM-DD for the start of `d`. */
@@ -57,7 +84,6 @@ function buildMonthGrid(year: number, monthIndex: number): MonthCell[] {
   const first = new Date(year, monthIndex, 1);
   const lead = mondayBasedDow(first);
   const cells: MonthCell[] = [];
-  // Leading days from the previous month.
   for (let i = lead; i > 0; i--) {
     const d = new Date(year, monthIndex, 1 - i);
     cells.push({ date: d, key: dateKey(d), inMonth: false });
@@ -67,7 +93,6 @@ function buildMonthGrid(year: number, monthIndex: number): MonthCell[] {
     const d = new Date(year, monthIndex, day);
     cells.push({ date: d, key: dateKey(d), inMonth: true });
   }
-  // Trailing days to fill out a 6×7 grid (42 cells max).
   while (cells.length % 7 !== 0) {
     const last = cells[cells.length - 1];
     if (!last) break;
@@ -78,32 +103,310 @@ function buildMonthGrid(year: number, monthIndex: number): MonthCell[] {
   return cells;
 }
 
+// ---------------------------------------------------------------------------
+// Quick-create dialog (extracted for readability)
+// ---------------------------------------------------------------------------
+
+interface QuickCreateDialogProps {
+  open: boolean;
+  dateLabel: string;
+  dueOn: string;
+  projects: Project[];
+  onClose: () => void;
+  onCreated: () => void;
+}
+
+function QuickCreateDialog({
+  open,
+  dateLabel,
+  dueOn,
+  projects,
+  onClose,
+  onCreated,
+}: QuickCreateDialogProps): ReactElement {
+  const { t } = useTranslation('common');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [priority, setPriority] = useState<TaskPriority>(2);
+  const [projectId, setProjectId] = useState<string>(projects[0]?.id ?? '');
+  const [startOn, setStartOn] = useState('');
+  const [endOn, setEndOn] = useState(dueOn);
+
+  const createMut = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await sdk.POST('/tasks', {
+        body: {
+          projectId,
+          title: title.trim(),
+          ...(description.trim() ? { description: description.trim() } : {}),
+          ...(startOn ? { startOn } : {}),
+          dueOn: endOn || dueOn,
+          priority,
+          visibility: 'project',
+        },
+      });
+      if (error || !data) throw new Error('Failed to create');
+      return data;
+    },
+    onSuccess: () => {
+      toaster.show({ tone: 'success', message: t('tasks.created') });
+      setTitle('');
+      setDescription('');
+      setPriority(2);
+      setStartOn('');
+      setEndOn('');
+      onCreated();
+    },
+    onError: () => {
+      toaster.show({ tone: 'danger', message: t('tasks.create_error') });
+    },
+  });
+
+  const handleSubmit = (ev: FormEvent<HTMLFormElement>): void => {
+    ev.preventDefault();
+    if (!title.trim() || !projectId) return;
+    createMut.mutate();
+  };
+
+  const handleClose = (): void => {
+    if (createMut.isPending) return;
+    setTitle('');
+    setDescription('');
+    setPriority(2);
+    setStartOn('');
+    setEndOn('');
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onClose={handleClose} title={`${t('tasks.new')} — ${dateLabel}`}>
+      <form
+        onSubmit={handleSubmit}
+        style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', minInlineSize: '20rem' }}
+      >
+        <FormField label={t('tasks.form.title')}>
+          {(control) => (
+            <Input
+              {...control}
+              value={title}
+              onChange={(e) => setTitle(e.currentTarget.value)}
+              placeholder={t('tasks.title_placeholder')}
+              autoFocus
+            />
+          )}
+        </FormField>
+
+        <FormField label={t('tasks.form.description')}>
+          {(control) => (
+            <Textarea
+              {...control}
+              value={description}
+              onChange={(e) => setDescription(e.currentTarget.value)}
+              rows={2}
+            />
+          )}
+        </FormField>
+
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <FormField label={t('tasks.form.start')} style={{ flex: 1 }}>
+            {(control) => (
+              <Input
+                {...control}
+                type="date"
+                value={startOn}
+                onChange={(e) => setStartOn(e.currentTarget.value)}
+              />
+            )}
+          </FormField>
+          <FormField label={t('tasks.form.due')} style={{ flex: 1 }}>
+            {(control) => (
+              <Input
+                {...control}
+                type="date"
+                value={endOn}
+                onChange={(e) => setEndOn(e.currentTarget.value)}
+              />
+            )}
+          </FormField>
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {projects.length > 1 ? (
+            <FormField label={t('tasks.select_project')} style={{ flex: 1 }}>
+              {(control) => (
+                <Select
+                  {...control}
+                  value={projectId}
+                  onChange={(e) => setProjectId(e.currentTarget.value)}
+                >
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </FormField>
+          ) : null}
+
+          <FormField label={t('tasks.form.priority')} style={{ flex: 1 }}>
+            {(control) => (
+              <Select
+                {...control}
+                value={String(priority)}
+                onChange={(e) => setPriority(Number(e.currentTarget.value) as TaskPriority)}
+              >
+                {PRIORITIES.map((p) => (
+                  <option key={p} value={String(p)}>
+                    {t(PRIORITY_KEY[p])}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </FormField>
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+          <Button type="button" variant="ghost" onClick={handleClose}>
+            {t('tasks.form.cancel')}
+          </Button>
+          <Button type="submit" disabled={createMut.isPending || !title.trim() || !projectId}>
+            {createMut.isPending ? t('common.loading') : t('tasks.form.submit')}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main calendar route
+// ---------------------------------------------------------------------------
+
 function CalendarRoute(): ReactElement {
   const { t, i18n } = useTranslation('common');
   const locale = i18n.resolvedLanguage ?? 'en';
+  const qc = useQueryClient();
   const today = new Date();
   const [cursor, setCursor] = useState<{ year: number; month: number }>({
     year: today.getFullYear(),
     month: today.getMonth(),
   });
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+  const dragDataRef = useRef<{ taskId: string; fromDate: string } | null>(null);
 
-  const { data: tasks } = useSuspenseQuery({
-    queryKey: ['me', 'tasks'] as const,
-    staleTime: 30_000,
-    queryFn: async (): Promise<AssignedTask[]> => {
-      const { data, error } = await sdk.GET('/me/tasks', {
-        params: { query: { limit: 200, offset: 0 } },
+  // Quick-create dialog state
+  const [createDate, setCreateDate] = useState<string | null>(null);
+
+  const { data: workspaces } = useWorkspacesQuery();
+
+  // Fetch tasks from every workspace the user belongs to.
+  const taskQueries = useQueries({
+    queries: workspaces.map((w) => ({
+      queryKey: ['calendar', 'tasks', w.id] as const,
+      staleTime: 30_000,
+      queryFn: async (): Promise<CalendarTask[]> => {
+        const { data, error } = await sdk.GET('/tasks', {
+          params: { query: { workspaceId: w.id, limit: 200, offset: 0 } },
+        });
+        if (error || !data) return [];
+        return (data.tasks ?? []).map((task) => ({ ...task, workspaceName: w.name }));
+      },
+    })),
+  });
+
+  const tasks = useMemo<CalendarTask[]>(() => {
+    const out: CalendarTask[] = [];
+    for (const q of taskQueries) {
+      if (q.data) out.push(...q.data);
+    }
+    return out;
+  }, [taskQueries]);
+
+  const rescheduleMut = useMutation({
+    mutationFn: async ({ taskId, dueOn }: { taskId: string; dueOn: string }) => {
+      const { data, error } = await sdk.PATCH('/tasks/{id}', {
+        params: { path: { id: taskId } },
+        body: { dueOn },
       });
-      if (error || !data) return [];
-      return data.tasks ?? [];
+      if (error || !data) throw new Error('Failed to reschedule');
+      return data;
+    },
+    onSuccess: () => {
+      for (const w of workspaces) {
+        void qc.invalidateQueries({ queryKey: ['calendar', 'tasks', w.id] });
+      }
+      toaster.show({ tone: 'success', message: t('calendar.reschedule_success') });
+    },
+    onError: () => {
+      toaster.show({ tone: 'danger', message: t('calendar.reschedule_error') });
     },
   });
+
+  const handleDragStart = useCallback((taskId: string, fromDate: string) => {
+    dragDataRef.current = { taskId, fromDate };
+  }, []);
+
+  const handleDragOver = useCallback((e: DragEvent, cellKey: string) => {
+    e.preventDefault();
+    setDragOverKey(cellKey);
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverKey(null);
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: DragEvent, cellKey: string) => {
+      e.preventDefault();
+      setDragOverKey(null);
+      const data = dragDataRef.current;
+      if (!data || data.fromDate === cellKey) return;
+      rescheduleMut.mutate({ taskId: data.taskId, dueOn: cellKey });
+      dragDataRef.current = null;
+    },
+    [rescheduleMut],
+  );
+
+  // Fetch projects for all workspaces (for quick-create picker).
+  const projectQueries = useQueries({
+    queries: workspaces.map((w) => ({
+      queryKey: ['calendar', 'projects', w.id] as const,
+      staleTime: 60_000,
+      queryFn: async (): Promise<Project[]> => {
+        const { data, error } = await sdk.GET('/workspaces/{wsId}/projects', {
+          params: { path: { wsId: w.id } },
+        });
+        if (error || !data) return [];
+        return data.projects ?? [];
+      },
+    })),
+  });
+
+  const allProjects = useMemo<Project[]>(() => {
+    const out: Project[] = [];
+    for (const q of projectQueries) {
+      if (q.data) out.push(...q.data);
+    }
+    return out;
+  }, [projectQueries]);
+
+  const handleCellClick = useCallback((cellKey: string) => {
+    setCreateDate(cellKey);
+  }, []);
+
+  const handleCreated = useCallback(() => {
+    setCreateDate(null);
+    for (const w of workspaces) {
+      void qc.invalidateQueries({ queryKey: ['calendar', 'tasks', w.id] });
+    }
+  }, [workspaces, qc]);
 
   const cells = useMemo(() => buildMonthGrid(cursor.year, cursor.month), [cursor]);
 
   /** dueOn → tasks for the current month grid. */
   const byDate = useMemo(() => {
-    const map = new Map<string, AssignedTask[]>();
+    const map = new Map<string, CalendarTask[]>();
     for (const task of tasks) {
       if (!task.dueOn) continue;
       if (task.derivedState === 'cancelled') continue;
@@ -128,6 +431,16 @@ function CalendarRoute(): ReactElement {
       ),
     [locale, cursor],
   );
+
+  const createDateLabel = useMemo(() => {
+    if (!createDate) return '';
+    const d = new Date(`${createDate}T00:00:00`);
+    return new Intl.DateTimeFormat(locale, {
+      month: 'long',
+      day: 'numeric',
+      weekday: 'short',
+    }).format(d);
+  }, [createDate, locale]);
 
   const goPrev = (): void => {
     setCursor((c) => {
@@ -238,25 +551,52 @@ function CalendarRoute(): ReactElement {
           {cells.map((cell) => {
             const dayTasks = byDate.get(cell.key) ?? [];
             const isToday = cell.key === todayKey;
+            const isDragOver = dragOverKey === cell.key;
             return (
               <div
                 key={cell.key}
+                onDragOver={(e) => {
+                  handleDragOver(e, cell.key);
+                }}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => {
+                  handleDrop(e, cell.key);
+                }}
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).closest('a, button')) return;
+                  if (cell.inMonth) handleCellClick(cell.key);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    if (cell.inMonth) handleCellClick(cell.key);
+                  }
+                }}
+                role={cell.inMonth ? 'button' : undefined}
+                tabIndex={cell.inMonth ? 0 : undefined}
                 style={{
                   minBlockSize: '7rem',
                   padding: '0.5rem',
                   borderRadius: '0.5rem',
-                  background: cell.inMonth
-                    ? 'var(--color-surface, rgba(127,127,127,0.05))'
-                    : 'transparent',
-                  border: isToday
-                    ? '1px solid var(--color-accent, #9b59b6)'
-                    : '1px solid transparent',
+                  background: isDragOver
+                    ? 'var(--color-primary-subtle, rgba(52, 152, 219, 0.12))'
+                    : cell.inMonth
+                      ? 'var(--color-surface, rgba(127,127,127,0.05))'
+                      : 'transparent',
+                  border: isDragOver
+                    ? '2px dashed var(--color-primary, #3498db)'
+                    : isToday
+                      ? '1px solid var(--color-accent, #9b59b6)'
+                      : '1px solid transparent',
                   opacity: cell.inMonth ? 1 : 0.4,
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '0.25rem',
                   overflow: 'hidden',
+                  cursor: cell.inMonth ? 'pointer' : 'default',
+                  transition: 'background 0.15s, border 0.15s',
                 }}
+                title={cell.inMonth ? t('calendar.click_to_add') : undefined}
               >
                 <div
                   style={{
@@ -289,6 +629,11 @@ function CalendarRoute(): ReactElement {
                         to="/tasks/$taskId"
                         params={{ taskId: task.id }}
                         title={`${task.title} · ${task.workspaceName}`}
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.effectAllowed = 'move';
+                          handleDragStart(task.id, cell.key);
+                        }}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -302,6 +647,10 @@ function CalendarRoute(): ReactElement {
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
+                          cursor: 'grab',
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
                         }}
                       >
                         <span
@@ -343,6 +692,15 @@ function CalendarRoute(): ReactElement {
           })}
         </div>
       </div>
+
+      <QuickCreateDialog
+        open={createDate !== null}
+        dateLabel={createDateLabel}
+        dueOn={createDate ?? ''}
+        projects={allProjects}
+        onClose={() => setCreateDate(null)}
+        onCreated={handleCreated}
+      />
     </section>
   );
 }

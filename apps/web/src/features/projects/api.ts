@@ -81,7 +81,7 @@ export function useProjectsQuery(workspaceId: string): UseSuspenseQueryResult<Pr
 
 export function useProjectQuery(id: string): UseSuspenseQueryResult<Project> {
   return useSuspenseQuery({
-    queryKey: projectsKeys.detail(id),
+    queryKey: projectsKeys.detail(id || '__empty__'),
     queryFn: async (): Promise<Project> => {
       if (!id) throw new ProjectApiError(undefined, 'Missing project ID');
       const { data, error } = await sdk.GET('/projects/{prjId}', {
@@ -90,6 +90,8 @@ export function useProjectQuery(id: string): UseSuspenseQueryResult<Project> {
       if (error || !data) throw toError(error, 'Failed to load project');
       return data;
     },
+    // Prevent retrying when ID is empty — the query will never succeed.
+    retry: id ? 2 : false,
   });
 }
 

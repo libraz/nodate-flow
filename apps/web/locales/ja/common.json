@@ -85,7 +85,8 @@
       "confirm_low": "確認: {tool} を実行しますか？",
       "command_hint": "> で AI コマンドモード",
       "no_workspace": "AI コマンドを使用するにはワークスペースを選択してください。",
-      "error": "コマンドを解析できませんでした。もう一度お試しください。"
+      "error": "コマンドを解析できませんでした。もう一度お試しください。",
+      "initial_command": "> "
     }
   },
   "theme": {
@@ -143,6 +144,10 @@
     "empty": "今月に予定されているタスクはありません。",
     "noDue": "期日なし",
     "more": "+{count} 件",
+    "click_to_add": "クリックしてタスクを追加",
+    "drag_to_reschedule": "ドラッグで日付変更",
+    "reschedule_success": "期日を更新しました",
+    "reschedule_error": "期日の更新に失敗しました",
     "weekday": {
       "mon": "月",
       "tue": "火",
@@ -320,6 +325,10 @@
     "title": "タスク",
     "new": "タスクを作成",
     "empty": "タスクがまだありません。最初のタスクを作成しましょう。",
+    "title_placeholder": "タスク名…",
+    "select_project": "プロジェクトを選択",
+    "create_error": "タスクの作成に失敗しました",
+    "created": "タスクを作成しました",
     "views": {
       "board": "ボード",
       "list": "リスト",
@@ -343,6 +352,7 @@
       "description": "説明",
       "priority": "優先度",
       "assignee": "担当者",
+      "start": "開始日",
       "due": "期日",
       "submit": "作成",
       "cancel": "キャンセル"

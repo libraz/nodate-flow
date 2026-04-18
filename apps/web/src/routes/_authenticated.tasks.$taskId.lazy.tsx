@@ -474,6 +474,7 @@ interface SidebarProps {
   workspaceId: string;
   state: TaskDerivedState;
   priority: TaskPriority;
+  startOn: string | undefined;
   dueOn: string | undefined;
 }
 
@@ -483,6 +484,7 @@ function Sidebar({
   workspaceId,
   state,
   priority,
+  startOn,
   dueOn,
 }: SidebarProps): ReactElement {
   const { t, i18n } = useTranslation('common');
@@ -493,6 +495,14 @@ function Sidebar({
   const handlePriorityChange = async (next: TaskPriority): Promise<void> => {
     try {
       await update.mutateAsync({ id, patch: { priority: next } });
+    } catch {
+      toaster.show({ tone: 'danger', message: t('tasks.errors.update_failed') });
+    }
+  };
+
+  const handleStartChange = async (next: string): Promise<void> => {
+    try {
+      await update.mutateAsync({ id, patch: { startOn: next } });
     } catch {
       toaster.show({ tone: 'danger', message: t('tasks.errors.update_failed') });
     }
@@ -543,6 +553,19 @@ function Sidebar({
                 </option>
               ))}
             </Select>
+          )}
+        </FormField>
+        <FormField label={t('tasks.form.start')}>
+          {(control) => (
+            <Input
+              {...control}
+              type="date"
+              lang={dateLocale}
+              value={startOn ?? ''}
+              onChange={(e) => {
+                void handleStartChange(e.target.value);
+              }}
+            />
           )}
         </FormField>
         <FormField label={t('tasks.detail.due_label')}>
@@ -960,6 +983,7 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
         workspaceId={task.workspaceId}
         state={state}
         priority={priority}
+        startOn={task.startedOn ?? undefined}
         dueOn={task.dueOn}
       />
     </section>

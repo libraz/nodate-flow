@@ -1,6 +1,6 @@
 import Icon from '@nodate-flow/ui/icon';
 import { cx } from '@nodate-flow/ui/lib/cx';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useRouterState } from '@tanstack/react-router';
 
 import { LogOut, Moon, Search, Sun } from 'lucide-react';
 import { type ReactElement, Suspense, useState } from 'react';
@@ -40,10 +40,14 @@ function initialsFrom(name: string | undefined): string {
  * first fetch; wrapped in a Suspense with a tiny label fallback so
  * the rest of the topbar renders immediately.
  */
+/** Pages where switching workspace should NOT navigate away. */
+const STAY_ON_PAGE_PREFIXES = ['/calendar', '/today', '/inbox', '/settings', '/pages'];
+
 function WorkspaceSwitcher(): ReactElement {
   const { t } = useTranslation('common');
   const { data: workspaces } = useWorkspacesQuery();
   const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const currentId = useCurrentWorkspaceId() ?? '';
 
   return (
@@ -53,7 +57,15 @@ function WorkspaceSwitcher(): ReactElement {
       value={currentId}
       onChange={(e) => {
         const id = e.target.value;
-        if (id) {
+        if (!id) return;
+        // On cross-workspace pages, stay on the current page.
+        const stayOnPage = STAY_ON_PAGE_PREFIXES.some((p) => pathname.startsWith(p));
+        if (stayOnPage) {
+          // Just changing the select value is enough — the workspace
+          // context propagates via useCurrentWorkspaceId and queries
+          // will refetch. Navigate to the same page to force re-render.
+          void navigate({ to: pathname as never });
+        } else {
           void navigate({ to: '/workspaces/$id', params: { id } });
         }
       }}

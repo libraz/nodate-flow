@@ -10,9 +10,21 @@
  * resolve-command endpoint translates it into a tool invocation.
  */
 
+import Icon from '@nodate-flow/ui/icon';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
 import { useQueries } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
+import {
+  Building2,
+  CalendarDays,
+  FolderKanban,
+  Home,
+  Inbox,
+  type LucideIcon,
+  Plus,
+  Settings,
+  SquareCheckBig,
+} from 'lucide-react';
 import {
   type KeyboardEvent,
   type ReactElement,
@@ -38,12 +50,14 @@ interface CommandItem {
   group: string;
   href: string;
   search?: Record<string, unknown>;
+  icon?: LucideIcon;
 }
 
 type PaletteMode = 'search' | 'command';
 
 interface InnerProps {
   onSelect: (item: Pick<CommandItem, 'href' | 'search'>) => void;
+  initialCommandMode?: boolean | undefined;
 }
 
 function normalize(s: string): string {
@@ -270,11 +284,11 @@ function toolToHref(result: ResolveCommandResult): Pick<CommandItem, 'href' | 's
 // Search mode sub-component (extracted from PaletteBody)
 // ---------------------------------------------------------------------------
 
-function PaletteBody({ onSelect }: InnerProps): ReactElement {
+function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement {
   const { t } = useTranslation('common');
   const { data: workspaces } = useWorkspacesQuery();
   const wsId = useCurrentWorkspaceId();
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialCommandMode ? '> ' : '');
   const [debounced, setDebounced] = useState('');
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -360,31 +374,59 @@ function PaletteBody({ onSelect }: InnerProps): ReactElement {
       group: actionsGroup,
       href: `/projects/${p.id}/tasks`,
       search: { new: true },
+      icon: Plus,
     }));
     const nav: CommandItem[] = [
-      { id: 'nav:home', label: t('dock.command_palette.home'), group: navGroup, href: '/' },
-      { id: 'nav:today', label: t('nav.today'), group: navGroup, href: '/today' },
-      { id: 'nav:inbox', label: t('nav.inbox'), group: navGroup, href: '/inbox' },
-      { id: 'nav:workspaces', label: t('nav.workspaces'), group: navGroup, href: '/workspaces' },
-      { id: 'nav:settings', label: t('nav.settings'), group: navGroup, href: '/settings' },
+      {
+        id: 'nav:home',
+        label: t('dock.command_palette.home'),
+        group: navGroup,
+        href: '/',
+        icon: Home,
+      },
+      {
+        id: 'nav:today',
+        label: t('nav.today'),
+        group: navGroup,
+        href: '/today',
+        icon: CalendarDays,
+      },
+      { id: 'nav:inbox', label: t('nav.inbox'), group: navGroup, href: '/inbox', icon: Inbox },
+      {
+        id: 'nav:workspaces',
+        label: t('nav.workspaces'),
+        group: navGroup,
+        href: '/workspaces',
+        icon: Building2,
+      },
+      {
+        id: 'nav:settings',
+        label: t('nav.settings'),
+        group: navGroup,
+        href: '/settings',
+        icon: Settings,
+      },
     ];
     const ws: CommandItem[] = workspaces.map((w) => ({
       id: `ws:${w.id}`,
       label: w.name,
       group: wsGroup,
       href: `/workspaces/${w.id}`,
+      icon: Building2,
     }));
     const tasks: CommandItem[] = taskResults.map((task) => ({
       id: `task:${task.id}`,
       label: task.title,
       group: taskGroup,
       href: `/tasks/${task.id}`,
+      icon: SquareCheckBig,
     }));
     const projects: CommandItem[] = projectResults.map((p) => ({
       id: `project:${p.id}`,
       label: p.name,
       group: projectGroup,
       href: `/projects/${p.id}`,
+      icon: FolderKanban,
     }));
     return [...actions, ...tasks, ...projects, ...nav, ...ws];
   }, [t, workspaces, taskResults, projectResults]);
@@ -497,7 +539,9 @@ function PaletteBody({ onSelect }: InnerProps): ReactElement {
                               if (idx >= 0) setActive(idx);
                             }}
                             style={{
-                              display: 'block',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
                               inlineSize: '100%',
                               textAlign: 'start',
                               padding: '0.5rem 0.75rem',
@@ -511,6 +555,13 @@ function PaletteBody({ onSelect }: InnerProps): ReactElement {
                               fontSize: '0.875rem',
                             }}
                           >
+                            {it.icon ? (
+                              <Icon
+                                icon={it.icon}
+                                decorative
+                                style={{ flexShrink: 0, opacity: 0.6 }}
+                              />
+                            ) : null}
                             {it.label}
                           </button>
                         </li>
@@ -580,9 +631,15 @@ const kbdStyle = {
 export interface CommandPaletteProps {
   open: boolean;
   onClose: () => void;
+  /** When true the palette opens in NL command mode ("> " prefilled). */
+  initialCommandMode?: boolean;
 }
 
-export default function CommandPalette({ open, onClose }: CommandPaletteProps): ReactElement {
+export default function CommandPalette({
+  open,
+  onClose,
+  initialCommandMode,
+}: CommandPaletteProps): ReactElement {
   const { t } = useTranslation('common');
   const navigate = useNavigate();
 
@@ -600,7 +657,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps): 
   return (
     <Dialog open={open} onClose={onClose} title={t('dock.command_palette.title')}>
       <Suspense fallback={<p style={{ margin: 0 }}>…</p>}>
-        <PaletteBody onSelect={handleSelect} />
+        <PaletteBody onSelect={handleSelect} initialCommandMode={initialCommandMode} />
       </Suspense>
     </Dialog>
   );
