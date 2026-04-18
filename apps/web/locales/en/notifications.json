@@ -15,7 +15,7 @@
     "urgent": "Urgent"
   },
   "badge": {
-    "unread": "{{count}} unread"
+    "unread": "{count} unread"
   },
   "toast": {
     "marked_read": "Marked as read",

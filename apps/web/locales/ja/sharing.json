@@ -9,8 +9,8 @@
     "title": "安全性チェック",
     "description": "公開前に機密データをスキャンしています...",
     "passed": "機密データは見つかりませんでした",
-    "findings": "{{count}}件の潜在的な問題が見つかりました",
-    "findings_plural": "{{count}}件の潜在的な問題が見つかりました",
+    "findings": "{count}件の潜在的な問題が見つかりました",
+    "findings_plural": "{count}件の潜在的な問題が見つかりました",
     "proceed_anyway": "このまま公開する"
   },
   "confirm_publish": "リンクを知っている全員がこのビューにアクセスできるようになります。続行しますか？",

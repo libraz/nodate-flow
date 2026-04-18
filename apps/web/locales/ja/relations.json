@@ -13,7 +13,7 @@
     "dismiss": "却下",
     "dismiss_all": "すべて却下"
   },
-  "confidence": "確信度: {{score}}%",
+  "confidence": "確信度: {score}%",
   "toast": {
     "accepted": "関連を承認しました",
     "dismissed": "提案を却下しました"

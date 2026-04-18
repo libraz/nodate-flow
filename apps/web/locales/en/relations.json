@@ -13,7 +13,7 @@
     "dismiss": "Dismiss",
     "dismiss_all": "Dismiss all"
   },
-  "confidence": "Confidence: {{score}}%",
+  "confidence": "Confidence: {score}%",
   "toast": {
     "accepted": "Relation accepted",
     "dismissed": "Suggestion dismissed"

@@ -9,8 +9,8 @@
     "title": "Safety check",
     "description": "Scanning for sensitive data before publishing...",
     "passed": "No sensitive data found",
-    "findings": "{{count}} potential issue found",
-    "findings_plural": "{{count}} potential issues found",
+    "findings": "{count} potential issue found",
+    "findings_plural": "{count} potential issues found",
     "proceed_anyway": "Publish anyway"
   },
   "confirm_publish": "This will make the view accessible to anyone with the link. Continue?",

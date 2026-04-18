@@ -25,7 +25,7 @@
   },
   "progress": {
     "title": "進捗",
-    "tasks_completed": "{{total}}件中{{completed}}件完了",
+    "tasks_completed": "{total}件中{completed}件完了",
     "burndown": "バーンダウン"
   },
   "toast": {

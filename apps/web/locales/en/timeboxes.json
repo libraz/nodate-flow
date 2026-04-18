@@ -25,7 +25,7 @@
   },
   "progress": {
     "title": "Progress",
-    "tasks_completed": "{{completed}} of {{total}} tasks completed",
+    "tasks_completed": "{completed} of {total} tasks completed",
     "burndown": "Burndown"
   },
   "toast": {
