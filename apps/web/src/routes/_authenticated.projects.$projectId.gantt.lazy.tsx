@@ -16,7 +16,7 @@ import type { components } from '@nodate-flow/sdk';
 import Button from '@nodate-flow/ui/primitives/button';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { Link, createLazyFileRoute, getRouteApi } from '@tanstack/react-router';
+import { Link, createLazyFileRoute, getRouteApi, useNavigate } from '@tanstack/react-router';
 import { ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react';
 import { type ReactElement, Suspense, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -38,6 +38,7 @@ const STATE_COLOR: Record<string, string> = {
 
 const ROW_HEIGHT = 28;
 const ROW_GAP = 4;
+const BAR_HEIGHT = 14;
 const HEADER_HEIGHT = 36;
 const LABEL_WIDTH = 220;
 
@@ -46,7 +47,7 @@ const ZOOM_LEVELS = [4, 6, 8, 12, 18, 24, 36, 48, 64] as const;
 const ZOOM_PRESET_DAY = 6; // index → 48px
 const ZOOM_PRESET_WEEK = 4; // index → 18px
 const ZOOM_PRESET_MONTH = 1; // index → 6px
-const ZOOM_DEFAULT = 5; // index → 24px (current default)
+const ZOOM_DEFAULT = ZOOM_PRESET_WEEK; // start at the Week preset so the button is highlighted
 
 function startOfDay(d: Date): Date {
   const x = new Date(d);
@@ -180,6 +181,7 @@ function GanttRoute(): ReactElement {
 function GanttView(): ReactElement {
   const { t } = useTranslation('common');
   const { projectId } = routeApi.useParams();
+  const navigate = useNavigate();
   const [offsetDays, setOffsetDays] = useState(0);
   const [zoomIdx, setZoomIdx] = useState(ZOOM_DEFAULT);
   const [showCriticalPath, setShowCriticalPath] = useState(true);
@@ -260,8 +262,9 @@ function GanttView(): ReactElement {
 
   const totalDays = Math.max(7, diffDays(range.start, range.end) + 1);
   const viewStart = addDays(range.start, offsetDays);
-  // Visible days adapts to zoom: show more at smaller scales
-  const visibleDays = Math.min(totalDays, Math.max(14, Math.round(960 / dayWidth)));
+  // Visible days: at least the data range, but cap to viewport-driven max
+  const viewportDays = Math.max(14, Math.round(960 / dayWidth));
+  const visibleDays = Math.min(totalDays - offsetDays, viewportDays);
   const chartWidth = visibleDays * dayWidth;
   const chartHeight = HEADER_HEIGHT + scheduled.length * (ROW_HEIGHT + ROW_GAP);
 
@@ -279,8 +282,7 @@ function GanttView(): ReactElement {
     scheduled.forEach(({ task, start, end }, idx) => {
       const startX = diffDays(viewStart, start) * dayWidth;
       const endX = (diffDays(viewStart, end) + 1) * dayWidth;
-      const y =
-        HEADER_HEIGHT + idx * (ROW_HEIGHT + ROW_GAP) + ROW_GAP / 2 + (ROW_HEIGHT - ROW_GAP) / 2;
+      const y = HEADER_HEIGHT + idx * (ROW_HEIGHT + ROW_GAP) + (ROW_HEIGHT + ROW_GAP) / 2;
       map.set(task.id, { x1: startX, x2: endX, y });
     });
     return map;
@@ -305,12 +307,30 @@ function GanttView(): ReactElement {
       const to = barPositions.get(edge.toTaskId);
       if (!from || !to) continue;
       if (from.y === to.y) continue;
-      const sx = from.x2;
+      // Offset endpoints so arrows start/end outside the bars.
+      // Arrows always arrive at the target's left edge going rightward (→).
+      const sx = from.x2 + 2;
       const sy = from.y;
-      const tx = to.x1;
+      const tx = to.x1 - 6; // leave room for the arrowhead marker
       const ty = to.y;
-      const midX = Math.max(sx + 8, tx - 8);
-      const path = `M ${sx} ${sy} L ${midX} ${sy} L ${midX} ${ty} L ${tx} ${ty}`;
+      let path: string;
+      // Half-row offset used to reach the gap between adjacent rows.
+      const rowStep = (ROW_HEIGHT + ROW_GAP) / 2;
+      if (sx + 12 <= tx) {
+        // Simple case: target is far enough to the right.
+        // right → down → right (arrives horizontally from the left).
+        const midX = sx + 8;
+        path = `M ${sx} ${sy} L ${midX} ${sy} L ${midX} ${ty} L ${tx} ${ty}`;
+      } else {
+        // Target overlaps or is to the left: wrap around so the arrow
+        // approaches from the left: right → down(gap) → left → down(gap) → right.
+        // Horizontal segments run through row gaps, not through bars.
+        const exitX = sx + 8;
+        const entryX = Math.min(from.x1, to.x1) - 10;
+        const gapAfterSource = sy + (ty > sy ? rowStep : -rowStep);
+        // Left vertical segment goes all the way to ty, then horizontal right to target.
+        path = `M ${sx} ${sy} L ${exitX} ${sy} L ${exitX} ${gapAfterSource} L ${entryX} ${gapAfterSource} L ${entryX} ${ty} L ${tx} ${ty}`;
+      }
       const danger =
         edge.fromTaskDerivedState !== 'done' && edge.fromTaskDerivedState !== 'cancelled';
       const critical = criticalPathIds.has(edge.fromTaskId) && criticalPathIds.has(edge.toTaskId);
@@ -333,8 +353,10 @@ function GanttView(): ReactElement {
 
   // Show day number in header only when there's enough room
   const showDayLabel = dayWidth >= 12;
-  // Show month label at month boundaries when zoomed enough
-  const showMonthLabel = dayWidth >= 6;
+  // Always show the month/year of the first visible day when no month
+  // boundary is in view, so users always have date context.
+  const hasMonthBoundary = dayCells.some((c) => c.isMonthStart);
+  const firstDayDate = dayCells[0]?.date ?? viewStart;
 
   const goPrev = (): void => {
     setOffsetDays((o) => Math.max(0, o - 7));
@@ -349,6 +371,10 @@ function GanttView(): ReactElement {
 
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <style>{`
+        .gantt-label-row:hover { background: var(--nf-color-bg-sunken, rgba(127,127,127,0.06)); }
+        .gantt-label-row:focus-visible { outline: 2px solid var(--nf-color-accent, #9b59b6); outline-offset: -2px; }
+      `}</style>
       <header
         style={{
           display: 'flex',
@@ -508,6 +534,7 @@ function GanttView(): ReactElement {
                 to="/tasks/$taskId"
                 params={{ taskId: task.id }}
                 title={task.title}
+                className="gantt-label-row"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -561,8 +588,8 @@ function GanttView(): ReactElement {
                   viewBox="0 0 10 10"
                   refX="9"
                   refY="5"
-                  markerWidth="6"
-                  markerHeight="6"
+                  markerWidth="4"
+                  markerHeight="4"
                   orient="auto-start-reverse"
                 >
                   <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--nf-color-danger, #c0392b)" />
@@ -572,11 +599,14 @@ function GanttView(): ReactElement {
                   viewBox="0 0 10 10"
                   refX="9"
                   refY="5"
-                  markerWidth="6"
-                  markerHeight="6"
+                  markerWidth="4"
+                  markerHeight="4"
                   orient="auto-start-reverse"
                 >
-                  <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--color-muted, #95a5a6)" />
+                  <path
+                    d="M 0 0 L 10 5 L 0 10 z"
+                    fill="var(--nf-color-fg-muted, var(--color-muted, #95a5a6))"
+                  />
                 </marker>
               </defs>
               {/* Day grid + weekend shading */}
@@ -605,18 +635,37 @@ function GanttView(): ReactElement {
                       y={HEADER_HEIGHT - 6}
                       textAnchor="middle"
                       fontSize="10"
-                      fill="var(--color-muted)"
+                      fill="var(--nf-color-fg-muted, var(--color-muted))"
                     >
                       {c.date.getDate()}
                     </text>
                   ) : null}
-                  {c.isMonthStart && showMonthLabel ? (
-                    <text x={c.x + 4} y={14} fontSize="10" fontWeight="600" fill="var(--color-fg)">
+                  {c.isMonthStart ? (
+                    <text
+                      x={c.x + 4}
+                      y={14}
+                      fontSize="10"
+                      fontWeight="600"
+                      fill="var(--nf-color-fg, var(--color-fg))"
+                    >
                       {`${c.date.getFullYear()}/${c.date.getMonth() + 1}`}
                     </text>
                   ) : null}
                 </g>
               ))}
+
+              {/* Fallback month label when no boundary is in view */}
+              {!hasMonthBoundary ? (
+                <text
+                  x={4}
+                  y={14}
+                  fontSize="10"
+                  fontWeight="600"
+                  fill="var(--nf-color-fg, var(--color-fg))"
+                >
+                  {`${firstDayDate.getFullYear()}/${firstDayDate.getMonth() + 1}`}
+                </text>
+              ) : null}
 
               {/* Today vertical line */}
               {showTodayLine ? (
@@ -631,7 +680,31 @@ function GanttView(): ReactElement {
                 />
               ) : null}
 
-              {/* Bars */}
+              {/* Dependency arrows (drawn before bars so they sit behind them) */}
+              {dependencyArrows.map((arrow) => (
+                <path
+                  key={arrow.id}
+                  d={arrow.path}
+                  fill="none"
+                  stroke={
+                    arrow.critical
+                      ? 'var(--nf-color-danger, #c0392b)'
+                      : arrow.danger
+                        ? 'var(--nf-color-danger, #c0392b)'
+                        : 'var(--nf-color-fg-muted, var(--color-muted, #95a5a6))'
+                  }
+                  strokeWidth={arrow.critical ? 1.5 : 0.75}
+                  strokeDasharray={arrow.danger || arrow.critical ? undefined : '3 3'}
+                  markerEnd={
+                    arrow.danger || arrow.critical
+                      ? 'url(#gantt-arrow-open)'
+                      : 'url(#gantt-arrow-done)'
+                  }
+                  opacity={arrow.critical ? 1 : arrow.danger ? 0.9 : 0.55}
+                />
+              ))}
+
+              {/* Bars (drawn after arrows so they sit on top) */}
               {scheduled.map(({ task, start, end }, idx) => {
                 const startX = diffDays(viewStart, start) * dayWidth;
                 const endX = (diffDays(viewStart, end) + 1) * dayWidth;
@@ -639,17 +712,40 @@ function GanttView(): ReactElement {
                 const visEnd = Math.min(chartWidth, endX);
                 if (visEnd <= 0 || visStart >= chartWidth) return null;
                 const w = Math.max(2, visEnd - visStart);
-                const y = HEADER_HEIGHT + idx * (ROW_HEIGHT + ROW_GAP) + ROW_GAP / 2;
+                const y =
+                  HEADER_HEIGHT +
+                  idx * (ROW_HEIGHT + ROW_GAP) +
+                  (ROW_HEIGHT + ROW_GAP - BAR_HEIGHT) / 2;
                 const fill = STATE_COLOR[task.derivedState] ?? 'var(--color-muted)';
                 const isCritical = criticalPathIds.has(task.id);
                 return (
-                  <g key={task.id}>
+                  <g
+                    key={task.id}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => {
+                      void navigate({
+                        to: '/tasks/$taskId',
+                        params: { taskId: task.id },
+                      });
+                    }}
+                    aria-label={task.title}
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        void navigate({
+                          to: '/tasks/$taskId',
+                          params: { taskId: task.id },
+                        });
+                      }
+                    }}
+                  >
                     {isCritical ? (
                       <rect
                         x={visStart - 2}
                         y={y - 2}
                         width={w + 4}
-                        height={ROW_HEIGHT - ROW_GAP + 4}
+                        height={BAR_HEIGHT + 4}
                         rx={6}
                         ry={6}
                         fill="none"
@@ -663,9 +759,9 @@ function GanttView(): ReactElement {
                       x={visStart}
                       y={y}
                       width={w}
-                      height={ROW_HEIGHT - ROW_GAP}
-                      rx={4}
-                      ry={4}
+                      height={BAR_HEIGHT}
+                      rx={3}
+                      ry={3}
                       fill={fill}
                       fillOpacity={task.derivedState === 'done' ? 0.5 : 0.85}
                       stroke={fill}
@@ -676,30 +772,6 @@ function GanttView(): ReactElement {
                   </g>
                 );
               })}
-
-              {/* Dependency arrows (drawn last so they sit over the bars) */}
-              {dependencyArrows.map((arrow) => (
-                <path
-                  key={arrow.id}
-                  d={arrow.path}
-                  fill="none"
-                  stroke={
-                    arrow.critical
-                      ? 'var(--nf-color-danger, #c0392b)'
-                      : arrow.danger
-                        ? 'var(--nf-color-danger, #c0392b)'
-                        : 'var(--color-muted, #95a5a6)'
-                  }
-                  strokeWidth={arrow.critical ? 2.5 : 1.25}
-                  strokeDasharray={arrow.danger || arrow.critical ? undefined : '3 3'}
-                  markerEnd={
-                    arrow.danger || arrow.critical
-                      ? 'url(#gantt-arrow-open)'
-                      : 'url(#gantt-arrow-done)'
-                  }
-                  opacity={arrow.critical ? 1 : arrow.danger ? 0.9 : 0.55}
-                />
-              ))}
             </svg>
           </div>
         </div>
