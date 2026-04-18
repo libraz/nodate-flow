@@ -8,6 +8,7 @@
 import Button from '@nodate-flow/ui/primitives/button';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { useNavigate } from '@tanstack/react-router';
+import { Inbox as InboxIcon } from 'lucide-react';
 import { type ChangeEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -270,7 +271,21 @@ export default function InboxList(): ReactElement {
             background: 'var(--nf-color-bg-sunken)',
           }}
         >
-          {t('view.empty')}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '0.75rem',
+            }}
+          >
+            <InboxIcon
+              size={48}
+              strokeWidth={1}
+              style={{ color: 'var(--nf-color-fg-muted)', opacity: 0.5 }}
+            />
+            {t('view.empty')}
+          </div>
         </div>
       ) : (
         <ul

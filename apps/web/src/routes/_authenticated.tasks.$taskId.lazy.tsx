@@ -8,7 +8,7 @@
  */
 
 import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
-import Button from '@nodate-flow/ui/primitives/button';
+import Button, { type ButtonVariant } from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
 import Combobox from '@nodate-flow/ui/primitives/combobox';
 import FormField from '@nodate-flow/ui/primitives/form-field';
@@ -87,6 +87,19 @@ const TRANSITION_KEY: Record<TransitionName, string> = {
   complete: 'tasks.detail.transitions.complete',
   reopen: 'tasks.detail.transitions.reopen',
   cancel: 'tasks.detail.transitions.cancel',
+};
+
+const PRIORITY_COLOR: Record<TaskPriority, string> = {
+  0: 'var(--color-muted, #95a5a6)',
+  1: '#3498db',
+  2: '#e67e22',
+  3: '#e74c3c',
+  4: '#c0392b',
+};
+
+const TRANSITION_VARIANT: Partial<Record<TransitionName, ButtonVariant>> = {
+  complete: 'primary',
+  cancel: 'danger',
 };
 
 const PRIORITIES: readonly TaskPriority[] = [0, 1, 2, 3, 4];
@@ -547,7 +560,23 @@ function Sidebar({
           <Badge tone={STATE_TONE[state]}>{t(STATE_KEY[state])}</Badge>
         </div>
         <Separator />
-        <FormField label={t('tasks.detail.priority_label')}>
+        <FormField
+          label={
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}>
+              {t('tasks.detail.priority_label')}
+              <span
+                aria-hidden
+                style={{
+                  display: 'inline-block',
+                  width: '0.5rem',
+                  height: '0.5rem',
+                  borderRadius: '0.125rem',
+                  background: PRIORITY_COLOR[priority],
+                }}
+              />
+            </span>
+          }
+        >
           {(control) => (
             <Select
               {...control}
@@ -613,6 +642,7 @@ function Sidebar({
             <Button
               key={name}
               type="button"
+              variant={TRANSITION_VARIANT[name] ?? 'default'}
               onClick={() => {
                 handleTransition(name);
               }}

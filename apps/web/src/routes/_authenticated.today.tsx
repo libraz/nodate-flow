@@ -11,6 +11,7 @@
 import type { components } from '@nodate-flow/sdk';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
+import { CheckCircle } from 'lucide-react';
 import { type ReactElement, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -165,6 +166,11 @@ function TodayRoute(): ReactElement {
             background: 'var(--nf-color-bg-sunken)',
           }}
         >
+          <CheckCircle
+            size={48}
+            strokeWidth={1}
+            style={{ color: 'var(--nf-color-fg-muted)', opacity: 0.5 }}
+          />
           <p style={{ margin: 0 }}>{t('today.empty')}</p>
           <button
             type="button"

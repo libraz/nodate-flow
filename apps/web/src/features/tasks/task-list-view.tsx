@@ -633,15 +633,21 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '0.375rem',
-              fontSize: '0.8125rem',
+              gap: '0.25rem',
+              fontSize: '0.75rem',
+              fontWeight: 500,
+              padding: '0.125rem 0.5rem',
+              borderRadius: '999px',
+              background: `${color}18`,
+              color: color,
+              whiteSpace: 'nowrap',
             }}
           >
             <span
               aria-hidden
               style={{
-                width: '0.5rem',
-                height: '0.5rem',
+                width: '0.375rem',
+                height: '0.375rem',
                 borderRadius: '999px',
                 background: color,
                 flexShrink: 0,

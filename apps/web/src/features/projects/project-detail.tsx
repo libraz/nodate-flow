@@ -17,6 +17,14 @@ import { type TaskDerivedState, useTasksQuery } from '../tasks/api';
 import { useDisableProject, useProjectQuery, useUpdateProject } from './api';
 import ProjectMembersTable from './project-members-table';
 
+const STATE_COLOR: Record<TaskDerivedState, string> = {
+  open: '#3498db',
+  waiting: '#e67e22',
+  review: '#9b59b6',
+  done: '#27ae60',
+  cancelled: '#95a5a6',
+};
+
 const STATE_ORDER: readonly TaskDerivedState[] = ['open', 'waiting', 'review', 'done', 'cancelled'];
 
 export interface ProjectDetailProps {
@@ -174,7 +182,7 @@ function OverviewPanel({ id }: { id: string }): ReactElement {
               title={`${t(`tasks.status.${s}`)}: ${counts[s]}`}
               style={{
                 flex: `${counts[s]} 1 0`,
-                background: `var(--color-state-${s}, var(--color-muted))`,
+                background: STATE_COLOR[s],
               }}
             />
           ) : null,
