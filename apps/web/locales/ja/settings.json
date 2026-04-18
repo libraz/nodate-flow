@@ -314,8 +314,8 @@
       "interval": {
         "label": "評価間隔",
         "description": "タスクを確認しアクションを適用する頻度です。",
-        "minutes": "{count}分",
-        "disabled": "無効（0分）"
+        "minutes": "分",
+        "disabled": "無効"
       },
       "threshold": {
         "label": "確度しきい値",

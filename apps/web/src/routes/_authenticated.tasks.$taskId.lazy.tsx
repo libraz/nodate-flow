@@ -517,7 +517,7 @@ function Sidebar({
     );
   };
 
-  const legal = TRANSITIONS_BY_STATE[state];
+  const legal = TRANSITIONS_BY_STATE[state] ?? [];
 
   return (
     <aside style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

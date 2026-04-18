@@ -314,8 +314,8 @@
       "interval": {
         "label": "Evaluation interval",
         "description": "How often the system checks tasks and applies actions.",
-        "minutes": "{count, plural, one {# minute} other {# minutes}}",
-        "disabled": "Disabled (0 minutes)"
+        "minutes": "min",
+        "disabled": "Disabled"
       },
       "threshold": {
         "label": "Confidence threshold",

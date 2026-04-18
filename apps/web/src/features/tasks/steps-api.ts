@@ -69,7 +69,6 @@ export function useApplySteps() {
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: tasksKeys.detail(vars.taskId) });
-      void qc.invalidateQueries({ queryKey: tasksKeys.all });
     },
   });
 }

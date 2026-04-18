@@ -150,7 +150,7 @@ export default function AutoActionSettingsPage({
             >
               {intervalMinutes === 0
                 ? t('workspace.auto_actions.interval.disabled')
-                : t('workspace.auto_actions.interval.minutes', { count: intervalMinutes })}
+                : t('workspace.auto_actions.interval.minutes')}
             </span>
           </div>
         )}
