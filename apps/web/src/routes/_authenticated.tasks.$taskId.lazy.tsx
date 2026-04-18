@@ -553,7 +553,18 @@ function Sidebar({
   const legal = TRANSITIONS_BY_STATE[state] ?? [];
 
   return (
-    <aside style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <aside
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1rem',
+        position: 'sticky',
+        top: '1rem',
+        alignSelf: 'start',
+        maxBlockSize: 'calc(100vh - 5rem)',
+        overflowY: 'auto',
+      }}
+    >
       <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ color: 'var(--color-muted)' }}>{t('tasks.detail.state_label')}</span>
@@ -955,7 +966,7 @@ function InferStateSection({ taskId }: { taskId: string }): ReactElement {
   );
 }
 
-function TaskBreadcrumb({
+function TaskBreadcrumbInner({
   workspaceId,
   projectId,
 }: {
@@ -993,6 +1004,17 @@ function TaskBreadcrumb({
       </Link>
     </nav>
   );
+}
+
+function TaskBreadcrumb({
+  workspaceId,
+  projectId,
+}: {
+  workspaceId: string;
+  projectId: string;
+}): ReactElement | null {
+  if (!workspaceId || !projectId) return null;
+  return <TaskBreadcrumbInner workspaceId={workspaceId} projectId={projectId} />;
 }
 
 function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
