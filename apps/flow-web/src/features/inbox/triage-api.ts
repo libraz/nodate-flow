@@ -6,26 +6,15 @@
 
 import { type UseMutationResult, useMutation } from '@tanstack/react-query';
 
+import { ApiError, toApiError } from '../../lib/api-error';
 import { sdk } from '../../lib/sdk';
 import { type Suggestion, suggestionsStore } from '../ai-suggestions/store';
-import { InboxApiError } from './api';
+
+export { ApiError as InboxApiError };
 
 export interface InboxTriageArgs {
   /** Optional cap on items to score. Backend default 20, max 50. */
   limit?: number;
-}
-
-function toError(err: unknown, fallback: string): InboxApiError {
-  if (err && typeof err === 'object') {
-    const obj = err as { detail?: unknown; title?: unknown; type?: unknown };
-    const message =
-      (typeof obj.detail === 'string' && obj.detail) ||
-      (typeof obj.title === 'string' && obj.title) ||
-      fallback;
-    const code = typeof obj.type === 'string' ? obj.type : undefined;
-    return new InboxApiError(code, message);
-  }
-  return new InboxApiError(undefined, fallback);
 }
 
 /**
@@ -35,7 +24,7 @@ function toError(err: unknown, fallback: string): InboxApiError {
  */
 export function useInboxTriageMutation(
   workspaceId: string,
-): UseMutationResult<Suggestion[], InboxApiError, InboxTriageArgs | undefined> {
+): UseMutationResult<Suggestion[], ApiError, InboxTriageArgs | undefined> {
   return useMutation({
     mutationFn: async (args: InboxTriageArgs | undefined): Promise<Suggestion[]> => {
       const body: InboxTriageArgs = args ?? {};
@@ -43,7 +32,7 @@ export function useInboxTriageMutation(
         params: { path: { wsId: workspaceId } },
         body,
       });
-      if (error || !data) throw toError(error, 'Failed to triage inbox');
+      if (error || !data) throw toApiError(error, 'Failed to triage inbox');
       return data.suggestions ?? [];
     },
     onSuccess: (suggestions) => {

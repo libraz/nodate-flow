@@ -16,9 +16,8 @@ import (
 // notifications. For now it logs reminders. Real push/email delivery can
 // be added later.
 //
-// TODO: Add deduplication via a calendar_notifications_sent table or a
-// notified_at column on calendar_events to avoid sending duplicate
-// notifications across scheduler restarts.
+// The scheduler marks each event's notified_at column after sending so that
+// duplicate notifications are never emitted across ticks or restarts.
 func StartNotificationScheduler(ctx context.Context, db *sql.DB, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -29,12 +28,13 @@ func StartNotificationScheduler(ctx context.Context, db *sql.DB, interval time.D
 			slog.Info("notification scheduler shutting down")
 			return
 		case <-ticker.C:
-			checkAndNotify(ctx, db)
+			CheckAndNotify(ctx, db)
 		}
 	}
 }
 
 type pendingNotification struct {
+	ID                 uint32
 	PublicID           types.PublicID
 	Title              string
 	StartAt            time.Time
@@ -42,14 +42,19 @@ type pendingNotification struct {
 	OwnerUserID        uint32
 }
 
-func checkAndNotify(ctx context.Context, db *sql.DB) {
+// CheckAndNotify queries for events whose notification window has opened
+// and logs reminders. After processing each event it marks notified_at so
+// the event is not picked up again on the next tick.
+func CheckAndNotify(ctx context.Context, db *sql.DB) {
 	// Find events where the notification window has opened but the event
-	// has not started yet. Limited to events starting within the next 24
-	// hours to avoid scanning the entire table.
+	// has not started yet and no notification has been sent. Limited to
+	// events starting within the next 24 hours to avoid scanning the
+	// entire table.
 	rows, err := db.QueryContext(ctx, `
-		SELECT ce.public_id, ce.title, ce.start_at, ce.notification_offset, ce.owner_user_id
+		SELECT ce.id, ce.public_id, ce.title, ce.start_at, ce.notification_offset, ce.owner_user_id
 		FROM calendar_events ce
 		WHERE ce.notification_offset IS NOT NULL
+		  AND ce.notified_at IS NULL
 		  AND ce.enabled = TRUE
 		  AND ce.start_at > NOW()
 		  AND DATE_SUB(ce.start_at, INTERVAL ce.notification_offset MINUTE) <= NOW()
@@ -64,7 +69,7 @@ func checkAndNotify(ctx context.Context, db *sql.DB) {
 	var notifications []pendingNotification
 	for rows.Next() {
 		var n pendingNotification
-		if err := rows.Scan(&n.PublicID, &n.Title, &n.StartAt, &n.NotificationOffset, &n.OwnerUserID); err != nil {
+		if err := rows.Scan(&n.ID, &n.PublicID, &n.Title, &n.StartAt, &n.NotificationOffset, &n.OwnerUserID); err != nil {
 			slog.Error("notification scheduler: failed to scan row", "err", err)
 			continue
 		}
@@ -84,6 +89,11 @@ func checkAndNotify(ctx context.Context, db *sql.DB) {
 			"offsetMinutes", n.NotificationOffset,
 			"ownerUserId", n.OwnerUserID,
 		)
+
+		// Mark the event as notified so it is not picked up again.
+		if _, err := db.ExecContext(ctx, `UPDATE calendar_events SET notified_at = NOW() WHERE id = ?`, n.ID); err != nil {
+			slog.Error("notification scheduler: failed to mark event as notified", "eventId", n.PublicID.String(), "err", err)
+		}
 	}
 
 	if len(notifications) > 0 {

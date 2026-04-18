@@ -25,8 +25,8 @@ type Config struct {
 	Version string
 }
 
-// LevelFromEnv parses NF_LOG_LEVEL (debug/info/warn/error), defaulting to
-// info.
+// LevelFromEnv parses ND_FLOW_LOG_LEVEL (debug/info/warn/error), defaulting
+// to info.
 func LevelFromEnv() slog.Level {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv("ND_FLOW_LOG_LEVEL"))) {
 	case "debug":

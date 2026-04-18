@@ -200,7 +200,7 @@ func main() {
 	// selects the redis-tagged driver when the binary is built with
 	// -tags redis. Mis-configured values log and fall back to MySQL
 	// so a bad env never locks users out.
-	sessions := buildSessionStore(cfg, queries, logger)
+	sessions := buildSessionStore(cfg, db, queries, logger)
 
 	// Agent runtime wiring. The runner (and optionally the mysql
 	// queue) is constructed before router.Build so the manual
@@ -232,7 +232,7 @@ func main() {
 		logger.Info("agent runner: orchestrator")
 	} else {
 		runner = &agentruntime.LogRunner{Sink: func(_ context.Context, j agentruntime.Job, _ time.Time) {
-			logger.Info("agent runtime: dispatch", "agent_id", j.AgentID, "ws", j.WsID)
+			logger.Info("agent runtime: dispatch", "agent_id", j.AgentID, "workspace_id", j.WsID)
 		}}
 	}
 	var agentQueue agentruntime.Queue

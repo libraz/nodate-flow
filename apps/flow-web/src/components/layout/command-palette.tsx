@@ -454,13 +454,10 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
     return items.filter((it) => normalize(it.label).includes(q));
   }, [items, query, mode]);
 
+  const filteredLen = filtered.length;
   useEffect(() => {
-    setActive(0);
-  }, []);
-
-  useEffect(() => {
-    if (active >= filtered.length) setActive(0);
-  }, [filtered, active]);
+    setActive((prev) => Math.min(prev, Math.max(filteredLen - 1, 0)));
+  }, [filteredLen]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, CommandItem[]>();

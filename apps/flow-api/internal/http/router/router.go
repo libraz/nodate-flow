@@ -229,7 +229,7 @@ func BuildResult(deps Deps) Result {
 
 	sessionStore := deps.Sessions
 	if sessionStore == nil {
-		sessionStore = sessionstore.NewMySQLStore(deps.Queries)
+		sessionStore = sessionstore.NewMySQLStore(deps.DB, deps.Queries)
 	}
 	auditRec := audit.New(deps.Queries)
 	authDeps := authhandlers.Deps{DB: deps.DB, Queries: deps.Queries, Sessions: sessionStore, JWT: deps.JWT, Cipher: deps.Cipher, CookieSecure: deps.CookieSecure, RegistrationOpen: deps.RegistrationOpen, Audit: auditRec}

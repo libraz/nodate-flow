@@ -73,28 +73,9 @@ export const pageKeys = {
 // Error helper
 // ---------------------------------------------------------------------------
 
-/** Lightweight error thrown when an API call fails. */
-export class PageApiError extends Error {
-  readonly code: string | undefined;
-  constructor(code: string | undefined, message: string) {
-    super(message);
-    this.name = 'PageApiError';
-    this.code = code;
-  }
-}
+import { ApiError, toApiError } from '../../lib/api-error';
 
-function toError(err: unknown, fallback: string): PageApiError {
-  if (err && typeof err === 'object') {
-    const obj = err as { detail?: unknown; title?: unknown; type?: unknown };
-    const message =
-      (typeof obj.detail === 'string' && obj.detail) ||
-      (typeof obj.title === 'string' && obj.title) ||
-      fallback;
-    const code = typeof obj.type === 'string' ? obj.type : undefined;
-    return new PageApiError(code, message);
-  }
-  return new PageApiError(undefined, fallback);
-}
+export { ApiError as PageApiError };
 
 // ---------------------------------------------------------------------------
 // Fetch helpers
@@ -117,7 +98,7 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as unknown;
-    throw toError(body, `Request failed with status ${String(res.status)}`);
+    throw toApiError(body, `Request failed with status ${String(res.status)}`);
   }
   return (await res.json()) as T;
 }
@@ -133,7 +114,7 @@ async function fetchVoid(url: string, init?: RequestInit): Promise<void> {
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as unknown;
-    throw toError(body, `Request failed with status ${String(res.status)}`);
+    throw toApiError(body, `Request failed with status ${String(res.status)}`);
   }
 }
 
@@ -203,9 +184,7 @@ export interface CreatePageArgs {
 }
 
 /** POST /workspaces/{wsId}/pages — create a new page. */
-export function useCreatePage(
-  wsId: string,
-): UseMutationResult<PageItem, PageApiError, CreatePageArgs> {
+export function useCreatePage(wsId: string): UseMutationResult<PageItem, ApiError, CreatePageArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ input }: CreatePageArgs): Promise<PageItem> => {
@@ -230,9 +209,7 @@ export interface UpdatePageArgs {
 }
 
 /** PATCH /workspaces/{wsId}/pages/{pageId} — update a page. */
-export function useUpdatePage(
-  wsId: string,
-): UseMutationResult<PageItem, PageApiError, UpdatePageArgs> {
+export function useUpdatePage(wsId: string): UseMutationResult<PageItem, ApiError, UpdatePageArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ pageId, patch }: UpdatePageArgs): Promise<PageItem> => {
@@ -250,7 +227,7 @@ export function useUpdatePage(
 }
 
 /** DELETE /workspaces/{wsId}/pages/{pageId} — soft delete. */
-export function useDeletePage(wsId: string): UseMutationResult<void, PageApiError, string> {
+export function useDeletePage(wsId: string): UseMutationResult<void, ApiError, string> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (pageId: string): Promise<void> => {
@@ -273,7 +250,7 @@ export interface GeneratePageArgs {
 /** POST /workspaces/{wsId}/pages/generate — AI page generation. */
 export function useGeneratePage(
   wsId: string,
-): UseMutationResult<PageItem, PageApiError, GeneratePageArgs> {
+): UseMutationResult<PageItem, ApiError, GeneratePageArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (args: GeneratePageArgs): Promise<PageItem> => {

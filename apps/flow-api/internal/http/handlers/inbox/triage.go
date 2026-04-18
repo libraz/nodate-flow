@@ -18,6 +18,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/inboxtriage"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/resolve"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
@@ -116,7 +117,7 @@ func Triage(deps TriageDeps) func(context.Context, *InboxTriageInput) (*InboxTri
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
 		}
-		wsID, err := resolveWorkspace(ctx, deps.DB, in.WorkspaceID, actorID)
+		wsID, err := resolve.WorkspaceMember(ctx, deps.DB, in.WorkspaceID, actorID)
 		if err != nil {
 			return nil, err
 		}

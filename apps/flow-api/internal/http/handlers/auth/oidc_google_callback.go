@@ -19,7 +19,14 @@ func OIDCGoogleCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*O
 		if deps.OIDC == nil {
 			return nil, httpErr(apierrors.AuthOidcProviderUnreachable)
 		}
-		idTok, err := deps.OIDC.Exchange(ctx, in.Code)
+		// Validate the state JWT to prevent CSRF. The signed state
+		// embeds the nonce, so we use the extracted nonce for the
+		// id_token verification below.
+		nonce, err := deps.JWT.VerifyOIDCState(in.State)
+		if err != nil {
+			return nil, httpErr(apierrors.AuthOidcStateMismatch)
+		}
+		idTok, err := deps.OIDC.Exchange(ctx, in.Code, nonce)
 		if err != nil {
 			return nil, httpErr(apierrors.AuthOidcIdTokenInvalid)
 		}

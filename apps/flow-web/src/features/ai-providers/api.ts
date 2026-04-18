@@ -28,28 +28,9 @@ export const aiProvidersKeys = {
   list: (workspaceId: string) => [...aiProvidersKeys.all, 'list', workspaceId] as const,
 };
 
-/** Lightweight error thrown when the SDK returns an error envelope. */
-export class AiProviderApiError extends Error {
-  readonly code: string | undefined;
-  constructor(code: string | undefined, message: string) {
-    super(message);
-    this.name = 'AiProviderApiError';
-    this.code = code;
-  }
-}
+import { ApiError, toApiError } from '../../lib/api-error';
 
-function toError(err: unknown, fallback: string): AiProviderApiError {
-  if (err && typeof err === 'object') {
-    const obj = err as { detail?: unknown; title?: unknown; type?: unknown };
-    const message =
-      (typeof obj.detail === 'string' && obj.detail) ||
-      (typeof obj.title === 'string' && obj.title) ||
-      fallback;
-    const code = typeof obj.type === 'string' ? obj.type : undefined;
-    return new AiProviderApiError(code, message);
-  }
-  return new AiProviderApiError(undefined, fallback);
-}
+export { ApiError as AiProviderApiError };
 
 /** GET /workspaces/{wsId}/ai/providers — masked list. */
 export function useAiProvidersQuery(workspaceId: string): UseSuspenseQueryResult<AiProvider[]> {
@@ -59,7 +40,7 @@ export function useAiProvidersQuery(workspaceId: string): UseSuspenseQueryResult
       const { data, error } = await sdk.GET('/workspaces/{wsId}/ai/providers', {
         params: { path: { wsId: workspaceId } },
       });
-      if (error || !data) throw toError(error, 'Failed to load AI providers');
+      if (error || !data) throw toApiError(error, 'Failed to load AI providers');
       return data.providers ?? [];
     },
   });
@@ -68,7 +49,7 @@ export function useAiProvidersQuery(workspaceId: string): UseSuspenseQueryResult
 /** POST /workspaces/{wsId}/ai/providers — register a provider with a write-only key. */
 export function useCreateAiProvider(
   workspaceId: string,
-): UseMutationResult<AiProvider, AiProviderApiError, CreateAiProviderInput> {
+): UseMutationResult<AiProvider, ApiError, CreateAiProviderInput> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: CreateAiProviderInput): Promise<AiProvider> => {
@@ -76,7 +57,7 @@ export function useCreateAiProvider(
         params: { path: { wsId: workspaceId } },
         body: input,
       });
-      if (error || !data) throw toError(error, 'Failed to create AI provider');
+      if (error || !data) throw toApiError(error, 'Failed to create AI provider');
       return data;
     },
     onSuccess: () => {
@@ -93,7 +74,7 @@ export interface UpdateAiProviderArgs {
 /** PATCH /workspaces/{wsId}/ai/providers/{providerId} — rotate the API key. */
 export function useUpdateAiProvider(
   workspaceId: string,
-): UseMutationResult<void, AiProviderApiError, UpdateAiProviderArgs> {
+): UseMutationResult<void, ApiError, UpdateAiProviderArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ providerId, patch }: UpdateAiProviderArgs): Promise<void> => {
@@ -101,7 +82,7 @@ export function useUpdateAiProvider(
         params: { path: { wsId: workspaceId, providerId } },
         body: patch,
       });
-      if (error) throw toError(error, 'Failed to update AI provider');
+      if (error) throw toApiError(error, 'Failed to update AI provider');
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: aiProvidersKeys.list(workspaceId) });
@@ -112,14 +93,14 @@ export function useUpdateAiProvider(
 /** DELETE /workspaces/{wsId}/ai/providers/{providerId}. */
 export function useDeleteAiProvider(
   workspaceId: string,
-): UseMutationResult<void, AiProviderApiError, string> {
+): UseMutationResult<void, ApiError, string> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (providerId: string): Promise<void> => {
       const { error } = await sdk.DELETE('/workspaces/{wsId}/ai/providers/{providerId}', {
         params: { path: { wsId: workspaceId, providerId } },
       });
-      if (error) throw toError(error, 'Failed to delete AI provider');
+      if (error) throw toApiError(error, 'Failed to delete AI provider');
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: aiProvidersKeys.list(workspaceId) });

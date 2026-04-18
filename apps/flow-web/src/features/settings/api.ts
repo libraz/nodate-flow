@@ -24,28 +24,9 @@ export const settingsKeys = {
   sessions: ['me', 'sessions'] as const,
 };
 
-/** Lightweight error thrown when the SDK returns an error envelope. */
-export class SettingsApiError extends Error {
-  readonly code: string | undefined;
-  constructor(code: string | undefined, message: string) {
-    super(message);
-    this.name = 'SettingsApiError';
-    this.code = code;
-  }
-}
+import { ApiError, toApiError } from '../../lib/api-error';
 
-function toError(err: unknown, fallback: string): SettingsApiError {
-  if (err && typeof err === 'object') {
-    const obj = err as { detail?: unknown; title?: unknown; type?: unknown };
-    const message =
-      (typeof obj.detail === 'string' && obj.detail) ||
-      (typeof obj.title === 'string' && obj.title) ||
-      fallback;
-    const code = typeof obj.type === 'string' ? obj.type : undefined;
-    return new SettingsApiError(code, message);
-  }
-  return new SettingsApiError(undefined, fallback);
-}
+export { ApiError as SettingsApiError };
 
 /** GET /me — current authenticated user profile. */
 export function useMeQuery(): UseSuspenseQueryResult<Me> {
@@ -53,7 +34,7 @@ export function useMeQuery(): UseSuspenseQueryResult<Me> {
     queryKey: settingsKeys.me,
     queryFn: async (): Promise<Me> => {
       const { data, error } = await sdk.GET('/me');
-      if (error || !data) throw toError(error, 'Failed to load profile');
+      if (error || !data) throw toApiError(error, 'Failed to load profile');
       return data;
     },
   });
@@ -67,18 +48,13 @@ interface UpdateMeContext {
  * PATCH /me — update profile fields with an optimistic cache update.
  * Rolls back to the previous snapshot on failure.
  */
-export function useUpdateMe(): UseMutationResult<
-  Me,
-  SettingsApiError,
-  PatchMeInput,
-  UpdateMeContext
-> {
+export function useUpdateMe(): UseMutationResult<Me, ApiError, PatchMeInput, UpdateMeContext> {
   const qc = useQueryClient();
-  return useMutation<Me, SettingsApiError, PatchMeInput, UpdateMeContext>({
+  return useMutation<Me, ApiError, PatchMeInput, UpdateMeContext>({
     throwOnError: false,
     mutationFn: async (input: PatchMeInput): Promise<Me> => {
       const { data, error } = await sdk.PATCH('/me', { body: input });
-      if (error || !data) throw toError(error, 'Failed to update profile');
+      if (error || !data) throw toApiError(error, 'Failed to update profile');
       return data;
     },
     onMutate: async (input: PatchMeInput): Promise<UpdateMeContext> => {
@@ -97,6 +73,9 @@ export function useUpdateMe(): UseMutationResult<
     onSuccess: (data) => {
       qc.setQueryData<Me>(settingsKeys.me, data);
     },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: settingsKeys.me });
+    },
   });
 }
 
@@ -106,22 +85,22 @@ export function useMySessionsQuery(): UseSuspenseQueryResult<SessionSummary[]> {
     queryKey: settingsKeys.sessions,
     queryFn: async (): Promise<SessionSummary[]> => {
       const { data, error } = await sdk.GET('/me/sessions');
-      if (error || !data) throw toError(error, 'Failed to load sessions');
+      if (error || !data) throw toApiError(error, 'Failed to load sessions');
       return data.items ?? [];
     },
   });
 }
 
 /** DELETE /me/sessions/{sessionId} — revoke a single session. */
-export function useRevokeSession(): UseMutationResult<void, SettingsApiError, string> {
+export function useRevokeSession(): UseMutationResult<void, ApiError, string> {
   const qc = useQueryClient();
-  return useMutation<void, SettingsApiError, string>({
+  return useMutation<void, ApiError, string>({
     throwOnError: false,
     mutationFn: async (sessionId: string): Promise<void> => {
       const { error } = await sdk.DELETE('/me/sessions/{sessionId}', {
         params: { path: { sessionId } },
       });
-      if (error) throw toError(error, 'Failed to revoke session');
+      if (error) throw toApiError(error, 'Failed to revoke session');
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: settingsKeys.sessions });
@@ -143,7 +122,7 @@ export function useTotpStatusQuery(): UseSuspenseQueryResult<TotpStatus> {
     queryKey: totpKeys.status,
     queryFn: async (): Promise<TotpStatus> => {
       const { data, error } = await sdk.GET('/me/totp');
-      if (error || !data) throw toError(error, 'Failed to load 2FA status');
+      if (error || !data) throw toApiError(error, 'Failed to load 2FA status');
       return data.status;
     },
   });
@@ -154,13 +133,13 @@ export interface TotpEnrollResponse {
   secret: string;
 }
 
-export function useTotpEnroll(): UseMutationResult<TotpEnrollResponse, SettingsApiError, void> {
+export function useTotpEnroll(): UseMutationResult<TotpEnrollResponse, ApiError, void> {
   const qc = useQueryClient();
-  return useMutation<TotpEnrollResponse, SettingsApiError, void>({
+  return useMutation<TotpEnrollResponse, ApiError, void>({
     throwOnError: false,
     mutationFn: async (): Promise<TotpEnrollResponse> => {
       const { data, error } = await sdk.POST('/me/totp/enroll');
-      if (error || !data) throw toError(error, 'Failed to start 2FA enrollment');
+      if (error || !data) throw toApiError(error, 'Failed to start 2FA enrollment');
       return { otpauthUrl: data.otpauthUrl, secret: data.secret };
     },
     onSuccess: () => {
@@ -173,13 +152,13 @@ export interface TotpConfirmResponse {
   recoveryCodes: string[];
 }
 
-export function useTotpConfirm(): UseMutationResult<TotpConfirmResponse, SettingsApiError, string> {
+export function useTotpConfirm(): UseMutationResult<TotpConfirmResponse, ApiError, string> {
   const qc = useQueryClient();
-  return useMutation<TotpConfirmResponse, SettingsApiError, string>({
+  return useMutation<TotpConfirmResponse, ApiError, string>({
     throwOnError: false,
     mutationFn: async (code: string): Promise<TotpConfirmResponse> => {
       const { data, error } = await sdk.POST('/me/totp/confirm', { body: { code } });
-      if (error || !data) throw toError(error, 'Failed to confirm 2FA code');
+      if (error || !data) throw toApiError(error, 'Failed to confirm 2FA code');
       return { recoveryCodes: data.recoveryCodes ?? [] };
     },
     onSuccess: () => {
@@ -194,7 +173,7 @@ export function useRecoveryCodesStatusQuery(): UseSuspenseQueryResult<number> {
     queryKey: totpKeys.recovery,
     queryFn: async (): Promise<number> => {
       const { data, error } = await sdk.GET('/me/totp/recovery-codes');
-      if (error || !data) throw toError(error, 'Failed to load recovery code status');
+      if (error || !data) throw toApiError(error, 'Failed to load recovery code status');
       return data.remaining;
     },
   });
@@ -202,15 +181,15 @@ export function useRecoveryCodesStatusQuery(): UseSuspenseQueryResult<number> {
 
 export function useRegenerateRecoveryCodes(): UseMutationResult<
   TotpConfirmResponse,
-  SettingsApiError,
+  ApiError,
   string
 > {
   const qc = useQueryClient();
-  return useMutation<TotpConfirmResponse, SettingsApiError, string>({
+  return useMutation<TotpConfirmResponse, ApiError, string>({
     throwOnError: false,
     mutationFn: async (password: string): Promise<TotpConfirmResponse> => {
       const { data, error } = await sdk.POST('/me/totp/recovery-codes', { body: { password } });
-      if (error || !data) throw toError(error, 'Failed to regenerate recovery codes');
+      if (error || !data) throw toApiError(error, 'Failed to regenerate recovery codes');
       return { recoveryCodes: data.recoveryCodes ?? [] };
     },
     onSuccess: () => {
@@ -219,13 +198,13 @@ export function useRegenerateRecoveryCodes(): UseMutationResult<
   });
 }
 
-export function useTotpDisable(): UseMutationResult<void, SettingsApiError, string> {
+export function useTotpDisable(): UseMutationResult<void, ApiError, string> {
   const qc = useQueryClient();
-  return useMutation<void, SettingsApiError, string>({
+  return useMutation<void, ApiError, string>({
     throwOnError: false,
     mutationFn: async (password: string): Promise<void> => {
       const { error } = await sdk.DELETE('/me/totp', { body: { password } });
-      if (error) throw toError(error, 'Failed to disable 2FA');
+      if (error) throw toApiError(error, 'Failed to disable 2FA');
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: totpKeys.status });
@@ -243,15 +222,15 @@ export interface ChangePasswordResponse {
 }
 export function useChangePassword(): UseMutationResult<
   ChangePasswordResponse,
-  SettingsApiError,
+  ApiError,
   ChangePasswordRequest
 > {
   const qc = useQueryClient();
-  return useMutation<ChangePasswordResponse, SettingsApiError, ChangePasswordRequest>({
+  return useMutation<ChangePasswordResponse, ApiError, ChangePasswordRequest>({
     throwOnError: false,
     mutationFn: async (input: ChangePasswordRequest): Promise<ChangePasswordResponse> => {
       const { data, error } = await sdk.POST('/me/password', { body: input });
-      if (error || !data) throw toError(error, 'Failed to change password');
+      if (error || !data) throw toApiError(error, 'Failed to change password');
       return { otherSessionsRevoked: data.otherSessionsRevoked };
     },
     onSuccess: () => {
@@ -263,15 +242,15 @@ export function useChangePassword(): UseMutationResult<
 /** DELETE /me/sessions — revoke every other session except the current one. */
 export function useRevokeAllOtherSessions(): UseMutationResult<
   { revoked: number },
-  SettingsApiError,
+  ApiError,
   void
 > {
   const qc = useQueryClient();
-  return useMutation<{ revoked: number }, SettingsApiError, void>({
+  return useMutation<{ revoked: number }, ApiError, void>({
     throwOnError: false,
     mutationFn: async (): Promise<{ revoked: number }> => {
       const { data, error } = await sdk.DELETE('/me/sessions');
-      if (error || !data) throw toError(error, 'Failed to revoke sessions');
+      if (error || !data) throw toApiError(error, 'Failed to revoke sessions');
       return { revoked: data.revoked };
     },
     onSuccess: () => {

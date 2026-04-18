@@ -12,35 +12,9 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/resolve"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 )
-
-// resolveWorkspace loads the internal workspace id from a public UUID
-// and verifies that the actor is an enabled member of it.
-func resolveWorkspace(ctx context.Context, db *sql.DB, wsPublic string, actorID uint32) (uint32, error) {
-	pub, err := types.Parse(wsPublic)
-	if err != nil {
-		return 0, httpErr(apierrors.WsWorkspaceNotFound)
-	}
-	const wsLookup = `SELECT id FROM workspaces WHERE public_id = ? AND enabled = TRUE LIMIT 1`
-	var wsID uint32
-	if err := db.QueryRowContext(ctx, wsLookup, pub).Scan(&wsID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, httpErr(apierrors.WsWorkspaceNotFound)
-		}
-		return 0, httpErr(apierrors.InternalUnexpected)
-	}
-	const wsMemQuery = `SELECT 1 FROM workspace_members
-WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
-	var one int
-	if err := db.QueryRowContext(ctx, wsMemQuery, wsID, actorID).Scan(&one); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, httpErr(apierrors.WsWorkspaceAccessDenied)
-		}
-		return 0, httpErr(apierrors.InternalUnexpected)
-	}
-	return wsID, nil
-}
 
 // resolveTaskInWorkspace loads the internal task id for a public UUID,
 // constrained to the given workspace. Returns (0, false, nil) when the
@@ -70,7 +44,7 @@ func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
 		}
-		wsID, err := resolveWorkspace(ctx, deps.DB, in.Body.WorkspaceID, actorID)
+		wsID, err := resolve.WorkspaceMember(ctx, deps.DB, in.Body.WorkspaceID, actorID)
 		if err != nil {
 			return nil, err
 		}

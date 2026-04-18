@@ -218,6 +218,12 @@ func UpdateChecklistItem(deps Deps) func(context.Context, *UpdateChecklistItemIn
 			return nil, huma.Error500InternalServerError("Failed to update checklist item", err)
 		}
 
+		_ = eventbus.Append(ctx, deps.DB, wsID, "calendar.event.checklist.updated", &actorID, map[string]any{
+			"eventId":    input.EvtId,
+			"calendarId": input.CalId,
+			"itemId":     input.ItemId,
+		})
+
 		out := &UpdateChecklistItemOutput{}
 		out.Body.Updated = true
 		return out, nil

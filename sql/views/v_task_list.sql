@@ -21,23 +21,8 @@ SELECT
   t.sort_weight,
   t.updated_at,
   t.created_at,
-  (
-    SELECT u.public_id
-    FROM task_actors ta
-    INNER JOIN users u ON u.id = ta.user_id AND u.enabled = TRUE
-    WHERE ta.task_id = t.id
-      AND ta.enabled = TRUE
-      AND ta.role = 'assignee'
-    ORDER BY ta.sort_weight ASC, ta.id ASC
-    LIMIT 1
-  ) AS primary_assignee_public_id,
-  (
-    SELECT COUNT(*)
-    FROM task_actors ta
-    WHERE ta.task_id = t.id
-      AND ta.enabled = TRUE
-      AND ta.role = 'assignee'
-  ) AS assignee_count
+  assignees.primary_assignee_public_id,
+  COALESCE(assignees.assignee_count, 0) AS assignee_count
 FROM tasks t
 INNER JOIN projects p
   ON p.id = t.project_id AND p.enabled = TRUE
@@ -45,4 +30,18 @@ INNER JOIN workspaces w
   ON w.id = t.workspace_id AND w.enabled = TRUE
 LEFT JOIN tasks pt
   ON pt.id = t.parent_task_id AND pt.enabled = TRUE
+LEFT JOIN (
+  SELECT
+    ta.task_id,
+    MIN(CASE WHEN rn = 1 THEN u.public_id END) AS primary_assignee_public_id,
+    COUNT(*) AS assignee_count
+  FROM (
+    SELECT ta2.task_id, ta2.user_id,
+           ROW_NUMBER() OVER (PARTITION BY ta2.task_id ORDER BY ta2.sort_weight ASC, ta2.id ASC) AS rn
+    FROM task_actors ta2
+    WHERE ta2.enabled = TRUE AND ta2.role = 'assignee'
+  ) ta
+  INNER JOIN users u ON u.id = ta.user_id AND u.enabled = TRUE
+  GROUP BY ta.task_id
+) assignees ON assignees.task_id = t.id
 WHERE t.enabled = TRUE;

@@ -11,6 +11,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
 // Deps is the dependency bundle passed to each handler in this package.
@@ -336,24 +337,11 @@ type InviteInfoOutputBody struct {
 	ExpiresAt     *time.Time `json:"expiresAt,omitempty"`
 }
 
-// nullStr converts a sql.NullString to a plain string (empty when NULL).
-func nullStr(s sql.NullString) string {
-	if s.Valid {
-		return s.String
-	}
-	return ""
-}
+// nullStr delegates to handlerutil.NullStr.
+var nullStr = handlerutil.NullStr
 
-// nullTime converts a sql.NullTime to a *time.Time, returning nil when
-// the column is NULL so the field is omitted from JSON instead of being
-// serialised as Go zero-time ("0001-01-01T00:00:00Z").
-func nullTime(t sql.NullTime) *time.Time {
-	if t.Valid {
-		v := t.Time
-		return &v
-	}
-	return nil
-}
+// nullTime delegates to handlerutil.NullTime.
+var nullTime = handlerutil.NullTime
 
 // timePtr wraps a non-null time.Time so it can be assigned to a
 // *time.Time DTO field.

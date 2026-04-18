@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DateTime } from 'luxon';
 
 import { api } from '../../lib/api-client';
+import { useWorkspaceStore } from '../../stores/workspace-store';
 import { expandAllRecurrences } from './recurrence';
 import type { Calendar, CalendarEvent, CalendarMember, Rsvp, SubscriptionRole } from './types';
 
@@ -9,7 +10,8 @@ export const calendarKeys = {
   all: ['calendars'] as const,
   lists: () => [...calendarKeys.all, 'list'] as const,
   events: (calendarId: string) => [...calendarKeys.all, calendarId, 'events'] as const,
-  eventRange: (start: string, end: string) => ['calendar-events', start, end] as const,
+  eventRange: (start: string, end: string) =>
+    [...calendarKeys.all, 'events-range', start, end] as const,
   members: (calendarId: string) => [...calendarKeys.all, calendarId, 'members'] as const,
   invites: (calendarId: string) => [...calendarKeys.all, calendarId, 'invites'] as const,
   comments: (eventId: string) => ['comments', eventId] as const,
@@ -17,23 +19,29 @@ export const calendarKeys = {
 };
 
 export function useCalendarsQuery() {
+  const wsId = useWorkspaceStore((s) => s.workspaceId);
   return useQuery({
-    queryKey: calendarKeys.lists(),
-    queryFn: () => api.get<{ items: Calendar[] }>('/calendars').then((r) => r.items),
+    queryKey: [...calendarKeys.lists(), wsId],
+    queryFn: () =>
+      api.get<{ calendars: Calendar[] }>(`/workspaces/${wsId}/calendars`).then((r) => r.calendars),
+    enabled: !!wsId,
   });
 }
 
 export function useCalendarEventsQuery(start: string, end: string, enabled = true) {
+  const wsId = useWorkspaceStore((s) => s.workspaceId);
   return useQuery({
-    queryKey: calendarKeys.eventRange(start, end),
+    queryKey: [...calendarKeys.eventRange(start, end), wsId],
     queryFn: () =>
       api
-        .get<{ items: CalendarEvent[] }>(`/events?start=${start}&end=${end}`)
-        .then((r) => r.items)
+        .get<{ events: CalendarEvent[] }>(
+          `/workspaces/${wsId}/calendar-events?start=${start}&end=${end}`,
+        )
+        .then((r) => r.events)
         .then((items) =>
           expandAllRecurrences(items, DateTime.fromISO(start), DateTime.fromISO(end)),
         ),
-    enabled,
+    enabled: enabled && !!wsId,
   });
 }
 
@@ -53,8 +61,11 @@ interface CreateEventInput {
 export function useCreateEventMutation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateEventInput) =>
-      api.post<CalendarEvent>(`/calendars/${input.calendarId}/events`, input),
+    mutationFn: (input: CreateEventInput) => {
+      const wsId = useWorkspaceStore.getState().workspaceId;
+      const { calendarId, ...body } = input;
+      return api.post<CalendarEvent>(`/workspaces/${wsId}/calendars/${calendarId}/events`, body);
+    },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: calendarKeys.all });
     },
@@ -73,13 +84,20 @@ interface UpdateEventInput {
   showAs?: string | undefined;
   location?: string | undefined;
   memo?: string | undefined;
+  recurrenceExceptions?: string[] | undefined;
 }
 
 export function useUpdateEventMutation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: UpdateEventInput) =>
-      api.patch<CalendarEvent>(`/calendars/${input.calendarId}/events/${input.eventId}`, input),
+    mutationFn: (input: UpdateEventInput) => {
+      const wsId = useWorkspaceStore.getState().workspaceId;
+      const { eventId, calendarId, ...body } = input;
+      return api.patch<CalendarEvent>(
+        `/workspaces/${wsId}/calendars/${calendarId}/events/${eventId}`,
+        body,
+      );
+    },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: calendarKeys.all });
     },
@@ -89,8 +107,10 @@ export function useUpdateEventMutation() {
 export function useDeleteEventMutation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ calendarId, eventId }: { calendarId: string; eventId: string }) =>
-      api.delete(`/calendars/${calendarId}/events/${eventId}`),
+    mutationFn: ({ calendarId, eventId }: { calendarId: string; eventId: string }) => {
+      const wsId = useWorkspaceStore.getState().workspaceId;
+      return api.delete(`/workspaces/${wsId}/calendars/${calendarId}/events/${eventId}`);
+    },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: calendarKeys.all });
     },

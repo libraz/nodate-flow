@@ -2,9 +2,12 @@ package calendars
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/google/uuid"
 
 	generated "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/types"
@@ -51,6 +54,39 @@ type CreateMemoInput struct {
 // CreateMemoOutput is the response for the create memo endpoint.
 type CreateMemoOutput struct {
 	Body MemoResponse
+}
+
+// UpdateMemoInput is the input for the update memo endpoint.
+type UpdateMemoInput struct {
+	WsId   string `path:"wsId" doc:"Workspace public ID"`
+	CalId  string `path:"calId" doc:"Calendar public ID"`
+	MemoId string `path:"memoId" doc:"Memo public ID"`
+	Body   struct {
+		Title      *string `json:"title,omitempty" minLength:"1" maxLength:"500" required:"false" doc:"Memo title"`
+		Done       *bool   `json:"done,omitempty" required:"false" doc:"Whether the memo is done"`
+		SortWeight *int32  `json:"sortWeight,omitempty" required:"false" doc:"Sort weight for ordering"`
+	}
+}
+
+// UpdateMemoOutput is the response for the update memo endpoint.
+type UpdateMemoOutput struct {
+	Body struct {
+		Updated bool `json:"updated"`
+	}
+}
+
+// DeleteMemoInput is the input for the delete memo endpoint.
+type DeleteMemoInput struct {
+	WsId   string `path:"wsId" doc:"Workspace public ID"`
+	CalId  string `path:"calId" doc:"Calendar public ID"`
+	MemoId string `path:"memoId" doc:"Memo public ID"`
+}
+
+// DeleteMemoOutput is the response for the delete memo endpoint.
+type DeleteMemoOutput struct {
+	Body struct {
+		Deleted bool `json:"deleted"`
+	}
 }
 
 // --- Handlers ---
@@ -131,6 +167,113 @@ func CreateMemo(deps Deps) func(context.Context, *CreateMemoInput) (*CreateMemoO
 			"memoId":     memoPublicID.String(),
 			"calendarId": input.CalId,
 			"title":      input.Body.Title,
+		})
+
+		return out, nil
+	}
+}
+
+// UpdateMemo updates a memo's title, done status, or sort weight.
+func UpdateMemo(deps Deps) func(context.Context, *UpdateMemoInput) (*UpdateMemoOutput, error) {
+	return func(ctx context.Context, input *UpdateMemoInput) (*UpdateMemoOutput, error) {
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		if err != nil {
+			return nil, err
+		}
+		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		if err != nil {
+			return nil, err
+		}
+
+		memoUID, err := uuid.Parse(input.MemoId)
+		if err != nil {
+			return nil, huma.Error404NotFound("Memo not found")
+		}
+
+		_, err = deps.Queries.FindCalendarMemoByPublicId(ctx, generated.FindCalendarMemoByPublicIdParams{
+			PublicID:   types.FromUUID(memoUID),
+			CalendarID: cal.ID,
+		})
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, huma.Error404NotFound("Memo not found")
+			}
+			return nil, huma.Error500InternalServerError("Failed to find memo", err)
+		}
+
+		params := generated.UpdateCalendarMemoParams{
+			PublicID:   types.FromUUID(memoUID),
+			CalendarID: cal.ID,
+		}
+		if input.Body.Title != nil {
+			params.Title = sql.NullString{String: *input.Body.Title, Valid: true}
+		}
+		if input.Body.Done != nil {
+			params.Done = sql.NullBool{Bool: *input.Body.Done, Valid: true}
+		}
+		if input.Body.SortWeight != nil {
+			params.SortWeight = sql.NullInt32{Int32: *input.Body.SortWeight, Valid: true}
+		}
+
+		err = deps.Queries.UpdateCalendarMemo(ctx, params)
+		if err != nil {
+			return nil, huma.Error500InternalServerError("Failed to update memo", err)
+		}
+
+		out := &UpdateMemoOutput{}
+		out.Body.Updated = true
+
+		_ = eventbus.Append(ctx, deps.DB, wsID, "calendar.memo.updated", &actorID, map[string]any{
+			"memoId":     input.MemoId,
+			"calendarId": input.CalId,
+		})
+
+		return out, nil
+	}
+}
+
+// DeleteMemo soft-deletes a memo from a calendar.
+func DeleteMemo(deps Deps) func(context.Context, *DeleteMemoInput) (*DeleteMemoOutput, error) {
+	return func(ctx context.Context, input *DeleteMemoInput) (*DeleteMemoOutput, error) {
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		if err != nil {
+			return nil, err
+		}
+		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		if err != nil {
+			return nil, err
+		}
+
+		memoUID, err := uuid.Parse(input.MemoId)
+		if err != nil {
+			return nil, huma.Error404NotFound("Memo not found")
+		}
+
+		_, err = deps.Queries.FindCalendarMemoByPublicId(ctx, generated.FindCalendarMemoByPublicIdParams{
+			PublicID:   types.FromUUID(memoUID),
+			CalendarID: cal.ID,
+		})
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, huma.Error404NotFound("Memo not found")
+			}
+			return nil, huma.Error500InternalServerError("Failed to find memo", err)
+		}
+
+		err = deps.Queries.DisableCalendarMemo(ctx, generated.DisableCalendarMemoParams{
+			PublicID:   types.FromUUID(memoUID),
+			CalendarID: cal.ID,
+		})
+		if err != nil {
+			return nil, huma.Error500InternalServerError("Failed to delete memo", err)
+		}
+
+		out := &DeleteMemoOutput{}
+		out.Body.Deleted = true
+
+		_ = eventbus.Append(ctx, deps.DB, wsID, "calendar.memo.deleted", &actorID, map[string]any{
+			"memoId":     input.MemoId,
+			"calendarId": input.CalId,
 		})
 
 		return out, nil

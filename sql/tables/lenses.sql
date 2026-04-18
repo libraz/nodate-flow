@@ -15,8 +15,8 @@ CREATE TABLE lenses (
   is_default BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Default lens for the scope',
   is_public BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Whether the lens is publicly shared',
   public_token CHAR(32) CHARACTER SET latin1 NULL COMMENT 'Random hex token for public share URL',
-  shared_at DATETIME(3) NULL COMMENT 'Timestamp when first shared publicly',
-  safety_checked_at DATETIME(3) NULL COMMENT 'Timestamp of last AI safety check',
+  shared_at DATETIME NULL COMMENT 'Timestamp when first shared publicly',
+  safety_checked_at DATETIME NULL COMMENT 'Timestamp of last AI safety check',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',

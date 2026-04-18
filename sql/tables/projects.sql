@@ -22,7 +22,7 @@ CREATE TABLE projects (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   UNIQUE KEY uniq_projects_public_id (public_id),
-  UNIQUE KEY uniq_projects_workspace_id_slug (workspace_id, slug),
+  UNIQUE KEY uniq_projects_workspace_id_slug_enabled (workspace_id, slug, enabled),
   KEY idx_projects_workspace_id_enabled (workspace_id, enabled),
 
   CONSTRAINT fk_projects_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE

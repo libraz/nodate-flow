@@ -528,6 +528,9 @@ type Querier interface {
 	ListProvidersForWorkspace(ctx context.Context, arg ListProvidersForWorkspaceParams) ([]ListProvidersForWorkspaceRow, error)
 	// List recent audit log entries for a workspace via v_audit_recent.
 	ListRecentAudit(ctx context.Context, arg ListRecentAuditParams) ([]ListRecentAuditRow, error)
+	// Cross-calendar query: list recurring events across multiple calendars
+	// whose recurrence window overlaps the query range.
+	ListRecurringCalendarEventsAcrossCalendars(ctx context.Context, arg ListRecurringCalendarEventsAcrossCalendarsParams) ([]ListRecurringCalendarEventsAcrossCalendarsRow, error)
 	// List recurring events whose recurrence window overlaps the query range.
 	ListRecurringCalendarEventsByRange(ctx context.Context, arg ListRecurringCalendarEventsByRangeParams) ([]ListRecurringCalendarEventsByRangeRow, error)
 	// List all active repository mappings for a workspace. Returns metadata

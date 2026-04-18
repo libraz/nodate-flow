@@ -13,7 +13,7 @@ import Select from '@nodate-flow/ui/primitives/select';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { Link, useNavigate } from '@tanstack/react-router';
 import type { ColumnDef, RowSelectionState } from '@tanstack/react-table';
-import { type DragEvent, type ReactElement, useCallback, useRef, useState } from 'react';
+import { type DragEvent, type ReactElement, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { computeBlockedByOpen, useProjectDependenciesQuery } from '../projects/api';
@@ -276,6 +276,15 @@ function InlineTitleCell({
      cancels the pending navigate and enters edit mode instead. */
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Clean up pending click timer on unmount to prevent stale navigation.
+  useEffect(() => {
+    return () => {
+      if (clickTimer.current !== null) {
+        clearTimeout(clickTimer.current);
+      }
+    };
+  }, []);
+
   return (
     <Link
       to="/tasks/$taskId"
@@ -527,6 +536,10 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
     setDropIdx(null);
   }, []);
 
+  const handleDragLeave = useCallback(() => {
+    setDropIdx(null);
+  }, []);
+
   const handleDrop = useCallback(
     (e: DragEvent, targetIdx: number) => {
       e.preventDefault();
@@ -589,6 +602,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
           title={t('tasks.reorder.drag_handle')}
           onDragStart={(e) => handleDragStart(e, row.index)}
           onDragOver={(e) => handleDragOver(e, row.index)}
+          onDragLeave={handleDragLeave}
           onDragEnd={handleDragEnd}
           onDrop={(e) => handleDrop(e, row.index)}
           style={{

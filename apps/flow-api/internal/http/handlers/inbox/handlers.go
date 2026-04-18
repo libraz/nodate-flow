@@ -2,8 +2,6 @@ package inbox
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,38 +9,9 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/resolve"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 )
-
-// resolveWorkspace validates the caller's membership of the workspace
-// identified by a public UUID.
-func resolveWorkspace(ctx context.Context, db *sql.DB, wsPublic string, actorID uint32) (uint32, error) {
-	if wsPublic == "" {
-		return 0, httpErr(apierrors.WsWorkspaceNotFound)
-	}
-	pub, err := types.Parse(wsPublic)
-	if err != nil {
-		return 0, httpErr(apierrors.WsWorkspaceNotFound)
-	}
-	const wsLookup = `SELECT id FROM workspaces WHERE public_id = ? AND enabled = TRUE LIMIT 1`
-	var wsID uint32
-	if err := db.QueryRowContext(ctx, wsLookup, pub).Scan(&wsID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, httpErr(apierrors.WsWorkspaceNotFound)
-		}
-		return 0, httpErr(apierrors.InternalUnexpected)
-	}
-	const wsMemQuery = `SELECT 1 FROM workspace_members
-WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
-	var one int
-	if err := db.QueryRowContext(ctx, wsMemQuery, wsID, actorID).Scan(&one); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, httpErr(apierrors.WsWorkspaceAccessDenied)
-		}
-		return 0, httpErr(apierrors.InternalUnexpected)
-	}
-	return wsID, nil
-}
 
 // List handles GET /inbox. When workspaceId is provided it scopes the
 // result to that workspace (after verifying membership). When omitted it
@@ -62,7 +31,7 @@ func List(deps Deps) func(context.Context, *ListInboxInput) (*ListInboxOutput, e
 		out.Body.Items = []InboxItem{}
 
 		if in.WorkspaceID != "" {
-			wsID, err := resolveWorkspace(ctx, deps.DB, in.WorkspaceID, actorID)
+			wsID, err := resolve.WorkspaceMember(ctx, deps.DB, in.WorkspaceID, actorID)
 			if err != nil {
 				return nil, err
 			}
@@ -130,7 +99,7 @@ func Archive(deps Deps) func(context.Context, *ArchiveInboxInput) (*ArchiveInbox
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
 		}
-		wsID, err := resolveWorkspace(ctx, deps.DB, in.WorkspaceID, actorID)
+		wsID, err := resolve.WorkspaceMember(ctx, deps.DB, in.WorkspaceID, actorID)
 		if err != nil {
 			return nil, err
 		}
@@ -157,7 +126,7 @@ func Snooze(deps Deps) func(context.Context, *SnoozeInboxInput) (*SnoozeInboxOut
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
 		}
-		wsID, err := resolveWorkspace(ctx, deps.DB, in.WorkspaceID, actorID)
+		wsID, err := resolve.WorkspaceMember(ctx, deps.DB, in.WorkspaceID, actorID)
 		if err != nil {
 			return nil, err
 		}

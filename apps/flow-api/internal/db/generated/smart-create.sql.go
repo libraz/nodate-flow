@@ -23,8 +23,12 @@ SELECT
   u.display_name AS assignee_name,
   u.public_id AS assignee_public_id
 FROM tasks t
-LEFT JOIN task_actors ta ON ta.task_id = t.id
-  AND ta.role = 'assignee' AND ta.enabled = TRUE AND ta.kind = 'user'
+LEFT JOIN (
+  SELECT ta_inner.task_id, ta_inner.user_id,
+         ROW_NUMBER() OVER (PARTITION BY ta_inner.task_id ORDER BY ta_inner.id ASC) AS rn
+  FROM task_actors ta_inner
+  WHERE ta_inner.role = 'assignee' AND ta_inner.enabled = TRUE AND ta_inner.kind = 'user'
+) ta ON ta.task_id = t.id AND ta.rn = 1
 LEFT JOIN users u ON u.id = ta.user_id AND u.enabled = TRUE
 WHERE t.workspace_id = ?
   AND t.enabled = TRUE

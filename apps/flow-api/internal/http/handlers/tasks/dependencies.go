@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
@@ -118,6 +119,15 @@ func AddDependency(deps Deps) func(context.Context, *AddTaskDependencyInput) (*A
 				"kind":         in.Body.Kind,
 			},
 		})
+		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "task.dependency.add",
+				ActorID:      aID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "task_dependency",
+				ResourceID:   pub.String(),
+			})
+		}
 		autoEvaluateConstraints(ctx, deps, ws.ID, task.ID)
 		return &AddTaskDependencyOutput{Body: TaskDependency{
 			ID:         pub.String(),
@@ -160,6 +170,15 @@ func RemoveDependency(deps Deps) func(context.Context, *RemoveTaskDependencyInpu
 				"dependencyId": depID.String(),
 			},
 		})
+		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "task.dependency.remove",
+				ActorID:      aID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "task_dependency",
+				ResourceID:   depID.String(),
+			})
+		}
 		autoEvaluateConstraints(ctx, deps, ws.ID, task.ID)
 		out := &RemoveTaskDependencyOutput{}
 		out.Body.Ok = true

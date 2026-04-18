@@ -54,9 +54,13 @@ export function useAuthBootstrap(): BootstrapResult {
     if (!bootstrapPromise) {
       bootstrapPromise = runBootstrap();
     }
-    bootstrapPromise.then((next) => {
-      if (!cancelled) setStatus(next);
-    });
+    bootstrapPromise
+      .then((next) => {
+        if (!cancelled) setStatus(next);
+      })
+      .catch(() => {
+        if (!cancelled) setStatus('unauthenticated');
+      });
     return () => {
       cancelled = true;
     };

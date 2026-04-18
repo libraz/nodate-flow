@@ -67,7 +67,7 @@ type CreateWorkspaceInviteParams struct {
 	WorkspaceID     uint32               `json:"-"`
 	TokenHash       string               `json:"tokenHash"`
 	Role            WorkspaceInvitesRole `json:"role"`
-	CreatedByUserID uint32               `json:"-"`
+	CreatedByUserID sql.NullInt32        `json:"-"`
 	MaxUses         sql.NullInt32        `json:"maxUses"`
 	ExpiresAt       sql.NullTime         `json:"expiresAt"`
 	Label           sql.NullString       `json:"label"`
@@ -234,7 +234,7 @@ type FindWorkspaceInviteByTokenHashRow struct {
 	WorkspaceID     uint32               `json:"-"`
 	TokenHash       string               `json:"tokenHash"`
 	Role            WorkspaceInvitesRole `json:"role"`
-	CreatedByUserID uint32               `json:"-"`
+	CreatedByUserID sql.NullInt32        `json:"-"`
 	MaxUses         sql.NullInt32        `json:"maxUses"`
 	UseCount        uint32               `json:"useCount"`
 	ExpiresAt       sql.NullTime         `json:"expiresAt"`

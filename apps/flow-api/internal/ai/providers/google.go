@@ -87,7 +87,10 @@ func (p *googleProvider) Complete(ctx context.Context, req Request) (*Response, 
 		return nil, fmt.Errorf("google: do: %w", err)
 	}
 	defer resp.Body.Close()
-	raw, _ := io.ReadAll(resp.Body)
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("google: read body: %w", err)
+	}
 	if resp.StatusCode/100 != 2 {
 		return nil, fmt.Errorf("google: upstream status %d", resp.StatusCode)
 	}

@@ -51,28 +51,9 @@ export const notificationKeys = {
   unreadCount: () => [...notificationKeys.all, 'unread-count'] as const,
 };
 
-/** Lightweight error thrown when an API call fails. */
-export class NotificationApiError extends Error {
-  readonly code: string | undefined;
-  constructor(code: string | undefined, message: string) {
-    super(message);
-    this.name = 'NotificationApiError';
-    this.code = code;
-  }
-}
+import { ApiError, toApiError } from '../../lib/api-error';
 
-function toError(err: unknown, fallback: string): NotificationApiError {
-  if (err && typeof err === 'object') {
-    const obj = err as { detail?: unknown; title?: unknown; type?: unknown };
-    const message =
-      (typeof obj.detail === 'string' && obj.detail) ||
-      (typeof obj.title === 'string' && obj.title) ||
-      fallback;
-    const code = typeof obj.type === 'string' ? obj.type : undefined;
-    return new NotificationApiError(code, message);
-  }
-  return new NotificationApiError(undefined, fallback);
-}
+export { ApiError as NotificationApiError };
 
 function authHeaders(): HeadersInit {
   const token = authStore.getState().accessToken;
@@ -91,7 +72,7 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as unknown;
-    throw toError(body, `Request failed with status ${String(res.status)}`);
+    throw toApiError(body, `Request failed with status ${String(res.status)}`);
   }
   return (await res.json()) as T;
 }
@@ -128,7 +109,7 @@ export function useUnreadCountQuery(): UseQueryResult<number> {
 }
 
 /** POST /notifications/{id}/read — optimistic mark-read. */
-export function useMarkNotificationRead(): UseMutationResult<void, NotificationApiError, string> {
+export function useMarkNotificationRead(): UseMutationResult<void, ApiError, string> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {
@@ -174,7 +155,7 @@ export function useMarkNotificationRead(): UseMutationResult<void, NotificationA
 }
 
 /** POST /notifications/{id}/archive — optimistic removal. */
-export function useArchiveNotification(): UseMutationResult<void, NotificationApiError, string> {
+export function useArchiveNotification(): UseMutationResult<void, ApiError, string> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {
@@ -221,13 +202,11 @@ export function useArchiveNotification(): UseMutationResult<void, NotificationAp
 }
 
 /** POST /workspaces/{wsId}/notifications/read-all — marks all read. */
-export function useMarkAllRead(
-  wsId: string | null,
-): UseMutationResult<void, NotificationApiError, void> {
+export function useMarkAllRead(wsId: string | null): UseMutationResult<void, ApiError, void> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (): Promise<void> => {
-      if (!wsId) throw new NotificationApiError(undefined, 'No workspace selected');
+      if (!wsId) throw new ApiError(undefined, 'No workspace selected');
       await fetchJson<unknown>(`${apiBaseUrl}/workspaces/${wsId}/notifications/read-all`, {
         method: 'POST',
       });

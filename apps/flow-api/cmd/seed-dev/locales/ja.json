@@ -1,0 +1,13 @@
+{
+  "displayName": "管理者",
+  "workspaceName": "デモワークスペース",
+  "projectName": "デモプロジェクト",
+  "projectDesc": "seed-dev で作成されたサンプルプロジェクトです。",
+  "tasks": [
+    { "title": "Q2 ロードマップレビュー", "priority": 3 },
+    { "title": "スプリント振り返りメモ作成", "priority": 2 },
+    { "title": "認証ミドルウェアのリファクタリング", "priority": 2 },
+    { "title": "受信トレイのバックログ整理", "priority": 1 },
+    { "title": "リリースアナウンス下書き", "priority": 1 }
+  ]
+}

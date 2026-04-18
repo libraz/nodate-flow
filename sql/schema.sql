@@ -133,7 +133,7 @@ CREATE TABLE ai_agents (
   KEY idx_ai_agents_model_id (model_id),
 
   CONSTRAINT fk_ai_agents_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_ai_agents_model FOREIGN KEY (model_id) REFERENCES ai_models(id) ON DELETE RESTRICT
+  CONSTRAINT fk_ai_agents_model FOREIGN KEY (model_id) REFERENCES ai_models(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Reusable LLM agent configurations';
 
 -- >>> ai_invocations.sql
@@ -465,7 +465,7 @@ CREATE TABLE calendar_event_checklist_items (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   UNIQUE KEY uniq_calendar_event_checklist_items_public_id (public_id),
-  KEY idx_calendar_event_checklist_items_event (event_id, sort_weight),
+  KEY idx_calendar_event_checklist_items_event (workspace_id, event_id, sort_weight),
 
   CONSTRAINT fk_calendar_event_checklist_items_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_event_checklist_items_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE,
@@ -495,7 +495,7 @@ CREATE TABLE calendar_event_comments (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   UNIQUE KEY uniq_calendar_event_comments_public_id (public_id),
-  KEY idx_calendar_event_comments_event (event_id, created_at),
+  KEY idx_calendar_event_comments_event (workspace_id, event_id, created_at),
   KEY idx_calendar_event_comments_workspace_author (workspace_id, author_id),
 
   CONSTRAINT fk_calendar_event_comments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -542,8 +542,10 @@ CREATE TABLE calendar_events (
   -- Recurrence (RFC 5545 subset stored as JSON)
   recurrence_rule JSON NULL COMMENT 'Recurrence rule: {freq, interval, byDay, byMonthDay, bySetPos, until, count}',
   recurrence_end DATETIME NULL COMMENT 'Computed end date for recurrence expansion queries',
+  recurrence_exceptions JSON DEFAULT NULL COMMENT 'Array of ISO 8601 dates/times to exclude from recurrence',
 
   notification_offset INT NULL COMMENT 'Minutes before event to send notification; NULL = no notification',
+  notified_at DATETIME NULL DEFAULT NULL COMMENT 'Timestamp when notification was sent; NULL = not yet notified',
 
   -- Cross-module link to nodate-flow tasks
   task_id INT UNSIGNED NULL COMMENT 'Linked task (optional, for task-calendar sync)',
@@ -619,6 +621,7 @@ CREATE TABLE calendar_member_filters (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   UNIQUE KEY uniq_calendar_member_filters_sub_target (subscription_id, target_user_id),
+  KEY idx_calendar_member_filters_target_user (target_user_id),
 
   CONSTRAINT fk_calendar_member_filters_subscription FOREIGN KEY (subscription_id) REFERENCES calendar_subscriptions(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_member_filters_target FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -724,7 +727,7 @@ CREATE TABLE calendars (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   UNIQUE KEY uniq_calendars_public_id (public_id),
-  UNIQUE KEY uniq_calendars_personal (workspace_id, owner_user_id, kind) COMMENT 'At most one personal calendar per user per workspace',
+  UNIQUE KEY uniq_calendars_personal (workspace_id, owner_user_id, kind, enabled) COMMENT 'At most one enabled personal calendar per user per workspace',
   UNIQUE KEY uniq_calendars_system_slug (workspace_id, system_slug),
   KEY idx_calendars_workspace_id_kind (workspace_id, kind),
 
@@ -947,8 +950,8 @@ CREATE TABLE lenses (
   is_default BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Default lens for the scope',
   is_public BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Whether the lens is publicly shared',
   public_token CHAR(32) CHARACTER SET latin1 NULL COMMENT 'Random hex token for public share URL',
-  shared_at DATETIME(3) NULL COMMENT 'Timestamp when first shared publicly',
-  safety_checked_at DATETIME(3) NULL COMMENT 'Timestamp of last AI safety check',
+  shared_at DATETIME NULL COMMENT 'Timestamp when first shared publicly',
+  safety_checked_at DATETIME NULL COMMENT 'Timestamp of last AI safety check',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
@@ -1073,6 +1076,7 @@ CREATE TABLE notifications (
   KEY idx_notifications_workspace_id_recipient_read (workspace_id, recipient_user_id, read_at, created_at DESC),
   KEY idx_notifications_workspace_id_recipient_archived (workspace_id, recipient_user_id, archived_at, created_at DESC),
   KEY idx_notifications_workspace_id_event_type (workspace_id, event_type),
+  KEY idx_notifications_recipient_unread (recipient_user_id, read_at, archived_at, enabled),
 
   CONSTRAINT fk_notifications_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_notifications_recipient FOREIGN KEY (recipient_user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -1137,7 +1141,8 @@ CREATE TABLE pages (
   CONSTRAINT fk_pages_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_pages_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL,
   CONSTRAINT fk_pages_creator FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_pages_parent FOREIGN KEY (parent_page_id) REFERENCES pages(id) ON DELETE SET NULL
+  CONSTRAINT fk_pages_parent FOREIGN KEY (parent_page_id) REFERENCES pages(id) ON DELETE SET NULL,
+  CONSTRAINT chk_pages_no_self_parent CHECK (parent_page_id IS NULL OR parent_page_id != id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Wiki/documentation pages with tree structure';
 
 -- >>> personal_access_tokens.sql
@@ -1230,7 +1235,7 @@ CREATE TABLE projects (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   UNIQUE KEY uniq_projects_public_id (public_id),
-  UNIQUE KEY uniq_projects_workspace_id_slug (workspace_id, slug),
+  UNIQUE KEY uniq_projects_workspace_id_slug_enabled (workspace_id, slug, enabled),
   KEY idx_projects_workspace_id_enabled (workspace_id, enabled),
 
   CONSTRAINT fk_projects_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
@@ -1253,9 +1258,9 @@ CREATE TABLE relation_suggestions (
   confidence DECIMAL(5,4) NOT NULL COMMENT 'Cosine similarity score (0.0000 to 1.0000)',
   status ENUM('pending','accepted','dismissed') NOT NULL DEFAULT 'pending' COMMENT 'Resolution status',
   resolved_by INT UNSIGNED NULL COMMENT 'Internal FK to users.id (who resolved)',
-  resolved_at DATETIME(3) NULL COMMENT 'When the suggestion was accepted or dismissed',
+  resolved_at DATETIME NULL COMMENT 'When the suggestion was accepted or dismissed',
 
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   UNIQUE KEY uniq_relation_suggestions_public_id (public_id),
   UNIQUE KEY uniq_relation_suggestions_edge (source_task_id, target_task_id, suggested_kind),
@@ -1265,7 +1270,8 @@ CREATE TABLE relation_suggestions (
   CONSTRAINT fk_relation_suggestions_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_relation_suggestions_source FOREIGN KEY (source_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
   CONSTRAINT fk_relation_suggestions_target FOREIGN KEY (target_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-  CONSTRAINT fk_relation_suggestions_resolved_by FOREIGN KEY (resolved_by) REFERENCES users(id) ON DELETE SET NULL
+  CONSTRAINT fk_relation_suggestions_resolved_by FOREIGN KEY (resolved_by) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT chk_relation_suggestions_no_self CHECK (source_task_id != target_task_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI-suggested task relation candidates';
 
 -- >>> repo_workspace_mappings.sql
@@ -1431,6 +1437,7 @@ CREATE TABLE task_constraints (
 
   UNIQUE KEY uniq_task_constraints_public_id (public_id),
   KEY idx_task_constraints_workspace_id_task_id (workspace_id, task_id),
+  KEY idx_task_constraints_task_id_enabled (task_id, enabled),
 
   CONSTRAINT fk_task_constraints_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_task_constraints_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
@@ -1457,12 +1464,13 @@ CREATE TABLE task_dependencies (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   UNIQUE KEY uniq_task_dependencies_public_id (public_id),
-  UNIQUE KEY uniq_task_dependencies_edge (from_task_id, to_task_id, kind),
+  UNIQUE KEY uniq_task_dependencies_edge (from_task_id, to_task_id, kind, enabled),
   KEY idx_task_dependencies_workspace_id_to_task_id (workspace_id, to_task_id),
 
   CONSTRAINT fk_task_dependencies_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_task_dependencies_from FOREIGN KEY (from_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-  CONSTRAINT fk_task_dependencies_to FOREIGN KEY (to_task_id) REFERENCES tasks(id) ON DELETE CASCADE
+  CONSTRAINT fk_task_dependencies_to FOREIGN KEY (to_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+  CONSTRAINT chk_task_dependencies_no_self CHECK (from_task_id != to_task_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Directed task dependencies';
 
 -- >>> task_embeddings.sql
@@ -1534,7 +1542,8 @@ CREATE TABLE tasks (
   CONSTRAINT fk_tasks_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_tasks_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   CONSTRAINT fk_tasks_parent FOREIGN KEY (parent_task_id) REFERENCES tasks(id) ON DELETE SET NULL,
-  CONSTRAINT fk_tasks_creator FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+  CONSTRAINT fk_tasks_creator FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT chk_tasks_no_self_parent CHECK (parent_task_id IS NULL OR parent_task_id != id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='nodate-flow core task object';
 
 -- >>> timebox_tasks.sql
@@ -1557,7 +1566,7 @@ CREATE TABLE timebox_tasks (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   UNIQUE KEY uniq_timebox_tasks_public_id (public_id),
-  UNIQUE KEY uniq_timebox_tasks_timebox_id_task_id (timebox_id, task_id),
+  UNIQUE KEY uniq_timebox_tasks_timebox_id_task_id_enabled (timebox_id, task_id, enabled),
   KEY idx_timebox_tasks_workspace_id_timebox_id (workspace_id, timebox_id),
   KEY idx_timebox_tasks_task_id (task_id),
 
@@ -1778,7 +1787,7 @@ CREATE TABLE workspace_invites (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
-  created_by_user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id who created the invite',
+  created_by_user_id INT UNSIGNED NULL COMMENT 'Internal FK to users.id who created the invite',
 
   token_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'SHA-256 hex of invite token plaintext',
   role ENUM('owner','admin','member','guest') NOT NULL DEFAULT 'member' COMMENT 'Role granted on accept',
@@ -1798,7 +1807,7 @@ CREATE TABLE workspace_invites (
   KEY idx_workspace_invites_workspace_id (workspace_id),
 
   CONSTRAINT fk_workspace_invites_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_workspace_invites_created_by FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE RESTRICT
+  CONSTRAINT fk_workspace_invites_created_by FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Token-based workspace invite links';
 
 -- >>> workspace_members.sql
@@ -1996,8 +2005,8 @@ WHERE p.enabled = TRUE;
 
 -- >>> v_task_detail.sql
 -- v_task_detail
--- Detailed task projection. Aggregates constraint / dependency / actor
--- counts; full lists are fetched via dedicated queries.
+-- Detailed task projection. Uses correlated subqueries for counts to
+-- avoid Cartesian products from multiple LEFT JOINs on 1:N tables.
 CREATE OR REPLACE VIEW v_task_detail AS
 SELECT
   t.workspace_id,
@@ -2016,10 +2025,10 @@ SELECT
   t.started_on,
   t.event_on,
   t.completed_at,
-  COUNT(DISTINCT c.id) AS constraint_count,
-  COUNT(DISTINCT CASE WHEN c.satisfied_at IS NOT NULL THEN c.id END) AS constraint_satisfied_count,
-  COUNT(DISTINCT d.id) AS dependency_count,
-  COUNT(DISTINCT a.id) AS actor_count,
+  (SELECT COUNT(*) FROM task_constraints c WHERE c.task_id = t.id AND c.enabled = TRUE) AS constraint_count,
+  (SELECT COUNT(*) FROM task_constraints c WHERE c.task_id = t.id AND c.enabled = TRUE AND c.satisfied_at IS NOT NULL) AS constraint_satisfied_count,
+  (SELECT COUNT(*) FROM task_dependencies d WHERE d.from_task_id = t.id AND d.enabled = TRUE) AS dependency_count,
+  (SELECT COUNT(*) FROM task_actors a WHERE a.task_id = t.id AND a.enabled = TRUE) AS actor_count,
   t.sort_weight,
   t.updated_at,
   t.created_at
@@ -2032,33 +2041,7 @@ LEFT JOIN tasks pt
   ON pt.id = t.parent_task_id AND pt.enabled = TRUE
 LEFT JOIN users creator
   ON creator.id = t.created_by_user_id AND creator.enabled = TRUE
-LEFT JOIN task_constraints c
-  ON c.task_id = t.id AND c.enabled = TRUE
-LEFT JOIN task_dependencies d
-  ON d.from_task_id = t.id AND d.enabled = TRUE
-LEFT JOIN task_actors a
-  ON a.task_id = t.id AND a.enabled = TRUE
-WHERE t.enabled = TRUE
-GROUP BY
-  t.workspace_id,
-  w.public_id,
-  t.public_id,
-  p.public_id,
-  p.name,
-  pt.public_id,
-  creator.public_id,
-  t.title,
-  t.description,
-  t.visibility,
-  t.derived_state,
-  t.priority,
-  t.due_on,
-  t.started_on,
-  t.event_on,
-  t.completed_at,
-  t.sort_weight,
-  t.updated_at,
-  t.created_at;
+WHERE t.enabled = TRUE;
 
 -- >>> v_task_list.sql
 -- v_task_list
@@ -2084,23 +2067,8 @@ SELECT
   t.sort_weight,
   t.updated_at,
   t.created_at,
-  (
-    SELECT u.public_id
-    FROM task_actors ta
-    INNER JOIN users u ON u.id = ta.user_id AND u.enabled = TRUE
-    WHERE ta.task_id = t.id
-      AND ta.enabled = TRUE
-      AND ta.role = 'assignee'
-    ORDER BY ta.sort_weight ASC, ta.id ASC
-    LIMIT 1
-  ) AS primary_assignee_public_id,
-  (
-    SELECT COUNT(*)
-    FROM task_actors ta
-    WHERE ta.task_id = t.id
-      AND ta.enabled = TRUE
-      AND ta.role = 'assignee'
-  ) AS assignee_count
+  assignees.primary_assignee_public_id,
+  COALESCE(assignees.assignee_count, 0) AS assignee_count
 FROM tasks t
 INNER JOIN projects p
   ON p.id = t.project_id AND p.enabled = TRUE
@@ -2108,6 +2076,20 @@ INNER JOIN workspaces w
   ON w.id = t.workspace_id AND w.enabled = TRUE
 LEFT JOIN tasks pt
   ON pt.id = t.parent_task_id AND pt.enabled = TRUE
+LEFT JOIN (
+  SELECT
+    ta.task_id,
+    MIN(CASE WHEN rn = 1 THEN u.public_id END) AS primary_assignee_public_id,
+    COUNT(*) AS assignee_count
+  FROM (
+    SELECT ta2.task_id, ta2.user_id,
+           ROW_NUMBER() OVER (PARTITION BY ta2.task_id ORDER BY ta2.sort_weight ASC, ta2.id ASC) AS rn
+    FROM task_actors ta2
+    WHERE ta2.enabled = TRUE AND ta2.role = 'assignee'
+  ) ta
+  INNER JOIN users u ON u.id = ta.user_id AND u.enabled = TRUE
+  GROUP BY ta.task_id
+) assignees ON assignees.task_id = t.id
 WHERE t.enabled = TRUE;
 
 -- >>> v_task_timeline.sql

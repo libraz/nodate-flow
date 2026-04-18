@@ -26,28 +26,9 @@ export const inboxKeys = {
   list: () => [...inboxKeys.all, 'list'] as const,
 };
 
-/** Lightweight error thrown when the SDK returns an error envelope. */
-export class InboxApiError extends Error {
-  readonly code: string | undefined;
-  constructor(code: string | undefined, message: string) {
-    super(message);
-    this.name = 'InboxApiError';
-    this.code = code;
-  }
-}
+import { ApiError, toApiError } from '../../lib/api-error';
 
-function toError(err: unknown, fallback: string): InboxApiError {
-  if (err && typeof err === 'object') {
-    const obj = err as { detail?: unknown; title?: unknown; type?: unknown };
-    const message =
-      (typeof obj.detail === 'string' && obj.detail) ||
-      (typeof obj.title === 'string' && obj.title) ||
-      fallback;
-    const code = typeof obj.type === 'string' ? obj.type : undefined;
-    return new InboxApiError(code, message);
-  }
-  return new InboxApiError(undefined, fallback);
-}
+export { ApiError as InboxApiError };
 
 /** GET /inbox — list items for the caller. */
 export function useInboxQuery(): UseSuspenseQueryResult<InboxItem[]> {
@@ -55,7 +36,7 @@ export function useInboxQuery(): UseSuspenseQueryResult<InboxItem[]> {
     queryKey: inboxKeys.list(),
     queryFn: async (): Promise<InboxItem[]> => {
       const { data, error } = await sdk.GET('/inbox');
-      if (error || !data) throw toError(error, 'Failed to load inbox');
+      if (error || !data) throw toApiError(error, 'Failed to load inbox');
       return data.items ?? [];
     },
   });
@@ -77,14 +58,14 @@ function removeFromLists(
 }
 
 /** POST /inbox/{id}/archive with optimistic list removal. */
-export function useArchiveInboxItem(): UseMutationResult<void, InboxApiError, string> {
+export function useArchiveInboxItem(): UseMutationResult<void, ApiError, string> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {
       const { error } = await sdk.POST('/inbox/{id}/archive', {
         params: { path: { id } },
       });
-      if (error) throw toError(error, 'Failed to archive inbox item');
+      if (error) throw toApiError(error, 'Failed to archive inbox item');
     },
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: inboxKeys.list() });
@@ -112,7 +93,7 @@ export interface SnoozeInboxArgs {
 }
 
 /** POST /inbox/{id}/snooze with optimistic list removal. */
-export function useSnoozeInboxItem(): UseMutationResult<void, InboxApiError, SnoozeInboxArgs> {
+export function useSnoozeInboxItem(): UseMutationResult<void, ApiError, SnoozeInboxArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, snoozeUntil }: SnoozeInboxArgs): Promise<void> => {
@@ -120,7 +101,7 @@ export function useSnoozeInboxItem(): UseMutationResult<void, InboxApiError, Sno
         params: { path: { id } },
         body: { snoozeUntil },
       });
-      if (error) throw toError(error, 'Failed to snooze inbox item');
+      if (error) throw toApiError(error, 'Failed to snooze inbox item');
     },
     onMutate: async ({ id }) => {
       await qc.cancelQueries({ queryKey: inboxKeys.list() });

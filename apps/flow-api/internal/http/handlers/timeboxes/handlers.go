@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
@@ -12,41 +11,20 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
 const dateLayout = "2006-01-02"
 
-// actorPtr returns a pointer to the actor's internal user id for
-// eventbus.Event, or nil if not available.
-func actorPtr(ctx context.Context) *int64 {
-	uid, ok := middleware.ActorFromContext(ctx)
-	if !ok {
-		return nil
-	}
-	v := int64(uid)
-	return &v
-}
+// actorPtr delegates to handlerutil.ActorPtr.
+var actorPtr = handlerutil.ActorPtr
 
-// publicIDOrEmpty returns the UUID string of a types.PublicID, or ""
-// when it is the zero value (i.e. a LEFT JOIN returned NULL).
-func publicIDOrEmpty(p types.PublicID) string {
-	var zero types.PublicID
-	if p == zero {
-		return ""
-	}
-	return p.String()
-}
+// publicIDOrEmpty delegates to handlerutil.PublicIDOrEmpty.
+var publicIDOrEmpty = handlerutil.PublicIDOrEmpty
 
-// isDuplicateEntry detects MySQL error 1062 without taking a hard
-// dependency on the mysql driver package.
-func isDuplicateEntry(err error) bool {
-	if err == nil {
-		return false
-	}
-	s := err.Error()
-	return strings.Contains(s, "Error 1062") || strings.Contains(s, "Duplicate entry")
-}
+// isDuplicateEntry delegates to handlerutil.IsDuplicateEntry.
+var isDuplicateEntry = handlerutil.IsDuplicateEntry
 
 // resolveTaskInternal looks up the internal task id by workspace_id + public_id.
 // This avoids pulling the full task detail view when only the numeric PK is needed.
@@ -113,15 +91,8 @@ func mapTaskRow(r generated.ListTasksForTimeboxRow) TimeboxTaskDTO {
 	}
 }
 
-// nullTimeUnix converts a sql.NullTime to a unix-seconds int64.
-// For timeboxes the UpdatedAt is always set after any mutation, so
-// we fall back to 0 only for the initial NULL case.
-func nullTimeUnix(t sql.NullTime) int64 {
-	if !t.Valid {
-		return 0
-	}
-	return t.Time.Unix()
-}
+// nullTimeUnix delegates to handlerutil.NullTimeUnixVal (returns int64, 0 for NULL).
+var nullTimeUnix = handlerutil.NullTimeUnixVal
 
 // Create handles POST /workspaces/{wsId}/timeboxes.
 func Create(deps Deps) func(context.Context, *CreateTimeboxInput) (*CreateTimeboxOutput, error) {

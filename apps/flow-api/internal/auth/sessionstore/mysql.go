@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
@@ -14,12 +15,14 @@ import (
 // existing sqlc-generated session queries so the refactor to the
 // driver interface is behavior-preserving.
 type MySQLStore struct {
-	q *generated.Queries
+	db *sql.DB
+	q  *generated.Queries
 }
 
 // NewMySQLStore returns a [Store] backed by the sqlc query bundle.
-func NewMySQLStore(q *generated.Queries) *MySQLStore {
-	return &MySQLStore{q: q}
+// The db handle is used for transaction support in RotateRefreshHash.
+func NewMySQLStore(db *sql.DB, q *generated.Queries) *MySQLStore {
+	return &MySQLStore{db: db, q: q}
 }
 
 // Create implements [Store].
@@ -33,7 +36,7 @@ func (s *MySQLStore) Create(ctx context.Context, p CreateParams) (uint32, error)
 		ExpiresAt:   p.ExpiresAt,
 	})
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("sessionstore/mysql: create: %w", err)
 	}
 	return uint32(id), nil //nolint:gosec // sqlc returns int64 but sessions.id is INT UNSIGNED
 }
@@ -45,7 +48,7 @@ func (s *MySQLStore) FindByRefreshHash(ctx context.Context, hash string) (*Sessi
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
-		return nil, err
+		return nil, fmt.Errorf("sessionstore/mysql: find: %w", err)
 	}
 	return &Session{
 		InternalID:  row.ID,
@@ -61,30 +64,46 @@ func (s *MySQLStore) FindByRefreshHash(ctx context.Context, hash string) (*Sessi
 	}, nil
 }
 
-// RotateRefreshHash implements [Store]. The MySQL driver resolves the
-// row by the old hash first so it can target the internal PK, which
-// matches the existing RotateSessionRefreshHash :exec contract.
+// RotateRefreshHash implements [Store]. The rotation is wrapped in a
+// transaction with SELECT ... FOR UPDATE to prevent TOCTOU races when
+// concurrent refresh requests arrive for the same session.
 func (s *MySQLStore) RotateRefreshHash(ctx context.Context, oldHash, newHash string, expiresAt time.Time) error {
-	row, err := s.q.FindSessionByRefreshHash(ctx, oldHash)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
+		return fmt.Errorf("sessionstore/mysql: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck // rollback after commit is no-op
+
+	// Lock the row to prevent concurrent rotation of the same refresh hash.
+	const lockQ = `SELECT id FROM sessions WHERE refresh_hash = ? AND enabled = TRUE AND revoked_at IS NULL FOR UPDATE`
+	var id uint32
+	if err := tx.QueryRowContext(ctx, lockQ, oldHash).Scan(&id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
 		}
-		return err
+		return fmt.Errorf("sessionstore/mysql: rotate lock: %w", err)
 	}
-	return s.q.RotateSessionRefreshHash(ctx, generated.RotateSessionRefreshHashParams{
-		RefreshHash: newHash,
-		ExpiresAt:   expiresAt,
-		ID:          row.ID,
-	})
+
+	const updateQ = `UPDATE sessions SET refresh_hash = ?, expires_at = ?, last_used_at = CURRENT_TIMESTAMP WHERE id = ?`
+	if _, err := tx.ExecContext(ctx, updateQ, newHash, expiresAt, id); err != nil {
+		return fmt.Errorf("sessionstore/mysql: rotate update: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("sessionstore/mysql: rotate commit: %w", err)
+	}
+	return nil
 }
 
 // Revoke implements [Store].
 func (s *MySQLStore) Revoke(ctx context.Context, userID uint32, publicID types.PublicID) error {
-	return s.q.RevokeSession(ctx, generated.RevokeSessionParams{
+	if err := s.q.RevokeSession(ctx, generated.RevokeSessionParams{
 		UserID:   userID,
 		PublicID: publicID,
-	})
+	}); err != nil {
+		return fmt.Errorf("sessionstore/mysql: revoke: %w", err)
+	}
+	return nil
 }
 
 // ListActive implements [Store].
@@ -95,7 +114,7 @@ func (s *MySQLStore) ListActive(ctx context.Context, userID uint32) ([]Session, 
 		Offset: 0,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("sessionstore/mysql: list: %w", err)
 	}
 	out := make([]Session, 0, len(rows))
 	for _, r := range rows {
@@ -114,10 +133,13 @@ func (s *MySQLStore) ListActive(ctx context.Context, userID uint32) ([]Session, 
 
 // RevokeAllExcept implements [Store].
 func (s *MySQLStore) RevokeAllExcept(ctx context.Context, userID uint32, keep types.PublicID) error {
-	return s.q.RevokeAllSessionsForUserExcept(ctx, generated.RevokeAllSessionsForUserExceptParams{
+	if err := s.q.RevokeAllSessionsForUserExcept(ctx, generated.RevokeAllSessionsForUserExceptParams{
 		UserID:   userID,
 		PublicID: keep,
-	})
+	}); err != nil {
+		return fmt.Errorf("sessionstore/mysql: revoke-all-except: %w", err)
+	}
+	return nil
 }
 
 func nullTimePtr(n sql.NullTime) *time.Time {

@@ -231,3 +231,8 @@ func randomHex(n int) string {
 	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)
 }
+
+// RandomHex returns a random hex string of 2*n characters.
+func RandomHex(n int) string {
+	return randomHex(n)
+}

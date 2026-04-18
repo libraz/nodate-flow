@@ -1,0 +1,245 @@
+package calendars
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"time"
+
+	"github.com/danielgtaylor/huma/v2"
+	"github.com/google/uuid"
+
+	generated "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/types"
+	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/eventbus"
+)
+
+// --- Input/Output types ---
+
+// ListAttachmentsInput is the input for listing event attachments.
+type ListAttachmentsInput struct {
+	WsId  string `path:"wsId" doc:"Workspace public ID"`
+	CalId string `path:"calId" doc:"Calendar public ID"`
+	EvtId string `path:"evtId" doc:"Event public ID"`
+}
+
+// AttachmentResponse is the JSON representation of an event attachment.
+type AttachmentResponse struct {
+	ID              string    `json:"id"`
+	Filename        string    `json:"filename"`
+	ContentType     string    `json:"contentType"`
+	ByteSize        uint64    `json:"byteSize"`
+	StorageKey      string    `json:"storageKey"`
+	UploaderID      string    `json:"uploaderId"`
+	UploaderName    string    `json:"uploaderName"`
+	CreatedAt       time.Time `json:"createdAt"`
+}
+
+// ListAttachmentsOutput is the response for the list attachments endpoint.
+type ListAttachmentsOutput struct {
+	Body struct {
+		Attachments []AttachmentResponse `json:"attachments"`
+	}
+}
+
+// CreateAttachmentInput is the input for creating an attachment metadata record.
+type CreateAttachmentInput struct {
+	WsId  string `path:"wsId" doc:"Workspace public ID"`
+	CalId string `path:"calId" doc:"Calendar public ID"`
+	EvtId string `path:"evtId" doc:"Event public ID"`
+	Body  struct {
+		Filename       string `json:"filename" minLength:"1" maxLength:"255" doc:"Original filename"`
+		ContentType    string `json:"contentType" minLength:"1" maxLength:"255" doc:"MIME content type"`
+		ByteSize       uint64 `json:"byteSize" doc:"File size in bytes"`
+		StorageKey     string `json:"storageKey" minLength:"1" maxLength:"1024" doc:"S3 object key"`
+		ChecksumSha256 string `json:"checksumSha256,omitempty" required:"false" maxLength:"64" doc:"SHA-256 checksum"`
+	}
+}
+
+// CreateAttachmentOutput is the response for the create attachment endpoint.
+type CreateAttachmentOutput struct {
+	Body AttachmentResponse
+}
+
+// DeleteAttachmentInput is the input for soft-deleting an attachment.
+type DeleteAttachmentInput struct {
+	WsId  string `path:"wsId" doc:"Workspace public ID"`
+	CalId string `path:"calId" doc:"Calendar public ID"`
+	EvtId string `path:"evtId" doc:"Event public ID"`
+	AttId string `path:"attId" doc:"Attachment public ID"`
+}
+
+// DeleteAttachmentOutput is the response for the delete attachment endpoint.
+type DeleteAttachmentOutput struct {
+	Body struct {
+		Deleted bool `json:"deleted"`
+	}
+}
+
+// --- Handlers ---
+
+// ListAttachments returns all attachments on an event.
+func ListAttachments(deps Deps) func(context.Context, *ListAttachmentsInput) (*ListAttachmentsOutput, error) {
+	return func(ctx context.Context, input *ListAttachmentsInput) (*ListAttachmentsOutput, error) {
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		if err != nil {
+			return nil, err
+		}
+		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		if err != nil {
+			return nil, err
+		}
+
+		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, input.EvtId)
+		if err != nil {
+			return nil, err
+		}
+
+		rows, err := deps.Queries.ListCalendarEventAttachments(ctx, evt.ID)
+		if err != nil {
+			return nil, huma.Error500InternalServerError("Failed to list attachments", err)
+		}
+
+		out := &ListAttachmentsOutput{}
+		out.Body.Attachments = make([]AttachmentResponse, len(rows))
+		for i, r := range rows {
+			out.Body.Attachments[i] = AttachmentResponse{
+				ID:           r.PublicID.String(),
+				Filename:     r.Filename,
+				ContentType:  r.ContentType,
+				ByteSize:     r.ByteSize,
+				StorageKey:   r.StorageKey,
+				UploaderID:   r.UserPublicID.String(),
+				UploaderName: r.DisplayName,
+				CreatedAt:    r.CreatedAt,
+			}
+		}
+		return out, nil
+	}
+}
+
+// CreateAttachment records metadata for an uploaded file attachment on an event.
+func CreateAttachment(deps Deps) func(context.Context, *CreateAttachmentInput) (*CreateAttachmentOutput, error) {
+	return func(ctx context.Context, input *CreateAttachmentInput) (*CreateAttachmentOutput, error) {
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		if err != nil {
+			return nil, err
+		}
+		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		if err != nil {
+			return nil, err
+		}
+
+		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, input.EvtId)
+		if err != nil {
+			return nil, err
+		}
+
+		attPublicID := types.New()
+		var checksum sql.NullString
+		if input.Body.ChecksumSha256 != "" {
+			checksum = sql.NullString{String: input.Body.ChecksumSha256, Valid: true}
+		}
+
+		_, err = deps.Queries.CreateCalendarEventAttachment(ctx, generated.CreateCalendarEventAttachmentParams{
+			PublicID:       attPublicID,
+			WorkspaceID:    wsID,
+			EventID:        evt.ID,
+			UploaderID:     actorID,
+			Filename:       input.Body.Filename,
+			ContentType:    input.Body.ContentType,
+			ByteSize:       input.Body.ByteSize,
+			StorageKey:     input.Body.StorageKey,
+			ChecksumSha256: checksum,
+		})
+		if err != nil {
+			return nil, huma.Error500InternalServerError("Failed to create attachment", err)
+		}
+
+		profile, err := deps.Queries.FindUserProfileById(ctx, actorID)
+		if err != nil {
+			return nil, huma.Error500InternalServerError("Failed to get user profile", err)
+		}
+
+		out := &CreateAttachmentOutput{}
+		out.Body = AttachmentResponse{
+			ID:           attPublicID.String(),
+			Filename:     input.Body.Filename,
+			ContentType:  input.Body.ContentType,
+			ByteSize:     input.Body.ByteSize,
+			StorageKey:   input.Body.StorageKey,
+			UploaderID:   profile.PublicID.String(),
+			UploaderName: profile.DisplayName,
+			CreatedAt:    time.Now().UTC(),
+		}
+
+		_ = eventbus.Append(ctx, deps.DB, wsID, "calendar.event.attachment.created", &actorID, map[string]any{
+			"eventId":      input.EvtId,
+			"calendarId":   input.CalId,
+			"attachmentId": attPublicID.String(),
+			"filename":     input.Body.Filename,
+		})
+
+		return out, nil
+	}
+}
+
+// DeleteAttachment soft-deletes an attachment from an event.
+func DeleteAttachment(deps Deps) func(context.Context, *DeleteAttachmentInput) (*DeleteAttachmentOutput, error) {
+	return func(ctx context.Context, input *DeleteAttachmentInput) (*DeleteAttachmentOutput, error) {
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		if err != nil {
+			return nil, err
+		}
+		cal, sub, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		if err != nil {
+			return nil, err
+		}
+
+		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, input.EvtId)
+		if err != nil {
+			return nil, err
+		}
+
+		attUID, err := uuid.Parse(input.AttId)
+		if err != nil {
+			return nil, huma.Error404NotFound("Attachment not found")
+		}
+
+		att, err := deps.Queries.FindCalendarEventAttachmentByPublicId(ctx, generated.FindCalendarEventAttachmentByPublicIdParams{
+			PublicID: types.FromUUID(attUID),
+			EventID:  evt.ID,
+		})
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, huma.Error404NotFound("Attachment not found")
+			}
+			return nil, huma.Error500InternalServerError("Failed to find attachment", err)
+		}
+
+		isUploader := att.UploaderID == actorID
+		isCalOwner := sub.Role == generated.CalendarSubscriptionsRoleOwner
+		if !isUploader && !isCalOwner {
+			return nil, errForbidden
+		}
+
+		err = deps.Queries.DisableCalendarEventAttachment(ctx, generated.DisableCalendarEventAttachmentParams{
+			PublicID: types.FromUUID(attUID),
+			EventID:  evt.ID,
+		})
+		if err != nil {
+			return nil, huma.Error500InternalServerError("Failed to delete attachment", err)
+		}
+
+		out := &DeleteAttachmentOutput{}
+		out.Body.Deleted = true
+
+		_ = eventbus.Append(ctx, deps.DB, wsID, "calendar.event.attachment.deleted", &actorID, map[string]any{
+			"eventId":      input.EvtId,
+			"calendarId":   input.CalId,
+			"attachmentId": input.AttId,
+		})
+
+		return out, nil
+	}
+}

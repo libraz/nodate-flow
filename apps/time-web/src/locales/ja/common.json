@@ -1,19 +1,94 @@
 {
+  "common": {
+    "loading": "読み込み中...",
+    "send": "送信",
+    "add": "追加",
+    "edit": "編集",
+    "delete": "削除",
+    "confirmDelete": "削除を確認",
+    "save": "保存",
+    "saving": "保存中...",
+    "cancel": "キャンセル",
+    "close": "閉じる",
+    "owner": "オーナー"
+  },
+  "auth": {
+    "signIn": "ログイン",
+    "signingIn": "ログイン中...",
+    "signOut": "ログアウト",
+    "createAccount": "アカウント作成",
+    "creatingAccount": "作成中...",
+    "email": "メールアドレス",
+    "password": "パスワード",
+    "confirmPassword": "パスワード確認",
+    "displayName": "表示名",
+    "noAccount": "アカウントをお持ちでないですか？",
+    "haveAccount": "既にアカウントをお持ちですか？",
+    "loginFailed": "ログインに失敗しました",
+    "registrationFailed": "登録に失敗しました",
+    "emailPlaceholder": "you@example.com",
+    "passwordPlaceholder": "パスワードを入力",
+    "passwordHint": "8文字以上",
+    "validation": {
+      "displayNameRequired": "表示名は必須です",
+      "invalidEmail": "無効なメールアドレスです",
+      "passwordMin": "パスワードは8文字以上必要です",
+      "passwordsMismatch": "パスワードが一致しません"
+    }
+  },
+  "workspace": {
+    "create": "ワークスペースを作成",
+    "description": "ワークスペースはチームでカレンダーを整理する場所です。",
+    "name": "ワークスペース名",
+    "namePlaceholder": "マイチーム",
+    "slug": "URLスラッグ",
+    "slugPlaceholder": "my-team",
+    "slugHint": "ワークスペースを識別するためにURLで使用されます",
+    "createButton": "ワークスペースを作成",
+    "creating": "作成中...",
+    "createFailed": "ワークスペースの作成に失敗しました"
+  },
   "calendar": {
+    "today": "今日",
     "month": "月",
     "week": "週",
-    "today": "今日",
-    "newEvent": "新しい予定",
-    "allDay": "終日"
+    "previousMonth": "前の月",
+    "nextMonth": "次の月",
+    "previousWeek": "前の週",
+    "nextWeek": "次の週",
+    "allDay": "終日",
+    "toggleSidebar": "サイドバー切替",
+    "closeSidebar": "サイドバーを閉じる",
+    "createNewEvent": "新しい予定を作成",
+    "noEventsForDay": "この日の予定はありません",
+    "closeDayDetail": "日の詳細を閉じる"
+  },
+  "sidebar": {
+    "sharedCalendars": "共有カレンダー",
+    "myCalendar": "マイカレンダー",
+    "other": "その他"
   },
   "event": {
+    "newEvent": "新しい予定",
+    "editEvent": "予定を編集",
     "title": "タイトル",
+    "calendar": "カレンダー",
+    "allDay": "終日",
     "start": "開始",
     "end": "終了",
+    "kind": "種類",
+    "showAs": "表示",
     "location": "場所",
     "memo": "メモ",
-    "kind": { "event": "予定", "block": "時間枠", "free": "空き" },
-    "showAs": { "busy": "予定あり", "free": "空き", "tentative": "仮", "oof": "不在" },
+    "more": "+{{count}}件",
+    "loadingEvent": "予定を読み込み中...",
+    "kindEvent": "予定",
+    "kindBlock": "時間枠",
+    "kindFree": "空き",
+    "showBusy": "予定あり",
+    "showFree": "空き",
+    "showTentative": "仮",
+    "showOof": "不在",
     "visibility": {
       "default": "デフォルト",
       "public": "公開",
@@ -21,17 +96,82 @@
       "confidential": "極秘"
     }
   },
-  "auth": {
-    "login": "ログイン",
-    "register": "アカウント作成",
-    "email": "メールアドレス",
-    "password": "パスワード",
-    "displayName": "表示名",
-    "logout": "ログアウト"
+  "detail": {
+    "attendees": "参加者",
+    "noAttendees": "参加者なし",
+    "checklist": "チェックリスト",
+    "noChecklist": "チェック項目なし",
+    "comments": "コメント",
+    "noComments": "コメントはまだありません",
+    "addComment": "コメントを追加...",
+    "attachments": "添付ファイル",
+    "noAttachments": "添付ファイルなし"
   },
-  "sidebar": {
-    "sharedCalendars": "共有カレンダー",
-    "myCalendar": "マイカレンダー",
-    "other": "その他"
+  "members": {
+    "title": "メンバー",
+    "emailPlaceholder": "メールアドレス",
+    "roleOwner": "オーナー",
+    "roleManager": "マネージャー",
+    "roleEditor": "編集者",
+    "roleViewer": "閲覧者"
+  },
+  "invite": {
+    "title": "招待リンク",
+    "createLink": "リンクを作成",
+    "noLinks": "有効な招待リンクはありません",
+    "copyLink": "招待リンクをコピー",
+    "revoke": "取り消し",
+    "expires": "有効期限: {{date}}",
+    "use": "{{count}}回使用",
+    "uses": "{{count}}回使用"
+  },
+  "settings": {
+    "title": "設定",
+    "theme": "テーマ",
+    "colorMode": "カラーモード",
+    "language": "言語",
+    "themeGlass": "ガラス",
+    "themeAurora": "オーロラ",
+    "themeDotline": "ドットライン",
+    "modeLight": "ライト",
+    "modeDark": "ダーク",
+    "modeSystem": "システム"
+  },
+  "search": {
+    "placeholder": "予定を検索...",
+    "close": "検索を閉じる",
+    "noResults": "予定が見つかりません",
+    "searchEvents": "予定を検索"
+  },
+  "rightPanel": {
+    "close": "パネルを閉じる",
+    "memo": "メモ",
+    "members": "メンバー",
+    "share": "共有",
+    "notifications": "通知",
+    "addMemo": "メモを追加...",
+    "noMemos": "メモはまだありません",
+    "loadingMembers": "メンバーを読み込み中...",
+    "noMembers": "メンバーなし",
+    "noSharedCalendar": "共有カレンダ��が選択されていません",
+    "noSharedCalendarAvailable": "利用可能な共有カレンダーがありません",
+    "shareDescription": "このカレンダーを他の人と共有:",
+    "copy": "コピー",
+    "shareLinkHint": "このリンクを持つ人はカレンダーを閲覧できます。編集権限には招待リンクを使用してください。",
+    "noNotifications": "通知はありません"
+  },
+  "tabs": {
+    "calendar": "カレンダー",
+    "memo": "メモ",
+    "search": "検索",
+    "settings": "設定"
+  },
+  "rsvp": {
+    "accept": "参加",
+    "decline": "不参加",
+    "tentative": "仮参加",
+    "pending": "未回答",
+    "accepted": "参加済み",
+    "declined": "不参加"
   }
 }

@@ -31,6 +31,7 @@ CREATE TABLE notifications (
   KEY idx_notifications_workspace_id_recipient_read (workspace_id, recipient_user_id, read_at, created_at DESC),
   KEY idx_notifications_workspace_id_recipient_archived (workspace_id, recipient_user_id, archived_at, created_at DESC),
   KEY idx_notifications_workspace_id_event_type (workspace_id, event_type),
+  KEY idx_notifications_recipient_unread (recipient_user_id, read_at, archived_at, enabled),
 
   CONSTRAINT fk_notifications_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_notifications_recipient FOREIGN KEY (recipient_user_id) REFERENCES users(id) ON DELETE CASCADE,

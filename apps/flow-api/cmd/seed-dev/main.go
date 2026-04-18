@@ -6,12 +6,16 @@
 // Usage:
 //
 //	ND_DB_DSN=... \
+//	ND_SEED_LOCALE=en \
 //	ND_SEED_EMAIL=admin@example.com \
 //	ND_SEED_PASSWORD=password123 \
 //	ND_SEED_DISPLAY_NAME=Admin \
 //	ND_SEED_WORKSPACE_SLUG=demo \
 //	ND_SEED_WORKSPACE_NAME="Demo Workspace" \
 //	  go run ./cmd/seed-dev
+//
+// ND_SEED_LOCALE selects the language for display names, project names,
+// and task titles. Supported values: "en" (default), "ja".
 //
 // Re-running is safe: existing rows (matched by email / slug) are
 // detected and the command becomes a no-op with an informational log.
@@ -21,6 +25,8 @@ package main
 import (
 	"context"
 	"database/sql"
+	"embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -33,6 +39,9 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 )
+
+//go:embed locales/*.json
+var localesFS embed.FS
 
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
@@ -49,24 +58,58 @@ type seedConfig struct {
 	displayName   string
 	workspaceSlug string
 	workspaceName string
+	locale        string
 }
 
-func loadConfig() (seedConfig, error) {
+// seedLocale holds locale-specific default values for seed data.
+// Loaded from locales/*.json via embed.FS.
+type seedLocale struct {
+	DisplayName   string     `json:"displayName"`
+	WorkspaceName string     `json:"workspaceName"`
+	ProjectName   string     `json:"projectName"`
+	ProjectDesc   string     `json:"projectDesc"`
+	Tasks         []seedTask `json:"tasks"`
+}
+
+type seedTask struct {
+	Title    string `json:"title"`
+	Priority int32  `json:"priority"`
+}
+
+func loadLocale(name string) (seedLocale, error) {
+	data, err := localesFS.ReadFile("locales/" + name + ".json")
+	if err != nil {
+		return seedLocale{}, fmt.Errorf("unsupported ND_SEED_LOCALE %q (add locales/%s.json to support it)", name, name)
+	}
+	var l seedLocale
+	if err := json.Unmarshal(data, &l); err != nil {
+		return seedLocale{}, fmt.Errorf("parse locales/%s.json: %w", name, err)
+	}
+	return l, nil
+}
+
+func loadConfig() (seedConfig, seedLocale, error) {
+	locale := envOr("ND_SEED_LOCALE", "en")
+	l, err := loadLocale(locale)
+	if err != nil {
+		return seedConfig{}, seedLocale{}, err
+	}
 	c := seedConfig{
 		dsn:           os.Getenv("ND_DB_DSN"),
 		email:         envOr("ND_SEED_EMAIL", "admin@example.com"),
 		password:      envOr("ND_SEED_PASSWORD", "password123"),
-		displayName:   envOr("ND_SEED_DISPLAY_NAME", "Admin"),
+		displayName:   envOr("ND_SEED_DISPLAY_NAME", l.DisplayName),
 		workspaceSlug: envOr("ND_SEED_WORKSPACE_SLUG", "demo"),
-		workspaceName: envOr("ND_SEED_WORKSPACE_NAME", "Demo Workspace"),
+		workspaceName: envOr("ND_SEED_WORKSPACE_NAME", l.WorkspaceName),
+		locale:        locale,
 	}
 	if c.dsn == "" {
-		return c, errors.New("ND_DB_DSN is required")
+		return c, seedLocale{}, errors.New("ND_DB_DSN is required")
 	}
 	if len(c.password) < 8 {
-		return c, errors.New("ND_SEED_PASSWORD must be >= 8 chars")
+		return c, seedLocale{}, errors.New("ND_SEED_PASSWORD must be >= 8 chars")
 	}
-	return c, nil
+	return c, l, nil
 }
 
 func envOr(key, def string) string {
@@ -77,7 +120,7 @@ func envOr(key, def string) string {
 }
 
 func run(ctx context.Context, logger *slog.Logger) error {
-	cfg, err := loadConfig()
+	cfg, l, err := loadConfig()
 	if err != nil {
 		return err
 	}
@@ -144,7 +187,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	}
 
 	// 6. Demo project + tasks (idempotent on project slug).
-	projID, projCreated, err := ensureProject(ctx, db, q, uint32(wsID))
+	projID, projCreated, err := ensureProject(ctx, db, q, uint32(wsID), l)
 	if err != nil {
 		return fmt.Errorf("ensure project: %w", err)
 	}
@@ -153,7 +196,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	} else {
 		logger.Info("project exists", "id", projID)
 	}
-	if err := ensureTasks(ctx, db, q, uint32(wsID), uint32(projID), uint32(userID), logger); err != nil {
+	if err := ensureTasks(ctx, db, q, uint32(wsID), uint32(projID), uint32(userID), l, logger); err != nil {
 		return fmt.Errorf("ensure tasks: %w", err)
 	}
 
@@ -177,7 +220,7 @@ func ensureUser(ctx context.Context, q *generated.Queries, cfg seedConfig) (int6
 		PublicID:        types.New(),
 		Email:           cfg.email,
 		DisplayName:     cfg.displayName,
-		Locale:          "en",
+		Locale:          cfg.locale,
 		ThemePreference: generated.UsersThemePreference("system"),
 	})
 	if err != nil {
@@ -235,7 +278,7 @@ func ensureMembership(ctx context.Context, db *sql.DB, q *generated.Queries, wsI
 
 const seedProjectSlug = "demo-project"
 
-func ensureProject(ctx context.Context, db *sql.DB, q *generated.Queries, wsID uint32) (int64, bool, error) {
+func ensureProject(ctx context.Context, db *sql.DB, q *generated.Queries, wsID uint32, l seedLocale) (int64, bool, error) {
 	var id uint32
 	err := db.QueryRowContext(ctx,
 		"SELECT id FROM projects WHERE workspace_id = ? AND slug = ?",
@@ -251,8 +294,8 @@ func ensureProject(ctx context.Context, db *sql.DB, q *generated.Queries, wsID u
 		PublicID:    types.New(),
 		WorkspaceID: wsID,
 		Slug:        seedProjectSlug,
-		Name:        "Demo Project",
-		Description: sql.NullString{String: "Sample project created by seed-dev.", Valid: true},
+		Name:        l.ProjectName,
+		Description: sql.NullString{String: l.ProjectDesc, Valid: true},
 	})
 	if err != nil {
 		return 0, false, err
@@ -260,7 +303,7 @@ func ensureProject(ctx context.Context, db *sql.DB, q *generated.Queries, wsID u
 	return newID, true, nil
 }
 
-func ensureTasks(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, projID, userID uint32, logger *slog.Logger) error {
+func ensureTasks(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, projID, userID uint32, l seedLocale, logger *slog.Logger) error {
 	var count int
 	if err := db.QueryRowContext(ctx,
 		"SELECT COUNT(*) FROM tasks WHERE workspace_id = ? AND project_id = ? AND enabled = TRUE",
@@ -272,31 +315,21 @@ func ensureTasks(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, pr
 		logger.Info("tasks exist, skipping", "project_id", projID, "count", count)
 		return nil
 	}
-	seeds := []struct {
-		title    string
-		priority int32
-	}{
-		{"Review Q2 roadmap", 3},
-		{"Prepare sprint retro notes", 2},
-		{"Refactor auth middleware", 2},
-		{"Triage inbox backlog", 1},
-		{"Draft release announcement", 1},
-	}
 	createdBy := sql.NullInt32{Int32: int32(userID), Valid: true}
-	for _, s := range seeds {
+	for _, s := range l.Tasks {
 		if _, err := q.CreateTask(ctx, generated.CreateTaskParams{
 			PublicID:        types.New(),
 			WorkspaceID:     wsID,
 			ProjectID:       projID,
 			CreatedByUserID: createdBy,
-			Title:           s.title,
-			Priority:        s.priority,
+			Title:           s.Title,
+			Priority:        s.Priority,
 			Visibility:      generated.TasksVisibilityPublic,
 		}); err != nil {
 			return err
 		}
 	}
-	logger.Info("created seed tasks", "project_id", projID, "count", len(seeds))
+	logger.Info("created seed tasks", "project_id", projID, "count", len(l.Tasks))
 	return nil
 }
 

@@ -17,7 +17,7 @@ CREATE TABLE timebox_tasks (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   UNIQUE KEY uniq_timebox_tasks_public_id (public_id),
-  UNIQUE KEY uniq_timebox_tasks_timebox_id_task_id (timebox_id, task_id),
+  UNIQUE KEY uniq_timebox_tasks_timebox_id_task_id_enabled (timebox_id, task_id, enabled),
   KEY idx_timebox_tasks_workspace_id_timebox_id (workspace_id, timebox_id),
   KEY idx_timebox_tasks_task_id (task_id),
 

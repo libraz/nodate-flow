@@ -24,6 +24,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
 // Deps is the dependency bundle for handlers in this package.
@@ -191,26 +192,11 @@ type DeleteMcpTokenOutput struct {
 	}
 }
 
-func nullStr(s sql.NullString) string {
-	if s.Valid {
-		return s.String
-	}
-	return ""
-}
+// nullStr delegates to handlerutil.NullStr.
+var nullStr = handlerutil.NullStr
 
-func nullTime(t sql.NullTime) *time.Time {
-	if !t.Valid {
-		return nil
-	}
-	tt := t.Time
-	return &tt
-}
+// nullTime delegates to handlerutil.NullTime.
+var nullTime = handlerutil.NullTime
 
-// nullTimeUnix converts a sql.NullTime to *int64 unix seconds. NULL → nil.
-func nullTimeUnix(t sql.NullTime) *int64 {
-	if !t.Valid {
-		return nil
-	}
-	u := t.Time.Unix()
-	return &u
-}
+// nullTimeUnix delegates to handlerutil.NullTimeUnix (returns *int64, nil for NULL).
+var nullTimeUnix = handlerutil.NullTimeUnix

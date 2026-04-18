@@ -160,7 +160,7 @@ NF_DB_USER     ?= nodate
 NF_DB_PASSWORD ?= nodatepw
 NF_DB_NAME     ?= nodate_flow
 
-.PHONY: db-schema db-apply db-reset db-shell db-seed
+.PHONY: db-schema db-apply db-reset db-shell seed-flow seed-time
 db-schema: ## Regenerate sql/schema.sql from sql/tables + sql/views
 	bash sql/build-schema.sh > sql/schema.sql
 
@@ -176,9 +176,12 @@ db-reset: ## Drop the compose mysql volume and re-init from schema.sql
 db-shell: ## Open a mysql shell against the compose mysql
 	docker compose exec mysql mysql -u $(NF_DB_USER) -p$(NF_DB_PASSWORD) $(NF_DB_NAME)
 
-db-seed: ## Insert dev admin user + demo workspace (idempotent; uses NF_DB_DSN or NF_DB_* vars)
+seed-flow: ## Insert dev admin user + demo workspace (idempotent; ND_SEED_LOCALE=en|ja)
 	@dsn="$${NF_DB_DSN:-$(NF_DB_USER):$(NF_DB_PASSWORD)@tcp($(NF_DB_HOST):$(NF_DB_PORT))/$(NF_DB_NAME)?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci}"; \
 	cd apps/flow-api && NF_DB_DSN="$$dsn" go run ./cmd/seed-dev
+
+seed-time: ## Seed nodate-time calendar demo data via REST API (ND_SEED_LOCALE=en|ja)
+	./scripts/seed-time.sh
 
 # ---------- clean ----------
 

@@ -88,6 +88,10 @@ func GetShareEvents(deps Deps) func(context.Context, *GetShareEventsInput) (*Get
 			return nil, huma.Error500InternalServerError("Failed to look up invite", err)
 		}
 
+		if err := validateInvite(invite.ExpiresAt, invite.MaxUses, invite.UseCount); err != nil {
+			return nil, err
+		}
+
 		rows, err := deps.Queries.ListCalendarEventsByRange(ctx, generated.ListCalendarEventsByRangeParams{
 			CalendarID: invite.CalendarID,
 			StartAt:    input.End,

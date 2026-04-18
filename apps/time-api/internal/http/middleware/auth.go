@@ -21,6 +21,7 @@ const (
 	ctxKeySessionIDPublic
 	ctxKeyCalendarID
 	ctxKeyCalendarIDPublic
+	ctxKeySubscription
 )
 
 // ACLDB is the minimal subset of *sql.DB that middleware needs.

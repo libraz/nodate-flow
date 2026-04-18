@@ -35,22 +35,16 @@ export const projectsKeys = {
 
 export type ProjectDependencyEdge = components['schemas']['ProjectDependencyEdge'];
 
-/** Lightweight error thrown when the SDK returns an error envelope. */
-export class ProjectApiError extends Error {
-  readonly code: string | undefined;
-  constructor(code: string | undefined, message: string) {
-    super(message);
-    this.name = 'ProjectApiError';
-    this.code = code;
-  }
-}
+import { ApiError } from '../../lib/api-error';
+
+export { ApiError as ProjectApiError };
 
 function extractCode(detail: string): string | undefined {
   const m = detail.match(/^([A-Z][A-Z0-9_.]+):/);
   return m ? m[1] : undefined;
 }
 
-function toError(err: unknown, fallback: string): ProjectApiError {
+function toError(err: unknown, fallback: string): ApiError {
   if (err && typeof err === 'object') {
     const obj = err as { detail?: unknown; title?: unknown; type?: unknown };
     const message =
@@ -61,9 +55,9 @@ function toError(err: unknown, fallback: string): ProjectApiError {
       (typeof obj.type === 'string' && obj.type) ||
       (typeof obj.detail === 'string' && extractCode(obj.detail)) ||
       undefined;
-    return new ProjectApiError(code, message);
+    return new ApiError(code, message);
   }
-  return new ProjectApiError(undefined, fallback);
+  return new ApiError(undefined, fallback);
 }
 
 export function useProjectsQuery(workspaceId: string): UseSuspenseQueryResult<Project[]> {
@@ -83,7 +77,7 @@ export function useProjectQuery(id: string): UseSuspenseQueryResult<Project> {
   return useSuspenseQuery({
     queryKey: projectsKeys.detail(id || '__empty__'),
     queryFn: async (): Promise<Project> => {
-      if (!id) throw new ProjectApiError(undefined, 'Missing project ID');
+      if (!id) throw new ApiError(undefined, 'Missing project ID');
       const { data, error } = await sdk.GET('/projects/{prjId}', {
         params: { path: { prjId: id } },
       });
@@ -144,7 +138,7 @@ export interface CreateProjectArgs {
   input: CreateProjectInput;
 }
 
-export function useCreateProject(): UseMutationResult<Project, ProjectApiError, CreateProjectArgs> {
+export function useCreateProject(): UseMutationResult<Project, ApiError, CreateProjectArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ workspaceId, input }: CreateProjectArgs): Promise<Project> => {
@@ -166,7 +160,7 @@ export interface UpdateProjectArgs {
   patch: PatchProjectInput;
 }
 
-export function useUpdateProject(): UseMutationResult<Project, ProjectApiError, UpdateProjectArgs> {
+export function useUpdateProject(): UseMutationResult<Project, ApiError, UpdateProjectArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, patch }: UpdateProjectArgs): Promise<Project> => {
@@ -184,7 +178,7 @@ export function useUpdateProject(): UseMutationResult<Project, ProjectApiError, 
   });
 }
 
-export function useDisableProject(): UseMutationResult<void, ProjectApiError, string> {
+export function useDisableProject(): UseMutationResult<void, ApiError, string> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {
@@ -207,7 +201,7 @@ export interface AddProjectMemberArgs {
 
 export function useAddProjectMember(): UseMutationResult<
   ProjectMember,
-  ProjectApiError,
+  ApiError,
   AddProjectMemberArgs
 > {
   const qc = useQueryClient();

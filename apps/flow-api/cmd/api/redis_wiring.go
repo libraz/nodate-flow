@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"log/slog"
 
 	"github.com/redis/go-redis/v9"
@@ -16,13 +17,13 @@ import (
 // buildSessionStore selects the Redis driver when ND_FLOW_SESSION_STORE=redis
 // and a Redis client is available; otherwise it falls through to the
 // MySQL driver.
-func buildSessionStore(cfg *config.Config, q *generated.Queries, logger *slog.Logger) sessionstore.Store {
+func buildSessionStore(cfg *config.Config, db *sql.DB, q *generated.Queries, logger *slog.Logger) sessionstore.Store {
 	if cfg.SessionStore != "redis" {
-		return sessionstore.NewMySQLStore(q)
+		return sessionstore.NewMySQLStore(db, q)
 	}
 	rdb := dialRedis(cfg, logger)
 	if rdb == nil {
-		return sessionstore.NewMySQLStore(q)
+		return sessionstore.NewMySQLStore(db, q)
 	}
 	logger.Info("session store: redis", "addr", cfg.RedisAddr)
 	return sessionstore.NewRedisStore(rdb)
@@ -73,7 +74,7 @@ func configureOutboundLimiters(cfg *config.Config, logger *slog.Logger, dests []
 // it logs and returns nil so the caller can fall back gracefully.
 func dialRedis(cfg *config.Config, logger *slog.Logger) *redis.Client {
 	if cfg.RedisAddr == "" {
-		logger.Warn("redis backend requested but ND_REDIS_ADDR is empty; falling back")
+		logger.Error("redis backend requested but ND_REDIS_ADDR is empty; falling back")
 		return nil
 	}
 	return redis.NewClient(&redis.Options{Addr: cfg.RedisAddr})

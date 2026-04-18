@@ -90,7 +90,10 @@ func (p *openAIProvider) Complete(ctx context.Context, req Request) (*Response, 
 		return nil, fmt.Errorf("openai: do: %w", err)
 	}
 	defer resp.Body.Close()
-	raw, _ := io.ReadAll(resp.Body)
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("openai: read body: %w", err)
+	}
 	if resp.StatusCode/100 != 2 {
 		return nil, fmt.Errorf("openai: upstream status %d", resp.StatusCode)
 	}

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -40,11 +41,12 @@ type EventResponse struct {
 	Memo               *string          `json:"memo,omitempty"`
 	Url                *string          `json:"url,omitempty"`
 	BlockLabel         *string          `json:"blockLabel,omitempty"`
-	RecurrenceRule     *json.RawMessage `json:"recurrenceRule,omitempty"`
-	RecurrenceEnd      *time.Time       `json:"recurrenceEnd,omitempty"`
-	NotificationOffset *int32           `json:"notificationOffset,omitempty"`
-	UpdatedAt          *time.Time       `json:"updatedAt,omitempty"`
-	CreatedAt          time.Time        `json:"createdAt"`
+	RecurrenceRule       *json.RawMessage `json:"recurrenceRule,omitempty"`
+	RecurrenceEnd        *time.Time       `json:"recurrenceEnd,omitempty"`
+	RecurrenceExceptions *json.RawMessage `json:"recurrenceExceptions,omitempty"`
+	NotificationOffset   *int32           `json:"notificationOffset,omitempty"`
+	UpdatedAt            *time.Time       `json:"updatedAt,omitempty"`
+	CreatedAt            time.Time        `json:"createdAt"`
 }
 
 // ListEventsOutput is the response for the list events endpoint.
@@ -113,9 +115,10 @@ type PatchEventInput struct {
 		Memo               *string          `json:"memo,omitempty" required:"false" doc:"Memo"`
 		Url                *string          `json:"url,omitempty" required:"false" doc:"Related URL"`
 		BlockLabel         *string          `json:"blockLabel,omitempty" required:"false" doc:"Block label"`
-		RecurrenceRule     *json.RawMessage `json:"recurrenceRule,omitempty" required:"false" doc:"Recurrence rule"`
-		RecurrenceEnd      *time.Time       `json:"recurrenceEnd,omitempty" required:"false" doc:"Recurrence end"`
-		NotificationOffset *int32           `json:"notificationOffset,omitempty" required:"false" doc:"Notification offset"`
+		RecurrenceRule       *json.RawMessage `json:"recurrenceRule,omitempty" required:"false" doc:"Recurrence rule"`
+		RecurrenceEnd        *time.Time       `json:"recurrenceEnd,omitempty" required:"false" doc:"Recurrence end"`
+		RecurrenceExceptions *json.RawMessage `json:"recurrenceExceptions,omitempty" required:"false" doc:"Array of ISO 8601 dates/times to exclude from recurrence"`
+		NotificationOffset   *int32           `json:"notificationOffset,omitempty" required:"false" doc:"Notification offset"`
 	}
 }
 
@@ -140,26 +143,30 @@ type DeleteEventOutput struct {
 
 // ListCalendarEventsInput is the input for the cross-calendar event list endpoint.
 type ListCalendarEventsInput struct {
-	WsId  string    `path:"wsId" doc:"Workspace public ID"`
-	Start time.Time `query:"start" doc:"Range start (inclusive)" required:"true"`
-	End   time.Time `query:"end" doc:"Range end (exclusive)" required:"true"`
+	WsId  string `path:"wsId" doc:"Workspace public ID"`
+	Start string `query:"start" doc:"Range start (inclusive, date or datetime)" required:"true"`
+	End   string `query:"end" doc:"Range end (exclusive, date or datetime)" required:"true"`
 }
 
 // CrossCalendarEventResponse is the JSON representation of a cross-calendar event.
 type CrossCalendarEventResponse struct {
-	ID         string     `json:"id"`
-	Kind       string     `json:"kind"`
-	Visibility string     `json:"visibility"`
-	ShowAs     string     `json:"showAs"`
-	Title      string     `json:"title"`
-	AllDay     bool       `json:"allDay"`
-	StartAt    time.Time  `json:"startAt"`
-	EndAt      time.Time  `json:"endAt"`
-	Timezone   string     `json:"timezone"`
-	Location   *string    `json:"location,omitempty"`
-	BlockLabel *string    `json:"blockLabel,omitempty"`
-	UpdatedAt  *time.Time `json:"updatedAt,omitempty"`
-	CreatedAt  time.Time  `json:"createdAt"`
+	ID             string           `json:"id"`
+	CalendarID     string           `json:"calendarId"`
+	Kind           string           `json:"kind"`
+	Visibility     string           `json:"visibility"`
+	ShowAs         string           `json:"showAs"`
+	Title          string           `json:"title"`
+	AllDay         bool             `json:"allDay"`
+	StartAt        time.Time        `json:"startAt"`
+	EndAt          time.Time        `json:"endAt"`
+	Timezone       string           `json:"timezone"`
+	Location       *string          `json:"location,omitempty"`
+	BlockLabel     *string          `json:"blockLabel,omitempty"`
+	RecurrenceRule       *json.RawMessage `json:"recurrenceRule,omitempty"`
+	RecurrenceEnd        *time.Time       `json:"recurrenceEnd,omitempty"`
+	RecurrenceExceptions *json.RawMessage `json:"recurrenceExceptions,omitempty"`
+	UpdatedAt            *time.Time       `json:"updatedAt,omitempty"`
+	CreatedAt            time.Time        `json:"createdAt"`
 }
 
 // ListCalendarEventsOutput is the response for the cross-calendar event list endpoint.
@@ -483,6 +490,9 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		if input.Body.RecurrenceEnd != nil {
 			params.RecurrenceEnd = sql.NullTime{Time: *input.Body.RecurrenceEnd, Valid: true}
 		}
+		if input.Body.RecurrenceExceptions != nil {
+			params.RecurrenceExceptions = json.RawMessage(*input.Body.RecurrenceExceptions)
+		}
 		if input.Body.NotificationOffset != nil {
 			params.NotificationOffset = sql.NullInt32{Int32: *input.Body.NotificationOffset, Valid: true}
 		}
@@ -581,21 +591,44 @@ func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInpu
 			return nil, err
 		}
 
+		startTime, err := parseFlexibleTime(input.Start)
+		if err != nil {
+			return nil, huma.Error422UnprocessableEntity("invalid start date/time", err)
+		}
+		endTime, err := parseFlexibleTime(input.End)
+		if err != nil {
+			return nil, huma.Error422UnprocessableEntity("invalid end date/time", err)
+		}
+
+		// Non-recurring events
 		rows, err := deps.Queries.ListCalendarEventsAcrossCalendars(ctx, generated.ListCalendarEventsAcrossCalendarsParams{
 			UserID:      actorID,
 			WorkspaceID: wsID,
-			StartAt:     input.End,
-			EndAt:       input.Start,
+			StartAt:     endTime,
+			EndAt:       startTime,
 		})
 		if err != nil {
 			return nil, huma.Error500InternalServerError("Failed to list calendar events", err)
 		}
 
+		// Recurring events whose recurrence window overlaps the query range
+		recurringRows, err := deps.Queries.ListRecurringCalendarEventsAcrossCalendars(ctx, generated.ListRecurringCalendarEventsAcrossCalendarsParams{
+			UserID:        actorID,
+			WorkspaceID:   wsID,
+			StartAt:       endTime,
+			RecurrenceEnd: sql.NullTime{Time: startTime, Valid: true},
+		})
+		if err != nil {
+			return nil, huma.Error500InternalServerError("Failed to list recurring calendar events", err)
+		}
+
 		out := &ListCalendarEventsOutput{}
-		out.Body.Events = make([]CrossCalendarEventResponse, len(rows))
-		for i, r := range rows {
+		out.Body.Events = make([]CrossCalendarEventResponse, 0, len(rows)+len(recurringRows))
+
+		for _, r := range rows {
 			resp := CrossCalendarEventResponse{
 				ID:         r.PublicID.String(),
+				CalendarID: r.CalendarPublicID.String(),
 				Kind:       string(r.Kind),
 				Visibility: string(r.Visibility),
 				ShowAs:     string(r.ShowAs),
@@ -615,8 +648,46 @@ func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInpu
 			if r.UpdatedAt.Valid {
 				resp.UpdatedAt = &r.UpdatedAt.Time
 			}
-			out.Body.Events[i] = resp
+			out.Body.Events = append(out.Body.Events, resp)
 		}
+
+		for _, r := range recurringRows {
+			resp := CrossCalendarEventResponse{
+				ID:         r.PublicID.String(),
+				CalendarID: r.CalendarPublicID.String(),
+				Kind:       string(r.Kind),
+				Visibility: string(r.Visibility),
+				ShowAs:     string(r.ShowAs),
+				Title:      r.Title,
+				AllDay:     r.AllDay,
+				StartAt:    r.StartAt,
+				EndAt:      r.EndAt,
+				Timezone:   r.Timezone,
+				CreatedAt:  r.CreatedAt,
+			}
+			if r.Location.Valid {
+				resp.Location = &r.Location.String
+			}
+			if r.BlockLabel.Valid {
+				resp.BlockLabel = &r.BlockLabel.String
+			}
+			if r.RecurrenceRule != nil {
+				raw := json.RawMessage(r.RecurrenceRule)
+				resp.RecurrenceRule = &raw
+			}
+			if r.RecurrenceEnd.Valid {
+				resp.RecurrenceEnd = &r.RecurrenceEnd.Time
+			}
+			if r.RecurrenceExceptions != nil {
+				raw := json.RawMessage(r.RecurrenceExceptions)
+				resp.RecurrenceExceptions = &raw
+			}
+			if r.UpdatedAt.Valid {
+				resp.UpdatedAt = &r.UpdatedAt.Time
+			}
+			out.Body.Events = append(out.Body.Events, resp)
+		}
+
 		return out, nil
 	}
 }
@@ -689,6 +760,10 @@ func eventFromRecurringRow(e generated.ListRecurringCalendarEventsByRangeRow) Ev
 	if e.RecurrenceEnd.Valid {
 		resp.RecurrenceEnd = &e.RecurrenceEnd.Time
 	}
+	if e.RecurrenceExceptions != nil {
+		raw := json.RawMessage(e.RecurrenceExceptions)
+		resp.RecurrenceExceptions = &raw
+	}
 	if e.NotificationOffset.Valid {
 		resp.NotificationOffset = &e.NotificationOffset.Int32
 	}
@@ -696,6 +771,18 @@ func eventFromRecurringRow(e generated.ListRecurringCalendarEventsByRangeRow) Ev
 		resp.UpdatedAt = &e.UpdatedAt.Time
 	}
 	return resp
+}
+
+// parseFlexibleTime parses a date string ("2006-01-02") or a full
+// RFC 3339 datetime string into a time.Time.
+func parseFlexibleTime(s string) (time.Time, error) {
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return t, nil
+	}
+	if t, err := time.Parse("2006-01-02", s); err == nil {
+		return t, nil
+	}
+	return time.Time{}, fmt.Errorf("cannot parse %q as date or datetime", s)
 }
 
 func eventFromFullRow(e generated.FindCalendarEventByPublicIdRow) EventResponse {
@@ -729,6 +816,10 @@ func eventFromFullRow(e generated.FindCalendarEventByPublicIdRow) EventResponse 
 	}
 	if e.RecurrenceEnd.Valid {
 		resp.RecurrenceEnd = &e.RecurrenceEnd.Time
+	}
+	if e.RecurrenceExceptions != nil {
+		raw := json.RawMessage(e.RecurrenceExceptions)
+		resp.RecurrenceExceptions = &raw
 	}
 	if e.NotificationOffset.Valid {
 		resp.NotificationOffset = &e.NotificationOffset.Int32

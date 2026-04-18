@@ -11,6 +11,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
 // Deps is the dependency bundle passed to each handler in this package.
@@ -213,20 +214,11 @@ type RemoveProjectMemberOutput struct {
 	Body RemoveProjectMemberBody
 }
 
-func nullStr(s sql.NullString) string {
-	if s.Valid {
-		return s.String
-	}
-	return ""
-}
+// nullStr delegates to handlerutil.NullStr.
+var nullStr = handlerutil.NullStr
 
-func nullTime(t sql.NullTime) *time.Time {
-	if !t.Valid {
-		return nil
-	}
-	tt := t.Time
-	return &tt
-}
+// nullTime delegates to handlerutil.NullTime.
+var nullTime = handlerutil.NullTime
 
 // timePtr returns a pointer to a time.Time value, for assigning non-null
 // times into DTO fields declared as *time.Time.

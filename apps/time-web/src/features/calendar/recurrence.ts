@@ -1,18 +1,12 @@
 import { DateTime } from 'luxon';
 
-export interface RecurrenceRule {
-  freq: 'daily' | 'weekly' | 'monthly' | 'yearly';
-  interval?: number;
-  byDay?: string[];
-  byMonthDay?: number[];
-  until?: string;
-  count?: number;
-}
+import type { RecurrenceRule } from './types';
 
 interface RecurrenceEvent {
   startAt: string;
   endAt: string;
   recurrenceRule: RecurrenceRule | null;
+  recurrenceExceptions?: string[];
 }
 
 interface ExpandedInstance {
@@ -68,6 +62,11 @@ export function expandRecurrence(
   const until = rule.until ? DateTime.fromISO(rule.until) : null;
   const maxCount = rule.count ?? Number.POSITIVE_INFINITY;
 
+  // Build a set of exception timestamps for fast lookup.
+  const exceptions = new Set(
+    event.recurrenceExceptions?.map((d) => DateTime.fromISO(d).toMillis()) ?? [],
+  );
+
   const results: ExpandedInstance[] = [];
   let current = eventStart;
   let emitted = 0;
@@ -80,11 +79,14 @@ export function expandRecurrence(
     const passesMonthDay = !rule.byMonthDay || matchesByMonthDay(candidate, rule.byMonthDay);
 
     if (passesDay && passesMonthDay) {
-      const instanceEnd = candidate.plus(duration);
-      if (instanceEnd > rangeStart) {
-        results.push({ startAt: candidate, endAt: instanceEnd });
-      }
       emitted++;
+      // Skip instances that match a recurrence exception date.
+      if (!exceptions.has(candidate.toMillis())) {
+        const instanceEnd = candidate.plus(duration);
+        if (instanceEnd > rangeStart) {
+          results.push({ startAt: candidate, endAt: instanceEnd });
+        }
+      }
     }
 
     current = advanceByFreq(current, rule.freq, interval);
@@ -95,7 +97,12 @@ export function expandRecurrence(
 
 /** Expand all recurring events in a list, merging with non-recurring events. */
 export function expandAllRecurrences<
-  T extends { startAt: string; endAt: string; recurrenceRule?: RecurrenceRule | null },
+  T extends {
+    startAt: string;
+    endAt: string;
+    recurrenceRule?: RecurrenceRule | null;
+    recurrenceExceptions?: string[];
+  },
 >(events: T[], rangeStart: DateTime, rangeEnd: DateTime): T[] {
   const result: T[] = [];
 
@@ -106,7 +113,12 @@ export function expandAllRecurrences<
     }
 
     const instances = expandRecurrence(
-      { startAt: event.startAt, endAt: event.endAt, recurrenceRule: event.recurrenceRule },
+      {
+        startAt: event.startAt,
+        endAt: event.endAt,
+        recurrenceRule: event.recurrenceRule,
+        recurrenceExceptions: event.recurrenceExceptions,
+      },
       rangeStart,
       rangeEnd,
     );

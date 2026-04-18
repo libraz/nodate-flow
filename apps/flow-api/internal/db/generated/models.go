@@ -1837,8 +1837,12 @@ type CalendarEvent struct {
 	RecurrenceRule json.RawMessage `json:"recurrenceRule"`
 	// Computed end date for recurrence expansion queries
 	RecurrenceEnd sql.NullTime `json:"recurrenceEnd"`
+	// Array of ISO 8601 dates/times to exclude from recurrence
+	RecurrenceExceptions json.RawMessage `json:"recurrenceExceptions"`
 	// Minutes before event to send notification; NULL = no notification
 	NotificationOffset sql.NullInt32 `json:"notificationOffset"`
+	// Timestamp when notification was sent; NULL = not yet notified
+	NotifiedAt sql.NullTime `json:"notifiedAt"`
 	// Linked task (optional, for task-calendar sync)
 	TaskID sql.NullInt32 `json:"-"`
 	// Display order
@@ -3046,7 +3050,7 @@ type VTaskList struct {
 	SortWeight              int32             `json:"sortWeight"`
 	UpdatedAt               sql.NullTime      `json:"updatedAt"`
 	CreatedAt               time.Time         `json:"createdAt"`
-	PrimaryAssigneePublicID []byte            `json:"primaryAssigneePublicId"`
+	PrimaryAssigneePublicID interface{}       `json:"primaryAssigneePublicId"`
 	AssigneeCount           int64             `json:"assigneeCount"`
 }
 
@@ -3196,7 +3200,7 @@ type WorkspaceInvite struct {
 	// Internal FK to workspaces.id
 	WorkspaceID uint32 `json:"-"`
 	// Internal FK to users.id who created the invite
-	CreatedByUserID uint32 `json:"-"`
+	CreatedByUserID sql.NullInt32 `json:"-"`
 	// SHA-256 hex of invite token plaintext
 	TokenHash string `json:"tokenHash"`
 	// Role granted on accept

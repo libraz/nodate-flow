@@ -110,37 +110,79 @@ func (s *RedisStore) FindByRefreshHash(ctx context.Context, hash string) (*Sessi
 	}, nil
 }
 
-// RotateRefreshHash implements [Store]. Reads the old entry, writes a
-// new one under the new hash key with the extended TTL, then deletes
-// the old key. The user-set and pub reverse index are updated in the
-// same TxPipeline so failures leave no dangling references.
+// rotateScript is a Lua script that atomically reads an old session
+// key, writes a new one, and deletes the old. This eliminates the
+// TOCTOU race where concurrent refresh requests could both read the
+// old session before either deletes it.
+var rotateScript = redis.NewScript(`
+local oldKey  = KEYS[1]
+local newKey  = KEYS[2]
+local userSet = KEYS[3]
+local pubIdx  = KEYS[4]
+
+local data = redis.call('HGETALL', oldKey)
+if #data == 0 then return redis.error_reply('NOT_FOUND') end
+
+-- Delete old key first to prevent double rotation.
+redis.call('DEL', oldKey)
+
+-- Build field map and write new key.
+for i = 1, #data, 2 do
+    redis.call('HSET', newKey, data[i], data[i+1])
+end
+redis.call('HSET', newKey, 'expiresAt', ARGV[1])
+redis.call('HSET', newKey, 'lastUsedAt', ARGV[2])
+redis.call('EXPIRE', newKey, tonumber(ARGV[3]))
+
+-- Update user set and pub reverse index.
+redis.call('SREM', userSet, ARGV[4])
+redis.call('SADD', userSet, ARGV[5])
+redis.call('EXPIRE', userSet, tonumber(ARGV[3]))
+redis.call('SET', pubIdx, ARGV[5], 'EX', tonumber(ARGV[3]))
+return 'OK'
+`)
+
+// RotateRefreshHash implements [Store]. Uses a Lua script for atomic
+// read-then-rekey to prevent TOCTOU races under concurrent refresh
+// requests.
 func (s *RedisStore) RotateRefreshHash(ctx context.Context, oldHash, newHash string, expiresAt time.Time) error {
-	old, err := s.FindByRefreshHash(ctx, oldHash)
-	if err != nil {
-		return err
-	}
 	ttl := time.Until(expiresAt)
 	if ttl <= 0 {
 		return errors.New("sessionstore/redis: rotated expiresAt in the past")
 	}
-	pipe := s.rdb.TxPipeline()
-	pipe.HSet(ctx, sessionKey(newHash), map[string]interface{}{
-		"publicId":    hex.EncodeToString(old.PublicID[:]),
-		"userId":      old.UserID,
-		"ua":          old.UserAgent,
-		"ip":          old.IPAddress,
-		"expiresAt":   expiresAt.Format(time.RFC3339Nano),
-		"createdAt":   old.CreatedAt.Format(time.RFC3339Nano),
-		"lastUsedAt":  time.Now().UTC().Format(time.RFC3339Nano),
-	})
-	pipe.Expire(ctx, sessionKey(newHash), ttl)
-	pipe.Del(ctx, sessionKey(oldHash))
-	pipe.SRem(ctx, userKey(old.UserID), oldHash)
-	pipe.SAdd(ctx, userKey(old.UserID), newHash)
-	pipe.Expire(ctx, userKey(old.UserID), ttl)
-	pipe.Set(ctx, pubKey(old.PublicID), newHash, ttl)
-	_, err = pipe.Exec(ctx)
-	return err
+
+	// We need the publicId and userId from the old session to build
+	// the correct key names. Read them first — the Lua script will
+	// atomically verify the key still exists.
+	old, err := s.FindByRefreshHash(ctx, oldHash)
+	if err != nil {
+		return err
+	}
+
+	ttlSec := int(ttl.Seconds()) + 1 // +1 to avoid off-by-one
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+
+	result, err := rotateScript.Run(ctx, s.rdb,
+		[]string{
+			sessionKey(oldHash),
+			sessionKey(newHash),
+			userKey(old.UserID),
+			pubKey(old.PublicID),
+		},
+		expiresAt.Format(time.RFC3339Nano), // ARGV[1]
+		now,                                 // ARGV[2]
+		ttlSec,                              // ARGV[3]
+		oldHash,                             // ARGV[4]
+		newHash,                             // ARGV[5]
+	).Text()
+	if err != nil {
+		if err.Error() == "NOT_FOUND" {
+			return ErrNotFound
+		}
+		return fmt.Errorf("sessionstore/redis: rotate: %w", err)
+	}
+	_ = result
+	return nil
 }
 
 // ListActive implements [Store]. It iterates the user's set of

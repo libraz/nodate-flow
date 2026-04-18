@@ -318,6 +318,10 @@ function CalendarRoute(): ReactElement {
   });
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const dragDataRef = useRef<{ taskId: string; fromDate: string } | null>(null);
+  // Counter to track nested dragenter/dragleave pairs per cell. Native
+  // HTML5 D&D fires leave/enter when the cursor crosses child elements
+  // inside a cell, which would otherwise cause the highlight to flicker.
+  const enterCountRef = useRef<Record<string, number>>({});
 
   // Quick-create dialog state
   const [createDate, setCreateDate] = useState<string | null>(null);
@@ -371,19 +375,28 @@ function CalendarRoute(): ReactElement {
     dragDataRef.current = { taskId, fromDate };
   }, []);
 
-  const handleDragOver = useCallback((e: DragEvent, cellKey: string) => {
+  const handleDragEnter = useCallback((e: DragEvent, cellKey: string) => {
     e.preventDefault();
-    setDragOverKey(cellKey);
+    const count = (enterCountRef.current[cellKey] ?? 0) + 1;
+    enterCountRef.current[cellKey] = count;
+    if (count === 1) setDragOverKey(cellKey);
   }, []);
 
-  const handleDragLeave = useCallback(() => {
-    setDragOverKey(null);
+  const handleDragOver = useCallback((e: DragEvent) => {
+    e.preventDefault();
+  }, []);
+
+  const handleDragLeave = useCallback((cellKey: string) => {
+    const count = Math.max(0, (enterCountRef.current[cellKey] ?? 0) - 1);
+    enterCountRef.current[cellKey] = count;
+    if (count === 0) setDragOverKey((prev) => (prev === cellKey ? null : prev));
   }, []);
 
   const handleDrop = useCallback(
     (e: DragEvent, cellKey: string) => {
       e.preventDefault();
       setDragOverKey(null);
+      enterCountRef.current = {};
       const data = dragDataRef.current;
       if (!data || data.fromDate === cellKey) return;
       rescheduleMut.mutate({ taskId: data.taskId, dueOn: cellKey });
@@ -599,10 +612,13 @@ function CalendarRoute(): ReactElement {
             return (
               <div
                 key={cell.key}
-                onDragOver={(e) => {
-                  handleDragOver(e, cell.key);
+                onDragEnter={(e) => {
+                  handleDragEnter(e, cell.key);
                 }}
-                onDragLeave={handleDragLeave}
+                onDragOver={handleDragOver}
+                onDragLeave={() => {
+                  handleDragLeave(cell.key);
+                }}
                 onDrop={(e) => {
                   handleDrop(e, cell.key);
                 }}

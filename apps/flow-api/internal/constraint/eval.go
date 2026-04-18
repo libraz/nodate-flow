@@ -101,6 +101,9 @@ func Evaluate(c Constraint, f Facts) (bool, error) {
 		}
 		return true, nil
 	case OpDepOpenAtMost:
+		if c.Max == nil {
+			return false, fmt.Errorf("%w: dependency.open_at_most missing max threshold", ErrEval)
+		}
 		open := 0
 		for _, st := range f.DependencyStates {
 			if st != "done" && st != "cancelled" {

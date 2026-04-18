@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
@@ -58,6 +59,15 @@ func AddActor(deps Deps) func(context.Context, *AddTaskActorInput) (*AddTaskActo
 				"role":    in.Body.Role,
 			},
 		})
+		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "task.actor.add",
+				ActorID:      aID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "task_actor",
+				ResourceID:   pub.String(),
+			})
+		}
 		return &AddTaskActorOutput{Body: TaskActor{
 			ID:     pub.String(),
 			UserID: userPub.String(),
@@ -134,6 +144,15 @@ func RemoveActor(deps Deps) func(context.Context, *RemoveTaskActorInput) (*Remov
 				"actorId": aid.String(),
 			},
 		})
+		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "task.actor.remove",
+				ActorID:      aID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "task_actor",
+				ResourceID:   aid.String(),
+			})
+		}
 		out := &RemoveTaskActorOutput{}
 		out.Body.Ok = true
 		return out, nil

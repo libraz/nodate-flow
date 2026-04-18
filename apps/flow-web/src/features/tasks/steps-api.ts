@@ -5,8 +5,11 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { ApiError } from '../../lib/api-error';
 import { sdk } from '../../lib/sdk';
-import { TaskApiError, tasksKeys } from './api';
+import { tasksKeys } from './api';
+
+export { ApiError as TaskApiError };
 
 export type StepGranularity = 'coarse' | 'standard' | 'fine';
 
@@ -32,7 +35,7 @@ export interface ProposeStepsResult {
  * Calls the AI-backed endpoint to decompose a task into subtask steps.
  */
 export function useProposeSteps() {
-  return useMutation<ProposeStepsResult, TaskApiError, ProposeStepsInput>({
+  return useMutation<ProposeStepsResult, ApiError, ProposeStepsInput>({
     mutationFn: async ({ taskId, granularity }) => {
       const { data, error } = await sdk.POST('/tasks/{id}/propose-steps', {
         params: { path: { id: taskId } },
@@ -40,7 +43,7 @@ export function useProposeSteps() {
       });
       if (error || !data) {
         const err = error as { detail?: string; title?: string; type?: string } | undefined;
-        throw new TaskApiError(err?.type, err?.detail ?? err?.title ?? 'Failed to propose steps');
+        throw new ApiError(err?.type, err?.detail ?? err?.title ?? 'Failed to propose steps');
       }
       return data as ProposeStepsResult;
     },
@@ -63,7 +66,7 @@ export interface ApplyStepsResult {
  */
 export function useApplySteps() {
   const qc = useQueryClient();
-  return useMutation<ApplyStepsResult, TaskApiError, ApplyStepsArgs>({
+  return useMutation<ApplyStepsResult, ApiError, ApplyStepsArgs>({
     mutationFn: async (args) => {
       const { data, error } = await sdk.POST('/tasks/{id}/apply-steps', {
         params: { path: { id: args.taskId } },
@@ -71,7 +74,7 @@ export function useApplySteps() {
       });
       if (error || !data) {
         const err = error as { detail?: string; title?: string; type?: string } | undefined;
-        throw new TaskApiError(err?.type, err?.detail ?? err?.title ?? 'Failed to apply steps');
+        throw new ApiError(err?.type, err?.detail ?? err?.title ?? 'Failed to apply steps');
       }
       return data as ApplyStepsResult;
     },

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
@@ -45,6 +46,15 @@ func AddConstraint(deps Deps) func(context.Context, *AddTaskConstraintInput) (*A
 				"kind":         in.Body.Kind,
 			},
 		})
+		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "task.constraint.add",
+				ActorID:      aID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "task_constraint",
+				ResourceID:   pub.String(),
+			})
+		}
 		autoEvaluateConstraints(ctx, deps, ws.ID, task.ID)
 		return &AddTaskConstraintOutput{Body: TaskConstraint{
 			ID:         pub.String(),
@@ -89,6 +99,15 @@ func RemoveConstraint(deps Deps) func(context.Context, *RemoveTaskConstraintInpu
 				"constraintId": cid.String(),
 			},
 		})
+		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "task.constraint.remove",
+				ActorID:      aID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "task_constraint",
+				ResourceID:   cid.String(),
+			})
+		}
 		autoEvaluateConstraints(ctx, deps, ws.ID, task.ID)
 		out := &RemoveTaskConstraintOutput{}
 		out.Body.Ok = true

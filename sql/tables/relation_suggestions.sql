@@ -14,9 +14,9 @@ CREATE TABLE relation_suggestions (
   confidence DECIMAL(5,4) NOT NULL COMMENT 'Cosine similarity score (0.0000 to 1.0000)',
   status ENUM('pending','accepted','dismissed') NOT NULL DEFAULT 'pending' COMMENT 'Resolution status',
   resolved_by INT UNSIGNED NULL COMMENT 'Internal FK to users.id (who resolved)',
-  resolved_at DATETIME(3) NULL COMMENT 'When the suggestion was accepted or dismissed',
+  resolved_at DATETIME NULL COMMENT 'When the suggestion was accepted or dismissed',
 
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   UNIQUE KEY uniq_relation_suggestions_public_id (public_id),
   UNIQUE KEY uniq_relation_suggestions_edge (source_task_id, target_task_id, suggested_kind),
@@ -26,5 +26,6 @@ CREATE TABLE relation_suggestions (
   CONSTRAINT fk_relation_suggestions_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_relation_suggestions_source FOREIGN KEY (source_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
   CONSTRAINT fk_relation_suggestions_target FOREIGN KEY (target_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-  CONSTRAINT fk_relation_suggestions_resolved_by FOREIGN KEY (resolved_by) REFERENCES users(id) ON DELETE SET NULL
+  CONSTRAINT fk_relation_suggestions_resolved_by FOREIGN KEY (resolved_by) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT chk_relation_suggestions_no_self CHECK (source_task_id != target_task_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI-suggested task relation candidates';

@@ -36,9 +36,10 @@ function RecoveryCodesView({
 }: { codes: string[]; onDismiss: () => void }): ReactElement {
   const { t } = useTranslation('settings');
   const handleCopyAll = (): void => {
-    void navigator.clipboard.writeText(codes.join('\n')).then(() => {
-      toaster.show({ tone: 'success', message: t('security.totp.recovery.copied') });
-    });
+    navigator.clipboard.writeText(codes.join('\n')).then(
+      () => toaster.show({ tone: 'success', message: t('security.totp.recovery.copied') }),
+      () => toaster.show({ tone: 'danger', message: t('security.totp.recovery.copy_failed') }),
+    );
   };
   const handleDownload = (): void => {
     const blob = new Blob([`${codes.join('\n')}\n`], { type: 'text/plain' });
@@ -132,9 +133,10 @@ function EnrollmentForm({
   };
 
   const handleCopy = (): void => {
-    void navigator.clipboard.writeText(enrollment.secret).then(() => {
-      toaster.show({ tone: 'success', message: t('security.totp.secret_copied') });
-    });
+    navigator.clipboard.writeText(enrollment.secret).then(
+      () => toaster.show({ tone: 'success', message: t('security.totp.secret_copied') }),
+      () => toaster.show({ tone: 'danger', message: t('security.totp.secret_copy_failed') }),
+    );
   };
 
   return (
@@ -180,7 +182,9 @@ function EnrollmentForm({
         </Button>
       </div>
       <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--color-fg-muted)' }}>
-        <a href={enrollment.otpauthUrl}>{t('security.totp.open_in_app')}</a>
+        <a href={enrollment.otpauthUrl.startsWith('otpauth:') ? enrollment.otpauthUrl : undefined}>
+          {t('security.totp.open_in_app')}
+        </a>
       </p>
       <FormField label={t('security.totp.code_label')} required>
         {(control) => (

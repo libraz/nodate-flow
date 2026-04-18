@@ -30,28 +30,9 @@ export interface LensDto {
   createdAt: string;
 }
 
-/** Lightweight error thrown when the lenses API returns an error envelope. */
-export class LensApiError extends Error {
-  readonly code: string | undefined;
-  constructor(code: string | undefined, message: string) {
-    super(message);
-    this.name = 'LensApiError';
-    this.code = code;
-  }
-}
+import { ApiError, toApiError } from '../../lib/api-error';
 
-function toError(err: unknown, fallback: string): LensApiError {
-  if (err && typeof err === 'object') {
-    const obj = err as { detail?: unknown; title?: unknown; type?: unknown };
-    const message =
-      (typeof obj.detail === 'string' && obj.detail) ||
-      (typeof obj.title === 'string' && obj.title) ||
-      fallback;
-    const code = typeof obj.type === 'string' ? obj.type : undefined;
-    return new LensApiError(code, message);
-  }
-  return new LensApiError(undefined, fallback);
-}
+export { ApiError as LensApiError };
 
 /** Query key factory for the lenses feature. */
 export const lensesKeys = {
@@ -73,7 +54,7 @@ export function useLensesQuery(
       const { data, error } = await sdk.GET('/workspaces/{wsId}/lenses', {
         params: { path: { wsId: workspaceId }, query },
       });
-      if (error || !data) throw toError(error, 'Failed to load saved views');
+      if (error || !data) throw toApiError(error, 'Failed to load saved views');
       // The response shape is { lenses: LensDto[] }
       const lenses = (data as { lenses?: LensDto[] }).lenses ?? [];
       return lenses;
@@ -91,7 +72,7 @@ export interface CreateLensArgs {
 }
 
 /** Creates a new saved view. */
-export function useCreateLens(): UseMutationResult<LensDto, LensApiError, CreateLensArgs> {
+export function useCreateLens(): UseMutationResult<LensDto, ApiError, CreateLensArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (args: CreateLensArgs): Promise<LensDto> => {
@@ -106,7 +87,7 @@ export function useCreateLens(): UseMutationResult<LensDto, LensApiError, Create
           isDefault: false,
         },
       });
-      if (error || !data) throw toError(error, 'Failed to save view');
+      if (error || !data) throw toApiError(error, 'Failed to save view');
       return data as unknown as LensDto;
     },
     onSuccess: (_data, vars) => {
@@ -122,14 +103,14 @@ export interface DeleteLensArgs {
 }
 
 /** Deletes a saved view. */
-export function useDeleteLens(): UseMutationResult<void, LensApiError, DeleteLensArgs> {
+export function useDeleteLens(): UseMutationResult<void, ApiError, DeleteLensArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ workspaceId, lensId }: DeleteLensArgs): Promise<void> => {
       const { error } = await sdk.DELETE('/workspaces/{wsId}/lenses/{lensId}', {
         params: { path: { wsId: workspaceId, lensId } },
       });
-      if (error) throw toError(error, 'Failed to delete view');
+      if (error) throw toApiError(error, 'Failed to delete view');
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: lensesKeys.list(vars.workspaceId, vars.projectId) });

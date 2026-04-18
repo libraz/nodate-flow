@@ -22,6 +22,7 @@ CREATE TABLE task_constraints (
 
   UNIQUE KEY uniq_task_constraints_public_id (public_id),
   KEY idx_task_constraints_workspace_id_task_id (workspace_id, task_id),
+  KEY idx_task_constraints_task_id_enabled (task_id, enabled),
 
   CONSTRAINT fk_task_constraints_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_task_constraints_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE

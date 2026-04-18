@@ -5,6 +5,7 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
@@ -40,25 +41,5 @@ func List(deps Deps) func(context.Context, *ListWorkspacesInput) (*ListWorkspace
 	}
 }
 
-// totalAsInt64 normalizes the COUNT(*) OVER() return type into int64.
-// MySQL drivers may return int64 or []byte depending on column type.
-func totalAsInt64(v interface{}) int64 {
-	switch x := v.(type) {
-	case int64:
-		return x
-	case int:
-		return int64(x)
-	case uint64:
-		return int64(x)
-	case []byte:
-		var n int64
-		for _, c := range x {
-			if c < '0' || c > '9' {
-				return n
-			}
-			n = n*10 + int64(c-'0')
-		}
-		return n
-	}
-	return 0
-}
+// totalAsInt64 delegates to handlerutil.TotalAsInt64.
+var totalAsInt64 = handlerutil.TotalAsInt64

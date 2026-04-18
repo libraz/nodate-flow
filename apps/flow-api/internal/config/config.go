@@ -2,6 +2,8 @@
 package config
 
 import (
+	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/caarlos0/env/v11"
@@ -205,11 +207,48 @@ type Config struct {
 	S3UseSSL bool `env:"ND_S3_USE_SSL" envDefault:"false"`
 }
 
-// Load parses ND_* environment variables into a Config.
+// Load parses ND_* environment variables into a Config and validates
+// enum-like fields.
 func Load() (*Config, error) {
 	cfg := &Config{}
 	if err := env.Parse(cfg); err != nil {
 		return nil, err
 	}
+	if err := validateEnums(cfg); err != nil {
+		return nil, err
+	}
 	return cfg, nil
+}
+
+// validateEnums checks that enum-like configuration fields contain one of
+// the allowed values.
+func validateEnums(cfg *Config) error {
+	// Port must be a valid integer in the 1-65535 range.
+	port, err := strconv.Atoi(cfg.Port)
+	if err != nil || port < 1 || port > 65535 {
+		return fmt.Errorf("config: ND_FLOW_PORT must be an integer between 1 and 65535, got %q", cfg.Port)
+	}
+
+	// SessionStore must be "mysql" or "redis".
+	switch cfg.SessionStore {
+	case "mysql", "redis":
+	default:
+		return fmt.Errorf("config: ND_FLOW_SESSION_STORE must be \"mysql\" or \"redis\", got %q", cfg.SessionStore)
+	}
+
+	// AgentRunner must be "orchestrator" or "log".
+	switch cfg.AgentRunner {
+	case "orchestrator", "log":
+	default:
+		return fmt.Errorf("config: ND_FLOW_AGENT_RUNNER must be \"orchestrator\" or \"log\", got %q", cfg.AgentRunner)
+	}
+
+	// AgentQueueBackend must be "memory" or "mysql".
+	switch cfg.AgentQueueBackend {
+	case "memory", "mysql":
+	default:
+		return fmt.Errorf("config: ND_FLOW_AGENT_QUEUE_BACKEND must be \"memory\" or \"mysql\", got %q", cfg.AgentQueueBackend)
+	}
+
+	return nil
 }

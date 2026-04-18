@@ -21,7 +21,8 @@ type CreateEventFromTaskInput struct {
 	WsId  string `path:"wsId" doc:"Workspace public ID"`
 	CalId string `path:"calId" doc:"Calendar public ID"`
 	Body  struct {
-		TaskID string `json:"taskId" doc:"Task public ID (UUID)"`
+		TaskID   string `json:"taskId" doc:"Task public ID (UUID)"`
+		Timezone string `json:"timezone,omitempty" doc:"IANA timezone (e.g. America/New_York). Defaults to Asia/Tokyo if omitted."`
 	}
 }
 
@@ -41,9 +42,14 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, sub, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
+		}
+
+		// Viewers cannot create events.
+		if sub.Role == generated.CalendarSubscriptionsRoleViewer {
+			return nil, errForbidden
 		}
 
 		taskUID, err := uuid.Parse(input.Body.TaskID)
@@ -53,7 +59,7 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 		taskPublicID := types.FromUUID(taskUID)
 
 		// Raw query: time-api does not have sqlc-generated task queries.
-		var taskID uint32
+		var taskID int32
 		var title string
 		var eventOn, dueOn *time.Time
 		err = deps.DB.QueryRowContext(ctx,
@@ -67,8 +73,17 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 			return nil, huma.Error500InternalServerError("Failed to look up task", err)
 		}
 
+		// Determine timezone from request or default.
+		tzName := input.Body.Timezone
+		if tzName == "" {
+			tzName = "Asia/Tokyo"
+		}
+		loc, locErr := time.LoadLocation(tzName)
+		if locErr != nil {
+			return nil, huma.Error400BadRequest("Invalid timezone: " + tzName)
+		}
+
 		// Determine start time from task dates.
-		jst := time.FixedZone("Asia/Tokyo", 9*60*60)
 		var baseDate time.Time
 		switch {
 		case eventOn != nil:
@@ -76,9 +91,9 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 		case dueOn != nil:
 			baseDate = *dueOn
 		default:
-			baseDate = time.Now().In(jst)
+			baseDate = time.Now().In(loc)
 		}
-		startAt := time.Date(baseDate.Year(), baseDate.Month(), baseDate.Day(), 9, 0, 0, 0, jst)
+		startAt := time.Date(baseDate.Year(), baseDate.Month(), baseDate.Day(), 9, 0, 0, 0, loc)
 		endAt := startAt.Add(time.Hour)
 
 		eventPublicID := types.New()
@@ -93,10 +108,10 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 			AllDay:          false,
 			StartAt:         startAt,
 			EndAt:           endAt,
-			Timezone:        "Asia/Tokyo",
+			Timezone:        tzName,
 			OwnerUserID:     actorID,
 			CreatedByUserID: actorID,
-			TaskID:          sql.NullInt32{Int32: int32(taskID), Valid: true},
+			TaskID:          sql.NullInt32{Int32: taskID, Valid: true},
 		}
 
 		_, err = deps.Queries.CreateCalendarEvent(ctx, params)
@@ -114,7 +129,7 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 			AllDay:    false,
 			StartAt:   startAt,
 			EndAt:     endAt,
-			Timezone:  "Asia/Tokyo",
+			Timezone:  tzName,
 			CreatedAt: time.Now().UTC(),
 		}
 

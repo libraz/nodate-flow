@@ -8,114 +8,144 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './routes/__root'
-import { Route as SetupRouteImport } from './routes/setup'
-import { Route as RegisterRouteImport } from './routes/register'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as CalendarRouteImport } from './routes/calendar'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as rootRouteImport } from './routes/__root';
+import { Route as SetupRouteImport } from './routes/setup';
+import { Route as RegisterRouteImport } from './routes/register';
+import { Route as LoginRouteImport } from './routes/login';
+import { Route as CalendarRouteImport } from './routes/calendar';
+import { Route as IndexRouteImport } from './routes/index';
+import { Route as ShareTokenRouteImport } from './routes/share/$token';
 
 const SetupRoute = SetupRouteImport.update({
   id: '/setup',
   path: '/setup',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const CalendarRoute = CalendarRouteImport.update({
   id: '/calendar',
   path: '/calendar',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
+const ShareTokenRoute = ShareTokenRouteImport.update({
+  id: '/share/$token',
+  path: '/share/$token',
+  getParentRoute: () => rootRouteImport,
+} as any);
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/calendar': typeof CalendarRoute
-  '/login': typeof LoginRoute
-  '/register': typeof RegisterRoute
-  '/setup': typeof SetupRoute
+  '/': typeof IndexRoute;
+  '/calendar': typeof CalendarRoute;
+  '/login': typeof LoginRoute;
+  '/register': typeof RegisterRoute;
+  '/setup': typeof SetupRoute;
+  '/share/$token': typeof ShareTokenRoute;
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/calendar': typeof CalendarRoute
-  '/login': typeof LoginRoute
-  '/register': typeof RegisterRoute
-  '/setup': typeof SetupRoute
+  '/': typeof IndexRoute;
+  '/calendar': typeof CalendarRoute;
+  '/login': typeof LoginRoute;
+  '/register': typeof RegisterRoute;
+  '/setup': typeof SetupRoute;
+  '/share/$token': typeof ShareTokenRoute;
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/calendar': typeof CalendarRoute
-  '/login': typeof LoginRoute
-  '/register': typeof RegisterRoute
-  '/setup': typeof SetupRoute
+  __root__: typeof rootRouteImport;
+  '/': typeof IndexRoute;
+  '/calendar': typeof CalendarRoute;
+  '/login': typeof LoginRoute;
+  '/register': typeof RegisterRoute;
+  '/setup': typeof SetupRoute;
+  '/share/$token': typeof ShareTokenRoute;
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/calendar' | '/login' | '/register' | '/setup'
-  fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/calendar' | '/login' | '/register' | '/setup'
-  id: '__root__' | '/' | '/calendar' | '/login' | '/register' | '/setup'
-  fileRoutesById: FileRoutesById
+  fileRoutesByFullPath: FileRoutesByFullPath;
+  fullPaths:
+    | '/'
+    | '/calendar'
+    | '/login'
+    | '/register'
+    | '/setup'
+    | '/share/$token';
+  fileRoutesByTo: FileRoutesByTo;
+  to: '/' | '/calendar' | '/login' | '/register' | '/setup' | '/share/$token';
+  id:
+    | '__root__'
+    | '/'
+    | '/calendar'
+    | '/login'
+    | '/register'
+    | '/setup'
+    | '/share/$token';
+  fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  CalendarRoute: typeof CalendarRoute
-  LoginRoute: typeof LoginRoute
-  RegisterRoute: typeof RegisterRoute
-  SetupRoute: typeof SetupRoute
+  IndexRoute: typeof IndexRoute;
+  CalendarRoute: typeof CalendarRoute;
+  LoginRoute: typeof LoginRoute;
+  RegisterRoute: typeof RegisterRoute;
+  SetupRoute: typeof SetupRoute;
+  ShareTokenRoute: typeof ShareTokenRoute;
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
     '/setup': {
-      id: '/setup'
-      path: '/setup'
-      fullPath: '/setup'
-      preLoaderRoute: typeof SetupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/setup';
+      path: '/setup';
+      fullPath: '/setup';
+      preLoaderRoute: typeof SetupRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/register': {
-      id: '/register'
-      path: '/register'
-      fullPath: '/register'
-      preLoaderRoute: typeof RegisterRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/register';
+      path: '/register';
+      fullPath: '/register';
+      preLoaderRoute: typeof RegisterRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/login';
+      path: '/login';
+      fullPath: '/login';
+      preLoaderRoute: typeof LoginRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/calendar': {
-      id: '/calendar'
-      path: '/calendar'
-      fullPath: '/calendar'
-      preLoaderRoute: typeof CalendarRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/calendar';
+      path: '/calendar';
+      fullPath: '/calendar';
+      preLoaderRoute: typeof CalendarRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/';
+      path: '/';
+      fullPath: '/';
+      preLoaderRoute: typeof IndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/share/$token': {
+      id: '/share/$token';
+      path: '/share/$token';
+      fullPath: '/share/$token';
+      preLoaderRoute: typeof ShareTokenRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
   }
 }
 
@@ -125,7 +155,8 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
   SetupRoute: SetupRoute,
-}
+  ShareTokenRoute: ShareTokenRoute,
+};
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>()
+  ._addFileTypes<FileRouteTypes>();

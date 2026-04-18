@@ -90,28 +90,9 @@ export const timeboxKeys = {
 // Error helper
 // ---------------------------------------------------------------------------
 
-/** Lightweight error thrown when an API call fails. */
-export class TimeboxApiError extends Error {
-  readonly code: string | undefined;
-  constructor(code: string | undefined, message: string) {
-    super(message);
-    this.name = 'TimeboxApiError';
-    this.code = code;
-  }
-}
+import { ApiError, toApiError } from '../../lib/api-error';
 
-function toError(err: unknown, fallback: string): TimeboxApiError {
-  if (err && typeof err === 'object') {
-    const obj = err as { detail?: unknown; title?: unknown; type?: unknown };
-    const message =
-      (typeof obj.detail === 'string' && obj.detail) ||
-      (typeof obj.title === 'string' && obj.title) ||
-      fallback;
-    const code = typeof obj.type === 'string' ? obj.type : undefined;
-    return new TimeboxApiError(code, message);
-  }
-  return new TimeboxApiError(undefined, fallback);
-}
+export { ApiError as TimeboxApiError };
 
 // ---------------------------------------------------------------------------
 // Fetch helpers
@@ -134,7 +115,7 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as unknown;
-    throw toError(body, `Request failed with status ${String(res.status)}`);
+    throw toApiError(body, `Request failed with status ${String(res.status)}`);
   }
   return (await res.json()) as T;
 }
@@ -150,7 +131,7 @@ async function fetchVoid(url: string, init?: RequestInit): Promise<void> {
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as unknown;
-    throw toError(body, `Request failed with status ${String(res.status)}`);
+    throw toApiError(body, `Request failed with status ${String(res.status)}`);
   }
 }
 
@@ -211,7 +192,7 @@ export interface CreateTimeboxArgs {
 /** POST /workspaces/{wsId}/timeboxes — create a new timebox. */
 export function useCreateTimebox(
   wsId: string,
-): UseMutationResult<TimeboxItem, TimeboxApiError, CreateTimeboxArgs> {
+): UseMutationResult<TimeboxItem, ApiError, CreateTimeboxArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ input }: CreateTimeboxArgs): Promise<TimeboxItem> => {
@@ -235,7 +216,7 @@ export interface UpdateTimeboxArgs {
 /** PATCH /workspaces/{wsId}/timeboxes/{timeboxId} — update a timebox. */
 export function useUpdateTimebox(
   wsId: string,
-): UseMutationResult<TimeboxItem, TimeboxApiError, UpdateTimeboxArgs> {
+): UseMutationResult<TimeboxItem, ApiError, UpdateTimeboxArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ timeboxId, patch }: UpdateTimeboxArgs): Promise<TimeboxItem> => {
@@ -260,7 +241,7 @@ export interface UpdateTimeboxStatusArgs {
 /** POST /workspaces/{wsId}/timeboxes/{timeboxId}/status — transition status. */
 export function useUpdateTimeboxStatus(
   wsId: string,
-): UseMutationResult<void, TimeboxApiError, UpdateTimeboxStatusArgs> {
+): UseMutationResult<void, ApiError, UpdateTimeboxStatusArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ timeboxId, status }: UpdateTimeboxStatusArgs): Promise<void> => {
@@ -278,7 +259,7 @@ export function useUpdateTimeboxStatus(
 }
 
 /** DELETE /workspaces/{wsId}/timeboxes/{timeboxId} — soft delete. */
-export function useDeleteTimebox(wsId: string): UseMutationResult<void, TimeboxApiError, string> {
+export function useDeleteTimebox(wsId: string): UseMutationResult<void, ApiError, string> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (timeboxId: string): Promise<void> => {
@@ -300,7 +281,7 @@ export interface AddTaskToTimeboxArgs {
 export function useAddTaskToTimebox(
   wsId: string,
   timeboxId: string,
-): UseMutationResult<void, TimeboxApiError, AddTaskToTimeboxArgs> {
+): UseMutationResult<void, ApiError, AddTaskToTimeboxArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId }: AddTaskToTimeboxArgs): Promise<void> => {
@@ -320,7 +301,7 @@ export function useAddTaskToTimebox(
 export function useRemoveTaskFromTimebox(
   wsId: string,
   timeboxId: string,
-): UseMutationResult<void, TimeboxApiError, string> {
+): UseMutationResult<void, ApiError, string> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (taskId: string): Promise<void> => {

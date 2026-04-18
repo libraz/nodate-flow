@@ -132,6 +132,12 @@ func CreateInvite(deps Deps) func(context.Context, *CreateInviteInput) (*CreateI
 			return nil, huma.Error500InternalServerError("Failed to create invite", err)
 		}
 
+		_ = eventbus.Append(ctx, deps.DB, wsID, "calendar.invite.created", &actorID, map[string]any{
+			"calendarId": input.CalId,
+			"inviteId":   invPublicID.String(),
+			"role":       input.Body.Role,
+		})
+
 		out := &CreateInviteOutput{}
 		out.Body = InviteResponse{
 			ID:        invPublicID.String(),
@@ -227,6 +233,11 @@ func RevokeInvite(deps Deps) func(context.Context, *RevokeInviteInput) (*RevokeI
 			return nil, huma.Error500InternalServerError("Failed to revoke invite", err)
 		}
 
+		_ = eventbus.Append(ctx, deps.DB, wsID, "calendar.invite.revoked", &actorID, map[string]any{
+			"calendarId": input.CalId,
+			"inviteId":   input.InvId,
+		})
+
 		out := &RevokeInviteOutput{}
 		out.Body.Revoked = true
 		return out, nil
@@ -250,14 +261,9 @@ func AcceptInvite(deps Deps) func(context.Context, *AcceptInviteInput) (*AcceptI
 			return nil, huma.Error500InternalServerError("Failed to find invite", err)
 		}
 
-		// Check expiry.
-		if invite.ExpiresAt.Valid && invite.ExpiresAt.Time.Before(time.Now()) {
-			return nil, errInviteNotFound
-		}
-
-		// Check max uses.
-		if invite.MaxUses.Valid && invite.UseCount >= uint32(invite.MaxUses.Int32) {
-			return nil, errInviteNotFound
+		// Check expiry and use limits.
+		if err := validateInvite(invite.ExpiresAt, invite.MaxUses, invite.UseCount); err != nil {
+			return nil, err
 		}
 
 		// Check if already subscribed.
@@ -267,6 +273,9 @@ func AcceptInvite(deps Deps) func(context.Context, *AcceptInviteInput) (*AcceptI
 		})
 		if err == nil {
 			return nil, huma.Error409Conflict("You are already a member of this calendar")
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, huma.Error500InternalServerError("Failed to check membership", err)
 		}
 
 		// Determine member color.

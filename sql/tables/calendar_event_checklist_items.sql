@@ -20,7 +20,7 @@ CREATE TABLE calendar_event_checklist_items (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   UNIQUE KEY uniq_calendar_event_checklist_items_public_id (public_id),
-  KEY idx_calendar_event_checklist_items_event (event_id, sort_weight),
+  KEY idx_calendar_event_checklist_items_event (workspace_id, event_id, sort_weight),
 
   CONSTRAINT fk_calendar_event_checklist_items_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_event_checklist_items_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE,

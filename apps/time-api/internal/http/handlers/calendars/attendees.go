@@ -129,7 +129,7 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, sub, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
@@ -137,6 +137,11 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, input.EvtId)
 		if err != nil {
 			return nil, err
+		}
+
+		// Only the event owner or calendar owner/manager can add attendees.
+		if evt.OwnerUserID != actorID && !isOwnerOrManager(sub) {
+			return nil, errForbidden
 		}
 
 		out := &AddAttendeesOutput{}
@@ -232,6 +237,12 @@ func RemoveAttendee(deps Deps) func(context.Context, *RemoveAttendeeInput) (*Rem
 		if err != nil {
 			return nil, huma.Error500InternalServerError("Failed to remove attendee", err)
 		}
+
+		_ = eventbus.Append(ctx, deps.DB, wsID, "calendar.event.attendee.removed", &actorID, map[string]any{
+			"eventId":    input.EvtId,
+			"calendarId": input.CalId,
+			"userId":     input.UserId,
+		})
 
 		out := &RemoveAttendeeOutput{}
 		out.Body.Removed = true

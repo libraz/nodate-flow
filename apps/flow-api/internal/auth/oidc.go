@@ -64,7 +64,9 @@ func (c *OIDCClient) AuthCodeURL(ctx context.Context, state, nonce string) (stri
 }
 
 // Exchange swaps an authorization code for tokens and verifies the id_token.
-func (c *OIDCClient) Exchange(ctx context.Context, code string) (*oidc.IDToken, error) {
+// When expectedNonce is non-empty, the id_token's nonce claim is validated
+// against it to prevent token replay attacks.
+func (c *OIDCClient) Exchange(ctx context.Context, code, expectedNonce string) (*oidc.IDToken, error) {
 	if err := c.ensure(ctx); err != nil {
 		return nil, err
 	}
@@ -79,6 +81,9 @@ func (c *OIDCClient) Exchange(ctx context.Context, code string) (*oidc.IDToken, 
 	idTok, err := c.verifier.Verify(ctx, raw)
 	if err != nil {
 		return nil, fmt.Errorf("auth: oidc verify: %w", err)
+	}
+	if expectedNonce != "" && idTok.Nonce != expectedNonce {
+		return nil, fmt.Errorf("auth: oidc nonce mismatch")
 	}
 	return idTok, nil
 }

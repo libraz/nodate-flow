@@ -12,6 +12,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
 // Deps is the dependency bundle passed to each handler in this package.
@@ -185,10 +186,5 @@ type DeleteLensBody struct {
 	Ok bool `json:"ok"`
 }
 
-func nullTime(t sql.NullTime) *time.Time {
-	if !t.Valid {
-		return nil
-	}
-	tt := t.Time
-	return &tt
-}
+// nullTime delegates to handlerutil.NullTime.
+var nullTime = handlerutil.NullTime

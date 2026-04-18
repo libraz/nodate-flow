@@ -4,13 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
@@ -294,13 +294,5 @@ func Delete(deps Deps) func(context.Context, *DeleteLensInput) (*DeleteLensOutpu
 	}
 }
 
-// isDuplicateEntry detects MySQL error 1062 without taking a hard
-// dependency on the mysql driver package. Matching on the substring
-// keeps this package driver-agnostic.
-func isDuplicateEntry(err error) bool {
-	if err == nil {
-		return false
-	}
-	s := err.Error()
-	return strings.Contains(s, "Error 1062") || strings.Contains(s, "Duplicate entry")
-}
+// isDuplicateEntry delegates to handlerutil.IsDuplicateEntry.
+var isDuplicateEntry = handlerutil.IsDuplicateEntry

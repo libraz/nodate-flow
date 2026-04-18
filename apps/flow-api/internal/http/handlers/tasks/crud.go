@@ -13,8 +13,18 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 )
+
+// escapeLike escapes the MySQL LIKE metacharacters %, _, and \ in a
+// user-supplied search term so they are matched literally.
+func escapeLike(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `%`, `\%`)
+	s = strings.ReplaceAll(s, `_`, `\_`)
+	return s
+}
 
 // allowedDerivedStates gate-keeps the `state` query parameter so that
 // callers can only filter by known derived_state enum values.
@@ -77,7 +87,7 @@ func listTasksFiltered(
 	}
 	if in.Q != "" {
 		where = append(where, "LOWER(v.title) LIKE ?")
-		args = append(args, "%"+strings.ToLower(in.Q)+"%")
+		args = append(args, "%"+escapeLike(strings.ToLower(in.Q))+"%")
 	}
 	if len(in.State) > 0 {
 		placeholders := make([]string, 0, len(in.State))
@@ -194,14 +204,8 @@ func parseDateOrNullTime(s string) (sql.NullTime, error) {
 	return sql.NullTime{Time: t, Valid: true}, nil
 }
 
-func actorPtr(ctx context.Context) *int64 {
-	uid, ok := middleware.ActorFromContext(ctx)
-	if !ok {
-		return nil
-	}
-	v := int64(uid)
-	return &v
-}
+// actorPtr delegates to handlerutil.ActorPtr.
+var actorPtr = handlerutil.ActorPtr
 
 // Create handles POST /tasks. The acting workspace and project are
 // resolved from the projectId in the body via FindProjectByPublicIdGlobal.

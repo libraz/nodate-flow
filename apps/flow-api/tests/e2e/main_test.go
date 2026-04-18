@@ -6,7 +6,9 @@ package e2e
 
 import (
 	"bytes"
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -122,4 +124,11 @@ func bootstrap(t *testing.T) {
 	t.Helper()
 	skipIfNoIntegration(t)
 	mustStartHarness(t)
+}
+
+// randomHex returns a hex-encoded random string of n bytes (2n chars).
+func randomHex(n int) string {
+	b := make([]byte, n)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
 }

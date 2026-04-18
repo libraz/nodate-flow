@@ -1,9 +1,10 @@
 import { getOrCreateProvider } from '@nodate/holidays';
 import { DateTime } from 'luxon';
-import { type ReactElement, useEffect, useMemo, useRef } from 'react';
+import { type ReactElement, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useCalendarUiStore } from '../../stores/calendar-ui-store';
-import { useCalendarEventsQuery } from './api';
+import { useCalendarEventsQuery, useUpdateEventMutation } from './api';
 import { getEventClassName, getEventStyle } from './event-styles';
 import type { CalendarEvent } from './types';
 
@@ -43,17 +44,42 @@ function groupEventsByDay(
     timed.set(key, []);
   }
 
+  const weekStart = weekDays[0] ?? DateTime.now();
+  const weekEnd = (weekDays[6] ?? DateTime.now()).plus({ days: 1 });
+
   for (const event of events) {
-    const key = DateTime.fromISO(event.startAt).toISODate();
-    if (!key) continue;
+    const evtStart = DateTime.fromISO(event.startAt);
+    const evtEnd = DateTime.fromISO(event.endAt);
+
     if (event.allDay) {
-      allDay.get(key)?.push(event);
+      let current = evtStart.startOf('day') < weekStart ? weekStart : evtStart.startOf('day');
+      const endDay = evtEnd.startOf('day');
+      while (current <= endDay && current < weekEnd) {
+        const key = current.toISODate();
+        if (key) {
+          allDay.get(key)?.push(event);
+        }
+        current = current.plus({ days: 1 });
+      }
     } else {
-      timed.get(key)?.push(event);
+      const key = evtStart.toISODate();
+      if (key) {
+        timed.get(key)?.push(event);
+      }
     }
   }
 
   return { allDay, timed };
+}
+
+function encodeDragData(event: CalendarEvent): string {
+  return JSON.stringify({
+    id: event.id,
+    calendarId: event.calendarId,
+    startAt: event.startAt,
+    endAt: event.endAt,
+    allDay: event.allDay,
+  });
 }
 
 function CurrentTimeIndicator(): ReactElement | null {
@@ -65,16 +91,21 @@ function CurrentTimeIndicator(): ReactElement | null {
   return (
     <div className="pointer-events-none absolute left-0 right-0 z-20" style={{ top }}>
       <div className="flex items-center">
-        <div className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-500" />
-        <div className="h-0.5 flex-1 bg-red-500" />
+        <div
+          className="h-2.5 w-2.5 shrink-0 rounded-full"
+          style={{ backgroundColor: 'var(--color-danger)' }}
+        />
+        <div className="h-0.5 flex-1" style={{ backgroundColor: 'var(--color-danger)' }} />
       </div>
     </div>
   );
 }
 
 export default function WeekView(): ReactElement {
+  const { t, i18n } = useTranslation();
   const { selectedDate, openEventDetail, openEventModal } = useCalendarUiStore();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const updateMutation = useUpdateEventMutation();
 
   const weekDays = useMemo(() => getWeekDays(selectedDate), [selectedDate]);
 
@@ -106,14 +137,61 @@ export default function WeekView(): ReactElement {
     openEventModal(undefined, startTime);
   };
 
+  const handleEventDrop = useCallback(
+    (dragData: CalendarEvent, targetDay: DateTime, targetHour: number) => {
+      const origStart = DateTime.fromISO(dragData.startAt);
+      const origEnd = DateTime.fromISO(dragData.endAt);
+      const duration = origEnd.diff(origStart);
+
+      const newStart = targetDay.set({ hour: targetHour, minute: 0, second: 0 });
+      const newEnd = newStart.plus(duration);
+
+      // Skip if dropped on same position
+      if (newStart.equals(origStart)) return;
+
+      const timezone = DateTime.local().zoneName;
+      updateMutation.mutate({
+        eventId: dragData.id,
+        calendarId: dragData.calendarId,
+        startAt: newStart.toISO() ?? '',
+        endAt: newEnd.toISO() ?? '',
+        allDay: false,
+        timezone,
+      });
+    },
+    [updateMutation],
+  );
+
+  const handleAllDayDrop = useCallback(
+    (dragData: CalendarEvent, targetDay: DateTime) => {
+      const origStart = DateTime.fromISO(dragData.startAt);
+      const origEnd = DateTime.fromISO(dragData.endAt);
+      const dayDelta = targetDay.startOf('day').diff(origStart.startOf('day'), 'days').days;
+      if (dayDelta === 0) return;
+      const timezone = DateTime.local().zoneName;
+      updateMutation.mutate({
+        eventId: dragData.id,
+        calendarId: dragData.calendarId,
+        startAt: dragData.allDay
+          ? `${targetDay.toISODate()}T00:00:00Z`
+          : (origStart.plus({ days: dayDelta }).toISO() ?? ''),
+        endAt: dragData.allDay
+          ? `${targetDay.plus({ days: origEnd.diff(origStart, 'days').days }).toISODate()}T00:00:00Z`
+          : (origEnd.plus({ days: dayDelta }).toISO() ?? ''),
+        timezone,
+      });
+    },
+    [updateMutation],
+  );
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Day header */}
       <div
-        className="grid shrink-0 border-b border-gray-200"
+        className="grid shrink-0 border-b border-[var(--color-separator)]"
         style={{ gridTemplateColumns: '56px repeat(7, 1fr)' }}
       >
-        <div className="border-r border-gray-200" />
+        <div className="border-r border-[var(--color-separator)]" />
         {weekDays.map((day) => {
           const iso = day.toISODate() ?? '';
           const isToday = iso === todayIso;
@@ -122,22 +200,36 @@ export default function WeekView(): ReactElement {
           const isSunday = dow === 0;
           const isSaturday = dow === 6;
 
-          let textColor = 'text-gray-700';
-          if (holiday || isSunday) textColor = 'text-red-500';
-          else if (isSaturday) textColor = 'text-blue-500';
+          let dayColor: string;
+          if (holiday || isSunday) dayColor = 'var(--color-sunday)';
+          else if (isSaturday) dayColor = 'var(--color-saturday)';
+          else dayColor = 'var(--color-text-primary)';
 
           return (
-            <div key={iso} className="border-r border-gray-200 px-1 py-2 text-center">
-              <div className={`text-xs ${textColor}`}>{day.toFormat('ccc')}</div>
+            <div
+              key={iso}
+              className="border-r border-[var(--color-separator)] px-1 py-2 text-center"
+            >
+              <div className="text-xs" style={{ color: dayColor }}>
+                {day.setLocale(i18n.language).toLocaleString({ weekday: 'short' })}
+              </div>
               <div
-                className={`mx-auto mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${
-                  isToday ? 'bg-blue-600 text-white' : textColor
-                }`}
+                className="mx-auto mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold"
+                style={
+                  isToday
+                    ? { backgroundColor: 'var(--color-accent)', color: '#fff' }
+                    : { color: dayColor }
+                }
               >
                 {day.day}
               </div>
               {holiday ? (
-                <div className="mt-0.5 truncate text-[9px] text-red-400">{holiday.name}</div>
+                <div
+                  className="mt-0.5 truncate text-[9px]"
+                  style={{ color: 'var(--color-sunday)' }}
+                >
+                  {holiday.name}
+                </div>
               ) : null}
             </div>
           );
@@ -147,23 +239,52 @@ export default function WeekView(): ReactElement {
       {/* All-day events bar */}
       {hasAnyAllDay(allDay) ? (
         <div
-          className="grid shrink-0 border-b border-gray-200"
+          className="grid shrink-0 border-b border-[var(--color-separator)]"
           style={{ gridTemplateColumns: '56px repeat(7, 1fr)' }}
         >
-          <div className="border-r border-gray-200 px-1 py-1 text-right text-[10px] text-gray-400">
-            all-day
+          <div
+            className="border-r border-[var(--color-separator)] px-1 py-1 text-right text-[10px]"
+            style={{ color: 'var(--color-text-tertiary)' }}
+          >
+            {t('calendar.allDay')}
           </div>
           {weekDays.map((day) => {
             const iso = day.toISODate() ?? '';
             const dayAllDay = allDay.get(iso) ?? [];
             return (
-              <div key={iso} className="border-r border-gray-200 px-0.5 py-0.5 space-y-0.5">
+              <div
+                key={iso}
+                className="border-r border-[var(--color-separator)] px-0.5 py-0.5 space-y-0.5"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const raw = e.dataTransfer.getData('application/x-calendar-event');
+                  if (!raw) return;
+                  try {
+                    const data = JSON.parse(raw) as CalendarEvent;
+                    handleAllDayDrop(data, day);
+                  } catch {}
+                }}
+              >
                 {dayAllDay.map((event) => (
                   <button
                     key={event.id}
                     type="button"
+                    draggable
+                    onDragStart={(e) => {
+                      e.stopPropagation();
+                      e.dataTransfer.setData('application/x-calendar-event', encodeDragData(event));
+                      e.dataTransfer.effectAllowed = 'move';
+                      (e.currentTarget as HTMLElement).style.opacity = '0.4';
+                    }}
+                    onDragEnd={(e) => {
+                      (e.currentTarget as HTMLElement).style.opacity = '1';
+                    }}
                     onClick={() => openEventDetail(event.id)}
-                    className={getEventClassName(event.kind)}
+                    className={`${getEventClassName(event.kind)} cursor-grab active:cursor-grabbing`}
                     style={getEventStyle(event.kind, event.showAs, '#3b82f6')}
                   >
                     {event.title}
@@ -185,14 +306,19 @@ export default function WeekView(): ReactElement {
           }}
         >
           {/* Hour labels */}
-          <div className="relative border-r border-gray-200">
+          <div className="relative border-r border-[var(--color-separator)]">
             {HOURS.map((hour) => (
               <div
                 key={hour}
-                className="absolute right-1 -translate-y-1/2 text-[11px] text-gray-400"
-                style={{ top: (hour - START_HOUR) * HOUR_HEIGHT }}
+                className="absolute right-1 -translate-y-1/2 text-[11px]"
+                style={{
+                  top: (hour - START_HOUR) * HOUR_HEIGHT,
+                  color: 'var(--color-text-tertiary)',
+                }}
               >
-                {DateTime.fromObject({ hour }).toFormat('h a')}
+                {DateTime.fromObject({ hour })
+                  .setLocale(i18n.language)
+                  .toLocaleString({ hour: 'numeric' })}
               </div>
             ))}
           </div>
@@ -209,7 +335,27 @@ export default function WeekView(): ReactElement {
             return (
               <div
                 key={iso}
-                className={`relative border-r border-gray-200 ${isNonWorking ? 'bg-gray-50/60' : ''}`}
+                className="relative border-r border-[var(--color-separator)]"
+                style={isNonWorking ? { backgroundColor: 'var(--color-surface-inset)' } : undefined}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const raw = e.dataTransfer.getData('application/x-calendar-event');
+                  if (!raw) return;
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const y = e.clientY - rect.top;
+                  const hour = Math.max(
+                    START_HOUR,
+                    Math.min(END_HOUR - 1, Math.floor(y / HOUR_HEIGHT) + START_HOUR),
+                  );
+                  try {
+                    const data = JSON.parse(raw) as CalendarEvent;
+                    handleEventDrop(data, day, hour);
+                  } catch {}
+                }}
               >
                 {/* Hour grid lines */}
                 {HOURS.map((hour) => (
@@ -221,7 +367,7 @@ export default function WeekView(): ReactElement {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleSlotClick(day, hour);
                     }}
-                    className="absolute left-0 right-0 border-t border-gray-100 cursor-pointer hover:bg-blue-50/40"
+                    className="absolute left-0 right-0 border-t border-[var(--color-separator)] cursor-pointer hover:bg-[var(--color-hover)]"
                     style={{
                       top: (hour - START_HOUR) * HOUR_HEIGHT,
                       height: HOUR_HEIGHT,
@@ -237,18 +383,36 @@ export default function WeekView(): ReactElement {
                     <button
                       key={event.id}
                       type="button"
+                      draggable
+                      onDragStart={(e) => {
+                        e.stopPropagation();
+                        e.dataTransfer.setData(
+                          'application/x-calendar-event',
+                          encodeDragData(event),
+                        );
+                        e.dataTransfer.effectAllowed = 'move';
+                        (e.currentTarget as HTMLElement).style.opacity = '0.4';
+                      }}
+                      onDragEnd={(e) => {
+                        (e.currentTarget as HTMLElement).style.opacity = '1';
+                      }}
                       onClick={(e) => {
                         e.stopPropagation();
                         openEventDetail(event.id);
                       }}
-                      className="absolute left-0.5 right-0.5 z-10 overflow-hidden rounded px-1 py-0.5 text-left text-[11px] leading-tight"
+                      className="absolute left-0.5 right-0.5 z-10 overflow-hidden rounded px-1 py-0.5 text-left text-[11px] leading-tight cursor-grab active:cursor-grabbing"
                       style={{ ...style, top, height, minHeight: 18 }}
                     >
                       <div className="font-medium truncate">{event.title}</div>
                       {height > 30 ? (
                         <div className="truncate opacity-80 text-[10px]">
-                          {DateTime.fromISO(event.startAt).toFormat('HH:mm')} -{' '}
-                          {DateTime.fromISO(event.endAt).toFormat('HH:mm')}
+                          {DateTime.fromISO(event.startAt)
+                            .setLocale(i18n.language)
+                            .toLocaleString(DateTime.TIME_SIMPLE)}{' '}
+                          -{' '}
+                          {DateTime.fromISO(event.endAt)
+                            .setLocale(i18n.language)
+                            .toLocaleString(DateTime.TIME_SIMPLE)}
                         </div>
                       ) : null}
                     </button>

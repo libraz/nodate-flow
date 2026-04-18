@@ -91,7 +91,10 @@ func (p *anthropicProvider) Complete(ctx context.Context, req Request) (*Respons
 	}
 	defer resp.Body.Close()
 
-	raw, _ := io.ReadAll(resp.Body)
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("anthropic: read body: %w", err)
+	}
 	if resp.StatusCode/100 != 2 {
 		return nil, fmt.Errorf("anthropic: upstream status %d", resp.StatusCode)
 	}

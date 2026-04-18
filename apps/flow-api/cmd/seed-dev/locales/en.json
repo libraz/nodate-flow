@@ -1,0 +1,13 @@
+{
+  "displayName": "Admin",
+  "workspaceName": "Demo Workspace",
+  "projectName": "Demo Project",
+  "projectDesc": "Sample project created by seed-dev.",
+  "tasks": [
+    { "title": "Review Q2 roadmap", "priority": 3 },
+    { "title": "Prepare sprint retro notes", "priority": 2 },
+    { "title": "Refactor auth middleware", "priority": 2 },
+    { "title": "Triage inbox backlog", "priority": 1 },
+    { "title": "Draft release announcement", "priority": 1 }
+  ]
+}

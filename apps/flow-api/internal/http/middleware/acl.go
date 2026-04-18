@@ -66,6 +66,9 @@ type ProjectRole string
 
 // Project role constants. Order matters for [ProjectRole.AtLeast].
 const (
+	// ProjectRoleElevated indicates that the caller has elevated workspace-level
+	// access (owner or admin) and is not scoped to a specific project role.
+	ProjectRoleElevated  ProjectRole = ""
 	ProjectRoleViewer    ProjectRole = "viewer"
 	ProjectRoleCommenter ProjectRole = "commenter"
 	ProjectRoleEditor    ProjectRole = "editor"
@@ -443,8 +446,8 @@ WHERE workspace_id = ? AND project_id = ? AND user_id = ? AND enabled = TRUE LIM
 						"You do not have access to this project")
 					return
 				}
-				// Elevated access: leave role empty so handlers can decide.
-				role = ""
+				// Elevated access: not scoped to a specific project role.
+				role = ProjectRoleElevated
 			default:
 				writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Internal error")
 				return
@@ -533,7 +536,7 @@ WHERE workspace_id = ? AND project_id = ? AND user_id = ? AND enabled = TRUE LIM
 						"You do not have access to this project")
 					return
 				}
-				role = ""
+				role = ProjectRoleElevated
 			default:
 				writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Internal error")
 				return
@@ -666,7 +669,7 @@ WHERE task_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 						"You do not have access to this task")
 					return
 				}
-				prjRole = ""
+				prjRole = ProjectRoleElevated
 			default:
 				writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Internal error")
 				return
@@ -692,7 +695,11 @@ WHERE task_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 						var one int
 						actorErr := db.QueryRowContext(r.Context(), taskActorQuery, taskID, userID).Scan(&one)
 						if actorErr != nil {
-							// Return 404 to avoid leaking existence.
+							if !errors.Is(actorErr, sql.ErrNoRows) {
+								writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Internal error")
+								return
+							}
+							// User is not a task actor — return 404 to avoid leaking existence.
 							writeError(w, http.StatusNotFound, errCodeTaskNotFound, "Task not found")
 							return
 						}
@@ -770,7 +777,7 @@ func RequireProjectRole(min ProjectRole) func(http.Handler) http.Handler {
 					"You do not have access to this project")
 				return
 			}
-			if prj.Role == "" {
+			if prj.Role == ProjectRoleElevated {
 				// Elevated workspace access established by RequireProjectMember.
 				next.ServeHTTP(w, r)
 				return

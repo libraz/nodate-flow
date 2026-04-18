@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
@@ -83,13 +83,21 @@ WHERE public_id = ? AND workspace_id = ? AND enabled = TRUE LIMIT 1`
 		const updateSQL = `UPDATE tasks SET sort_weight = ? WHERE id = ? AND workspace_id = ? AND enabled = TRUE`
 		for _, item := range items {
 			if _, err := tx.ExecContext(ctx, updateSQL, item.sortWeight, item.internalID, prj.WorkspaceID); err != nil {
-				return nil, fmt.Errorf("reorder: update task %d: %w", item.internalID, err)
+				return nil, httpErr(apierrors.InternalUnexpected)
 			}
 		}
 
 		if err := tx.Commit(); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "task.reorder",
+			ActorID:      actorID,
+			WorkspaceID:  prj.WorkspaceID,
+			ResourceType: "project",
+			ResourceID:   prjPub.String(),
+		})
 
 		out := &ReorderTasksOutput{}
 		out.Body.Ok = true

@@ -14,6 +14,7 @@ CREATE TABLE calendar_member_filters (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   UNIQUE KEY uniq_calendar_member_filters_sub_target (subscription_id, target_user_id),
+  KEY idx_calendar_member_filters_target_user (target_user_id),
 
   CONSTRAINT fk_calendar_member_filters_subscription FOREIGN KEY (subscription_id) REFERENCES calendar_subscriptions(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_member_filters_target FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE CASCADE

@@ -19,6 +19,13 @@ type CalendarContext struct {
 	PublicID uuid.UUID
 }
 
+// SubscriptionContext holds the caller's subscription (membership) info for the
+// resolved calendar. It is populated by RequireCalendarMember.
+type SubscriptionContext struct {
+	ID   uint32
+	Role string
+}
+
 // CalendarFromContext extracts the calendar metadata established by
 // RequireCalendarMember.
 func CalendarFromContext(ctx context.Context) (CalendarContext, bool) {
@@ -30,23 +37,35 @@ func CalendarFromContext(ctx context.Context) (CalendarContext, bool) {
 	return CalendarContext{ID: id, PublicID: pub}, true
 }
 
+// SubscriptionFromContext extracts the caller's subscription info established
+// by RequireCalendarMember. Returns false when the middleware has not run or
+// the user has no subscription.
+func SubscriptionFromContext(ctx context.Context) (SubscriptionContext, bool) {
+	v, ok := ctx.Value(ctxKeySubscription).(SubscriptionContext)
+	return v, ok
+}
+
 // RequireCalendarMember returns a middleware that resolves {calId} from the
-// URL, verifies the actor is a member of the calendar, and stores the
-// internal calendar id on the request context.
+// URL, verifies the actor holds an active subscription to the calendar, and
+// stores both the internal calendar id and the subscription info on the
+// request context.
 //
-// This is a placeholder that performs the lookup but does not yet check
-// membership in a calendar_members table. The real implementation will be
-// wired once the database schema is defined.
+// Handlers downstream can retrieve the pre-resolved data via
+// CalendarFromContext and SubscriptionFromContext instead of calling
+// resolveWorkspace + resolveCalendar manually.
 func RequireCalendarMember(db ACLDB) func(http.Handler) http.Handler {
 	const calQuery = `SELECT id FROM calendars WHERE public_id = ? AND enabled = TRUE LIMIT 1`
+	const subQuery = `SELECT id, role FROM calendar_subscriptions WHERE calendar_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			_, ok := ActorFromContext(r.Context())
+			actorID, ok := ActorFromContext(r.Context())
 			if !ok {
 				writeError(w, http.StatusForbidden, apierrors.CalendarAccessDenied.Code,
 					apierrors.CalendarAccessDenied.Message)
 				return
 			}
+
 			raw := chi.URLParam(r, "calId")
 			pub, err := uuid.Parse(raw)
 			if err != nil {
@@ -54,6 +73,7 @@ func RequireCalendarMember(db ACLDB) func(http.Handler) http.Handler {
 					apierrors.CalendarNotFound.Message)
 				return
 			}
+
 			var calID uint32
 			if err := db.QueryRowContext(r.Context(), calQuery, types.FromUUID(pub)).Scan(&calID); err != nil {
 				if errors.Is(err, sql.ErrNoRows) {
@@ -64,8 +84,26 @@ func RequireCalendarMember(db ACLDB) func(http.Handler) http.Handler {
 				writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Internal error")
 				return
 			}
+
+			// Verify the actor has an active subscription (membership).
+			var subID uint32
+			var role string
+			if err := db.QueryRowContext(r.Context(), subQuery, calID, actorID).Scan(&subID, &role); err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					writeError(w, http.StatusForbidden, apierrors.CalendarAccessDenied.Code,
+						apierrors.CalendarAccessDenied.Message)
+					return
+				}
+				writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Internal error")
+				return
+			}
+
 			ctx := context.WithValue(r.Context(), ctxKeyCalendarID, calID)
 			ctx = context.WithValue(ctx, ctxKeyCalendarIDPublic, pub)
+			ctx = context.WithValue(ctx, ctxKeySubscription, SubscriptionContext{
+				ID:   subID,
+				Role: role,
+			})
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

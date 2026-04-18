@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import { type FormEvent, type ReactElement, useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import {
@@ -9,13 +10,6 @@ import {
   useUpdateMemberRoleMutation,
 } from './api';
 import type { SubscriptionRole } from './types';
-
-const ROLES: { value: SubscriptionRole; label: string }[] = [
-  { value: 'owner', label: 'Owner' },
-  { value: 'manager', label: 'Manager' },
-  { value: 'editor', label: 'Editor' },
-  { value: 'viewer', label: 'Viewer' },
-];
 
 interface MembersDialogProps {
   calendarId: string;
@@ -28,11 +22,19 @@ export default function MembersDialog({
   open,
   onClose,
 }: MembersDialogProps): ReactElement | null {
+  const { t } = useTranslation();
   const wsId = useWorkspaceStore((s) => s.workspaceId) ?? '';
   const { data: members, isLoading } = useMembersQuery(wsId, calendarId, open);
   const addMutation = useAddMemberMutation(wsId, calendarId);
   const updateRoleMutation = useUpdateMemberRoleMutation(wsId, calendarId);
   const removeMutation = useRemoveMemberMutation(wsId, calendarId);
+
+  const roles: { value: SubscriptionRole; label: string }[] = [
+    { value: 'owner', label: t('members.roleOwner') },
+    { value: 'manager', label: t('members.roleManager') },
+    { value: 'editor', label: t('members.roleEditor') },
+    { value: 'viewer', label: t('members.roleViewer') },
+  ];
 
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<SubscriptionRole>('editor');
@@ -54,11 +56,18 @@ export default function MembersDialog({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-overlay)]">
+      <div className="glass-surface-heavy w-full max-w-md rounded-[var(--radius-lg)] p-6 ring-1 ring-[var(--color-border)]">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Members</h2>
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+            {t('members.title')}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="transition-colors"
+            style={{ color: 'var(--color-text-tertiary)' }}
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -66,47 +75,69 @@ export default function MembersDialog({
         <form onSubmit={handleAdd} className="mb-4 flex gap-2">
           <input
             type="email"
-            placeholder="Email address"
+            placeholder={t('members.emailPlaceholder')}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="flex-1 rounded-[var(--radius-sm)] border border-[var(--color-border)] px-3 py-2 text-sm outline-none focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]"
+            style={{
+              backgroundColor: 'var(--color-surface-inset)',
+              color: 'var(--color-text-primary)',
+            }}
           />
           <select
             value={role}
             onChange={(e) => setRole(e.target.value as SubscriptionRole)}
-            className="rounded-md border border-gray-300 px-2 py-2 text-sm"
+            className="rounded-[var(--radius-sm)] border border-[var(--color-border)] px-2 py-2 text-sm"
+            style={{
+              backgroundColor: 'var(--color-surface-inset)',
+              color: 'var(--color-text-primary)',
+            }}
           >
-            {ROLES.filter((r) => r.value !== 'owner').map((r) => (
-              <option key={r.value} value={r.value}>
-                {r.label}
-              </option>
-            ))}
+            {roles
+              .filter((r) => r.value !== 'owner')
+              .map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
           </select>
           <button
             type="submit"
             disabled={addMutation.isPending}
-            className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="rounded-[var(--radius-sm)] bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-[var(--color-text-on-accent)] hover:opacity-90 disabled:opacity-50"
           >
-            Add
+            {t('common.add')}
           </button>
         </form>
 
         {addMutation.isError ? (
-          <p className="mb-2 text-xs text-red-500">{addMutation.error.message}</p>
+          <p className="mb-2 text-xs" style={{ color: 'var(--color-danger)' }}>
+            {addMutation.error.message}
+          </p>
         ) : null}
 
         <div className="max-h-64 space-y-2 overflow-y-auto">
           {isLoading ? (
-            <p className="text-sm text-gray-500">Loading...</p>
+            <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+              {t('common.loading')}
+            </p>
           ) : (
             members?.map((member) => (
-              <div key={member.userId} className="flex items-center gap-3 rounded-md px-2 py-1.5">
+              <div
+                key={member.userId}
+                className="flex items-center gap-3 rounded-[var(--radius-sm)] px-2 py-1.5 hover:bg-[var(--color-hover)]"
+              >
                 <span
                   className="h-3 w-3 shrink-0 rounded-full"
                   style={{ backgroundColor: member.memberColor }}
                 />
                 <div className="flex-1 min-w-0">
-                  <p className="truncate text-sm font-medium">{member.displayName}</p>
+                  <p
+                    className="truncate text-sm font-medium"
+                    style={{ color: 'var(--color-text-primary)' }}
+                  >
+                    {member.displayName}
+                  </p>
                 </div>
                 <select
                   value={member.role}
@@ -116,9 +147,13 @@ export default function MembersDialog({
                       role: e.target.value as SubscriptionRole,
                     })
                   }
-                  className="rounded border border-gray-200 px-1.5 py-0.5 text-xs"
+                  className="rounded-[var(--radius-sm)] border border-[var(--color-border)] px-1.5 py-0.5 text-xs"
+                  style={{
+                    backgroundColor: 'var(--color-surface-inset)',
+                    color: 'var(--color-text-secondary)',
+                  }}
                 >
-                  {ROLES.map((r) => (
+                  {roles.map((r) => (
                     <option key={r.value} value={r.value}>
                       {r.label}
                     </option>
@@ -127,7 +162,8 @@ export default function MembersDialog({
                 <button
                   type="button"
                   onClick={() => removeMutation.mutate(member.userId)}
-                  className="text-gray-400 hover:text-red-500"
+                  className="hover:text-[var(--color-danger)] transition-colors"
+                  style={{ color: 'var(--color-text-tertiary)' }}
                 >
                   <X className="h-4 w-4" />
                 </button>

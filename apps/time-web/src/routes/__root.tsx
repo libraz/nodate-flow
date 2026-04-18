@@ -1,6 +1,7 @@
 import { Outlet, createRootRouteWithContext } from '@tanstack/react-router';
 import { type ReactElement, Suspense, lazy } from 'react';
 
+import ThemeInitializer from '../components/theme-initializer';
 import type { RouterContext } from '../router/router';
 
 const TanStackRouterDevtools = import.meta.env.DEV
@@ -13,16 +14,19 @@ const TanStackRouterDevtools = import.meta.env.DEV
 
 function RootLayout(): ReactElement {
   return (
-    <>
+    <div className="app-bg flex h-full min-h-screen flex-col">
+      <ThemeInitializer />
       <Suspense fallback={null}>
-        <Outlet />
+        <div className="flex flex-1 flex-col">
+          <Outlet />
+        </div>
       </Suspense>
       {TanStackRouterDevtools ? (
         <Suspense fallback={null}>
           <TanStackRouterDevtools />
         </Suspense>
       ) : null}
-    </>
+    </div>
   );
 }
 

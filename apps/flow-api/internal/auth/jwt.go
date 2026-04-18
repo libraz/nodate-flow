@@ -2,75 +2,52 @@ package auth
 
 import (
 	"crypto/ed25519"
-	"crypto/rand"
 	"errors"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
 )
 
-// JWTIssuer signs and verifies short-lived access tokens (EdDSA).
+// JWTIssuer signs and verifies short-lived access tokens (EdDSA) and
+// provides flow-api-specific extensions (TOTP step-up, OIDC state).
 type JWTIssuer struct {
-	priv     ed25519.PrivateKey
-	pub      ed25519.PublicKey
-	issuer   string
-	audience string
-	ttl      time.Duration
+	*authn.JWTIssuer
 }
 
 // AccessClaims is the structured claims body of an access token.
-type AccessClaims struct {
-	UserPublicID    types.PublicID `json:"sub_uid"`
-	SessionPublicID types.PublicID `json:"sid,omitempty"`
-	jwt.RegisteredClaims
-}
+type AccessClaims = authn.AccessClaims
 
 // NewJWTIssuer constructs a JWTIssuer. If priv is nil an ephemeral key is
 // generated and slog.Warn is emitted; this fallback is for development only.
 func NewJWTIssuer(priv ed25519.PrivateKey, issuer, audience string, ttl time.Duration) (*JWTIssuer, error) {
-	if priv == nil {
-		pub, generated, err := ed25519.GenerateKey(rand.Reader)
-		if err != nil {
-			return nil, fmt.Errorf("auth: generate ephemeral key: %w", err)
-		}
-		slog.Warn("auth: using ephemeral JWT signing key; tokens will not survive restart")
-		return &JWTIssuer{priv: generated, pub: pub, issuer: issuer, audience: audience, ttl: ttl}, nil
+	inner, err := authn.NewJWTIssuer(priv, issuer, audience, ttl)
+	if err != nil {
+		return nil, err
 	}
-	return &JWTIssuer{priv: priv, pub: priv.Public().(ed25519.PublicKey), issuer: issuer, audience: audience, ttl: ttl}, nil
+	return &JWTIssuer{JWTIssuer: inner}, nil
 }
 
 // Sign issues a signed access token for the given user + session public id.
 // The session public id is embedded as the "sid" claim so downstream
 // middleware can identify the calling session without requiring the
 // refresh cookie (which is scoped to /auth and not sent on other paths).
-func (j *JWTIssuer) Sign(userPublicID types.PublicID, sessionPublicID types.PublicID) (string, time.Time, error) {
-	now := time.Now().UTC()
-	exp := now.Add(j.ttl)
-	claims := AccessClaims{
-		UserPublicID:    userPublicID,
-		SessionPublicID: sessionPublicID,
-		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    j.issuer,
-			Audience:  jwt.ClaimStrings{j.audience},
-			Subject:   userPublicID.String(),
-			IssuedAt:  jwt.NewNumericDate(now),
-			NotBefore: jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(exp),
-			ID:        uuid.NewString(),
-		},
-	}
-	tok := jwt.NewWithClaims(jwt.SigningMethodEdDSA, claims)
-	signed, err := tok.SignedString(j.priv)
-	if err != nil {
-		return "", time.Time{}, fmt.Errorf("auth: sign jwt: %w", err)
-	}
-	return signed, exp, nil
+func (j *JWTIssuer) Sign(userPublicID dbtype.PublicID, sessionPublicID dbtype.PublicID) (string, time.Time, error) {
+	return j.JWTIssuer.Sign(userPublicID, sessionPublicID)
 }
+
+// Verify parses and validates an access token, returning its claims.
+func (j *JWTIssuer) Verify(token string) (*AccessClaims, error) {
+	return j.JWTIssuer.Verify(token)
+}
+
+// ---------------------------------------------------------------------------
+// TOTP step-up token (flow-api only)
+// ---------------------------------------------------------------------------
 
 // totpChallengeAudience is a dedicated audience string used by the
 // short-lived TOTP step-up token. Using a different audience from the
@@ -99,7 +76,7 @@ func (j *JWTIssuer) SignTotpChallenge(userID uint32) (string, time.Time, error) 
 	claims := TotpChallengeClaims{
 		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    j.issuer,
+			Issuer:    j.Issuer(),
 			Audience:  jwt.ClaimStrings{totpChallengeAudience},
 			Subject:   fmt.Sprintf("%d", userID),
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -109,7 +86,7 @@ func (j *JWTIssuer) SignTotpChallenge(userID uint32) (string, time.Time, error) 
 		},
 	}
 	tok := jwt.NewWithClaims(jwt.SigningMethodEdDSA, claims)
-	signed, err := tok.SignedString(j.priv)
+	signed, err := tok.SignedString(j.Priv())
 	if err != nil {
 		return "", time.Time{}, fmt.Errorf("auth: sign totp challenge: %w", err)
 	}
@@ -123,8 +100,8 @@ func (j *JWTIssuer) VerifyTotpChallenge(token string) (uint32, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodEd25519); !ok {
 			return nil, errors.New("auth: unexpected jwt signing method")
 		}
-		return j.pub, nil
-	}, jwt.WithIssuer(j.issuer), jwt.WithAudience(totpChallengeAudience))
+		return j.Pub(), nil
+	}, jwt.WithIssuer(j.Issuer()), jwt.WithAudience(totpChallengeAudience))
 	if err != nil {
 		return 0, err
 	}
@@ -135,20 +112,67 @@ func (j *JWTIssuer) VerifyTotpChallenge(token string) (uint32, error) {
 	return claims.UserID, nil
 }
 
-// Verify parses and validates an access token, returning its claims.
-func (j *JWTIssuer) Verify(token string) (*AccessClaims, error) {
-	parsed, err := jwt.ParseWithClaims(token, &AccessClaims{}, func(t *jwt.Token) (interface{}, error) {
+// ---------------------------------------------------------------------------
+// OIDC state token (flow-api only)
+// ---------------------------------------------------------------------------
+
+// oidcStateAudience is a dedicated audience for the short-lived OIDC
+// state token. Using a distinct audience prevents any cross-use with
+// access tokens or TOTP challenges.
+const oidcStateAudience = "oidc-state"
+
+// oidcStateTTL is how long the OIDC flow has to complete after the
+// authorization URL is generated.
+const oidcStateTTL = 10 * time.Minute
+
+// OIDCStateClaims is the claim body of a signed OIDC state token.
+type OIDCStateClaims struct {
+	// Nonce is the nonce value that must appear in the id_token.
+	Nonce string `json:"nonce"`
+	jwt.RegisteredClaims
+}
+
+// SignOIDCState issues a signed, short-lived state parameter for the
+// OIDC authorization flow. The returned token encodes the nonce so the
+// callback can verify both CSRF (state signature) and token replay
+// (nonce in id_token) in a single round-trip.
+func (j *JWTIssuer) SignOIDCState(nonce string) (string, error) {
+	now := time.Now().UTC()
+	exp := now.Add(oidcStateTTL)
+	claims := OIDCStateClaims{
+		Nonce: nonce,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    j.Issuer(),
+			Audience:  jwt.ClaimStrings{oidcStateAudience},
+			IssuedAt:  jwt.NewNumericDate(now),
+			NotBefore: jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(exp),
+			ID:        uuid.NewString(),
+		},
+	}
+	tok := jwt.NewWithClaims(jwt.SigningMethodEdDSA, claims)
+	signed, err := tok.SignedString(j.Priv())
+	if err != nil {
+		return "", fmt.Errorf("auth: sign oidc state: %w", err)
+	}
+	return signed, nil
+}
+
+// VerifyOIDCState parses and validates a signed OIDC state token.
+// Returns the embedded nonce on success.
+func (j *JWTIssuer) VerifyOIDCState(token string) (string, error) {
+	parsed, err := jwt.ParseWithClaims(token, &OIDCStateClaims{}, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodEd25519); !ok {
 			return nil, errors.New("auth: unexpected jwt signing method")
 		}
-		return j.pub, nil
-	}, jwt.WithIssuer(j.issuer), jwt.WithAudience(j.audience))
+		return j.Pub(), nil
+	}, jwt.WithIssuer(j.Issuer()), jwt.WithAudience(oidcStateAudience))
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	claims, ok := parsed.Claims.(*AccessClaims)
-	if !ok || !parsed.Valid {
-		return nil, errors.New("auth: invalid jwt claims")
+	claims, ok := parsed.Claims.(*OIDCStateClaims)
+	if !ok || !parsed.Valid || claims.Nonce == "" {
+		return "", errors.New("auth: invalid oidc state claims")
 	}
-	return claims, nil
+	return claims.Nonce, nil
 }

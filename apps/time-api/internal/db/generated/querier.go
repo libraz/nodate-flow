@@ -184,6 +184,9 @@ type Querier interface {
 	ListMemberFilters(ctx context.Context, subscriptionID uint32) ([]uint32, error)
 	// List a user's PATs in a workspace, masked (no token_hash).
 	ListPatsForUser(ctx context.Context, arg ListPatsForUserParams) ([]ListPatsForUserRow, error)
+	// Cross-calendar query: list recurring events across multiple calendars
+	// whose recurrence window overlaps the query range.
+	ListRecurringCalendarEventsAcrossCalendars(ctx context.Context, arg ListRecurringCalendarEventsAcrossCalendarsParams) ([]ListRecurringCalendarEventsAcrossCalendarsRow, error)
 	// List recurring events whose recurrence window overlaps the query range.
 	ListRecurringCalendarEventsByRange(ctx context.Context, arg ListRecurringCalendarEventsByRangeParams) ([]ListRecurringCalendarEventsByRangeRow, error)
 	// List a user's active sessions ordered by most recent first.

@@ -14,31 +14,12 @@ import {
 } from 'lucide-react';
 import { DateTime } from 'luxon';
 import { type ReactElement, useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useCalendarUiStore } from '../../stores/calendar-ui-store';
 import { useCalendarEventsQuery, useDeleteEventMutation } from './api';
 import { getEventStyle } from './event-styles';
 import type { CalendarEvent, EventKind, Rsvp, ShowAs } from './types';
-
-const KIND_LABELS: Record<EventKind, { label: string; color: string }> = {
-  event: { label: 'Event', color: 'bg-blue-100 text-blue-800' },
-  block: { label: 'Block', color: 'bg-gray-100 text-gray-800' },
-  free: { label: 'Free', color: 'bg-green-100 text-green-800' },
-};
-
-const SHOW_AS_LABELS: Record<ShowAs, { label: string; color: string }> = {
-  busy: { label: 'Busy', color: 'bg-red-100 text-red-700' },
-  free: { label: 'Free', color: 'bg-green-100 text-green-700' },
-  tentative: { label: 'Tentative', color: 'bg-yellow-100 text-yellow-700' },
-  oof: { label: 'Out of office', color: 'bg-gray-100 text-gray-700' },
-};
-
-const RSVP_LABELS: Record<Rsvp, { label: string; color: string }> = {
-  pending: { label: 'Pending', color: 'bg-gray-100 text-gray-600' },
-  accepted: { label: 'Accepted', color: 'bg-green-100 text-green-700' },
-  declined: { label: 'Declined', color: 'bg-red-100 text-red-700' },
-  tentative: { label: 'Tentative', color: 'bg-yellow-100 text-yellow-700' },
-};
 
 interface ChecklistItem {
   id: string;
@@ -66,21 +47,21 @@ interface Attendee {
   memberColor: string;
 }
 
-function formatDateRange(startAt: string, endAt: string, allDay: boolean): string {
-  const start = DateTime.fromISO(startAt);
-  const end = DateTime.fromISO(endAt);
+function formatDateRange(startAt: string, endAt: string, allDay: boolean, locale: string): string {
+  const start = DateTime.fromISO(startAt).setLocale(locale);
+  const end = DateTime.fromISO(endAt).setLocale(locale);
 
   if (allDay) {
     if (start.hasSame(end, 'day') || end.diff(start, 'days').days <= 1) {
-      return start.toFormat('cccc, MMMM d, yyyy');
+      return start.toLocaleString(DateTime.DATE_HUGE);
     }
-    return `${start.toFormat('MMM d')} - ${end.toFormat('MMM d, yyyy')}`;
+    return `${start.toLocaleString({ month: 'short', day: 'numeric' })} - ${end.toLocaleString(DateTime.DATE_MED)}`;
   }
 
   if (start.hasSame(end, 'day')) {
-    return `${start.toFormat('cccc, MMMM d, yyyy')}\n${start.toFormat('h:mm a')} - ${end.toFormat('h:mm a')}`;
+    return `${start.toLocaleString(DateTime.DATE_HUGE)}\n${start.toLocaleString(DateTime.TIME_SIMPLE)} - ${end.toLocaleString(DateTime.TIME_SIMPLE)}`;
   }
-  return `${start.toFormat('MMM d, h:mm a')} - ${end.toFormat('MMM d, h:mm a, yyyy')}`;
+  return `${start.toLocaleString(DateTime.DATETIME_MED)} - ${end.toLocaleString(DateTime.DATETIME_MED)}`;
 }
 
 function isUrl(text: string): boolean {
@@ -125,7 +106,10 @@ function useEventById(eventId: string): CalendarEvent | null {
   return events?.find((e) => e.id === eventId) ?? null;
 }
 
+const badgeBase = 'rounded-full px-2 py-0.5 text-xs font-medium';
+
 export default function EventDetail(): ReactElement | null {
+  const { t, i18n } = useTranslation();
   const { eventDetailId, closeEventDetail, openEventModal } = useCalendarUiStore();
   const deleteMutation = useDeleteEventMutation();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -138,6 +122,59 @@ export default function EventDetail(): ReactElement | null {
   const [newComment, setNewComment] = useState('');
 
   const event = useEventById(eventDetailId ?? '');
+
+  const kindLabels: Record<EventKind, { label: string; className: string }> = {
+    event: {
+      label: t('event.kindEvent'),
+      className: `${badgeBase} bg-[var(--color-accent-bg)] text-[var(--color-accent)]`,
+    },
+    block: {
+      label: t('event.kindBlock'),
+      className: `${badgeBase} bg-[var(--color-surface-inset)]`,
+    },
+    free: {
+      label: t('event.kindFree'),
+      className: `${badgeBase} bg-[var(--color-surface-inset)]`,
+    },
+  };
+
+  const showAsLabels: Record<ShowAs, { label: string; className: string }> = {
+    busy: {
+      label: t('event.showBusy'),
+      className: `${badgeBase} bg-[var(--color-accent-bg)] text-[var(--color-accent)]`,
+    },
+    free: {
+      label: t('event.showFree'),
+      className: `${badgeBase} bg-[var(--color-surface-inset)]`,
+    },
+    tentative: {
+      label: t('event.showTentative'),
+      className: `${badgeBase} bg-[var(--color-surface-inset)]`,
+    },
+    oof: {
+      label: t('event.showOof'),
+      className: `${badgeBase} bg-[var(--color-surface-inset)]`,
+    },
+  };
+
+  const rsvpLabels: Record<Rsvp, { label: string; className: string }> = {
+    pending: {
+      label: t('rsvp.pending'),
+      className: `${badgeBase} bg-[var(--color-surface-inset)]`,
+    },
+    accepted: {
+      label: t('rsvp.accepted'),
+      className: `${badgeBase} bg-[var(--color-accent-bg)] text-[var(--color-accent)]`,
+    },
+    declined: {
+      label: t('rsvp.declined'),
+      className: `${badgeBase} bg-[var(--color-surface-inset)]`,
+    },
+    tentative: {
+      label: t('rsvp.tentative'),
+      className: `${badgeBase} bg-[var(--color-surface-inset)]`,
+    },
+  };
 
   const handleDelete = useCallback(() => {
     if (!event) return;
@@ -166,34 +203,42 @@ export default function EventDetail(): ReactElement | null {
 
   if (!event) {
     return (
-      <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 sm:relative sm:inset-auto sm:z-auto sm:w-80 sm:shrink-0 sm:border-l sm:border-gray-200 sm:bg-white">
-        <div className="w-full max-w-md rounded-lg bg-white p-6 sm:max-w-none sm:rounded-none sm:shadow-none">
-          <p className="text-sm text-gray-500">Loading event...</p>
+      <div
+        className="fixed inset-0 z-40 flex items-center justify-center sm:relative sm:inset-auto sm:z-auto sm:w-80 sm:shrink-0 sm:border-l sm:border-[var(--color-border)] sm:flex"
+        style={{ backgroundColor: 'var(--color-overlay)' }}
+      >
+        <div
+          className="w-full max-w-md rounded-lg p-6 sm:max-w-none sm:rounded-none sm:shadow-none"
+          style={{ backgroundColor: 'var(--color-surface-elevated)' }}
+        >
+          <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+            {t('event.loadingEvent')}
+          </p>
         </div>
       </div>
     );
   }
 
-  const kindInfo = KIND_LABELS[event.kind];
-  const showAsInfo = SHOW_AS_LABELS[event.showAs];
+  const kindInfo = kindLabels[event.kind];
+  const showAsInfo = showAsLabels[event.showAs];
   const eventColor = '#3b82f6';
 
   const content = (
     <div className="flex h-full flex-col overflow-y-auto">
       {/* Header bar with color */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+      <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
         <div className="flex items-center gap-2">
           <div
-            className="h-3 w-3 rounded-full shrink-0"
+            className="h-3 w-3 shrink-0 rounded-full"
             style={getEventStyle(event.kind, event.showAs, eventColor)}
           />
-          <h2 className="text-lg font-semibold truncate">{event.title}</h2>
+          <h2 className="truncate text-lg font-semibold">{event.title}</h2>
         </div>
         <button
           type="button"
           onClick={closeEventDetail}
-          className="rounded-md p-1 hover:bg-gray-100"
-          aria-label="Close detail"
+          className="rounded-md p-1 hover:bg-[var(--color-hover)]"
+          aria-label={t('common.close')}
         >
           <X className="h-5 w-5" />
         </button>
@@ -202,32 +247,35 @@ export default function EventDetail(): ReactElement | null {
       <div className="flex-1 space-y-4 p-4">
         {/* Badges */}
         <div className="flex flex-wrap gap-2">
-          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${kindInfo.color}`}>
-            {kindInfo.label}
-          </span>
-          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${showAsInfo.color}`}>
-            {showAsInfo.label}
-          </span>
+          <span className={kindInfo.className}>{kindInfo.label}</span>
+          <span className={showAsInfo.className}>{showAsInfo.label}</span>
         </div>
 
         {/* Date/Time */}
-        <div className="flex gap-2 text-sm text-gray-700">
-          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+        <div className="flex gap-2 text-sm" style={{ color: 'var(--color-text-primary)' }}>
+          <Clock
+            className="mt-0.5 h-4 w-4 shrink-0"
+            style={{ color: 'var(--color-text-tertiary)' }}
+          />
           <span className="whitespace-pre-line">
-            {formatDateRange(event.startAt, event.endAt, event.allDay)}
+            {formatDateRange(event.startAt, event.endAt, event.allDay, i18n.language)}
           </span>
         </div>
 
         {/* Location */}
         {event.location ? (
-          <div className="flex gap-2 text-sm text-gray-700">
-            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+          <div className="flex gap-2 text-sm" style={{ color: 'var(--color-text-primary)' }}>
+            <MapPin
+              className="mt-0.5 h-4 w-4 shrink-0"
+              style={{ color: 'var(--color-text-tertiary)' }}
+            />
             {isUrl(event.location) ? (
               <a
                 href={event.location}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1 text-blue-600 hover:underline"
+                className="flex items-center gap-1 hover:underline"
+                style={{ color: 'var(--color-accent)' }}
               >
                 {event.location}
                 <ExternalLink className="h-3 w-3" />
@@ -240,44 +288,48 @@ export default function EventDetail(): ReactElement | null {
 
         {/* Memo */}
         {event.memo ? (
-          <div className="rounded-md bg-gray-50 p-3 text-sm text-gray-700 whitespace-pre-wrap">
+          <div
+            className="rounded-md p-3 text-sm whitespace-pre-wrap"
+            style={{
+              backgroundColor: 'var(--color-surface-secondary)',
+              color: 'var(--color-text-primary)',
+            }}
+          >
             {event.memo}
           </div>
         ) : null}
 
         {/* Owner */}
         <div className="flex items-center gap-2 text-sm">
-          <User className="h-4 w-4 text-gray-400" />
+          <User className="h-4 w-4" style={{ color: 'var(--color-text-tertiary)' }} />
           <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: eventColor }} />
-          <span className="text-gray-700">Owner</span>
+          <span style={{ color: 'var(--color-text-primary)' }}>{t('common.owner')}</span>
         </div>
 
         {/* Attendees */}
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <Users className="h-4 w-4 text-gray-400" />
-            <span className="text-sm font-medium text-gray-700">
-              Attendees {attendees.length > 0 ? `(${attendees.length})` : ''}
+          <div className="mb-2 flex items-center gap-2">
+            <Users className="h-4 w-4" style={{ color: 'var(--color-text-tertiary)' }} />
+            <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+              {t('detail.attendees')} {attendees.length > 0 ? `(${attendees.length})` : ''}
             </span>
           </div>
           {attendees.length === 0 ? (
-            <p className="ml-6 text-xs text-gray-400">No attendees</p>
+            <p className="ml-6 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+              {t('detail.noAttendees')}
+            </p>
           ) : (
             <div className="ml-6 space-y-1.5">
               {attendees.map((a) => {
-                const rsvpInfo = RSVP_LABELS[a.rsvp];
+                const rsvpInfo = rsvpLabels[a.rsvp];
                 return (
                   <div key={a.userId} className="flex items-center gap-2">
                     <div
-                      className="h-2.5 w-2.5 rounded-full shrink-0"
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
                       style={{ backgroundColor: a.memberColor }}
                     />
                     <span className="flex-1 truncate text-sm">{a.displayName}</span>
-                    <span
-                      className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${rsvpInfo.color}`}
-                    >
-                      {rsvpInfo.label}
-                    </span>
+                    <span className={rsvpInfo.className}>{rsvpInfo.label}</span>
                   </div>
                 );
               })}
@@ -287,22 +339,33 @@ export default function EventDetail(): ReactElement | null {
 
         {/* Checklist */}
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <CheckSquare className="h-4 w-4 text-gray-400" />
-            <span className="text-sm font-medium text-gray-700">Checklist</span>
+          <div className="mb-2 flex items-center gap-2">
+            <CheckSquare className="h-4 w-4" style={{ color: 'var(--color-text-tertiary)' }} />
+            <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+              {t('detail.checklist')}
+            </span>
           </div>
           {checklist.length === 0 ? (
-            <p className="ml-6 text-xs text-gray-400">No checklist items</p>
+            <p className="ml-6 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+              {t('detail.noChecklist')}
+            </p>
           ) : (
             <div className="ml-6 space-y-1">
               {checklist.map((item) => (
-                <div key={item.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                <div key={item.id} className="flex cursor-pointer items-center gap-2 text-sm">
                   {item.checked ? (
-                    <CheckSquare className="h-4 w-4 text-blue-500" />
+                    <CheckSquare className="h-4 w-4" style={{ color: 'var(--color-accent)' }} />
                   ) : (
-                    <Square className="h-4 w-4 text-gray-300" />
+                    <Square className="h-4 w-4" style={{ color: 'var(--color-text-tertiary)' }} />
                   )}
-                  <span className={item.checked ? 'text-gray-400 line-through' : ''}>
+                  <span
+                    className={item.checked ? 'line-through' : ''}
+                    style={{
+                      color: item.checked
+                        ? 'var(--color-text-tertiary)'
+                        : 'var(--color-text-primary)',
+                    }}
+                  >
                     {item.text}
                   </span>
                 </div>
@@ -313,25 +376,38 @@ export default function EventDetail(): ReactElement | null {
 
         {/* Comments */}
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <MessageSquare className="h-4 w-4 text-gray-400" />
-            <span className="text-sm font-medium text-gray-700">
-              Comments {comments.length > 0 ? `(${comments.length})` : ''}
+          <div className="mb-2 flex items-center gap-2">
+            <MessageSquare className="h-4 w-4" style={{ color: 'var(--color-text-tertiary)' }} />
+            <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+              {t('detail.comments')} {comments.length > 0 ? `(${comments.length})` : ''}
             </span>
           </div>
           {comments.length === 0 ? (
-            <p className="ml-6 text-xs text-gray-400">No comments yet</p>
+            <p className="ml-6 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+              {t('detail.noComments')}
+            </p>
           ) : (
-            <div className="ml-6 space-y-2 mb-2">
+            <div className="ml-6 mb-2 space-y-2">
               {comments.map((c) => (
-                <div key={c.id} className="rounded bg-gray-50 p-2">
+                <div
+                  key={c.id}
+                  className="rounded p-2"
+                  style={{ backgroundColor: 'var(--color-surface-secondary)' }}
+                >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-gray-700">{c.author}</span>
-                    <span className="text-[10px] text-gray-400">
-                      {DateTime.fromISO(c.createdAt).toRelative()}
+                    <span
+                      className="text-xs font-medium"
+                      style={{ color: 'var(--color-text-primary)' }}
+                    >
+                      {c.author}
+                    </span>
+                    <span className="text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+                      {DateTime.fromISO(c.createdAt).setLocale(i18n.language).toRelative()}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-sm text-gray-600">{c.text}</p>
+                  <p className="mt-0.5 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                    {c.text}
+                  </p>
                 </div>
               ))}
             </div>
@@ -339,41 +415,50 @@ export default function EventDetail(): ReactElement | null {
           <div className="ml-6 flex gap-2">
             <input
               type="text"
-              placeholder="Add a comment..."
+              placeholder={t('detail.addComment')}
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
-              className="flex-1 rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="flex-1 rounded-md border border-[var(--color-border)] bg-transparent px-2 py-1 text-sm outline-none focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]"
+              style={{ color: 'var(--color-text-primary)' }}
             />
             <button
               type="button"
               disabled={!newComment.trim()}
-              className="rounded-md bg-blue-600 px-3 py-1 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              className="rounded-md bg-[var(--color-accent)] px-3 py-1 text-sm font-medium text-[var(--color-text-on-accent)] hover:opacity-80 disabled:opacity-50"
             >
-              Send
+              {t('common.send')}
             </button>
           </div>
         </div>
 
         {/* Attachments */}
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <Paperclip className="h-4 w-4 text-gray-400" />
-            <span className="text-sm font-medium text-gray-700">
-              Attachments {attachments.length > 0 ? `(${attachments.length})` : ''}
+          <div className="mb-2 flex items-center gap-2">
+            <Paperclip className="h-4 w-4" style={{ color: 'var(--color-text-tertiary)' }} />
+            <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
+              {t('detail.attachments')} {attachments.length > 0 ? `(${attachments.length})` : ''}
             </span>
           </div>
           {attachments.length === 0 ? (
-            <p className="ml-6 text-xs text-gray-400">No attachments</p>
+            <p className="ml-6 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+              {t('detail.noAttachments')}
+            </p>
           ) : (
             <div className="ml-6 space-y-1">
               {attachments.map((a) => (
                 <div
                   key={a.id}
-                  className="flex items-center gap-2 rounded bg-gray-50 px-2 py-1.5 text-sm"
+                  className="flex items-center gap-2 rounded px-2 py-1.5 text-sm"
+                  style={{ backgroundColor: 'var(--color-surface-secondary)' }}
                 >
-                  <Paperclip className="h-3.5 w-3.5 text-gray-400" />
+                  <Paperclip
+                    className="h-3.5 w-3.5"
+                    style={{ color: 'var(--color-text-tertiary)' }}
+                  />
                   <span className="flex-1 truncate">{a.filename}</span>
-                  <span className="text-xs text-gray-400">{formatFileSize(a.size)}</span>
+                  <span className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+                    {formatFileSize(a.size)}
+                  </span>
                 </div>
               ))}
             </div>
@@ -382,27 +467,29 @@ export default function EventDetail(): ReactElement | null {
       </div>
 
       {/* Action buttons */}
-      <div className="flex gap-2 border-t border-gray-200 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-4">
+      <div className="flex gap-2 border-t border-[var(--color-border)] p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-4">
         <button
           type="button"
           onClick={handleEdit}
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-[var(--color-border)] px-3 py-2 text-sm font-medium hover:bg-[var(--color-hover)]"
+          style={{ color: 'var(--color-text-primary)' }}
         >
           <Pencil className="h-4 w-4" />
-          Edit
+          {t('common.edit')}
         </button>
         <button
           type="button"
           onClick={handleDelete}
           disabled={deleteMutation.isPending}
-          className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium ${
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium disabled:opacity-50"
+          style={
             confirmDelete
-              ? 'bg-red-600 text-white hover:bg-red-700'
-              : 'border border-red-300 text-red-600 hover:bg-red-50'
-          } disabled:opacity-50`}
+              ? { backgroundColor: 'var(--color-danger)', color: '#fff' }
+              : { borderColor: 'var(--color-danger)', color: 'var(--color-danger)' }
+          }
         >
           <Trash2 className="h-4 w-4" />
-          {confirmDelete ? 'Confirm Delete' : 'Delete'}
+          {confirmDelete ? t('common.confirmDelete') : t('common.delete')}
         </button>
       </div>
     </div>
@@ -412,9 +499,17 @@ export default function EventDetail(): ReactElement | null {
   return (
     <>
       {/* Mobile overlay */}
-      <div className="fixed inset-0 z-40 bg-white sm:hidden">{content}</div>
+      <div
+        className="fixed inset-0 z-40 sm:hidden"
+        style={{ backgroundColor: 'var(--color-surface-elevated)' }}
+      >
+        {content}
+      </div>
       {/* Desktop side panel */}
-      <div className="hidden w-80 shrink-0 border-l border-gray-200 bg-white sm:flex sm:flex-col">
+      <div
+        className="hidden w-80 shrink-0 border-l border-[var(--color-border)] sm:flex sm:flex-col"
+        style={{ backgroundColor: 'var(--color-surface-elevated)' }}
+      >
         {content}
       </div>
     </>

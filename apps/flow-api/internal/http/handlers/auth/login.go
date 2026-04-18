@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"log/slog"
+
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
@@ -26,14 +28,21 @@ func Login(deps Deps) func(context.Context, *LoginInput) (*LoginOutput, error) {
 		row, err := deps.Queries.FindLocalIdentityByEmail(ctx, email)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
+				// Run Argon2id against a dummy hash to equalise
+				// timing so attackers cannot enumerate valid emails
+				// by measuring response latency.
+				_, _ = auth.VerifyPassword(auth.DummyHash(), in.Body.Password)
 				return nil, httpErr(apierrors.AuthLoginInvalidCredentials)
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		if row.LockedUntilAt.Valid && row.LockedUntilAt.Time.After(time.Now()) {
+			// Also equalise timing for locked accounts.
+			_, _ = auth.VerifyPassword(auth.DummyHash(), in.Body.Password)
 			return nil, httpErr(apierrors.AuthLoginAccountLocked)
 		}
 		if !row.PasswordHash.Valid {
+			_, _ = auth.VerifyPassword(auth.DummyHash(), in.Body.Password)
 			return nil, httpErr(apierrors.AuthLoginInvalidCredentials)
 		}
 		ok, err := auth.VerifyPassword(row.PasswordHash.String, in.Body.Password)
@@ -52,7 +61,9 @@ func Login(deps Deps) func(context.Context, *LoginInput) (*LoginOutput, error) {
 		}
 		// Password OK. Clear counters immediately so a second-factor
 		// failure does not re-trigger the lockout counter.
-		_ = deps.Queries.ResetIdentityFailedAttempts(ctx, row.ID)
+		if err := deps.Queries.ResetIdentityFailedAttempts(ctx, row.ID); err != nil {
+			slog.ErrorContext(ctx, "login: failed to reset failed attempts", slog.Any("err", err), slog.Int("identity_id", int(row.ID)))
+		}
 
 		// If the account has confirmed TOTP, do NOT issue session
 		// tokens yet. Return a short-lived challenge instead; the
@@ -71,7 +82,9 @@ func Login(deps Deps) func(context.Context, *LoginInput) (*LoginOutput, error) {
 			}, nil
 		}
 
-		_ = deps.Queries.UpdateUserLastLoginAt(ctx, row.UserID)
+		if err := deps.Queries.UpdateUserLastLoginAt(ctx, row.UserID); err != nil {
+			slog.ErrorContext(ctx, "login: failed to update last_login_at", slog.Any("err", err), slog.Int("user_id", int(row.UserID)))
+		}
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "auth.login",
 			ActorID:      uint32(row.UserID),
@@ -152,7 +165,9 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		_ = deps.Queries.UpdateUserLastLoginAt(ctx, uid)
+		if err := deps.Queries.UpdateUserLastLoginAt(ctx, uid); err != nil {
+			slog.ErrorContext(ctx, "login_totp: failed to update last_login_at", slog.Any("err", err), slog.Int("user_id", int(uid)))
+		}
 		tokens, refresh, err := issueTokens(ctx, deps, uid, u.PublicID, in.UserAgent, middleware.ClientIPFromContext(ctx))
 		if err != nil {
 			return nil, err
@@ -170,9 +185,11 @@ func bumpFailed(ctx context.Context, deps Deps, row generated.FindLocalIdentityB
 	if next >= maxFailedBeforeLock {
 		lock = sql.NullTime{Time: time.Now().Add(15 * time.Minute), Valid: true}
 	}
-	_ = deps.Queries.UpdateIdentityFailedAttempts(ctx, generated.UpdateIdentityFailedAttemptsParams{
+	if err := deps.Queries.UpdateIdentityFailedAttempts(ctx, generated.UpdateIdentityFailedAttemptsParams{
 		FailedAttempts: next,
 		LockedUntilAt:  lock,
 		ID:             row.ID,
-	})
+	}); err != nil {
+		slog.ErrorContext(ctx, "login: failed to bump failed attempts counter", slog.Any("err", err), slog.Int("identity_id", int(row.ID)))
+	}
 }

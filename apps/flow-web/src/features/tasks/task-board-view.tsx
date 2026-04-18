@@ -10,7 +10,7 @@
 import Card from '@nodate-flow/ui/primitives/card';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { useNavigate } from '@tanstack/react-router';
-import { type DragEvent, type ReactElement, useState } from 'react';
+import { type DragEvent, type ReactElement, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { computeBlockedByOpen, useProjectDependenciesQuery } from '../projects/api';
@@ -67,6 +67,11 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [hoverState, setHoverState] = useState<TaskDerivedState | null>(null);
+  // Counter per column to track nested dragenter/dragleave pairs. Native
+  // HTML5 D&D fires leave/enter when moving between child elements inside
+  // the same drop zone, which would otherwise cause the hover highlight to
+  // flicker on and off as the cursor crosses card boundaries.
+  const enterCountRef = useRef<Partial<Record<TaskDerivedState, number>>>({});
 
   const groups = groupByState(tasks);
 
@@ -79,23 +84,36 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
   const handleDragEnd = (): void => {
     setDraggingId(null);
     setHoverState(null);
+    enterCountRef.current = {};
   };
 
-  const handleDragOver = (e: DragEvent<HTMLElement>, state: TaskDerivedState): void => {
+  const handleDragEnter = useCallback(
+    (e: DragEvent<HTMLElement>, state: TaskDerivedState): void => {
+      e.preventDefault();
+      const count = (enterCountRef.current[state] ?? 0) + 1;
+      enterCountRef.current[state] = count;
+      if (count === 1) setHoverState(state);
+    },
+    [],
+  );
+
+  const handleDragOver = (e: DragEvent<HTMLElement>, _state: TaskDerivedState): void => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    if (hoverState !== state) setHoverState(state);
   };
 
-  const handleDragLeave = (state: TaskDerivedState): void => {
-    if (hoverState === state) setHoverState(null);
-  };
+  const handleDragLeave = useCallback((state: TaskDerivedState): void => {
+    const count = Math.max(0, (enterCountRef.current[state] ?? 0) - 1);
+    enterCountRef.current[state] = count;
+    if (count === 0) setHoverState((prev) => (prev === state ? null : prev));
+  }, []);
 
   const handleDrop = (e: DragEvent<HTMLElement>, toState: TaskDerivedState): void => {
     e.preventDefault();
     const taskId = e.dataTransfer.getData(DRAG_MIME) || draggingId;
     setDraggingId(null);
     setHoverState(null);
+    enterCountRef.current = {};
     if (!taskId) return;
     const current = tasks.find((task) => task.id === taskId);
     if (!current) return;
@@ -158,6 +176,9 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
             key={state}
             role="listitem"
             aria-label={t(STATE_KEY[state])}
+            onDragEnter={(e) => {
+              handleDragEnter(e, state);
+            }}
             onDragOver={(e) => {
               handleDragOver(e, state);
             }}

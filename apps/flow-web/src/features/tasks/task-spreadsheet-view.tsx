@@ -263,7 +263,10 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
   };
 
   const commitEdit = (rowIdx: number, column: EditableColumn, value: string) => {
-    const task = tasks[rowIdx];
+    // Look up by the task ID stored when editing started to avoid stale
+    // rowIdx if the tasks array was reordered/refreshed mid-edit.
+    const editTaskId = editingCell?.rowIdx === rowIdx ? tasks[rowIdx]?.id : undefined;
+    const task = editTaskId ? tasks.find((t) => t.id === editTaskId) : tasks[rowIdx];
     if (!task) return;
 
     let patch: { title?: string; priority?: TaskPriority; dueOn?: string } | null = null;

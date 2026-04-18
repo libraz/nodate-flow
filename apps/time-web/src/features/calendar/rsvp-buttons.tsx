@@ -1,15 +1,9 @@
 import { type ReactElement, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useUpdateRsvpMutation } from './api';
 import type { Rsvp } from './types';
-
-const RSVP_OPTIONS: { value: Rsvp; label: string }[] = [
-  { value: 'accepted', label: 'Accept' },
-  { value: 'declined', label: 'Decline' },
-  { value: 'tentative', label: 'Tentative' },
-  { value: 'pending', label: 'Pending' },
-];
 
 interface RsvpButtonsProps {
   calendarId: string;
@@ -24,8 +18,16 @@ export default function RsvpButtons({
   currentRsvp,
   onUpdate,
 }: RsvpButtonsProps): ReactElement {
+  const { t } = useTranslation();
   const wsId = useWorkspaceStore((s) => s.workspaceId) ?? '';
   const mutation = useUpdateRsvpMutation(wsId, calendarId, eventId);
+
+  const rsvpOptions: { value: Rsvp; label: string }[] = [
+    { value: 'accepted', label: t('rsvp.accept') },
+    { value: 'declined', label: t('rsvp.decline') },
+    { value: 'tentative', label: t('rsvp.tentative') },
+    { value: 'pending', label: t('rsvp.pending') },
+  ];
 
   const handleClick = useCallback(
     (rsvp: Rsvp) => {
@@ -39,7 +41,7 @@ export default function RsvpButtons({
 
   return (
     <div className="flex gap-1">
-      {RSVP_OPTIONS.map((opt) => {
+      {rsvpOptions.map((opt) => {
         const isActive = currentRsvp === opt.value;
         return (
           <button

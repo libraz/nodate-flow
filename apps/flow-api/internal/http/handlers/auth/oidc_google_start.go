@@ -16,8 +16,14 @@ func OIDCGoogleStart(deps Deps) func(context.Context, *struct{}) (*OIDCStartOutp
 		if deps.OIDC == nil {
 			return nil, httpErr(apierrors.AuthOidcProviderUnreachable)
 		}
-		state := randomHex(16)
 		nonce := randomHex(16)
+		// State is a signed JWT that embeds the nonce. The callback
+		// validates the JWT signature + expiry to provide CSRF
+		// protection without server-side storage.
+		state, err := deps.JWT.SignOIDCState(nonce)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
 		url, err := deps.OIDC.AuthCodeURL(ctx, state, nonce)
 		if err != nil {
 			return nil, httpErr(apierrors.AuthOidcProviderUnreachable)

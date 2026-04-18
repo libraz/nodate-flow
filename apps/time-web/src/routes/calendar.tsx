@@ -1,11 +1,17 @@
 import { Navigate, createFileRoute } from '@tanstack/react-router';
-import { Plus } from 'lucide-react';
-import type { ReactElement } from 'react';
+import { Calendar, ListTodo, Search, Settings } from 'lucide-react';
+import type { ReactElement, ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import CalendarGrid from '../features/calendar/calendar-grid';
 import CalendarHeader from '../features/calendar/calendar-header';
+import DayDetail from '../features/calendar/day-detail';
 import EventDetail from '../features/calendar/event-detail';
 import EventModal from '../features/calendar/event-modal';
+import FabButton from '../features/calendar/fab-button';
+import RightSidebar from '../features/calendar/right-sidebar';
+import SearchPanel from '../features/calendar/search-panel';
+import SettingsModal from '../features/calendar/settings-modal';
 import CalendarSidebar from '../features/calendar/sidebar';
 import WeekView from '../features/calendar/week-view';
 import { useAuthStore } from '../stores/auth-store';
@@ -15,18 +21,45 @@ export const Route = createFileRoute('/calendar')({
   component: CalendarPage,
 });
 
+function TabButton({
+  icon,
+  label,
+  active,
+  onClick,
+}: {
+  icon: ReactNode;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}): ReactElement {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex flex-1 flex-col items-center gap-0.5 py-2"
+      style={{ color: active ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}
+    >
+      {icon}
+      <span className="text-[10px] font-medium">{label}</span>
+    </button>
+  );
+}
+
 function CalendarPage(): ReactElement {
+  const { t } = useTranslation();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const { currentView, sidebarOpen, setSidebarOpen, openEventModal } = useCalendarUiStore();
+  const { currentView, sidebarOpen, setSidebarOpen, mobileTab, setMobileTab } =
+    useCalendarUiStore();
 
   if (!isAuthenticated) return <Navigate to="/login" />;
 
   return (
     <div className="flex h-full flex-col">
       <CalendarHeader />
+      <SearchPanel />
       <div className="flex flex-1 overflow-hidden">
         {/* Desktop sidebar */}
-        <div className="hidden sm:block">
+        <div className="hidden sm:flex">
           <CalendarSidebar />
         </div>
 
@@ -34,7 +67,7 @@ function CalendarPage(): ReactElement {
         {sidebarOpen ? (
           <>
             <div
-              className="fixed inset-0 z-30 bg-black/40 sm:hidden"
+              className="fixed inset-0 z-30 bg-[var(--color-overlay)] sm:hidden"
               onClick={() => setSidebarOpen(false)}
               onKeyDown={(e) => {
                 if (e.key === 'Escape') setSidebarOpen(false);
@@ -43,31 +76,68 @@ function CalendarPage(): ReactElement {
               tabIndex={-1}
               aria-label="Close sidebar"
             />
-            <div className="fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-xl sm:hidden">
+            <div
+              className="fixed inset-y-0 left-0 z-30 flex w-64 shadow-xl sm:hidden"
+              style={{ backgroundColor: 'var(--color-surface-primary)' }}
+            >
               <CalendarSidebar />
             </div>
           </>
         ) : null}
 
-        {/* Calendar content */}
-        {currentView === 'week' ? <WeekView /> : <CalendarGrid />}
+        {/* Calendar content with bottom tab bar padding on mobile */}
+        <div className="flex flex-1 flex-col pb-[calc(52px+env(safe-area-inset-bottom))] sm:pb-0">
+          {currentView === 'week' ? <WeekView /> : <CalendarGrid />}
+        </div>
 
         {/* Event detail panel */}
         <EventDetail />
+
+        {/* Right sidebar */}
+        <div className="hidden sm:block">
+          <RightSidebar />
+        </div>
       </div>
 
+      {/* Mobile day detail bottom sheet */}
+      <DayDetail />
+
       {/* Mobile FAB for creating events */}
-      <button
-        type="button"
-        onClick={() => openEventModal()}
-        className="fixed bottom-6 right-6 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 active:scale-95 transition-transform sm:hidden"
-        style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
-        aria-label="Create new event"
-      >
-        <Plus className="h-6 w-6" />
-      </button>
+      <FabButton />
 
       <EventModal />
+      <SettingsModal />
+
+      {/* Mobile bottom tab bar */}
+      <nav
+        className="glass-surface-heavy fixed bottom-0 left-0 right-0 z-40 flex border-t border-[var(--color-border)] sm:hidden"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <TabButton
+          icon={<Calendar size={20} />}
+          label={t('tabs.calendar')}
+          active={mobileTab === 'calendar'}
+          onClick={() => setMobileTab('calendar')}
+        />
+        <TabButton
+          icon={<ListTodo size={20} />}
+          label={t('tabs.memo')}
+          active={mobileTab === 'memo'}
+          onClick={() => setMobileTab('memo')}
+        />
+        <TabButton
+          icon={<Search size={20} />}
+          label={t('tabs.search')}
+          active={mobileTab === 'search'}
+          onClick={() => setMobileTab('search')}
+        />
+        <TabButton
+          icon={<Settings size={20} />}
+          label={t('tabs.settings')}
+          active={mobileTab === 'settings'}
+          onClick={() => setMobileTab('settings')}
+        />
+      </nav>
     </div>
   );
 }

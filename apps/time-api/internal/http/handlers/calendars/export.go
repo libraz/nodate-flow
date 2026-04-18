@@ -1,13 +1,16 @@
 package calendars
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -58,13 +61,16 @@ func ExportICS(deps Deps) func(context.Context, *ExportICSInput) (*ExportICSOutp
 			return nil, huma.Error500InternalServerError("Failed to list events for export", err)
 		}
 
-		ics := buildICS(cal.Name, events)
+		var buf bytes.Buffer
+		if err := buildICS(&buf, cal.Name, events); err != nil {
+			return nil, huma.Error500InternalServerError("Failed to build iCal export", err)
+		}
 		safeName := sanitizeFilename(cal.Name)
 
 		out := &ExportICSOutput{
 			ContentType:        "text/calendar; charset=utf-8",
 			ContentDisposition: fmt.Sprintf(`attachment; filename="%s.ics"`, safeName),
-			Body:               ics,
+			Body:               buf.String(),
 		}
 		return out, nil
 	}
@@ -81,89 +87,183 @@ func ShareExportICS(deps Deps) func(context.Context, *ShareExportICSInput) (*Sha
 			return nil, huma.Error500InternalServerError("Failed to look up invite", err)
 		}
 
+		if err := validateInvite(invite.ExpiresAt, invite.MaxUses, invite.UseCount); err != nil {
+			return nil, err
+		}
+
 		events, err := deps.Queries.ListAllCalendarEvents(ctx, invite.CalendarID)
 		if err != nil {
 			return nil, huma.Error500InternalServerError("Failed to list events for export", err)
 		}
 
-		ics := buildICS(invite.CalendarName, events)
+		var buf bytes.Buffer
+		if err := buildICS(&buf, invite.CalendarName, events); err != nil {
+			return nil, huma.Error500InternalServerError("Failed to build iCal export", err)
+		}
 		safeName := sanitizeFilename(invite.CalendarName)
 
 		out := &ShareExportICSOutput{
 			ContentType:        "text/calendar; charset=utf-8",
 			ContentDisposition: fmt.Sprintf(`attachment; filename="%s.ics"`, safeName),
-			Body:               ics,
+			Body:               buf.String(),
 		}
 		return out, nil
 	}
 }
 
-func buildICS(calendarName string, events []generated.ListAllCalendarEventsRow) string {
-	var b strings.Builder
-	b.WriteString("BEGIN:VCALENDAR\r\n")
-	b.WriteString("VERSION:2.0\r\n")
-	b.WriteString("PRODID:-//Nodate Time//EN\r\n")
-	b.WriteString("CALSCALE:GREGORIAN\r\n")
-	b.WriteString(foldLine("X-WR-CALNAME:" + escapeICS(calendarName)))
+// buildICS writes an iCalendar (RFC 5545) document to w.
+//
+// The function accepts io.Writer so that callers can stream directly to an
+// http.ResponseWriter in the future. Currently Huma requires the full body
+// in memory (ExportICSOutput.Body string), so handlers pass a bytes.Buffer.
+// When Huma streaming support is available, this function can write directly
+// to the response without buffering.
+func buildICS(w io.Writer, calendarName string, events []generated.ListAllCalendarEventsRow) error {
+	wr := func(s string) error {
+		_, err := io.WriteString(w, s)
+		return err
+	}
+	wrf := func(format string, args ...any) error {
+		_, err := fmt.Fprintf(w, format, args...)
+		return err
+	}
+
+	if err := wr("BEGIN:VCALENDAR\r\n"); err != nil {
+		return err
+	}
+	if err := wr("VERSION:2.0\r\n"); err != nil {
+		return err
+	}
+	if err := wr("PRODID:-//Nodate Time//EN\r\n"); err != nil {
+		return err
+	}
+	if err := wr("CALSCALE:GREGORIAN\r\n"); err != nil {
+		return err
+	}
+	if err := wr(foldLine("X-WR-CALNAME:" + escapeICS(calendarName))); err != nil {
+		return err
+	}
 
 	for _, e := range events {
-		b.WriteString("BEGIN:VEVENT\r\n")
-		b.WriteString(fmt.Sprintf("UID:%s@nodate-time\r\n", e.PublicID.String()))
-		b.WriteString(foldLine("SUMMARY:" + escapeICS(e.Title)))
+		if err := wr("BEGIN:VEVENT\r\n"); err != nil {
+			return err
+		}
+		if err := wrf("UID:%s@nodate-time\r\n", e.PublicID.String()); err != nil {
+			return err
+		}
+		if err := wr(foldLine("SUMMARY:" + escapeICS(e.Title))); err != nil {
+			return err
+		}
 
 		if e.AllDay {
-			b.WriteString(fmt.Sprintf("DTSTART;VALUE=DATE:%s\r\n", e.StartAt.Format("20060102")))
-			b.WriteString(fmt.Sprintf("DTEND;VALUE=DATE:%s\r\n", e.EndAt.Format("20060102")))
+			if err := wrf("DTSTART;VALUE=DATE:%s\r\n", e.StartAt.Format("20060102")); err != nil {
+				return err
+			}
+			if err := wrf("DTEND;VALUE=DATE:%s\r\n", e.EndAt.Format("20060102")); err != nil {
+				return err
+			}
 		} else {
-			b.WriteString(fmt.Sprintf("DTSTART:%s\r\n", e.StartAt.UTC().Format("20060102T150405Z")))
-			b.WriteString(fmt.Sprintf("DTEND:%s\r\n", e.EndAt.UTC().Format("20060102T150405Z")))
+			if err := wrf("DTSTART:%s\r\n", e.StartAt.UTC().Format("20060102T150405Z")); err != nil {
+				return err
+			}
+			if err := wrf("DTEND:%s\r\n", e.EndAt.UTC().Format("20060102T150405Z")); err != nil {
+				return err
+			}
 		}
 
 		if e.Location.Valid && e.Location.String != "" {
-			b.WriteString(foldLine("LOCATION:" + escapeICS(e.Location.String)))
+			if err := wr(foldLine("LOCATION:" + escapeICS(e.Location.String))); err != nil {
+				return err
+			}
 		}
 		if e.Memo.Valid && e.Memo.String != "" {
-			b.WriteString(foldLine("DESCRIPTION:" + escapeICS(e.Memo.String)))
+			if err := wr(foldLine("DESCRIPTION:" + escapeICS(e.Memo.String))); err != nil {
+				return err
+			}
 		}
 		if e.Url.Valid && e.Url.String != "" {
-			b.WriteString(foldLine("URL:" + e.Url.String))
+			if err := wr(foldLine("URL:" + e.Url.String)); err != nil {
+				return err
+			}
 		}
 
 		// TRANSP: busy=OPAQUE, free/tentative/oof=TRANSPARENT
 		switch e.ShowAs {
 		case generated.CalendarEventsShowAsBusy:
-			b.WriteString("TRANSP:OPAQUE\r\n")
+			if err := wr("TRANSP:OPAQUE\r\n"); err != nil {
+				return err
+			}
 		default:
-			b.WriteString("TRANSP:TRANSPARENT\r\n")
+			if err := wr("TRANSP:TRANSPARENT\r\n"); err != nil {
+				return err
+			}
 		}
 
 		// Recurrence rule
 		if e.RecurrenceRule != nil {
 			rrule := buildRRule(e.RecurrenceRule)
 			if rrule != "" {
-				b.WriteString(foldLine("RRULE:" + rrule))
+				if err := wr(foldLine("RRULE:" + rrule)); err != nil {
+					return err
+				}
+			}
+		}
+
+		// Recurrence exceptions (EXDATE)
+		if e.RecurrenceExceptions != nil {
+			var exdates []string
+			if jsonErr := json.Unmarshal(e.RecurrenceExceptions, &exdates); jsonErr == nil {
+				for _, exStr := range exdates {
+					t, parseErr := time.Parse(time.RFC3339, exStr)
+					if parseErr == nil {
+						if e.AllDay {
+							if err := wrf("EXDATE;VALUE=DATE:%s\r\n", t.Format("20060102")); err != nil {
+								return err
+							}
+						} else {
+							if err := wrf("EXDATE:%s\r\n", t.UTC().Format("20060102T150405Z")); err != nil {
+								return err
+							}
+						}
+					}
+				}
 			}
 		}
 
 		// Notification as VALARM
 		if e.NotificationOffset.Valid {
-			b.WriteString("BEGIN:VALARM\r\n")
-			b.WriteString("ACTION:DISPLAY\r\n")
-			b.WriteString("DESCRIPTION:Reminder\r\n")
-			b.WriteString(fmt.Sprintf("TRIGGER:-PT%dM\r\n", e.NotificationOffset.Int32))
-			b.WriteString("END:VALARM\r\n")
+			if err := wr("BEGIN:VALARM\r\n"); err != nil {
+				return err
+			}
+			if err := wr("ACTION:DISPLAY\r\n"); err != nil {
+				return err
+			}
+			if err := wr("DESCRIPTION:Reminder\r\n"); err != nil {
+				return err
+			}
+			if err := wrf("TRIGGER:-PT%dM\r\n", e.NotificationOffset.Int32); err != nil {
+				return err
+			}
+			if err := wr("END:VALARM\r\n"); err != nil {
+				return err
+			}
 		}
 
 		if e.UpdatedAt.Valid {
-			b.WriteString(fmt.Sprintf("LAST-MODIFIED:%s\r\n", e.UpdatedAt.Time.UTC().Format("20060102T150405Z")))
+			if err := wrf("LAST-MODIFIED:%s\r\n", e.UpdatedAt.Time.UTC().Format("20060102T150405Z")); err != nil {
+				return err
+			}
 		}
-		b.WriteString(fmt.Sprintf("DTSTAMP:%s\r\n", e.CreatedAt.UTC().Format("20060102T150405Z")))
+		if err := wrf("DTSTAMP:%s\r\n", e.CreatedAt.UTC().Format("20060102T150405Z")); err != nil {
+			return err
+		}
 
-		b.WriteString("END:VEVENT\r\n")
+		if err := wr("END:VEVENT\r\n"); err != nil {
+			return err
+		}
 	}
 
-	b.WriteString("END:VCALENDAR\r\n")
-	return b.String()
+	return wr("END:VCALENDAR\r\n")
 }
 
 // buildRRule converts the JSON recurrence_rule into an iCal RRULE string.
@@ -227,25 +327,40 @@ func escapeICS(s string) string {
 }
 
 // foldLine implements RFC 5545 line folding (75 octet max per line).
+// It respects UTF-8 multi-byte boundaries so that no rune is split across
+// folded lines.
 func foldLine(line string) string {
 	const maxLen = 75
 	if len(line) <= maxLen {
 		return line + "\r\n"
 	}
 	var b strings.Builder
+	first := true
 	for len(line) > 0 {
-		cut := maxLen
-		if b.Len() > 0 {
-			// Continuation lines start with a space
+		limit := maxLen
+		if !first {
 			b.WriteString(" ")
-			cut = maxLen - 1
+			limit = maxLen - 1
 		}
-		if cut > len(line) {
-			cut = len(line)
+		if len(line) <= limit {
+			b.WriteString(line)
+			b.WriteString("\r\n")
+			break
+		}
+		// Walk back from limit to find a valid UTF-8 boundary
+		cut := limit
+		for cut > 0 && !utf8.RuneStart(line[cut]) {
+			cut--
+		}
+		if cut == 0 {
+			// Single rune wider than limit (shouldn't happen with UTF-8, but be safe)
+			_, size := utf8.DecodeRuneInString(line)
+			cut = size
 		}
 		b.WriteString(line[:cut])
 		b.WriteString("\r\n")
 		line = line[cut:]
+		first = false
 	}
 	return b.String()
 }

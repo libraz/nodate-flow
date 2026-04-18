@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -100,6 +101,19 @@ type MeBody struct {
 
 type MeOutput struct {
 	Body MeBody
+}
+
+type ChangePasswordInput struct {
+	Body struct {
+		CurrentPassword string `json:"currentPassword" minLength:"1" maxLength:"256"`
+		NewPassword     string `json:"newPassword" minLength:"8" maxLength:"256"`
+	}
+}
+
+type ChangePasswordOutput struct {
+	Body struct {
+		Updated bool `json:"updated"`
+	}
 }
 
 type PatchMeInput struct {
@@ -236,6 +250,7 @@ func Register(deps Deps) func(context.Context, *RegisterInput) (*RegisterOutput,
 		if err != nil {
 			return nil, err
 		}
+		slog.InfoContext(ctx, "auth.register.success", "userId", userPub.String(), "email", email)
 		return &RegisterOutput{
 			SetCookie: newRefreshCookie(refresh, deps.CookieSecure),
 			Body:      tokens,
@@ -250,22 +265,30 @@ func Login(deps Deps) func(context.Context, *LoginInput) (*LoginOutput, error) {
 		row, err := deps.Queries.FindLocalIdentityByEmail(ctx, email)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
+				// Perform a dummy argon2id verification to equalise timing
+				// with the real path, preventing user enumeration.
+				_, _ = auth.VerifyPassword(auth.DummyHash(), in.Body.Password)
+				slog.WarnContext(ctx, "auth.login.failure", "email", email, "reason", "user_not_found")
 				return nil, httpErr(apierrors.AuthLoginInvalidCredentials)
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		if row.LockedUntilAt.Valid && row.LockedUntilAt.Time.After(time.Now()) {
+			slog.WarnContext(ctx, "auth.login.failure", "email", email, "reason", "account_locked")
 			return nil, httpErr(apierrors.AuthLoginAccountLocked)
 		}
 		if !row.PasswordHash.Valid {
+			slog.WarnContext(ctx, "auth.login.failure", "email", email, "reason", "no_password")
 			return nil, httpErr(apierrors.AuthLoginInvalidCredentials)
 		}
 		ok, verr := auth.VerifyPassword(row.PasswordHash.String, in.Body.Password)
 		if verr != nil || !ok {
 			bumpFailed(ctx, deps, row)
 			if row.FailedAttempts+1 >= maxFailedBeforeLock {
+				slog.WarnContext(ctx, "auth.login.failure", "email", email, "reason", "rate_limited", "attempts", row.FailedAttempts+1)
 				return nil, httpErr(apierrors.AuthLoginRateLimited)
 			}
+			slog.WarnContext(ctx, "auth.login.failure", "email", email, "reason", "invalid_credentials")
 			return nil, httpErr(apierrors.AuthLoginInvalidCredentials)
 		}
 		_ = deps.Queries.ResetIdentityFailedAttempts(ctx, row.ID)
@@ -275,6 +298,7 @@ func Login(deps Deps) func(context.Context, *LoginInput) (*LoginOutput, error) {
 		if err != nil {
 			return nil, err
 		}
+		slog.InfoContext(ctx, "auth.login.success", "userId", row.UserPublicID.String(), "email", email)
 		return &LoginOutput{
 			SetCookie: newRefreshCookie(refresh, deps.CookieSecure),
 			Body:      tokens,
@@ -335,6 +359,7 @@ func Refresh(deps Deps) func(context.Context, *RefreshInput) (*RefreshOutput, er
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		slog.InfoContext(ctx, "auth.token.refresh", "userId", pub.String())
 		return &RefreshOutput{
 			SetCookie: newRefreshCookie(newPlain, deps.CookieSecure),
 			Body: AuthTokens{
@@ -366,6 +391,7 @@ func Logout(deps Deps) func(context.Context, *LogoutInput) (*LogoutOutput, error
 			UserID:   sess.UserID,
 			PublicID: sess.PublicID,
 		})
+		slog.InfoContext(ctx, "auth.logout", "sessionId", sess.PublicID.String())
 		return out, nil
 	}
 }
@@ -419,6 +445,51 @@ func PatchMe(deps Deps) func(context.Context, *PatchMeInput) (*PatchMeOutput, er
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		return &PatchMeOutput{Body: rowToMe(row)}, nil
+	}
+}
+
+// ChangePassword handles PATCH /me/password.
+func ChangePassword(deps Deps) func(context.Context, *ChangePasswordInput) (*ChangePasswordOutput, error) {
+	return func(ctx context.Context, in *ChangePasswordInput) (*ChangePasswordOutput, error) {
+		uid, ok := middleware.ActorFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.AuthSessionRevoked)
+		}
+
+		identity, err := deps.Queries.FindLocalIdentityByUserId(ctx, uid)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, huma.Error404NotFound("No local identity found")
+			}
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
+		if !identity.PasswordHash.Valid {
+			return nil, httpErr(apierrors.AuthLoginInvalidCredentials)
+		}
+
+		ok, verr := auth.VerifyPassword(identity.PasswordHash.String, in.Body.CurrentPassword)
+		if verr != nil || !ok {
+			return nil, httpErr(apierrors.AuthLoginInvalidCredentials)
+		}
+
+		newHash, err := auth.HashPassword(in.Body.NewPassword)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
+		err = deps.Queries.UpdateIdentityPasswordHash(ctx, generated.UpdateIdentityPasswordHashParams{
+			PasswordHash: sql.NullString{String: newHash, Valid: true},
+			ID:           identity.ID,
+		})
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
+		slog.InfoContext(ctx, "auth.password.changed", "userId", uid)
+		out := &ChangePasswordOutput{}
+		out.Body.Updated = true
+		return out, nil
 	}
 }
 

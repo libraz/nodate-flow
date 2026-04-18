@@ -1,0 +1,90 @@
+package e2e
+
+import (
+	"net/http"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
+
+// TestLensVisibleToAllWorkspaceMembers verifies that lenses
+// created by any workspace member are visible to other members.
+func TestLensVisibleToAllWorkspaceMembers(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	owner := newTenant(t)
+	member := newTenant(t)
+
+	var invite struct {
+		Token string `json:"token"`
+	}
+	doJSON(t, http.MethodPost,
+		testServerURL+"/workspaces/"+owner.WorkspacePublicID+"/invites",
+		owner.AccessToken, map[string]any{"role": "member"}, &invite)
+	doJSON(t, http.MethodPost,
+		testServerURL+"/invites/"+invite.Token+"/accept",
+		member.AccessToken, nil, nil)
+
+	wsURL := testServerURL + "/workspaces/" + owner.WorkspacePublicID
+
+	// Owner creates a lens.
+	var lens struct {
+		ID string `json:"id"`
+	}
+	doJSON(t, http.MethodPost, wsURL+"/lenses", owner.AccessToken,
+		map[string]any{
+			"name":      "Shared Lens",
+			"filter":    map[string]any{"state": "open"},
+			"sort":      []map[string]any{{"field": "createdAt", "dir": "desc"}},
+			"isDefault": false,
+		}, &lens)
+
+	// Member can see it in the list.
+	var list struct {
+		Lenses []struct {
+			ID string `json:"id"`
+		} `json:"lenses"`
+	}
+	doJSON(t, http.MethodGet, wsURL+"/lenses",
+		member.AccessToken, nil, &list)
+
+	found := false
+	for _, l := range list.Lenses {
+		if l.ID == lens.ID {
+			found = true
+		}
+	}
+	require.True(t, found,
+		"workspace member must see lenses created by other members")
+}
+
+// TestLensCrossTenantNotVisible verifies that lenses from one
+// workspace are invisible to users of another workspace.
+func TestLensCrossTenantNotVisible(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tenant1 := newTenant(t)
+	tenant2 := newTenant(t)
+
+	wsURL := testServerURL + "/workspaces/" + tenant1.WorkspacePublicID
+
+	// Tenant1 creates a lens.
+	var lens struct {
+		ID string `json:"id"`
+	}
+	doJSON(t, http.MethodPost, wsURL+"/lenses", tenant1.AccessToken,
+		map[string]any{
+			"name":      "T1 Lens",
+			"filter":    map[string]any{"state": "open"},
+			"sort":      []map[string]any{{"field": "createdAt", "dir": "desc"}},
+			"isDefault": false,
+		}, &lens)
+
+	// Tenant2 cannot access tenant1's lens.
+	status, _ := doJSONStatus(t, http.MethodGet,
+		wsURL+"/lenses/"+lens.ID, tenant2.AccessToken, nil)
+	require.GreaterOrEqual(t, status, 403,
+		"outsider must not access another workspace's lens")
+}

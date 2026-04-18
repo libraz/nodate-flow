@@ -6,8 +6,9 @@
 
 import Icon from '@nodate-flow/ui/icon';
 import Button from '@nodate-flow/ui/primitives/button';
+import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { LayoutDashboard, Pencil, Plus } from 'lucide-react';
-import { type ReactElement, Suspense, useRef, useState } from 'react';
+import { type ReactElement, Suspense, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import AddWidgetDialog from './add-widget-dialog';
@@ -32,6 +33,21 @@ function WidgetGrid({ wsId, editing }: WidgetGridProps): ReactElement {
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const dragStartRef = useRef<{ id: string; startX: number; startY: number } | null>(null);
+  const listenersRef = useRef<{
+    move: (e: MouseEvent) => void;
+    up: (e: MouseEvent) => void;
+  } | null>(null);
+
+  // Clean up drag listeners on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (listenersRef.current) {
+        document.removeEventListener('mousemove', listenersRef.current.move);
+        document.removeEventListener('mouseup', listenersRef.current.up);
+        listenersRef.current = null;
+      }
+    };
+  }, []);
 
   const handleMouseDown = (widget: WidgetItem, e: React.MouseEvent<HTMLDivElement>): void => {
     if (!editing) return;
@@ -51,6 +67,7 @@ function WidgetGrid({ wsId, editing }: WidgetGridProps): ReactElement {
     const handleMouseUp = (upEvent: MouseEvent): void => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      listenersRef.current = null;
       setDraggingId(null);
 
       const start = dragStartRef.current;
@@ -65,22 +82,29 @@ function WidgetGrid({ wsId, editing }: WidgetGridProps): ReactElement {
         const rowDelta = Math.round(dy / 80);
         const newX = Math.max(0, widget.positionX + colDelta);
         const newY = Math.max(0, widget.positionY + rowDelta);
-        void updatePosition.mutateAsync({
-          widgetId: widget.id,
-          positionX: newX,
-          positionY: newY,
-        });
+        void updatePosition
+          .mutateAsync({
+            widgetId: widget.id,
+            positionX: newX,
+            positionY: newY,
+          })
+          .catch(() => {
+            toaster.show({ tone: 'danger', message: t('widget.position_failed') });
+          });
       }
 
       dragStartRef.current = null;
     };
 
+    listenersRef.current = { move: handleMouseMove, up: handleMouseUp };
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
   };
 
   const handleRemove = (widgetId: string): void => {
-    void deleteWidget.mutateAsync(widgetId);
+    void deleteWidget.mutateAsync(widgetId).catch(() => {
+      toaster.show({ tone: 'danger', message: t('widget.delete_failed') });
+    });
   };
 
   if (widgets.length === 0) {

@@ -14,8 +14,11 @@ import {
   useSuspenseQuery,
 } from '@tanstack/react-query';
 
+import { ApiError } from '../../lib/api-error';
 import { sdk } from '../../lib/sdk';
-import { WorkspaceApiError, workspacesKeys } from './api';
+import { workspacesKeys } from './api';
+
+export { ApiError as WorkspaceApiError };
 
 export type WorkspaceInvite = components['schemas']['WorkspaceInvite'];
 export type CreateInviteInput = components['schemas']['CreateWorkspaceInviteInputBody'];
@@ -29,7 +32,7 @@ export const inviteKeys = {
   info: (token: string) => ['invites', 'info', token] as const,
 };
 
-function toError(err: unknown, fallback: string): WorkspaceApiError {
+function toError(err: unknown, fallback: string): ApiError {
   if (err && typeof err === 'object') {
     const obj = err as { detail?: unknown; title?: unknown; type?: unknown };
     const message =
@@ -40,9 +43,9 @@ function toError(err: unknown, fallback: string): WorkspaceApiError {
       (typeof obj.type === 'string' && obj.type) ||
       (typeof obj.detail === 'string' && obj.detail.match(/^([A-Z][A-Z0-9_.]+):/)?.[1]) ||
       undefined;
-    return new WorkspaceApiError(code, message);
+    return new ApiError(code, message);
   }
-  return new WorkspaceApiError(undefined, fallback);
+  return new ApiError(undefined, fallback);
 }
 
 /** POST /workspaces/{wsId}/invites — create an invite link. */
@@ -58,7 +61,7 @@ export interface CreateInviteResult {
 
 export function useCreateInvite(): UseMutationResult<
   CreateInviteResult,
-  WorkspaceApiError,
+  ApiError,
   CreateInviteArgs
 > {
   const qc = useQueryClient();
@@ -97,7 +100,7 @@ export interface RevokeInviteArgs {
   inviteId: string;
 }
 
-export function useRevokeInvite(): UseMutationResult<void, WorkspaceApiError, RevokeInviteArgs> {
+export function useRevokeInvite(): UseMutationResult<void, ApiError, RevokeInviteArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ wsId, inviteId }: RevokeInviteArgs): Promise<void> => {
@@ -113,11 +116,7 @@ export function useRevokeInvite(): UseMutationResult<void, WorkspaceApiError, Re
 }
 
 /** POST /invites/{token}/accept — accept an invite link (authenticated). */
-export function useAcceptInvite(): UseMutationResult<
-  AcceptInviteOutput,
-  WorkspaceApiError,
-  string
-> {
+export function useAcceptInvite(): UseMutationResult<AcceptInviteOutput, ApiError, string> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (token: string): Promise<AcceptInviteOutput> => {

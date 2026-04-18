@@ -1,6 +1,9 @@
 package calendars
 
 import (
+	"database/sql"
+	"time"
+
 	"github.com/danielgtaylor/huma/v2"
 
 	generated "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/generated"
@@ -55,4 +58,15 @@ func canSetOwner(
 func isOwnerOrManager(sub generated.FindCalendarSubscriptionRow) bool {
 	return sub.Role == generated.CalendarSubscriptionsRoleOwner ||
 		sub.Role == generated.CalendarSubscriptionsRoleManager
+}
+
+// validateInvite checks that the invite has not expired and has not exceeded its use limit.
+func validateInvite(expiresAt sql.NullTime, maxUses sql.NullInt32, useCount uint32) error {
+	if expiresAt.Valid && expiresAt.Time.Before(time.Now()) {
+		return errInviteNotFound
+	}
+	if maxUses.Valid && useCount >= uint32(maxUses.Int32) {
+		return errInviteNotFound
+	}
+	return nil
 }

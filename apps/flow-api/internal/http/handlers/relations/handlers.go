@@ -5,13 +5,13 @@ import (
 	"database/sql"
 	"errors"
 	"strconv"
-	"strings"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
@@ -314,36 +314,8 @@ func parseConfidence(s string) float64 {
 	return v
 }
 
-// totalAsInt64 normalizes the COUNT(*) OVER() return type into int64.
-func totalAsInt64(v interface{}) int64 {
-	switch x := v.(type) {
-	case int64:
-		return x
-	case int:
-		return int64(x)
-	case uint64:
-		return int64(x)
-	case []byte:
-		var n int64
-		for _, c := range x {
-			if c < '0' || c > '9' {
-				return n
-			}
-			n = n*10 + int64(c-'0')
-		}
-		return n
-	default:
-		return 0
-	}
-}
+// totalAsInt64 delegates to handlerutil.TotalAsInt64.
+var totalAsInt64 = handlerutil.TotalAsInt64
 
-// isDuplicateEntry detects MySQL error 1062 without importing the mysql
-// driver package. Matching on the substring keeps this package
-// driver-agnostic.
-func isDuplicateEntry(err error) bool {
-	if err == nil {
-		return false
-	}
-	s := err.Error()
-	return strings.Contains(s, "Error 1062") || strings.Contains(s, "Duplicate entry")
-}
+// isDuplicateEntry delegates to handlerutil.IsDuplicateEntry.
+var isDuplicateEntry = handlerutil.IsDuplicateEntry

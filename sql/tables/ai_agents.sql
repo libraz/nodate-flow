@@ -32,5 +32,5 @@ CREATE TABLE ai_agents (
   KEY idx_ai_agents_model_id (model_id),
 
   CONSTRAINT fk_ai_agents_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_ai_agents_model FOREIGN KEY (model_id) REFERENCES ai_models(id) ON DELETE RESTRICT
+  CONSTRAINT fk_ai_agents_model FOREIGN KEY (model_id) REFERENCES ai_models(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Reusable LLM agent configurations';

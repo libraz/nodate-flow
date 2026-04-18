@@ -27,28 +27,9 @@ export const aiSuggestionsKeys = {
   list: (workspaceId: string) => [...aiSuggestionsKeys.all, 'list', workspaceId] as const,
 };
 
-/** Lightweight error thrown when the SDK returns an error envelope. */
-export class AiSuggestionsApiError extends Error {
-  readonly code: string | undefined;
-  constructor(code: string | undefined, message: string) {
-    super(message);
-    this.name = 'AiSuggestionsApiError';
-    this.code = code;
-  }
-}
+import { ApiError, toApiError } from '../../lib/api-error';
 
-function toError(err: unknown, fallback: string): AiSuggestionsApiError {
-  if (err && typeof err === 'object') {
-    const obj = err as { detail?: unknown; title?: unknown; type?: unknown };
-    const message =
-      (typeof obj.detail === 'string' && obj.detail) ||
-      (typeof obj.title === 'string' && obj.title) ||
-      fallback;
-    const code = typeof obj.type === 'string' ? obj.type : undefined;
-    return new AiSuggestionsApiError(code, message);
-  }
-  return new AiSuggestionsApiError(undefined, fallback);
-}
+export { ApiError as AiSuggestionsApiError };
 
 /**
  * useAiSuggestionsQuery — non-suspense list of cross-device AI suggestions
@@ -56,9 +37,9 @@ function toError(err: unknown, fallback: string): AiSuggestionsApiError {
  */
 export function useAiSuggestionsQuery(
   workspaceId: string | undefined,
-): UseQueryResult<AiSuggestion[], AiSuggestionsApiError> {
+): UseQueryResult<AiSuggestion[], ApiError> {
   const streamHealthy = useStreamHealthy();
-  return useQuery<AiSuggestion[], AiSuggestionsApiError>({
+  return useQuery<AiSuggestion[], ApiError>({
     queryKey: aiSuggestionsKeys.list(workspaceId ?? ''),
     enabled: typeof workspaceId === 'string' && workspaceId.length > 0,
     refetchInterval: streamHealthy ? false : POLL_INTERVAL_MS,
@@ -69,7 +50,7 @@ export function useAiSuggestionsQuery(
       const { data, error } = await sdk.GET('/workspaces/{wsId}/ai/suggestions', {
         params: { path: { wsId: workspaceId } },
       });
-      if (error || !data) throw toError(error, 'Failed to load AI suggestions');
+      if (error || !data) throw toApiError(error, 'Failed to load AI suggestions');
       return data.suggestions ?? [];
     },
   });
@@ -81,14 +62,14 @@ export function useAiSuggestionsQuery(
  */
 export function useApplyAiSuggestion(
   workspaceId: string,
-): UseMutationResult<void, AiSuggestionsApiError, string> {
+): UseMutationResult<void, ApiError, string> {
   const qc = useQueryClient();
-  return useMutation<void, AiSuggestionsApiError, string>({
+  return useMutation<void, ApiError, string>({
     mutationFn: async (inboxItemId: string): Promise<void> => {
       const { error } = await sdk.POST('/workspaces/{wsId}/ai/suggestions/{inboxItemId}/apply', {
         params: { path: { wsId: workspaceId, inboxItemId } },
       });
-      if (error) throw toError(error, 'Failed to apply AI suggestion');
+      if (error) throw toApiError(error, 'Failed to apply AI suggestion');
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: aiSuggestionsKeys.list(workspaceId) });
@@ -102,14 +83,14 @@ export function useApplyAiSuggestion(
  */
 export function useDismissAiSuggestion(
   workspaceId: string,
-): UseMutationResult<void, AiSuggestionsApiError, string> {
+): UseMutationResult<void, ApiError, string> {
   const qc = useQueryClient();
-  return useMutation<void, AiSuggestionsApiError, string>({
+  return useMutation<void, ApiError, string>({
     mutationFn: async (inboxItemId: string): Promise<void> => {
       const { error } = await sdk.POST('/workspaces/{wsId}/ai/suggestions/{inboxItemId}/dismiss', {
         params: { path: { wsId: workspaceId, inboxItemId } },
       });
-      if (error) throw toError(error, 'Failed to dismiss AI suggestion');
+      if (error) throw toApiError(error, 'Failed to dismiss AI suggestion');
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: aiSuggestionsKeys.list(workspaceId) });

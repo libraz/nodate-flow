@@ -50,28 +50,9 @@ export const relationKeys = {
   forWorkspace: (wsId: string) => [...relationKeys.all, 'workspace', wsId] as const,
 };
 
-/** Lightweight error thrown when an API call fails. */
-export class RelationApiError extends Error {
-  readonly code: string | undefined;
-  constructor(code: string | undefined, message: string) {
-    super(message);
-    this.name = 'RelationApiError';
-    this.code = code;
-  }
-}
+import { ApiError, toApiError } from '../../lib/api-error';
 
-function toError(err: unknown, fallback: string): RelationApiError {
-  if (err && typeof err === 'object') {
-    const obj = err as { detail?: unknown; title?: unknown; type?: unknown };
-    const message =
-      (typeof obj.detail === 'string' && obj.detail) ||
-      (typeof obj.title === 'string' && obj.title) ||
-      fallback;
-    const code = typeof obj.type === 'string' ? obj.type : undefined;
-    return new RelationApiError(code, message);
-  }
-  return new RelationApiError(undefined, fallback);
-}
+export { ApiError as RelationApiError };
 
 function authHeaders(): HeadersInit {
   const token = authStore.getState().accessToken;
@@ -90,7 +71,7 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as unknown;
-    throw toError(body, `Request failed with status ${String(res.status)}`);
+    throw toApiError(body, `Request failed with status ${String(res.status)}`);
   }
   return (await res.json()) as T;
 }
@@ -121,11 +102,7 @@ export function useRelationSuggestionsForTask(
  * POST /relation-suggestions/{suggestionId}/resolve — optimistic
  * removal from the task suggestion list on accept or dismiss.
  */
-export function useResolveSuggestion(): UseMutationResult<
-  void,
-  RelationApiError,
-  ResolveSuggestionArgs
-> {
+export function useResolveSuggestion(): UseMutationResult<void, ApiError, ResolveSuggestionArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ suggestionId, action }: ResolveSuggestionArgs): Promise<void> => {

@@ -15,6 +15,7 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/resolve"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
@@ -95,7 +96,7 @@ func ListAiSuggestions(deps TriageDeps) func(context.Context, *AiSuggestionListI
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
 		}
-		wsID, err := resolveWorkspace(ctx, deps.DB, in.WorkspaceID, actorID)
+		wsID, err := resolve.WorkspaceMember(ctx, deps.DB, in.WorkspaceID, actorID)
 		if err != nil {
 			return nil, err
 		}
@@ -142,7 +143,7 @@ func appendSuggestionReaction(deps TriageDeps, kind eventbus.Kind) func(context.
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
 		}
-		wsID, err := resolveWorkspace(ctx, deps.DB, in.WorkspaceID, actorID)
+		wsID, err := resolve.WorkspaceMember(ctx, deps.DB, in.WorkspaceID, actorID)
 		if err != nil {
 			return nil, err
 		}

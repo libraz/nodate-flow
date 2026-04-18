@@ -46,14 +46,18 @@ func TraceMiddleware() func(http.Handler) http.Handler {
 			defer span.End()
 
 			// Attach structured identifiers as span attributes.
+			var attrs []attribute.KeyValue
 			if reqID := nflog.RequestIDFromContext(ctx); reqID != "" {
-				span.SetAttributes(attribute.String("request_id", reqID))
+				attrs = append(attrs, attribute.String("request_id", reqID))
 			}
 			if uid, ok := middleware.ActorFromContext(ctx); ok {
-				span.SetAttributes(attribute.Int64("user_id", int64(uid)))
+				attrs = append(attrs, attribute.Int64("user_id", int64(uid)))
 			}
 			if ws, ok := middleware.WorkspaceFromContext(ctx); ok {
-				span.SetAttributes(attribute.String("workspace_id", ws.PublicID.String()))
+				attrs = append(attrs, attribute.String("workspace_id", ws.PublicID.String()))
+			}
+			if len(attrs) > 0 {
+				span.SetAttributes(attrs...)
 			}
 
 			// Record the HTTP status after the handler runs.

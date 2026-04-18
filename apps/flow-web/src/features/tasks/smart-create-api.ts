@@ -5,8 +5,11 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { ApiError } from '../../lib/api-error';
 import { sdk } from '../../lib/sdk';
-import { TaskApiError, tasksKeys } from './api';
+import { tasksKeys } from './api';
+
+export { ApiError as TaskApiError };
 
 export interface AssigneeSuggestion {
   userPublicId: string;
@@ -41,7 +44,7 @@ export interface ProposeSmartArgs {
  * decomposition based on past ticket patterns.
  */
 export function useProposeSmartTask() {
-  return useMutation<SmartProposal, TaskApiError, ProposeSmartArgs>({
+  return useMutation<SmartProposal, ApiError, ProposeSmartArgs>({
     mutationFn: async (args) => {
       const { data, error } = await sdk.POST('/workspaces/{wsId}/tasks/propose-smart', {
         params: { path: { wsId: args.workspaceId } },
@@ -53,7 +56,7 @@ export function useProposeSmartTask() {
       });
       if (error || !data) {
         const err = error as { detail?: string; title?: string; type?: string } | undefined;
-        throw new TaskApiError(
+        throw new ApiError(
           err?.type,
           err?.detail ?? err?.title ?? 'Failed to get smart suggestions',
         );
@@ -93,7 +96,7 @@ export interface ApplySmartResult {
  */
 export function useApplySmartTask() {
   const qc = useQueryClient();
-  return useMutation<ApplySmartResult, TaskApiError, ApplySmartArgs>({
+  return useMutation<ApplySmartResult, ApiError, ApplySmartArgs>({
     mutationFn: async (args) => {
       const { data, error } = await sdk.POST('/workspaces/{wsId}/tasks/apply-smart', {
         params: { path: { wsId: args.workspaceId } },
@@ -108,10 +111,7 @@ export function useApplySmartTask() {
       });
       if (error || !data) {
         const err = error as { detail?: string; title?: string; type?: string } | undefined;
-        throw new TaskApiError(
-          err?.type,
-          err?.detail ?? err?.title ?? 'Failed to apply smart create',
-        );
+        throw new ApiError(err?.type, err?.detail ?? err?.title ?? 'Failed to apply smart create');
       }
       return data as ApplySmartResult;
     },

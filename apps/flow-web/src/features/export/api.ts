@@ -22,28 +22,9 @@ export interface ExportTasksArgs {
   lensId?: string | undefined;
 }
 
-/** Lightweight error thrown when the export API call fails. */
-export class ExportApiError extends Error {
-  readonly code: string | undefined;
-  constructor(code: string | undefined, message: string) {
-    super(message);
-    this.name = 'ExportApiError';
-    this.code = code;
-  }
-}
+import { ApiError, toApiError } from '../../lib/api-error';
 
-function toError(err: unknown, fallback: string): ExportApiError {
-  if (err && typeof err === 'object') {
-    const obj = err as { detail?: unknown; title?: unknown; type?: unknown };
-    const message =
-      (typeof obj.detail === 'string' && obj.detail) ||
-      (typeof obj.title === 'string' && obj.title) ||
-      fallback;
-    const code = typeof obj.type === 'string' ? obj.type : undefined;
-    return new ExportApiError(code, message);
-  }
-  return new ExportApiError(undefined, fallback);
-}
+export { ApiError as ExportApiError };
 
 function authHeaders(): HeadersInit {
   const token = authStore.getState().accessToken;
@@ -83,8 +64,8 @@ function buildTimestamp(): string {
  * useExportTasks — mutation that fetches the export endpoint and triggers
  * a browser download. Returns the number of exported tasks on success.
  */
-export function useExportTasks(): UseMutationResult<number, ExportApiError, ExportTasksArgs> {
-  return useMutation<number, ExportApiError, ExportTasksArgs>({
+export function useExportTasks(): UseMutationResult<number, ApiError, ExportTasksArgs> {
+  return useMutation<number, ApiError, ExportTasksArgs>({
     mutationFn: async ({ workspaceId, format, lensId }): Promise<number> => {
       const params = new URLSearchParams({ format, limit: '5000' });
       if (lensId) {
@@ -99,7 +80,7 @@ export function useExportTasks(): UseMutationResult<number, ExportApiError, Expo
 
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as unknown;
-        throw toError(body, `Export failed with status ${String(res.status)}`);
+        throw toApiError(body, `Export failed with status ${String(res.status)}`);
       }
 
       const timestamp = buildTimestamp();

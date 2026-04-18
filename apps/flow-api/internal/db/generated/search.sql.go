@@ -64,7 +64,7 @@ type SearchTasksRow struct {
 	SortWeight              int32             `json:"sortWeight"`
 	UpdatedAt               sql.NullTime      `json:"updatedAt"`
 	CreatedAt               time.Time         `json:"createdAt"`
-	PrimaryAssigneePublicID []byte            `json:"primaryAssigneePublicId"`
+	PrimaryAssigneePublicID interface{}       `json:"primaryAssigneePublicId"`
 	AssigneeCount           int64             `json:"assigneeCount"`
 	Total                   interface{}       `json:"total"`
 }

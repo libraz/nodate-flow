@@ -10,6 +10,7 @@ import (
 
 	"database/sql"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
@@ -67,6 +68,15 @@ func AddAgentActor(deps Deps) func(context.Context, *AddTaskAgentActorInput) (*A
 				"role":    in.Body.Role,
 			},
 		})
+		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "task.agent_actor.add",
+				ActorID:      aID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "task_actor",
+				ResourceID:   pub.String(),
+			})
+		}
 		return &AddTaskAgentActorOutput{Body: TaskAgentActor{
 			ID:      pub.String(),
 			AgentID: agentPub.String(),

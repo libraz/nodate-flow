@@ -1,47 +1,49 @@
-import { ChevronLeft, ChevronRight, Menu } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Menu, Plus, Search } from 'lucide-react';
+import { DateTime } from 'luxon';
 import type { ReactElement } from 'react';
+import { useTranslation } from 'react-i18next';
 
-import { type CalendarView, useCalendarUiStore } from '../../stores/calendar-ui-store';
-
-const VIEW_LABELS: Record<CalendarView, string> = {
-  month: 'Month',
-  week: 'Week',
-};
+import { useCalendarUiStore } from '../../stores/calendar-ui-store';
 
 export default function CalendarHeader(): ReactElement {
+  const { t, i18n } = useTranslation();
   const {
     selectedDate,
+    displayMonth,
     currentView,
     setCurrentView,
     goToPrevious,
     goToNext,
     goToToday,
     toggleSidebar,
+    toggleSearch,
+    openEventModal,
   } = useCalendarUiStore();
 
   const title =
     currentView === 'week'
-      ? `${selectedDate.startOf('week', { useLocaleWeeks: true }).toFormat('MMM d')} - ${selectedDate.endOf('week', { useLocaleWeeks: true }).toFormat('MMM d, yyyy')}`
-      : selectedDate.toFormat('MMMM yyyy');
+      ? `${selectedDate.startOf('week', { useLocaleWeeks: true }).setLocale(i18n.language).toLocaleString({ month: 'short', day: 'numeric' })} - ${selectedDate.endOf('week', { useLocaleWeeks: true }).setLocale(i18n.language).toLocaleString(DateTime.DATE_MED)}`
+      : displayMonth.toLocaleString({ month: 'long', year: 'numeric' });
 
-  const prevLabel = currentView === 'week' ? 'Previous week' : 'Previous month';
-  const nextLabel = currentView === 'week' ? 'Next week' : 'Next month';
+  const prevLabel =
+    currentView === 'week' ? t('calendar.previousWeek') : t('calendar.previousMonth');
+  const nextLabel = currentView === 'week' ? t('calendar.nextWeek') : t('calendar.nextMonth');
 
   return (
-    <header className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-      <div className="flex items-center gap-2">
+    <header className="glass-surface-heavy sticky top-0 z-30 flex h-[56px] items-center justify-between px-3">
+      <div className="flex items-center gap-1">
         <button
           type="button"
           onClick={toggleSidebar}
-          className="rounded-md p-1.5 hover:bg-gray-100 sm:hidden"
-          aria-label="Toggle sidebar"
+          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-[var(--color-hover)] sm:hidden"
+          aria-label={t('calendar.toggleSidebar')}
         >
           <Menu className="h-5 w-5" />
         </button>
         <button
           type="button"
           onClick={goToPrevious}
-          className="rounded-md p-1.5 hover:bg-gray-100"
+          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-[var(--color-hover)]"
           aria-label={prevLabel}
         >
           <ChevronLeft className="h-5 w-5" />
@@ -49,7 +51,7 @@ export default function CalendarHeader(): ReactElement {
         <button
           type="button"
           onClick={goToNext}
-          className="rounded-md p-1.5 hover:bg-gray-100"
+          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-[var(--color-hover)]"
           aria-label={nextLabel}
         >
           <ChevronRight className="h-5 w-5" />
@@ -57,31 +59,47 @@ export default function CalendarHeader(): ReactElement {
         <button
           type="button"
           onClick={goToToday}
-          className="ml-2 rounded-md border border-gray-300 px-3 py-1 text-sm font-medium hover:bg-gray-50"
+          className="ml-1 rounded-full bg-[var(--color-accent-bg)] px-3 text-sm font-medium text-[var(--color-accent)]"
         >
-          Today
+          {t('calendar.today')}
         </button>
       </div>
 
-      <h1 className="text-sm font-semibold sm:text-lg">{title}</h1>
+      <h1 className="text-[16px] font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+        {title}
+      </h1>
 
-      <div className="hidden rounded-md border border-gray-300 sm:flex">
-        {(['month', 'week'] as const).map((view) => (
-          <button
-            key={view}
-            type="button"
-            onClick={() => setCurrentView(view)}
-            className={`px-3 py-1 text-sm font-medium ${
-              currentView === view ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
-            } ${view === 'month' ? 'rounded-l-md' : 'rounded-r-md'}`}
-          >
-            {VIEW_LABELS[view]}
-          </button>
-        ))}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => openEventModal()}
+          className="hidden items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90 sm:flex"
+          style={{ background: 'var(--color-accent)' }}
+        >
+          <Plus className="h-4 w-4" />
+          {t('calendar.createNewEvent')}
+        </button>
+        <button
+          type="button"
+          onClick={toggleSearch}
+          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-[var(--color-hover)]"
+          aria-label={t('search.searchEvents')}
+        >
+          <Search className="h-5 w-5" />
+        </button>
+        <div className="segmented-control hidden sm:flex">
+          {(['month', 'week'] as const).map((view) => (
+            <button
+              key={view}
+              type="button"
+              data-active={currentView === view}
+              onClick={() => setCurrentView(view)}
+            >
+              {t(`calendar.${view}` as const)}
+            </button>
+          ))}
+        </div>
       </div>
-
-      {/* Spacer on mobile where toggle is hidden */}
-      <div className="w-8 sm:hidden" />
     </header>
   );
 }

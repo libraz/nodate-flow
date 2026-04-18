@@ -20,7 +20,7 @@ CREATE TABLE calendar_event_comments (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   UNIQUE KEY uniq_calendar_event_comments_public_id (public_id),
-  KEY idx_calendar_event_comments_event (event_id, created_at),
+  KEY idx_calendar_event_comments_event (workspace_id, event_id, created_at),
   KEY idx_calendar_event_comments_workspace_author (workspace_id, author_id),
 
   CONSTRAINT fk_calendar_event_comments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,

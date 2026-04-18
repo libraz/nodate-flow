@@ -4,38 +4,31 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"strings"
-	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
-// actorPtr returns a pointer to the actor's internal user id for
-// eventbus.Event, or nil if not available.
-func actorPtr(ctx context.Context) *int64 {
-	uid, ok := middleware.ActorFromContext(ctx)
-	if !ok {
-		return nil
-	}
-	v := int64(uid)
-	return &v
+// escapeLike escapes the MySQL LIKE metacharacters %, _, and \ in a
+// user-supplied search term so they are matched literally.
+func escapeLike(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `%`, `\%`)
+	s = strings.ReplaceAll(s, `_`, `\_`)
+	return s
 }
 
-// isDuplicateEntry detects MySQL error 1062 without taking a hard
-// dependency on the mysql driver package.
-func isDuplicateEntry(err error) bool {
-	if err == nil {
-		return false
-	}
-	s := err.Error()
-	return strings.Contains(s, "Error 1062") || strings.Contains(s, "Duplicate entry")
-}
+// actorPtr delegates to handlerutil.ActorPtr.
+var actorPtr = handlerutil.ActorPtr
+
+// isDuplicateEntry delegates to handlerutil.IsDuplicateEntry.
+var isDuplicateEntry = handlerutil.IsDuplicateEntry
 
 // resolvePageInternal looks up the internal page id by workspace_id + public_id.
 func resolvePageInternal(ctx context.Context, db *sql.DB, wsID uint32, pub types.PublicID) (uint32, error) {
@@ -191,14 +184,7 @@ func Create(deps Deps) func(context.Context, *CreatePageInput) (*CreatePageOutpu
 			PublicID:    pub,
 		})
 		if err != nil {
-			// Fallback: return minimal DTO if re-fetch fails.
-			return &CreatePageOutput{Body: PageDTO{
-				ID:            pub.String(),
-				Title:         in.Body.Title,
-				Body:          in.Body.Body,
-				IsAIGenerated: false,
-				CreatedAt:     time.Now().Unix(),
-			}}, nil
+			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		return &CreatePageOutput{Body: mapGetRow(row)}, nil
 	}
@@ -482,8 +468,8 @@ func Search(deps Deps) func(context.Context, *SearchPagesInput) (*SearchPagesOut
 			limit = 50
 		}
 
-		// Wrap the search term for SQL LIKE.
-		pattern := fmt.Sprintf("%%%s%%", in.Q)
+		// Wrap the search term for SQL LIKE with metacharacter escaping.
+		pattern := "%" + escapeLike(in.Q) + "%"
 
 		rows, err := deps.Queries.SearchPages(ctx, generated.SearchPagesParams{
 			WorkspaceID: ws.ID,

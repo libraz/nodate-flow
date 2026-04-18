@@ -106,28 +106,9 @@ export interface DuplicatesResult {
   candidates: DuplicateCandidate[];
 }
 
-/** Lightweight error thrown when the SDK returns an error envelope. */
-export class TaskApiError extends Error {
-  readonly code: string | undefined;
-  constructor(code: string | undefined, message: string) {
-    super(message);
-    this.name = 'TaskApiError';
-    this.code = code;
-  }
-}
+import { ApiError, toApiError } from '../../lib/api-error';
 
-function toError(err: unknown, fallback: string): TaskApiError {
-  if (err && typeof err === 'object') {
-    const obj = err as { detail?: unknown; title?: unknown; type?: unknown };
-    const message =
-      (typeof obj.detail === 'string' && obj.detail) ||
-      (typeof obj.title === 'string' && obj.title) ||
-      fallback;
-    const code = typeof obj.type === 'string' ? obj.type : undefined;
-    return new TaskApiError(code, message);
-  }
-  return new TaskApiError(undefined, fallback);
-}
+export { ApiError as TaskApiError };
 
 /**
  * Legal transitions from a given derived state, per ADR 0001 (v1 state
@@ -241,7 +222,7 @@ export function useTasksQuery(
       if (states.length > 0) query.state = [...states];
       if (assignee.length > 0) query.assignee = assignee;
       const { data, error } = await sdk.GET('/tasks', { params: { query } });
-      if (error || !data) throw toError(error, 'Failed to load tasks');
+      if (error || !data) throw toApiError(error, 'Failed to load tasks');
       const tasks = data.tasks ?? [];
       // Client-side priority filter (API does not support priority param yet)
       if (priorities.length > 0) {
@@ -260,7 +241,7 @@ export function useTaskQuery(taskId: string): UseSuspenseQueryResult<Task> {
       const { data, error } = await sdk.GET('/tasks/{id}', {
         params: { path: { id: taskId } },
       });
-      if (error || !data) throw toError(error, 'Failed to load task');
+      if (error || !data) throw toApiError(error, 'Failed to load task');
       return data;
     },
   });
@@ -273,7 +254,7 @@ export function useTaskDuplicatesQuery(taskId: string): UseSuspenseQueryResult<D
       const { data, error } = await sdk.GET('/tasks/{id}/duplicates', {
         params: { path: { id: taskId } },
       });
-      if (error || !data) throw toError(error, 'Failed to load duplicates');
+      if (error || !data) throw toApiError(error, 'Failed to load duplicates');
       return { model: data.model, candidates: data.candidates ?? [] };
     },
   });
@@ -286,7 +267,7 @@ export function useTaskInferStateQuery(taskId: string): UseSuspenseQueryResult<I
       const { data, error } = await sdk.GET('/tasks/{id}/infer-state', {
         params: { path: { id: taskId } },
       });
-      if (error || !data) throw toError(error, 'Failed to infer state');
+      if (error || !data) throw toApiError(error, 'Failed to infer state');
       const result: InferStateResult = {
         taskId: data.taskId,
         state: data.state as TaskDerivedState,
@@ -306,7 +287,7 @@ export function useTaskAiInvocationsQuery(
       const { data, error } = await sdk.GET('/tasks/{id}/ai/invocations', {
         params: { path: { id: taskId } },
       });
-      if (error || !data) throw toError(error, 'Failed to load task AI invocations');
+      if (error || !data) throw toApiError(error, 'Failed to load task AI invocations');
       return data.invocations ?? [];
     },
   });
@@ -319,7 +300,7 @@ export function useTaskActorsQuery(taskId: string): UseSuspenseQueryResult<TaskA
       const { data, error } = await sdk.GET('/tasks/{id}/actors', {
         params: { path: { id: taskId } },
       });
-      if (error || !data) throw toError(error, 'Failed to load task actors');
+      if (error || !data) throw toApiError(error, 'Failed to load task actors');
       return data.actors ?? [];
     },
   });
@@ -330,7 +311,7 @@ export interface AddActorArgs {
   input: AddActorInput;
 }
 
-export function useAddTaskActor(): UseMutationResult<TaskActor, TaskApiError, AddActorArgs> {
+export function useAddTaskActor(): UseMutationResult<TaskActor, ApiError, AddActorArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId, input }: AddActorArgs): Promise<TaskActor> => {
@@ -338,7 +319,7 @@ export function useAddTaskActor(): UseMutationResult<TaskActor, TaskApiError, Ad
         params: { path: { id: taskId } },
         body: input,
       });
-      if (error || !data) throw toError(error, 'Failed to add task actor');
+      if (error || !data) throw toApiError(error, 'Failed to add task actor');
       return data;
     },
     onSuccess: (_data, vars) => {
@@ -354,14 +335,14 @@ export interface RemoveActorArgs {
   actorId: string;
 }
 
-export function useRemoveTaskActor(): UseMutationResult<void, TaskApiError, RemoveActorArgs> {
+export function useRemoveTaskActor(): UseMutationResult<void, ApiError, RemoveActorArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId, actorId }: RemoveActorArgs): Promise<void> => {
       const { error } = await sdk.DELETE('/tasks/{id}/actors/{actorId}', {
         params: { path: { id: taskId, actorId } },
       });
-      if (error) throw toError(error, 'Failed to remove task actor');
+      if (error) throw toApiError(error, 'Failed to remove task actor');
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: tasksKeys.actors(vars.taskId) });
@@ -378,18 +359,18 @@ export function useTaskCommentsQuery(taskId: string): UseSuspenseQueryResult<Tas
       const { data, error } = await sdk.GET('/tasks/{id}/comments', {
         params: { path: { id: taskId } },
       });
-      if (error || !data) throw toError(error, 'Failed to load comments');
+      if (error || !data) throw toApiError(error, 'Failed to load comments');
       return data.comments ?? [];
     },
   });
 }
 
-export function useCreateTask(): UseMutationResult<Task, TaskApiError, CreateTaskInput> {
+export function useCreateTask(): UseMutationResult<Task, ApiError, CreateTaskInput> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: CreateTaskInput): Promise<Task> => {
       const { data, error } = await sdk.POST('/tasks', { body: input });
-      if (error || !data) throw toError(error, 'Failed to create task');
+      if (error || !data) throw toApiError(error, 'Failed to create task');
       return data;
     },
     onSuccess: (_data, vars) => {
@@ -403,7 +384,7 @@ export interface UpdateTaskArgs {
   patch: PatchTaskInput;
 }
 
-export function useUpdateTask(): UseMutationResult<Task, TaskApiError, UpdateTaskArgs> {
+export function useUpdateTask(): UseMutationResult<Task, ApiError, UpdateTaskArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, patch }: UpdateTaskArgs): Promise<Task> => {
@@ -411,28 +392,30 @@ export function useUpdateTask(): UseMutationResult<Task, TaskApiError, UpdateTas
         params: { path: { id } },
         body: patch,
       });
-      if (error || !data) throw toError(error, 'Failed to update task');
+      if (error || !data) throw toApiError(error, 'Failed to update task');
       return data;
     },
-    onSuccess: (_data, vars) => {
+    onSuccess: (data, vars) => {
+      qc.setQueryData(tasksKeys.detail(vars.id), data);
       void qc.invalidateQueries({ queryKey: tasksKeys.detail(vars.id) });
-      void qc.invalidateQueries({ queryKey: tasksKeys.all });
+      void qc.invalidateQueries({ queryKey: [...tasksKeys.all, 'list'] });
       void qc.invalidateQueries({ queryKey: [...timelineKeys.all, 'task', vars.id] });
     },
   });
 }
 
-export function useDeleteTask(): UseMutationResult<void, TaskApiError, string> {
+export function useDeleteTask(): UseMutationResult<void, ApiError, string> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {
       const { error } = await sdk.DELETE('/tasks/{id}', {
         params: { path: { id } },
       });
-      if (error) throw toError(error, 'Failed to delete task');
+      if (error) throw toApiError(error, 'Failed to delete task');
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: tasksKeys.all });
+    onSuccess: (_data, id) => {
+      qc.removeQueries({ queryKey: tasksKeys.detail(id) });
+      void qc.invalidateQueries({ queryKey: [...tasksKeys.all, 'list'] });
     },
   });
 }
@@ -442,7 +425,7 @@ export interface AddCommentArgs {
   body: string;
 }
 
-export function useAddTaskComment(): UseMutationResult<TaskComment, TaskApiError, AddCommentArgs> {
+export function useAddTaskComment(): UseMutationResult<TaskComment, ApiError, AddCommentArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId, body }: AddCommentArgs): Promise<TaskComment> => {
@@ -450,7 +433,7 @@ export function useAddTaskComment(): UseMutationResult<TaskComment, TaskApiError
         params: { path: { id: taskId } },
         body: { body },
       });
-      if (error || !data) throw toError(error, 'Failed to add comment');
+      if (error || !data) throw toApiError(error, 'Failed to add comment');
       return data;
     },
     onSuccess: (_data, vars) => {
@@ -476,7 +459,7 @@ export interface TransitionTaskArgs {
  * columns) and `tasks.detail` (flip derivedState), then reconciles with the
  * authoritative Task returned by the server. Rolls back on error.
  */
-export function useTransitionTask(): UseMutationResult<Task, TaskApiError, TransitionTaskArgs> {
+export function useTransitionTask(): UseMutationResult<Task, ApiError, TransitionTaskArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, transition }: TransitionTaskArgs): Promise<Task> => {
@@ -484,11 +467,21 @@ export function useTransitionTask(): UseMutationResult<Task, TaskApiError, Trans
         params: { path: { id } },
         body: { transition },
       });
-      if (error || !data) throw toError(error, 'Failed to apply transition');
+      if (error || !data) throw toApiError(error, 'Failed to apply transition');
       return data;
     },
     onMutate: async (vars) => {
-      await qc.cancelQueries({ queryKey: tasksKeys.all });
+      // Scope cancellation to the affected project list and task detail only.
+      // Cancelling `tasksKeys.all` would kill in-flight queries for *other*
+      // projects / search results that `onSettled` never re-triggers.
+      if (vars.projectId) {
+        await qc.cancelQueries({
+          queryKey: [...tasksKeys.all, 'list', vars.projectId],
+        });
+      } else {
+        await qc.cancelQueries({ queryKey: [...tasksKeys.all, 'list'] });
+      }
+      await qc.cancelQueries({ queryKey: tasksKeys.detail(vars.id) });
       const listSnapshots = qc.getQueriesData<TaskListItem[]>({
         queryKey: [...tasksKeys.all, 'list'],
       });
@@ -552,7 +545,7 @@ export function useTaskDependenciesQuery(
       const { data, error } = await sdk.GET('/tasks/{id}/dependencies', {
         params: { path: { id: taskId } },
       });
-      if (error || !data) throw toError(error, 'Failed to load task dependencies');
+      if (error || !data) throw toApiError(error, 'Failed to load task dependencies');
       return {
         outgoing: data.outgoing ?? [],
         incoming: data.incoming ?? [],
@@ -567,7 +560,7 @@ export interface AddDependencyArgs {
   kind: TaskDependencyKind;
 }
 
-export function useAddTaskDependency(): UseMutationResult<void, TaskApiError, AddDependencyArgs> {
+export function useAddTaskDependency(): UseMutationResult<void, ApiError, AddDependencyArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId, toTaskId, kind }: AddDependencyArgs): Promise<void> => {
@@ -575,7 +568,7 @@ export function useAddTaskDependency(): UseMutationResult<void, TaskApiError, Ad
         params: { path: { id: taskId } },
         body: { toTaskId, kind },
       });
-      if (error) throw toError(error, 'Failed to add task dependency');
+      if (error) throw toApiError(error, 'Failed to add task dependency');
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: tasksKeys.dependencies(vars.taskId) });
@@ -590,18 +583,14 @@ export interface RemoveDependencyArgs {
   depId: string;
 }
 
-export function useRemoveTaskDependency(): UseMutationResult<
-  void,
-  TaskApiError,
-  RemoveDependencyArgs
-> {
+export function useRemoveTaskDependency(): UseMutationResult<void, ApiError, RemoveDependencyArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId, depId }: RemoveDependencyArgs): Promise<void> => {
       const { error } = await sdk.DELETE('/tasks/{id}/dependencies/{depId}', {
         params: { path: { id: taskId, depId } },
       });
-      if (error) throw toError(error, 'Failed to remove task dependency');
+      if (error) throw toApiError(error, 'Failed to remove task dependency');
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: tasksKeys.dependencies(vars.taskId) });
@@ -630,14 +619,14 @@ export interface ReorderTasksArgs {
  * Performs optimistic reorder on the `tasks.list` cache so the UI is
  * snappy, rolling back on failure.
  */
-export function useReorderTasks(): UseMutationResult<void, TaskApiError, ReorderTasksArgs> {
+export function useReorderTasks(): UseMutationResult<void, ApiError, ReorderTasksArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ projectId, items }: ReorderTasksArgs): Promise<void> => {
       const { error } = await sdk.POST('/tasks/reorder', {
         body: { projectId, items },
       });
-      if (error) throw toError(error, 'Failed to reorder tasks');
+      if (error) throw toApiError(error, 'Failed to reorder tasks');
     },
     onMutate: async (vars) => {
       await qc.cancelQueries({ queryKey: [...tasksKeys.all, 'list', vars.projectId] });
@@ -702,7 +691,7 @@ export function useListAttachments(taskPublicId: string): UseSuspenseQueryResult
       const { data, error } = await sdk.GET('/tasks/{id}/attachments', {
         params: { path: { id: taskPublicId } },
       });
-      if (error || !data) throw toError(error, 'Failed to load attachments');
+      if (error || !data) throw toApiError(error, 'Failed to load attachments');
       return data.attachments ?? [];
     },
   });
@@ -714,11 +703,7 @@ export interface AddAttachmentArgs {
 }
 
 /** Registers attachment metadata on a task. */
-export function useAddAttachment(): UseMutationResult<
-  TaskAttachment,
-  TaskApiError,
-  AddAttachmentArgs
-> {
+export function useAddAttachment(): UseMutationResult<TaskAttachment, ApiError, AddAttachmentArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId, input }: AddAttachmentArgs): Promise<TaskAttachment> => {
@@ -726,7 +711,7 @@ export function useAddAttachment(): UseMutationResult<
         params: { path: { id: taskId } },
         body: input,
       });
-      if (error || !data) throw toError(error, 'Failed to add attachment');
+      if (error || !data) throw toApiError(error, 'Failed to add attachment');
       return data;
     },
     onSuccess: (_data, vars) => {
@@ -743,7 +728,7 @@ export interface PresignUploadArgs {
 /** Requests a presigned PUT URL, uploads the file, and returns the result. */
 export function usePresignUpload(): UseMutationResult<
   PresignUploadResult,
-  TaskApiError,
+  ApiError,
   PresignUploadArgs
 > {
   const qc = useQueryClient();
@@ -757,14 +742,14 @@ export function usePresignUpload(): UseMutationResult<
           byteSize: file.size,
         },
       });
-      if (error || !data) throw toError(error, 'Failed to presign upload');
+      if (error || !data) throw toApiError(error, 'Failed to presign upload');
 
       const res = await fetch(data.uploadUrl, {
         method: 'PUT',
         body: file,
         headers: { 'Content-Type': file.type || 'application/octet-stream' },
       });
-      if (!res.ok) throw new TaskApiError('UPLOAD_FAILED', 'File upload failed');
+      if (!res.ok) throw new ApiError('UPLOAD_FAILED', 'File upload failed');
 
       return data;
     },
@@ -784,7 +769,7 @@ export async function fetchDownloadUrl(taskId: string, attachmentId: string): Pr
   const { data, error } = await sdk.GET('/tasks/{id}/attachments/{aid}/download', {
     params: { path: { id: taskId, aid: attachmentId } },
   });
-  if (error || !data) throw toError(error, 'Failed to get download URL');
+  if (error || !data) throw toApiError(error, 'Failed to get download URL');
   return data.downloadUrl;
 }
 
@@ -794,14 +779,14 @@ export interface DeleteAttachmentArgs {
 }
 
 /** Soft-deletes an attachment from a task. */
-export function useDeleteAttachment(): UseMutationResult<void, TaskApiError, DeleteAttachmentArgs> {
+export function useDeleteAttachment(): UseMutationResult<void, ApiError, DeleteAttachmentArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId, attachmentId }: DeleteAttachmentArgs): Promise<void> => {
       const { error } = await sdk.DELETE('/tasks/{id}/attachments/{aid}', {
         params: { path: { id: taskId, aid: attachmentId } },
       });
-      if (error) throw toError(error, 'Failed to delete attachment');
+      if (error) throw toApiError(error, 'Failed to delete attachment');
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: tasksKeys.attachments(vars.taskId) });

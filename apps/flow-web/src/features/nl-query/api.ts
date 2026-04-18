@@ -20,28 +20,9 @@ export interface CompileLensResult {
   lens: Lens;
 }
 
-/** Error envelope for NL query failures. */
-export class NlQueryError extends Error {
-  readonly code: string | undefined;
-  constructor(code: string | undefined, message: string) {
-    super(message);
-    this.name = 'NlQueryError';
-    this.code = code;
-  }
-}
+import { ApiError, toApiError } from '../../lib/api-error';
 
-function toError(err: unknown, fallback: string): NlQueryError {
-  if (err && typeof err === 'object') {
-    const obj = err as { detail?: unknown; title?: unknown; type?: unknown };
-    const message =
-      (typeof obj.detail === 'string' && obj.detail) ||
-      (typeof obj.title === 'string' && obj.title) ||
-      fallback;
-    const code = typeof obj.type === 'string' ? obj.type : undefined;
-    return new NlQueryError(code, message);
-  }
-  return new NlQueryError(undefined, fallback);
-}
+export { ApiError as NlQueryError };
 
 export interface CompileLensArgs {
   workspaceId: string;
@@ -53,20 +34,16 @@ export interface CompileLensArgs {
  *
  * The backend validates against the closed NL→Lens grammar (ADR 0004) and
  * returns AI.NL_QUERY.UNPARSEABLE on failure; callers should render a
- * "rephrase" hint when {@link NlQueryError.code} contains that code.
+ * "rephrase" hint when {@link ApiError.code} contains that code.
  */
-export function useCompileLens(): UseMutationResult<
-  CompileLensResult,
-  NlQueryError,
-  CompileLensArgs
-> {
-  return useMutation<CompileLensResult, NlQueryError, CompileLensArgs>({
+export function useCompileLens(): UseMutationResult<CompileLensResult, ApiError, CompileLensArgs> {
+  return useMutation<CompileLensResult, ApiError, CompileLensArgs>({
     mutationFn: async ({ workspaceId, prompt }): Promise<CompileLensResult> => {
       const { data, error } = await sdk.POST('/workspaces/{wsId}/ai/compile-lens', {
         params: { path: { wsId: workspaceId } },
         body: { prompt },
       });
-      if (error || !data) throw toError(error, 'Failed to compile prompt');
+      if (error || !data) throw toApiError(error, 'Failed to compile prompt');
       return { prompt: data.prompt, lens: data.lens };
     },
   });

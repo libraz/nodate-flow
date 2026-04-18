@@ -67,7 +67,10 @@ func (p *ollamaProvider) Complete(ctx context.Context, req Request) (*Response, 
 		return nil, fmt.Errorf("ollama: do: %w", err)
 	}
 	defer resp.Body.Close()
-	raw, _ := io.ReadAll(resp.Body)
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("ollama: read body: %w", err)
+	}
 	if resp.StatusCode/100 != 2 {
 		return nil, fmt.Errorf("ollama: upstream status %d", resp.StatusCode)
 	}

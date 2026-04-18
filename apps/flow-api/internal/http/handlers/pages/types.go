@@ -11,6 +11,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
 // MaxPageDepth is the maximum nesting depth allowed for page hierarchies.
@@ -27,49 +28,17 @@ func httpErr(spec *apierrors.Spec) error {
 	return huma.NewError(spec.Status, spec.Code+": "+spec.Message)
 }
 
-func nullStr(s sql.NullString) string {
-	if s.Valid {
-		return s.String
-	}
-	return ""
-}
+// nullStr delegates to handlerutil.NullStr.
+var nullStr = handlerutil.NullStr
 
-func nullStrPtr(s sql.NullString) *string {
-	if !s.Valid {
-		return nil
-	}
-	return &s.String
-}
+// nullStrPtr delegates to handlerutil.NullStrPtr.
+var nullStrPtr = handlerutil.NullStrPtr
 
-func totalAsInt64(v interface{}) int64 {
-	switch x := v.(type) {
-	case int64:
-		return x
-	case int:
-		return int64(x)
-	case uint64:
-		return int64(x)
-	case []byte:
-		var n int64
-		for _, c := range x {
-			if c < '0' || c > '9' {
-				return n
-			}
-			n = n*10 + int64(c-'0')
-		}
-		return n
-	}
-	return 0
-}
+// totalAsInt64 delegates to handlerutil.TotalAsInt64.
+var totalAsInt64 = handlerutil.TotalAsInt64
 
-// nullTimeUnix converts a sql.NullTime to a unix-seconds int64.
-// Returns 0 for the NULL case.
-func nullTimeUnix(t sql.NullTime) int64 {
-	if !t.Valid {
-		return 0
-	}
-	return t.Time.Unix()
-}
+// nullTimeUnix delegates to handlerutil.NullTimeUnixVal (returns int64, 0 for NULL).
+var nullTimeUnix = handlerutil.NullTimeUnixVal
 
 // ptrStr safely dereferences a *string, returning "" if nil.
 func ptrStr(s *string) string {

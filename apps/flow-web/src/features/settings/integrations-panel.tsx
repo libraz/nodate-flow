@@ -34,7 +34,16 @@ export default function IntegrationsPanel(): ReactElement {
         provider: name,
         redirectTo: `${window.location.origin}/settings/integrations`,
       });
-      window.location.assign(authorizeUrl);
+      try {
+        const url = new URL(authorizeUrl);
+        if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+          throw new Error('Invalid URL scheme');
+        }
+        window.location.assign(url.href);
+      } catch {
+        toaster.show({ tone: 'danger', message: t('integrations.errors.connect_failed') });
+        return;
+      }
     } catch {
       toaster.show({ tone: 'danger', message: t('integrations.errors.connect_failed') });
     }

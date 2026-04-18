@@ -34,6 +34,11 @@ export function initI18n(): typeof i18n {
       interpolation: { escapeValue: false },
       react: { useSuspense: true },
     });
+  // Sync <html lang> with detected/configured language
+  document.documentElement.lang = i18n.language;
+  i18n.on('languageChanged', (lng) => {
+    document.documentElement.lang = lng;
+  });
   return i18n;
 }
 
@@ -44,6 +49,7 @@ export function setLanguage(lang: SupportedLanguage): void {
   } catch {
     // ignore
   }
+  document.documentElement.lang = lang;
   void i18n.changeLanguage(lang);
 }
 

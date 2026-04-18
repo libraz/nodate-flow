@@ -83,28 +83,9 @@ export const dashboardKeys = {
 // Error helper
 // ---------------------------------------------------------------------------
 
-/** Lightweight error thrown when an API call fails. */
-export class DashboardApiError extends Error {
-  readonly code: string | undefined;
-  constructor(code: string | undefined, message: string) {
-    super(message);
-    this.name = 'DashboardApiError';
-    this.code = code;
-  }
-}
+import { ApiError, toApiError } from '../../lib/api-error';
 
-function toError(err: unknown, fallback: string): DashboardApiError {
-  if (err && typeof err === 'object') {
-    const obj = err as { detail?: unknown; title?: unknown; type?: unknown };
-    const message =
-      (typeof obj.detail === 'string' && obj.detail) ||
-      (typeof obj.title === 'string' && obj.title) ||
-      fallback;
-    const code = typeof obj.type === 'string' ? obj.type : undefined;
-    return new DashboardApiError(code, message);
-  }
-  return new DashboardApiError(undefined, fallback);
-}
+export { ApiError as DashboardApiError };
 
 // ---------------------------------------------------------------------------
 // Fetch helpers
@@ -127,7 +108,7 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as unknown;
-    throw toError(body, `Request failed with status ${String(res.status)}`);
+    throw toApiError(body, `Request failed with status ${String(res.status)}`);
   }
   return (await res.json()) as T;
 }
@@ -143,7 +124,7 @@ async function fetchVoid(url: string, init?: RequestInit): Promise<void> {
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as unknown;
-    throw toError(body, `Request failed with status ${String(res.status)}`);
+    throw toApiError(body, `Request failed with status ${String(res.status)}`);
   }
 }
 
@@ -175,7 +156,7 @@ export interface CreateWidgetArgs {
 /** POST /workspaces/{wsId}/dashboard/widgets — create a new widget. */
 export function useCreateWidget(
   wsId: string,
-): UseMutationResult<WidgetItem, DashboardApiError, CreateWidgetArgs> {
+): UseMutationResult<WidgetItem, ApiError, CreateWidgetArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ input }: CreateWidgetArgs): Promise<WidgetItem> => {
@@ -199,7 +180,7 @@ export interface UpdateWidgetArgs {
 /** PATCH /workspaces/{wsId}/dashboard/widgets/{widgetId} — update a widget. */
 export function useUpdateWidget(
   wsId: string,
-): UseMutationResult<WidgetItem, DashboardApiError, UpdateWidgetArgs> {
+): UseMutationResult<WidgetItem, ApiError, UpdateWidgetArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ widgetId, patch }: UpdateWidgetArgs): Promise<WidgetItem> => {
@@ -228,7 +209,7 @@ export interface UpdateWidgetPositionArgs {
 /** PATCH /workspaces/{wsId}/dashboard/widgets/{widgetId} — update position only. */
 export function useUpdateWidgetPosition(
   wsId: string,
-): UseMutationResult<WidgetItem, DashboardApiError, UpdateWidgetPositionArgs> {
+): UseMutationResult<WidgetItem, ApiError, UpdateWidgetPositionArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -253,7 +234,7 @@ export function useUpdateWidgetPosition(
 }
 
 /** DELETE /workspaces/{wsId}/dashboard/widgets/{widgetId} — remove a widget. */
-export function useDeleteWidget(wsId: string): UseMutationResult<void, DashboardApiError, string> {
+export function useDeleteWidget(wsId: string): UseMutationResult<void, ApiError, string> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (widgetId: string): Promise<void> => {

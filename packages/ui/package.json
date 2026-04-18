@@ -13,6 +13,8 @@
     "./themes/aurora-dark.css": "./src/themes/aurora-dark.css",
     "./themes/dotline-light.css": "./src/themes/dotline-light.css",
     "./themes/dotline-dark.css": "./src/themes/dotline-dark.css",
+    "./themes/glass-light.css": "./src/themes/glass-light.css",
+    "./themes/glass-dark.css": "./src/themes/glass-dark.css",
     "./hooks/use-theme": "./src/hooks/use-theme.ts",
     "./hooks/use-controllable-state": "./src/hooks/use-controllable-state.ts",
     "./hooks/use-focus-trap": "./src/hooks/use-focus-trap.ts",

@@ -1,0 +1,33 @@
+# Locale: en — seed-time display strings
+MANAGER_NAME="Manager Sato"
+TALENT_A_NAME="Talent A"
+TALENT_B_NAME="Talent B"
+WS_NAME="Demo Office"
+CAL_NAME="Operations Schedule"
+
+# Event titles (order must match EVENTS_META in seed-time.sh)
+EVENT_TITLES=(
+  "A Photo Shoot"
+  "B Audition"
+  "A Rehearsal"
+  "A Day Off"
+  "MGR Interview"
+  "B TV Recording"
+  "A Radio Appearance"
+  "All-Hands Meeting"
+  "B Day Off"
+  "A Magazine Interview"
+  "B Dance Lesson"
+  "A Music Video Shoot"
+  "MGR Meeting"
+  "A Photo Session"
+  "B Live Rehearsal"
+  "B Live Show"
+  "Weekly Standup"
+  "A Variety Show Recording"
+  "B Press Interview"
+  "A Commercial Shoot"
+  "Month-End Report"
+  "A Unavailable"
+  "B Recording Session"
+)

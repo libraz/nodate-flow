@@ -25,7 +25,7 @@ CREATE TABLE calendars (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   UNIQUE KEY uniq_calendars_public_id (public_id),
-  UNIQUE KEY uniq_calendars_personal (workspace_id, owner_user_id, kind) COMMENT 'At most one personal calendar per user per workspace',
+  UNIQUE KEY uniq_calendars_personal (workspace_id, owner_user_id, kind, enabled) COMMENT 'At most one enabled personal calendar per user per workspace',
   UNIQUE KEY uniq_calendars_system_slug (workspace_id, system_slug),
   KEY idx_calendars_workspace_id_kind (workspace_id, kind),
 

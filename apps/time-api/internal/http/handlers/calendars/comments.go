@@ -223,6 +223,12 @@ func EditComment(deps Deps) func(context.Context, *EditCommentInput) (*EditComme
 			return nil, huma.Error500InternalServerError("Failed to update comment", err)
 		}
 
+		_ = eventbus.Append(ctx, deps.DB, wsID, "calendar.event.comment.updated", &actorID, map[string]any{
+			"eventId":    input.EvtId,
+			"calendarId": input.CalId,
+			"commentId":  input.CId,
+		})
+
 		out := &EditCommentOutput{}
 		out.Body.Updated = true
 		return out, nil

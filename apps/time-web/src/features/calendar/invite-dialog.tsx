@@ -1,5 +1,7 @@
 import { Check, Copy, X } from 'lucide-react';
+import { DateTime } from 'luxon';
 import { type ReactElement, useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useCreateInviteMutation, useInvitesQuery, useRevokeInviteMutation } from './api';
@@ -15,6 +17,7 @@ export default function InviteDialog({
   open,
   onClose,
 }: InviteDialogProps): ReactElement | null {
+  const { t, i18n } = useTranslation();
   const wsId = useWorkspaceStore((s) => s.workspaceId) ?? '';
   const { data: invites, isLoading } = useInvitesQuery(wsId, calendarId, open);
   const createMutation = useCreateInviteMutation(wsId, calendarId);
@@ -38,11 +41,18 @@ export default function InviteDialog({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-overlay)]">
+      <div className="glass-surface-heavy w-full max-w-md rounded-[var(--radius-lg)] p-6 ring-1 ring-[var(--color-border)]">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Invite Links</h2>
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+            {t('invite.title')}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="hover:opacity-80"
+            style={{ color: 'var(--color-text-tertiary)' }}
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -51,46 +61,63 @@ export default function InviteDialog({
           <select
             value={role}
             onChange={(e) => setRole(e.target.value)}
-            className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
+            className="flex-1 rounded-md border border-[var(--color-border)] px-3 py-2 text-sm"
+            style={{
+              backgroundColor: 'var(--color-surface-inset)',
+              color: 'var(--color-text-primary)',
+            }}
           >
-            <option value="manager">Manager</option>
-            <option value="editor">Editor</option>
-            <option value="viewer">Viewer</option>
+            <option value="manager">{t('members.roleManager')}</option>
+            <option value="editor">{t('members.roleEditor')}</option>
+            <option value="viewer">{t('members.roleViewer')}</option>
           </select>
           <button
             type="button"
             onClick={handleCreate}
             disabled={createMutation.isPending}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-[var(--color-text-on-accent)] hover:opacity-90 disabled:opacity-50"
           >
-            Create Link
+            {t('invite.createLink')}
           </button>
         </div>
 
         <div className="max-h-64 space-y-3 overflow-y-auto">
           {isLoading ? (
-            <p className="text-sm text-gray-500">Loading...</p>
+            <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+              {t('common.loading')}
+            </p>
           ) : invites?.length === 0 ? (
-            <p className="text-sm text-gray-400">No active invite links</p>
+            <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>
+              {t('invite.noLinks')}
+            </p>
           ) : (
             invites?.map((invite) => (
               <div
                 key={invite.id}
-                className="flex items-center justify-between rounded-md border border-gray-200 px-3 py-2"
+                className="flex items-center justify-between rounded-md border border-[var(--color-border)] px-3 py-2"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium capitalize">
+                    <span
+                      className="rounded bg-[var(--color-surface-inset)] px-1.5 py-0.5 text-xs font-medium capitalize"
+                      style={{ color: 'var(--color-text-primary)' }}
+                    >
                       {invite.role}
                     </span>
-                    <span className="text-xs text-gray-500">
-                      {invite.useCount} use{invite.useCount !== 1 ? 's' : ''}
+                    <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                      {invite.useCount === 1
+                        ? t('invite.use', { count: invite.useCount })
+                        : t('invite.uses', { count: invite.useCount })}
                       {invite.maxUses != null ? ` / ${invite.maxUses}` : ''}
                     </span>
                   </div>
                   {invite.expiresAt ? (
-                    <p className="mt-0.5 text-xs text-gray-400">
-                      Expires {new Date(invite.expiresAt).toLocaleDateString()}
+                    <p className="mt-0.5 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+                      {t('invite.expires', {
+                        date: DateTime.fromISO(invite.expiresAt)
+                          .setLocale(i18n.language)
+                          .toLocaleString(DateTime.DATE_MED),
+                      })}
                     </p>
                   ) : null}
                 </div>
@@ -98,11 +125,12 @@ export default function InviteDialog({
                   <button
                     type="button"
                     onClick={() => handleCopy(invite.token)}
-                    className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                    title="Copy invite link"
+                    className="rounded p-1 hover:bg-[var(--color-hover)]"
+                    style={{ color: 'var(--color-text-tertiary)' }}
+                    title={t('invite.copyLink')}
                   >
                     {copiedToken === invite.token ? (
-                      <Check className="h-4 w-4 text-green-500" />
+                      <Check className="h-4 w-4" style={{ color: 'var(--color-accent)' }} />
                     ) : (
                       <Copy className="h-4 w-4" />
                     )}
@@ -110,10 +138,11 @@ export default function InviteDialog({
                   <button
                     type="button"
                     onClick={() => revokeMutation.mutate(invite.id)}
-                    className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-500"
-                    title="Revoke"
+                    className="group rounded p-1 hover:bg-[var(--color-hover)]"
+                    style={{ color: 'var(--color-text-tertiary)' }}
+                    title={t('invite.revoke')}
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-4 w-4 group-hover:text-[var(--color-danger)]" />
                   </button>
                 </div>
               </div>

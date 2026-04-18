@@ -36,8 +36,10 @@ CREATE TABLE calendar_events (
   -- Recurrence (RFC 5545 subset stored as JSON)
   recurrence_rule JSON NULL COMMENT 'Recurrence rule: {freq, interval, byDay, byMonthDay, bySetPos, until, count}',
   recurrence_end DATETIME NULL COMMENT 'Computed end date for recurrence expansion queries',
+  recurrence_exceptions JSON DEFAULT NULL COMMENT 'Array of ISO 8601 dates/times to exclude from recurrence',
 
   notification_offset INT NULL COMMENT 'Minutes before event to send notification; NULL = no notification',
+  notified_at DATETIME NULL DEFAULT NULL COMMENT 'Timestamp when notification was sent; NULL = not yet notified',
 
   -- Cross-module link to nodate-flow tasks
   task_id INT UNSIGNED NULL COMMENT 'Linked task (optional, for task-calendar sync)',

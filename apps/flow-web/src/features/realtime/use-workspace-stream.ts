@@ -167,7 +167,8 @@ export function useWorkspaceStream(workspaceId: string | undefined): void {
       cancelled = true;
       controller.abort();
       if (fallbackTimer) clearTimeout(fallbackTimer);
-      setStreamHealthy(true);
+      // Do not set streamHealthy to true — the stream is disconnecting,
+      // not healthy. Let the next mount's connect() manage the state.
     };
   }, [workspaceId, queryClient]);
 }

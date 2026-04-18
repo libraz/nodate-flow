@@ -1,9 +1,8 @@
 package dashboard
 
 import (
-	"database/sql"
-
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
 // mapGetRow converts a GetWidgetByPublicIDRow to a WidgetDTO.
@@ -44,34 +43,8 @@ func mapListRow(r generated.ListWidgetsForWorkspaceRow) WidgetDTO {
 	}
 }
 
-// nullTimeUnix converts a sql.NullTime to a unix-seconds int64.
-// Returns 0 for NULL (e.g. initial updated_at before any mutation).
-func nullTimeUnix(t sql.NullTime) int64 {
-	if !t.Valid {
-		return 0
-	}
-	return t.Time.Unix()
-}
+// nullTimeUnix delegates to handlerutil.NullTimeUnixVal (returns int64, 0 for NULL).
+var nullTimeUnix = handlerutil.NullTimeUnixVal
 
-// totalAsInt64 normalizes the COUNT(*) OVER() return type into int64.
-func totalAsInt64(v interface{}) int64 {
-	switch x := v.(type) {
-	case int64:
-		return x
-	case int:
-		return int64(x)
-	case uint64:
-		return int64(x)
-	case []byte:
-		var n int64
-		for _, c := range x {
-			if c < '0' || c > '9' {
-				return n
-			}
-			n = n*10 + int64(c-'0')
-		}
-		return n
-	default:
-		return 0
-	}
-}
+// totalAsInt64 delegates to handlerutil.TotalAsInt64.
+var totalAsInt64 = handlerutil.TotalAsInt64

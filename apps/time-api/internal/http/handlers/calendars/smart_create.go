@@ -17,7 +17,8 @@ type SmartCreateInput struct {
 	WsId  string `path:"wsId" doc:"Workspace public ID"`
 	CalId string `path:"calId" doc:"Calendar public ID"`
 	Body  struct {
-		Text string `json:"text" minLength:"1" maxLength:"1000" doc:"Natural language event description"`
+		Text     string `json:"text" minLength:"1" maxLength:"1000" doc:"Natural language event description"`
+		Timezone string `json:"timezone,omitempty" doc:"IANA timezone (e.g. America/New_York). Defaults to Asia/Tokyo if omitted."`
 	}
 }
 
@@ -42,12 +43,20 @@ type SmartCreateOutput struct {
 // POST /events request.
 func SmartCreate(deps Deps) func(context.Context, *SmartCreateInput) (*SmartCreateOutput, error) {
 	return func(ctx context.Context, input *SmartCreateInput) (*SmartCreateOutput, error) {
-		_, _, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		if err != nil {
+			return nil, err
+		}
+		_, _, err = resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
 
-		proposal, err := ParseEventFromText(input.Body.Text, time.Now())
+		tz := input.Body.Timezone
+		if tz == "" {
+			tz = "Asia/Tokyo"
+		}
+		proposal, err := ParseEventFromText(input.Body.Text, time.Now(), tz)
 		if err != nil {
 			return nil, huma.Error422UnprocessableEntity("Could not parse event from text", err)
 		}
@@ -60,9 +69,13 @@ func SmartCreate(deps Deps) func(context.Context, *SmartCreateInput) (*SmartCrea
 
 // ParseEventFromText extracts event parameters from natural language.
 // This is a simple rule-based parser. Can be replaced with LLM later.
-func ParseEventFromText(text string, now time.Time) (*EventProposal, error) {
-	jst := time.FixedZone("Asia/Tokyo", 9*60*60)
-	nowJST := now.In(jst)
+// The timezone parameter is an IANA timezone name (e.g. "America/New_York").
+func ParseEventFromText(text string, now time.Time, timezone string) (*EventProposal, error) {
+	loc, err := time.LoadLocation(timezone)
+	if err != nil {
+		return nil, err
+	}
+	nowJST := now.In(loc)
 
 	remaining := text
 
@@ -73,16 +86,16 @@ func ParseEventFromText(text string, now time.Time) (*EventProposal, error) {
 	// Extract start time
 	startHour, startMin, hasStart := extractStartTime(remaining)
 	if hasStart {
-		date = time.Date(date.Year(), date.Month(), date.Day(), startHour, startMin, 0, 0, jst)
+		date = time.Date(date.Year(), date.Month(), date.Day(), startHour, startMin, 0, 0, loc)
 	} else {
-		date = time.Date(date.Year(), date.Month(), date.Day(), 9, 0, 0, 0, jst)
+		date = time.Date(date.Year(), date.Month(), date.Day(), 9, 0, 0, 0, loc)
 	}
 
 	// Extract end time
 	endHour, endMin, hasEnd := extractEndTime(remaining)
 	var endAt time.Time
 	if hasEnd {
-		endAt = time.Date(date.Year(), date.Month(), date.Day(), endHour, endMin, 0, 0, jst)
+		endAt = time.Date(date.Year(), date.Month(), date.Day(), endHour, endMin, 0, 0, loc)
 		if endAt.Before(date) {
 			endAt = endAt.Add(24 * time.Hour)
 		}
@@ -173,7 +186,11 @@ func nextWeekdayFrom(from time.Time, wd time.Weekday, nextWeek bool) time.Time {
 	current := from.Weekday()
 	daysAhead := int(wd) - int(current)
 	if nextWeek {
+		// "来週X曜" should always be 7-13 days ahead
 		daysAhead += 7
+		if daysAhead < 7 {
+			daysAhead += 7
+		}
 		if daysAhead > 13 {
 			daysAhead -= 7
 		}

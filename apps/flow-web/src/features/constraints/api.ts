@@ -63,7 +63,7 @@ export function useAddConstraint(): UseMutationResult<{ id: string }, Error, Add
       return { id: data.id };
     },
     onSuccess: (_res, { taskId }) => {
-      qc.invalidateQueries({ queryKey: ['tasks', taskId] });
+      void qc.invalidateQueries({ queryKey: ['tasks', 'detail', taskId] });
     },
   });
 }
@@ -155,7 +155,7 @@ export function useRemoveConstraint(): UseMutationResult<
       return { ok: true };
     },
     onSuccess: (_res, { taskId }) => {
-      qc.invalidateQueries({ queryKey: ['tasks', taskId] });
+      void qc.invalidateQueries({ queryKey: ['tasks', 'detail', taskId] });
     },
   });
 }

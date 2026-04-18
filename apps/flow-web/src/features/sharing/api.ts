@@ -46,28 +46,9 @@ export const sharingKeys = {
   publicLens: (token: string) => [...sharingKeys.all, 'public-lens', token] as const,
 };
 
-/** Lightweight error thrown when a sharing API call fails. */
-export class SharingApiError extends Error {
-  readonly code: string | undefined;
-  constructor(code: string | undefined, message: string) {
-    super(message);
-    this.name = 'SharingApiError';
-    this.code = code;
-  }
-}
+import { ApiError, toApiError } from '../../lib/api-error';
 
-function toError(err: unknown, fallback: string): SharingApiError {
-  if (err && typeof err === 'object') {
-    const obj = err as { detail?: unknown; title?: unknown; type?: unknown };
-    const message =
-      (typeof obj.detail === 'string' && obj.detail) ||
-      (typeof obj.title === 'string' && obj.title) ||
-      fallback;
-    const code = typeof obj.type === 'string' ? obj.type : undefined;
-    return new SharingApiError(code, message);
-  }
-  return new SharingApiError(undefined, fallback);
-}
+export { ApiError as SharingApiError };
 
 function authHeaders(): HeadersInit {
   const token = authStore.getState().accessToken;
@@ -86,7 +67,7 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as unknown;
-    throw toError(body, `Request failed with status ${String(res.status)}`);
+    throw toApiError(body, `Request failed with status ${String(res.status)}`);
   }
   return (await res.json()) as T;
 }
@@ -102,9 +83,9 @@ export interface LensMutationArgs {
  */
 export function usePublishLens(
   wsId: string,
-): UseMutationResult<PublishResult, SharingApiError, LensMutationArgs> {
+): UseMutationResult<PublishResult, ApiError, LensMutationArgs> {
   const qc = useQueryClient();
-  return useMutation<PublishResult, SharingApiError, LensMutationArgs>({
+  return useMutation<PublishResult, ApiError, LensMutationArgs>({
     mutationFn: async ({ lensId }): Promise<PublishResult> => {
       return fetchJson<PublishResult>(`${apiBaseUrl}/workspaces/${wsId}/lenses/${lensId}/publish`, {
         method: 'POST',
@@ -121,9 +102,9 @@ export function usePublishLens(
  */
 export function useUnpublishLens(
   wsId: string,
-): UseMutationResult<void, SharingApiError, LensMutationArgs> {
+): UseMutationResult<void, ApiError, LensMutationArgs> {
   const qc = useQueryClient();
-  return useMutation<void, SharingApiError, LensMutationArgs>({
+  return useMutation<void, ApiError, LensMutationArgs>({
     mutationFn: async ({ lensId }): Promise<void> => {
       await fetchJson<{ ok: boolean }>(
         `${apiBaseUrl}/workspaces/${wsId}/lenses/${lensId}/unpublish`,
@@ -142,14 +123,14 @@ export function useUnpublishLens(
  * This is a non-suspense query because the public page does not live
  * inside the authenticated layout with its ErrorBoundary hierarchy.
  */
-export function usePublicLensQuery(token: string): UseQueryResult<PublicLensData, SharingApiError> {
-  return useQuery<PublicLensData, SharingApiError>({
+export function usePublicLensQuery(token: string): UseQueryResult<PublicLensData, ApiError> {
+  return useQuery<PublicLensData, ApiError>({
     queryKey: sharingKeys.publicLens(token),
     queryFn: async (): Promise<PublicLensData> => {
       const res = await fetch(`${apiBaseUrl}/public/lenses/${token}`);
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as unknown;
-        throw toError(body, 'Failed to load public view');
+        throw toApiError(body, 'Failed to load public view');
       }
       return (await res.json()) as PublicLensData;
     },

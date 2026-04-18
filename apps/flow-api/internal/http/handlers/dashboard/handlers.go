@@ -12,19 +12,12 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
-// actorPtr returns a pointer to the actor's internal user id for
-// eventbus.Event, or nil if not available.
-func actorPtr(ctx context.Context) *int64 {
-	uid, ok := middleware.ActorFromContext(ctx)
-	if !ok {
-		return nil
-	}
-	v := int64(uid)
-	return &v
-}
+// actorPtr delegates to handlerutil.ActorPtr.
+var actorPtr = handlerutil.ActorPtr
 
 // Create handles POST /workspaces/{wsId}/dashboard/widgets.
 func Create(deps Deps) func(context.Context, *CreateWidgetInput) (*CreateWidgetOutput, error) {

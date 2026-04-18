@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
@@ -14,6 +15,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/auth"
 	authhandlers "github.com/nodate-flow/nodate-flow/apps/time-api/internal/http/handlers/auth"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/http/handlers/calendars"
+	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/http/handlers/workspaces"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/http/middleware"
 )
 
@@ -47,6 +49,8 @@ func Build(deps Deps) http.Handler {
 // OpenAPI extraction.
 func BuildResult(deps Deps) Result {
 	r := chi.NewRouter()
+	r.Use(middleware.ClientIP())
+	r.Use(middleware.SecurityHeaders)
 
 	newConfig := func() huma.Config {
 		return huma.DefaultConfig("nodate-time", "0.0.0")
@@ -71,6 +75,12 @@ func BuildResult(deps Deps) Result {
 		DB:      deps.DB,
 	}
 
+	// Build workspace handler dependencies.
+	wsDeps := workspaces.Deps{
+		Queries: queries,
+		DB:      deps.DB,
+	}
+
 	// Health endpoint (public).
 	huma.Register(api, huma.Operation{
 		OperationID: "health",
@@ -83,31 +93,41 @@ func BuildResult(deps Deps) Result {
 		return out, nil
 	})
 
-	// Public auth endpoints.
-	huma.Register(api, huma.Operation{
-		OperationID: "auth-register",
-		Method:      http.MethodPost,
-		Path:        "/auth/register",
-		Summary:     "Register a new account",
-	}, authhandlers.Register(authDeps))
-	huma.Register(api, huma.Operation{
-		OperationID: "auth-login",
-		Method:      http.MethodPost,
-		Path:        "/auth/login",
-		Summary:     "Log in with email and password",
-	}, authhandlers.Login(authDeps))
-	huma.Register(api, huma.Operation{
-		OperationID: "auth-refresh",
-		Method:      http.MethodPost,
-		Path:        "/auth/refresh",
-		Summary:     "Rotate refresh token",
-	}, authhandlers.Refresh(authDeps))
-	huma.Register(api, huma.Operation{
-		OperationID: "auth-logout",
-		Method:      http.MethodPost,
-		Path:        "/auth/logout",
-		Summary:     "Revoke a session",
-	}, authhandlers.Logout(authDeps))
+	// Public auth endpoints (rate-limited per IP).
+	var authAPI huma.API
+	r.Group(func(sub chi.Router) {
+		authRateLimiter := middleware.NewIPRateLimiter(middleware.RateLimitConfig{
+			MaxRequests: 10,
+			Window:      time.Minute,
+		})
+		sub.Use(authRateLimiter.Middleware())
+		authAPI = newSubAPI(sub)
+
+		huma.Register(authAPI, huma.Operation{
+			OperationID: "auth-register",
+			Method:      http.MethodPost,
+			Path:        "/auth/register",
+			Summary:     "Register a new account",
+		}, authhandlers.Register(authDeps))
+		huma.Register(authAPI, huma.Operation{
+			OperationID: "auth-login",
+			Method:      http.MethodPost,
+			Path:        "/auth/login",
+			Summary:     "Log in with email and password",
+		}, authhandlers.Login(authDeps))
+		huma.Register(authAPI, huma.Operation{
+			OperationID: "auth-refresh",
+			Method:      http.MethodPost,
+			Path:        "/auth/refresh",
+			Summary:     "Rotate refresh token",
+		}, authhandlers.Refresh(authDeps))
+		huma.Register(authAPI, huma.Operation{
+			OperationID: "auth-logout",
+			Method:      http.MethodPost,
+			Path:        "/auth/logout",
+			Summary:     "Revoke a session",
+		}, authhandlers.Logout(authDeps))
+	})
 
 	// Public share endpoints (no auth).
 	huma.Register(api, huma.Operation{
@@ -135,6 +155,7 @@ func BuildResult(deps Deps) Result {
 		JWT: deps.JWT,
 		DB:  aclDB,
 	})
+	calMW := middleware.RequireCalendarMember(aclDB)
 
 	var subAPI huma.API
 	r.Group(func(sub chi.Router) {
@@ -154,8 +175,28 @@ func BuildResult(deps Deps) Result {
 			Path:        "/me",
 			Summary:     "Patch the authenticated user's profile",
 		}, authhandlers.PatchMe(authDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "me-change-password",
+			Method:      http.MethodPatch,
+			Path:        "/me/password",
+			Summary:     "Change the authenticated user's password",
+		}, authhandlers.ChangePassword(authDeps))
 
-		// Workspace-scoped calendar routes.
+		// Workspaces.
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "workspaces-list",
+			Method:      http.MethodGet,
+			Path:        "/workspaces",
+			Summary:     "List workspaces for the authenticated user",
+		}, workspaces.List(wsDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "workspaces-create",
+			Method:      http.MethodPost,
+			Path:        "/workspaces",
+			Summary:     "Create a workspace",
+		}, workspaces.Create(wsDeps))
+
+		// Workspace-scoped calendar routes (no calId).
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "calendars-list",
 			Method:      http.MethodGet,
@@ -168,82 +209,8 @@ func BuildResult(deps Deps) Result {
 			Path:        "/workspaces/{wsId}/calendars",
 			Summary:     "Create a calendar",
 		}, calendars.CreateCalendar(calDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "calendars-get",
-			Method:      http.MethodGet,
-			Path:        "/workspaces/{wsId}/calendars/{calId}",
-			Summary:     "Get a calendar",
-		}, calendars.GetCalendar(calDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "calendars-patch",
-			Method:      http.MethodPatch,
-			Path:        "/workspaces/{wsId}/calendars/{calId}",
-			Summary:     "Update a calendar",
-		}, calendars.PatchCalendar(calDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "calendars-delete",
-			Method:      http.MethodDelete,
-			Path:        "/workspaces/{wsId}/calendars/{calId}",
-			Summary:     "Delete a calendar",
-		}, calendars.DeleteCalendar(calDeps))
 
-		// Events within a calendar.
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "events-list",
-			Method:      http.MethodGet,
-			Path:        "/workspaces/{wsId}/calendars/{calId}/events",
-			Summary:     "List events in a calendar",
-		}, calendars.ListEvents(calDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "events-create",
-			Method:      http.MethodPost,
-			Path:        "/workspaces/{wsId}/calendars/{calId}/events",
-			Summary:     "Create an event",
-		}, calendars.CreateEvent(calDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "events-get",
-			Method:      http.MethodGet,
-			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}",
-			Summary:     "Get an event",
-		}, calendars.GetEvent(calDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "events-patch",
-			Method:      http.MethodPatch,
-			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}",
-			Summary:     "Update an event",
-		}, calendars.PatchEvent(calDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "events-delete",
-			Method:      http.MethodDelete,
-			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}",
-			Summary:     "Delete an event",
-		}, calendars.DeleteEvent(calDeps))
-
-		// Smart event creation (natural language parser).
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "events-smart-create",
-			Method:      http.MethodPost,
-			Path:        "/workspaces/{wsId}/calendars/{calId}/events/smart-create",
-			Summary:     "Parse natural language text into an event proposal",
-		}, calendars.SmartCreate(calDeps))
-
-		// iCalendar export.
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "events-export-ics",
-			Method:      http.MethodGet,
-			Path:        "/workspaces/{wsId}/calendars/{calId}/export.ics",
-			Summary:     "Export all calendar events as iCalendar",
-		}, calendars.ExportICS(calDeps))
-
-		// Task-to-calendar sync.
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "events-from-task",
-			Method:      http.MethodPost,
-			Path:        "/workspaces/{wsId}/calendars/{calId}/events/from-task",
-			Summary:     "Create a calendar event from a task",
-		}, calendars.CreateEventFromTask(calDeps))
-
-		// Cross-calendar event query.
+		// Cross-calendar event query (no calId, outside calendar member scope).
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "calendar-events-list",
 			Method:      http.MethodGet,
@@ -251,78 +218,170 @@ func BuildResult(deps Deps) Result {
 			Summary:     "List events across all calendars in a workspace",
 		}, calendars.ListCalendarEvents(calDeps))
 
-		// Calendar members.
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "members-add",
-			Method:      http.MethodPost,
-			Path:        "/workspaces/{wsId}/calendars/{calId}/members",
-			Summary:     "Add a member to a calendar",
-		}, calendars.AddMember(calDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "members-list",
-			Method:      http.MethodGet,
-			Path:        "/workspaces/{wsId}/calendars/{calId}/members",
-			Summary:     "List members of a calendar",
-		}, calendars.ListMembers(calDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "members-update-role",
-			Method:      http.MethodPatch,
-			Path:        "/workspaces/{wsId}/calendars/{calId}/members/{userId}",
-			Summary:     "Update a member's role",
-		}, calendars.UpdateMemberRole(calDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "members-remove",
-			Method:      http.MethodDelete,
-			Path:        "/workspaces/{wsId}/calendars/{calId}/members/{userId}",
-			Summary:     "Remove a member from a calendar",
-		}, calendars.RemoveMember(calDeps))
-
-		// Calendar invites.
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "invites-create",
-			Method:      http.MethodPost,
-			Path:        "/workspaces/{wsId}/calendars/{calId}/invites",
-			Summary:     "Create an invite link for a calendar",
-		}, calendars.CreateInvite(calDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "invites-list",
-			Method:      http.MethodGet,
-			Path:        "/workspaces/{wsId}/calendars/{calId}/invites",
-			Summary:     "List invite links for a calendar",
-		}, calendars.ListInvites(calDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "invites-revoke",
-			Method:      http.MethodDelete,
-			Path:        "/workspaces/{wsId}/calendars/{calId}/invites/{invId}",
-			Summary:     "Revoke an invite link",
-		}, calendars.RevokeInvite(calDeps))
+		// Accept invite (no calId, outside calendar member scope).
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "invites-accept",
 			Method:      http.MethodPost,
 			Path:        "/invites/{token}/accept",
 			Summary:     "Accept a calendar invite",
 		}, calendars.AcceptInvite(calDeps))
+	})
+
+	// Calendar-scoped routes (RequireAuth + RequireCalendarMember).
+	// The calMW middleware resolves {calId}, verifies the actor has an active
+	// subscription, and stores CalendarContext + SubscriptionContext on the
+	// request context. Handlers can retrieve them via CalendarFromContext and
+	// SubscriptionFromContext. Existing handlers still call resolveWorkspace +
+	// resolveCalendar internally (redundant but safe); new handlers should
+	// prefer the context values to reduce boilerplate.
+	var calAPI huma.API
+	r.Group(func(sub chi.Router) {
+		sub.Use(authMW)
+		sub.Use(calMW)
+		calAPI = newSubAPI(sub)
+
+		// Single calendar CRUD.
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "calendars-get",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/calendars/{calId}",
+			Summary:     "Get a calendar",
+		}, calendars.GetCalendar(calDeps))
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "calendars-patch",
+			Method:      http.MethodPatch,
+			Path:        "/workspaces/{wsId}/calendars/{calId}",
+			Summary:     "Update a calendar",
+		}, calendars.PatchCalendar(calDeps))
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "calendars-delete",
+			Method:      http.MethodDelete,
+			Path:        "/workspaces/{wsId}/calendars/{calId}",
+			Summary:     "Delete a calendar",
+		}, calendars.DeleteCalendar(calDeps))
+
+		// Events within a calendar.
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "events-list",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/events",
+			Summary:     "List events in a calendar",
+		}, calendars.ListEvents(calDeps))
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "events-create",
+			Method:      http.MethodPost,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/events",
+			Summary:     "Create an event",
+		}, calendars.CreateEvent(calDeps))
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "events-get",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}",
+			Summary:     "Get an event",
+		}, calendars.GetEvent(calDeps))
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "events-patch",
+			Method:      http.MethodPatch,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}",
+			Summary:     "Update an event",
+		}, calendars.PatchEvent(calDeps))
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "events-delete",
+			Method:      http.MethodDelete,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}",
+			Summary:     "Delete an event",
+		}, calendars.DeleteEvent(calDeps))
+
+		// Smart event creation (natural language parser).
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "events-smart-create",
+			Method:      http.MethodPost,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/events/smart-create",
+			Summary:     "Parse natural language text into an event proposal",
+		}, calendars.SmartCreate(calDeps))
+
+		// iCalendar export.
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "events-export-ics",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/export.ics",
+			Summary:     "Export all calendar events as iCalendar",
+		}, calendars.ExportICS(calDeps))
+
+		// Task-to-calendar sync.
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "events-from-task",
+			Method:      http.MethodPost,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/events/from-task",
+			Summary:     "Create a calendar event from a task",
+		}, calendars.CreateEventFromTask(calDeps))
+
+		// Calendar members.
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "members-add",
+			Method:      http.MethodPost,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/members",
+			Summary:     "Add a member to a calendar",
+		}, calendars.AddMember(calDeps))
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "members-list",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/members",
+			Summary:     "List members of a calendar",
+		}, calendars.ListMembers(calDeps))
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "members-update-role",
+			Method:      http.MethodPatch,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/members/{userId}",
+			Summary:     "Update a member's role",
+		}, calendars.UpdateMemberRole(calDeps))
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "members-remove",
+			Method:      http.MethodDelete,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/members/{userId}",
+			Summary:     "Remove a member from a calendar",
+		}, calendars.RemoveMember(calDeps))
+
+		// Calendar invites (scoped to a calendar).
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "invites-create",
+			Method:      http.MethodPost,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/invites",
+			Summary:     "Create an invite link for a calendar",
+		}, calendars.CreateInvite(calDeps))
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "invites-list",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/invites",
+			Summary:     "List invite links for a calendar",
+		}, calendars.ListInvites(calDeps))
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "invites-revoke",
+			Method:      http.MethodDelete,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/invites/{invId}",
+			Summary:     "Revoke an invite link",
+		}, calendars.RevokeInvite(calDeps))
 
 		// Event attendees.
-		huma.Register(subAPI, huma.Operation{
+		huma.Register(calAPI, huma.Operation{
 			OperationID: "attendees-add",
 			Method:      http.MethodPost,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees",
 			Summary:     "Add attendees to an event",
 		}, calendars.AddAttendees(calDeps))
-		huma.Register(subAPI, huma.Operation{
+		huma.Register(calAPI, huma.Operation{
 			OperationID: "attendees-remove",
 			Method:      http.MethodDelete,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{userId}",
 			Summary:     "Remove an attendee from an event",
 		}, calendars.RemoveAttendee(calDeps))
-		huma.Register(subAPI, huma.Operation{
+		huma.Register(calAPI, huma.Operation{
 			OperationID: "attendees-rsvp",
 			Method:      http.MethodPatch,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/rsvp",
 			Summary:     "Update own RSVP for an event",
 		}, calendars.UpdateRsvp(calDeps))
-		huma.Register(subAPI, huma.Operation{
+		huma.Register(calAPI, huma.Operation{
 			OperationID: "attendees-can-edit",
 			Method:      http.MethodPatch,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{userId}/can-edit",
@@ -330,25 +389,25 @@ func BuildResult(deps Deps) Result {
 		}, calendars.ToggleCanEdit(calDeps))
 
 		// Event comments.
-		huma.Register(subAPI, huma.Operation{
+		huma.Register(calAPI, huma.Operation{
 			OperationID: "comments-list",
 			Method:      http.MethodGet,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/comments",
 			Summary:     "List comments on an event",
 		}, calendars.ListComments(calDeps))
-		huma.Register(subAPI, huma.Operation{
+		huma.Register(calAPI, huma.Operation{
 			OperationID: "comments-create",
 			Method:      http.MethodPost,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/comments",
 			Summary:     "Add a comment to an event",
 		}, calendars.CreateComment(calDeps))
-		huma.Register(subAPI, huma.Operation{
+		huma.Register(calAPI, huma.Operation{
 			OperationID: "comments-edit",
 			Method:      http.MethodPatch,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/comments/{cId}",
 			Summary:     "Edit a comment",
 		}, calendars.EditComment(calDeps))
-		huma.Register(subAPI, huma.Operation{
+		huma.Register(calAPI, huma.Operation{
 			OperationID: "comments-delete",
 			Method:      http.MethodDelete,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/comments/{cId}",
@@ -356,25 +415,25 @@ func BuildResult(deps Deps) Result {
 		}, calendars.DeleteComment(calDeps))
 
 		// Event checklist.
-		huma.Register(subAPI, huma.Operation{
+		huma.Register(calAPI, huma.Operation{
 			OperationID: "checklist-list",
 			Method:      http.MethodGet,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/checklist",
 			Summary:     "List checklist items for an event",
 		}, calendars.ListChecklist(calDeps))
-		huma.Register(subAPI, huma.Operation{
+		huma.Register(calAPI, huma.Operation{
 			OperationID: "checklist-create",
 			Method:      http.MethodPost,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/checklist",
 			Summary:     "Add a checklist item to an event",
 		}, calendars.CreateChecklistItem(calDeps))
-		huma.Register(subAPI, huma.Operation{
+		huma.Register(calAPI, huma.Operation{
 			OperationID: "checklist-update",
 			Method:      http.MethodPatch,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/checklist/{itemId}",
 			Summary:     "Update a checklist item",
 		}, calendars.UpdateChecklistItem(calDeps))
-		huma.Register(subAPI, huma.Operation{
+		huma.Register(calAPI, huma.Operation{
 			OperationID: "checklist-delete",
 			Method:      http.MethodDelete,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/checklist/{itemId}",
@@ -382,21 +441,53 @@ func BuildResult(deps Deps) Result {
 		}, calendars.DeleteChecklistItem(calDeps))
 
 		// Memos within a calendar.
-		huma.Register(subAPI, huma.Operation{
+		huma.Register(calAPI, huma.Operation{
 			OperationID: "memos-list",
 			Method:      http.MethodGet,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/memos",
 			Summary:     "List memos in a calendar",
 		}, calendars.ListMemos(calDeps))
-		huma.Register(subAPI, huma.Operation{
+		huma.Register(calAPI, huma.Operation{
 			OperationID: "memos-create",
 			Method:      http.MethodPost,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/memos",
 			Summary:     "Create a memo",
 		}, calendars.CreateMemo(calDeps))
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "memos-update",
+			Method:      http.MethodPatch,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/memos/{memoId}",
+			Summary:     "Update a memo",
+		}, calendars.UpdateMemo(calDeps))
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "memos-delete",
+			Method:      http.MethodDelete,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/memos/{memoId}",
+			Summary:     "Delete a memo",
+		}, calendars.DeleteMemo(calDeps))
+
+		// Event attachments.
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "attachments-list",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments",
+			Summary:     "List attachments on an event",
+		}, calendars.ListAttachments(calDeps))
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "attachments-create",
+			Method:      http.MethodPost,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments",
+			Summary:     "Record attachment metadata for an event",
+		}, calendars.CreateAttachment(calDeps))
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "attachments-delete",
+			Method:      http.MethodDelete,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}",
+			Summary:     "Delete an attachment from an event",
+		}, calendars.DeleteAttachment(calDeps))
 	})
 
-	return Result{Handler: r, APIs: []huma.API{api, subAPI}}
+	return Result{Handler: r, APIs: []huma.API{api, authAPI, subAPI, calAPI}}
 }
 
 // passthroughDB adapts *sql.DB to middleware.ACLDB.

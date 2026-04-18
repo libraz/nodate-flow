@@ -1,0 +1,33 @@
+# Locale: ja — seed-time display strings
+MANAGER_NAME="佐藤マネージャー"
+TALENT_A_NAME="タレントA"
+TALENT_B_NAME="タレントB"
+WS_NAME="デモ事務所"
+CAL_NAME="運営スケジュール"
+
+# Event titles (order must match EVENTS_META in seed-time.sh)
+EVENT_TITLES=(
+  "A 撮影"
+  "B オーディション"
+  "A リハーサル"
+  "A 休み"
+  "MGR面談"
+  "B TV収録"
+  "A ラジオ出演"
+  "全体ミーティング"
+  "B 休み"
+  "A 雑誌インタビュー"
+  "B ダンスレッスン"
+  "A MV撮影"
+  "MGR 打ち合わせ"
+  "A フォトシュート"
+  "B ライブリハーサル"
+  "B ライブ本番"
+  "全体定例会"
+  "A バラエティ収録"
+  "B 取材対応"
+  "A CM撮影"
+  "月末報告会"
+  "A 稼働NG"
+  "B レコーディング"
+)

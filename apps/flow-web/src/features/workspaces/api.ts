@@ -33,22 +33,16 @@ export const workspacesKeys = {
   users: (id: string) => [...workspacesKeys.all, 'detail', id, 'users'] as const,
 };
 
-/** Lightweight error thrown when the SDK returns an error envelope. */
-export class WorkspaceApiError extends Error {
-  readonly code: string | undefined;
-  constructor(code: string | undefined, message: string) {
-    super(message);
-    this.name = 'WorkspaceApiError';
-    this.code = code;
-  }
-}
+import { ApiError } from '../../lib/api-error';
+
+export { ApiError as WorkspaceApiError };
 
 function extractCode(detail: string): string | undefined {
   const m = detail.match(/^([A-Z][A-Z0-9_.]+):/);
   return m ? m[1] : undefined;
 }
 
-function toError(err: unknown, fallback: string): WorkspaceApiError {
+function toError(err: unknown, fallback: string): ApiError {
   if (err && typeof err === 'object') {
     const obj = err as { detail?: unknown; title?: unknown; type?: unknown };
     const message =
@@ -59,9 +53,9 @@ function toError(err: unknown, fallback: string): WorkspaceApiError {
       (typeof obj.type === 'string' && obj.type) ||
       (typeof obj.detail === 'string' && extractCode(obj.detail)) ||
       undefined;
-    return new WorkspaceApiError(code, message);
+    return new ApiError(code, message);
   }
-  return new WorkspaceApiError(undefined, fallback);
+  return new ApiError(undefined, fallback);
 }
 
 export function useWorkspacesQuery(): UseSuspenseQueryResult<Workspace[]> {
@@ -121,11 +115,7 @@ export function useWorkspaceUsersQuery(
   });
 }
 
-export function useCreateWorkspace(): UseMutationResult<
-  Workspace,
-  WorkspaceApiError,
-  CreateWorkspaceInput
-> {
+export function useCreateWorkspace(): UseMutationResult<Workspace, ApiError, CreateWorkspaceInput> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: CreateWorkspaceInput): Promise<Workspace> => {
@@ -144,11 +134,7 @@ export interface UpdateWorkspaceArgs {
   patch: PatchWorkspaceInput;
 }
 
-export function useUpdateWorkspace(): UseMutationResult<
-  Workspace,
-  WorkspaceApiError,
-  UpdateWorkspaceArgs
-> {
+export function useUpdateWorkspace(): UseMutationResult<Workspace, ApiError, UpdateWorkspaceArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, patch }: UpdateWorkspaceArgs): Promise<Workspace> => {
@@ -166,7 +152,7 @@ export function useUpdateWorkspace(): UseMutationResult<
   });
 }
 
-export function useDisableWorkspace(): UseMutationResult<void, WorkspaceApiError, string> {
+export function useDisableWorkspace(): UseMutationResult<void, ApiError, string> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {
@@ -187,11 +173,7 @@ export interface AddMemberArgs {
   input: InviteMemberInput;
 }
 
-export function useAddMember(): UseMutationResult<
-  WorkspaceMember,
-  WorkspaceApiError,
-  AddMemberArgs
-> {
+export function useAddMember(): UseMutationResult<WorkspaceMember, ApiError, AddMemberArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, input }: AddMemberArgs): Promise<WorkspaceMember> => {
@@ -204,6 +186,7 @@ export function useAddMember(): UseMutationResult<
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: workspacesKeys.members(vars.id) });
+      void qc.invalidateQueries({ queryKey: workspacesKeys.users(vars.id) });
     },
   });
 }
@@ -217,7 +200,7 @@ export interface UpdateMemberRoleArgs {
 /** PATCH /workspaces/{wsId}/members/{userId} — change a member's role. */
 export function useUpdateMemberRole(): UseMutationResult<
   WorkspaceMember,
-  WorkspaceApiError,
+  ApiError,
   UpdateMemberRoleArgs
 > {
   const qc = useQueryClient();
@@ -232,6 +215,7 @@ export function useUpdateMemberRole(): UseMutationResult<
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: workspacesKeys.members(vars.wsId) });
+      void qc.invalidateQueries({ queryKey: workspacesKeys.users(vars.wsId) });
     },
   });
 }
@@ -242,7 +226,7 @@ export interface RemoveMemberArgs {
   userId: string;
 }
 
-export function useRemoveMember(): UseMutationResult<void, WorkspaceApiError, RemoveMemberArgs> {
+export function useRemoveMember(): UseMutationResult<void, ApiError, RemoveMemberArgs> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ wsId, userId }: RemoveMemberArgs): Promise<void> => {
@@ -253,6 +237,7 @@ export function useRemoveMember(): UseMutationResult<void, WorkspaceApiError, Re
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: workspacesKeys.members(vars.wsId) });
+      void qc.invalidateQueries({ queryKey: workspacesKeys.users(vars.wsId) });
     },
   });
 }

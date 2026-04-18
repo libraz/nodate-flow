@@ -41,6 +41,7 @@ export interface CalendarEvent {
   ownerUserId: string;
   blockLabel?: string;
   recurrenceRule?: RecurrenceRule | null;
+  recurrenceExceptions?: string[];
 }
 
 export interface CalendarMember {

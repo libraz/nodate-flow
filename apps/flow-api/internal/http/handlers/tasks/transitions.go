@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
@@ -137,6 +138,21 @@ func Transition(deps Deps) func(context.Context, *TransitionTaskInput) (*Transit
 
 		if err := tx.Commit(); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
+		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "task.transition",
+				ActorID:      aID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "task",
+				ResourceID:   task.PublicID.String(),
+				Metadata: map[string]any{
+					"transition": in.Body.Transition,
+					"fromState":  string(current.DerivedState),
+					"toState":    string(nextDerived),
+				},
+			})
 		}
 
 		autoEvaluateConstraints(ctx, deps, ws.ID, task.ID)

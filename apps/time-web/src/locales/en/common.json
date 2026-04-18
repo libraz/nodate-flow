@@ -1,19 +1,94 @@
 {
+  "common": {
+    "loading": "Loading...",
+    "send": "Send",
+    "add": "Add",
+    "edit": "Edit",
+    "delete": "Delete",
+    "confirmDelete": "Confirm Delete",
+    "save": "Save",
+    "saving": "Saving...",
+    "cancel": "Cancel",
+    "close": "Close",
+    "owner": "Owner"
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "signingIn": "Signing in...",
+    "signOut": "Sign out",
+    "createAccount": "Create account",
+    "creatingAccount": "Creating account...",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Confirm password",
+    "displayName": "Display name",
+    "noAccount": "Don't have an account?",
+    "haveAccount": "Already have an account?",
+    "loginFailed": "Login failed",
+    "registrationFailed": "Registration failed",
+    "emailPlaceholder": "you@example.com",
+    "passwordPlaceholder": "Enter your password",
+    "passwordHint": "At least 8 characters",
+    "validation": {
+      "displayNameRequired": "Display name is required",
+      "invalidEmail": "Invalid email address",
+      "passwordMin": "Password must be at least 8 characters",
+      "passwordsMismatch": "Passwords do not match"
+    }
+  },
+  "workspace": {
+    "create": "Create your workspace",
+    "description": "A workspace is where you and your team organize calendars.",
+    "name": "Workspace name",
+    "namePlaceholder": "My Team",
+    "slug": "URL slug",
+    "slugPlaceholder": "my-team",
+    "slugHint": "Used in URLs to identify your workspace",
+    "createButton": "Create workspace",
+    "creating": "Creating...",
+    "createFailed": "Failed to create workspace"
+  },
   "calendar": {
+    "today": "Today",
     "month": "Month",
     "week": "Week",
-    "today": "Today",
-    "newEvent": "New Event",
-    "allDay": "All day"
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "previousWeek": "Previous week",
+    "nextWeek": "Next week",
+    "allDay": "all-day",
+    "toggleSidebar": "Toggle sidebar",
+    "closeSidebar": "Close sidebar",
+    "createNewEvent": "Create new event",
+    "noEventsForDay": "No events for this day",
+    "closeDayDetail": "Close day detail"
+  },
+  "sidebar": {
+    "sharedCalendars": "Shared Calendars",
+    "myCalendar": "My Calendar",
+    "other": "Other"
   },
   "event": {
+    "newEvent": "New Event",
+    "editEvent": "Edit Event",
     "title": "Title",
+    "calendar": "Calendar",
+    "allDay": "All day",
     "start": "Start",
     "end": "End",
+    "kind": "Kind",
+    "showAs": "Show as",
     "location": "Location",
-    "memo": "Notes",
-    "kind": { "event": "Event", "block": "Time Block", "free": "Available" },
-    "showAs": { "busy": "Busy", "free": "Free", "tentative": "Tentative", "oof": "Out of Office" },
+    "memo": "Memo",
+    "more": "+{{count}} more",
+    "loadingEvent": "Loading event...",
+    "kindEvent": "Event",
+    "kindBlock": "Block",
+    "kindFree": "Free",
+    "showBusy": "Busy",
+    "showFree": "Free",
+    "showTentative": "Tentative",
+    "showOof": "Out of office",
     "visibility": {
       "default": "Default",
       "public": "Public",
@@ -21,17 +96,82 @@
       "confidential": "Confidential"
     }
   },
-  "auth": {
-    "login": "Log In",
-    "register": "Create Account",
-    "email": "Email",
-    "password": "Password",
-    "displayName": "Display Name",
-    "logout": "Log Out"
+  "detail": {
+    "attendees": "Attendees",
+    "noAttendees": "No attendees",
+    "checklist": "Checklist",
+    "noChecklist": "No checklist items",
+    "comments": "Comments",
+    "noComments": "No comments yet",
+    "addComment": "Add a comment...",
+    "attachments": "Attachments",
+    "noAttachments": "No attachments"
   },
-  "sidebar": {
-    "sharedCalendars": "Shared Calendars",
-    "myCalendar": "My Calendar",
-    "other": "Other"
+  "members": {
+    "title": "Members",
+    "emailPlaceholder": "Email address",
+    "roleOwner": "Owner",
+    "roleManager": "Manager",
+    "roleEditor": "Editor",
+    "roleViewer": "Viewer"
+  },
+  "invite": {
+    "title": "Invite Links",
+    "createLink": "Create Link",
+    "noLinks": "No active invite links",
+    "copyLink": "Copy invite link",
+    "revoke": "Revoke",
+    "expires": "Expires {{date}}",
+    "use": "{{count}} use",
+    "uses": "{{count}} uses"
+  },
+  "settings": {
+    "title": "Settings",
+    "theme": "Theme",
+    "colorMode": "Color mode",
+    "language": "Language",
+    "themeGlass": "Glass",
+    "themeAurora": "Aurora",
+    "themeDotline": "Dotline",
+    "modeLight": "Light",
+    "modeDark": "Dark",
+    "modeSystem": "System"
+  },
+  "search": {
+    "placeholder": "Search events...",
+    "close": "Close search",
+    "noResults": "No events found",
+    "searchEvents": "Search events"
+  },
+  "rightPanel": {
+    "close": "Close panel",
+    "memo": "Memo",
+    "members": "Members",
+    "share": "Share",
+    "notifications": "Notifications",
+    "addMemo": "Add a memo...",
+    "noMemos": "No memos yet",
+    "loadingMembers": "Loading members...",
+    "noMembers": "No members",
+    "noSharedCalendar": "No shared calendar selected",
+    "noSharedCalendarAvailable": "No shared calendar available",
+    "shareDescription": "Share this calendar with others:",
+    "copy": "Copy",
+    "shareLinkHint": "Anyone with this link can view the calendar. Use invite links for edit access.",
+    "noNotifications": "No notifications"
+  },
+  "tabs": {
+    "calendar": "Calendar",
+    "memo": "Memo",
+    "search": "Search",
+    "settings": "Settings"
+  },
+  "rsvp": {
+    "accept": "Accept",
+    "decline": "Decline",
+    "tentative": "Tentative",
+    "pending": "Pending",
+    "accepted": "Accepted",
+    "declined": "Declined"
   }
 }

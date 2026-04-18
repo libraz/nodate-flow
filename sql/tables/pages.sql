@@ -30,5 +30,6 @@ CREATE TABLE pages (
   CONSTRAINT fk_pages_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_pages_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL,
   CONSTRAINT fk_pages_creator FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_pages_parent FOREIGN KEY (parent_page_id) REFERENCES pages(id) ON DELETE SET NULL
+  CONSTRAINT fk_pages_parent FOREIGN KEY (parent_page_id) REFERENCES pages(id) ON DELETE SET NULL,
+  CONSTRAINT chk_pages_no_self_parent CHECK (parent_page_id IS NULL OR parent_page_id != id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Wiki/documentation pages with tree structure';

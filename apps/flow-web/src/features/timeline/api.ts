@@ -63,28 +63,9 @@ export const timelineKeys = {
     [...timelineKeys.all, scope, id, filters ?? {}] as const,
 };
 
-/** Lightweight error thrown when the SDK returns an error envelope. */
-export class TimelineApiError extends Error {
-  readonly code: string | undefined;
-  constructor(code: string | undefined, message: string) {
-    super(message);
-    this.name = 'TimelineApiError';
-    this.code = code;
-  }
-}
+import { ApiError, toApiError } from '../../lib/api-error';
 
-function toError(err: unknown, fallback: string): TimelineApiError {
-  if (err && typeof err === 'object') {
-    const obj = err as { detail?: unknown; title?: unknown; type?: unknown };
-    const message =
-      (typeof obj.detail === 'string' && obj.detail) ||
-      (typeof obj.title === 'string' && obj.title) ||
-      fallback;
-    const code = typeof obj.type === 'string' ? obj.type : undefined;
-    return new TimelineApiError(code, message);
-  }
-  return new TimelineApiError(undefined, fallback);
-}
+export { ApiError as TimelineApiError };
 
 interface TimelineQuery {
   limit?: number;
@@ -136,7 +117,7 @@ export function useTaskTimelineQuery(
       const { data, error } = await sdk.GET('/tasks/{id}/timeline', {
         params: { path: { id: taskId }, query: buildQuery(filters) },
       });
-      if (error || !data) throw toError(error, 'Failed to load task timeline');
+      if (error || !data) throw toApiError(error, 'Failed to load task timeline');
       return normalize(data);
     },
   });
@@ -152,7 +133,7 @@ export function useProjectTimelineQuery(
       const { data, error } = await sdk.GET('/projects/{prjId}/timeline', {
         params: { path: { prjId: projectId }, query: buildQuery(filters) },
       });
-      if (error || !data) throw toError(error, 'Failed to load project timeline');
+      if (error || !data) throw toApiError(error, 'Failed to load project timeline');
       return normalize(data);
     },
   });
@@ -168,7 +149,7 @@ export function useWorkspaceTimelineQuery(
       const { data, error } = await sdk.GET('/workspaces/{wsId}/timeline', {
         params: { path: { wsId: workspaceId }, query: buildQuery(filters) },
       });
-      if (error || !data) throw toError(error, 'Failed to load workspace timeline');
+      if (error || !data) throw toApiError(error, 'Failed to load workspace timeline');
       return normalize(data);
     },
   });

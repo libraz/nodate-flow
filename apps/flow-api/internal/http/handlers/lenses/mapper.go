@@ -1,10 +1,10 @@
 package lenses
 
 import (
-	"database/sql"
 	"encoding/json"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
 // lensJSON is the internal structure stored in the lens_json column.
@@ -14,28 +14,8 @@ type lensJSON struct {
 	GroupBy *string         `json:"groupBy"`
 }
 
-// totalAsInt64 normalizes the COUNT(*) OVER() return type into int64.
-func totalAsInt64(v interface{}) int64 {
-	switch x := v.(type) {
-	case int64:
-		return x
-	case int:
-		return int64(x)
-	case uint64:
-		return int64(x)
-	case []byte:
-		var n int64
-		for _, c := range x {
-			if c < '0' || c > '9' {
-				return n
-			}
-			n = n*10 + int64(c-'0')
-		}
-		return n
-	default:
-		return 0
-	}
-}
+// totalAsInt64 delegates to handlerutil.TotalAsInt64.
+var totalAsInt64 = handlerutil.TotalAsInt64
 
 // buildLensJSON serializes filter, sort, and groupBy into the single
 // JSON blob stored in the lens_json column.
@@ -121,21 +101,8 @@ func rowToPublicLens(r generated.FindLensByPublicTokenRow) PublicLens {
 	}
 }
 
-// nullTimeUnix converts a sql.NullTime to *int64 unix seconds. This is
-// the single conversion point for _at columns in this package, per the
-// api-types convention.
-func nullTimeUnix(t sql.NullTime) *int64 {
-	if !t.Valid {
-		return nil
-	}
-	v := t.Time.Unix()
-	return &v
-}
+// nullTimeUnix delegates to handlerutil.NullTimeUnix (returns *int64, nil for NULL).
+var nullTimeUnix = handlerutil.NullTimeUnix
 
-// nullString converts a sql.NullString to *string.
-func nullString(s sql.NullString) *string {
-	if !s.Valid {
-		return nil
-	}
-	return &s.String
-}
+// nullString delegates to handlerutil.NullStrPtr.
+var nullString = handlerutil.NullStrPtr

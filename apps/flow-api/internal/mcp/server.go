@@ -24,8 +24,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -68,10 +68,11 @@ type Handler struct {
 // mcpRateLimiter is a per-token sliding window rate limiter for the MCP
 // endpoint. It limits each MCP token to 60 requests per minute.
 type mcpRateLimiter struct {
-	mu      sync.Mutex
-	tokens  map[string]*tokenBucket
-	maxReqs int
-	window  time.Duration
+	mu        sync.Mutex
+	tokens    map[string]*tokenBucket
+	maxReqs   int
+	window    time.Duration
+	lastEvict time.Time
 }
 
 type tokenBucket struct {
@@ -92,6 +93,17 @@ func (rl *mcpRateLimiter) allow(token string) (bool, time.Duration) {
 	now := time.Now()
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
+
+	// Periodically evict stale entries to prevent unbounded map growth.
+	if now.Sub(rl.lastEvict) > rl.window*2 {
+		cutoff := now.Add(-rl.window)
+		for k, v := range rl.tokens {
+			if len(v.timestamps) == 0 || v.timestamps[len(v.timestamps)-1].Before(cutoff) {
+				delete(rl.tokens, k)
+			}
+		}
+		rl.lastEvict = now
+	}
 
 	b, ok := rl.tokens[token]
 	if !ok {
@@ -159,7 +171,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if err != nil {
-		writeRPCError(w, nil, apierrors.McpProtocolFrameMalformed, err.Error())
+		writeRPCError(w, nil, apierrors.McpProtocolFrameMalformed, "failed to read request body")
 		return
 	}
 	var req rpcRequest
@@ -246,16 +258,18 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 	if s.agentID != 0 {
 		agent, aerr := h.loadAgentGuardSnapshot(r.Context(), s.agentID)
 		if aerr != nil {
+			slog.ErrorContext(r.Context(), "mcp: agent guard load failed", slog.Any("err", aerr))
 			h.audit(r.Context(), s, params.Name, params.Arguments, nil,
 				generated.McpInvocationsStatusError, apierrors.McpToolExecutionFailed.Code, 0)
-			writeRPCError(w, req.ID, apierrors.McpToolExecutionFailed, aerr.Error())
+			writeRPCError(w, req.ID, apierrors.McpToolExecutionFailed, "agent guard check failed")
 			return
 		}
 		spent, serr := h.loadAgentMonthSpendCents(r.Context(), s.agentID)
 		if serr != nil {
+			slog.ErrorContext(r.Context(), "mcp: agent spend load failed", slog.Any("err", serr))
 			h.audit(r.Context(), s, params.Name, params.Arguments, nil,
 				generated.McpInvocationsStatusError, apierrors.McpToolExecutionFailed.Code, 0)
-			writeRPCError(w, req.ID, apierrors.McpToolExecutionFailed, serr.Error())
+			writeRPCError(w, req.ID, apierrors.McpToolExecutionFailed, "agent spend check failed")
 			return
 		}
 		decision := agentguard.Decide(agent, agentguard.Request{
@@ -293,7 +307,9 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 		}
 		h.audit(r.Context(), s, params.Name, args, nil,
 			generated.McpInvocationsStatusError, spec.Code, dur)
-		writeRPCError(w, req.ID, spec, toolErr.Error())
+		// Use the stable spec message rather than the raw error to
+		// avoid leaking internal details (DB errors, paths, etc.).
+		writeRPCError(w, req.ID, spec, spec.Message)
 		return
 	}
 	resultJSON, _ := json.Marshal(result)
@@ -377,7 +393,9 @@ func (h *Handler) loadAgentGuardSnapshot(ctx context.Context, agentID uint32) (a
 	}
 	var scopes []string
 	if scopesJSON.Valid && scopesJSON.String != "" {
-		_ = json.Unmarshal([]byte(scopesJSON.String), &scopes)
+		if err := json.Unmarshal([]byte(scopesJSON.String), &scopes); err != nil {
+			slog.WarnContext(ctx, "mcp: malformed allowed_scopes_json", slog.Int("agent_id", int(agentID)), slog.String("err", err.Error()))
+		}
 	}
 	var cap *int64
 	if monthlyCapRaw.Valid {
@@ -473,6 +491,6 @@ func (h *Handler) audit(
 		InvokedAt:             time.Now().UTC(),
 	})
 	if err != nil {
-		_ = fmt.Errorf("mcp audit log failed: %w", err)
+		slog.ErrorContext(ctx, "mcp audit log failed", slog.String("tool", toolName), slog.Any("err", err))
 	}
 }

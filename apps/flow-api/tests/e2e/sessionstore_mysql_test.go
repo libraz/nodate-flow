@@ -23,7 +23,7 @@ func TestSessionstoreMySQLDriver(t *testing.T) {
 
 	tt := newTenant(t)
 	queries := generated.New(testDB)
-	store := sessionstore.NewMySQLStore(queries)
+	store := sessionstore.NewMySQLStore(testDB, queries)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

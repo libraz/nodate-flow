@@ -3,17 +3,11 @@ package pages
 import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
-// publicIDOrEmpty returns the UUID string of a types.PublicID, or ""
-// when it is the zero value (i.e. a LEFT JOIN returned NULL).
-func publicIDOrEmpty(p types.PublicID) string {
-	var zero types.PublicID
-	if p == zero {
-		return ""
-	}
-	return p.String()
-}
+// publicIDOrEmpty delegates to handlerutil.PublicIDOrEmpty.
+var publicIDOrEmpty = handlerutil.PublicIDOrEmpty
 
 // publicIDPtr returns a *string for a types.PublicID, or nil when zero.
 func publicIDPtr(p types.PublicID) *string {

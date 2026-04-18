@@ -1,5 +1,6 @@
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
 import { authApi } from '../lib/api-client';
@@ -9,23 +10,24 @@ export const Route = createFileRoute('/register')({
   component: RegisterPage,
 });
 
-const registerSchema = z
-  .object({
-    displayName: z.string().min(1, 'Display name is required').max(50),
-    email: z.string().email('Invalid email address'),
-    password: z.string().min(8, 'Password must be at least 8 characters'),
-    confirmPassword: z.string(),
-  })
-  .refine((d) => d.password === d.confirmPassword, {
-    message: 'Passwords do not match',
-    path: ['confirmPassword'],
-  });
-
 type FieldErrors = Partial<Record<string, string>>;
 
 function RegisterPage(): ReactElement {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
+
+  const registerSchema = z
+    .object({
+      displayName: z.string().min(1, t('auth.validation.displayNameRequired')).max(50),
+      email: z.string().email(t('auth.validation.invalidEmail')),
+      password: z.string().min(8, t('auth.validation.passwordMin')),
+      confirmPassword: z.string(),
+    })
+    .refine((d) => d.password === d.confirmPassword, {
+      message: t('auth.validation.passwordsMismatch'),
+      path: ['confirmPassword'],
+    });
 
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
@@ -61,7 +63,7 @@ function RegisterPage(): ReactElement {
       setAuth(res.accessToken, res.user);
       void navigate({ to: '/setup' });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed');
+      setError(err instanceof Error ? err.message : t('auth.registrationFailed'));
     } finally {
       setLoading(false);
     }
@@ -70,14 +72,16 @@ function RegisterPage(): ReactElement {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm">
-        <h1 className="mb-8 text-center text-2xl font-bold text-gray-900">Create account</h1>
+        <h1 className="mb-8 text-center text-2xl font-bold text-gray-900">
+          {t('auth.createAccount')}
+        </h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
           )}
           <div>
             <label htmlFor="displayName" className="mb-1 block text-sm font-medium text-gray-700">
-              Display name
+              {t('auth.displayName')}
             </label>
             <input
               id="displayName"
@@ -93,7 +97,7 @@ function RegisterPage(): ReactElement {
           </div>
           <div>
             <label htmlFor="email" className="mb-1 block text-sm font-medium text-gray-700">
-              Email
+              {t('auth.email')}
             </label>
             <input
               id="email"
@@ -102,13 +106,13 @@ function RegisterPage(): ReactElement {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              placeholder="you@example.com"
+              placeholder={t('auth.emailPlaceholder')}
             />
             {fieldErrors.email && <p className="mt-1 text-xs text-red-600">{fieldErrors.email}</p>}
           </div>
           <div>
             <label htmlFor="password" className="mb-1 block text-sm font-medium text-gray-700">
-              Password
+              {t('auth.password')}
             </label>
             <input
               id="password"
@@ -117,7 +121,7 @@ function RegisterPage(): ReactElement {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              placeholder="At least 8 characters"
+              placeholder={t('auth.passwordHint')}
             />
             {fieldErrors.password && (
               <p className="mt-1 text-xs text-red-600">{fieldErrors.password}</p>
@@ -128,7 +132,7 @@ function RegisterPage(): ReactElement {
               htmlFor="confirmPassword"
               className="mb-1 block text-sm font-medium text-gray-700"
             >
-              Confirm password
+              {t('auth.confirmPassword')}
             </label>
             <input
               id="confirmPassword"
@@ -147,13 +151,13 @@ function RegisterPage(): ReactElement {
             disabled={loading}
             className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
           >
-            {loading ? 'Creating account...' : 'Create account'}
+            {loading ? t('auth.creatingAccount') : t('auth.createAccount')}
           </button>
         </form>
         <p className="mt-6 text-center text-sm text-gray-600">
-          Already have an account?{' '}
+          {t('auth.haveAccount')}{' '}
           <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">
-            Sign in
+            {t('auth.signIn')}
           </Link>
         </p>
       </div>

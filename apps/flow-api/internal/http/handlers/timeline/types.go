@@ -14,6 +14,7 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
 // Deps is the dependency bundle for handlers in this package.
@@ -26,37 +27,11 @@ func httpErr(spec *apierrors.Spec) error {
 	return huma.NewError(spec.Status, spec.Code+": "+spec.Message)
 }
 
-// totalAsInt64 normalises the COUNT(*) OVER() return type into int64.
-// MySQL drivers may surface the value as int64, int, uint64 or as a
-// decimal byte slice depending on the underlying column type, so we
-// accept all four shapes here.
-func totalAsInt64(v interface{}) int64 {
-	switch x := v.(type) {
-	case int64:
-		return x
-	case int:
-		return int64(x)
-	case uint64:
-		return int64(x)
-	case []byte:
-		var n int64
-		for _, c := range x {
-			if c < '0' || c > '9' {
-				return n
-			}
-			n = n*10 + int64(c-'0')
-		}
-		return n
-	}
-	return 0
-}
+// totalAsInt64 delegates to handlerutil.TotalAsInt64.
+var totalAsInt64 = handlerutil.TotalAsInt64
 
-func nullStr(s sql.NullString) string {
-	if s.Valid {
-		return s.String
-	}
-	return ""
-}
+// nullStr delegates to handlerutil.NullStr.
+var nullStr = handlerutil.NullStr
 
 // uuidFromBytes converts a raw BINARY(16) public_id into its canonical
 // UUID string form. Empty or malformed slices yield an empty string so

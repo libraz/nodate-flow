@@ -3,4 +3,5 @@ go 1.25.0
 use (
 	./apps/flow-api
 	./apps/time-api
+	./packages/go-shared
 )
