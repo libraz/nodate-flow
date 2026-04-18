@@ -12,10 +12,11 @@ import { useFocusTrap } from '@nodate-flow/ui/hooks/use-focus-trap';
 import Icon from '@nodate-flow/ui/icon';
 import Badge from '@nodate-flow/ui/primitives/badge';
 import Card from '@nodate-flow/ui/primitives/card';
-import { useMatches } from '@tanstack/react-router';
+import { useMatches, useNavigate } from '@tanstack/react-router';
 import { Sparkles, X } from 'lucide-react';
 import { type ReactElement, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
 
 import {
   type AiSuggestion,
@@ -29,17 +30,97 @@ import { type CompileLensResult, NlQueryError, useCompileLens } from '../nl-quer
 import { type StateSuggestion, useStateSuggestionsQuery } from '../nl-query/state-suggestions';
 import { useWorkspaceStream } from '../realtime/use-workspace-stream';
 import { type TaskReminder, useRemindersQuery } from '../reminders/api';
+import { setTaskFilters } from '../tasks/use-task-filters';
 
 const NL_UNPARSEABLE = 'AI.NL_QUERY.UNPARSEABLE';
 
+const BADGE_STYLE: React.CSSProperties = {
+  display: 'inline-block',
+  padding: '0.125rem 0.5rem',
+  borderRadius: '999px',
+  background: 'var(--nf-color-accent-subtle)',
+  color: 'var(--nf-color-fg)',
+  fontSize: '0.6875rem',
+  lineHeight: 1.6,
+};
+
+const PRIORITY_LABELS: Record<number, string> = {
+  1: '\u4F4E',
+  2: '\u4E2D',
+  3: '\u9AD8',
+};
+
+/** Produce a human-readable label for a single filter condition. */
+function formatFilterCondition(field: string, operator: string, value: unknown): string {
+  if (field === 'priority' && operator === 'eq' && typeof value === 'number') {
+    const label = PRIORITY_LABELS[value] ?? String(value);
+    return `\u512A\u5148\u5EA6: ${label}`;
+  }
+  if (field === 'blocked' && operator === 'eq' && value === true) {
+    return '\u30D6\u30ED\u30C3\u30AF\u4E2D';
+  }
+  if (field === 'due_on' && operator === 'between' && value === 'this_week') {
+    return '\u671F\u65E5: \u4ECA\u9031';
+  }
+  if (field === 'status' && operator === 'in' && Array.isArray(value)) {
+    return `\u30B9\u30C6\u30FC\u30BF\u30B9: ${(value as string[]).join(', ')}`;
+  }
+  const display = Array.isArray(value) ? (value as unknown[]).join(', ') : String(value ?? '');
+  return `${field} ${operator} ${display}`;
+}
+
+function useActiveProjectId(): string | undefined {
+  const matches = useMatches();
+  for (let i = matches.length - 1; i >= 0; i -= 1) {
+    const params = matches[i]?.params as Record<string, string> | undefined;
+    if (!params) continue;
+    const id = params.projectId;
+    if (typeof id === 'string' && id.length > 0) return id;
+  }
+  return undefined;
+}
+
 function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): ReactElement {
   const { t } = useTranslation('ai-suggestions');
+  const navigate = useNavigate();
+  const projectId = useActiveProjectId();
   const [prompt, setPrompt] = useState('');
   const [result, setResult] = useState<CompileLensResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const mutation = useCompileLens();
 
   const disabled = !workspaceId || prompt.trim().length === 0 || mutation.isPending;
+
+  /** Extract TaskFilters from a Lens and apply them. */
+  const applyLensFilter = (lens: {
+    filter?: Record<string, Record<string, unknown>>;
+  }): void => {
+    if (!projectId) return;
+    const priorityFilter = lens.filter?.priority;
+    const statusFilter = lens.filter?.status;
+    const priority: number[] = [];
+    if (priorityFilter) {
+      const v = priorityFilter.eq ?? priorityFilter.in;
+      if (typeof v === 'number') priority.push(v);
+      if (Array.isArray(v)) priority.push(...(v as number[]));
+    }
+    const states: string[] = [];
+    if (statusFilter) {
+      const v = statusFilter.eq ?? statusFilter.in;
+      if (typeof v === 'string') states.push(v);
+      if (Array.isArray(v)) states.push(...(v as string[]));
+    }
+    setTaskFilters(projectId, {
+      search: '',
+      priority: priority.length > 0 ? priority : undefined,
+      states: states.length > 0 ? (states as never[]) : undefined,
+      assigneeId: '',
+    });
+    void navigate({
+      to: '/projects/$projectId/tasks',
+      params: { projectId },
+    });
+  };
 
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
@@ -49,7 +130,13 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
     mutation.mutate(
       { workspaceId, prompt: prompt.trim() },
       {
-        onSuccess: (r) => setResult(r),
+        onSuccess: (r) => {
+          setResult(r);
+          // Automatically apply the filter — no extra click needed.
+          if (r.lens) {
+            applyLensFilter(r.lens as { filter?: Record<string, Record<string, unknown>> });
+          }
+        },
         onError: (err) => {
           if (err instanceof NlQueryError && err.code?.includes(NL_UNPARSEABLE)) {
             setErrorMsg(t('nl_query.unparseable'));
@@ -61,6 +148,39 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
     );
   };
 
+  // Derive badge data from result.lens
+  const filterBadges: Array<{ key: string; label: string }> = [];
+  if (result?.lens) {
+    const lens = result.lens as {
+      filter?: Record<string, Record<string, unknown>>;
+      sort?: Array<{ field: string; dir: string }>;
+      groupBy?: string | null;
+    };
+    if (lens.filter) {
+      for (const [field, conditions] of Object.entries(lens.filter)) {
+        for (const [op, value] of Object.entries(conditions)) {
+          filterBadges.push({
+            key: `${field}-${op}`,
+            label: formatFilterCondition(field, op, value),
+          });
+        }
+      }
+    }
+    if (lens.sort && lens.sort.length > 0) {
+      const sortText = lens.sort.map((s) => `${s.field} ${s.dir}`).join(', ');
+      filterBadges.push({
+        key: '_sort',
+        label: `${t('nl_query.sort_label')}: ${sortText}`,
+      });
+    }
+    if (lens.groupBy) {
+      filterBadges.push({
+        key: '_group',
+        label: `${t('nl_query.group_label')}: ${lens.groupBy}`,
+      });
+    }
+  }
+
   return (
     <form
       onSubmit={handleSubmit}
@@ -69,15 +189,19 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
         flexDirection: 'column',
         gap: '0.5rem',
         padding: '0.75rem',
-        borderBlockEnd: '1px solid var(--color-border)',
+        borderBlockEnd: '1px solid var(--nf-color-border)',
       }}
     >
-      <label htmlFor="nl-query-input" style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}>
+      <label
+        htmlFor="nl-query-input"
+        style={{ fontSize: '0.75rem', color: 'var(--nf-color-muted)' }}
+      >
         {t('nl_query.label')}
       </label>
       <input
         id="nl-query-input"
         type="text"
+        autoComplete="off"
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
         placeholder={t('nl_query.placeholder')}
@@ -85,9 +209,9 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
         style={{
           padding: '0.5rem 0.625rem',
           borderRadius: '0.375rem',
-          border: '1px solid var(--color-border)',
-          background: 'var(--color-bg)',
-          color: 'var(--color-fg)',
+          border: '1px solid var(--nf-color-border)',
+          background: 'var(--nf-color-bg)',
+          color: 'var(--nf-color-fg)',
           fontSize: '0.8125rem',
         }}
       />
@@ -97,9 +221,9 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
         style={{
           padding: '0.4rem 0.75rem',
           borderRadius: '0.375rem',
-          border: '1px solid var(--color-border)',
-          background: 'var(--color-surface)',
-          color: 'var(--color-fg)',
+          border: '1px solid var(--nf-color-border)',
+          background: 'var(--nf-color-surface)',
+          color: 'var(--nf-color-fg)',
           fontSize: '0.75rem',
           cursor: disabled ? 'not-allowed' : 'pointer',
           opacity: disabled ? 0.6 : 1,
@@ -108,40 +232,38 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
         {mutation.isPending ? t('nl_query.compiling') : t('nl_query.submit')}
       </button>
       {errorMsg ? (
-        <p role="alert" style={{ margin: 0, fontSize: '0.75rem', color: 'var(--color-danger)' }}>
+        <p role="alert" style={{ margin: 0, fontSize: '0.75rem', color: 'var(--nf-color-danger)' }}>
           {errorMsg}
         </p>
       ) : null}
-      {result ? (
-        <pre
+      {filterBadges.length > 0 ? (
+        <div
           style={{
-            margin: 0,
-            padding: '0.5rem',
-            background: 'var(--color-bg)',
-            border: '1px solid var(--color-border)',
-            borderRadius: '0.375rem',
-            fontSize: '0.6875rem',
-            color: 'var(--color-fg)',
-            overflow: 'auto',
-            maxBlockSize: '8rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.5rem',
           }}
         >
-          {JSON.stringify(result.lens, null, 2)}
-        </pre>
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '0.375rem',
+            }}
+          >
+            {filterBadges.map((badge) => (
+              <span key={badge.key} style={BADGE_STYLE}>
+                {badge.label}
+              </span>
+            ))}
+          </div>
+          <p style={{ margin: 0, fontSize: '0.6875rem', color: 'var(--nf-color-fg-muted)' }}>
+            {t('nl_query.applied')}
+          </p>
+        </div>
       ) : null}
     </form>
   );
-}
-
-function useActiveWorkspaceId(): string | undefined {
-  const matches = useMatches();
-  for (let i = matches.length - 1; i >= 0; i -= 1) {
-    const params = matches[i]?.params as Record<string, string> | undefined;
-    if (!params) continue;
-    const id = params.id ?? params.wsId;
-    if (typeof id === 'string' && id.length > 0) return id;
-  }
-  return undefined;
 }
 
 function GlassDockSuggestionRow({
@@ -174,7 +296,7 @@ function GlassDockSuggestionRow({
             style={{
               fontFamily: 'var(--font-mono)',
               fontSize: '0.75rem',
-              color: 'var(--color-muted)',
+              color: 'var(--nf-color-muted)',
             }}
           >
             {suggestion.recommendedAction}
@@ -184,7 +306,7 @@ function GlassDockSuggestionRow({
           style={{
             margin: 0,
             fontSize: '0.8125rem',
-            color: 'var(--color-fg)',
+            color: 'var(--nf-color-fg)',
             overflow: 'hidden',
             display: '-webkit-box',
             // biome-ignore lint/style/useNamingConvention: vendor-prefixed CSS props
@@ -223,10 +345,10 @@ function StateSuggestionsPanel({
         flexDirection: 'column',
         gap: '0.375rem',
         padding: '0.75rem',
-        borderBlockEnd: '1px solid var(--color-border)',
+        borderBlockEnd: '1px solid var(--nf-color-border)',
       }}
     >
-      <strong style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}>
+      <strong style={{ fontSize: '0.75rem', color: 'var(--nf-color-muted)' }}>
         {t('state_suggestions.title')}
       </strong>
       <ul
@@ -247,7 +369,7 @@ function StateSuggestionsPanel({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.5rem',
-                color: 'var(--color-fg)',
+                color: 'var(--nf-color-fg)',
                 textDecoration: 'none',
                 fontSize: '0.75rem',
               }}
@@ -259,7 +381,7 @@ function StateSuggestionsPanel({
               <span
                 style={{
                   fontFamily: 'var(--font-mono)',
-                  color: 'var(--color-muted)',
+                  color: 'var(--nf-color-muted)',
                 }}
               >
                 {s.confidence.toFixed(2)}
@@ -288,10 +410,10 @@ function RemindersPanel({
         flexDirection: 'column',
         gap: '0.375rem',
         padding: '0.75rem',
-        borderBlockEnd: '1px solid var(--color-border)',
+        borderBlockEnd: '1px solid var(--nf-color-border)',
       }}
     >
-      <strong style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}>
+      <strong style={{ fontSize: '0.75rem', color: 'var(--nf-color-muted)' }}>
         {t('reminders.title')}
       </strong>
       <ul
@@ -315,7 +437,7 @@ function RemindersPanel({
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
-                  color: 'var(--color-fg)',
+                  color: 'var(--nf-color-fg)',
                   textDecoration: 'none',
                   fontSize: '0.75rem',
                 }}
@@ -327,7 +449,7 @@ function RemindersPanel({
                 <span
                   style={{
                     fontFamily: 'var(--font-mono)',
-                    color: 'var(--color-muted)',
+                    color: 'var(--nf-color-muted)',
                   }}
                 >
                   {r.dueOn}
@@ -357,10 +479,10 @@ function AutoActionsPanel({
         flexDirection: 'column',
         gap: '0.375rem',
         padding: '0.75rem',
-        borderBlockEnd: '1px solid var(--color-border)',
+        borderBlockEnd: '1px solid var(--nf-color-border)',
       }}
     >
-      <strong style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}>
+      <strong style={{ fontSize: '0.75rem', color: 'var(--nf-color-muted)' }}>
         {t('auto_actions.title')}
       </strong>
       <ul
@@ -388,7 +510,7 @@ function AutoActionsPanel({
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
-                  color: 'var(--color-fg)',
+                  color: 'var(--nf-color-fg)',
                   textDecoration: 'none',
                   fontSize: '0.75rem',
                 }}
@@ -400,7 +522,7 @@ function AutoActionsPanel({
                 <span
                   style={{
                     fontFamily: 'var(--font-mono)',
-                    color: 'var(--color-muted)',
+                    color: 'var(--nf-color-muted)',
                   }}
                 >
                   {a.confidence.toFixed(2)}
@@ -419,7 +541,7 @@ export default function GlassDock(): ReactElement {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  const workspaceId = useActiveWorkspaceId();
+  const workspaceId = useCurrentWorkspaceId() ?? undefined;
   useWorkspaceStream(workspaceId);
   const { data } = useAiSuggestionsQuery(workspaceId);
   const suggestions: AiSuggestion[] = data ?? [];
@@ -458,9 +580,9 @@ export default function GlassDock(): ReactElement {
           gap: '0.5rem',
           padding: '0.625rem 0.875rem',
           borderRadius: '999px',
-          background: 'var(--color-surface)',
-          border: '1px solid var(--color-border)',
-          color: 'var(--color-fg)',
+          background: 'var(--nf-color-surface)',
+          border: '1px solid var(--nf-color-border)',
+          color: 'var(--nf-color-fg)',
           boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
           cursor: 'pointer',
           zIndex: 50,
@@ -486,8 +608,8 @@ export default function GlassDock(): ReactElement {
         maxBlockSize: '70vh',
         display: 'flex',
         flexDirection: 'column',
-        background: 'var(--color-surface)',
-        border: '1px solid var(--color-border)',
+        background: 'var(--nf-color-bg-elevated)',
+        border: '1px solid var(--nf-color-border)',
         borderRadius: '0.75rem',
         boxShadow: '0 16px 48px rgba(0, 0, 0, 0.18)',
         zIndex: 50,
@@ -499,7 +621,7 @@ export default function GlassDock(): ReactElement {
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '0.75rem 0.875rem',
-          borderBlockEnd: '1px solid var(--color-border)',
+          borderBlockEnd: '1px solid var(--nf-color-border)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -521,7 +643,7 @@ export default function GlassDock(): ReactElement {
             borderRadius: '0.375rem',
             border: 'none',
             background: 'transparent',
-            color: 'var(--color-fg)',
+            color: 'var(--nf-color-fg)',
             cursor: 'pointer',
           }}
         >
@@ -545,7 +667,7 @@ export default function GlassDock(): ReactElement {
           <p
             style={{
               margin: 0,
-              color: 'var(--color-muted)',
+              color: 'var(--nf-color-muted)',
               fontSize: '0.8125rem',
               textAlign: 'center',
               padding: '1rem',

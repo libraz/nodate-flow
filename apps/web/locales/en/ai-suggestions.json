@@ -108,9 +108,13 @@
   "nl_query": {
     "label": "Ask in plain language",
     "placeholder": "show me everything blocked this week",
-    "submit": "Compile",
-    "compiling": "Compiling...",
+    "submit": "Submit",
+    "compiling": "Processing...",
     "unparseable": "Couldn't understand that — try rephrasing.",
-    "error": "Failed to compile prompt"
+    "error": "Failed to process query",
+    "apply": "Apply filter",
+    "applied": "Filter applied",
+    "sort_label": "Sort",
+    "group_label": "Group by"
   }
 }

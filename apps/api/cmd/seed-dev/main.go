@@ -291,6 +291,7 @@ func ensureTasks(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, pr
 			CreatedByUserID: createdBy,
 			Title:           s.title,
 			Priority:        s.priority,
+			Visibility:      generated.TasksVisibilityPublic,
 		}); err != nil {
 			return err
 		}

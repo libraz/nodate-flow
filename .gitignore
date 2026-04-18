@@ -58,6 +58,7 @@ blob-report/
 .turbo/
 .cache/
 *.log
+.tanstack/
 
 # ---- Editor / OS ----
 .vscode/*

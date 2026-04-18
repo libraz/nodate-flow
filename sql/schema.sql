@@ -13,16 +13,22 @@ DROP TABLE IF EXISTS `ai_settings`;
 DROP TABLE IF EXISTS `attachments`;
 DROP TABLE IF EXISTS `audit_logs`;
 DROP TABLE IF EXISTS `comments`;
+DROP TABLE IF EXISTS `dashboard_widgets`;
 DROP TABLE IF EXISTS `events`;
 DROP TABLE IF EXISTS `identities`;
 DROP TABLE IF EXISTS `instance_admins`;
 DROP TABLE IF EXISTS `instance_audit_logs`;
+DROP TABLE IF EXISTS `lenses`;
 DROP TABLE IF EXISTS `mcp_invocations`;
 DROP TABLE IF EXISTS `mcp_tokens`;
+DROP TABLE IF EXISTS `notifications`;
 DROP TABLE IF EXISTS `oauth_states`;
+DROP TABLE IF EXISTS `pages`;
 DROP TABLE IF EXISTS `personal_access_tokens`;
 DROP TABLE IF EXISTS `project_members`;
 DROP TABLE IF EXISTS `projects`;
+DROP TABLE IF EXISTS `relation_suggestions`;
+DROP TABLE IF EXISTS `repo_workspace_mappings`;
 DROP TABLE IF EXISTS `sessions`;
 DROP TABLE IF EXISTS `signals`;
 DROP TABLE IF EXISTS `task_actors`;
@@ -30,9 +36,13 @@ DROP TABLE IF EXISTS `task_constraints`;
 DROP TABLE IF EXISTS `task_dependencies`;
 DROP TABLE IF EXISTS `task_embeddings`;
 DROP TABLE IF EXISTS `tasks`;
+DROP TABLE IF EXISTS `timebox_tasks`;
+DROP TABLE IF EXISTS `timeboxes`;
 DROP TABLE IF EXISTS `user_integrations`;
 DROP TABLE IF EXISTS `user_recovery_codes`;
 DROP TABLE IF EXISTS `users`;
+DROP TABLE IF EXISTS `webhook_deliveries`;
+DROP TABLE IF EXISTS `webhook_subscriptions`;
 DROP TABLE IF EXISTS `workspace_members`;
 DROP TABLE IF EXISTS `workspaces`;
 
@@ -352,6 +362,40 @@ CREATE TABLE comments (
   CONSTRAINT fk_comments_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Task discussion comments';
 
+-- >>> dashboard_widgets.sql
+-- ====================================
+-- dashboard_widgets
+-- Configurable widgets that users arrange on their workspace dashboard.
+-- Each widget has a type, grid position, and JSON configuration blob.
+-- ====================================
+CREATE TABLE dashboard_widgets (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  creator_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
+
+  widget_type ENUM('task_summary','burndown','signals_feed','ai_suggestions','overdue_tasks','notification_feed') NOT NULL COMMENT 'Widget variant',
+  title VARCHAR(200) NOT NULL COMMENT 'User-facing widget title',
+  config JSON NULL COMMENT 'Widget-specific configuration (filters, timebox_id, etc.)',
+  position_x SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Grid column offset',
+  position_y SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Grid row offset',
+  width SMALLINT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'Grid column span',
+  height SMALLINT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'Grid row span',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  UNIQUE KEY uniq_dashboard_widgets_public_id (public_id),
+  KEY idx_dashboard_widgets_workspace_id_enabled_sort_weight (workspace_id, enabled, sort_weight),
+  KEY idx_dashboard_widgets_workspace_id_creator_id (workspace_id, creator_id),
+
+  CONSTRAINT fk_dashboard_widgets_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_dashboard_widgets_creator FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Dashboard widgets arranged by users';
+
 -- >>> events.sql
 -- ====================================
 -- events
@@ -483,6 +527,44 @@ CREATE TABLE instance_audit_logs (
   CONSTRAINT fk_instance_audit_logs_workspace FOREIGN KEY (target_workspace_id) REFERENCES workspaces(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Instance-wide audit log';
 
+-- >>> lenses.sql
+-- ====================================
+-- lenses
+-- Saved views (filter + sort + groupBy) for task queries.
+-- Can be workspace-wide (project_id IS NULL) or project-scoped.
+-- ====================================
+CREATE TABLE lenses (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  project_id INT UNSIGNED NULL COMMENT 'Internal FK to projects.id (NULL = workspace-wide)',
+  creator_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
+
+  name VARCHAR(100) NOT NULL COMMENT 'Display name',
+  lens_json JSON NOT NULL COMMENT 'Serialized Lens object (filter, sort, groupBy)',
+  is_default BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Default lens for the scope',
+  is_public BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Whether the lens is publicly shared',
+  public_token CHAR(32) CHARACTER SET latin1 NULL COMMENT 'Random hex token for public share URL',
+  shared_at DATETIME(3) NULL COMMENT 'Timestamp when first shared publicly',
+  safety_checked_at DATETIME(3) NULL COMMENT 'Timestamp of last AI safety check',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  UNIQUE KEY uniq_lenses_public_id (public_id),
+  UNIQUE KEY uniq_lenses_workspace_id_project_id_name_enabled (workspace_id, project_id, name, enabled),
+  UNIQUE KEY uniq_lenses_public_token (public_token),
+  KEY idx_lenses_workspace_id_project_id_enabled (workspace_id, project_id, enabled),
+  KEY idx_lenses_workspace_id_creator_id (workspace_id, creator_id),
+
+  CONSTRAINT fk_lenses_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_lenses_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_lenses_creator FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Saved task query views';
+
 -- >>> mcp_invocations.sql
 -- ====================================
 -- mcp_invocations
@@ -555,6 +637,46 @@ CREATE TABLE mcp_tokens (
   CONSTRAINT fk_mcp_tokens_agent FOREIGN KEY (agent_id) REFERENCES ai_agents(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='MCP personal access tokens';
 
+-- >>> notifications.sql
+-- ====================================
+-- notifications
+-- Per-user notification entries produced by eventbus fan-out when workspace
+-- events occur. Each row represents one notification to one recipient.
+-- ====================================
+CREATE TABLE notifications (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  recipient_user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id, the user who receives this notification',
+  actor_user_id INT UNSIGNED NULL COMMENT 'Internal FK to users.id, who triggered the event (null for system)',
+
+  event_type VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Matches eventbus event types (e.g. task.created, task.comment.added)',
+  resource_type VARCHAR(32) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Resource kind: task, project, comment, etc.',
+  resource_public_id BINARY(16) NULL COMMENT 'public_id of the affected resource (null for workspace-level events)',
+  title VARCHAR(255) NOT NULL COMMENT 'Human-readable notification title (i18n key or pre-rendered)',
+  body TEXT NULL COMMENT 'Optional longer description',
+  severity ENUM('low','normal','high','urgent') NOT NULL DEFAULT 'normal' COMMENT 'AI-inferred or rule-based severity',
+  channel ENUM('in_app','email','push') NOT NULL DEFAULT 'in_app' COMMENT 'Delivery channel',
+  read_at DATETIME NULL COMMENT 'When the user marked it read (null = unread)',
+  archived_at DATETIME NULL COMMENT 'When the user archived it (null = active)',
+  delivered_at DATETIME NULL COMMENT 'When email/push was actually sent (null for in_app only)',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  UNIQUE KEY uniq_notifications_public_id (public_id),
+  KEY idx_notifications_workspace_id_recipient_read (workspace_id, recipient_user_id, read_at, created_at DESC),
+  KEY idx_notifications_workspace_id_recipient_archived (workspace_id, recipient_user_id, archived_at, created_at DESC),
+  KEY idx_notifications_workspace_id_event_type (workspace_id, event_type),
+
+  CONSTRAINT fk_notifications_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_notifications_recipient FOREIGN KEY (recipient_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_notifications_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Per-user notification entries from eventbus fan-out';
+
 -- >>> oauth_states.sql
 -- ====================================
 -- oauth_states
@@ -579,6 +701,42 @@ CREATE TABLE oauth_states (
 
   CONSTRAINT fk_oauth_states_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Short-lived OAuth CSRF state tokens for personal integrations';
+
+-- >>> pages.sql
+-- ====================================
+-- pages
+-- Wiki/documentation pages with tree structure.
+-- A page belongs to a workspace and optionally scopes to a project.
+-- Self-referential parent_page_id enables nested page hierarchies.
+-- ====================================
+CREATE TABLE pages (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  project_id INT UNSIGNED NULL COMMENT 'Internal FK to projects.id (NULL = workspace-wide)',
+  creator_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
+  parent_page_id INT UNSIGNED NULL COMMENT 'Internal FK to pages.id (NULL = root page)',
+
+  title VARCHAR(500) NOT NULL COMMENT 'Page title',
+  body MEDIUMTEXT NOT NULL COMMENT 'Page content',
+  is_ai_generated BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Whether the page was generated by AI',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order among siblings',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  UNIQUE KEY uniq_pages_public_id (public_id),
+  KEY idx_pages_workspace_id_enabled_sort_weight (workspace_id, enabled, sort_weight),
+  KEY idx_pages_workspace_id_project_id (workspace_id, project_id),
+  KEY idx_pages_parent_page_id (parent_page_id),
+
+  CONSTRAINT fk_pages_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_pages_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL,
+  CONSTRAINT fk_pages_creator FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_pages_parent FOREIGN KEY (parent_page_id) REFERENCES pages(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Wiki/documentation pages with tree structure';
 
 -- >>> personal_access_tokens.sql
 -- ====================================
@@ -675,6 +833,74 @@ CREATE TABLE projects (
 
   CONSTRAINT fk_projects_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Task container';
+
+-- >>> relation_suggestions.sql
+-- ====================================
+-- relation_suggestions
+-- AI-generated suggestions for task relations (blocks, relates, duplicates).
+-- Created when an embedding pipeline detects similarity between tasks.
+-- ====================================
+CREATE TABLE relation_suggestions (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  source_task_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to tasks.id (trigger task)',
+  target_task_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to tasks.id (suggested relation)',
+
+  suggested_kind ENUM('blocks','relates','duplicates') NOT NULL COMMENT 'Suggested dependency kind',
+  confidence DECIMAL(5,4) NOT NULL COMMENT 'Cosine similarity score (0.0000 to 1.0000)',
+  status ENUM('pending','accepted','dismissed') NOT NULL DEFAULT 'pending' COMMENT 'Resolution status',
+  resolved_by INT UNSIGNED NULL COMMENT 'Internal FK to users.id (who resolved)',
+  resolved_at DATETIME(3) NULL COMMENT 'When the suggestion was accepted or dismissed',
+
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_relation_suggestions_public_id (public_id),
+  UNIQUE KEY uniq_relation_suggestions_edge (source_task_id, target_task_id, suggested_kind),
+  KEY idx_relation_suggestions_workspace_id_status_created_at (workspace_id, status, created_at DESC),
+  KEY idx_relation_suggestions_target_task_id_status (target_task_id, status),
+
+  CONSTRAINT fk_relation_suggestions_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_relation_suggestions_source FOREIGN KEY (source_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+  CONSTRAINT fk_relation_suggestions_target FOREIGN KEY (target_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+  CONSTRAINT fk_relation_suggestions_resolved_by FOREIGN KEY (resolved_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI-suggested task relation candidates';
+
+-- >>> repo_workspace_mappings.sql
+-- ====================================
+-- repo_workspace_mappings
+-- Maps a GitHub repository to a workspace so incoming webhooks can
+-- be routed to the correct tenant. Optionally pins a default project
+-- and controls which event types are synchronised as tasks.
+-- ====================================
+CREATE TABLE repo_workspace_mappings (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  integration_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to user_integrations.id (the GitHub OAuth connection)',
+
+  repo_full_name VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'GitHub owner/repo (e.g. nodate-flow/nodate-flow)',
+  repo_id BIGINT UNSIGNED NOT NULL COMMENT 'GitHub numeric repository ID for webhook lookup',
+  default_project_id INT UNSIGNED NULL COMMENT 'Optional FK to projects.id for routing issues/PRs',
+  is_sync_issues BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Sync GitHub issues as tasks',
+  is_sync_pull_requests BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Sync GitHub pull requests as tasks',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  UNIQUE KEY uniq_repo_workspace_mappings_public_id (public_id),
+  UNIQUE KEY uniq_repo_workspace_mappings_workspace_repo (workspace_id, repo_full_name),
+  KEY idx_repo_workspace_mappings_repo_id (repo_id),
+  KEY idx_repo_workspace_mappings_integration_id (integration_id),
+  KEY idx_repo_workspace_mappings_workspace_id_enabled (workspace_id, enabled),
+
+  CONSTRAINT fk_repo_workspace_mappings_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_repo_workspace_mappings_integration FOREIGN KEY (integration_id) REFERENCES user_integrations(id) ON DELETE CASCADE,
+  CONSTRAINT fk_repo_workspace_mappings_project FOREIGN KEY (default_project_id) REFERENCES projects(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Maps GitHub repositories to workspaces for webhook routing';
 
 -- >>> sessions.sql
 -- ====================================
@@ -887,6 +1113,7 @@ CREATE TABLE tasks (
   started_on DATE NULL COMMENT 'Started date',
   completed_at DATETIME NULL COMMENT 'Time derived_state transitioned to done',
 
+  visibility ENUM('public','project','private') NOT NULL DEFAULT 'public' COMMENT 'ACL Layer 4: public=workspace members, project=project members, private=task actors only',
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
@@ -905,6 +1132,71 @@ CREATE TABLE tasks (
   CONSTRAINT fk_tasks_parent FOREIGN KEY (parent_task_id) REFERENCES tasks(id) ON DELETE SET NULL,
   CONSTRAINT fk_tasks_creator FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='nodate-flow core task object';
+
+-- >>> timebox_tasks.sql
+-- ====================================
+-- timebox_tasks
+-- Join table associating tasks with timeboxes.
+-- A task can belong to multiple timeboxes (e.g., carried over).
+-- ====================================
+CREATE TABLE timebox_tasks (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  timebox_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to timeboxes.id',
+  task_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to tasks.id',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  UNIQUE KEY uniq_timebox_tasks_public_id (public_id),
+  UNIQUE KEY uniq_timebox_tasks_timebox_id_task_id (timebox_id, task_id),
+  KEY idx_timebox_tasks_workspace_id_timebox_id (workspace_id, timebox_id),
+  KEY idx_timebox_tasks_task_id (task_id),
+
+  CONSTRAINT fk_timebox_tasks_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_timebox_tasks_timebox FOREIGN KEY (timebox_id) REFERENCES timeboxes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_timebox_tasks_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Timebox-task associations';
+
+-- >>> timeboxes.sql
+-- ====================================
+-- timeboxes
+-- Time-bounded work containers (sprints, iterations, cycles).
+-- A timebox belongs to a workspace and optionally scopes to a project.
+-- Tasks are associated via the timebox_tasks join table.
+-- ====================================
+CREATE TABLE timeboxes (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  project_id INT UNSIGNED NULL COMMENT 'Internal FK to projects.id (NULL = spans all projects)',
+  creator_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
+
+  name VARCHAR(255) NOT NULL COMMENT 'Display name (e.g., Sprint 12)',
+  description TEXT NULL COMMENT 'Optional description or goals',
+  starts_on DATE NOT NULL COMMENT 'Timebox start date',
+  ends_on DATE NOT NULL COMMENT 'Timebox end date (must be > starts_on)',
+  status ENUM('planned','active','completed','cancelled') NOT NULL DEFAULT 'planned' COMMENT 'Lifecycle status',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  UNIQUE KEY uniq_timeboxes_public_id (public_id),
+  UNIQUE KEY uniq_timeboxes_workspace_id_name_enabled (workspace_id, name, enabled),
+  KEY idx_timeboxes_workspace_id_status_enabled (workspace_id, status, enabled),
+  KEY idx_timeboxes_workspace_id_project_id_enabled (workspace_id, project_id, enabled),
+
+  CONSTRAINT fk_timeboxes_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_timeboxes_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL,
+  CONSTRAINT fk_timeboxes_creator FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Time-bounded work containers';
 
 -- >>> user_integrations.sql
 -- ====================================
@@ -1000,6 +1292,77 @@ CREATE TABLE users (
   UNIQUE KEY uniq_users_email (email),
   KEY idx_users_enabled (enabled)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Global user accounts';
+
+-- >>> webhook_deliveries.sql
+-- ====================================
+-- webhook_deliveries
+-- Tracks each delivery attempt for a webhook subscription. Append-mostly;
+-- retries update the existing row with incremented attempts and new status.
+-- ====================================
+CREATE TABLE webhook_deliveries (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  subscription_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to webhook_subscriptions.id',
+
+  event_type VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'The event that triggered this delivery',
+  event_public_id BINARY(16) NULL COMMENT 'public_id of the source event',
+  payload_json JSON NOT NULL COMMENT 'The JSON payload that was/will be sent',
+  status ENUM('pending','delivering','delivered','failed','dead') NOT NULL DEFAULT 'pending' COMMENT 'Delivery state',
+  http_status SMALLINT UNSIGNED NULL COMMENT 'HTTP response status from the target',
+  response_body TEXT NULL COMMENT 'Truncated response body (first 4KB) for debugging',
+  attempts TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Number of delivery attempts so far',
+  max_attempts TINYINT UNSIGNED NOT NULL DEFAULT 6 COMMENT 'Maximum retry attempts',
+  next_retry_at DATETIME NULL COMMENT 'When to retry next (null when delivered or dead)',
+  delivered_at DATETIME NULL COMMENT 'When successfully delivered',
+  failed_at DATETIME NULL COMMENT 'When marked dead (all retries exhausted)',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  UNIQUE KEY uniq_webhook_deliveries_public_id (public_id),
+  KEY idx_webhook_deliveries_workspace_id_subscription_id_created_at (workspace_id, subscription_id, created_at DESC),
+  KEY idx_webhook_deliveries_status_next_retry_at (status, next_retry_at),
+  KEY idx_webhook_deliveries_workspace_id_status (workspace_id, status),
+
+  CONSTRAINT fk_webhook_deliveries_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_webhook_deliveries_subscription FOREIGN KEY (subscription_id) REFERENCES webhook_subscriptions(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Webhook delivery attempts and retry tracking';
+
+-- >>> webhook_subscriptions.sql
+-- ====================================
+-- webhook_subscriptions
+-- Workspace-level webhook subscription. When events occur, matching
+-- subscriptions trigger deliveries to the configured URL endpoint.
+-- ====================================
+CREATE TABLE webhook_subscriptions (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  creator_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id, who created this subscription',
+
+  url VARCHAR(2048) NOT NULL COMMENT 'Delivery endpoint URL',
+  secret VARCHAR(255) NOT NULL COMMENT 'HMAC-SHA256 shared secret for signing deliveries',
+  description VARCHAR(255) NOT NULL DEFAULT '' COMMENT 'Human-readable description',
+  event_types JSON NOT NULL COMMENT 'JSON array of event type patterns to match (e.g. ["task.created","task.updated"])',
+  is_active BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Whether deliveries are sent',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  UNIQUE KEY uniq_webhook_subscriptions_public_id (public_id),
+  KEY idx_webhook_subscriptions_workspace_id_is_active (workspace_id, is_active),
+  KEY idx_webhook_subscriptions_workspace_id_creator_id (workspace_id, creator_id),
+
+  CONSTRAINT fk_webhook_subscriptions_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_webhook_subscriptions_creator FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Workspace-level webhook subscriptions';
 
 -- >>> workspace_members.sql
 -- ====================================
@@ -1207,6 +1570,7 @@ SELECT
   creator.public_id AS created_by_user_public_id,
   t.title,
   t.description,
+  t.visibility,
   t.derived_state,
   t.priority,
   t.due_on,
@@ -1245,6 +1609,7 @@ GROUP BY
   creator.public_id,
   t.title,
   t.description,
+  t.visibility,
   t.derived_state,
   t.priority,
   t.due_on,
@@ -1260,11 +1625,15 @@ GROUP BY
 CREATE OR REPLACE VIEW v_task_list AS
 SELECT
   t.workspace_id,
+  t.id AS task_internal_id,
+  t.project_id,
+  t.created_by_user_id,
   t.public_id,
   p.public_id AS project_public_id,
   p.name AS project_name,
   pt.public_id AS parent_task_public_id,
   t.title,
+  t.visibility,
   t.derived_state,
   t.priority,
   t.due_on,

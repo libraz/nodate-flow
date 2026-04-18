@@ -286,6 +286,18 @@ func BuildResult(deps Deps) Result {
 		}
 		embedClient = embed.New(embed.NewOpenAIProvider(deps.EmbedOpenAIKey, opts...), deps.Queries)
 	}
+	// When a real cipher is available but the NL query compiler was not
+	// set up by the embed-key path above, wire it to the workspace's
+	// configured AI provider so POST /ai/compile-lens works without
+	// NF_AI_MOCK.
+	if nlQueryCompiler == nil && deps.Cipher != nil {
+		wsResolver := providers.NewWorkspaceResolver(deps.Queries, deps.Cipher)
+		wsProv := nlquery.NewWorkspaceProvider(wsResolver, func(ctx context.Context) (uint32, bool) {
+			ws, ok := middleware.WorkspaceFromContext(ctx)
+			return ws.ID, ok
+		})
+		nlQueryCompiler = nlquery.New(wsProv)
+	}
 	taskDeps := tasks.Deps{DB: deps.DB, Queries: deps.Queries, Embedder: embedClient, NlConstraint: nlConstraintCompiler, Storage: deps.Storage, Audit: auditRec}
 	tlDeps := timeline.Deps{DB: deps.DB, Queries: deps.Queries}
 	inboxDeps := inbox.Deps{DB: deps.DB, Queries: deps.Queries}
