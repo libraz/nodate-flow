@@ -30,6 +30,13 @@ function formatDateShort(iso: string, locale: string): string {
   }
 }
 
+function isOverdue(dueOn: string | null | undefined, state: string): boolean {
+  if (!dueOn || state === 'done' || state === 'cancelled') return false;
+  const now = new Date();
+  const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  return dueOn < todayKey;
+}
+
 const PRIORITY_TONE: Record<TaskPriority, BadgeTone> = {
   0: 'neutral',
   1: 'info',
@@ -124,9 +131,12 @@ export default function TaskCard({
         {task.title}
       </Link>
       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-        <Badge tone={tone}>{priorityLabel}</Badge>
+        {priority > 0 ? <Badge tone={tone}>{priorityLabel}</Badge> : null}
         {task.dueOn ? (
-          <Badge tone="neutral" aria-label={t('tasks.columns.due')}>
+          <Badge
+            tone={isOverdue(task.dueOn, task.derivedState) ? 'danger' : 'neutral'}
+            aria-label={t('tasks.columns.due')}
+          >
             {formatDateShort(task.dueOn, locale)}
           </Badge>
         ) : null}

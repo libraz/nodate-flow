@@ -169,7 +169,9 @@ export default function TaskFiltersBar({
                   paddingBlock: '0.25rem',
                   paddingInline: '0.625rem',
                   borderRadius: '999px',
-                  border: '1px solid var(--nf-color-border)',
+                  border: active
+                    ? '1px solid var(--nf-color-accent, currentColor)'
+                    : '1px solid var(--nf-color-border)',
                   background: active
                     ? 'var(--nf-color-accent-subtle, var(--nf-color-bg-sunken))'
                     : 'transparent',
@@ -187,6 +189,16 @@ export default function TaskFiltersBar({
             );
           })}
         </div>
+        <span
+          aria-hidden
+          style={{
+            display: 'block',
+            inlineSize: '1px',
+            blockSize: '1.25rem',
+            background: 'var(--nf-color-border, var(--color-hairline))',
+            flexShrink: 0,
+          }}
+        />
         <div
           role="group"
           aria-label={t('tasks.filters.priority')}
@@ -206,7 +218,9 @@ export default function TaskFiltersBar({
                   paddingBlock: '0.25rem',
                   paddingInline: '0.625rem',
                   borderRadius: '999px',
-                  border: '1px solid var(--nf-color-border)',
+                  border: active
+                    ? '1px solid var(--nf-color-accent, currentColor)'
+                    : '1px solid var(--nf-color-border)',
                   background: active
                     ? 'var(--nf-color-accent-subtle, var(--nf-color-bg-sunken))'
                     : 'transparent',
