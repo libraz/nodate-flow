@@ -548,6 +548,69 @@
         "required": ["title", "priority"],
         "type": "object"
       },
+      "ApplyStep": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "maxLength": 50000,
+            "type": "string"
+          },
+          "priority": {
+            "format": "int32",
+            "maximum": 4,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["title", "priority"],
+        "type": "object"
+      },
+      "ApplyStepsInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ApplyStepsInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/ApplyStep"
+            },
+            "minItems": 1,
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["steps"],
+        "type": "object"
+      },
+      "ApplyStepsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ApplyStepsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "created": {
+            "items": {
+              "type": "string"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["created"],
+        "type": "object"
+      },
       "ArchiveInboxOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -4104,6 +4167,45 @@
           }
         },
         "required": ["projectId", "title"],
+        "type": "object"
+      },
+      "ProposeStepsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ProposeStepsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "parentTaskId": {
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/ProposedStep"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["parentTaskId", "steps"],
+        "type": "object"
+      },
+      "ProposedStep": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": ["title", "description", "priority"],
         "type": "object"
       },
       "Provider": {
@@ -9131,6 +9233,54 @@
         "summary": "List recent AI invocations scoped to this task"
       }
     },
+    "/tasks/{id}/apply-steps": {
+      "post": {
+        "operationId": "tasks-apply-steps",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyStepsInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplyStepsOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Apply proposed steps as child tasks under a parent task"
+      }
+    },
     "/tasks/{id}/attachments": {
       "get": {
         "operationId": "tasks-attachments-list",
@@ -10017,6 +10167,44 @@
           }
         },
         "summary": "Propose the next likely state transition for a task"
+      }
+    },
+    "/tasks/{id}/propose-steps": {
+      "post": {
+        "operationId": "tasks-propose-steps",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposeStepsOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "AI-powered step decomposition for a task"
       }
     },
     "/tasks/{id}/relation-suggestions": {

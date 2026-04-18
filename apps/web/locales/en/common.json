@@ -503,6 +503,25 @@
         "cancel": "Cancel"
       }
     },
+    "steps": {
+      "title": "Step decomposition",
+      "propose_button": "Decompose into steps",
+      "proposing": "Analyzing task\u2026",
+      "propose_error": "Could not generate steps. Please try again.",
+      "empty": "No steps were suggested.",
+      "toggle_step": "Include step: {title}",
+      "edit_title": "Edit step title",
+      "priority_low": "Low",
+      "priority_medium": "Medium",
+      "priority_high": "High",
+      "expand": "Show description",
+      "collapse": "Hide description",
+      "apply_button": "Create as subtasks",
+      "applying": "Creating\u2026",
+      "apply_success": "{count, plural, one {# subtask created.} other {# subtasks created.}}",
+      "apply_error": "Could not create subtasks. Please try again.",
+      "discard": "Discard"
+    },
     "attachments": {
       "title": "Attachments",
       "empty": "No attachments yet.",

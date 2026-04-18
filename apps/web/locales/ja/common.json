@@ -503,6 +503,25 @@
         "cancel": "キャンセル"
       }
     },
+    "steps": {
+      "title": "ステップ分解",
+      "propose_button": "ステップに分解する",
+      "proposing": "タスクを分析中\u2026",
+      "propose_error": "ステップの生成に失敗しました。もう一度お試しください。",
+      "empty": "提案されたステップはありません。",
+      "toggle_step": "ステップを含める: {title}",
+      "edit_title": "ステップのタイトルを編集",
+      "priority_low": "低",
+      "priority_medium": "中",
+      "priority_high": "高",
+      "expand": "説明を表示",
+      "collapse": "説明を非表示",
+      "apply_button": "サブタスクとして作成",
+      "applying": "作成中\u2026",
+      "apply_success": "{count, plural, other {# 件のサブタスクを作成しました。}}",
+      "apply_error": "サブタスクの作成に失敗しました。もう一度お試しください。",
+      "discard": "破棄"
+    },
     "attachments": {
       "title": "添付ファイル",
       "empty": "添付ファイルはまだありません。",

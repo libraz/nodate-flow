@@ -666,6 +666,10 @@ func BuildResult(deps Deps) Result {
 		timeline.RegisterTaskScoped(subAPI, tlDeps)
 		relationTaskDeps := relations.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
 		relations.RegisterTaskScoped(subAPI, relationTaskDeps)
+
+		// AI-powered step decomposition (propose + apply).
+		stepsDeps := tasks.StepsDeps{DB: deps.DB, Queries: deps.Queries, AI: aiOrch, Audit: auditRec}
+		tasks.RegisterSteps(subAPI, stepsDeps)
 	})
 
 	// Workspace timeline.

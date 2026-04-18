@@ -47,6 +47,7 @@ import {
 import DependenciesSection from '../features/tasks/dependencies-section';
 import MarkdownEditor from '../features/tasks/markdown-editor';
 import TaskAttachments from '../features/tasks/task-attachments';
+import TaskStepsPanel from '../features/tasks/task-steps-panel';
 import { useTaskTimelineQuery } from '../features/timeline/api';
 import ReplayPanel from '../features/timeline/replay-panel';
 import TaskMiniTimeline from '../features/timeline/task-mini-timeline';
@@ -637,6 +638,16 @@ function Sidebar({
           <InferStateSection taskId={id} />
         </Suspense>
       </Card>
+
+      <Suspense
+        fallback={
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem' }}>
+            <Spinner label={t('common.loading')} />
+          </div>
+        }
+      >
+        <TaskStepsPanel taskId={id} workspaceId={workspaceId} />
+      </Suspense>
 
       <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         <h2 style={{ margin: 0, fontSize: '1rem' }}>{t('tasks.detail.duplicates.title')}</h2>

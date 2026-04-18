@@ -747,6 +747,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/{id}/apply-steps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply proposed steps as child tasks under a parent task */
+        post: operations["tasks-apply-steps"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{id}/attachments": {
         parameters: {
             query?: never;
@@ -1000,6 +1017,23 @@ export interface paths {
         get: operations["tasks-infer-state"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/propose-steps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** AI-powered step decomposition for a task */
+        post: operations["tasks-propose-steps"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2348,6 +2382,28 @@ export interface components {
             /** Format: int32 */
             priority: number;
             title: string;
+        };
+        ApplyStep: {
+            description?: string;
+            /** Format: int32 */
+            priority: number;
+            title: string;
+        };
+        ApplyStepsInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            steps: components["schemas"]["ApplyStep"][] | null;
+        };
+        ApplyStepsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            created: string[] | null;
         };
         ArchiveInboxOutputBody: {
             /**
@@ -3859,6 +3915,20 @@ export interface components {
             readonly $schema?: string;
             description?: string;
             projectId: string;
+            title: string;
+        };
+        ProposeStepsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            parentTaskId: string;
+            steps: components["schemas"]["ProposedStep"][] | null;
+        };
+        ProposedStep: {
+            description: string;
+            priority: string;
             title: string;
         };
         Provider: {
@@ -6748,6 +6818,41 @@ export interface operations {
             };
         };
     };
+    "tasks-apply-steps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyStepsInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplyStepsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "tasks-attachments-list": {
         parameters: {
             query?: {
@@ -7368,6 +7473,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InferStateOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-propose-steps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposeStepsOutputBody"];
                 };
             };
             /** @description Error */
