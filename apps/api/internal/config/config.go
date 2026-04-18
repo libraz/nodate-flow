@@ -142,6 +142,17 @@ type Config struct {
 	// row must reach before the purger deletes it.
 	AgentRunsRetention time.Duration `env:"NF_AGENT_RUNS_RETENTION" envDefault:"168h"`
 
+	// AutoActionInterval controls how often the autonomous auto-action
+	// executor evaluates tasks and applies actions (escalate, close
+	// stale reviews). Set to 0 to disable. Default: 5m.
+	AutoActionInterval time.Duration `env:"NF_AUTO_ACTION_INTERVAL" envDefault:"5m"`
+	// AutoActionThreshold is the minimum confidence score for an
+	// auto-action to be applied without human approval. Default: 0.80.
+	AutoActionThreshold float64 `env:"NF_AUTO_ACTION_THRESHOLD" envDefault:"0.80"`
+	// AutoActionDryRun logs what auto-actions would be applied without
+	// actually mutating the database. Useful for tuning thresholds.
+	AutoActionDryRun bool `env:"NF_AUTO_ACTION_DRY_RUN" envDefault:"false"`
+
 	// OtelEndpoint is the OTLP HTTP collector endpoint (e.g.
 	// "localhost:4318"). When empty, tracing is disabled and the server
 	// registers a no-op TracerProvider.

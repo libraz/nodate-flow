@@ -20,6 +20,7 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/agentruntime"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/autoactions"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/providers"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/config"
@@ -409,6 +410,23 @@ func main() {
 
 	webhookWorker.Start(context.Background())
 
+	// Autonomous auto-action executor: periodically evaluates tasks and
+	// applies deterministic actions (escalate overdue, close stale
+	// reviews) without human intervention. Controlled by
+	// NF_AUTO_ACTION_INTERVAL (0 disables).
+	autoActionExec := &autoactions.Executor{
+		DB:     db,
+		Config: autoactions.ExecutorConfig{
+			Interval:            cfg.AutoActionInterval,
+			ConfidenceThreshold: float32(cfg.AutoActionThreshold),
+			DryRun:              cfg.AutoActionDryRun,
+		},
+		Logger: logger,
+	}
+	autoActionCtx, autoActionCancel := context.WithCancel(context.Background())
+	defer autoActionCancel()
+	go autoActionExec.Start(autoActionCtx)
+
 	addr := ":" + cfg.Port
 	srv := &http.Server{
 		Addr:              addr,
@@ -442,6 +460,7 @@ func main() {
 	}
 
 	scheduler.Stop()
+	autoActionExec.Stop()
 	webhookWorker.Stop()
 	schedulerCancel()
 	refresherCancel()
