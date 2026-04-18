@@ -74,12 +74,30 @@ func (s *RedisStore) FindByRefreshHash(ctx context.Context, hash string) (*Sessi
 	if len(m) == 0 {
 		return nil, ErrNotFound
 	}
-	uid64, _ := strconv.ParseUint(m["userId"], 10, 32)
-	exp, _ := time.Parse(time.RFC3339Nano, m["expiresAt"])
-	created, _ := time.Parse(time.RFC3339Nano, m["createdAt"])
-	pubBytes, _ := hex.DecodeString(m["publicId"])
+	uid64, err := strconv.ParseUint(m["userId"], 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("sessionstore/redis: invalid userId %q: %w", m["userId"], err)
+	}
+	exp, err := time.Parse(time.RFC3339Nano, m["expiresAt"])
+	if err != nil {
+		return nil, fmt.Errorf("sessionstore/redis: invalid expiresAt %q: %w", m["expiresAt"], err)
+	}
+	created, err := time.Parse(time.RFC3339Nano, m["createdAt"])
+	if err != nil {
+		return nil, fmt.Errorf("sessionstore/redis: invalid createdAt %q: %w", m["createdAt"], err)
+	}
+	pubBytes, err := hex.DecodeString(m["publicId"])
+	if err != nil {
+		return nil, fmt.Errorf("sessionstore/redis: invalid publicId %q: %w", m["publicId"], err)
+	}
 	var pub types.PublicID
 	copy(pub[:], pubBytes)
+	var lastUsed *time.Time
+	if raw, ok := m["lastUsedAt"]; ok && raw != "" {
+		if t, err := time.Parse(time.RFC3339Nano, raw); err == nil {
+			lastUsed = &t
+		}
+	}
 	return &Session{
 		PublicID:    pub,
 		UserID:      uint32(uid64),
@@ -87,6 +105,7 @@ func (s *RedisStore) FindByRefreshHash(ctx context.Context, hash string) (*Sessi
 		UserAgent:   m["ua"],
 		IPAddress:   m["ip"],
 		ExpiresAt:   exp,
+		LastUsedAt:  lastUsed,
 		CreatedAt:   created,
 	}, nil
 }
@@ -106,12 +125,13 @@ func (s *RedisStore) RotateRefreshHash(ctx context.Context, oldHash, newHash str
 	}
 	pipe := s.rdb.TxPipeline()
 	pipe.HSet(ctx, sessionKey(newHash), map[string]interface{}{
-		"publicId":  hex.EncodeToString(old.PublicID[:]),
-		"userId":    old.UserID,
-		"ua":        old.UserAgent,
-		"ip":        old.IPAddress,
-		"expiresAt": expiresAt.Format(time.RFC3339Nano),
-		"createdAt": old.CreatedAt.Format(time.RFC3339Nano),
+		"publicId":    hex.EncodeToString(old.PublicID[:]),
+		"userId":      old.UserID,
+		"ua":          old.UserAgent,
+		"ip":          old.IPAddress,
+		"expiresAt":   expiresAt.Format(time.RFC3339Nano),
+		"createdAt":   old.CreatedAt.Format(time.RFC3339Nano),
+		"lastUsedAt":  time.Now().UTC().Format(time.RFC3339Nano),
 	})
 	pipe.Expire(ctx, sessionKey(newHash), ttl)
 	pipe.Del(ctx, sessionKey(oldHash))
@@ -166,7 +186,8 @@ func (s *RedisStore) RevokeAllExcept(ctx context.Context, userID uint32, keep ty
 
 // Revoke implements [Store]. The publicID reverse index gives us the
 // current refresh hash so we can delete the HASH and pop it from the
-// user's set in one pipeline.
+// user's set in one pipeline. The session's userID is validated before
+// deletion to prevent cross-user revocation.
 func (s *RedisStore) Revoke(ctx context.Context, userID uint32, publicID types.PublicID) error {
 	hash, err := s.rdb.Get(ctx, pubKey(publicID)).Result()
 	if errors.Is(err, redis.Nil) {
@@ -174,6 +195,17 @@ func (s *RedisStore) Revoke(ctx context.Context, userID uint32, publicID types.P
 	}
 	if err != nil {
 		return err
+	}
+	// Validate that the session belongs to the requesting user.
+	sess, err := s.FindByRefreshHash(ctx, hash)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return nil // Already expired / purged.
+		}
+		return err
+	}
+	if sess.UserID != userID {
+		return nil // Not this user's session; treat as no-op (idempotent).
 	}
 	pipe := s.rdb.TxPipeline()
 	pipe.Del(ctx, sessionKey(hash))

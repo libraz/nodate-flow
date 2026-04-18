@@ -256,7 +256,8 @@ func (q *Queries) RevokeSession(ctx context.Context, arg RevokeSessionParams) er
 const rotateSessionRefreshHash = `-- name: RotateSessionRefreshHash :exec
 UPDATE sessions
 SET refresh_hash = ?,
-    expires_at = ?
+    expires_at = ?,
+    last_used_at = CURRENT_TIMESTAMP
 WHERE id = ?
 `
 
@@ -266,7 +267,7 @@ type RotateSessionRefreshHashParams struct {
 	ID          uint32    `json:"-"`
 }
 
-// Replace the refresh token hash and extend expiry on a refresh rotation.
+// Replace the refresh token hash, extend expiry, and record last usage on a refresh rotation.
 func (q *Queries) RotateSessionRefreshHash(ctx context.Context, arg RotateSessionRefreshHashParams) error {
 	_, err := q.db.ExecContext(ctx, rotateSessionRefreshHash, arg.RefreshHash, arg.ExpiresAt, arg.ID)
 	return err

@@ -82,8 +82,9 @@ WHERE user_id = ?
   AND public_id <> ?;
 
 -- name: RotateSessionRefreshHash :exec
--- Replace the refresh token hash and extend expiry on a refresh rotation.
+-- Replace the refresh token hash, extend expiry, and record last usage on a refresh rotation.
 UPDATE sessions
 SET refresh_hash = ?,
-    expires_at = ?
+    expires_at = ?,
+    last_used_at = CURRENT_TIMESTAMP
 WHERE id = ?;

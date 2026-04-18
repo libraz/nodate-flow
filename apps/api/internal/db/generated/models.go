@@ -2018,11 +2018,11 @@ type Task struct {
 	DerivedState TasksDerivedState `json:"derivedState"`
 	// LLM-optimized heuristic priority
 	Priority int32 `json:"priority"`
-	// Due date
+	// Deadline for task completion; drives constraint evaluation
 	DueOn sql.NullTime `json:"dueOn"`
-	// Started date
+	// Date work began on this task
 	StartedOn sql.NullTime `json:"startedOn"`
-	// Event or milestone date
+	// External reference date (meeting, launch, milestone) this task relates to; NOT a constraint — use deadline constraint for enforcement
 	EventOn sql.NullTime `json:"eventOn"`
 	// Time derived_state transitioned to done
 	CompletedAt sql.NullTime `json:"completedAt"`

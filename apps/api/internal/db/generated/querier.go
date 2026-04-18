@@ -544,7 +544,7 @@ type Querier interface {
 	RevokePat(ctx context.Context, arg RevokePatParams) error
 	// Mark a session as revoked. Workspace scoping does not apply (user-scoped).
 	RevokeSession(ctx context.Context, arg RevokeSessionParams) error
-	// Replace the refresh token hash and extend expiry on a refresh rotation.
+	// Replace the refresh token hash, extend expiry, and record last usage on a refresh rotation.
 	RotateSessionRefreshHash(ctx context.Context, arg RotateSessionRefreshHashParams) error
 	// Mark a constraint as satisfied at the current time.
 	SatisfyConstraint(ctx context.Context, arg SatisfyConstraintParams) error

@@ -82,11 +82,11 @@ func resolveBearer(ctx context.Context, deps AuthDeps, tok string) (uint32, type
 		uid, err := resolveMCP(ctx, deps, tok)
 		return uid, types.PublicID{}, err
 	default:
-		return resolveJWT(deps, tok)
+		return resolveJWT(ctx, deps, tok)
 	}
 }
 
-func resolveJWT(deps AuthDeps, tok string) (uint32, types.PublicID, error) {
+func resolveJWT(ctx context.Context, deps AuthDeps, tok string) (uint32, types.PublicID, error) {
 	if deps.JWT == nil || deps.DB == nil {
 		return 0, types.PublicID{}, apierrors.New(apierrors.AuthTokenSignatureInvalid)
 	}
@@ -96,7 +96,7 @@ func resolveJWT(deps AuthDeps, tok string) (uint32, types.PublicID, error) {
 	}
 	const q = `SELECT id FROM users WHERE public_id = ? AND enabled = TRUE LIMIT 1`
 	var uid uint32
-	if err := deps.DB.QueryRowContext(context.Background(), q, claims.UserPublicID).Scan(&uid); err != nil {
+	if err := deps.DB.QueryRowContext(ctx, q, claims.UserPublicID).Scan(&uid); err != nil {
 		if errors.Is(err, stddb.ErrNoRows) {
 			return 0, types.PublicID{}, apierrors.New(apierrors.AuthSessionRevoked)
 		}
