@@ -30,6 +30,7 @@ import { type CompileLensResult, NlQueryError, useCompileLens } from '../nl-quer
 import { type StateSuggestion, useStateSuggestionsQuery } from '../nl-query/state-suggestions';
 import { useWorkspaceStream } from '../realtime/use-workspace-stream';
 import { type TaskReminder, useRemindersQuery } from '../reminders/api';
+import type { TaskDerivedState, TaskPriority } from '../tasks/api';
 import { setTaskFilters } from '../tasks/use-task-filters';
 
 const NL_UNPARSEABLE = 'AI.NL_QUERY.UNPARSEABLE';
@@ -98,24 +99,25 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
     if (!projectId) return;
     const priorityFilter = lens.filter?.priority;
     const statusFilter = lens.filter?.status;
-    const priority: number[] = [];
+    const priority: TaskPriority[] = [];
     if (priorityFilter) {
       const v = priorityFilter.eq ?? priorityFilter.in;
-      if (typeof v === 'number') priority.push(v);
-      if (Array.isArray(v)) priority.push(...(v as number[]));
+      if (typeof v === 'number') priority.push(v as TaskPriority);
+      if (Array.isArray(v)) priority.push(...(v as TaskPriority[]));
     }
-    const states: string[] = [];
+    const states: TaskDerivedState[] = [];
     if (statusFilter) {
       const v = statusFilter.eq ?? statusFilter.in;
-      if (typeof v === 'string') states.push(v);
-      if (Array.isArray(v)) states.push(...(v as string[]));
+      if (typeof v === 'string') states.push(v as TaskDerivedState);
+      if (Array.isArray(v)) states.push(...(v as TaskDerivedState[]));
     }
-    setTaskFilters(projectId, {
+    const filters: Parameters<typeof setTaskFilters>[1] = {
       search: '',
-      priority: priority.length > 0 ? priority : undefined,
-      states: states.length > 0 ? (states as never[]) : undefined,
       assigneeId: '',
-    });
+    };
+    if (priority.length > 0) filters.priority = priority;
+    if (states.length > 0) filters.states = states;
+    setTaskFilters(projectId, filters);
     void navigate({
       to: '/projects/$projectId/tasks',
       params: { projectId },

@@ -286,17 +286,34 @@ func BuildResult(deps Deps) Result {
 		}
 		embedClient = embed.New(embed.NewOpenAIProvider(deps.EmbedOpenAIKey, opts...), deps.Queries)
 	}
-	// When a real cipher is available but the NL query compiler was not
-	// set up by the embed-key path above, wire it to the workspace's
-	// configured AI provider so POST /ai/compile-lens works without
+	// When a real cipher is available but the NL compilers were not
+	// set up by the embed-key path above, wire them to the workspace's
+	// configured AI provider so the AI endpoints work without
 	// NF_AI_MOCK.
-	if nlQueryCompiler == nil && deps.Cipher != nil {
+	if deps.Cipher != nil {
 		wsResolver := providers.NewWorkspaceResolver(deps.Queries, deps.Cipher)
-		wsProv := nlquery.NewWorkspaceProvider(wsResolver, func(ctx context.Context) (uint32, bool) {
+		extractWS := func(ctx context.Context) (uint32, bool) {
 			ws, ok := middleware.WorkspaceFromContext(ctx)
 			return ws.ID, ok
-		})
-		nlQueryCompiler = nlquery.New(wsProv)
+		}
+		if nlQueryCompiler == nil {
+			nlQueryCompiler = nlquery.New(nlquery.NewWorkspaceProvider(wsResolver, extractWS))
+		}
+		if nlConstraintCompiler == nil {
+			nlConstraintCompiler = nlconstraint.New(nlconstraint.NewWorkspaceProvider(wsResolver, extractWS))
+		}
+		if nlCommandResolver == nil {
+			tools := []nlcommand.ToolSpec{
+				{Name: "create_task", Description: "Create a new task", InputSchema: map[string]any{"type": "object", "properties": map[string]any{"title": map[string]any{"type": "string"}, "priority": map[string]any{"type": "integer", "minimum": 1, "maximum": 3}}}},
+				{Name: "update_task", Description: "Update an existing task", InputSchema: map[string]any{"type": "object", "properties": map[string]any{"taskId": map[string]any{"type": "string"}, "title": map[string]any{"type": "string"}, "status": map[string]any{"type": "string"}}}},
+				{Name: "search_tasks", Description: "Search tasks by query", InputSchema: map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string"}}}},
+				{Name: "propose_lens", Description: "Propose a filter lens from natural language", InputSchema: map[string]any{"type": "object", "properties": map[string]any{"prompt": map[string]any{"type": "string"}}}},
+				{Name: "add_comment", Description: "Add a comment to a task", InputSchema: map[string]any{"type": "object", "properties": map[string]any{"taskId": map[string]any{"type": "string"}, "body": map[string]any{"type": "string"}}}},
+				{Name: "list_tasks", Description: "List tasks in a project", InputSchema: map[string]any{"type": "object", "properties": map[string]any{"projectId": map[string]any{"type": "string"}}}},
+				{Name: "list_projects", Description: "List projects in a workspace", InputSchema: map[string]any{"type": "object", "properties": map[string]any{}}},
+			}
+			nlCommandResolver = nlcommand.New(nlcommand.NewWorkspaceProvider(wsResolver, extractWS), tools)
+		}
 	}
 	taskDeps := tasks.Deps{DB: deps.DB, Queries: deps.Queries, Embedder: embedClient, NlConstraint: nlConstraintCompiler, Storage: deps.Storage, Audit: auditRec}
 	tlDeps := timeline.Deps{DB: deps.DB, Queries: deps.Queries}

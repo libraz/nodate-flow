@@ -40,11 +40,11 @@ const RESOURCE_TYPE_OPTIONS: readonly string[] = [
   'session',
 ];
 
-function toneForAction(action: string): 'accent' | 'warning' | 'danger' | 'default' {
+function toneForAction(action: string): 'accent' | 'warning' | 'danger' | 'neutral' {
   if (action.startsWith('auth.')) return 'warning';
   if (action.includes('disabled') || action.includes('delete')) return 'danger';
   if (action.includes('created')) return 'accent';
-  return 'default';
+  return 'neutral';
 }
 
 function formatTimestamp(unix: number): string {
@@ -169,49 +169,49 @@ export default function AuditLogView({
   const currentPage = Math.floor((filters.offset ?? 0) / PAGE_SIZE);
   const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE));
 
+  const buildNext = (
+    prev: AuditLogFilters,
+    overrides: {
+      action?: string;
+      resourceType?: string;
+      actorSearch?: string;
+      dateFrom?: string;
+      dateTo?: string;
+    },
+  ): AuditLogFilters => {
+    const next: AuditLogFilters = { limit: prev.limit ?? PAGE_SIZE, offset: 0 };
+    const m = { ...prev, ...overrides };
+    if (m.action) next.action = m.action;
+    if (m.resourceType) next.resourceType = m.resourceType;
+    if (m.actorSearch) next.actorSearch = m.actorSearch;
+    if (m.dateFrom) next.dateFrom = m.dateFrom;
+    if (m.dateTo) next.dateTo = m.dateTo;
+    return next;
+  };
+
   const handleActionChange = (e: ChangeEvent<HTMLSelectElement>): void => {
-    const value = e.target.value;
-    setFilters((prev) => ({
-      ...prev,
-      action: value || undefined,
-      offset: 0,
-    }));
+    const v = e.target.value;
+    setFilters((prev) => buildNext(prev, v ? { action: v } : {}));
   };
 
   const handleResourceTypeChange = (e: ChangeEvent<HTMLSelectElement>): void => {
-    const value = e.target.value;
-    setFilters((prev) => ({
-      ...prev,
-      resourceType: value || undefined,
-      offset: 0,
-    }));
+    const v = e.target.value;
+    setFilters((prev) => buildNext(prev, v ? { resourceType: v } : {}));
   };
 
   const handleActorSearchChange = (e: ChangeEvent<HTMLInputElement>): void => {
-    const value = e.target.value;
-    setFilters((prev) => ({
-      ...prev,
-      actorSearch: value || undefined,
-      offset: 0,
-    }));
+    const v = e.target.value;
+    setFilters((prev) => buildNext(prev, v ? { actorSearch: v } : {}));
   };
 
   const handleDateFromChange = (e: ChangeEvent<HTMLInputElement>): void => {
-    const value = e.target.value;
-    setFilters((prev) => ({
-      ...prev,
-      dateFrom: value || undefined,
-      offset: 0,
-    }));
+    const v = e.target.value;
+    setFilters((prev) => buildNext(prev, v ? { dateFrom: v } : {}));
   };
 
   const handleDateToChange = (e: ChangeEvent<HTMLInputElement>): void => {
-    const value = e.target.value;
-    setFilters((prev) => ({
-      ...prev,
-      dateTo: value || undefined,
-      offset: 0,
-    }));
+    const v = e.target.value;
+    setFilters((prev) => buildNext(prev, v ? { dateTo: v } : {}));
   };
 
   const handleClearFilters = (): void => {

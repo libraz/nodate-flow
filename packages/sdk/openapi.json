@@ -929,6 +929,37 @@
         "required": ["webhook"],
         "type": "object"
       },
+      "CreatePageBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreatePageBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "body": {
+            "maxLength": 100000,
+            "type": "string"
+          },
+          "parentPageId": {
+            "description": "Parent page public id",
+            "type": "string"
+          },
+          "projectId": {
+            "description": "Project public id",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["title"],
+        "type": "object"
+      },
       "CreateProjectBody": {
         "additionalProperties": false,
         "properties": {
@@ -1080,6 +1111,54 @@
         "required": ["name", "startsOn", "endsOn"],
         "type": "object"
       },
+      "CreateWidgetBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateWidgetBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "config": {
+            "description": "Arbitrary JSON configuration blob"
+          },
+          "height": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "positionX": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "positionY": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "widgetType": {
+            "description": "Widget type enum value",
+            "maxLength": 50,
+            "minLength": 1,
+            "type": "string"
+          },
+          "width": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["widgetType", "title", "positionX", "positionY", "width", "height"],
+        "type": "object"
+      },
       "CreateWorkspaceInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -1163,6 +1242,23 @@
         "required": ["ok"],
         "type": "object"
       },
+      "DeletePageBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/DeletePageBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
       "DeleteProviderOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -1220,6 +1316,23 @@
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
             "examples": ["https://example.com/schemas/DeleteTimeboxBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
+      "DeleteWidgetBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/DeleteWidgetBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -1586,6 +1699,36 @@
         "required": ["id", "title", "status", "priority", "projectId", "projectName", "createdAt"],
         "type": "object"
       },
+      "GeneratePageBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/GeneratePageBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "projectId": {
+            "description": "Scope to a project",
+            "type": "string"
+          },
+          "prompt": {
+            "description": "Instructions for AI generation",
+            "maxLength": 10000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": {
+            "description": "Title for the generated page",
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["title", "prompt"],
+        "type": "object"
+      },
       "GetOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -1826,6 +1969,30 @@
           }
         },
         "required": ["total", "actions"],
+        "type": "object"
+      },
+      "ListChildPagesBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListChildPagesBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "pages": {
+            "items": {
+              "$ref": "#/components/schemas/PageSummaryDTO"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "pages"],
         "type": "object"
       },
       "ListDeliveriesOutputBody": {
@@ -2116,6 +2283,30 @@
           }
         },
         "required": ["total", "webhooks", "nextCursor"],
+        "type": "object"
+      },
+      "ListPagesBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListPagesBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "pages": {
+            "items": {
+              "$ref": "#/components/schemas/PageSummaryDTO"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "pages"],
         "type": "object"
       },
       "ListPrioritySuggestionsOutputBody": {
@@ -2469,6 +2660,33 @@
             "readOnly": true,
             "type": "string"
           },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TaskListItem"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "tasks", "nextCursor"],
+        "type": "object"
+      },
+      "ListTimeboxTasksBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListTimeboxTasksBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
           "completedTasks": {
             "format": "int64",
             "type": "integer"
@@ -2540,6 +2758,30 @@
           }
         },
         "required": ["total", "events", "nextCursor"],
+        "type": "object"
+      },
+      "ListWidgetsBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListWidgetsBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "widgets": {
+            "items": {
+              "$ref": "#/components/schemas/WidgetDTO"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["total", "widgets"],
         "type": "object"
       },
       "ListWorkspaceMembersOutputBody": {
@@ -3035,6 +3277,139 @@
           }
         },
         "required": ["destination", "allowed", "waited", "denied"],
+        "type": "object"
+      },
+      "PageDTO": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PageDTO.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "createdAt": {
+            "description": "Unix seconds",
+            "format": "int64",
+            "type": "integer"
+          },
+          "creatorDisplayName": {
+            "type": "string"
+          },
+          "creatorId": {
+            "description": "Creator public id",
+            "type": "string"
+          },
+          "id": {
+            "description": "Page public id (UUID v7)",
+            "type": "string"
+          },
+          "isAiGenerated": {
+            "type": "boolean"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "parentPageId": {
+            "description": "Parent page public id",
+            "type": "string"
+          },
+          "parentPageTitle": {
+            "type": "string"
+          },
+          "projectId": {
+            "description": "Project public id",
+            "type": "string"
+          },
+          "projectName": {
+            "type": "string"
+          },
+          "sortWeight": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "description": "Unix seconds",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "creatorId",
+          "creatorDisplayName",
+          "title",
+          "body",
+          "isAiGenerated",
+          "sortWeight",
+          "updatedAt",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "PageSummaryDTO": {
+        "additionalProperties": false,
+        "properties": {
+          "createdAt": {
+            "description": "Unix seconds",
+            "format": "int64",
+            "type": "integer"
+          },
+          "creatorDisplayName": {
+            "type": "string"
+          },
+          "creatorId": {
+            "description": "Creator public id",
+            "type": "string"
+          },
+          "id": {
+            "description": "Page public id (UUID v7)",
+            "type": "string"
+          },
+          "isAiGenerated": {
+            "type": "boolean"
+          },
+          "parentPageId": {
+            "description": "Parent page public id",
+            "type": "string"
+          },
+          "projectId": {
+            "description": "Project public id",
+            "type": "string"
+          },
+          "projectName": {
+            "type": "string"
+          },
+          "sortWeight": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "description": "Unix seconds",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "creatorId",
+          "creatorDisplayName",
+          "title",
+          "isAiGenerated",
+          "sortWeight",
+          "updatedAt",
+          "createdAt"
+        ],
         "type": "object"
       },
       "PatchMeInputBody": {
@@ -3947,6 +4322,30 @@
           "sortWeight",
           "createdAt"
         ],
+        "type": "object"
+      },
+      "SearchPagesBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/SearchPagesBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "pages": {
+            "items": {
+              "$ref": "#/components/schemas/PageSummaryDTO"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "pages"],
         "type": "object"
       },
       "SessionSummary": {
@@ -5291,6 +5690,36 @@
         },
         "type": "object"
       },
+      "UpdatePageBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/UpdatePageBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "body": {
+            "maxLength": 100000,
+            "type": "string"
+          },
+          "parentPageId": {
+            "description": "Parent page public id; null to unset",
+            "type": "string"
+          },
+          "projectId": {
+            "description": "Project public id; null to unset",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "UpdateTimeboxBody": {
         "additionalProperties": false,
         "properties": {
@@ -5337,6 +5766,85 @@
           }
         },
         "required": ["status"],
+        "type": "object"
+      },
+      "UpdateWidgetBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/UpdateWidgetBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "config": {
+            "description": "Arbitrary JSON configuration blob"
+          },
+          "height": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "positionX": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "positionY": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "width": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "UpdateWidgetPositionBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/UpdateWidgetPositionBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "height": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "positionX": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "positionY": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "sortWeight": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "width": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["positionX", "positionY", "width", "height", "sortWeight"],
         "type": "object"
       },
       "UpdateWorkspaceMemberRoleInputBody": {
@@ -5570,6 +6078,78 @@
           }
         },
         "required": ["taskId", "title", "date"],
+        "type": "object"
+      },
+      "WidgetDTO": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/WidgetDTO.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "config": {},
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "creatorDisplayName": {
+            "type": "string"
+          },
+          "creatorId": {
+            "type": "string"
+          },
+          "height": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "description": "Widget public id (UUID v7)",
+            "type": "string"
+          },
+          "positionX": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "positionY": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "sortWeight": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "widgetType": {
+            "type": "string"
+          },
+          "width": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "creatorId",
+          "creatorDisplayName",
+          "widgetType",
+          "title",
+          "positionX",
+          "positionY",
+          "width",
+          "height",
+          "sortWeight",
+          "updatedAt",
+          "createdAt"
+        ],
         "type": "object"
       },
       "Workspace": {
@@ -10667,6 +11247,313 @@
         "summary": "Deterministic weekly digest markdown for a workspace (2.AI-9)"
       }
     },
+    "/workspaces/{wsId}/dashboard/widgets": {
+      "get": {
+        "operationId": "dashboard-widgets-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListWidgetsBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List dashboard widgets in a workspace"
+      },
+      "post": {
+        "operationId": "dashboard-widgets-create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWidgetBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WidgetDTO"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create a dashboard widget"
+      }
+    },
+    "/workspaces/{wsId}/dashboard/widgets/{widgetId}": {
+      "delete": {
+        "operationId": "dashboard-widgets-delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "widgetId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteWidgetBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Soft-delete a dashboard widget"
+      },
+      "get": {
+        "operationId": "dashboard-widgets-get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "widgetId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WidgetDTO"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Fetch a dashboard widget by id"
+      },
+      "patch": {
+        "operationId": "dashboard-widgets-update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "widgetId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWidgetBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WidgetDTO"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update a dashboard widget"
+      }
+    },
+    "/workspaces/{wsId}/dashboard/widgets/{widgetId}/position": {
+      "put": {
+        "operationId": "dashboard-widgets-update-position",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "widgetId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWidgetPositionBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WidgetDTO"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update widget position and size"
+      }
+    },
     "/workspaces/{wsId}/export/tasks": {
       "get": {
         "description": "Export workspace tasks as a JSON array, optionally scoped by a saved lens.",
@@ -11543,6 +12430,447 @@
         "summary": "Mark all notifications as read in a workspace"
       }
     },
+    "/workspaces/{wsId}/pages": {
+      "get": {
+        "operationId": "pages-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListPagesBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List root pages in a workspace"
+      },
+      "post": {
+        "operationId": "pages-create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePageBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageDTO"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create a page"
+      }
+    },
+    "/workspaces/{wsId}/pages/generate": {
+      "post": {
+        "operationId": "pages-generate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GeneratePageBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageDTO"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Generate a page with AI"
+      }
+    },
+    "/workspaces/{wsId}/pages/search": {
+      "get": {
+        "operationId": "pages-search",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Search term for title",
+            "explode": false,
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "description": "Search term for title",
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchPagesBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Search pages by title"
+      }
+    },
+    "/workspaces/{wsId}/pages/{pageId}": {
+      "delete": {
+        "operationId": "pages-delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "pageId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletePageBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Soft-delete a page"
+      },
+      "get": {
+        "operationId": "pages-get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "pageId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageDTO"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Fetch a page by id"
+      },
+      "patch": {
+        "operationId": "pages-update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "pageId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePageBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageDTO"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update a page"
+      }
+    },
+    "/workspaces/{wsId}/pages/{pageId}/children": {
+      "get": {
+        "operationId": "pages-list-children",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "pageId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListChildPagesBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List child pages"
+      }
+    },
     "/workspaces/{wsId}/projects": {
       "get": {
         "operationId": "projects-list",
@@ -12069,7 +13397,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListTasksBody"
+                  "$ref": "#/components/schemas/ListTimeboxTasksBody"
                 }
               }
             },

@@ -407,7 +407,7 @@ function GanttView(): ReactElement {
             </Button>
             <Button
               type="button"
-              variant={zoomIdx === ZOOM_PRESET_MONTH ? 'secondary' : 'ghost'}
+              variant={zoomIdx === ZOOM_PRESET_MONTH ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setZoomIdx(ZOOM_PRESET_MONTH)}
             >
@@ -415,7 +415,7 @@ function GanttView(): ReactElement {
             </Button>
             <Button
               type="button"
-              variant={zoomIdx === ZOOM_PRESET_WEEK ? 'secondary' : 'ghost'}
+              variant={zoomIdx === ZOOM_PRESET_WEEK ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setZoomIdx(ZOOM_PRESET_WEEK)}
             >
@@ -423,7 +423,7 @@ function GanttView(): ReactElement {
             </Button>
             <Button
               type="button"
-              variant={zoomIdx === ZOOM_PRESET_DAY ? 'secondary' : 'ghost'}
+              variant={zoomIdx === ZOOM_PRESET_DAY ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setZoomIdx(ZOOM_PRESET_DAY)}
             >

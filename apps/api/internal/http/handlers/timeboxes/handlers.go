@@ -648,8 +648,8 @@ func RemoveTask(deps Deps) func(context.Context, *RemoveTaskInput) (*RemoveTaskO
 }
 
 // ListTasks handles GET /workspaces/{wsId}/timeboxes/{timeboxId}/tasks.
-func ListTasks(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, error) {
-	return func(ctx context.Context, in *ListTasksInput) (*ListTasksOutput, error) {
+func ListTasks(deps Deps) func(context.Context, *ListTimeboxTasksInput) (*ListTimeboxTasksOutput, error) {
+	return func(ctx context.Context, in *ListTimeboxTasksInput) (*ListTimeboxTasksOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
@@ -691,7 +691,7 @@ func ListTasks(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutp
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		out := &ListTasksOutput{}
+		out := &ListTimeboxTasksOutput{}
 		out.Body.Tasks = make([]TimeboxTaskDTO, 0, len(rows))
 		for _, r := range rows {
 			out.Body.Tasks = append(out.Body.Tasks, mapTaskRow(r))

@@ -248,23 +248,23 @@ type RemoveTaskOutput struct {
 
 // --- ListTasks ---
 
-// ListTasksInput is the query for GET /workspaces/{wsId}/timeboxes/{timeboxId}/tasks.
-type ListTasksInput struct {
+// ListTimeboxTasksInput is the query for GET /workspaces/{wsId}/timeboxes/{timeboxId}/tasks.
+type ListTimeboxTasksInput struct {
 	WsID      string `path:"wsId"`
 	TimeboxID string `path:"timeboxId"`
 	Limit     int32  `query:"limit" minimum:"1" maximum:"200" default:"50"`
 	Offset    int32  `query:"offset" minimum:"0" default:"0"`
 }
 
-// ListTasksBody is the response body for GET /workspaces/{wsId}/timeboxes/{timeboxId}/tasks.
-type ListTasksBody struct {
+// ListTimeboxTasksBody is the response body for GET /workspaces/{wsId}/timeboxes/{timeboxId}/tasks.
+type ListTimeboxTasksBody struct {
 	Total          int64            `json:"total"`
 	Tasks          []TimeboxTaskDTO `json:"tasks"`
 	TotalTasks     int64            `json:"totalTasks"`
 	CompletedTasks int64            `json:"completedTasks"`
 }
 
-// ListTasksOutput is the response for GET /workspaces/{wsId}/timeboxes/{timeboxId}/tasks.
-type ListTasksOutput struct {
-	Body ListTasksBody
+// ListTimeboxTasksOutput is the response for GET /workspaces/{wsId}/timeboxes/{timeboxId}/tasks.
+type ListTimeboxTasksOutput struct {
+	Body ListTimeboxTasksBody
 }

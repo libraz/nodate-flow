@@ -107,6 +107,7 @@ export default function TaskCreateDialog({
         ...(parsed.data.description ? { description: parsed.data.description } : {}),
         priority: parsed.data.priority as TaskPriority,
         ...(parsed.data.dueOn ? { dueOn: parsed.data.dueOn } : {}),
+        visibility: 'public' as const,
       });
       reset();
       onClose();

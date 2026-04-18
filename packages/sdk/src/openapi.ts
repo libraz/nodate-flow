@@ -1471,6 +1471,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{wsId}/dashboard/widgets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List dashboard widgets in a workspace */
+        get: operations["dashboard-widgets-list"];
+        put?: never;
+        /** Create a dashboard widget */
+        post: operations["dashboard-widgets-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/dashboard/widgets/{widgetId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fetch a dashboard widget by id */
+        get: operations["dashboard-widgets-get"];
+        put?: never;
+        post?: never;
+        /** Soft-delete a dashboard widget */
+        delete: operations["dashboard-widgets-delete"];
+        options?: never;
+        head?: never;
+        /** Update a dashboard widget */
+        patch: operations["dashboard-widgets-update"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/dashboard/widgets/{widgetId}/position": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update widget position and size */
+        put: operations["dashboard-widgets-update-position"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{wsId}/export/tasks": {
         parameters: {
             query?: never;
@@ -1661,6 +1715,94 @@ export interface paths {
         put?: never;
         /** Mark all notifications as read in a workspace */
         post: operations["notifications-mark-all-read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List root pages in a workspace */
+        get: operations["pages-list"];
+        put?: never;
+        /** Create a page */
+        post: operations["pages-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/pages/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generate a page with AI */
+        post: operations["pages-generate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/pages/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search pages by title */
+        get: operations["pages-search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/pages/{pageId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fetch a page by id */
+        get: operations["pages-get"];
+        put?: never;
+        post?: never;
+        /** Soft-delete a page */
+        delete: operations["pages-delete"];
+        options?: never;
+        head?: never;
+        /** Update a page */
+        patch: operations["pages-update"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/pages/{pageId}/children": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List child pages */
+        get: operations["pages-list-children"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2321,6 +2463,19 @@ export interface components {
             readonly $schema?: string;
             webhook: components["schemas"]["WebhookSubscriptionDetailDTO"];
         };
+        CreatePageBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            body?: string;
+            /** @description Parent page public id */
+            parentPageId?: string;
+            /** @description Project public id */
+            projectId?: string;
+            title: string;
+        };
         CreateProjectBody: {
             /**
              * Format: uri
@@ -2384,6 +2539,26 @@ export interface components {
             /** @description YYYY-MM-DD */
             startsOn: string;
         };
+        CreateWidgetBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Arbitrary JSON configuration blob */
+            config?: unknown;
+            /** Format: int64 */
+            height: number;
+            /** Format: int64 */
+            positionX: number;
+            /** Format: int64 */
+            positionY: number;
+            title: string;
+            /** @description Widget type enum value */
+            widgetType: string;
+            /** Format: int64 */
+            width: number;
+        };
         CreateWorkspaceInputBody: {
             /**
              * Format: uri
@@ -2419,6 +2594,14 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        DeletePageBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
         DeleteProviderOutputBody: {
             /**
              * Format: uri
@@ -2444,6 +2627,14 @@ export interface components {
             ok: boolean;
         };
         DeleteTimeboxBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        DeleteWidgetBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
@@ -2625,6 +2816,19 @@ export interface components {
              */
             updatedAt?: number;
         };
+        GeneratePageBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Scope to a project */
+            projectId?: string;
+            /** @description Instructions for AI generation */
+            prompt: string;
+            /** @description Title for the generated page */
+            title: string;
+        };
         GetOutputBody: {
             /**
              * Format: uri
@@ -2724,6 +2928,16 @@ export interface components {
              */
             readonly $schema?: string;
             actions: components["schemas"]["TaskAutoAction"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
+        ListChildPagesBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            pages: components["schemas"]["PageSummaryDTO"][] | null;
             /** Format: int64 */
             total: number;
         };
@@ -2844,6 +3058,16 @@ export interface components {
             /** Format: int64 */
             total: number;
             webhooks: components["schemas"]["WebhookSubscriptionDTO"][] | null;
+        };
+        ListPagesBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            pages: components["schemas"]["PageSummaryDTO"][] | null;
+            /** Format: int64 */
+            total: number;
         };
         ListPrioritySuggestionsOutputBody: {
             /**
@@ -2989,6 +3213,17 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
+            nextCursor: string | null;
+            tasks: components["schemas"]["TaskListItem"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
+        ListTimeboxTasksBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
             /** Format: int64 */
             completedTasks: number;
             tasks: components["schemas"]["TimeboxTaskDTO"][] | null;
@@ -3017,6 +3252,16 @@ export interface components {
             nextCursor: string | null;
             /** Format: int64 */
             total: number;
+        };
+        ListWidgetsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            total: number;
+            widgets: components["schemas"]["WidgetDTO"][] | null;
         };
         ListWorkspaceMembersOutputBody: {
             /**
@@ -3206,6 +3451,66 @@ export interface components {
             destination: string;
             /** Format: int64 */
             waited: number;
+        };
+        PageDTO: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            body: string;
+            /**
+             * Format: int64
+             * @description Unix seconds
+             */
+            createdAt: number;
+            creatorDisplayName: string;
+            /** @description Creator public id */
+            creatorId: string;
+            /** @description Page public id (UUID v7) */
+            id: string;
+            isAiGenerated: boolean;
+            notes?: string;
+            /** @description Parent page public id */
+            parentPageId?: string;
+            parentPageTitle?: string;
+            /** @description Project public id */
+            projectId?: string;
+            projectName?: string;
+            /** Format: int32 */
+            sortWeight: number;
+            title: string;
+            /**
+             * Format: int64
+             * @description Unix seconds
+             */
+            updatedAt: number;
+        };
+        PageSummaryDTO: {
+            /**
+             * Format: int64
+             * @description Unix seconds
+             */
+            createdAt: number;
+            creatorDisplayName: string;
+            /** @description Creator public id */
+            creatorId: string;
+            /** @description Page public id (UUID v7) */
+            id: string;
+            isAiGenerated: boolean;
+            /** @description Parent page public id */
+            parentPageId?: string;
+            /** @description Project public id */
+            projectId?: string;
+            projectName?: string;
+            /** Format: int32 */
+            sortWeight: number;
+            title: string;
+            /**
+             * Format: int64
+             * @description Unix seconds
+             */
+            updatedAt: number;
         };
         PatchMeInputBody: {
             /**
@@ -3620,6 +3925,16 @@ export interface components {
             sortWeight: number;
             /** Format: date-time */
             updatedAt?: string;
+        };
+        SearchPagesBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            pages: components["schemas"]["PageSummaryDTO"][] | null;
+            /** Format: int64 */
+            total: number;
         };
         SessionSummary: {
             /**
@@ -4183,6 +4498,19 @@ export interface components {
             name?: string;
             sort?: unknown;
         };
+        UpdatePageBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            body?: string;
+            /** @description Parent page public id; null to unset */
+            parentPageId?: string;
+            /** @description Project public id; null to unset */
+            projectId?: string;
+            title?: string;
+        };
         UpdateTimeboxBody: {
             /**
              * Format: uri
@@ -4204,6 +4532,41 @@ export interface components {
             readonly $schema?: string;
             /** @description Target status: planned, active, completed, cancelled */
             status: string;
+        };
+        UpdateWidgetBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Arbitrary JSON configuration blob */
+            config?: unknown;
+            /** Format: int64 */
+            height?: number;
+            /** Format: int64 */
+            positionX?: number;
+            /** Format: int64 */
+            positionY?: number;
+            title?: string;
+            /** Format: int64 */
+            width?: number;
+        };
+        UpdateWidgetPositionBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            height: number;
+            /** Format: int64 */
+            positionX: number;
+            /** Format: int64 */
+            positionY: number;
+            /** Format: int64 */
+            sortWeight: number;
+            /** Format: int64 */
+            width: number;
         };
         UpdateWorkspaceMemberRoleInputBody: {
             /**
@@ -4285,6 +4648,34 @@ export interface components {
             date: string;
             taskId: string;
             title: string;
+        };
+        WidgetDTO: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            config?: unknown;
+            /** Format: int64 */
+            createdAt: number;
+            creatorDisplayName: string;
+            creatorId: string;
+            /** Format: int64 */
+            height: number;
+            /** @description Widget public id (UUID v7) */
+            id: string;
+            /** Format: int64 */
+            positionX: number;
+            /** Format: int64 */
+            positionY: number;
+            /** Format: int64 */
+            sortWeight: number;
+            title: string;
+            /** Format: int64 */
+            updatedAt: number;
+            widgetType: string;
+            /** Format: int64 */
+            width: number;
         };
         Workspace: {
             /**
@@ -7888,6 +8279,211 @@ export interface operations {
             };
         };
     };
+    "dashboard-widgets-list": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListWidgetsBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "dashboard-widgets-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateWidgetBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WidgetDTO"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "dashboard-widgets-get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                widgetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WidgetDTO"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "dashboard-widgets-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                widgetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteWidgetBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "dashboard-widgets-update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                widgetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateWidgetBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WidgetDTO"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "dashboard-widgets-update-position": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                widgetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateWidgetPositionBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WidgetDTO"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "export-tasks": {
         parameters: {
             query?: {
@@ -8466,6 +9062,281 @@ export interface operations {
             };
         };
     };
+    "pages-list": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListPagesBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "pages-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePageBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageDTO"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "pages-generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GeneratePageBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageDTO"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "pages-search": {
+        parameters: {
+            query?: {
+                /** @description Search term for title */
+                q?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchPagesBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "pages-get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                pageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageDTO"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "pages-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                pageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletePageBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "pages-update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                pageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePageBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageDTO"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "pages-list-children": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                wsId: string;
+                pageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListChildPagesBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "projects-list": {
         parameters: {
             query?: {
@@ -8796,7 +9667,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListTasksBody"];
+                    "application/json": components["schemas"]["ListTimeboxTasksBody"];
                 };
             };
             /** @description Error */
