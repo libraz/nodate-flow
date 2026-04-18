@@ -1,5 +1,6 @@
 import Icon from '@nodate-flow/ui/icon';
 import { cx } from '@nodate-flow/ui/lib/cx';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { Link, useRouterState } from '@tanstack/react-router';
 import {
   Briefcase,
@@ -149,7 +150,7 @@ export default function Sidebar(): ReactElement {
           const sectionActive =
             (item.key === 'settings' && pathname.startsWith('/settings')) ||
             (item.key === 'workspaces' && pathname.startsWith('/workspaces'));
-          const node = (
+          const linkEl = (
             <Link
               key={item.key}
               to={item.to}
@@ -165,14 +166,21 @@ export default function Sidebar(): ReactElement {
           if (item.key === 'workspaces' && currentWorkspaceId && !collapsed) {
             return (
               <div key={item.key}>
-                {node}
+                {linkEl}
                 <Suspense fallback={null}>
                   <WorkspaceProjectsSection workspaceId={currentWorkspaceId} />
                 </Suspense>
               </div>
             );
           }
-          return node;
+          if (collapsed) {
+            return (
+              <Tooltip key={item.key} content={label} placement="right">
+                {linkEl}
+              </Tooltip>
+            );
+          }
+          return linkEl;
         })}
       </nav>
       <div className={styles.footer}>

@@ -657,6 +657,8 @@
     "focus_search": "Search",
     "go_inbox": "Go to Inbox",
     "go_today": "Go to My Tasks",
+    "go_calendar": "Go to Calendar",
+    "go_pages": "Go to Pages",
     "go_workspaces": "Go to Workspaces",
     "go_settings": "Go to Settings",
     "show_help": "Show shortcuts"

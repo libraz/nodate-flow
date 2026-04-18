@@ -48,7 +48,9 @@ function WorkspaceSwitcher(): ReactElement {
   const { data: workspaces } = useWorkspacesQuery();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const currentId = useCurrentWorkspaceId() ?? '';
+  const routeWsId = useCurrentWorkspaceId() ?? '';
+  // Auto-select when there is exactly one workspace.
+  const currentId = routeWsId || (workspaces.length === 1 ? (workspaces[0]?.id ?? '') : '');
 
   return (
     <select

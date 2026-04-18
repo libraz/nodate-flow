@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 
 import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
+import { useWorkspacesQuery } from '../workspaces/api';
 import { useSearchPages } from './api';
 import PageDetail from './page-detail';
 import PageEditor from './page-editor';
@@ -68,7 +69,10 @@ interface PageListProps {
 export default function PageList({ activePageId }: PageListProps): ReactElement {
   const { t } = useTranslation('pages');
   const navigate = useNavigate();
-  const workspaceId = useCurrentWorkspaceId();
+  const routeWsId = useCurrentWorkspaceId();
+  const { data: workspaces } = useWorkspacesQuery();
+  // Fall back to the first workspace on cross-workspace pages (e.g. /pages).
+  const workspaceId = routeWsId ?? (workspaces.length === 1 ? (workspaces[0]?.id ?? null) : null);
   const [mode, setMode] = useState<PageMode>(activePageId ? 'view' : 'create');
   const [searchQuery, setSearchQuery] = useState('');
 

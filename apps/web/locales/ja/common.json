@@ -657,6 +657,8 @@
     "focus_search": "検索",
     "go_inbox": "受信トレイへ移動",
     "go_today": "今日のタスクへ移動",
+    "go_calendar": "カレンダーへ移動",
+    "go_pages": "ページへ移動",
     "go_workspaces": "ワークスペースへ移動",
     "go_settings": "設定へ移動",
     "show_help": "ショートカットを表示"

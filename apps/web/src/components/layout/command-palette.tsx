@@ -17,6 +17,8 @@ import { useNavigate } from '@tanstack/react-router';
 import {
   Building2,
   CalendarDays,
+  CalendarRange,
+  FileText,
   FolderKanban,
   Home,
   Inbox,
@@ -392,6 +394,20 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
         icon: CalendarDays,
       },
       { id: 'nav:inbox', label: t('nav.inbox'), group: navGroup, href: '/inbox', icon: Inbox },
+      {
+        id: 'nav:calendar',
+        label: t('nav.calendar'),
+        group: navGroup,
+        href: '/calendar',
+        icon: CalendarRange,
+      },
+      {
+        id: 'nav:pages',
+        label: t('nav.pages'),
+        group: navGroup,
+        href: '/pages',
+        icon: FileText,
+      },
       {
         id: 'nav:workspaces',
         label: t('nav.workspaces'),

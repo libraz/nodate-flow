@@ -45,6 +45,8 @@ export const SHORTCUT_BINDINGS: ShortcutBinding[] = [
   { keys: '/', labelKey: 'shortcuts.focus_search', sectionKey: 'shortcuts.section_navigation' },
   { keys: 'g i', labelKey: 'shortcuts.go_inbox', sectionKey: 'shortcuts.section_navigation' },
   { keys: 'g t', labelKey: 'shortcuts.go_today', sectionKey: 'shortcuts.section_navigation' },
+  { keys: 'g c', labelKey: 'shortcuts.go_calendar', sectionKey: 'shortcuts.section_navigation' },
+  { keys: 'g p', labelKey: 'shortcuts.go_pages', sectionKey: 'shortcuts.section_navigation' },
   { keys: 'g w', labelKey: 'shortcuts.go_workspaces', sectionKey: 'shortcuts.section_navigation' },
   { keys: 'g s', labelKey: 'shortcuts.go_settings', sectionKey: 'shortcuts.section_navigation' },
   { keys: '?', labelKey: 'shortcuts.show_help', sectionKey: 'shortcuts.section_general' },
@@ -93,6 +95,14 @@ export function useKeyboardShortcuts({
           case 't':
             e.preventDefault();
             void navigate({ to: '/today' });
+            return;
+          case 'c':
+            e.preventDefault();
+            void navigate({ to: '/calendar' });
+            return;
+          case 'p':
+            e.preventDefault();
+            void navigate({ to: '/pages' });
             return;
           case 'w':
             e.preventDefault();

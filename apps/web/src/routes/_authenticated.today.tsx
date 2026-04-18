@@ -15,11 +15,36 @@ import { type ReactElement, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { OPEN_COMMAND_PALETTE_EVENT } from '../components/layout/glass-dock';
+import type { TaskPriority } from '../features/tasks/api';
 import { sdk } from '../lib/sdk';
 
 type AssignedTask = components['schemas']['MyTaskListItem'];
 
 type SectionKey = 'overdue' | 'today' | 'tomorrow' | 'thisWeek' | 'later' | 'noDue';
+
+const STATE_COLOR: Record<string, string> = {
+  open: 'var(--color-info, #3498db)',
+  waiting: 'var(--color-warning, #f39c12)',
+  review: 'var(--color-accent, #9b59b6)',
+  done: 'var(--color-success, #27ae60)',
+  cancelled: 'var(--color-muted, #95a5a6)',
+};
+
+const PRIORITY_LABEL: Record<TaskPriority, string> = {
+  0: 'tasks.priority.none',
+  1: 'tasks.priority.low',
+  2: 'tasks.priority.medium',
+  3: 'tasks.priority.high',
+  4: 'tasks.priority.urgent',
+};
+
+const PRIORITY_COLOR: Record<TaskPriority, string> = {
+  0: 'transparent',
+  1: 'var(--color-info, #3498db)',
+  2: 'var(--color-warning, #f39c12)',
+  3: 'var(--nf-color-danger, #e67e22)',
+  4: 'var(--nf-color-danger, #c0392b)',
+};
 
 const SECTION_ORDER: readonly SectionKey[] = [
   'overdue',
@@ -195,62 +220,91 @@ function TodayRoute(): ReactElement {
                 gap: '0.25rem',
               }}
             >
-              {items.map((task) => (
-                <li
-                  key={task.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    padding: '0.6rem 0.75rem',
-                    borderRadius: '0.5rem',
-                    background: isOverdue
-                      ? 'var(--nf-color-danger-subtle, rgba(192,57,43,0.08))'
-                      : 'var(--color-surface, rgba(127,127,127,0.05))',
-                    borderInlineStart: isOverdue
-                      ? '3px solid var(--nf-color-danger, #c0392b)'
-                      : '3px solid transparent',
-                  }}
-                >
-                  <Link
-                    to="/tasks/$taskId"
-                    params={{ taskId: task.id }}
+              {items.map((task) => {
+                const pri = (task.priority ?? 0) as TaskPriority;
+                return (
+                  <li
+                    key={task.id}
                     style={{
-                      flex: 1,
-                      minWidth: 0,
-                      color: 'inherit',
-                      textDecoration: 'none',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      padding: '0.6rem 0.75rem',
+                      borderRadius: '0.5rem',
+                      background: isOverdue
+                        ? 'var(--nf-color-danger-subtle, rgba(192,57,43,0.08))'
+                        : 'var(--color-surface, rgba(127,127,127,0.05))',
+                      borderInlineStart: isOverdue
+                        ? '3px solid var(--nf-color-danger, #c0392b)'
+                        : '3px solid transparent',
                     }}
                   >
-                    {task.title}
-                  </Link>
-                  <span
-                    style={{
-                      fontSize: '0.75rem',
-                      color: 'var(--color-muted)',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {task.projectName
-                      ? `${task.workspaceName} · ${task.projectName}`
-                      : task.workspaceName}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: '0.75rem',
-                      color: 'var(--color-muted)',
-                      whiteSpace: 'nowrap',
-                      minWidth: '5.5rem',
-                      textAlign: 'right',
-                    }}
-                  >
-                    {task.dueOn ?? t('today.no_due_label')}
-                  </span>
-                </li>
-              ))}
+                    <span
+                      aria-hidden
+                      style={{
+                        inlineSize: '0.5rem',
+                        blockSize: '0.5rem',
+                        borderRadius: '999px',
+                        background: STATE_COLOR[task.derivedState] ?? 'var(--color-muted)',
+                        flexShrink: 0,
+                      }}
+                    />
+                    <Link
+                      to="/tasks/$taskId"
+                      params={{ taskId: task.id }}
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        color: 'inherit',
+                        textDecoration: 'none',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {task.title}
+                    </Link>
+                    {pri > 0 ? (
+                      <span
+                        style={{
+                          fontSize: '0.6875rem',
+                          fontWeight: 600,
+                          padding: '0.125rem 0.375rem',
+                          borderRadius: '0.25rem',
+                          background: PRIORITY_COLOR[pri],
+                          color: 'white',
+                          whiteSpace: 'nowrap',
+                          lineHeight: 1.3,
+                        }}
+                      >
+                        {t(PRIORITY_LABEL[pri])}
+                      </span>
+                    ) : null}
+                    <span
+                      style={{
+                        fontSize: '0.75rem',
+                        color: 'var(--color-muted)',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {task.projectName
+                        ? `${task.workspaceName} · ${task.projectName}`
+                        : task.workspaceName}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: '0.75rem',
+                        color: 'var(--color-muted)',
+                        whiteSpace: 'nowrap',
+                        minWidth: '5.5rem',
+                        textAlign: 'right',
+                      }}
+                    >
+                      {task.dueOn ?? t('today.no_due_label')}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           </section>
         );

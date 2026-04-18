@@ -129,8 +129,16 @@ function QuickCreateDialog({
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TaskPriority>(2);
   const [projectId, setProjectId] = useState<string>(projects[0]?.id ?? '');
-  const [startOn, setStartOn] = useState('');
+  const [startOn, setStartOn] = useState(dueOn);
   const [endOn, setEndOn] = useState(dueOn);
+
+  // Sync defaults when the dialog opens for a different date.
+  const prevDueOn = useRef(dueOn);
+  if (dueOn !== prevDueOn.current) {
+    prevDueOn.current = dueOn;
+    setStartOn(dueOn);
+    setEndOn(dueOn);
+  }
 
   const createMut = useMutation({
     mutationFn: async () => {
@@ -153,8 +161,8 @@ function QuickCreateDialog({
       setTitle('');
       setDescription('');
       setPriority(2);
-      setStartOn('');
-      setEndOn('');
+      setStartOn(dueOn);
+      setEndOn(dueOn);
       onCreated();
     },
     onError: () => {
@@ -173,8 +181,8 @@ function QuickCreateDialog({
     setTitle('');
     setDescription('');
     setPriority(2);
-    setStartOn('');
-    setEndOn('');
+    setStartOn(dueOn);
+    setEndOn(dueOn);
     onClose();
   };
 
