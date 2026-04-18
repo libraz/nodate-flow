@@ -83,6 +83,7 @@ export function useProjectQuery(id: string): UseSuspenseQueryResult<Project> {
   return useSuspenseQuery({
     queryKey: projectsKeys.detail(id),
     queryFn: async (): Promise<Project> => {
+      if (!id) throw new ProjectApiError(undefined, 'Missing project ID');
       const { data, error } = await sdk.GET('/projects/{prjId}', {
         params: { path: { prjId: id } },
       });
