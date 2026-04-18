@@ -219,26 +219,47 @@ function DescriptionEditor({
       setValue(initial);
       setEditing(true);
     };
+    const isEmpty = initial.length === 0;
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         <div
+          role={isEmpty ? 'button' : undefined}
+          tabIndex={isEmpty ? 0 : undefined}
+          onClick={isEmpty ? enterEdit : undefined}
+          onKeyDown={
+            isEmpty
+              ? (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    enterEdit();
+                  }
+                }
+              : undefined
+          }
           style={{
-            color: initial.length > 0 ? 'var(--color-fg)' : 'var(--color-muted)',
+            color: isEmpty ? 'var(--color-muted)' : 'var(--color-fg)',
             minBlockSize: '3rem',
             inlineSize: '100%',
+            ...(isEmpty
+              ? {
+                  border: '1px dashed var(--nf-color-border, var(--color-hairline))',
+                  borderRadius: '0.5rem',
+                  padding: '1rem',
+                  cursor: 'pointer',
+                  textAlign: 'center' as const,
+                }
+              : {}),
           }}
         >
-          {initial.length > 0 ? (
-            <Markdown>{initial}</Markdown>
-          ) : (
-            t('tasks.detail.description_empty')
-          )}
+          {isEmpty ? t('tasks.detail.description_empty') : <Markdown>{initial}</Markdown>}
         </div>
-        <div>
-          <Button type="button" variant="ghost" onClick={enterEdit}>
-            {t('tasks.detail.description_edit')}
-          </Button>
-        </div>
+        {!isEmpty && (
+          <div>
+            <Button type="button" variant="ghost" onClick={enterEdit}>
+              {t('tasks.detail.description_edit')}
+            </Button>
+          </div>
+        )}
       </div>
     );
   }
