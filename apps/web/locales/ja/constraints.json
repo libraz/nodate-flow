@@ -17,6 +17,7 @@
     "explain": "説明",
     "explaining": "説明中\u2026",
     "explanation": "説明",
+    "advanced": "詳細設定（種類・JSON 式）",
     "errors": {
       "addFailed": "制約の追加に失敗しました",
       "removeFailed": "制約の削除に失敗しました",

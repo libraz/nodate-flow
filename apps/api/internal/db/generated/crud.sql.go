@@ -171,6 +171,68 @@ func (q *Queries) FindTaskByPublicId(ctx context.Context, arg FindTaskByPublicId
 	return i, err
 }
 
+const listChildTasksByParentID = `-- name: ListChildTasksByParentID :many
+SELECT
+  t.id,
+  t.public_id,
+  t.title,
+  t.description,
+  t.priority,
+  t.derived_state
+FROM tasks t
+WHERE t.workspace_id = ?
+  AND t.parent_task_id = ?
+  AND t.enabled = TRUE
+ORDER BY t.created_at ASC
+LIMIT 100
+`
+
+type ListChildTasksByParentIDParams struct {
+	WorkspaceID  uint32        `json:"-"`
+	ParentTaskID sql.NullInt32 `json:"-"`
+}
+
+type ListChildTasksByParentIDRow struct {
+	ID           uint32            `json:"-"`
+	PublicID     types.PublicID    `json:"publicId"`
+	Title        string            `json:"title"`
+	Description  sql.NullString    `json:"description"`
+	Priority     int32             `json:"priority"`
+	DerivedState TasksDerivedState `json:"derivedState"`
+}
+
+// List existing child tasks for a given parent task. Used by step
+// decomposition to avoid suggesting duplicates of already-created steps.
+func (q *Queries) ListChildTasksByParentID(ctx context.Context, arg ListChildTasksByParentIDParams) ([]ListChildTasksByParentIDRow, error) {
+	rows, err := q.db.QueryContext(ctx, listChildTasksByParentID, arg.WorkspaceID, arg.ParentTaskID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListChildTasksByParentIDRow{}
+	for rows.Next() {
+		var i ListChildTasksByParentIDRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicID,
+			&i.Title,
+			&i.Description,
+			&i.Priority,
+			&i.DerivedState,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listMyTasks = `-- name: ListMyTasks :many
 SELECT
   v.public_id,

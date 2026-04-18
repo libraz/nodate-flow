@@ -520,7 +520,11 @@
       "applying": "作成中\u2026",
       "apply_success": "{count, plural, other {# 件のサブタスクを作成しました。}}",
       "apply_error": "サブタスクの作成に失敗しました。もう一度お試しください。",
-      "discard": "破棄"
+      "discard": "破棄",
+      "granularity_label": "粒度",
+      "granularity_coarse": "粗い",
+      "granularity_standard": "標準",
+      "granularity_fine": "細かい"
     },
     "attachments": {
       "title": "添付ファイル",

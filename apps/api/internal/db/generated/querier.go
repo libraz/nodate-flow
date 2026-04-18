@@ -335,6 +335,9 @@ type Querier interface {
 	ListCandidateTaskEmbeddings(ctx context.Context, arg ListCandidateTaskEmbeddingsParams) ([]ListCandidateTaskEmbeddingsRow, error)
 	// List enabled child pages for a given parent page with creator info.
 	ListChildPages(ctx context.Context, arg ListChildPagesParams) ([]ListChildPagesRow, error)
+	// List existing child tasks for a given parent task. Used by step
+	// decomposition to avoid suggesting duplicates of already-created steps.
+	ListChildTasksByParentID(ctx context.Context, arg ListChildTasksByParentIDParams) ([]ListChildTasksByParentIDRow, error)
 	// List comments on a task joined with author display fields.
 	ListCommentsForTask(ctx context.Context, arg ListCommentsForTaskParams) ([]ListCommentsForTaskRow, error)
 	// List enabled integrations whose access token will expire before

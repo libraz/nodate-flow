@@ -52,7 +52,13 @@
     "task_transition_reopen": "{actor} がこのタスクを再オープンしました",
     "task_transition_cancel": "{actor} がこのタスクをキャンセルしました",
     "signal_attached": "{actor} がシグナルを添付しました",
-    "comment_added": "{actor} がコメントしました"
+    "comment_added": "{actor} がコメントしました",
+    "ai_auto_action_proposed": "AI が自動アクションを提案しました",
+    "ai_auto_action_applied": "AI が自動アクションを実行しました",
+    "ai_suggestion_created": "AI が提案を作成しました",
+    "ai_suggestion_applied": "{actor} が AI の提案を適用しました",
+    "ai_suggestion_dismissed": "{actor} が AI の提案を却下しました",
+    "mcp_tool_invoked": "MCP ツールが実行されました"
   },
   "event_kind": {
     "task_created": "タスク作成",
@@ -77,6 +83,12 @@
     "task_transition_reopen": "再オープン",
     "task_transition_cancel": "キャンセル",
     "signal_attached": "シグナル添付",
-    "comment_added": "コメント追加"
+    "comment_added": "コメント追加",
+    "ai_auto_action_proposed": "自動アクション提案",
+    "ai_auto_action_applied": "自動アクション実行",
+    "ai_suggestion_created": "AI 提案",
+    "ai_suggestion_applied": "提案適用",
+    "ai_suggestion_dismissed": "提案却下",
+    "mcp_tool_invoked": "MCP ツール"
   }
 }

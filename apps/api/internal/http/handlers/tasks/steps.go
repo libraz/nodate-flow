@@ -8,6 +8,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai"
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/embed"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
@@ -21,17 +22,21 @@ import (
 // these endpoints require an AI orchestrator that the regular CRUD
 // routes do not need.
 type StepsDeps struct {
-	DB      *sql.DB
-	Queries *generated.Queries
-	AI      *ai.Orchestrator
-	Audit   *audit.Recorder
+	DB       *sql.DB
+	Queries  *generated.Queries
+	AI       *ai.Orchestrator
+	Embedder *embed.Client
+	Audit    *audit.Recorder
 }
 
 // ---- Propose Steps I/O -----------------------------------------------------
 
 // ProposeStepsInput is the request for POST /tasks/{id}/propose-steps.
 type ProposeStepsInput struct {
-	ID string `path:"id"`
+	ID   string `path:"id"`
+	Body struct {
+		Granularity string `json:"granularity,omitempty" enum:"coarse,standard,fine" default:"standard" doc:"Decomposition granularity: coarse (3-5), standard (5-8), fine (8-15)"`
+	}
 }
 
 // ProposedStep is a single step entry in the propose-steps response.
@@ -85,7 +90,7 @@ type ApplyStepsOutput struct {
 // It reads the task's title and description from the database, then asks
 // the AI orchestrator to decompose it into concrete execution steps.
 func ProposeSteps(deps StepsDeps) func(context.Context, *ProposeStepsInput) (*ProposeStepsOutput, error) {
-	return func(ctx context.Context, _ *ProposeStepsInput) (*ProposeStepsOutput, error) {
+	return func(ctx context.Context, in *ProposeStepsInput) (*ProposeStepsOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
@@ -107,12 +112,49 @@ func ProposeSteps(deps StepsDeps) func(context.Context, *ProposeStepsInput) (*Pr
 			return nil, httpErr(apierrors.WsTaskNotFound)
 		}
 
-		source := "Break this task into concrete execution steps.\n\nTitle: " + row.Title
-		if row.Description.Valid && row.Description.String != "" {
-			source += "\n\nDescription:\n" + row.Description.String
+		// Map granularity string to typed constant.
+		granularity := ai.GranularityStandard
+		switch in.Body.Granularity {
+		case "coarse":
+			granularity = ai.GranularityCoarse
+		case "fine":
+			granularity = ai.GranularityFine
 		}
 
-		steps, err := deps.AI.ProposeTasksFrom(ctx, ws.ID, source)
+		// Fetch existing child tasks to avoid duplicate proposals.
+		var children []ai.ChildTaskSummary
+		childRows, err := deps.Queries.ListChildTasksByParentID(ctx, generated.ListChildTasksByParentIDParams{
+			WorkspaceID:  ws.ID,
+			ParentTaskID: sql.NullInt32{Int32: int32(task.ID), Valid: true},
+		})
+		if err == nil {
+			for _, c := range childRows {
+				children = append(children, ai.ChildTaskSummary{
+					Title: c.Title,
+					State: string(c.DerivedState),
+				})
+			}
+		}
+
+		// Resolve optional embed client for similar-task context.
+		var embedProvider ai.EmbedClient
+		var reader ai.SmartCreateReader
+		if deps.Embedder != nil {
+			embedProvider = deps.Embedder.Provider
+			reader = deps.Queries
+		}
+
+		desc := ""
+		if row.Description.Valid {
+			desc = row.Description.String
+		}
+
+		steps, err := deps.AI.ProposeSteps(
+			ctx, ws.ID,
+			row.Title, desc,
+			granularity, children,
+			embedProvider, reader,
+		)
 		if err != nil {
 			return nil, mapAIError(err)
 		}

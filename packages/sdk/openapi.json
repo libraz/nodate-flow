@@ -4169,6 +4169,25 @@
         "required": ["projectId", "title"],
         "type": "object"
       },
+      "ProposeStepsInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ProposeStepsInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "granularity": {
+            "default": "standard",
+            "description": "Decomposition granularity: coarse (3-5), standard (5-8), fine (8-15)",
+            "enum": ["coarse", "standard", "fine"],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ProposeStepsOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -10182,6 +10201,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposeStepsInputBody"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {

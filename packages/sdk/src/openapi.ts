@@ -3917,6 +3917,19 @@ export interface components {
             projectId: string;
             title: string;
         };
+        ProposeStepsInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * @description Decomposition granularity: coarse (3-5), standard (5-8), fine (8-15)
+             * @default standard
+             * @enum {string}
+             */
+            granularity: "coarse" | "standard" | "fine";
+        };
         ProposeStepsOutputBody: {
             /**
              * Format: uri
@@ -7495,7 +7508,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposeStepsInputBody"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {

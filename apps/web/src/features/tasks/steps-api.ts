@@ -8,6 +8,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { sdk } from '../../lib/sdk';
 import { TaskApiError, tasksKeys } from './api';
 
+export type StepGranularity = 'coarse' | 'standard' | 'fine';
+
+export interface ProposeStepsInput {
+  taskId: string;
+  granularity?: StepGranularity;
+}
+
 export interface StepProposal {
   title: string;
   description: string;
@@ -25,10 +32,11 @@ export interface ProposeStepsResult {
  * Calls the AI-backed endpoint to decompose a task into subtask steps.
  */
 export function useProposeSteps() {
-  return useMutation<ProposeStepsResult, TaskApiError, string>({
-    mutationFn: async (taskId) => {
+  return useMutation<ProposeStepsResult, TaskApiError, ProposeStepsInput>({
+    mutationFn: async ({ taskId, granularity }) => {
       const { data, error } = await sdk.POST('/tasks/{id}/propose-steps', {
         params: { path: { id: taskId } },
+        body: { granularity: granularity ?? 'standard' },
       });
       if (error || !data) {
         const err = error as { detail?: string; title?: string; type?: string } | undefined;

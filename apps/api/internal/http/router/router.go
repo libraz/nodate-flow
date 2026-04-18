@@ -668,7 +668,7 @@ func BuildResult(deps Deps) Result {
 		relations.RegisterTaskScoped(subAPI, relationTaskDeps)
 
 		// AI-powered step decomposition (propose + apply).
-		stepsDeps := tasks.StepsDeps{DB: deps.DB, Queries: deps.Queries, AI: aiOrch, Audit: auditRec}
+		stepsDeps := tasks.StepsDeps{DB: deps.DB, Queries: deps.Queries, AI: aiOrch, Embedder: embedClient, Audit: auditRec}
 		tasks.RegisterSteps(subAPI, stepsDeps)
 	})
 

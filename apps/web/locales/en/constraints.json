@@ -17,6 +17,7 @@
     "explain": "Explain",
     "explaining": "Explaining\u2026",
     "explanation": "Explanation",
+    "advanced": "Advanced (kind & JSON expression)",
     "errors": {
       "addFailed": "Failed to add constraint",
       "removeFailed": "Failed to remove constraint",

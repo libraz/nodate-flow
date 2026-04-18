@@ -52,7 +52,13 @@
     "task_transition_reopen": "{actor} reopened this task",
     "task_transition_cancel": "{actor} cancelled this task",
     "signal_attached": "{actor} attached a signal",
-    "comment_added": "{actor} commented"
+    "comment_added": "{actor} commented",
+    "ai_auto_action_proposed": "AI proposed an auto-action",
+    "ai_auto_action_applied": "AI applied an auto-action",
+    "ai_suggestion_created": "AI created a suggestion",
+    "ai_suggestion_applied": "{actor} applied an AI suggestion",
+    "ai_suggestion_dismissed": "{actor} dismissed an AI suggestion",
+    "mcp_tool_invoked": "MCP tool invoked"
   },
   "event_kind": {
     "task_created": "Task created",
@@ -77,6 +83,12 @@
     "task_transition_reopen": "Reopened",
     "task_transition_cancel": "Cancelled",
     "signal_attached": "Signal attached",
-    "comment_added": "Comment added"
+    "comment_added": "Comment added",
+    "ai_auto_action_proposed": "Auto-action proposed",
+    "ai_auto_action_applied": "Auto-action applied",
+    "ai_suggestion_created": "AI suggestion",
+    "ai_suggestion_applied": "Suggestion applied",
+    "ai_suggestion_dismissed": "Suggestion dismissed",
+    "mcp_tool_invoked": "MCP tool"
   }
 }

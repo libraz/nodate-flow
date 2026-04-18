@@ -520,7 +520,11 @@
       "applying": "Creating\u2026",
       "apply_success": "{count, plural, one {# subtask created.} other {# subtasks created.}}",
       "apply_error": "Could not create subtasks. Please try again.",
-      "discard": "Discard"
+      "discard": "Discard",
+      "granularity_label": "Detail level",
+      "granularity_coarse": "Coarse",
+      "granularity_standard": "Standard",
+      "granularity_fine": "Fine"
     },
     "attachments": {
       "title": "Attachments",

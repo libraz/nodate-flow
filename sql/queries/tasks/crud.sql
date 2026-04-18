@@ -182,3 +182,20 @@ INNER JOIN workspaces w
 WHERE v.user_public_id = ?
 ORDER BY v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
+
+-- name: ListChildTasksByParentID :many
+-- List existing child tasks for a given parent task. Used by step
+-- decomposition to avoid suggesting duplicates of already-created steps.
+SELECT
+  t.id,
+  t.public_id,
+  t.title,
+  t.description,
+  t.priority,
+  t.derived_state
+FROM tasks t
+WHERE t.workspace_id = ?
+  AND t.parent_task_id = ?
+  AND t.enabled = TRUE
+ORDER BY t.created_at ASC
+LIMIT 100;

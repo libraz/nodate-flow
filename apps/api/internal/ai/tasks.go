@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/embed"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/ai/providers"
 	"github.com/nodate-flow/nodate-flow/apps/api/internal/db/generated"
 )
@@ -205,6 +207,199 @@ func (o *Orchestrator) ProposePriority(ctx context.Context, workspaceID uint32, 
 		return "", fmt.Errorf("%w: %v", ErrParse, err)
 	}
 	return parsed.Priority, nil
+}
+
+// --------------------------------------------------------------------
+// ProposeSteps — context-aware step decomposition
+// --------------------------------------------------------------------
+
+// Granularity controls how many steps the LLM proposes.
+type Granularity string
+
+const (
+	// GranularityCoarse requests 3-5 high-level steps.
+	GranularityCoarse Granularity = "coarse"
+	// GranularityStandard requests 5-8 steps (default).
+	GranularityStandard Granularity = "standard"
+	// GranularityFine requests 8-15 detailed steps.
+	GranularityFine Granularity = "fine"
+)
+
+// ChildTaskSummary is a lightweight representation of an existing child
+// task, passed to ProposeSteps so the LLM avoids duplicating them.
+type ChildTaskSummary struct {
+	Title string
+	State string
+}
+
+// granularityRange returns the (min, max) step counts for a Granularity.
+func granularityRange(g Granularity) (int, int) {
+	switch g {
+	case GranularityCoarse:
+		return 3, 5
+	case GranularityFine:
+		return 8, 15
+	default:
+		return 5, 8
+	}
+}
+
+// proposeStepsSystemPrompt builds a granularity-aware system prompt.
+func proposeStepsSystemPrompt(g Granularity) string {
+	nMin, nMax := granularityRange(g)
+	return fmt.Sprintf(
+		"You are a task-planning assistant.\n"+
+			"Break the given task into %d-%d concrete execution steps.\n"+
+			"- Do NOT duplicate any items listed under \"Existing Subtasks\".\n"+
+			"- Learn from decomposition patterns in \"Similar Past Tasks\" if provided.\n"+
+			"- Reply ONLY with a JSON array of objects with keys \"title\", \"description\", \"priority\".\n"+
+			"- priority is one of \"low\", \"medium\", \"high\".\n"+
+			"- Return ONLY valid JSON, no prose, no markdown fences.",
+		nMin, nMax,
+	)
+}
+
+const (
+	stepsMaxCandidates = 200
+	stepsTopN          = 10
+)
+
+// ProposeSteps asks the workspace's default LLM provider to decompose a
+// task into subtasks, with awareness of existing child tasks (to avoid
+// duplicates) and similar past tasks (via embedding similarity). The
+// embedClient and reader may be nil; in that case, similar-task context
+// is omitted and only the task text and existing children are used.
+func (o *Orchestrator) ProposeSteps(
+	ctx context.Context,
+	workspaceID uint32,
+	title, description string,
+	granularity Granularity,
+	existingChildren []ChildTaskSummary,
+	embedClient EmbedClient,
+	reader SmartCreateReader,
+) ([]ProposedTask, error) {
+	// ---- guard ----
+	if o == nil || o.Resolver == nil {
+		return nil, ErrNoProvider
+	}
+	if err := o.Guard.Check(ctx, workspaceID); err != nil {
+		return nil, err
+	}
+	prov, err := o.Resolver.Default(ctx, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	if prov == nil {
+		return nil, ErrNoProvider
+	}
+
+	// ---- cache check ----
+	cacheKey := ProposalCacheKey(workspaceID, "propose_steps", title, description, string(granularity))
+	if cached, ok := o.ProposalCache.Get(cacheKey); ok {
+		if tasks, _ := cached.([]ProposedTask); tasks != nil {
+			return tasks, nil
+		}
+	}
+
+	// ---- find similar past tasks (optional) ----
+	var ranked []scoredTask
+	if embedClient != nil && reader != nil {
+		taskText := composeText(title, description)
+		if taskText != "" {
+			queryVec, embedErr := embedClient.Embed(ctx, taskText)
+			if embedErr == nil {
+				embed.Normalize(queryVec)
+				candidates, listErr := reader.ListCandidateTaskEmbeddings(ctx, generated.ListCandidateTaskEmbeddingsParams{
+					WorkspaceID: workspaceID,
+					Model:       embedClient.Model(),
+					TaskID:      0,
+					Limit:       stepsMaxCandidates,
+				})
+				if listErr == nil {
+					ranked = make([]scoredTask, 0, len(candidates))
+					for _, c := range candidates {
+						vec, derr := embed.Decode(toBytes(c.Vector))
+						if derr != nil || len(vec) != len(queryVec) {
+							continue
+						}
+						sim := embed.Cosine(queryVec, vec)
+						ranked = append(ranked, scoredTask{id: c.ID, title: c.Title, score: sim})
+					}
+					sort.Slice(ranked, func(i, j int) bool { return ranked[i].score > ranked[j].score })
+					if len(ranked) > stepsTopN {
+						ranked = ranked[:stepsTopN]
+					}
+				}
+			}
+		}
+	}
+
+	// ---- build user prompt ----
+	userPrompt := buildStepsPrompt(title, description, existingChildren, ranked)
+
+	// ---- call LLM ----
+	req := providers.Request{
+		System: proposeStepsSystemPrompt(granularity),
+		Prompt: userPrompt,
+	}
+	wsIDStr := strconv.FormatUint(uint64(workspaceID), 10)
+	resp, err := prov.Complete(ctx, req)
+	if err != nil {
+		o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, 0)
+		o.logFailure(ctx, workspaceID, "propose_steps", req, err)
+		return nil, fmt.Errorf("ai: provider call failed: %w", err)
+	}
+	o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, resp.CostCents)
+	o.logSuccess(ctx, workspaceID, "propose_steps", req, resp)
+
+	// ---- parse response ----
+	tasks, parseErr := parseProposedTasks(resp.Text)
+	if parseErr != nil {
+		return nil, parseErr
+	}
+	o.ProposalCache.Put(cacheKey, tasks)
+	return tasks, nil
+}
+
+// buildStepsPrompt assembles the user prompt for step decomposition,
+// including the task to decompose, existing children, and similar tasks.
+func buildStepsPrompt(
+	title, description string,
+	children []ChildTaskSummary,
+	similar []scoredTask,
+) string {
+	var b strings.Builder
+
+	b.WriteString("## Task to Decompose\n")
+	b.WriteString("Title: ")
+	b.WriteString(title)
+	b.WriteByte('\n')
+	if description != "" {
+		b.WriteString("Description:\n")
+		b.WriteString(description)
+		b.WriteByte('\n')
+	}
+	b.WriteByte('\n')
+
+	b.WriteString("## Existing Subtasks\n")
+	if len(children) == 0 {
+		b.WriteString("None\n")
+	} else {
+		for _, c := range children {
+			fmt.Fprintf(&b, "- \"%s\" [%s]\n", c.Title, c.State)
+		}
+	}
+	b.WriteByte('\n')
+
+	if len(similar) > 0 {
+		b.WriteString("## Similar Past Tasks\n")
+		for _, s := range similar {
+			fmt.Fprintf(&b, "- \"%s\" (similarity: %.2f)\n", s.title, s.score)
+		}
+		b.WriteByte('\n')
+	}
+
+	return b.String()
 }
 
 // parseProposedTasks tolerates the model wrapping the JSON array in prose

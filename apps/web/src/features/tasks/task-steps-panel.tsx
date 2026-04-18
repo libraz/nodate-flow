@@ -14,7 +14,12 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { type StepProposal, useApplySteps, useProposeSteps } from './steps-api';
+import {
+  type StepGranularity,
+  type StepProposal,
+  useApplySteps,
+  useProposeSteps,
+} from './steps-api';
 
 const PRIORITY_TONE: Record<string, BadgeTone> = {
   low: 'neutral',
@@ -130,6 +135,7 @@ export default function TaskStepsPanel({ taskId }: TaskStepsPanelProps): ReactEl
   const propose = useProposeSteps();
   const apply = useApplySteps();
 
+  const [granularity, setGranularity] = useState<StepGranularity>('standard');
   const [steps, setSteps] = useState<StepProposal[]>([]);
   const [checked, setChecked] = useState<boolean[]>([]);
   const [titles, setTitles] = useState<string[]>([]);
@@ -137,7 +143,7 @@ export default function TaskStepsPanel({ taskId }: TaskStepsPanelProps): ReactEl
 
   const handlePropose = async (): Promise<void> => {
     try {
-      const result = await propose.mutateAsync(taskId);
+      const result = await propose.mutateAsync({ taskId, granularity });
       setSteps(result.steps);
       setChecked(result.steps.map(() => true));
       setTitles(result.steps.map((s) => s.title));
@@ -189,7 +195,41 @@ export default function TaskStepsPanel({ taskId }: TaskStepsPanelProps): ReactEl
       <h2 style={{ margin: 0, fontSize: '1rem' }}>{t('tasks.steps.title')}</h2>
 
       {!hasProposed ? (
-        <div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div>
+            <span
+              style={{
+                display: 'block',
+                fontSize: '0.8125rem',
+                color: 'var(--color-muted)',
+                marginBlockEnd: '0.25rem',
+              }}
+            >
+              {t('tasks.steps.granularity_label')}
+            </span>
+            <div style={{ display: 'inline-flex', gap: '0.25rem' }}>
+              {(['coarse', 'standard', 'fine'] as const).map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => {
+                    setGranularity(g);
+                  }}
+                  style={{
+                    background: granularity === g ? 'var(--color-primary)' : 'transparent',
+                    color: granularity === g ? 'var(--color-on-primary)' : 'var(--color-fg)',
+                    border: '1px solid var(--color-border)',
+                    padding: '0.375rem 0.75rem',
+                    cursor: 'pointer',
+                    fontSize: '0.8125rem',
+                    borderRadius: '0.25rem',
+                  }}
+                >
+                  {t(`tasks.steps.granularity_${g}`)}
+                </button>
+              ))}
+            </div>
+          </div>
           {propose.isPending ? (
             <div
               style={{

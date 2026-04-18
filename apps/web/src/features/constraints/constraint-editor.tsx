@@ -138,36 +138,48 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
       </div>
 
       <form onSubmit={onSubmit}>
-        <FormField label={t('editor.kind')}>
-          {(control) => (
-            <Select
-              {...control}
-              value={kind}
-              onChange={(e) => {
-                const v = e.currentTarget.value;
-                if (isKind(v)) setKind(v);
-              }}
-            >
-              {KINDS.map((k) => (
-                <option key={k} value={k}>
-                  {t(`editor.kinds.${k}`)}
-                </option>
-              ))}
-            </Select>
-          )}
-        </FormField>
-        <FormField label={t('editor.expression')}>
-          {(control) => (
-            <Textarea
-              {...control}
-              value={expression}
-              placeholder={t('editor.placeholder')}
-              onChange={(e) => setExpression(e.currentTarget.value)}
-              rows={4}
-              spellCheck={false}
-            />
-          )}
-        </FormField>
+        <details style={{ marginBlockEnd: '0.5rem' }} open={expression.length > 0}>
+          <summary
+            style={{
+              cursor: 'pointer',
+              color: 'var(--color-muted)',
+              fontSize: '0.8125rem',
+              marginBlockEnd: '0.375rem',
+            }}
+          >
+            {t('editor.advanced')}
+          </summary>
+          <FormField label={t('editor.kind')}>
+            {(control) => (
+              <Select
+                {...control}
+                value={kind}
+                onChange={(e) => {
+                  const v = e.currentTarget.value;
+                  if (isKind(v)) setKind(v);
+                }}
+              >
+                {KINDS.map((k) => (
+                  <option key={k} value={k}>
+                    {t(`editor.kinds.${k}`)}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </FormField>
+          <FormField label={t('editor.expression')}>
+            {(control) => (
+              <Textarea
+                {...control}
+                value={expression}
+                placeholder={t('editor.placeholder')}
+                onChange={(e) => setExpression(e.currentTarget.value)}
+                rows={4}
+                spellCheck={false}
+              />
+            )}
+          </FormField>
+        </details>
         <div>
           <Button type="submit" disabled={addMut.isPending || !expression.trim()}>
             {t('editor.add')}
