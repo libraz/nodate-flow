@@ -25,8 +25,9 @@ INSERT INTO tasks (
   priority,
   due_on,
   started_on,
+  event_on,
   visibility
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateTaskParams struct {
@@ -40,6 +41,7 @@ type CreateTaskParams struct {
 	Priority        int32           `json:"priority"`
 	DueOn           sql.NullTime    `json:"dueOn"`
 	StartedOn       sql.NullTime    `json:"startedOn"`
+	EventOn         sql.NullTime    `json:"eventOn"`
 	Visibility      TasksVisibility `json:"visibility"`
 }
 
@@ -57,6 +59,7 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (int64, 
 		arg.Priority,
 		arg.DueOn,
 		arg.StartedOn,
+		arg.EventOn,
 		arg.Visibility,
 	)
 	if err != nil {
@@ -98,6 +101,7 @@ SELECT
   v.priority,
   v.due_on,
   v.started_on,
+  v.event_on,
   v.completed_at,
   v.constraint_count,
   v.constraint_satisfied_count,
@@ -131,6 +135,7 @@ type FindTaskByPublicIdRow struct {
 	Priority                 int32             `json:"priority"`
 	DueOn                    sql.NullTime      `json:"dueOn"`
 	StartedOn                sql.NullTime      `json:"startedOn"`
+	EventOn                  sql.NullTime      `json:"eventOn"`
 	CompletedAt              sql.NullTime      `json:"completedAt"`
 	ConstraintCount          int64             `json:"constraintCount"`
 	ConstraintSatisfiedCount int64             `json:"constraintSatisfiedCount"`
@@ -159,6 +164,7 @@ func (q *Queries) FindTaskByPublicId(ctx context.Context, arg FindTaskByPublicId
 		&i.Priority,
 		&i.DueOn,
 		&i.StartedOn,
+		&i.EventOn,
 		&i.CompletedAt,
 		&i.ConstraintCount,
 		&i.ConstraintSatisfiedCount,
@@ -326,6 +332,8 @@ SELECT
   v.derived_state,
   v.priority,
   v.due_on,
+  v.started_on,
+  v.event_on,
   v.actor_role,
   v.updated_at,
   v.created_at,
@@ -354,6 +362,8 @@ type ListMyTasksGlobalRow struct {
 	DerivedState      TasksDerivedState `json:"derivedState"`
 	Priority          int32             `json:"priority"`
 	DueOn             sql.NullTime      `json:"dueOn"`
+	StartedOn         sql.NullTime      `json:"startedOn"`
+	EventOn           sql.NullTime      `json:"eventOn"`
 	ActorRole         TaskActorsRole    `json:"actorRole"`
 	UpdatedAt         sql.NullTime      `json:"updatedAt"`
 	CreatedAt         time.Time         `json:"createdAt"`
@@ -384,6 +394,8 @@ func (q *Queries) ListMyTasksGlobal(ctx context.Context, arg ListMyTasksGlobalPa
 			&i.DerivedState,
 			&i.Priority,
 			&i.DueOn,
+			&i.StartedOn,
+			&i.EventOn,
 			&i.ActorRole,
 			&i.UpdatedAt,
 			&i.CreatedAt,
@@ -414,6 +426,7 @@ SELECT
   v.priority,
   v.due_on,
   v.started_on,
+  v.event_on,
   v.completed_at,
   v.sort_weight,
   v.updated_at,
@@ -446,6 +459,7 @@ type ListTasksForProjectRow struct {
 	Priority                int32             `json:"priority"`
 	DueOn                   sql.NullTime      `json:"dueOn"`
 	StartedOn               sql.NullTime      `json:"startedOn"`
+	EventOn                 sql.NullTime      `json:"eventOn"`
 	CompletedAt             sql.NullTime      `json:"completedAt"`
 	SortWeight              int32             `json:"sortWeight"`
 	UpdatedAt               sql.NullTime      `json:"updatedAt"`
@@ -481,6 +495,7 @@ func (q *Queries) ListTasksForProject(ctx context.Context, arg ListTasksForProje
 			&i.Priority,
 			&i.DueOn,
 			&i.StartedOn,
+			&i.EventOn,
 			&i.CompletedAt,
 			&i.SortWeight,
 			&i.UpdatedAt,
@@ -514,6 +529,7 @@ SELECT
   v.priority,
   v.due_on,
   v.started_on,
+  v.event_on,
   v.completed_at,
   v.sort_weight,
   v.updated_at,
@@ -544,6 +560,7 @@ type ListTasksForWorkspaceRow struct {
 	Priority                int32             `json:"priority"`
 	DueOn                   sql.NullTime      `json:"dueOn"`
 	StartedOn               sql.NullTime      `json:"startedOn"`
+	EventOn                 sql.NullTime      `json:"eventOn"`
 	CompletedAt             sql.NullTime      `json:"completedAt"`
 	SortWeight              int32             `json:"sortWeight"`
 	UpdatedAt               sql.NullTime      `json:"updatedAt"`
@@ -574,6 +591,7 @@ func (q *Queries) ListTasksForWorkspace(ctx context.Context, arg ListTasksForWor
 			&i.Priority,
 			&i.DueOn,
 			&i.StartedOn,
+			&i.EventOn,
 			&i.CompletedAt,
 			&i.SortWeight,
 			&i.UpdatedAt,
@@ -631,6 +649,7 @@ SET title = ?,
     priority = ?,
     due_on = ?,
     started_on = ?,
+    event_on = ?,
     sort_weight = ?,
     visibility = ?
 WHERE workspace_id = ?
@@ -644,6 +663,7 @@ type UpdateTaskParams struct {
 	Priority    int32           `json:"priority"`
 	DueOn       sql.NullTime    `json:"dueOn"`
 	StartedOn   sql.NullTime    `json:"startedOn"`
+	EventOn     sql.NullTime    `json:"eventOn"`
 	SortWeight  int32           `json:"sortWeight"`
 	Visibility  TasksVisibility `json:"visibility"`
 	WorkspaceID uint32          `json:"-"`
@@ -658,6 +678,7 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) error {
 		arg.Priority,
 		arg.DueOn,
 		arg.StartedOn,
+		arg.EventOn,
 		arg.SortWeight,
 		arg.Visibility,
 		arg.WorkspaceID,

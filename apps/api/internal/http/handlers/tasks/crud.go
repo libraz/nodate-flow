@@ -242,6 +242,10 @@ WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 		if err != nil {
 			return nil, httpErr(apierrors.ValidationBodyDateFormatInvalid)
 		}
+		event, err := parseDateOrNullTime(in.Body.EventOn)
+		if err != nil {
+			return nil, httpErr(apierrors.ValidationBodyDateFormatInvalid)
+		}
 
 		pub := types.New()
 		desc := sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""}
@@ -260,6 +264,7 @@ WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 			Priority:        in.Body.Priority,
 			DueOn:           due,
 			StartedOn:       start,
+			EventOn:         event,
 			Visibility:      vis,
 		})
 		if err != nil {
@@ -506,6 +511,14 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			}
 			newStart = parsed
 		}
+		newEvent := current.EventOn
+		if in.Body.EventOn != nil {
+			parsed, err := parseDateOrNullTime(*in.Body.EventOn)
+			if err != nil {
+				return nil, httpErr(apierrors.ValidationBodyDateFormatInvalid)
+			}
+			newEvent = parsed
+		}
 		newSortWeight := current.SortWeight
 		if in.Body.SortWeight != nil {
 			newSortWeight = *in.Body.SortWeight
@@ -521,6 +534,7 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			Priority:    newPriority,
 			DueOn:       newDue,
 			StartedOn:   newStart,
+			EventOn:     newEvent,
 			SortWeight:  newSortWeight,
 			Visibility:  newVisibility,
 			WorkspaceID: ws.ID,

@@ -2693,6 +2693,8 @@ export interface components {
             description?: string;
             /** @description YYYY-MM-DD */
             dueOn?: string;
+            /** @description YYYY-MM-DD event or milestone date */
+            eventOn?: string;
             /** Format: int32 */
             priority?: number;
             /** @description Project public id (UUID v7) */
@@ -3594,6 +3596,7 @@ export interface components {
             createdAt: string;
             derivedState: string;
             dueOn?: string;
+            eventOn?: string;
             id: string;
             /** Format: int32 */
             priority: number;
@@ -3793,6 +3796,8 @@ export interface components {
             description?: string;
             /** @description YYYY-MM-DD or empty string to clear */
             dueOn?: string;
+            /** @description YYYY-MM-DD or empty string to clear */
+            eventOn?: string;
             /** Format: int32 */
             priority?: number;
             /**
@@ -4337,6 +4342,7 @@ export interface components {
             derivedState: string;
             description?: string;
             dueOn?: string;
+            eventOn?: string;
             id: string;
             parentTaskId?: string;
             /** Format: int32 */
@@ -4503,6 +4509,7 @@ export interface components {
             createdAt: string;
             derivedState: string;
             dueOn?: string;
+            eventOn?: string;
             id: string;
             parentTaskId?: string;
             primaryAssigneeId: string | null;

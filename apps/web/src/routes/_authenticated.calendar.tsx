@@ -131,6 +131,7 @@ function QuickCreateDialog({
   const [projectId, setProjectId] = useState<string>(projects[0]?.id ?? '');
   const [startOn, setStartOn] = useState(dueOn);
   const [endOn, setEndOn] = useState(dueOn);
+  const [eventOn, setEventOn] = useState('');
 
   // Sync defaults when the dialog opens for a different date.
   const prevDueOn = useRef(dueOn);
@@ -138,6 +139,7 @@ function QuickCreateDialog({
     prevDueOn.current = dueOn;
     setStartOn(dueOn);
     setEndOn(dueOn);
+    setEventOn('');
   }
 
   const createMut = useMutation({
@@ -148,6 +150,7 @@ function QuickCreateDialog({
           title: title.trim(),
           ...(description.trim() ? { description: description.trim() } : {}),
           ...(startOn ? { startOn } : {}),
+          ...(eventOn ? { eventOn } : {}),
           dueOn: endOn || dueOn,
           priority,
           visibility: 'project',
@@ -163,6 +166,7 @@ function QuickCreateDialog({
       setPriority(2);
       setStartOn(dueOn);
       setEndOn(dueOn);
+      setEventOn('');
       onCreated();
     },
     onError: () => {
@@ -183,6 +187,7 @@ function QuickCreateDialog({
     setPriority(2);
     setStartOn(dueOn);
     setEndOn(dueOn);
+    setEventOn('');
     onClose();
   };
 
@@ -237,6 +242,17 @@ function QuickCreateDialog({
             )}
           </FormField>
         </div>
+
+        <FormField label={t('tasks.form.event')}>
+          {(control) => (
+            <Input
+              {...control}
+              type="date"
+              value={eventOn}
+              onChange={(e) => setEventOn(e.currentTarget.value)}
+            />
+          )}
+        </FormField>
 
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           {projects.length > 1 ? (
@@ -431,6 +447,24 @@ function CalendarRoute(): ReactElement {
     return map;
   }, [tasks]);
 
+  /** eventOn → tasks whose event date falls on this cell (separate from due). */
+  const eventByDate = useMemo(() => {
+    const map = new Map<string, CalendarTask[]>();
+    for (const task of tasks) {
+      if (!task.eventOn) continue;
+      if (task.derivedState === 'cancelled') continue;
+      // Skip if eventOn === dueOn (already shown in the due list).
+      if (task.eventOn === task.dueOn) continue;
+      const arr = map.get(task.eventOn);
+      if (arr) {
+        arr.push(task);
+      } else {
+        map.set(task.eventOn, [task]);
+      }
+    }
+    return map;
+  }, [tasks]);
+
   const todayKey = dateKey(today);
   const monthLabel = useMemo(
     () =>
@@ -558,6 +592,8 @@ function CalendarRoute(): ReactElement {
         >
           {cells.map((cell) => {
             const dayTasks = byDate.get(cell.key) ?? [];
+            const dayEvents = eventByDate.get(cell.key) ?? [];
+            const totalCount = dayTasks.length + dayEvents.length;
             const isToday = cell.key === todayKey;
             const isDragOver = dragOverKey === cell.key;
             return (
@@ -618,7 +654,7 @@ function CalendarRoute(): ReactElement {
                   }}
                 >
                   <span>{cell.date.getDate()}</span>
-                  {dayTasks.length > 0 ? <span>{dayTasks.length}</span> : null}
+                  {totalCount > 0 ? <span>{totalCount}</span> : null}
                 </div>
                 <ul
                   style={{
@@ -694,6 +730,52 @@ function CalendarRoute(): ReactElement {
                       {t('calendar.more', { count: dayTasks.length - 3 })}
                     </li>
                   ) : null}
+                  {dayEvents.slice(0, 2).map((task) => (
+                    <li key={`ev-${task.id}`}>
+                      <Link
+                        to="/tasks/$taskId"
+                        params={{ taskId: task.id }}
+                        title={`${task.title} · ${t('tasks.form.event')}`}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                          fontSize: '0.75rem',
+                          color: 'inherit',
+                          textDecoration: 'none',
+                          padding: '0.125rem 0.25rem',
+                          borderRadius: '0.25rem',
+                          background: 'var(--nf-color-accent-subtle, rgba(155,89,182,0.08))',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                        }}
+                      >
+                        <span
+                          aria-hidden
+                          style={{
+                            inlineSize: '0.5rem',
+                            blockSize: '0.5rem',
+                            transform: 'rotate(45deg)',
+                            background: 'var(--color-accent, #9b59b6)',
+                            flexShrink: 0,
+                          }}
+                        />
+                        <span
+                          style={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {task.title}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
                 </ul>
               </div>
             );

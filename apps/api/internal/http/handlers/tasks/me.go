@@ -62,6 +62,7 @@ func rowToMyTaskListItem(r generated.ListMyTasksGlobalRow) MyTaskListItem {
 		DerivedState:  string(r.DerivedState),
 		Priority:      r.Priority,
 		DueOn:         nullDate(r.DueOn),
+		EventOn:       nullDate(r.EventOn),
 		ActorRole:     string(r.ActorRole),
 		UpdatedAt:     nullTime(r.UpdatedAt),
 		CreatedAt:     r.CreatedAt,

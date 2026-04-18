@@ -1269,6 +1269,10 @@
             "description": "YYYY-MM-DD",
             "type": "string"
           },
+          "eventOn": {
+            "description": "YYYY-MM-DD event or milestone date",
+            "type": "string"
+          },
           "priority": {
             "format": "int32",
             "maximum": 4,
@@ -3370,6 +3374,9 @@
           "dueOn": {
             "type": "string"
           },
+          "eventOn": {
+            "type": "string"
+          },
           "id": {
             "type": "string"
           },
@@ -3872,6 +3879,10 @@
             "type": "string"
           },
           "dueOn": {
+            "description": "YYYY-MM-DD or empty string to clear",
+            "type": "string"
+          },
+          "eventOn": {
             "description": "YYYY-MM-DD or empty string to clear",
             "type": "string"
           },
@@ -5064,6 +5075,9 @@
           "dueOn": {
             "type": "string"
           },
+          "eventOn": {
+            "type": "string"
+          },
           "id": {
             "type": "string"
           },
@@ -5503,6 +5517,9 @@
             "type": "string"
           },
           "dueOn": {
+            "type": "string"
+          },
+          "eventOn": {
             "type": "string"
           },
           "id": {

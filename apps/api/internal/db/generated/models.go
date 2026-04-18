@@ -2022,6 +2022,8 @@ type Task struct {
 	DueOn sql.NullTime `json:"dueOn"`
 	// Started date
 	StartedOn sql.NullTime `json:"startedOn"`
+	// Event or milestone date
+	EventOn sql.NullTime `json:"eventOn"`
 	// Time derived_state transitioned to done
 	CompletedAt sql.NullTime `json:"completedAt"`
 	// ACL Layer 4: public=workspace members, project=project members, private=task actors only
@@ -2314,6 +2316,8 @@ type VMyTask struct {
 	DerivedState    TasksDerivedState `json:"derivedState"`
 	Priority        int32             `json:"priority"`
 	DueOn           sql.NullTime      `json:"dueOn"`
+	StartedOn       sql.NullTime      `json:"startedOn"`
+	EventOn         sql.NullTime      `json:"eventOn"`
 	ActorRole       TaskActorsRole    `json:"actorRole"`
 	UpdatedAt       sql.NullTime      `json:"updatedAt"`
 	CreatedAt       time.Time         `json:"createdAt"`
@@ -2362,6 +2366,7 @@ type VTaskDetail struct {
 	Priority                 int32             `json:"priority"`
 	DueOn                    sql.NullTime      `json:"dueOn"`
 	StartedOn                sql.NullTime      `json:"startedOn"`
+	EventOn                  sql.NullTime      `json:"eventOn"`
 	CompletedAt              sql.NullTime      `json:"completedAt"`
 	ConstraintCount          int64             `json:"constraintCount"`
 	ConstraintSatisfiedCount int64             `json:"constraintSatisfiedCount"`
@@ -2387,6 +2392,7 @@ type VTaskList struct {
 	Priority                int32             `json:"priority"`
 	DueOn                   sql.NullTime      `json:"dueOn"`
 	StartedOn               sql.NullTime      `json:"startedOn"`
+	EventOn                 sql.NullTime      `json:"eventOn"`
 	CompletedAt             sql.NullTime      `json:"completedAt"`
 	SortWeight              int32             `json:"sortWeight"`
 	UpdatedAt               sql.NullTime      `json:"updatedAt"`

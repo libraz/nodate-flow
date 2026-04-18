@@ -24,6 +24,7 @@ SELECT
   v.priority,
   v.due_on,
   v.started_on,
+  v.event_on,
   v.completed_at,
   v.sort_weight,
   v.updated_at,
@@ -58,6 +59,7 @@ type SearchTasksRow struct {
 	Priority                int32             `json:"priority"`
 	DueOn                   sql.NullTime      `json:"dueOn"`
 	StartedOn               sql.NullTime      `json:"startedOn"`
+	EventOn                 sql.NullTime      `json:"eventOn"`
 	CompletedAt             sql.NullTime      `json:"completedAt"`
 	SortWeight              int32             `json:"sortWeight"`
 	UpdatedAt               sql.NullTime      `json:"updatedAt"`
@@ -94,6 +96,7 @@ func (q *Queries) SearchTasks(ctx context.Context, arg SearchTasksParams) ([]Sea
 			&i.Priority,
 			&i.DueOn,
 			&i.StartedOn,
+			&i.EventOn,
 			&i.CompletedAt,
 			&i.SortWeight,
 			&i.UpdatedAt,

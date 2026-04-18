@@ -11,6 +11,7 @@ SELECT
   v.priority,
   v.due_on,
   v.started_on,
+  v.event_on,
   v.completed_at,
   v.sort_weight,
   v.updated_at,

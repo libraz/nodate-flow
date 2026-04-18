@@ -512,6 +512,7 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		Priority    int32  `json:"priority"`
 		DueOn       string `json:"dueOn"`
 		StartOn     string `json:"startOn"`
+		EventOn     string `json:"eventOn"`
 	}
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
@@ -534,6 +535,10 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	if err != nil {
 		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 	}
+	event, err := parseDateOrNull(in.EventOn)
+	if err != nil {
+		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+	}
 	pub := newPublicID()
 	desc := sql.NullString{String: in.Description, Valid: in.Description != ""}
 	taskID, err := deps.Queries.CreateTask(ctx, generated.CreateTaskParams{
@@ -547,6 +552,7 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		Priority:        in.Priority,
 		DueOn:           due,
 		StartedOn:       start,
+		EventOn:         event,
 	})
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
@@ -574,6 +580,7 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		Priority    *int32  `json:"priority"`
 		DueOn       *string `json:"dueOn"`
 		StartOn     *string `json:"startOn"`
+		EventOn     *string `json:"eventOn"`
 	}
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
@@ -620,12 +627,21 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		}
 		start = p
 	}
+	evt := current.EventOn
+	if in.EventOn != nil {
+		p, err := parseDateOrNull(*in.EventOn)
+		if err != nil {
+			return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+		}
+		evt = p
+	}
 	if err := deps.Queries.UpdateTask(ctx, generated.UpdateTaskParams{
 		Title:       title,
 		Description: desc,
 		Priority:    prio,
 		DueOn:       due,
 		StartedOn:   start,
+		EventOn:     evt,
 		WorkspaceID: s.workspaceID,
 		PublicID:    pub,
 	}); err != nil {
@@ -1407,6 +1423,7 @@ func runExportTasks(ctx context.Context, deps Deps, s *session, raw json.RawMess
 		Priority            int32
 		DueOn               sql.NullTime
 		StartedOn           sql.NullTime
+		EventOn             sql.NullTime
 		ProjectName         string
 		AssigneeDisplayName sql.NullString
 	}
@@ -1433,6 +1450,7 @@ func runExportTasks(ctx context.Context, deps Deps, s *session, raw json.RawMess
 				Priority:            r.Priority,
 				DueOn:               r.DueOn,
 				StartedOn:           r.StartedOn,
+				EventOn:             r.EventOn,
 				ProjectName:         r.ProjectName,
 				AssigneeDisplayName: r.AssigneeDisplayName,
 			})
@@ -1454,6 +1472,7 @@ func runExportTasks(ctx context.Context, deps Deps, s *session, raw json.RawMess
 				Priority:            r.Priority,
 				DueOn:               r.DueOn,
 				StartedOn:           r.StartedOn,
+				EventOn:             r.EventOn,
 				ProjectName:         r.ProjectName,
 				AssigneeDisplayName: r.AssigneeDisplayName,
 			})

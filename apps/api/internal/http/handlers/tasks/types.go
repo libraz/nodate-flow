@@ -107,6 +107,7 @@ type Task struct {
 	Priority                 int32     `json:"priority"`
 	DueOn                    string    `json:"dueOn,omitempty"`
 	StartedOn                string    `json:"startedOn,omitempty"`
+	EventOn                  string    `json:"eventOn,omitempty"`
 	CompletedAt              *time.Time `json:"completedAt,omitempty"`
 	ConstraintCount          int64      `json:"constraintCount"`
 	ConstraintSatisfiedCount int64      `json:"constraintSatisfiedCount"`
@@ -129,6 +130,7 @@ type TaskListItem struct {
 	Priority           int32     `json:"priority"`
 	DueOn              string    `json:"dueOn,omitempty"`
 	StartedOn          string    `json:"startedOn,omitempty"`
+	EventOn            string    `json:"eventOn,omitempty"`
 	CompletedAt        *time.Time `json:"completedAt,omitempty"`
 	SortWeight         int32      `json:"sortWeight"`
 	PrimaryAssigneeID  *string    `json:"primaryAssigneeId"`
@@ -209,6 +211,7 @@ type CreateTaskBody struct {
 	Priority    int32  `json:"priority,omitempty" minimum:"0" maximum:"4"`
 	DueOn       string `json:"dueOn,omitempty" doc:"YYYY-MM-DD"`
 	StartOn     string `json:"startOn,omitempty" doc:"YYYY-MM-DD"`
+	EventOn     string `json:"eventOn,omitempty" doc:"YYYY-MM-DD event or milestone date"`
 	Visibility  string `json:"visibility,omitempty" enum:"public,project,private" default:"public" doc:"Task visibility: public (workspace), project (project members), or private (task actors only)"`
 }
 
@@ -259,6 +262,7 @@ type MyTaskListItem struct {
 	DerivedState  string     `json:"derivedState"`
 	Priority      int32      `json:"priority"`
 	DueOn         string     `json:"dueOn,omitempty"`
+	EventOn       string     `json:"eventOn,omitempty"`
 	ActorRole     string     `json:"actorRole"`
 	UpdatedAt     *time.Time `json:"updatedAt,omitempty"`
 	CreatedAt     time.Time  `json:"createdAt"`
@@ -298,6 +302,7 @@ type PatchTaskBody struct {
 	Priority    *int32  `json:"priority,omitempty" minimum:"0" maximum:"4"`
 	DueOn       *string `json:"dueOn,omitempty" doc:"YYYY-MM-DD or empty string to clear"`
 	StartOn     *string `json:"startOn,omitempty" doc:"YYYY-MM-DD or empty string to clear"`
+	EventOn     *string `json:"eventOn,omitempty" doc:"YYYY-MM-DD or empty string to clear"`
 	SortWeight  *int32  `json:"sortWeight,omitempty" doc:"Display order weight. Lower values sort first."`
 	Visibility  *string `json:"visibility,omitempty" enum:"public,project,private" doc:"Task visibility: public (workspace), project (project members), or private (task actors only)"`
 }
