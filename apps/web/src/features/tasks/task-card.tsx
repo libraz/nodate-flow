@@ -22,6 +22,14 @@ export interface TaskCardProps {
   onSelect: (taskId: string) => void;
 }
 
+function formatDateShort(iso: string, locale: string): string {
+  try {
+    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(iso));
+  } catch {
+    return iso;
+  }
+}
+
 const PRIORITY_TONE: Record<TaskPriority, BadgeTone> = {
   0: 'neutral',
   1: 'info',
@@ -45,7 +53,8 @@ export default function TaskCard({
   onDragEnd,
   onSelect,
 }: TaskCardProps): ReactElement {
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
+  const locale = i18n.resolvedLanguage ?? 'en';
   const priority = (task.priority as TaskPriority) ?? 0;
   const tone = PRIORITY_TONE[priority] ?? 'neutral';
   const priorityLabel = t(PRIORITY_KEY[priority] ?? 'tasks.priority.none');
@@ -118,7 +127,7 @@ export default function TaskCard({
         <Badge tone={tone}>{priorityLabel}</Badge>
         {task.dueOn ? (
           <Badge tone="neutral" aria-label={t('tasks.columns.due')}>
-            {task.dueOn}
+            {formatDateShort(task.dueOn, locale)}
           </Badge>
         ) : null}
         {blockedByOpenCount > 0 ? (

@@ -364,11 +364,13 @@ function InlinePriorityCell({
     );
   }
 
+  const label = t(PRIORITY_KEY[p] ?? 'tasks.priority.none');
   return (
     <span
       role="button"
       tabIndex={0}
-      aria-label={t('tasks.inline.edit_priority')}
+      title={t('tasks.inline.edit_priority')}
+      aria-label={`${label} — ${t('tasks.inline.edit_priority')}`}
       onClick={onStartEdit}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -394,7 +396,7 @@ function InlinePriorityCell({
           flexShrink: 0,
         }}
       />
-      {t(PRIORITY_KEY[p] ?? 'tasks.priority.none')}
+      {label}
     </span>
   );
 }
@@ -405,12 +407,14 @@ function InlineDueCell({
   onStartEdit,
   onStopEdit,
   onSave,
+  locale,
 }: {
   task: TaskListItem;
   editing: boolean;
   onStartEdit: () => void;
   onStopEdit: () => void;
   onSave: (dueOn: string) => void;
+  locale: string;
 }): ReactElement {
   const { t } = useTranslation('common');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -458,11 +462,13 @@ function InlineDueCell({
     );
   }
 
+  const displayDate = dueOn ? formatDate(dueOn, locale) : '—';
   return (
     <span
       role="button"
       tabIndex={0}
-      aria-label={t('tasks.inline.edit_due')}
+      title={t('tasks.inline.edit_due')}
+      aria-label={`${displayDate} — ${t('tasks.inline.edit_due')}`}
       onClick={onStartEdit}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -476,7 +482,7 @@ function InlineDueCell({
         cursor: 'pointer',
       }}
     >
-      {dueOn ?? '—'}
+      {displayDate}
     </span>
   );
 }
@@ -725,6 +731,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
           onStartEdit={() => inlineEdit.startEdit(row.original.id, 'due')}
           onStopEdit={inlineEdit.stopEdit}
           onSave={(dueOn) => handleInlineSave(row.original.id, { dueOn })}
+          locale={locale}
         />
       ),
     },

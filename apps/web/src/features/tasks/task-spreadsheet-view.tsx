@@ -509,7 +509,7 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
 
     return (
       <span className={overdue ? css.overdueText : undefined}>
-        {dueOn ?? <span className={css.mutedText}>—</span>}
+        {dueOn ? formatDate(dueOn, locale) : <span className={css.mutedText}>—</span>}
       </span>
     );
   };
