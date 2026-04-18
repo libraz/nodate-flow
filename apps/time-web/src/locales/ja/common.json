@@ -1,0 +1,37 @@
+{
+  "calendar": {
+    "month": "月",
+    "week": "週",
+    "today": "今日",
+    "newEvent": "新しい予定",
+    "allDay": "終日"
+  },
+  "event": {
+    "title": "タイトル",
+    "start": "開始",
+    "end": "終了",
+    "location": "場所",
+    "memo": "メモ",
+    "kind": { "event": "予定", "block": "時間枠", "free": "空き" },
+    "showAs": { "busy": "予定あり", "free": "空き", "tentative": "仮", "oof": "不在" },
+    "visibility": {
+      "default": "デフォルト",
+      "public": "公開",
+      "private": "非公開",
+      "confidential": "極秘"
+    }
+  },
+  "auth": {
+    "login": "ログイン",
+    "register": "アカウント作成",
+    "email": "メールアドレス",
+    "password": "パスワード",
+    "displayName": "表示名",
+    "logout": "ログアウト"
+  },
+  "sidebar": {
+    "sharedCalendars": "共有カレンダー",
+    "myCalendar": "マイカレンダー",
+    "other": "その他"
+  }
+}

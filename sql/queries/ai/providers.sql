@@ -2,7 +2,7 @@
 -- ai/providers.sql
 -- WARNING: api_key_ciphertext is a write-only secret. The only query in this
 -- file that reads it is FindProviderForDecrypt, which is reserved for the
--- apps/api/internal/ai/providers/ package via golangci-lint depguard.
+-- apps/flow-api/internal/ai/providers/ package via golangci-lint depguard.
 -- All list / read queries MUST exclude api_key_ciphertext.
 -- ============================================================================
 
@@ -53,7 +53,7 @@ LIMIT 1;
 -- name: FindProviderForDecrypt :one
 -- INTERNAL USE ONLY. Returns api_key_ciphertext for the providers package
 -- to decrypt before calling the upstream LLM. Must NOT be called from
--- handlers, MCP tools, or any code outside apps/api/internal/ai/providers/.
+-- handlers, MCP tools, or any code outside apps/flow-api/internal/ai/providers/.
 SELECT
   id,
   public_id,

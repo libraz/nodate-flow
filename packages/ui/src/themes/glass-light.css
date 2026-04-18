@@ -1,0 +1,63 @@
+/*
+ * glass-light — frosted glass morphism, blue accent, high blur.
+ */
+
+[data-theme="glass-light"] {
+  color-scheme: light;
+
+  --nf-color-bg: oklch(98% 0.005 250);
+  --nf-color-bg-elevated: oklch(99% 0.003 250);
+  --nf-color-bg-sunken: oklch(95% 0.007 250);
+  --nf-color-surface: oklch(100% 0 0 / 0.72);
+  --nf-color-surface-hover: oklch(100% 0 0 / 0.82);
+  --nf-color-overlay: oklch(0% 0 0 / 0.3);
+
+  --nf-color-fg: oklch(18% 0.02 250);
+  --nf-color-fg-muted: oklch(42% 0.016 250);
+  --nf-color-fg-subtle: oklch(58% 0.012 250);
+  --nf-color-fg-on-accent: oklch(99% 0.005 250);
+
+  --nf-color-border: oklch(90% 0.008 250);
+  --nf-color-border-strong: oklch(78% 0.01 250);
+  --nf-color-hairline: oklch(90% 0.008 250);
+
+  --nf-color-accent: oklch(60% 0.22 260);
+  --nf-color-accent-hover: oklch(55% 0.22 260);
+  --nf-color-accent-active: oklch(50% 0.22 260);
+  --nf-color-accent-subtle: oklch(95% 0.03 260);
+
+  --nf-color-success: oklch(68% 0.16 150);
+  --nf-color-warning: oklch(78% 0.15 75);
+  --nf-color-danger: oklch(60% 0.21 25);
+  --nf-color-info: oklch(70% 0.13 240);
+
+  --nf-color-focus-ring: oklch(60% 0.22 260);
+  --nf-focus-ring-width: 2px;
+  --nf-focus-ring-offset: 2px;
+
+  --nf-radius-xs: 0.375rem;
+  --nf-radius-sm: 0.5rem;
+  --nf-radius-md: 0.625rem;
+  --nf-radius-lg: 1.125rem;
+  --nf-radius-pill: 9999px;
+
+  --nf-shadow-sm: 0 1px 2px oklch(0% 0 0 / 0.05);
+  --nf-shadow-md: 0 6px 20px oklch(0% 0 0 / 0.07);
+  --nf-shadow-lg: 0 16px 44px oklch(0% 0 0 / 0.1);
+  --nf-shadow-focus: 0 0 0 var(--nf-focus-ring-offset) var(--nf-color-bg), 0 0 0
+    calc(var(--nf-focus-ring-offset) + var(--nf-focus-ring-width)) var(--nf-color-focus-ring);
+
+  --nf-surface-blur: 40px;
+  --nf-surface-saturation: 1.5;
+
+  --nf-motion-duration: var(--nf-duration-base);
+  --nf-motion-easing: var(--nf-ease-emphasized);
+
+  /* Brand wordmark gradient — blue system accent sweep. */
+  --nf-gradient-wordmark: linear-gradient(
+    115deg,
+    oklch(62% 0.2 250) 0%,
+    oklch(56% 0.22 270) 50%,
+    oklch(64% 0.18 290) 100%
+  );
+}

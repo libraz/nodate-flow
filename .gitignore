@@ -36,9 +36,15 @@ vendor/
 *.test
 *.out
 # stray binaries from `go build ./cmd/<name>` run without -o
-/apps/api/api
-/apps/api/secrets-rotate
-/apps/api/dump-openapi
+/apps/flow-api/api
+/apps/flow-api/secrets-rotate
+/apps/flow-api/dump-openapi
+/apps/flow-api/seed-dev
+/apps/flow-api/healthcheck
+/apps/time-api/api
+/apps/time-api/dump-openapi
+/apps/time-api/healthcheck
+/healthcheck
 go.sum.bak
 
 # ---- Python (scripts) ----
@@ -77,4 +83,4 @@ CLAUDE.md
 # ---- Docs (local only) ----
 docs/
 
-apps/api/seed-dev
+apps/flow-api/seed-dev

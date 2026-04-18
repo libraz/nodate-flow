@@ -1,6 +1,30 @@
 {
   "components": {
     "schemas": {
+      "AcceptWorkspaceInviteOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AcceptWorkspaceInviteOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "description": "Workspace public id for client redirect",
+            "type": "string"
+          },
+          "workspaceName": {
+            "type": "string"
+          }
+        },
+        "required": ["workspaceId", "workspaceName", "role"],
+        "type": "object"
+      },
       "AddProjectMemberBody": {
         "additionalProperties": false,
         "properties": {
@@ -1417,6 +1441,64 @@
         "required": ["slug", "name"],
         "type": "object"
       },
+      "CreateWorkspaceInviteInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateWorkspaceInviteInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "email": {
+            "maxLength": 320,
+            "type": "string"
+          },
+          "expiresIn": {
+            "description": "Seconds until invite expires",
+            "format": "int64",
+            "minimum": 60,
+            "type": "integer"
+          },
+          "label": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "maxUses": {
+            "format": "int32",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "role": {
+            "enum": ["owner", "admin", "member", "guest"],
+            "type": "string"
+          }
+        },
+        "required": ["role"],
+        "type": "object"
+      },
+      "CreateWorkspaceInviteOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateWorkspaceInviteOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "invite": {
+            "$ref": "#/components/schemas/WorkspaceInvite"
+          },
+          "token": {
+            "description": "Plaintext token (only returned once)",
+            "type": "string"
+          }
+        },
+        "required": ["invite", "token"],
+        "type": "object"
+      },
       "DeleteLensBody": {
         "additionalProperties": false,
         "properties": {
@@ -2144,6 +2226,30 @@
           }
         },
         "required": ["transition", "confidence", "reason"],
+        "type": "object"
+      },
+      "InviteInfoOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/InviteInfoOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "workspaceName": {
+            "type": "string"
+          }
+        },
+        "required": ["workspaceName", "role"],
         "type": "object"
       },
       "Lens": {
@@ -3028,6 +3134,33 @@
           }
         },
         "required": ["total", "widgets"],
+        "type": "object"
+      },
+      "ListWorkspaceInvitesOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListWorkspaceInvitesOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "invites": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceInvite"
+            },
+            "type": ["array", "null"]
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "invites", "nextCursor"],
         "type": "object"
       },
       "ListWorkspaceMembersOutputBody": {
@@ -4669,6 +4802,23 @@
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
             "examples": ["https://example.com/schemas/RevokeSessionOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
+      "RevokeWorkspaceInviteOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/RevokeWorkspaceInviteOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -6682,6 +6832,43 @@
         "required": ["id", "slug", "name", "memberCount", "createdAt"],
         "type": "object"
       },
+      "WorkspaceInvite": {
+        "additionalProperties": false,
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdByName": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "description": "Invite public id (UUID v7)",
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "maxUses": {
+            "format": "int32",
+            "type": ["integer", "null"]
+          },
+          "role": {
+            "type": "string"
+          },
+          "useCount": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": ["id", "role", "maxUses", "useCount", "createdByName", "createdAt"],
+        "type": "object"
+      },
       "WorkspaceMember": {
         "additionalProperties": false,
         "properties": {
@@ -7288,6 +7475,82 @@
           }
         },
         "summary": "Snooze an inbox item"
+      }
+    },
+    "/invites/{token}/accept": {
+      "post": {
+        "operationId": "workspaces-invites-accept",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptWorkspaceInviteOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Accept a workspace invite link"
+      }
+    },
+    "/invites/{token}/info": {
+      "get": {
+        "operationId": "workspaces-invites-info",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteInfoOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Fetch public info about a workspace invite (no auth required)"
       }
     },
     "/me": {
@@ -12422,6 +12685,159 @@
           }
         },
         "summary": "Ask the AI orchestrator to score and recommend actions for inbox items"
+      }
+    },
+    "/workspaces/{wsId}/invites": {
+      "get": {
+        "operationId": "workspaces-invites-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListWorkspaceInvitesOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List active invite links for a workspace"
+      },
+      "post": {
+        "operationId": "workspaces-invites-create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWorkspaceInviteInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateWorkspaceInviteOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create a shareable invite link for a workspace"
+      }
+    },
+    "/workspaces/{wsId}/invites/{inviteId}": {
+      "delete": {
+        "operationId": "workspaces-invites-revoke",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "inviteId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeWorkspaceInviteOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Revoke an invite link"
       }
     },
     "/workspaces/{wsId}/lenses": {

@@ -2,11 +2,11 @@
 * @libraz
 
 # Go backend
-apps/api/ @libraz
+apps/flow-api/ @libraz
 sql/ @libraz
 
 # Frontend
-apps/web/ @libraz
+apps/flow-web/ @libraz
 packages/ui/ @libraz
 
 # Infrastructure

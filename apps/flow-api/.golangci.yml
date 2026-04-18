@@ -1,0 +1,35 @@
+run:
+  timeout: 5m
+  go: "1.23"
+
+linters:
+  disable-all: true
+  enable:
+    - gofmt
+    - goimports
+    - govet
+    - staticcheck
+    - errcheck
+    - depguard
+    - revive
+    - gosec
+
+linters-settings:
+  depguard:
+    rules:
+      crypto-internal:
+        list-mode: lax
+        files:
+          - "!**/internal/crypto/**"
+          - "!**/internal/ai/**"
+          - "!**/internal/http/handlers/ai/**"
+          - "!**/cmd/secrets-rotate/**"
+          - "!**/cmd/api/**"
+        deny:
+          - pkg: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/crypto"
+            desc: "crypto package may only be imported from internal/crypto, internal/ai, internal/http/handlers/ai, and cmd/secrets-rotate"
+
+issues:
+  exclude-dirs:
+    - apps/flow-api/internal/db/generated
+    - apps/flow-api/internal/errors

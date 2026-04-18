@@ -8,7 +8,7 @@ sql:
     gen:
       go:
         package: "generated"
-        out: "../apps/api/internal/db/generated"
+        out: "../apps/flow-api/internal/db/generated"
         sql_package: "database/sql"
         emit_interface: true
         emit_json_tags: true
@@ -22,12 +22,12 @@ sql:
           # public_id is the only externally visible identifier (UUID v7, BINARY(16)).
           - column: "*.public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
+              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.user_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/api/internal/db/types"
+              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
           # Internal surrogate keys must never leak to JSON responses.
@@ -64,4 +64,93 @@ sql:
           - column: "*.resolved_by"
             go_struct_tag: 'json:"-"'
           - column: "*.parent_page_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.calendar_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.event_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.owner_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.created_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.author_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.uploader_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.target_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.calendar_public_id"
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+  # --- nodate-time API (calendar + auth queries only) ---
+  - engine: "mysql"
+    queries:
+      - "queries/calendars"
+      - "queries/auth"
+      - "queries/workspaces"
+    schema:
+      - "tables"
+      - "views"
+    gen:
+      go:
+        package: "generated"
+        out: "../apps/time-api/internal/db/generated"
+        sql_package: "database/sql"
+        emit_interface: true
+        emit_json_tags: true
+        json_tags_case_style: "camel"
+        emit_pointers_for_null_types: true
+        emit_db_tags: false
+        emit_prepared_queries: false
+        emit_exact_table_names: false
+        emit_empty_slices: true
+        overrides:
+          - column: "*.public_id"
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+          - column: "*.user_public_id"
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+          - column: "*.calendar_public_id"
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+          - column: "*.id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.workspace_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.calendar_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.event_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.owner_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.created_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.author_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.uploader_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.target_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.subscription_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.task_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.project_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.creator_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.actor_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.provider_id"
             go_struct_tag: 'json:"-"'

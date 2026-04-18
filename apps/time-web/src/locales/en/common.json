@@ -1,0 +1,37 @@
+{
+  "calendar": {
+    "month": "Month",
+    "week": "Week",
+    "today": "Today",
+    "newEvent": "New Event",
+    "allDay": "All day"
+  },
+  "event": {
+    "title": "Title",
+    "start": "Start",
+    "end": "End",
+    "location": "Location",
+    "memo": "Notes",
+    "kind": { "event": "Event", "block": "Time Block", "free": "Available" },
+    "showAs": { "busy": "Busy", "free": "Free", "tentative": "Tentative", "oof": "Out of Office" },
+    "visibility": {
+      "default": "Default",
+      "public": "Public",
+      "private": "Private",
+      "confidential": "Confidential"
+    }
+  },
+  "auth": {
+    "login": "Log In",
+    "register": "Create Account",
+    "email": "Email",
+    "password": "Password",
+    "displayName": "Display Name",
+    "logout": "Log Out"
+  },
+  "sidebar": {
+    "sharedCalendars": "Shared Calendars",
+    "myCalendar": "My Calendar",
+    "other": "Other"
+  }
+}

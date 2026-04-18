@@ -1,7 +1,7 @@
 {
   "files": [],
   "references": [
-    { "path": "./apps/web" },
+    { "path": "./apps/flow-web" },
     { "path": "./apps/cli" },
     { "path": "./packages/sdk" },
     { "path": "./packages/ui" },

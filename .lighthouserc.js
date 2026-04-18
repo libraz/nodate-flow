@@ -2,7 +2,7 @@
 export default {
   ci: {
     collect: {
-      startServerCommand: 'cd apps/web && bun run preview',
+      startServerCommand: 'cd apps/flow-web && bun run preview',
       startServerReadyPattern: 'Local:',
       url: ['http://localhost:4173/', 'http://localhost:4173/login'],
       numberOfRuns: 1,

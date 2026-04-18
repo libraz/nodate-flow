@@ -87,7 +87,7 @@ Detailed conventions live in `docs/conventions/`:
 **Go:**
 
 ```sh
-cd apps/api && golangci-lint run ./...
+cd apps/flow-api && golangci-lint run ./...
 ```
 
 **TypeScript:**
@@ -105,7 +105,7 @@ Both run automatically via git hooks (pre-commit) and CI. Do not bypass them.
 nodate-flow uses real infrastructure for tests -- no database mocks.
 
 **Backend (Go):** `go test` with `testify` and `testcontainers-go` for MySQL,
-Redis, and MinIO. API E2E tests live in `apps/api/tests/`.
+Redis, and MinIO. API E2E tests live in `apps/flow-api/tests/`.
 
 **Frontend (TypeScript):** Vitest with `@testing-library/react` and `happy-dom`
 for component tests. Playwright for browser E2E.
@@ -128,7 +128,7 @@ To add or modify an error code:
 
 1. Edit the relevant YAML file in `errors/` (e.g. `errors/auth.yaml`).
 2. Run `make gen-errors` to regenerate Go and TS files.
-3. Never hand-edit files in `apps/api/internal/errors/` or
+3. Never hand-edit files in `apps/flow-api/internal/errors/` or
    `packages/sdk/src/errors/` -- they are generated.
 
 Error codes follow the `DOMAIN.RESOURCE.REASON` format. See
@@ -139,7 +139,7 @@ Error codes follow the `DOMAIN.RESOURCE.REASON` format. See
 All user-facing strings in the web frontend go through `t('key')` via
 `react-i18next`. Hardcoded UI strings are not allowed.
 
-Translation files live in `apps/web/locales/`. See
+Translation files live in `apps/flow-web/locales/`. See
 [docs/conventions/i18n.md](./docs/conventions/i18n.md) for the full guide.
 
 ## Generated files
@@ -147,8 +147,8 @@ Translation files live in `apps/web/locales/`. See
 Several directories contain generated code. These are marked with
 "DO NOT EDIT" headers and must never be modified by hand:
 
-- `apps/api/internal/db/generated/` -- sqlc output
-- `apps/api/internal/errors/` -- error code codegen output
+- `apps/flow-api/internal/db/generated/` -- sqlc output
+- `apps/flow-api/internal/errors/` -- error code codegen output
 - `packages/sdk/` -- OpenAPI TypeScript SDK
 
 ## License

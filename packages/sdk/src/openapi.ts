@@ -191,6 +191,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/invites/{token}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept a workspace invite link */
+        post: operations["workspaces-invites-accept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invites/{token}/info": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fetch public info about a workspace invite (no auth required) */
+        get: operations["workspaces-invites-info"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me": {
         parameters: {
             query?: never;
@@ -1632,6 +1666,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{wsId}/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List active invite links for a workspace */
+        get: operations["workspaces-invites-list"];
+        put?: never;
+        /** Create a shareable invite link for a workspace */
+        post: operations["workspaces-invites-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/invites/{inviteId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke an invite link */
+        delete: operations["workspaces-invites-revoke"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{wsId}/lenses": {
         parameters: {
             query?: never;
@@ -2162,6 +2231,17 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AcceptWorkspaceInviteOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            role: string;
+            /** @description Workspace public id for client redirect */
+            workspaceId: string;
+            workspaceName: string;
+        };
         AddProjectMemberBody: {
             /**
              * Format: uri
@@ -2755,6 +2835,34 @@ export interface components {
             name: string;
             slug: string;
         };
+        CreateWorkspaceInviteInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            email?: string;
+            /**
+             * Format: int64
+             * @description Seconds until invite expires
+             */
+            expiresIn?: number;
+            label?: string;
+            /** Format: int32 */
+            maxUses?: number;
+            /** @enum {string} */
+            role: "owner" | "admin" | "member" | "guest";
+        };
+        CreateWorkspaceInviteOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            invite: components["schemas"]["WorkspaceInvite"];
+            /** @description Plaintext token (only returned once) */
+            token: string;
+        };
         DeleteLensBody: {
             /**
              * Format: uri
@@ -3094,6 +3202,17 @@ export interface components {
             confidence: number;
             reason: string;
             transition: string;
+        };
+        InviteInfoOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: date-time */
+            expiresAt?: string;
+            role: string;
+            workspaceName: string;
         };
         Lens: {
             filter: {
@@ -3455,6 +3574,17 @@ export interface components {
             /** Format: int64 */
             total: number;
             widgets: components["schemas"]["WidgetDTO"][] | null;
+        };
+        ListWorkspaceInvitesOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            invites: components["schemas"]["WorkspaceInvite"][] | null;
+            nextCursor: string | null;
+            /** Format: int64 */
+            total: number;
         };
         ListWorkspaceMembersOutputBody: {
             /**
@@ -4154,6 +4284,14 @@ export interface components {
             revoked: number;
         };
         RevokeSessionOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        RevokeWorkspaceInviteOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
@@ -4988,6 +5126,21 @@ export interface components {
             /** Format: date-time */
             updatedAt?: string;
         };
+        WorkspaceInvite: {
+            /** Format: date-time */
+            createdAt: string;
+            createdByName: string;
+            /** Format: date-time */
+            expiresAt?: string;
+            /** @description Invite public id (UUID v7) */
+            id: string;
+            label?: string;
+            /** Format: int32 */
+            maxUses: number | null;
+            role: string;
+            /** Format: int32 */
+            useCount: number;
+        };
         WorkspaceMember: {
             avatarUrl?: string;
             /** Format: date-time */
@@ -5379,6 +5532,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SnoozeInboxOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "workspaces-invites-accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptWorkspaceInviteOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "workspaces-invites-info": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteInfoOutputBody"];
                 };
             };
             /** @description Error */
@@ -9033,6 +9248,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InboxTriageOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "workspaces-invites-list": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListWorkspaceInvitesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "workspaces-invites-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateWorkspaceInviteInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateWorkspaceInviteOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "workspaces-invites-revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                inviteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevokeWorkspaceInviteOutputBody"];
                 };
             };
             /** @description Error */

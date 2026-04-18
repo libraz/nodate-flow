@@ -1,0 +1,64 @@
+-- name: CreateCalendarMemo :execlastid
+-- Add a shared memo/to-do item to a calendar.
+INSERT INTO calendar_memos (
+  public_id,
+  workspace_id,
+  calendar_id,
+  created_by_user_id,
+  title,
+  sort_weight
+) VALUES (?, ?, ?, ?, ?, ?);
+
+-- name: ListCalendarMemos :many
+-- List memos for a calendar in display order.
+SELECT
+  m.public_id,
+  m.title,
+  m.done,
+  m.sort_weight,
+  m.created_by_user_id,
+  u.public_id AS user_public_id,
+  u.display_name,
+  m.updated_at,
+  m.created_at
+FROM calendar_memos m
+INNER JOIN users u ON u.id = m.created_by_user_id AND u.enabled = TRUE
+WHERE m.calendar_id = ?
+  AND m.enabled = TRUE
+ORDER BY m.sort_weight ASC, m.created_at ASC;
+
+-- name: FindCalendarMemoByPublicId :one
+-- Resolve a memo by UUID v7.
+SELECT
+  id,
+  public_id,
+  calendar_id,
+  title,
+  done,
+  sort_weight,
+  created_by_user_id,
+  enabled,
+  updated_at,
+  created_at
+FROM calendar_memos
+WHERE public_id = ?
+  AND calendar_id = ?
+  AND enabled = TRUE
+LIMIT 1;
+
+-- name: UpdateCalendarMemo :exec
+-- Update a memo's title, done, or sort_weight.
+UPDATE calendar_memos
+SET title       = COALESCE(sqlc.narg('title'), title),
+    done        = COALESCE(sqlc.narg('done'), done),
+    sort_weight = COALESCE(sqlc.narg('sort_weight'), sort_weight)
+WHERE public_id = ?
+  AND calendar_id = ?
+  AND enabled = TRUE;
+
+-- name: DisableCalendarMemo :exec
+-- Soft-delete a memo.
+UPDATE calendar_memos
+SET enabled = FALSE
+WHERE public_id = ?
+  AND calendar_id = ?;

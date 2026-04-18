@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+@import "@nodate-flow/ui/tokens/base.css";
+@import "@nodate-flow/ui/tokens/semantic.css";
+@import "@nodate-flow/ui/themes/aurora-light.css";
+@import "@nodate-flow/ui/themes/aurora-dark.css";
+
+:root {
+  color-scheme: light dark;
+}
+
+html,
+body,
+#root {
+  block-size: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--nf-color-bg);
+  color: var(--nf-color-fg);
+  font-family: var(--nf-font-sans);
+  -webkit-font-smoothing: antialiased;
+}

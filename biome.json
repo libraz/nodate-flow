@@ -11,10 +11,11 @@
       "**/dist",
       "**/build",
       "**/.next",
-      "apps/api/internal/db/generated/**",
-      "apps/api/internal/errors/**",
+      "apps/flow-api/internal/db/generated/**",
+      "apps/flow-api/internal/errors/**",
       "packages/sdk/src/errors/**",
-      "apps/web/src/routeTree.gen.ts",
+      "apps/flow-web/src/routeTree.gen.ts",
+      "apps/time-web/src/routeTree.gen.ts",
       "packages/sdk/src/openapi.ts",
       "packages/sdk/src/schema.d.ts"
     ]
@@ -93,7 +94,7 @@
       }
     },
     {
-      "include": ["packages/ui/src/primitives/**", "apps/web/src/features/**"],
+      "include": ["packages/ui/src/primitives/**", "apps/flow-web/src/features/**"],
       "linter": {
         "rules": {
           "a11y": {

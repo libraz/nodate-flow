@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 2.AI-10 i18n translator bot — deterministic scaffold.
 //
-// Walks apps/web/locales/en/*.json, finds keys that are missing in the
+// Walks apps/flow-web/locales/en/*.json, finds keys that are missing in the
 // matching ja file, and either reports them (--check, CI gate) or fills
 // them in with a `[TODO:ja] <english>` placeholder (--write, used by the
 // GitHub Actions translator job). A future LLM path can replace the
@@ -17,8 +17,8 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, "..");
-const enDir = join(repo, "apps/web/locales/en");
-const jaDir = join(repo, "apps/web/locales/ja");
+const enDir = join(repo, "apps/flow-web/locales/en");
+const jaDir = join(repo, "apps/flow-web/locales/ja");
 
 const mode = process.argv.includes("--write") ? "write" : "check";
 

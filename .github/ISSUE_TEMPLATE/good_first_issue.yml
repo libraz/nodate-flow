@@ -40,7 +40,7 @@ body:
         Step-by-step guidance. Be specific enough that someone unfamiliar
         with the codebase can follow along.
       placeholder: |
-        1. Read `apps/web/src/features/tasks/task-list-view.tsx`
+        1. Read `apps/flow-web/src/features/tasks/task-list-view.tsx`
         2. Add a Suspense fallback using `<Skeleton>` from `packages/ui`
         3. Verify with `bun run dev` — the skeleton should appear during loading
         4. Add a Vitest snapshot test
@@ -55,7 +55,7 @@ body:
         File paths or directories to look at. This helps newcomers
         navigate the codebase.
       placeholder: |
-        - apps/web/src/features/tasks/task-list-view.tsx
+        - apps/flow-web/src/features/tasks/task-list-view.tsx
         - packages/ui/src/primitives/skeleton/
     validations:
       required: false

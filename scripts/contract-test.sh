@@ -35,7 +35,7 @@ fi
 
 if [[ ! -f "$SPEC_FILE" ]]; then
   echo "ERROR: OpenAPI spec not found at $SPEC_FILE"
-  echo "       Run 'go run ./apps/api/cmd/dump-openapi' first."
+  echo "       Run 'go run ./apps/flow-api/cmd/dump-openapi' first."
   exit 1
 fi
 

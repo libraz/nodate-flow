@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Bundle size performance budget for apps/web.
+# Bundle size performance budget for apps/flow-web.
 #
 # Budgets:
 #   - Single JS chunk: max 600 KB (614400 bytes)
@@ -13,7 +13,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-WEB_DIR="$REPO_ROOT/apps/web"
+WEB_DIR="$REPO_ROOT/apps/flow-web"
 DIST_ASSETS="$WEB_DIR/dist/assets"
 
 MAX_CHUNK_BYTES=614400    # 600 KB
@@ -23,7 +23,7 @@ MAX_TOTAL_BYTES=2097152   # 2 MB
 # Build (unless --skip-build)
 # ---------------------------------------------------------------------------
 if [[ "${1:-}" != "--skip-build" ]]; then
-  echo "==> Building apps/web ..."
+  echo "==> Building apps/flow-web ..."
   (cd "$WEB_DIR" && npx vite build --mode production)
   echo ""
 fi

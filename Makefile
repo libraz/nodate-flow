@@ -31,11 +31,16 @@ help: ## Show this help
 
 # ---------- dev (yarn dev equivalent) ----------
 
-.PHONY: dev dev-api dev-web up down logs
-dev: db-schema .env ## Start MySQL (compose) + API + web in parallel
-	@echo "starting mysql, api, web..."
+.PHONY: dev dev-api dev-web dev-time-api dev-time up down logs
+dev: db-schema .env ## Start MySQL (compose) + flow API + flow web in parallel
+	@echo "starting mysql, flow-api, flow-web..."
 	@docker compose up -d mysql
 	@$(MAKE) -j2 dev-api dev-web
+
+dev-time: db-schema .env ## Start MySQL (compose) + time API + time web in parallel
+	@echo "starting mysql, time-api..."
+	@docker compose up -d mysql
+	@$(MAKE) dev-time-api
 
 # Copy .env.example on first run so `make dev` works out of the box.
 .env:
@@ -46,10 +51,13 @@ dev: db-schema .env ## Start MySQL (compose) + API + web in parallel
 	@sed -i.bak 's|@tcp(mysql:3306)|@tcp(127.0.0.1:3306)|' .env && rm -f .env.bak
 
 dev-api: ## Run Go API against the local MySQL (reads .env)
-	cd apps/api && go run ./cmd/api
+	cd apps/flow-api && go run ./cmd/api
 
 dev-web: ## Run Vite dev server
-	cd apps/web && $(PKG_RUN) dev
+	cd apps/flow-web && $(PKG_RUN) dev
+
+dev-time-api: ## Run nodate-time API against the local MySQL (reads .env)
+	cd apps/time-api && go run ./cmd/api
 
 up: ## docker compose up -d (full stack)
 	docker compose up -d
@@ -63,27 +71,33 @@ logs: ## Tail compose logs
 # ---------- build ----------
 
 .PHONY: build build-api build-web
-build: build-api build-web ## Build API and web
+build: build-api build-time-api build-web ## Build all apps
 
 build-api:
-	cd apps/api && go build -o ../../bin/api ./cmd/api
+	cd apps/flow-api && go build -o ../../bin/flow-api ./cmd/api
+
+build-time-api:
+	cd apps/time-api && go build -o ../../bin/time-api ./cmd/api
 
 build-web:
-	cd apps/web && $(PKG_RUN) build
+	cd apps/flow-web && $(PKG_RUN) build
 
 # ---------- test ----------
 
 .PHONY: test test-api test-web test-e2e test-contract lighthouse
-test: test-api test-web ## Run unit/integration tests (Go + TS)
+test: test-api test-time-api test-web ## Run unit/integration tests (Go + TS)
 
-test-api: ## Go tests
-	cd apps/api && go test ./...
+test-api: ## Go tests (flow)
+	cd apps/flow-api && go test ./...
+
+test-time-api: ## Go tests (time)
+	cd apps/time-api && go test ./...
 
 test-web: ## Vitest
-	cd apps/web && $(PKG_RUN) test
+	cd apps/flow-web && $(PKG_RUN) test
 
 test-e2e: ## Playwright E2E
-	cd apps/web && $(PKG_RUN) e2e
+	cd apps/flow-web && $(PKG_RUN) e2e
 
 test-contract: ## Schemathesis contract tests (requires running API)
 	./scripts/contract-test.sh
@@ -98,17 +112,18 @@ check: lint typecheck vet ## Lint + typecheck + go vet
 
 lint: ## biome check + golangci-lint
 	$(PKG_RUN) check
-	cd apps/api && golangci-lint run ./... || true
+	cd apps/flow-api && golangci-lint run ./... || true
 
 format: ## biome format + gofmt
 	$(PKG_RUN) format
-	cd apps/api && gofmt -w .
+	cd apps/flow-api && gofmt -w .
 
 typecheck: ## tsc -b
 	$(PKG_RUN) typecheck
 
 vet: ## go vet
-	cd apps/api && go vet ./...
+	cd apps/flow-api && go vet ./...
+	cd apps/time-api && go vet ./...
 
 # ---------- codegen ----------
 
@@ -122,10 +137,16 @@ gen-errors: ## Regenerate Go/TS error modules + locale stubs + docs from errors/
 	go -C scripts run gen-errors.go
 
 gen-openapi: ## Dump merged OpenAPI 3.1 to packages/sdk/openapi.json
-	cd apps/api && go run ./cmd/dump-openapi -o ../../packages/sdk/openapi.json
+	cd apps/flow-api && go run ./cmd/dump-openapi -o ../../packages/sdk/openapi.json
 
 gen-sdk: gen-openapi ## Generate TS SDK from OpenAPI
 	cd packages/sdk && $(PKG_X) openapi-typescript openapi.json -o src/openapi.ts
+
+gen-time-openapi: ## Dump nodate-time OpenAPI 3.1 to packages/time-sdk/openapi.json
+	cd apps/time-api && go run ./cmd/dump-openapi -o ../../packages/time-sdk/openapi.json
+
+gen-time-sdk: gen-time-openapi ## Generate nodate-time TS SDK from OpenAPI
+	cd packages/time-sdk && $(PKG_X) openapi-typescript openapi.json -o src/openapi.ts
 
 # ---------- database ----------
 
@@ -157,10 +178,10 @@ db-shell: ## Open a mysql shell against the compose mysql
 
 db-seed: ## Insert dev admin user + demo workspace (idempotent; uses NF_DB_DSN or NF_DB_* vars)
 	@dsn="$${NF_DB_DSN:-$(NF_DB_USER):$(NF_DB_PASSWORD)@tcp($(NF_DB_HOST):$(NF_DB_PORT))/$(NF_DB_NAME)?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci}"; \
-	cd apps/api && NF_DB_DSN="$$dsn" go run ./cmd/seed-dev
+	cd apps/flow-api && NF_DB_DSN="$$dsn" go run ./cmd/seed-dev
 
 # ---------- clean ----------
 
 .PHONY: clean
 clean: ## Remove build artifacts
-	rm -rf bin apps/web/dist packages/sdk/dist
+	rm -rf bin apps/flow-web/dist packages/sdk/dist packages/holidays/dist

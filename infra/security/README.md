@@ -55,7 +55,7 @@ trivy image nodate-flow-web:latest
 go install golang.org/x/vuln/cmd/govulncheck@latest
 
 # Run from the Go module root
-cd apps/api && govulncheck ./...
+cd apps/flow-api && govulncheck ./...
 ```
 
 ### ZAP Baseline Scan (DAST)
