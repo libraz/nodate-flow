@@ -105,6 +105,16 @@
       "close_stale_review": "Close review"
     }
   },
+  "confidence": {
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low"
+  },
+  "relative_date": {
+    "overdue": "{count}d overdue",
+    "today": "Today",
+    "in_days": "In {count}d"
+  },
   "nl_query": {
     "label": "Ask in plain language",
     "placeholder": "show me everything blocked this week",

@@ -51,6 +51,26 @@ const PRIORITY_LABELS: Record<number, string> = {
   3: '\u9AD8',
 };
 
+/** Map a 0-1 confidence score to a qualitative i18n key. */
+function confidenceLabel(score: number, t: (key: string) => string): string {
+  if (score >= 0.8) return t('confidence.high');
+  if (score >= 0.5) return t('confidence.medium');
+  return t('confidence.low');
+}
+
+/** Format a YYYY-MM-DD date as a relative expression. */
+// biome-ignore lint/suspicious/noExplicitAny: i18next TFunction overloads are complex
+function formatRelativeDate(dateStr: string, t: any): string {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(`${dateStr}T00:00:00`);
+  const diffMs = target.getTime() - today.getTime();
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return String(t('relative_date.overdue', { count: Math.abs(diffDays) }));
+  if (diffDays === 0) return String(t('relative_date.today'));
+  return String(t('relative_date.in_days', { count: diffDays }));
+}
+
 /** Produce a human-readable label for a single filter condition. */
 function formatFilterCondition(field: string, operator: string, value: unknown): string {
   if (field === 'priority' && operator === 'eq' && typeof value === 'number') {
@@ -277,6 +297,7 @@ function GlassDockSuggestionRow({
   onApply: (inboxItemId: string) => void;
   onDismiss: (inboxItemId: string) => void;
 }): ReactElement {
+  const { t } = useTranslation('ai-suggestions');
   const handleApply = (): void => {
     onApply(suggestion.inboxItemId);
   };
@@ -292,11 +313,10 @@ function GlassDockSuggestionRow({
               suggestion.score >= 0.8 ? 'danger' : suggestion.score >= 0.5 ? 'warning' : 'neutral'
             }
           >
-            {suggestion.score.toFixed(2)}
+            {confidenceLabel(suggestion.score, t)}
           </Badge>
           <span
             style={{
-              fontFamily: 'var(--font-mono)',
               fontSize: '0.75rem',
               color: 'var(--nf-color-muted)',
             }}
@@ -380,14 +400,11 @@ function StateSuggestionsPanel({
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {s.title}
               </span>
-              <span
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  color: 'var(--nf-color-muted)',
-                }}
+              <Badge
+                tone={s.confidence >= 0.8 ? 'danger' : s.confidence >= 0.5 ? 'warning' : 'neutral'}
               >
-                {s.confidence.toFixed(2)}
-              </span>
+                {confidenceLabel(s.confidence, t)}
+              </Badge>
             </a>
           </li>
         ))}
@@ -450,11 +467,11 @@ function RemindersPanel({
                 </span>
                 <span
                   style={{
-                    fontFamily: 'var(--font-mono)',
+                    fontSize: '0.6875rem',
                     color: 'var(--nf-color-muted)',
                   }}
                 >
-                  {r.dueOn}
+                  {r.dueOn ? formatRelativeDate(r.dueOn, t) : ''}
                 </span>
               </a>
             </li>
@@ -521,14 +538,13 @@ function AutoActionsPanel({
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {a.title}
                 </span>
-                <span
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    color: 'var(--nf-color-muted)',
-                  }}
+                <Badge
+                  tone={
+                    a.confidence >= 0.8 ? 'danger' : a.confidence >= 0.5 ? 'warning' : 'neutral'
+                  }
                 >
-                  {a.confidence.toFixed(2)}
-                </span>
+                  {confidenceLabel(a.confidence, t)}
+                </Badge>
               </a>
             </li>
           );

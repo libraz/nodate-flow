@@ -105,6 +105,16 @@
       "close_stale_review": "レビューを閉じる"
     }
   },
+  "confidence": {
+    "high": "確度 高",
+    "medium": "確度 中",
+    "low": "確度 低"
+  },
+  "relative_date": {
+    "overdue": "{count}日超過",
+    "today": "今日",
+    "in_days": "あと{count}日"
+  },
   "nl_query": {
     "label": "自然言語で問い合わせ",
     "placeholder": "今週ブロックされているものを見せて",
