@@ -9,6 +9,7 @@ import enConstraints from '../../locales/en/constraints.json';
 import enDashboard from '../../locales/en/dashboard.json';
 import enErrors from '../../locales/en/errors.json';
 import enInbox from '../../locales/en/inbox.json';
+import enNotifications from '../../locales/en/notifications.json';
 import enPages from '../../locales/en/pages.json';
 import enRelations from '../../locales/en/relations.json';
 import enSettings from '../../locales/en/settings.json';
@@ -20,6 +21,7 @@ import jaConstraints from '../../locales/ja/constraints.json';
 import jaDashboard from '../../locales/ja/dashboard.json';
 import jaErrors from '../../locales/ja/errors.json';
 import jaInbox from '../../locales/ja/inbox.json';
+import jaNotifications from '../../locales/ja/notifications.json';
 import jaPages from '../../locales/ja/pages.json';
 import jaRelations from '../../locales/ja/relations.json';
 import jaSettings from '../../locales/ja/settings.json';
@@ -68,6 +70,7 @@ export function initI18n(): typeof i18n {
         'ai-suggestions',
         'constraints',
         'errors',
+        'notifications',
         'relations',
         'dashboard',
         'pages',
@@ -82,6 +85,7 @@ export function initI18n(): typeof i18n {
           'ai-suggestions': enAiSuggestions,
           constraints: enConstraints,
           errors: enErrors,
+          notifications: enNotifications,
           relations: enRelations,
           dashboard: enDashboard,
           pages: enPages,
@@ -95,6 +99,7 @@ export function initI18n(): typeof i18n {
           'ai-suggestions': jaAiSuggestions,
           constraints: jaConstraints,
           errors: jaErrors,
+          notifications: jaNotifications,
           relations: jaRelations,
           dashboard: jaDashboard,
           pages: jaPages,

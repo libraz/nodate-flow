@@ -16,6 +16,7 @@ export const namespaces = [
   'ai-suggestions',
   'mcp',
   'errors',
+  'notifications',
   'relations',
   'dashboard',
   'pages',
