@@ -14,8 +14,9 @@ import SearchPanel from '../features/calendar/search-panel';
 import SettingsModal from '../features/calendar/settings-modal';
 import CalendarSidebar from '../features/calendar/sidebar';
 import WeekView from '../features/calendar/week-view';
-import { useAuthStore } from '../stores/auth-store';
-import { useCalendarUiStore } from '../stores/calendar-ui-store';
+import { selectIsAuthenticated, useAuth } from '../stores/auth-store';
+import { useCalendarUi } from '../stores/calendar-ui-store';
+import styles from './calendar.module.css';
 
 export const Route = createFileRoute('/calendar')({
   component: CalendarPage,
@@ -36,57 +37,55 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex flex-1 flex-col items-center gap-0.5 py-2"
+      className={styles.tabBtn}
       style={{ color: active ? 'var(--nf-color-accent)' : 'var(--nf-color-fg-subtle)' }}
     >
       {icon}
-      <span className="text-[10px] font-medium">{label}</span>
+      <span className={styles.tabLabel}>{label}</span>
     </button>
   );
 }
 
 function CalendarPage(): ReactElement {
   const { t } = useTranslation();
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const { currentView, sidebarOpen, setSidebarOpen, mobileTab, setMobileTab } =
-    useCalendarUiStore();
+  const isAuthenticated = useAuth(selectIsAuthenticated);
+  const currentView = useCalendarUi((s) => s.currentView);
+  const sidebarOpen = useCalendarUi((s) => s.sidebarOpen);
+  const setSidebarOpen = useCalendarUi((s) => s.setSidebarOpen);
+  const mobileTab = useCalendarUi((s) => s.mobileTab);
+  const setMobileTab = useCalendarUi((s) => s.setMobileTab);
 
   if (!isAuthenticated) return <Navigate to="/login" />;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className={styles.page}>
       <CalendarHeader />
       <SearchPanel />
-      <div className="flex flex-1 overflow-hidden">
+      <div className={styles.content}>
         {/* Desktop sidebar */}
-        <div className="hidden sm:flex">
+        <div className={styles.desktopSidebar}>
           <CalendarSidebar />
         </div>
 
         {/* Mobile sidebar drawer */}
         {sidebarOpen ? (
           <>
+            {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismissal */}
             <div
-              className="fixed inset-0 z-30 bg-[var(--nf-color-overlay)] sm:hidden"
+              className={styles.sidebarBackdrop}
               onClick={() => setSidebarOpen(false)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') setSidebarOpen(false);
-              }}
               role="button"
               tabIndex={-1}
-              aria-label="Close sidebar"
+              aria-label={t('calendar.closeSidebar')}
             />
-            <div
-              className="fixed inset-y-0 left-0 z-30 flex w-64 shadow-xl sm:hidden"
-              style={{ backgroundColor: 'var(--nf-color-surface-primary)' }}
-            >
+            <div className={styles.sidebarDrawer}>
               <CalendarSidebar />
             </div>
           </>
         ) : null}
 
-        {/* Calendar content with bottom tab bar padding on mobile */}
-        <div className="flex flex-1 flex-col pb-[calc(52px+env(safe-area-inset-bottom))] sm:pb-0">
+        {/* Calendar content */}
+        <div className={styles.mainArea}>
           {currentView === 'week' ? <WeekView /> : <CalendarGrid />}
         </div>
 
@@ -94,7 +93,7 @@ function CalendarPage(): ReactElement {
         <EventDetail />
 
         {/* Right sidebar */}
-        <div className="hidden sm:block">
+        <div className={styles.desktopRight}>
           <RightSidebar />
         </div>
       </div>
@@ -102,17 +101,14 @@ function CalendarPage(): ReactElement {
       {/* Mobile day detail bottom sheet */}
       <DayDetail />
 
-      {/* Mobile FAB for creating events */}
+      {/* Mobile FAB */}
       <FabButton />
 
       <EventModal />
       <SettingsModal />
 
       {/* Mobile bottom tab bar */}
-      <nav
-        className="glass-surface-heavy fixed bottom-0 left-0 right-0 z-40 flex border-t border-[var(--nf-color-border)] sm:hidden"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-      >
+      <nav className={`glass-surface-heavy ${styles.tabBar}`}>
         <TabButton
           icon={<Calendar size={20} />}
           label={t('tabs.calendar')}

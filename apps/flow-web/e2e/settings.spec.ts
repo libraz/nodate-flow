@@ -11,6 +11,7 @@
 import { expect, test } from '@playwright/test';
 
 import { type TestTenant, cleanupTenant, createTestTenant, injectAuth } from './fixtures/tenant';
+import { checkA11y } from './helpers/a11y';
 
 test.describe('settings', () => {
   let tenant: TestTenant | null = null;
@@ -31,6 +32,9 @@ test.describe('settings', () => {
     // Verify the profile section is visible (match English or Japanese heading)
     const profileHeading = page.getByRole('heading', { name: /profile|プロフィール/i });
     await expect(profileHeading).toBeVisible({ timeout: 10_000 });
+
+    // Accessibility check on the settings/profile page
+    await checkA11y(page);
 
     // Verify the current display name is shown
     const nameInput = page.getByLabel(/display name|表示名|name/i);

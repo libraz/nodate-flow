@@ -24,7 +24,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/providers"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/config"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/crypto"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/router"
@@ -320,11 +320,24 @@ func main() {
 	outer.Use(obs.MetricsMiddleware())
 	outer.Use(buildCORS(cfg.CorsAllowedOrigins))
 
-	// Prometheus metrics endpoint. Mounted before the application routes
-	// so it is not gated by auth middleware.
-	outer.Handle("/metrics", obs.MetricsHandler())
-
 	outer.Mount("/", inner)
+
+	// Prometheus metrics are served on a separate internal-only listener
+	// so they are never reachable through the public API port.
+	metricsMux := http.NewServeMux()
+	metricsMux.Handle("/metrics", obs.MetricsHandler())
+	metricsAddr := ":" + cfg.MetricsPort
+	metricsSrv := &http.Server{
+		Addr:              metricsAddr,
+		Handler:           metricsMux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	go func() {
+		logger.Info("metrics server listening", "addr", metricsAddr)
+		if err := metricsSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("metrics server exited", "err", err)
+		}
+	}()
 
 	// Interval scheduler. Ticks every NF_FLOW_AGENT_TICK_INTERVAL
 	// and dispatches due agents to the runner built above. When
@@ -441,6 +454,9 @@ func main() {
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer shutdownCancel()
+	if err := metricsSrv.Shutdown(shutdownCtx); err != nil {
+		logger.Error("metrics server shutdown failed", "err", err)
+	}
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("graceful shutdown failed", "err", err)
 		os.Exit(1)
@@ -460,6 +476,7 @@ func buildCORS(allowed []string) func(http.Handler) http.Handler {
 	allowCreds := true
 	if len(allowed) == 1 && allowed[0] == "*" {
 		allowCreds = false
+		slog.Warn("CORS configured with wildcard origin: credentials (cookies, Authorization header) are disabled per the CORS spec")
 	}
 	return cors.Handler(cors.Options{
 		AllowedOrigins:   allowed,

@@ -72,8 +72,15 @@ export function useAuditLogsQuery(
       if (filters.dateFrom !== undefined) queryParams.dateFrom = filters.dateFrom;
       if (filters.dateTo !== undefined) queryParams.dateTo = filters.dateTo;
 
-      // biome-ignore lint/suspicious/noExplicitAny: untyped endpoint until OpenAPI spec includes it
-      const { data, error } = await (sdk as any).GET(`/workspaces/${workspaceId}/audit-logs`, {
+      // TODO: Remove type suppression once /workspaces/{wsId}/audit-logs is added to OpenAPI spec
+      const untypedSdk = sdk as unknown as {
+        // biome-ignore lint/style/useNamingConvention: SDK method name
+        GET: (
+          url: string,
+          opts: { params: { query: Record<string, unknown> } },
+        ) => Promise<{ data?: AuditLogListResponse; error?: unknown }>;
+      };
+      const { data, error } = await untypedSdk.GET(`/workspaces/${workspaceId}/audit-logs`, {
         params: { query: queryParams },
       });
       if (error || !data) throw new Error('Failed to load audit logs');

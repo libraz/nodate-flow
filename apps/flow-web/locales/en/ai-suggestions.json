@@ -115,6 +115,17 @@
     "today": "Today",
     "in_days": "In {count}d"
   },
+  "filter_condition": {
+    "priority": "Priority: {label}",
+    "blocked": "Blocked",
+    "due_this_week": "Due: This week",
+    "status": "Status: {values}"
+  },
+  "priority_label": {
+    "1": "Low",
+    "2": "Medium",
+    "3": "High"
+  },
   "nl_query": {
     "label": "Ask in plain language",
     "placeholder": "show me everything blocked this week",

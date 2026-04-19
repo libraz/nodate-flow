@@ -6,11 +6,11 @@ import (
 	"errors"
 	"time"
 
-	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
 
 	generated "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/types"
+	apierrors "github.com/nodate-flow/nodate-flow/apps/time-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/eventbus"
 )
 
@@ -25,14 +25,14 @@ type ListAttachmentsInput struct {
 
 // AttachmentResponse is the JSON representation of an event attachment.
 type AttachmentResponse struct {
-	ID              string    `json:"id"`
-	Filename        string    `json:"filename"`
-	ContentType     string    `json:"contentType"`
-	ByteSize        uint64    `json:"byteSize"`
-	StorageKey      string    `json:"storageKey"`
-	UploaderID      string    `json:"uploaderId"`
-	UploaderName    string    `json:"uploaderName"`
-	CreatedAt       time.Time `json:"createdAt"`
+	ID           string `json:"id"`
+	Filename     string `json:"filename"`
+	ContentType  string `json:"contentType"`
+	ByteSize     uint64 `json:"byteSize"`
+	StorageKey   string `json:"storageKey"`
+	UploaderID   string `json:"uploaderId"`
+	UploaderName string `json:"uploaderName"`
+	CreatedAt    int64  `json:"createdAt"`
 }
 
 // ListAttachmentsOutput is the response for the list attachments endpoint.
@@ -97,7 +97,7 @@ func ListAttachments(deps Deps) func(context.Context, *ListAttachmentsInput) (*L
 
 		rows, err := deps.Queries.ListCalendarEventAttachments(ctx, evt.ID)
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to list attachments", err)
+			return nil, httpErr(apierrors.CalendarAttachmentListQueryInterrupted)
 		}
 
 		out := &ListAttachmentsOutput{}
@@ -111,7 +111,7 @@ func ListAttachments(deps Deps) func(context.Context, *ListAttachmentsInput) (*L
 				StorageKey:   r.StorageKey,
 				UploaderID:   r.UserPublicID.String(),
 				UploaderName: r.DisplayName,
-				CreatedAt:    r.CreatedAt,
+				CreatedAt:    r.CreatedAt.Unix(),
 			}
 		}
 		return out, nil
@@ -153,12 +153,12 @@ func CreateAttachment(deps Deps) func(context.Context, *CreateAttachmentInput) (
 			ChecksumSha256: checksum,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to create attachment", err)
+			return nil, httpErr(apierrors.CalendarAttachmentStoreWriteInterrupted)
 		}
 
 		profile, err := deps.Queries.FindUserProfileById(ctx, actorID)
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to get user profile", err)
+			return nil, httpErr(apierrors.CalendarUserProfileLookupInterrupted)
 		}
 
 		out := &CreateAttachmentOutput{}
@@ -170,7 +170,7 @@ func CreateAttachment(deps Deps) func(context.Context, *CreateAttachmentInput) (
 			StorageKey:   input.Body.StorageKey,
 			UploaderID:   profile.PublicID.String(),
 			UploaderName: profile.DisplayName,
-			CreatedAt:    time.Now().UTC(),
+			CreatedAt:    time.Now().UTC().Unix(),
 		}
 
 		_ = eventbus.Append(ctx, deps.DB, wsID, "calendar.event.attachment.created", &actorID, map[string]any{
@@ -203,7 +203,7 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteAttachmentInput) (
 
 		attUID, err := uuid.Parse(input.AttId)
 		if err != nil {
-			return nil, huma.Error404NotFound("Attachment not found")
+			return nil, httpErr(apierrors.CalendarAttachmentNotFound)
 		}
 
 		att, err := deps.Queries.FindCalendarEventAttachmentByPublicId(ctx, generated.FindCalendarEventAttachmentByPublicIdParams{
@@ -212,15 +212,15 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteAttachmentInput) (
 		})
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return nil, huma.Error404NotFound("Attachment not found")
+				return nil, httpErr(apierrors.CalendarAttachmentNotFound)
 			}
-			return nil, huma.Error500InternalServerError("Failed to find attachment", err)
+			return nil, httpErr(apierrors.CalendarAttachmentStoreReadInterrupted)
 		}
 
 		isUploader := att.UploaderID == actorID
 		isCalOwner := sub.Role == generated.CalendarSubscriptionsRoleOwner
 		if !isUploader && !isCalOwner {
-			return nil, errForbidden
+			return nil, httpErr(apierrors.CalendarAttachmentUploaderOrOwnerRequired)
 		}
 
 		err = deps.Queries.DisableCalendarEventAttachment(ctx, generated.DisableCalendarEventAttachmentParams{
@@ -228,7 +228,7 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteAttachmentInput) (
 			EventID:  evt.ID,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to delete attachment", err)
+			return nil, httpErr(apierrors.CalendarAttachmentStoreDeleteInterrupted)
 		}
 
 		out := &DeleteAttachmentOutput{}

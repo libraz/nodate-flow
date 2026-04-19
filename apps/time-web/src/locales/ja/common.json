@@ -10,7 +10,18 @@
     "saving": "保存中...",
     "cancel": "キャンセル",
     "close": "閉じる",
+    "closeModal": "モーダルを閉じる",
     "owner": "オーナー"
+  },
+  "fatal": {
+    "title": "エラーが発生しました",
+    "description": "予期しないエラーが発生しました。再試行するか、ホームページに戻ってください。",
+    "retry": "再試行",
+    "backHome": "ホームに戻る"
+  },
+  "notFound": {
+    "description": "お探しのページは存在しません。",
+    "backHome": "ホームに戻る"
   },
   "auth": {
     "signIn": "ログイン",
@@ -61,7 +72,9 @@
     "closeSidebar": "サイドバーを閉じる",
     "createNewEvent": "新しい予定を作成",
     "noEventsForDay": "この日の予定はありません",
-    "closeDayDetail": "日の詳細を閉じる"
+    "closeDayDetail": "日の詳細を閉じる",
+    "toggleDropdown": "ドロップダウン切替",
+    "selected": "選択済み"
   },
   "sidebar": {
     "sharedCalendars": "共有カレンダー",
@@ -115,7 +128,8 @@
     "roleOwner": "オーナー",
     "roleManager": "マネージャー",
     "roleEditor": "編集者",
-    "roleViewer": "閲覧者"
+    "roleViewer": "閲覧者",
+    "remove": "メンバーを削除"
   },
   "invite": {
     "title": "招待リンク",

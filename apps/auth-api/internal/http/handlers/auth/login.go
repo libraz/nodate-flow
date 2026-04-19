@@ -62,7 +62,7 @@ func Login(deps Deps) func(context.Context, *LoginInput) (*LoginOutput, error) {
 		// Password OK. Clear counters immediately so a second-factor
 		// failure does not re-trigger the lockout counter.
 		if err := deps.Queries.ResetIdentityFailedAttempts(ctx, row.ID); err != nil {
-			slog.ErrorContext(ctx, "login: failed to reset failed attempts", slog.Any("err", err), slog.Int("identity_id", int(row.ID)))
+			slog.ErrorContext(ctx, "login: failed to reset failed attempts", slog.Any("err", err), slog.String("user_public_id", row.UserPublicID.String()))
 		}
 
 		// If the account has confirmed TOTP, do NOT issue session
@@ -83,7 +83,7 @@ func Login(deps Deps) func(context.Context, *LoginInput) (*LoginOutput, error) {
 		}
 
 		if err := deps.Queries.UpdateUserLastLoginAt(ctx, row.UserID); err != nil {
-			slog.ErrorContext(ctx, "login: failed to update last_login_at", slog.Any("err", err), slog.Int("user_id", int(row.UserID)))
+			slog.ErrorContext(ctx, "login: failed to update last_login_at", slog.Any("err", err), slog.String("user_public_id", row.UserPublicID.String()))
 		}
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "auth.login",
@@ -166,7 +166,7 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		if err := deps.Queries.UpdateUserLastLoginAt(ctx, uid); err != nil {
-			slog.ErrorContext(ctx, "login_totp: failed to update last_login_at", slog.Any("err", err), slog.Int("user_id", int(uid)))
+			slog.ErrorContext(ctx, "login_totp: failed to update last_login_at", slog.Any("err", err), slog.String("user_public_id", u.PublicID.String()))
 		}
 		tokens, refresh, err := issueTokens(ctx, deps, uid, u.PublicID, in.UserAgent, authn.ClientIPFromContext(ctx))
 		if err != nil {
@@ -190,6 +190,6 @@ func bumpFailed(ctx context.Context, deps Deps, row generated.FindLocalIdentityB
 		LockedUntilAt:  lock,
 		ID:             row.ID,
 	}); err != nil {
-		slog.ErrorContext(ctx, "login: failed to bump failed attempts counter", slog.Any("err", err), slog.Int("identity_id", int(row.ID)))
+		slog.ErrorContext(ctx, "login: failed to bump failed attempts counter", slog.Any("err", err), slog.String("user_public_id", row.UserPublicID.String()))
 	}
 }

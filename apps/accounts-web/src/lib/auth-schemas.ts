@@ -8,29 +8,29 @@
 import { z } from 'zod';
 
 export const loginSchema = z.object({
-  email: z.string().min(1, 'auth.validation.emailRequired').email('auth.validation.emailInvalid'),
-  password: z.string().min(8, 'auth.validation.passwordMin'),
+  email: z.string().min(1, 'auth.validation.email_required').email('auth.validation.email_invalid'),
+  password: z.string().min(8, 'auth.validation.password_min'),
 });
 
 export type LoginFormValues = z.infer<typeof loginSchema>;
 
 export const signupSchema = z.object({
-  email: z.string().min(1, 'auth.validation.emailRequired').email('auth.validation.emailInvalid'),
-  password: z.string().min(8, 'auth.validation.passwordMin'),
-  displayName: z.string().min(1, 'auth.validation.nameRequired'),
+  email: z.string().min(1, 'auth.validation.email_required').email('auth.validation.email_invalid'),
+  password: z.string().min(8, 'auth.validation.password_min'),
+  displayName: z.string().min(1, 'auth.validation.name_required'),
 });
 
 export type SignupFormValues = z.infer<typeof signupSchema>;
 
 export const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1, 'auth.validation.currentPasswordRequired'),
-  newPassword: z.string().min(8, 'auth.validation.passwordMin'),
+  currentPassword: z.string().min(1, 'auth.validation.current_password_required'),
+  newPassword: z.string().min(8, 'auth.validation.password_min'),
 });
 
 export type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
 
 export const profileSchema = z.object({
-  displayName: z.string().min(1, 'auth.validation.nameRequired'),
+  displayName: z.string().min(1, 'auth.validation.name_required'),
   locale: z.enum(['en', 'ja']),
   themePreference: z.enum([
     'aurora-light',

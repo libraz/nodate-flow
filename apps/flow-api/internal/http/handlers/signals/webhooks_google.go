@@ -18,7 +18,6 @@ import (
 // Google Drive push notifications do not sign payloads; instead each
 // channel is registered with a unique X-Goog-Channel-Token that we
 // verify with a constant-time compare against [Deps.GoogleChannelToken].
-//
 func HandleGoogleWebhook(deps Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))

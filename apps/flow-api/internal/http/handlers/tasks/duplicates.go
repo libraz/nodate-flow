@@ -17,11 +17,11 @@ import (
 // Default thresholds mirror ADR 0003 §4. Used when ai_settings has no
 // row for the workspace yet.
 const (
-	defaultEmbedModel        = "mock-768"
-	defaultDuplicateHigh     = 0.870
-	defaultDuplicateLow      = 0.750
-	duplicateCandidateLimit  = 200
-	duplicateResultLimit     = 20
+	defaultEmbedModel       = "mock-768"
+	defaultDuplicateHigh    = 0.870
+	defaultDuplicateLow     = 0.750
+	duplicateCandidateLimit = 200
+	duplicateResultLimit    = 20
 )
 
 // ListDuplicatesInput is the Huma input for GET /tasks/{id}/duplicates.
@@ -175,4 +175,3 @@ func vectorBytes(v any) []byte {
 	}
 	return nil
 }
-

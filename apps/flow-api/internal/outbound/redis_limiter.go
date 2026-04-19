@@ -26,14 +26,14 @@ import (
 // [Limiter]. All counters are tracked in-memory per replica for
 // Stats(); the authoritative rate accounting lives in Redis.
 type RedisLimiter struct {
-	rdb         *redis.Client
-	key         string
-	capacity    float64
-	refill      float64
-	pollWait    time.Duration
-	allowed     atomic.Uint64
-	waited      atomic.Uint64
-	denied      atomic.Uint64
+	rdb      *redis.Client
+	key      string
+	capacity float64
+	refill   float64
+	pollWait time.Duration
+	allowed  atomic.Uint64
+	waited   atomic.Uint64
+	denied   atomic.Uint64
 }
 
 // NewRedisLimiter constructs a RedisLimiter. destination is used as

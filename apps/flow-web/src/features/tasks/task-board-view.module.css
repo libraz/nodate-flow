@@ -1,0 +1,72 @@
+/* Board view — responsive Kanban grid */
+
+.board {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-columns: repeat(var(--col-count, 5), minmax(12rem, 1fr));
+  gap: var(--nf-space-4);
+  overflow-x: auto;
+  padding-block-end: var(--nf-space-4);
+  max-inline-size: 100%;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  min-block-size: 24rem;
+}
+
+.columnHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--nf-space-2);
+}
+
+.columnHeaderLabel {
+  font-weight: 600;
+}
+
+.columnHeaderCount {
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.dropZone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-1);
+  border: 2px dashed transparent;
+  border-radius: var(--nf-radius-md);
+  min-block-size: 6rem;
+  transition: border-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.dropZoneHover {
+  border-color: var(--nf-color-accent);
+}
+
+.emptyColumn {
+  margin: 0;
+  padding: var(--nf-space-5) var(--nf-space-3);
+  text-align: center;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+  border: 1px dashed var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-bg-sunken);
+}
+
+@media (max-width: 767px) {
+  .board {
+    grid-auto-flow: row;
+    grid-template-columns: 1fr;
+    overflow-x: visible;
+  }
+
+  .column {
+    min-block-size: auto;
+  }
+}

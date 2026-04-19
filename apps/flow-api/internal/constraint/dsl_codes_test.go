@@ -23,13 +23,13 @@ func codeOf(t *testing.T, raw string) string {
 
 func TestParseError_Codes(t *testing.T) {
 	cases := map[string]string{
-		`not json`:                                     CodeInvalidJSON,
-		`{"op":"bogus"}`:                               CodeUnknownOp,
-		`{"op":"and","terms":[]}`:                      CodeEmptyTerms,
-		`{"op":"time.due_before"}`:                     CodeMissingArg,
-		`{"op":"dependency.all_done"}`:                 CodeMissingArg,
-		`{"op":"dependency.open_at_most"}`:             CodeMissingArg,
-		`{"op":"actor.has_role"}`:                      CodeMissingArg,
+		`not json`:                         CodeInvalidJSON,
+		`{"op":"bogus"}`:                   CodeUnknownOp,
+		`{"op":"and","terms":[]}`:          CodeEmptyTerms,
+		`{"op":"time.due_before"}`:         CodeMissingArg,
+		`{"op":"dependency.all_done"}`:     CodeMissingArg,
+		`{"op":"dependency.open_at_most"}`: CodeMissingArg,
+		`{"op":"actor.has_role"}`:          CodeMissingArg,
 	}
 	for in, want := range cases {
 		if got := codeOf(t, in); got != want {

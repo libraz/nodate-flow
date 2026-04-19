@@ -5,11 +5,11 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
 
 	generated "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/types"
+	apierrors "github.com/nodate-flow/nodate-flow/apps/time-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/eventbus"
 )
 
@@ -22,20 +22,20 @@ type ListCalendarsInput struct {
 
 // CalendarResponse is the JSON representation of a calendar with subscription info.
 type CalendarResponse struct {
-	ID                     string     `json:"id"`
-	Kind                   string     `json:"kind"`
-	Name                   string     `json:"name"`
-	Description            *string    `json:"description,omitempty"`
-	Color                  string     `json:"color"`
-	CoverUrl               *string    `json:"coverUrl,omitempty"`
-	SystemSlug             *string    `json:"systemSlug,omitempty"`
-	Role                   string     `json:"role"`
-	MemberColor            string     `json:"memberColor"`
-	DisplayColor           string     `json:"displayColor"`
-	Visible                bool       `json:"visible"`
-	SubscriptionSortWeight int32      `json:"subscriptionSortWeight"`
-	UpdatedAt              *time.Time `json:"updatedAt,omitempty"`
-	CreatedAt              time.Time  `json:"createdAt"`
+	ID                     string  `json:"id"`
+	Kind                   string  `json:"kind"`
+	Name                   string  `json:"name"`
+	Description            *string `json:"description,omitempty"`
+	Color                  string  `json:"color"`
+	CoverUrl               *string `json:"coverUrl,omitempty"`
+	SystemSlug             *string `json:"systemSlug,omitempty"`
+	Role                   string  `json:"role"`
+	MemberColor            string  `json:"memberColor"`
+	DisplayColor           string  `json:"displayColor"`
+	Visible                bool    `json:"visible"`
+	SubscriptionSortWeight int32   `json:"subscriptionSortWeight"`
+	UpdatedAt              *int64  `json:"updatedAt,omitempty"`
+	CreatedAt              int64   `json:"createdAt"`
 }
 
 // ListCalendarsOutput is the response for the list calendars endpoint.
@@ -123,7 +123,7 @@ func ListCalendars(deps Deps) func(context.Context, *ListCalendarsInput) (*ListC
 			WorkspaceID: wsID,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to list calendars", err)
+			return nil, httpErr(apierrors.CalendarCalendarListQueryInterrupted)
 		}
 		out := &ListCalendarsOutput{}
 		out.Body.Calendars = make([]CalendarResponse, len(rows))
@@ -170,7 +170,7 @@ func CreateCalendar(deps Deps) func(context.Context, *CreateCalendarInput) (*Cre
 			SystemSlug:  systemSlug,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to create calendar", err)
+			return nil, httpErr(apierrors.CalendarCalendarStoreWriteInterrupted)
 		}
 
 		subPublicID := types.New()
@@ -184,7 +184,7 @@ func CreateCalendar(deps Deps) func(context.Context, *CreateCalendarInput) (*Cre
 			DisplayColor: input.Body.Color,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to create subscription", err)
+			return nil, httpErr(apierrors.CalendarSubscriptionStoreWriteInterrupted)
 		}
 
 		out := &CreateCalendarOutput{}
@@ -201,7 +201,7 @@ func CreateCalendar(deps Deps) func(context.Context, *CreateCalendarInput) (*Cre
 			DisplayColor:           input.Body.Color,
 			Visible:                true,
 			SubscriptionSortWeight: 0,
-			CreatedAt:              time.Now().UTC(),
+			CreatedAt:              time.Now().UTC().Unix(),
 		}
 
 		_ = eventbus.Append(ctx, deps.DB, wsID, "calendar.created", &actorID, map[string]any{
@@ -245,7 +245,7 @@ func PatchCalendar(deps Deps) func(context.Context, *PatchCalendarInput) (*Patch
 			return nil, err
 		}
 		if !isOwnerOrManager(sub) {
-			return nil, errForbidden
+			return nil, httpErr(apierrors.CalendarCalendarManagerRoleRequired)
 		}
 
 		patchName := sql.NullString{}
@@ -275,7 +275,7 @@ func PatchCalendar(deps Deps) func(context.Context, *PatchCalendarInput) (*Patch
 			WorkspaceID: wsID,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to update calendar", err)
+			return nil, httpErr(apierrors.CalendarCalendarStoreWriteInterrupted)
 		}
 
 		// Re-read the updated calendar.
@@ -284,7 +284,7 @@ func PatchCalendar(deps Deps) func(context.Context, *PatchCalendarInput) (*Patch
 			WorkspaceID: wsID,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to read updated calendar", err)
+			return nil, httpErr(apierrors.CalendarCalendarStoreReadInterrupted)
 		}
 		out := &PatchCalendarOutput{}
 		out.Body = calendarFromRow(cal, sub)
@@ -309,7 +309,7 @@ func DeleteCalendar(deps Deps) func(context.Context, *DeleteCalendarInput) (*Del
 			return nil, err
 		}
 		if sub.Role != generated.CalendarSubscriptionsRoleOwner {
-			return nil, errForbidden
+			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
 
 		calUID, _ := uuid.Parse(input.CalId)
@@ -318,7 +318,7 @@ func DeleteCalendar(deps Deps) func(context.Context, *DeleteCalendarInput) (*Del
 			WorkspaceID: wsID,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to delete calendar", err)
+			return nil, httpErr(apierrors.CalendarCalendarStoreDeleteInterrupted)
 		}
 
 		out := &DeleteCalendarOutput{}
@@ -345,7 +345,7 @@ func calendarFromListRow(r generated.ListCalendarsForUserRow) CalendarResponse {
 		DisplayColor:           r.DisplayColor,
 		Visible:                r.Visible,
 		SubscriptionSortWeight: r.SubscriptionSortWeight,
-		CreatedAt:              r.CreatedAt,
+		CreatedAt:              r.CreatedAt.Unix(),
 	}
 	if r.Description.Valid {
 		resp.Description = &r.Description.String
@@ -357,7 +357,7 @@ func calendarFromListRow(r generated.ListCalendarsForUserRow) CalendarResponse {
 		resp.SystemSlug = &r.SystemSlug.String
 	}
 	if r.UpdatedAt.Valid {
-		resp.UpdatedAt = &r.UpdatedAt.Time
+		resp.UpdatedAt = int64Ptr(r.UpdatedAt.Time.Unix())
 	}
 	return resp
 }
@@ -373,7 +373,7 @@ func calendarFromRow(c generated.FindCalendarByPublicIdRow, s generated.FindCale
 		DisplayColor:           s.DisplayColor,
 		Visible:                s.Visible,
 		SubscriptionSortWeight: s.SortWeight,
-		CreatedAt:              c.CreatedAt,
+		CreatedAt:              c.CreatedAt.Unix(),
 	}
 	if c.Description.Valid {
 		resp.Description = &c.Description.String
@@ -385,7 +385,7 @@ func calendarFromRow(c generated.FindCalendarByPublicIdRow, s generated.FindCale
 		resp.SystemSlug = &c.SystemSlug.String
 	}
 	if c.UpdatedAt.Valid {
-		resp.UpdatedAt = &c.UpdatedAt.Time
+		resp.UpdatedAt = int64Ptr(c.UpdatedAt.Time.Unix())
 	}
 	return resp
 }

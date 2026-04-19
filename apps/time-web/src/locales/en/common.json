@@ -10,7 +10,18 @@
     "saving": "Saving...",
     "cancel": "Cancel",
     "close": "Close",
+    "closeModal": "Close modal",
     "owner": "Owner"
+  },
+  "fatal": {
+    "title": "Something went wrong",
+    "description": "An unexpected error occurred. Please try again or return to the home page.",
+    "retry": "Retry",
+    "backHome": "Back to home"
+  },
+  "notFound": {
+    "description": "The page you are looking for does not exist.",
+    "backHome": "Back to home"
   },
   "auth": {
     "signIn": "Sign in",
@@ -61,7 +72,9 @@
     "closeSidebar": "Close sidebar",
     "createNewEvent": "Create new event",
     "noEventsForDay": "No events for this day",
-    "closeDayDetail": "Close day detail"
+    "closeDayDetail": "Close day detail",
+    "toggleDropdown": "Toggle dropdown",
+    "selected": "Selected"
   },
   "sidebar": {
     "sharedCalendars": "Shared Calendars",
@@ -115,7 +128,8 @@
     "roleOwner": "Owner",
     "roleManager": "Manager",
     "roleEditor": "Editor",
-    "roleViewer": "Viewer"
+    "roleViewer": "Viewer",
+    "remove": "Remove member"
   },
   "invite": {
     "title": "Invite Links",

@@ -8,7 +8,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { apiRequest } from '../../../lib/api-client';
+import { sdk } from '../../../lib/sdk';
 
 interface InstanceAdmin {
   id: string;
@@ -58,27 +58,28 @@ function AdminsPage(): ReactElement {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    void apiRequest<AdminsResponse>('/admin/admins').then((result) => {
+    void sdk.GET('/admin/admins').then((result) => {
       if (result.error || !result.data) {
         setError(t('errors.generic'));
         setLoading(false);
         return;
       }
-      setAdmins(result.data.items);
+      const body = result.data as AdminsResponse;
+      setAdmins(body.items);
       setLoading(false);
     });
   }, [t]);
 
   const handleRevoke = async (adminId: string) => {
-    if (!window.confirm(t('admins.confirmRevoke'))) return;
+    if (!window.confirm(t('admins.confirm_revoke'))) return;
 
     setActionLoading(true);
-    const result = await apiRequest(`/admin/admins/${adminId}`, {
-      method: 'DELETE',
+    const { error: err } = await sdk.DELETE('/admin/admins/{adminId}', {
+      params: { path: { adminId } },
     });
     setActionLoading(false);
 
-    if (!result.error) {
+    if (!err) {
       setAdmins((prev) => prev.filter((a) => a.id !== adminId));
     }
   };
@@ -89,18 +90,18 @@ function AdminsPage(): ReactElement {
 
     setGrantError(null);
     setActionLoading(true);
-    const result = await apiRequest<{ admin: InstanceAdmin }>('/admin/admins', {
-      method: 'POST',
+    const { data, error: err } = await sdk.POST('/admin/admins', {
       body: { userId: grantUserId.trim() },
     });
     setActionLoading(false);
 
-    if (result.error || !result.data) {
+    if (err || !data) {
       setGrantError(t('errors.generic'));
       return;
     }
 
-    setAdmins((prev) => [...prev, result.data.admin]);
+    const body = data as { admin: InstanceAdmin };
+    setAdmins((prev) => [...prev, body.admin]);
     setGrantUserId('');
   };
 
@@ -132,7 +133,7 @@ function AdminsPage(): ReactElement {
       {loading ? (
         <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('common.loading')}</p>
       ) : admins.length === 0 ? (
-        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('admins.noAdmins')}</p>
+        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('admins.no_admins')}</p>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
@@ -140,8 +141,8 @@ function AdminsPage(): ReactElement {
               <tr>
                 <th style={thStyle}>{t('admins.name')}</th>
                 <th style={thStyle}>{t('admins.email')}</th>
-                <th style={thStyle}>{t('admins.grantedAt')}</th>
-                <th style={thStyle}>{t('admins.grantedBy')}</th>
+                <th style={thStyle}>{t('admins.granted_at')}</th>
+                <th style={thStyle}>{t('admins.granted_by')}</th>
                 <th style={thStyle} />
               </tr>
             </thead>
@@ -198,7 +199,7 @@ function AdminsPage(): ReactElement {
                 marginBlockEnd: 'var(--nf-space-1, 0.25rem)',
               }}
             >
-              {t('admins.grantUserIdLabel')}
+              {t('admins.grant_user_id_label')}
             </label>
             <Input
               id="grant-user-id"
@@ -209,7 +210,7 @@ function AdminsPage(): ReactElement {
             />
           </div>
           <Button type="submit" variant="primary" disabled={actionLoading || !grantUserId.trim()}>
-            {t('admins.grantSubmit')}
+            {t('admins.grant_submit')}
           </Button>
         </form>
         {grantError ? (

@@ -54,7 +54,7 @@ type Response struct {
 }
 
 // Decryptor is the narrow contract that providers depend on for unsealing
-// stored API keys. Only internal/crypto.Cipher satisfies this in production;
+// stored API keys. Only go-shared/crypto.Cipher satisfies this in production;
 // tests may inject a fake.
 type Decryptor interface {
 	Decrypt(blob []byte) ([]byte, error)

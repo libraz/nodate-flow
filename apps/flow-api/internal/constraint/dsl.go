@@ -27,17 +27,17 @@ type Op string
 // Supported operations for the initial constraint slice. Any Op not in
 // this set is rejected by Parse.
 const (
-	OpAnd           Op = "and"
-	OpOr            Op = "or"
-	OpNot           Op = "not"
-	OpTimeDueBefore Op = "time.due_before"
-	OpTimeDueAfter  Op = "time.due_after"
-	OpDepAllDone    Op = "dependency.all_done"
-	OpDepOpenAtMost Op = "dependency.open_at_most"
-	OpActorHasRole  Op = "actor.has_role"
-	OpSignalReceived Op = "signal.received"
+	OpAnd             Op = "and"
+	OpOr              Op = "or"
+	OpNot             Op = "not"
+	OpTimeDueBefore   Op = "time.due_before"
+	OpTimeDueAfter    Op = "time.due_after"
+	OpDepAllDone      Op = "dependency.all_done"
+	OpDepOpenAtMost   Op = "dependency.open_at_most"
+	OpActorHasRole    Op = "actor.has_role"
+	OpSignalReceived  Op = "signal.received"
 	OpApprovalGranted Op = "approval.granted"
-	OpCIStatusIs    Op = "ci.status_is"
+	OpCIStatusIs      Op = "ci.status_is"
 )
 
 // Constraint is the parsed DSL AST. It is a single struct with

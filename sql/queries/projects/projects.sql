@@ -96,7 +96,8 @@ UPDATE projects
 SET name = ?,
     slug = ?,
     description = ?
-WHERE public_id = ?
+WHERE workspace_id = ?
+  AND public_id = ?
   AND enabled = TRUE;
 
 -- name: DisableProject :exec

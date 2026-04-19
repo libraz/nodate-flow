@@ -8,11 +8,12 @@ import (
 	"errors"
 	"time"
 
-	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
 
+	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/auth"
 	generated "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/types"
+	apierrors "github.com/nodate-flow/nodate-flow/apps/time-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/http/middleware"
 )
@@ -32,13 +33,13 @@ type CreateInviteInput struct {
 
 // InviteResponse is the JSON representation of a calendar invite.
 type InviteResponse struct {
-	ID        string     `json:"id"`
-	Token     string     `json:"token"`
-	Role      string     `json:"role"`
-	MaxUses   *int32     `json:"maxUses,omitempty"`
-	UseCount  uint32     `json:"useCount"`
-	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
-	CreatedAt time.Time  `json:"createdAt"`
+	ID        string `json:"id"`
+	Token     string `json:"token"`
+	Role      string `json:"role"`
+	MaxUses   *int32 `json:"maxUses,omitempty"`
+	UseCount  uint32 `json:"useCount"`
+	ExpiresAt *int64 `json:"expiresAt,omitempty"`
+	CreatedAt int64  `json:"createdAt"`
 }
 
 // CreateInviteOutput is the response for the create invite endpoint.
@@ -102,12 +103,12 @@ func CreateInvite(deps Deps) func(context.Context, *CreateInviteInput) (*CreateI
 			return nil, err
 		}
 		if !isOwnerOrManager(sub) {
-			return nil, errForbidden
+			return nil, httpErr(apierrors.CalendarCalendarManagerRoleRequired)
 		}
 
 		tokenBytes := make([]byte, 32)
 		if _, err := rand.Read(tokenBytes); err != nil {
-			return nil, huma.Error500InternalServerError("Failed to generate token", err)
+			return nil, httpErr(apierrors.CalendarInviteTokenGenerateInterrupted)
 		}
 		token := hex.EncodeToString(tokenBytes)
 
@@ -117,7 +118,7 @@ func CreateInvite(deps Deps) func(context.Context, *CreateInviteInput) (*CreateI
 			WorkspaceID:     wsID,
 			CalendarID:      cal.ID,
 			CreatedByUserID: actorID,
-			Token:           token,
+			TokenHash:       auth.HashOpaque(token),
 			Role:            generated.CalendarInvitesRole(input.Body.Role),
 		}
 		if input.Body.MaxUses != nil {
@@ -129,7 +130,7 @@ func CreateInvite(deps Deps) func(context.Context, *CreateInviteInput) (*CreateI
 
 		_, err = deps.Queries.CreateCalendarInvite(ctx, params)
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to create invite", err)
+			return nil, httpErr(apierrors.CalendarInviteStoreWriteInterrupted)
 		}
 
 		_ = eventbus.Append(ctx, deps.DB, wsID, "calendar.invite.created", &actorID, map[string]any{
@@ -144,13 +145,13 @@ func CreateInvite(deps Deps) func(context.Context, *CreateInviteInput) (*CreateI
 			Token:     token,
 			Role:      input.Body.Role,
 			UseCount:  0,
-			CreatedAt: time.Now().UTC(),
+			CreatedAt: time.Now().UTC().Unix(),
 		}
 		if input.Body.MaxUses != nil {
 			out.Body.MaxUses = input.Body.MaxUses
 		}
 		if input.Body.ExpiresAt != nil {
-			out.Body.ExpiresAt = input.Body.ExpiresAt
+			out.Body.ExpiresAt = int64Ptr(input.Body.ExpiresAt.Unix())
 		}
 
 		return out, nil
@@ -170,7 +171,7 @@ func ListInvites(deps Deps) func(context.Context, *ListInvitesInput) (*ListInvit
 			return nil, err
 		}
 		if !isOwnerOrManager(sub) {
-			return nil, errForbidden
+			return nil, httpErr(apierrors.CalendarCalendarManagerRoleRequired)
 		}
 
 		rows, err := deps.Queries.ListCalendarInvites(ctx, generated.ListCalendarInvitesParams{
@@ -178,7 +179,7 @@ func ListInvites(deps Deps) func(context.Context, *ListInvitesInput) (*ListInvit
 			WorkspaceID: wsID,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to list invites", err)
+			return nil, httpErr(apierrors.CalendarInviteListQueryInterrupted)
 		}
 
 		out := &ListInvitesOutput{}
@@ -186,17 +187,17 @@ func ListInvites(deps Deps) func(context.Context, *ListInvitesInput) (*ListInvit
 		for i, r := range rows {
 			resp := InviteResponse{
 				ID:        r.PublicID.String(),
-				Token:     r.Token,
+				Token:     r.TokenHash,
 				Role:      string(r.Role),
 				UseCount:  r.UseCount,
-				CreatedAt: r.CreatedAt,
+				CreatedAt: r.CreatedAt.Unix(),
 			}
 			if r.MaxUses.Valid {
 				v := r.MaxUses.Int32
 				resp.MaxUses = &v
 			}
 			if r.ExpiresAt.Valid {
-				resp.ExpiresAt = &r.ExpiresAt.Time
+				resp.ExpiresAt = int64Ptr(r.ExpiresAt.Time.Unix())
 			}
 			out.Body.Invites[i] = resp
 		}
@@ -217,7 +218,7 @@ func RevokeInvite(deps Deps) func(context.Context, *RevokeInviteInput) (*RevokeI
 			return nil, err
 		}
 		if !isOwnerOrManager(sub) {
-			return nil, errForbidden
+			return nil, httpErr(apierrors.CalendarCalendarManagerRoleRequired)
 		}
 
 		invUID, err := uuid.Parse(input.InvId)
@@ -230,7 +231,7 @@ func RevokeInvite(deps Deps) func(context.Context, *RevokeInviteInput) (*RevokeI
 			CalendarID: cal.ID,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to revoke invite", err)
+			return nil, httpErr(apierrors.CalendarInviteStoreRevokeInterrupted)
 		}
 
 		_ = eventbus.Append(ctx, deps.DB, wsID, "calendar.invite.revoked", &actorID, map[string]any{
@@ -253,12 +254,12 @@ func AcceptInvite(deps Deps) func(context.Context, *AcceptInviteInput) (*AcceptI
 			return nil, errAccessDenied
 		}
 
-		invite, err := deps.Queries.FindCalendarInviteByToken(ctx, input.Token)
+		invite, err := deps.Queries.FindCalendarInviteByTokenHash(ctx, auth.HashOpaque(input.Token))
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, errInviteNotFound
 			}
-			return nil, huma.Error500InternalServerError("Failed to find invite", err)
+			return nil, httpErr(apierrors.CalendarInviteStoreLookupInterrupted)
 		}
 
 		// Check expiry and use limits.
@@ -272,10 +273,10 @@ func AcceptInvite(deps Deps) func(context.Context, *AcceptInviteInput) (*AcceptI
 			UserID:     actorID,
 		})
 		if err == nil {
-			return nil, huma.Error409Conflict("You are already a member of this calendar")
+			return nil, httpErr(apierrors.CalendarMemberAlreadySubscribed)
 		}
 		if !errors.Is(err, sql.ErrNoRows) {
-			return nil, huma.Error500InternalServerError("Failed to check membership", err)
+			return nil, httpErr(apierrors.CalendarSubscriptionMembershipCheckInterrupted)
 		}
 
 		// Determine member color.
@@ -284,7 +285,7 @@ func AcceptInvite(deps Deps) func(context.Context, *AcceptInviteInput) (*AcceptI
 			WorkspaceID: invite.WorkspaceID,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to list members", err)
+			return nil, httpErr(apierrors.CalendarMemberListQueryInterrupted)
 		}
 		color := memberColors[len(members)%len(memberColors)]
 
@@ -302,7 +303,7 @@ func AcceptInvite(deps Deps) func(context.Context, *AcceptInviteInput) (*AcceptI
 			DisplayColor: color,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to create subscription", err)
+			return nil, httpErr(apierrors.CalendarSubscriptionStoreWriteInterrupted)
 		}
 
 		// Increment use count.

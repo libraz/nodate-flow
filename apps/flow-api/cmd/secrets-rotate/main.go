@@ -33,7 +33,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/crypto"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 )
 
 func main() {

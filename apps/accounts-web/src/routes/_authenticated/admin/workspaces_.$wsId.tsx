@@ -7,7 +7,7 @@ import { Link, createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { apiRequest } from '../../../lib/api-client';
+import { sdk } from '../../../lib/sdk';
 
 interface WorkspaceDetail {
   id: string;
@@ -56,14 +56,14 @@ function WorkspaceDetailPage(): ReactElement {
     setLoading(true);
     setError(null);
 
-    void apiRequest<WorkspaceDetail>(`/admin/workspaces/${wsId}`).then((result) => {
+    void sdk.GET('/admin/workspaces/{wsId}', { params: { path: { wsId } } }).then((result) => {
       if (cancelled) return;
       if (result.error || !result.data) {
         setError(t('errors.generic'));
         setLoading(false);
         return;
       }
-      setWorkspace(result.data);
+      setWorkspace(result.data as WorkspaceDetail);
       setLoading(false);
     });
 
@@ -78,16 +78,16 @@ function WorkspaceDetailPage(): ReactElement {
     if (!window.confirm(confirmMsg)) return;
 
     setActionLoading(true);
-    await apiRequest<{ ok: boolean }>(`/admin/workspaces/${wsId}`, {
-      method: 'PATCH',
+    await sdk.PATCH('/admin/workspaces/{wsId}', {
+      params: { path: { wsId } },
       body: { enabled: !workspace.enabled },
     });
     setActionLoading(false);
 
     // Refetch
-    const result = await apiRequest<WorkspaceDetail>(`/admin/workspaces/${wsId}`);
+    const result = await sdk.GET('/admin/workspaces/{wsId}', { params: { path: { wsId } } });
     if (result.data) {
-      setWorkspace(result.data);
+      setWorkspace(result.data as WorkspaceDetail);
     }
   };
 
@@ -174,7 +174,7 @@ function WorkspaceDetailPage(): ReactElement {
           </span>
         </div>
 
-        <div style={labelStyle}>{t('workspaces.createdAt')}</div>
+        <div style={labelStyle}>{t('workspaces.created_at')}</div>
         <div style={valueStyle}>{formatTimestamp(workspace.createdAt, t('common.never'))}</div>
       </div>
 

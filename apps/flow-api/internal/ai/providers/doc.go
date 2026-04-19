@@ -1,6 +1,6 @@
 // Package providers contains the LLM provider abstraction (Anthropic /
 // OpenAI / Google / Ollama / OpenAI-compatible) and is the ONLY package
-// outside internal/crypto allowed to import internal/crypto.
+// outside go-shared/crypto allowed to import go-shared/crypto.
 //
 // The depguard rule in apps/flow-api/.golangci.yml enforces this. Plaintext API
 // keys decrypted here MUST flow straight into the upstream HTTP request's

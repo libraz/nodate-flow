@@ -75,10 +75,10 @@ type InProcessNotifier struct {
 
 // MetricsSnapshot is a point-in-time view of notifier counters.
 type MetricsSnapshot struct {
-	EventsPublished    uint64
-	EventsDropped      uint64
-	ActiveWorkspaces   int
-	ActiveSubscribers  int
+	EventsPublished   uint64
+	EventsDropped     uint64
+	ActiveWorkspaces  int
+	ActiveSubscribers int
 }
 
 // Snapshot returns a consistent read of the notifier's counters

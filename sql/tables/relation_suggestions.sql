@@ -16,6 +16,7 @@ CREATE TABLE relation_suggestions (
   resolved_by INT UNSIGNED NULL COMMENT 'Internal FK to users.id (who resolved)',
   resolved_at DATETIME NULL COMMENT 'When the suggestion was accepted or dismissed',
 
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   UNIQUE KEY uniq_relation_suggestions_public_id (public_id),

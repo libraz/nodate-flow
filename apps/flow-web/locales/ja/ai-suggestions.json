@@ -115,6 +115,17 @@
     "today": "今日",
     "in_days": "あと{count}日"
   },
+  "filter_condition": {
+    "priority": "優先度: {label}",
+    "blocked": "ブロック中",
+    "due_this_week": "期日: 今週",
+    "status": "ステータス: {values}"
+  },
+  "priority_label": {
+    "1": "低",
+    "2": "中",
+    "3": "高"
+  },
   "nl_query": {
     "label": "自然言語で問い合わせ",
     "placeholder": "今週ブロックされているものを見せて",

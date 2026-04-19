@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/crypto"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 )
@@ -255,6 +255,113 @@ func TestLoadUserTokenSet_Expired_JITRefreshFails_ReturnsStaleFallback(t *testin
 	require.NoError(t, err,
 		"transient refresh failure must not be fatal — caller gets the stale token to try")
 	assert.Equal(t, "stale-access", ts.AccessToken)
+}
+
+func TestLoadUserTokenSet_Expired_JITRefreshRotatesRefreshToken(t *testing.T) {
+	t.Parallel()
+	c := newTestCipher(t)
+	accessCT, _ := c.Encrypt([]byte("old-access"))
+	refreshCT, _ := c.Encrypt([]byte("old-refresh"))
+
+	var updatedParams generated.UpdateConnectionTokensParams
+	reg := NewRegistry(func() (Provider, error) {
+		return &stubRefreshProvider{
+			stubProvider: stubProvider{name: "google_calendar"},
+			refreshFn: func(ctx context.Context, rt string) (*TokenSet, error) {
+				return &TokenSet{
+					AccessToken:  "new-access",
+					RefreshToken: "rotated-refresh", // different from stored
+					ExpiresAt:    time.Now().Add(time.Hour),
+				}, nil
+			},
+		}, nil
+	})
+	q := &fakeLoaderQuerier{
+		findRow: generated.FindUserIntegrationByUserProviderRow{
+			ID:                     3,
+			AccessTokenCiphertext:  accessCT,
+			RefreshTokenCiphertext: sql.NullString{String: string(refreshCT), Valid: true},
+			AccessTokenExpiresAt:   sql.NullTime{Time: time.Now().Add(-time.Minute), Valid: true},
+		},
+		updateFn: func(params generated.UpdateConnectionTokensParams) error {
+			updatedParams = params
+			return nil
+		},
+	}
+	ts, err := LoadUserTokenSet(context.Background(), q, c, reg, 1, "google_calendar")
+	require.NoError(t, err)
+	assert.Equal(t, "new-access", ts.AccessToken)
+	assert.Equal(t, "rotated-refresh", ts.RefreshToken,
+		"caller must receive the rotated refresh token")
+
+	// Persisted refresh token must be the new one, encrypted.
+	require.True(t, updatedParams.RefreshTokenCiphertext.Valid,
+		"rotated refresh token must be persisted")
+	decrypted, err := c.Decrypt([]byte(updatedParams.RefreshTokenCiphertext.String))
+	require.NoError(t, err)
+	assert.Equal(t, "rotated-refresh", string(decrypted),
+		"persisted ciphertext must decrypt to the rotated token")
+}
+
+func TestLoadUserTokenSet_Expired_JITRefreshPersistFails_StillReturnsFresh(t *testing.T) {
+	t.Parallel()
+	c := newTestCipher(t)
+	accessCT, _ := c.Encrypt([]byte("old-access"))
+	refreshCT, _ := c.Encrypt([]byte("rt"))
+	reg := NewRegistry(func() (Provider, error) {
+		return &stubRefreshProvider{
+			stubProvider: stubProvider{name: "google_calendar"},
+			refreshFn: func(ctx context.Context, rt string) (*TokenSet, error) {
+				return &TokenSet{
+					AccessToken: "fresh",
+					ExpiresAt:   time.Now().Add(time.Hour),
+				}, nil
+			},
+		}, nil
+	})
+	q := &fakeLoaderQuerier{
+		findRow: generated.FindUserIntegrationByUserProviderRow{
+			ID:                     1,
+			AccessTokenCiphertext:  accessCT,
+			RefreshTokenCiphertext: sql.NullString{String: string(refreshCT), Valid: true},
+			AccessTokenExpiresAt:   sql.NullTime{Time: time.Now().Add(-time.Minute), Valid: true},
+		},
+		updateFn: func(params generated.UpdateConnectionTokensParams) error {
+			return errors.New("db write failed")
+		},
+	}
+	ts, err := LoadUserTokenSet(context.Background(), q, c, reg, 1, "google_calendar")
+	require.NoError(t, err,
+		"DB persist failure must be non-fatal — the background refresher will catch up")
+	assert.Equal(t, "fresh", ts.AccessToken,
+		"caller must receive the fresh token regardless of persistence outcome")
+}
+
+func TestLoadUserTokenSet_Expired_JITRefreshReturnsNil_FallsBack(t *testing.T) {
+	t.Parallel()
+	c := newTestCipher(t)
+	accessCT, _ := c.Encrypt([]byte("stale"))
+	refreshCT, _ := c.Encrypt([]byte("rt"))
+	reg := NewRegistry(func() (Provider, error) {
+		return &stubRefreshProvider{
+			stubProvider: stubProvider{name: "google_calendar"},
+			refreshFn: func(ctx context.Context, rt string) (*TokenSet, error) {
+				return nil, nil // nil result, nil error
+			},
+		}, nil
+	})
+	q := &fakeLoaderQuerier{
+		findRow: generated.FindUserIntegrationByUserProviderRow{
+			ID:                     1,
+			AccessTokenCiphertext:  accessCT,
+			RefreshTokenCiphertext: sql.NullString{String: string(refreshCT), Valid: true},
+			AccessTokenExpiresAt:   sql.NullTime{Time: time.Now().Add(-time.Minute), Valid: true},
+		},
+	}
+	ts, err := LoadUserTokenSet(context.Background(), q, c, reg, 1, "google_calendar")
+	require.NoError(t, err)
+	assert.Equal(t, "stale", ts.AccessToken,
+		"nil refresh result must fall back to the stale token")
 }
 
 func TestLoadUserTokenSet_DBError_PropagatesUnwrapped(t *testing.T) {

@@ -4,17 +4,34 @@
 package integrations
 
 import (
+	"context"
 	"database/sql"
 
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/crypto"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	integrationspkg "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/integrations"
 )
 
+// HandlerQuerier is the narrow subset of [generated.Querier] that the
+// integrations handlers need. Declared as an interface so unit tests
+// can substitute a fake without standing up a real database, following
+// the same pattern as [integrationspkg.LoaderQuerier].
+type HandlerQuerier interface {
+	ListUserIntegrations(ctx context.Context, userID uint32) ([]generated.ListUserIntegrationsRow, error)
+	CreateOauthState(ctx context.Context, arg generated.CreateOauthStateParams) error
+	ConsumeOauthState(ctx context.Context, state string) (generated.ConsumeOauthStateRow, error)
+	DeleteOauthState(ctx context.Context, state string) error
+	PurgeExpiredOauthStates(ctx context.Context) error
+	UpsertUserIntegration(ctx context.Context, arg generated.UpsertUserIntegrationParams) (int64, error)
+	FindUserIntegrationByPublicId(ctx context.Context, arg generated.FindUserIntegrationByPublicIdParams) (generated.FindUserIntegrationByPublicIdRow, error)
+	FindUserIntegrationByUserProvider(ctx context.Context, arg generated.FindUserIntegrationByUserProviderParams) (generated.FindUserIntegrationByUserProviderRow, error)
+	DeleteUserIntegration(ctx context.Context, arg generated.DeleteUserIntegrationParams) error
+}
+
 // Deps bundles the dependencies required by the integrations handlers.
 type Deps struct {
 	DB            *sql.DB
-	Queries       *generated.Queries
+	Queries       HandlerQuerier
 	Cipher        *crypto.Cipher
 	Registry      *integrationspkg.Registry
 	PublicBaseURL string

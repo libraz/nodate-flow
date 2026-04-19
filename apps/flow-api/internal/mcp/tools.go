@@ -1385,7 +1385,7 @@ func runListTimeboxes(ctx context.Context, deps Deps, s *session, raw json.RawMe
 			m["description"] = r.Description.String
 		}
 		if r.ProjectName.Valid {
-			m["projectId"]   = r.ProjectPublicID.String()
+			m["projectId"] = r.ProjectPublicID.String()
 			m["projectName"] = r.ProjectName.String
 		}
 		items = append(items, m)
@@ -2496,27 +2496,27 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 
 	pub := newPublicID()
 	_, err = deps.Queries.CreateCalendarEvent(ctx, generated.CreateCalendarEventParams{
-		PublicID:        pub,
-		WorkspaceID:     s.workspaceID,
-		CalendarID:      calID,
-		Kind:            kind,
-		Visibility:      visibility,
-		ShowAs:          showAs,
-		Title:           in.Title,
-		AllDay:          allDay,
-		StartAt:         startAt,
-		EndAt:           endAt,
-		Timezone:        "UTC",
-		Location:        sql.NullString{String: in.Location, Valid: in.Location != ""},
-		Memo:            sql.NullString{String: in.Memo, Valid: in.Memo != ""},
-		Url:             sql.NullString{},
-		OwnerUserID:     ownerUserID,
-		CreatedByUserID: s.userID,
-		BlockLabel:      sql.NullString{String: in.BlockLabel, Valid: in.BlockLabel != ""},
-		RecurrenceRule:  nil,
-		RecurrenceEnd:   sql.NullTime{},
+		PublicID:           pub,
+		WorkspaceID:        s.workspaceID,
+		CalendarID:         calID,
+		Kind:               kind,
+		Visibility:         visibility,
+		ShowAs:             showAs,
+		Title:              in.Title,
+		AllDay:             allDay,
+		StartAt:            startAt,
+		EndAt:              endAt,
+		Timezone:           "UTC",
+		Location:           sql.NullString{String: in.Location, Valid: in.Location != ""},
+		Memo:               sql.NullString{String: in.Memo, Valid: in.Memo != ""},
+		Url:                sql.NullString{},
+		OwnerUserID:        ownerUserID,
+		CreatedByUserID:    s.userID,
+		BlockLabel:         sql.NullString{String: in.BlockLabel, Valid: in.BlockLabel != ""},
+		RecurrenceRule:     nil,
+		RecurrenceEnd:      sql.NullTime{},
 		NotificationOffset: sql.NullInt32{},
-		TaskID:          sql.NullInt32{},
+		TaskID:             sql.NullInt32{},
 	})
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
@@ -2940,4 +2940,3 @@ func runToggleCalendarMemo(ctx context.Context, deps Deps, s *session, raw json.
 func runSmartCreateEvent(_ context.Context, _ Deps, _ *session, _ json.RawMessage) (any, error) {
 	return nil, apierrors.Newf(apierrors.AiProviderNotConfigured, "AI-powered event creation coming soon")
 }
-

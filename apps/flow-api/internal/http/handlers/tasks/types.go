@@ -69,49 +69,49 @@ var totalAsInt64 = handlerutil.TotalAsInt64
 
 // Task is the public DTO for a task row.
 type Task struct {
-	ID                       string  `json:"id"`
-	WorkspaceID              string  `json:"workspaceId" format:"uuid"`
-	ProjectID                string  `json:"projectId"`
-	ProjectName              string  `json:"projectName,omitempty"`
-	ParentTaskID             string  `json:"parentTaskId,omitempty"`
-	CreatedByUserID          string  `json:"createdByUserId,omitempty"`
-	Title                    string  `json:"title"`
-	Description              string  `json:"description,omitempty"`
-	Visibility               string  `json:"visibility"`
-	DerivedState             string  `json:"derivedState"`
-	Priority                 int32   `json:"priority"`
-	DueOn                    string  `json:"dueOn,omitempty"`
-	StartedOn                string  `json:"startedOn,omitempty"`
-	EventOn                  string  `json:"eventOn,omitempty"`
-	CompletedAt              *int64  `json:"completedAt,omitempty"`
-	ConstraintCount          int64   `json:"constraintCount"`
-	ConstraintSatisfiedCount int64   `json:"constraintSatisfiedCount"`
-	DependencyCount          int64   `json:"dependencyCount"`
-	ActorCount               int64   `json:"actorCount"`
-	SortWeight               int32   `json:"sortWeight"`
-	UpdatedAt                *int64  `json:"updatedAt,omitempty"`
-	CreatedAt                int64   `json:"createdAt"`
+	ID                       string `json:"id"`
+	WorkspaceID              string `json:"workspaceId" format:"uuid"`
+	ProjectID                string `json:"projectId"`
+	ProjectName              string `json:"projectName,omitempty"`
+	ParentTaskID             string `json:"parentTaskId,omitempty"`
+	CreatedByUserID          string `json:"createdByUserId,omitempty"`
+	Title                    string `json:"title"`
+	Description              string `json:"description,omitempty"`
+	Visibility               string `json:"visibility"`
+	DerivedState             string `json:"derivedState"`
+	Priority                 int32  `json:"priority"`
+	DueOn                    string `json:"dueOn,omitempty"`
+	StartedOn                string `json:"startedOn,omitempty"`
+	EventOn                  string `json:"eventOn,omitempty"`
+	CompletedAt              *int64 `json:"completedAt,omitempty"`
+	ConstraintCount          int64  `json:"constraintCount"`
+	ConstraintSatisfiedCount int64  `json:"constraintSatisfiedCount"`
+	DependencyCount          int64  `json:"dependencyCount"`
+	ActorCount               int64  `json:"actorCount"`
+	SortWeight               int32  `json:"sortWeight"`
+	UpdatedAt                *int64 `json:"updatedAt,omitempty"`
+	CreatedAt                int64  `json:"createdAt"`
 }
 
 // TaskListItem is the public DTO for a task row in list responses.
 type TaskListItem struct {
-	ID                 string  `json:"id"`
-	ProjectID          string  `json:"projectId"`
-	ProjectName        string  `json:"projectName,omitempty"`
-	ParentTaskID       string  `json:"parentTaskId,omitempty"`
-	Title              string  `json:"title"`
-	Visibility         string  `json:"visibility"`
-	DerivedState       string  `json:"derivedState"`
-	Priority           int32   `json:"priority"`
-	DueOn              string  `json:"dueOn,omitempty"`
-	StartedOn          string  `json:"startedOn,omitempty"`
-	EventOn            string  `json:"eventOn,omitempty"`
-	CompletedAt        *int64  `json:"completedAt,omitempty"`
-	SortWeight         int32   `json:"sortWeight"`
-	PrimaryAssigneeID  *string `json:"primaryAssigneeId"`
-	AssigneeCount      int64   `json:"assigneeCount"`
-	UpdatedAt          *int64  `json:"updatedAt,omitempty"`
-	CreatedAt          int64   `json:"createdAt"`
+	ID                string  `json:"id"`
+	ProjectID         string  `json:"projectId"`
+	ProjectName       string  `json:"projectName,omitempty"`
+	ParentTaskID      string  `json:"parentTaskId,omitempty"`
+	Title             string  `json:"title"`
+	Visibility        string  `json:"visibility"`
+	DerivedState      string  `json:"derivedState"`
+	Priority          int32   `json:"priority"`
+	DueOn             string  `json:"dueOn,omitempty"`
+	StartedOn         string  `json:"startedOn,omitempty"`
+	EventOn           string  `json:"eventOn,omitempty"`
+	CompletedAt       *int64  `json:"completedAt,omitempty"`
+	SortWeight        int32   `json:"sortWeight"`
+	PrimaryAssigneeID *string `json:"primaryAssigneeId"`
+	AssigneeCount     int64   `json:"assigneeCount"`
+	UpdatedAt         *int64  `json:"updatedAt,omitempty"`
+	CreatedAt         int64   `json:"createdAt"`
 }
 
 // TaskConstraint is the public DTO for a task_constraints row.

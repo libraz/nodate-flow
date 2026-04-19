@@ -6,7 +6,7 @@ interface RecurrenceEvent {
   startAt: string;
   endAt: string;
   recurrenceRule: RecurrenceRule | null;
-  recurrenceExceptions?: string[];
+  recurrenceExceptions?: string[] | undefined;
 }
 
 interface ExpandedInstance {

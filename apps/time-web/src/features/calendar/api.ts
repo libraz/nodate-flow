@@ -1,10 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DateTime } from 'luxon';
 
-import { api } from '../../lib/api-client';
-import { useWorkspaceStore } from '../../stores/workspace-store';
+import { toApiError } from '../../lib/api-error';
+import { sdk } from '../../lib/sdk';
+import { useWorkspace, workspaceStore } from '../../stores/workspace-store';
 import { expandAllRecurrences } from './recurrence';
 import type { Calendar, CalendarEvent, CalendarMember, Rsvp, SubscriptionRole } from './types';
+
+/**
+ * Unwraps an SDK response: returns `data` on success, throws an
+ * ApiError on failure. This keeps TanStack Query's error boundary
+ * pipeline working as expected.
+ */
+function unwrap<T>(result: { data?: T; error?: unknown }, fallback: string): T {
+  if (result.error || !result.data) {
+    throw toApiError(result.error, fallback);
+  }
+  return result.data;
+}
 
 export const calendarKeys = {
   all: ['calendars'] as const,
@@ -19,28 +32,34 @@ export const calendarKeys = {
 };
 
 export function useCalendarsQuery() {
-  const wsId = useWorkspaceStore((s) => s.workspaceId);
+  const wsId = useWorkspace((s) => s.workspaceId);
   return useQuery({
     queryKey: [...calendarKeys.lists(), wsId],
-    queryFn: () =>
-      api.get<{ calendars: Calendar[] }>(`/workspaces/${wsId}/calendars`).then((r) => r.calendars),
+    queryFn: async () => {
+      const result = await sdk.GET('/workspaces/{wsId}/calendars', {
+        params: { path: { wsId: wsId ?? '' } },
+      });
+      const body = unwrap(result, 'Failed to fetch calendars') as { calendars: Calendar[] };
+      return body.calendars;
+    },
     enabled: !!wsId,
   });
 }
 
 export function useCalendarEventsQuery(start: string, end: string, enabled = true) {
-  const wsId = useWorkspaceStore((s) => s.workspaceId);
+  const wsId = useWorkspace((s) => s.workspaceId);
   return useQuery({
     queryKey: [...calendarKeys.eventRange(start, end), wsId],
-    queryFn: () =>
-      api
-        .get<{ events: CalendarEvent[] }>(
-          `/workspaces/${wsId}/calendar-events?start=${start}&end=${end}`,
-        )
-        .then((r) => r.events)
-        .then((items) =>
-          expandAllRecurrences(items, DateTime.fromISO(start), DateTime.fromISO(end)),
-        ),
+    queryFn: async () => {
+      const result = await sdk.GET('/workspaces/{wsId}/calendar-events', {
+        params: {
+          path: { wsId: wsId ?? '' },
+          query: { start, end },
+        },
+      });
+      const body = unwrap(result, 'Failed to fetch events') as { events: CalendarEvent[] };
+      return expandAllRecurrences(body.events, DateTime.fromISO(start), DateTime.fromISO(end));
+    },
     enabled: enabled && !!wsId,
   });
 }
@@ -61,10 +80,14 @@ interface CreateEventInput {
 export function useCreateEventMutation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateEventInput) => {
-      const wsId = useWorkspaceStore.getState().workspaceId;
+    mutationFn: async (input: CreateEventInput) => {
+      const wsId = workspaceStore.getState().workspaceId;
       const { calendarId, ...body } = input;
-      return api.post<CalendarEvent>(`/workspaces/${wsId}/calendars/${calendarId}/events`, body);
+      const result = await sdk.POST('/workspaces/{wsId}/calendars/{calendarId}/events', {
+        params: { path: { wsId: wsId ?? '', calendarId } },
+        body,
+      });
+      return unwrap(result, 'Failed to create event') as CalendarEvent;
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: calendarKeys.all });
@@ -90,13 +113,14 @@ interface UpdateEventInput {
 export function useUpdateEventMutation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: UpdateEventInput) => {
-      const wsId = useWorkspaceStore.getState().workspaceId;
+    mutationFn: async (input: UpdateEventInput) => {
+      const wsId = workspaceStore.getState().workspaceId;
       const { eventId, calendarId, ...body } = input;
-      return api.patch<CalendarEvent>(
-        `/workspaces/${wsId}/calendars/${calendarId}/events/${eventId}`,
+      const result = await sdk.PATCH('/workspaces/{wsId}/calendars/{calendarId}/events/{eventId}', {
+        params: { path: { wsId: wsId ?? '', calendarId, eventId } },
         body,
-      );
+      });
+      return unwrap(result, 'Failed to update event') as CalendarEvent;
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: calendarKeys.all });
@@ -107,9 +131,15 @@ export function useUpdateEventMutation() {
 export function useDeleteEventMutation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ calendarId, eventId }: { calendarId: string; eventId: string }) => {
-      const wsId = useWorkspaceStore.getState().workspaceId;
-      return api.delete(`/workspaces/${wsId}/calendars/${calendarId}/events/${eventId}`);
+    mutationFn: async ({ calendarId, eventId }: { calendarId: string; eventId: string }) => {
+      const wsId = workspaceStore.getState().workspaceId;
+      const result = await sdk.DELETE(
+        '/workspaces/{wsId}/calendars/{calendarId}/events/{eventId}',
+        {
+          params: { path: { wsId: wsId ?? '', calendarId, eventId } },
+        },
+      );
+      if (result.error) throw toApiError(result.error, 'Failed to delete event');
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: calendarKeys.all });
@@ -122,10 +152,13 @@ export function useDeleteEventMutation() {
 export function useMembersQuery(wsId: string, calendarId: string, enabled = true) {
   return useQuery({
     queryKey: calendarKeys.members(calendarId),
-    queryFn: () =>
-      api
-        .get<{ members: CalendarMember[] }>(`/workspaces/${wsId}/calendars/${calendarId}/members`)
-        .then((r) => r.members),
+    queryFn: async () => {
+      const result = await sdk.GET('/workspaces/{wsId}/calendars/{calendarId}/members', {
+        params: { path: { wsId, calendarId } },
+      });
+      const body = unwrap(result, 'Failed to fetch members') as { members: CalendarMember[] };
+      return body.members;
+    },
     enabled,
   });
 }
@@ -133,8 +166,13 @@ export function useMembersQuery(wsId: string, calendarId: string, enabled = true
 export function useAddMemberMutation(wsId: string, calendarId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { email: string; role: SubscriptionRole }) =>
-      api.post<CalendarMember>(`/workspaces/${wsId}/calendars/${calendarId}/members`, input),
+    mutationFn: async (input: { email: string; role: SubscriptionRole }) => {
+      const result = await sdk.POST('/workspaces/{wsId}/calendars/{calendarId}/members', {
+        params: { path: { wsId, calendarId } },
+        body: input,
+      });
+      return unwrap(result, 'Failed to add member') as CalendarMember;
+    },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: calendarKeys.members(calendarId) });
     },
@@ -144,10 +182,13 @@ export function useAddMemberMutation(wsId: string, calendarId: string) {
 export function useUpdateMemberRoleMutation(wsId: string, calendarId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { userId: string; role: SubscriptionRole }) =>
-      api.patch(`/workspaces/${wsId}/calendars/${calendarId}/members/${input.userId}`, {
-        role: input.role,
-      }),
+    mutationFn: async (input: { userId: string; role: SubscriptionRole }) => {
+      const result = await sdk.PATCH('/workspaces/{wsId}/calendars/{calendarId}/members/{userId}', {
+        params: { path: { wsId, calendarId, userId: input.userId } },
+        body: { role: input.role },
+      });
+      if (result.error) throw toApiError(result.error, 'Failed to update member role');
+    },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: calendarKeys.members(calendarId) });
     },
@@ -157,8 +198,15 @@ export function useUpdateMemberRoleMutation(wsId: string, calendarId: string) {
 export function useRemoveMemberMutation(wsId: string, calendarId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (userId: string) =>
-      api.delete(`/workspaces/${wsId}/calendars/${calendarId}/members/${userId}`),
+    mutationFn: async (userId: string) => {
+      const result = await sdk.DELETE(
+        '/workspaces/{wsId}/calendars/{calendarId}/members/{userId}',
+        {
+          params: { path: { wsId, calendarId, userId } },
+        },
+      );
+      if (result.error) throw toApiError(result.error, 'Failed to remove member');
+    },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: calendarKeys.members(calendarId) });
     },
@@ -180,10 +228,13 @@ interface InviteResponse {
 export function useInvitesQuery(wsId: string, calendarId: string, enabled = true) {
   return useQuery({
     queryKey: calendarKeys.invites(calendarId),
-    queryFn: () =>
-      api
-        .get<{ invites: InviteResponse[] }>(`/workspaces/${wsId}/calendars/${calendarId}/invites`)
-        .then((r) => r.invites),
+    queryFn: async () => {
+      const result = await sdk.GET('/workspaces/{wsId}/calendars/{calendarId}/invites', {
+        params: { path: { wsId, calendarId } },
+      });
+      const body = unwrap(result, 'Failed to fetch invites') as { invites: InviteResponse[] };
+      return body.invites;
+    },
     enabled,
   });
 }
@@ -191,8 +242,13 @@ export function useInvitesQuery(wsId: string, calendarId: string, enabled = true
 export function useCreateInviteMutation(wsId: string, calendarId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { role: string; maxUses?: number; expiresAt?: string }) =>
-      api.post<InviteResponse>(`/workspaces/${wsId}/calendars/${calendarId}/invites`, input),
+    mutationFn: async (input: { role: string; maxUses?: number; expiresAt?: string }) => {
+      const result = await sdk.POST('/workspaces/{wsId}/calendars/{calendarId}/invites', {
+        params: { path: { wsId, calendarId } },
+        body: input,
+      });
+      return unwrap(result, 'Failed to create invite') as InviteResponse;
+    },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: calendarKeys.invites(calendarId) });
     },
@@ -202,8 +258,15 @@ export function useCreateInviteMutation(wsId: string, calendarId: string) {
 export function useRevokeInviteMutation(wsId: string, calendarId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (inviteId: string) =>
-      api.delete(`/workspaces/${wsId}/calendars/${calendarId}/invites/${inviteId}`),
+    mutationFn: async (inviteId: string) => {
+      const result = await sdk.DELETE(
+        '/workspaces/{wsId}/calendars/{calendarId}/invites/{inviteId}',
+        {
+          params: { path: { wsId, calendarId, inviteId } },
+        },
+      );
+      if (result.error) throw toApiError(result.error, 'Failed to revoke invite');
+    },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: calendarKeys.invites(calendarId) });
     },
@@ -213,11 +276,17 @@ export function useRevokeInviteMutation(wsId: string, calendarId: string) {
 export function useAcceptInviteMutation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (token: string) =>
-      api.post<{ calendarId: string; calendarName: string; role: string }>(
-        `/invites/${token}/accept`,
-        {},
-      ),
+    mutationFn: async (token: string) => {
+      const result = await sdk.POST('/invites/{token}/accept', {
+        params: { path: { token } },
+        body: {},
+      });
+      return unwrap(result, 'Failed to accept invite') as {
+        calendarId: string;
+        calendarName: string;
+        role: string;
+      };
+    },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: calendarKeys.all });
     },
@@ -228,10 +297,16 @@ export function useAcceptInviteMutation() {
 
 export function useUpdateRsvpMutation(wsId: string, calendarId: string, eventId: string) {
   return useMutation({
-    mutationFn: (rsvp: Rsvp) =>
-      api.patch(`/workspaces/${wsId}/calendars/${calendarId}/events/${eventId}/attendees/rsvp`, {
-        rsvp,
-      }),
+    mutationFn: async (rsvp: Rsvp) => {
+      const result = await sdk.PATCH(
+        '/workspaces/{wsId}/calendars/{calendarId}/events/{eventId}/attendees/rsvp',
+        {
+          params: { path: { wsId, calendarId, eventId } },
+          body: { rsvp },
+        },
+      );
+      if (result.error) throw toApiError(result.error, 'Failed to update RSVP');
+    },
   });
 }
 
@@ -255,12 +330,18 @@ export function useCommentsQuery(
 ) {
   return useQuery({
     queryKey: calendarKeys.comments(eventId),
-    queryFn: () =>
-      api
-        .get<{ comments: CommentResponse[] }>(
-          `/workspaces/${wsId}/calendars/${calendarId}/events/${eventId}/comments`,
-        )
-        .then((r) => r.comments),
+    queryFn: async () => {
+      const result = await sdk.GET(
+        '/workspaces/{wsId}/calendars/{calendarId}/events/{eventId}/comments',
+        {
+          params: { path: { wsId, calendarId, eventId } },
+        },
+      );
+      const body = unwrap(result, 'Failed to fetch comments') as {
+        comments: CommentResponse[];
+      };
+      return body.comments;
+    },
     enabled,
   });
 }
@@ -268,11 +349,16 @@ export function useCommentsQuery(
 export function useCreateCommentMutation(wsId: string, calendarId: string, eventId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: string) =>
-      api.post<CommentResponse>(
-        `/workspaces/${wsId}/calendars/${calendarId}/events/${eventId}/comments`,
-        { body },
-      ),
+    mutationFn: async (commentBody: string) => {
+      const result = await sdk.POST(
+        '/workspaces/{wsId}/calendars/{calendarId}/events/{eventId}/comments',
+        {
+          params: { path: { wsId, calendarId, eventId } },
+          body: { body: commentBody },
+        },
+      );
+      return unwrap(result, 'Failed to create comment') as CommentResponse;
+    },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: calendarKeys.comments(eventId) });
     },
@@ -297,12 +383,18 @@ export function useChecklistQuery(
 ) {
   return useQuery({
     queryKey: calendarKeys.checklist(eventId),
-    queryFn: () =>
-      api
-        .get<{ items: ChecklistItemResponse[] }>(
-          `/workspaces/${wsId}/calendars/${calendarId}/events/${eventId}/checklist`,
-        )
-        .then((r) => r.items),
+    queryFn: async () => {
+      const result = await sdk.GET(
+        '/workspaces/{wsId}/calendars/{calendarId}/events/{eventId}/checklist',
+        {
+          params: { path: { wsId, calendarId, eventId } },
+        },
+      );
+      const body = unwrap(result, 'Failed to fetch checklist') as {
+        items: ChecklistItemResponse[];
+      };
+      return body.items;
+    },
     enabled,
   });
 }
@@ -310,11 +402,16 @@ export function useChecklistQuery(
 export function useCreateChecklistItemMutation(wsId: string, calendarId: string, eventId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { title: string; sortWeight?: number }) =>
-      api.post<ChecklistItemResponse>(
-        `/workspaces/${wsId}/calendars/${calendarId}/events/${eventId}/checklist`,
-        input,
-      ),
+    mutationFn: async (input: { title: string; sortWeight?: number }) => {
+      const result = await sdk.POST(
+        '/workspaces/{wsId}/calendars/{calendarId}/events/{eventId}/checklist',
+        {
+          params: { path: { wsId, calendarId, eventId } },
+          body: input,
+        },
+      );
+      return unwrap(result, 'Failed to create checklist item') as ChecklistItemResponse;
+    },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: calendarKeys.checklist(eventId) });
     },
@@ -324,16 +421,21 @@ export function useCreateChecklistItemMutation(wsId: string, calendarId: string,
 export function useUpdateChecklistItemMutation(wsId: string, calendarId: string, eventId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: {
+    mutationFn: async (input: {
       itemId: string;
       title?: string;
       done?: boolean;
       sortWeight?: number;
-    }) =>
-      api.patch(
-        `/workspaces/${wsId}/calendars/${calendarId}/events/${eventId}/checklist/${input.itemId}`,
-        input,
-      ),
+    }) => {
+      const result = await sdk.PATCH(
+        '/workspaces/{wsId}/calendars/{calendarId}/events/{eventId}/checklist/{itemId}',
+        {
+          params: { path: { wsId, calendarId, eventId, itemId: input.itemId } },
+          body: input,
+        },
+      );
+      if (result.error) throw toApiError(result.error, 'Failed to update checklist item');
+    },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: calendarKeys.checklist(eventId) });
     },

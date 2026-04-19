@@ -1,0 +1,65 @@
+.loadingOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--nf-color-overlay);
+}
+
+.loadingCard {
+  inline-size: 100%;
+  max-inline-size: 28rem;
+  border-radius: var(--nf-radius-lg);
+  padding: var(--nf-space-6);
+  background-color: var(--nf-color-bg-elevated);
+}
+
+.scrollContainer {
+  display: flex;
+  block-size: 100%;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.mobileOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background-color: var(--nf-color-bg-elevated);
+}
+
+.desktopPanel {
+  display: none;
+  inline-size: 20rem;
+  flex-shrink: 0;
+  flex-direction: column;
+  border-inline-start: 1px solid var(--nf-color-border);
+  background-color: var(--nf-color-bg-elevated);
+}
+
+@media (min-width: 640px) {
+  .loadingOverlay {
+    position: relative;
+    inset: auto;
+    z-index: auto;
+    inline-size: 20rem;
+    flex-shrink: 0;
+    border-inline-start: 1px solid var(--nf-color-border);
+  }
+
+  .loadingCard {
+    max-inline-size: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .mobileOverlay {
+    display: none;
+  }
+
+  .desktopPanel {
+    display: flex;
+  }
+}

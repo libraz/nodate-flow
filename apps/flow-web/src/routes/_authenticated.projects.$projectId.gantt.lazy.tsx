@@ -614,7 +614,7 @@ function GanttView(): ReactElement {
                       y={HEADER_HEIGHT}
                       width={dayWidth}
                       height={chartHeight - HEADER_HEIGHT}
-                      fill="rgba(127,127,127,0.06)"
+                      fill="var(--nf-color-bg-sunken)"
                     />
                   ) : null}
                   <line
@@ -622,7 +622,7 @@ function GanttView(): ReactElement {
                     y1={HEADER_HEIGHT}
                     x2={c.x}
                     y2={chartHeight}
-                    stroke="rgba(127,127,127,0.12)"
+                    stroke="var(--nf-color-hairline)"
                     strokeWidth={c.isMonthStart ? 1.5 : 0.5}
                   />
                   {showDayLabel ? (

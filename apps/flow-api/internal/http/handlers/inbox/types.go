@@ -33,14 +33,14 @@ var totalAsInt64 = handlerutil.TotalAsInt64
 type InboxItem struct {
 	ID          string          `json:"id" doc:"InboxItem public id (UUID v7)"`
 	WorkspaceID string          `json:"workspaceId"`
-	TaskID     string          `json:"taskId,omitempty"`
-	TaskTitle  string          `json:"taskTitle,omitempty"`
-	Source     string          `json:"source"`
-	Kind       string          `json:"kind"`
-	ExternalID string          `json:"externalId,omitempty"`
-	Payload    json.RawMessage `json:"payload,omitempty"`
-	ReceivedAt int64           `json:"receivedAt"`
-	CreatedAt  int64           `json:"createdAt"`
+	TaskID      string          `json:"taskId,omitempty"`
+	TaskTitle   string          `json:"taskTitle,omitempty"`
+	Source      string          `json:"source"`
+	Kind        string          `json:"kind"`
+	ExternalID  string          `json:"externalId,omitempty"`
+	Payload     json.RawMessage `json:"payload,omitempty"`
+	ReceivedAt  int64           `json:"receivedAt"`
+	CreatedAt   int64           `json:"createdAt"`
 }
 
 // ListInboxInput is the query for GET /inbox.

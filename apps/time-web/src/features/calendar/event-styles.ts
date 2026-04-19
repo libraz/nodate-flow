@@ -3,10 +3,10 @@ import type { CSSProperties } from 'react';
 import type { EventKind, ShowAs } from './types';
 
 const STRIPE_GRADIENT =
-  'repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(255,255,255,0.4) 3px, rgba(255,255,255,0.4) 6px)';
+  'repeating-linear-gradient(45deg, transparent, transparent 3px, var(--nf-color-fg-on-accent, #fff) 3px, var(--nf-color-fg-on-accent, #fff) 6px)';
 
 const HATCH_GRADIENT =
-  'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(0,0,0,0.08) 4px, rgba(0,0,0,0.08) 8px)';
+  'repeating-linear-gradient(45deg, transparent, transparent 4px, var(--nf-color-border, rgba(0,0,0,0.08)) 4px, var(--nf-color-border, rgba(0,0,0,0.08)) 8px)';
 
 /** Returns inline styles for an event based on its kind, showAs, and owner color. */
 export function getEventStyle(kind: EventKind, showAs: ShowAs, color: string): CSSProperties {
@@ -16,15 +16,15 @@ export function getEventStyle(kind: EventKind, showAs: ShowAs, color: string): C
   switch (kind) {
     case 'event':
       style.backgroundColor = color;
-      style.color = '#fff';
+      style.color = 'var(--nf-color-fg-on-accent)';
       break;
     case 'block':
       style.backgroundImage = STRIPE_GRADIENT;
       style.backgroundColor = color;
-      style.color = '#fff';
+      style.color = 'var(--nf-color-fg-on-accent)';
       break;
     case 'free':
-      style.backgroundColor = 'rgba(34, 197, 94, 0.1)';
+      style.backgroundColor = 'var(--nf-color-success-subtle)';
       style.border = `1.5px dashed ${color}`;
       style.color = color;
       break;
@@ -34,7 +34,7 @@ export function getEventStyle(kind: EventKind, showAs: ShowAs, color: string): C
   switch (showAs) {
     case 'free':
       if (kind !== 'free') {
-        style.backgroundColor = 'rgba(34, 197, 94, 0.15)';
+        style.backgroundColor = 'var(--nf-color-success-subtle)';
         style.color = color;
       }
       break;
@@ -45,20 +45,11 @@ export function getEventStyle(kind: EventKind, showAs: ShowAs, color: string): C
       }
       break;
     case 'oof':
-      style.backgroundColor = '#9ca3af';
-      style.color = '#fff';
+      style.backgroundColor = 'var(--nf-color-fg-muted)';
+      style.color = 'var(--nf-color-fg-on-accent)';
       break;
     // 'busy' is default, no extra styling
   }
 
   return style;
-}
-
-/** CSS class names for the event pill container. */
-export function getEventClassName(kind: EventKind): string {
-  const base = 'w-full truncate rounded px-1 py-0.5 text-left text-[11px] leading-tight';
-  if (kind === 'free') {
-    return `${base} bg-transparent`;
-  }
-  return base;
 }

@@ -12,6 +12,7 @@
 import { expect, test } from '@playwright/test';
 
 import { type TestTenant, cleanupTenant, createTestTenant, injectAuth } from './fixtures/tenant';
+import { checkA11y } from './helpers/a11y';
 
 test.describe('task crud', () => {
   let tenant: TestTenant | null = null;
@@ -65,5 +66,8 @@ test.describe('task crud', () => {
 
     // Verify task is removed
     await expect(page.getByText(updatedTitle)).not.toBeVisible({ timeout: 5_000 });
+
+    // Accessibility check on the task list after CRUD operations
+    await checkA11y(page);
   });
 });

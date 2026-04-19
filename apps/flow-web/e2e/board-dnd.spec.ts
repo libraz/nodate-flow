@@ -16,6 +16,7 @@ import {
   createTestTenant,
   injectAuth,
 } from './fixtures/tenant';
+import { checkA11y } from './helpers/a11y';
 
 test.describe('board view', () => {
   let tenant: TestTenant | null = null;
@@ -48,5 +49,8 @@ test.describe('board view', () => {
       .getByRole('region', { name: /open/i })
       .or(page.locator('[data-column="open"]'));
     await expect(openColumn.getByText(taskTitle)).toBeVisible({ timeout: 10_000 });
+
+    // Accessibility check on the board view
+    await checkA11y(page);
   });
 });

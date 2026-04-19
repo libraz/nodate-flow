@@ -12,9 +12,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/danielgtaylor/huma/v2"
-
+	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/auth"
 	generated "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/generated"
+	apierrors "github.com/nodate-flow/nodate-flow/apps/time-api/internal/errors"
 )
 
 // --- Input/Output types ---
@@ -58,12 +58,12 @@ func ExportICS(deps Deps) func(context.Context, *ExportICSInput) (*ExportICSOutp
 
 		events, err := deps.Queries.ListAllCalendarEvents(ctx, cal.ID)
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to list events for export", err)
+			return nil, httpErr(apierrors.CalendarEventListQueryInterrupted)
 		}
 
 		var buf bytes.Buffer
 		if err := buildICS(&buf, cal.Name, events); err != nil {
-			return nil, huma.Error500InternalServerError("Failed to build iCal export", err)
+			return nil, httpErr(apierrors.CalendarEventListQueryInterrupted)
 		}
 		safeName := sanitizeFilename(cal.Name)
 
@@ -79,12 +79,12 @@ func ExportICS(deps Deps) func(context.Context, *ExportICSInput) (*ExportICSOutp
 // ShareExportICS generates an iCalendar file for a shared calendar (no auth required).
 func ShareExportICS(deps Deps) func(context.Context, *ShareExportICSInput) (*ShareExportICSOutput, error) {
 	return func(ctx context.Context, input *ShareExportICSInput) (*ShareExportICSOutput, error) {
-		invite, err := deps.Queries.FindCalendarInviteByToken(ctx, input.Token)
+		invite, err := deps.Queries.FindCalendarInviteByTokenHash(ctx, auth.HashOpaque(input.Token))
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return nil, huma.Error404NotFound("Invite not found or expired")
+				return nil, errInviteNotFound
 			}
-			return nil, huma.Error500InternalServerError("Failed to look up invite", err)
+			return nil, httpErr(apierrors.CalendarInviteStoreLookupInterrupted)
 		}
 
 		if err := validateInvite(invite.ExpiresAt, invite.MaxUses, invite.UseCount); err != nil {
@@ -93,12 +93,12 @@ func ShareExportICS(deps Deps) func(context.Context, *ShareExportICSInput) (*Sha
 
 		events, err := deps.Queries.ListAllCalendarEvents(ctx, invite.CalendarID)
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to list events for export", err)
+			return nil, httpErr(apierrors.CalendarEventListQueryInterrupted)
 		}
 
 		var buf bytes.Buffer
 		if err := buildICS(&buf, invite.CalendarName, events); err != nil {
-			return nil, huma.Error500InternalServerError("Failed to build iCal export", err)
+			return nil, httpErr(apierrors.CalendarEventListQueryInterrupted)
 		}
 		safeName := sanitizeFilename(invite.CalendarName)
 

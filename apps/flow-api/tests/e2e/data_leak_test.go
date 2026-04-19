@@ -21,8 +21,8 @@ var sensitivePatterns = []*regexp.Regexp{
 	regexp.MustCompile(`"mfaSecret"`),
 	regexp.MustCompile(`"token_hash"`),
 	regexp.MustCompile(`"tokenHash"`),
-	regexp.MustCompile(`\$argon2`),       // argon2 hash prefix
-	regexp.MustCompile(`\$2[aby]\$`),     // bcrypt hash prefix
+	regexp.MustCompile(`\$argon2`),   // argon2 hash prefix
+	regexp.MustCompile(`\$2[aby]\$`), // bcrypt hash prefix
 }
 
 // assertNoSensitiveData checks that none of the known sensitive field

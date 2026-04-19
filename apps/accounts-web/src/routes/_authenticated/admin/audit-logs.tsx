@@ -8,7 +8,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { apiRequest } from '../../../lib/api-client';
+import { sdk } from '../../../lib/sdk';
 
 interface AuditLogEntry {
   id: string;
@@ -73,17 +73,30 @@ function AuditLogsPage(): ReactElement {
     if (fromDate) params.set('from', fromDate);
     if (toDate) params.set('to', toDate);
 
-    void apiRequest<AuditLogsResponse>(`/admin/audit-logs?${params.toString()}`).then((result) => {
-      if (cancelled) return;
-      if (result.error || !result.data) {
-        setError(t('errors.generic'));
+    void sdk
+      .GET('/admin/audit-logs', {
+        params: {
+          query: {
+            page: String(page),
+            perPage: String(perPage),
+            ...(actionFilter ? { action: actionFilter } : {}),
+            ...(fromDate ? { from: fromDate } : {}),
+            ...(toDate ? { to: toDate } : {}),
+          },
+        },
+      })
+      .then((result) => {
+        if (cancelled) return;
+        if (result.error || !result.data) {
+          setError(t('errors.generic'));
+          setLoading(false);
+          return;
+        }
+        const body = result.data as AuditLogsResponse;
+        setEntries(body.items);
+        setTotal(body.total);
         setLoading(false);
-        return;
-      }
-      setEntries(result.data.items);
-      setTotal(result.data.total);
-      setLoading(false);
-    });
+      });
 
     return () => {
       cancelled = true;
@@ -116,7 +129,7 @@ function AuditLogsPage(): ReactElement {
           margin: 0,
         }}
       >
-        {t('auditLogs.title')}
+        {t('audit_logs.title')}
       </h1>
 
       <div
@@ -130,7 +143,7 @@ function AuditLogsPage(): ReactElement {
         <div style={{ flex: 1, minWidth: '200px' }}>
           <Input
             type="text"
-            placeholder={t('auditLogs.filterAction')}
+            placeholder={t('audit_logs.filter_action')}
             value={actionFilter}
             onChange={handleActionChange}
           />
@@ -142,7 +155,7 @@ function AuditLogsPage(): ReactElement {
               color: 'var(--nf-color-fg-muted)',
             }}
           >
-            {t('auditLogs.filterFrom')}
+            {t('audit_logs.filter_from')}
             <input
               type="date"
               value={fromDate}
@@ -166,7 +179,7 @@ function AuditLogsPage(): ReactElement {
               color: 'var(--nf-color-fg-muted)',
             }}
           >
-            {t('auditLogs.filterTo')}
+            {t('audit_logs.filter_to')}
             <input
               type="date"
               value={toDate}
@@ -201,17 +214,17 @@ function AuditLogsPage(): ReactElement {
       {loading ? (
         <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('common.loading')}</p>
       ) : entries.length === 0 ? (
-        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('auditLogs.noResults')}</p>
+        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('audit_logs.no_results')}</p>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
             <thead>
               <tr>
-                <th style={thStyle}>{t('auditLogs.occurredAt')}</th>
-                <th style={thStyle}>{t('auditLogs.action')}</th>
-                <th style={thStyle}>{t('auditLogs.actor')}</th>
-                <th style={thStyle}>{t('auditLogs.target')}</th>
-                <th style={thStyle}>{t('auditLogs.ipAddress')}</th>
+                <th style={thStyle}>{t('audit_logs.occurred_at')}</th>
+                <th style={thStyle}>{t('audit_logs.action')}</th>
+                <th style={thStyle}>{t('audit_logs.actor')}</th>
+                <th style={thStyle}>{t('audit_logs.target')}</th>
+                <th style={thStyle}>{t('audit_logs.ip_address')}</th>
               </tr>
             </thead>
             <tbody>

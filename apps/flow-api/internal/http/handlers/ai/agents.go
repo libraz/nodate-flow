@@ -20,12 +20,12 @@ import (
 // internal ids stay hidden; system_prompt round-trips so the edit UI
 // can show the existing text without a separate detail endpoint.
 type AgentSummary struct {
-	ID           string `json:"id" doc:"Agent public id (UUID v7)"`
-	Name         string `json:"name"`
-	Description  string `json:"description,omitempty"`
-	SystemPrompt string `json:"systemPrompt"`
-	ModelID      string `json:"modelId"`
-	ModelName    string `json:"modelName"`
+	ID                string   `json:"id" doc:"Agent public id (UUID v7)"`
+	Name              string   `json:"name"`
+	Description       string   `json:"description,omitempty"`
+	SystemPrompt      string   `json:"systemPrompt"`
+	ModelID           string   `json:"modelId"`
+	ModelName         string   `json:"modelName"`
 	ScheduleKind      string   `json:"scheduleKind"`
 	Paused            bool     `json:"paused"`
 	EventTriggerTypes []string `json:"eventTriggerTypes,omitempty"`
@@ -96,12 +96,12 @@ func ListAgents(deps Deps) func(context.Context, *ListAgentsInput) (*ListAgentsO
 				total = t
 			}
 			out.Body.Agents = append(out.Body.Agents, AgentSummary{
-				ID:           r.PublicID.String(),
-				Name:         r.Name,
-				Description:  nullStr(r.Description),
-				SystemPrompt: r.SystemPrompt,
-				ModelID:      r.ModelPublicID.String(),
-				ModelName:    r.ModelName,
+				ID:                r.PublicID.String(),
+				Name:              r.Name,
+				Description:       nullStr(r.Description),
+				SystemPrompt:      r.SystemPrompt,
+				ModelID:           r.ModelPublicID.String(),
+				ModelName:         r.ModelName,
 				ScheduleKind:      string(r.ScheduleKind),
 				Paused:            r.Paused,
 				EventTriggerTypes: triggerByPub[r.PublicID.String()],
@@ -183,10 +183,10 @@ func UpdateAgentSchedule(deps Deps) func(context.Context, *UpdateAgentScheduleIn
 type CreateAgentInput struct {
 	WsID string `path:"wsId"`
 	Body struct {
-		ModelID      string `json:"modelId" doc:"ai_models public id"`
-		Name         string `json:"name" minLength:"1" maxLength:"255"`
-		Description  string `json:"description,omitempty" maxLength:"1000"`
-		SystemPrompt string `json:"systemPrompt" minLength:"1" maxLength:"16000"`
+		ModelID           string   `json:"modelId" doc:"ai_models public id"`
+		Name              string   `json:"name" minLength:"1" maxLength:"255"`
+		Description       string   `json:"description,omitempty" maxLength:"1000"`
+		SystemPrompt      string   `json:"systemPrompt" minLength:"1" maxLength:"16000"`
 		Temperature       uint16   `json:"temperature,omitempty" minimum:"0" maximum:"200" doc:"Sampling temperature x100 (default 100)"`
 		ScheduleKind      string   `json:"scheduleKind,omitempty" enum:"disabled,interval,on_event,manual" default:"disabled"`
 		EventTriggerTypes []string `json:"eventTriggerTypes,omitempty" doc:"Eventbus kinds that fire this agent when scheduleKind=on_event"`
@@ -274,12 +274,12 @@ func CreateAgent(deps Deps) func(context.Context, *CreateAgentInput) (*CreateAge
 		}
 		now := time.Now()
 		out := &CreateAgentOutput{Body: AgentSummary{
-			ID:           pub.String(),
-			Name:         in.Body.Name,
-			Description:  in.Body.Description,
-			SystemPrompt: in.Body.SystemPrompt,
-			ModelID:      modelPub.String(),
-			ModelName:    modelName,
+			ID:                pub.String(),
+			Name:              in.Body.Name,
+			Description:       in.Body.Description,
+			SystemPrompt:      in.Body.SystemPrompt,
+			ModelID:           modelPub.String(),
+			ModelName:         modelName,
 			ScheduleKind:      scheduleKind,
 			Paused:            false,
 			EventTriggerTypes: in.Body.EventTriggerTypes,

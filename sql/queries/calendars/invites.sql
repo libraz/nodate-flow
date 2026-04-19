@@ -5,20 +5,20 @@ INSERT INTO calendar_invites (
   workspace_id,
   calendar_id,
   created_by_user_id,
-  token,
+  token_hash,
   role,
   max_uses,
   expires_at
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
--- name: FindCalendarInviteByToken :one
--- Resolve an invite by its token for the acceptance flow.
+-- name: FindCalendarInviteByTokenHash :one
+-- Resolve an invite by its token hash for the acceptance flow.
 SELECT
   i.id,
   i.public_id,
   i.workspace_id,
   i.calendar_id,
-  i.token,
+  i.token_hash,
   i.role,
   i.max_uses,
   i.use_count,
@@ -30,7 +30,7 @@ SELECT
   i.created_at
 FROM calendar_invites i
 INNER JOIN calendars c ON c.id = i.calendar_id AND c.enabled = TRUE
-WHERE i.token = ?
+WHERE i.token_hash = ?
   AND i.enabled = TRUE
 LIMIT 1;
 
@@ -38,7 +38,7 @@ LIMIT 1;
 -- List active invites for a calendar.
 SELECT
   public_id,
-  token,
+  token_hash,
   role,
   max_uses,
   use_count,
@@ -63,7 +63,7 @@ SET enabled = FALSE
 WHERE public_id = ?
   AND calendar_id = ?;
 
--- name: FindCalendarInviteByTokenPublic :one
+-- name: FindCalendarInviteByTokenHashPublic :one
 -- Public-facing invite lookup (for share page preview, no auth required).
 SELECT
   c.public_id AS calendar_public_id,
@@ -76,7 +76,7 @@ SELECT
    WHERE cs.calendar_id = c.id AND cs.enabled = TRUE) AS member_count
 FROM calendar_invites i
 INNER JOIN calendars c ON c.id = i.calendar_id AND c.enabled = TRUE
-WHERE i.token = ?
+WHERE i.token_hash = ?
   AND i.enabled = TRUE
   AND (i.expires_at IS NULL OR i.expires_at > NOW())
   AND (i.max_uses IS NULL OR i.use_count < i.max_uses)

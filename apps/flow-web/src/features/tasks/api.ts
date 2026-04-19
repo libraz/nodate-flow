@@ -53,15 +53,6 @@ export type TaskPriority = 0 | 1 | 2 | 3 | 4;
 /** Ordered list of all priority levels for filter rendering. */
 export const TASK_PRIORITIES: readonly TaskPriority[] = [0, 1, 2, 3, 4] as const;
 
-/** i18n key map for each priority level. */
-export const PRIORITY_I18N_KEY: Record<TaskPriority, string> = {
-  0: 'tasks.priority.none',
-  1: 'tasks.priority.low',
-  2: 'tasks.priority.medium',
-  3: 'tasks.priority.high',
-  4: 'tasks.priority.urgent',
-};
-
 export interface TaskFilters {
   search?: string;
   states?: readonly TaskDerivedState[];

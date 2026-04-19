@@ -18,6 +18,8 @@ CREATE TABLE task_embeddings (
   content_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'SHA-256 hex of embedded text',
   embedded_at  DATETIME(3)  NOT NULL COMMENT 'Last embed time',
 
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
   PRIMARY KEY (task_id, model),
   INDEX idx_task_embeddings_model_embedded_at (model, embedded_at),
 

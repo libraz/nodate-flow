@@ -2,6 +2,7 @@
 
 export * from "./ai";
 export * from "./auth";
+export * from "./calendar";
 export * from "./constraint";
 export * from "./export";
 export * from "./instance";

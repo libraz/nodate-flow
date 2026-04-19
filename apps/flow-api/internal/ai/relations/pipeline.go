@@ -161,10 +161,10 @@ func (p *Pipeline) processTask(ctx context.Context, workspaceID uint32, taskID u
 
 	// Score and filter.
 	type scored struct {
-		taskID    uint32
-		publicID  types.PublicID
-		score     float64
-		kind      generated.RelationSuggestionsSuggestedKind
+		taskID   uint32
+		publicID types.PublicID
+		score    float64
+		kind     generated.RelationSuggestionsSuggestedKind
 	}
 	var matches []scored
 	for _, c := range candidates {

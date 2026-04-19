@@ -4,21 +4,20 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/danielgtaylor/huma/v2"
-
 	generated "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/generated"
+	apierrors "github.com/nodate-flow/nodate-flow/apps/time-api/internal/errors"
 )
 
 // Sentinel errors returned by resolve/permission helpers. These are translated
 // to Huma errors at the handler level.
 var (
-	errWorkspaceNotFound   = huma.Error404NotFound("Workspace not found")
-	errCalendarNotFound    = huma.Error404NotFound("Calendar not found")
-	errCalendarAccessDenied = huma.Error403Forbidden("You do not have access to this calendar")
-	errAccessDenied        = huma.Error403Forbidden("Access denied")
-	errEventNotFound       = huma.Error404NotFound("Event not found")
-	errForbidden           = huma.Error403Forbidden("You do not have permission to perform this action")
-	errInviteNotFound      = huma.Error404NotFound("Invite not found or expired")
+	errWorkspaceNotFound    = httpErr(apierrors.CalendarWorkspaceNotFound)
+	errCalendarNotFound     = httpErr(apierrors.CalendarCalendarNotFound)
+	errCalendarAccessDenied = httpErr(apierrors.CalendarCalendarAccessDenied)
+	errAccessDenied         = httpErr(apierrors.CalendarCalendarAccessDenied)
+	errEventNotFound        = httpErr(apierrors.CalendarEventNotFound)
+	errForbidden            = httpErr(apierrors.CalendarCalendarManagerRoleRequired)
+	errInviteNotFound       = httpErr(apierrors.CalendarInviteNotFound)
 )
 
 // canEditEvent checks if the actor can modify an event.

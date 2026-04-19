@@ -1,16 +1,16 @@
 import { Navigate, createFileRoute } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 
-import { useAuthStore } from '../stores/auth-store';
-import { useWorkspaceStore } from '../stores/workspace-store';
+import { selectIsAuthenticated, useAuth } from '../stores/auth-store';
+import { selectWorkspaceId, useWorkspace } from '../stores/workspace-store';
 
 export const Route = createFileRoute('/')({
   component: IndexRedirect,
 });
 
 function IndexRedirect(): ReactElement {
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const workspaceId = useWorkspaceStore((s) => s.workspaceId);
+  const isAuthenticated = useAuth(selectIsAuthenticated);
+  const workspaceId = useWorkspace(selectWorkspaceId);
 
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (!workspaceId) return <Navigate to="/setup" />;

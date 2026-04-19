@@ -1,0 +1,36 @@
+.header {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 30;
+  display: flex;
+  block-size: 56px;
+  align-items: center;
+  justify-content: space-between;
+  padding-inline: var(--nf-space-3);
+}
+
+.mobileOnly {
+  display: inline-flex;
+}
+
+.desktopOnly {
+  display: none;
+}
+
+.segmented {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .mobileOnly {
+    display: none;
+  }
+
+  .desktopOnly {
+    display: inline-flex;
+  }
+
+  .segmented {
+    display: flex;
+  }
+}

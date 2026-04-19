@@ -76,7 +76,7 @@ func TestRequireCalendarMember_NoActor(t *testing.T) {
 	r.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusForbidden, rec.Code)
-	assert.Contains(t, rec.Body.String(), "CALENDAR.ACCESS_DENIED")
+	assert.Contains(t, rec.Body.String(), "CALENDAR.CALENDAR.ACCESS_DENIED")
 }
 
 // TestRequireCalendarMember_InvalidUUID verifies that a malformed calId
@@ -103,5 +103,5 @@ func TestRequireCalendarMember_InvalidUUID(t *testing.T) {
 	r.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusNotFound, rec.Code)
-	assert.Contains(t, rec.Body.String(), "CALENDAR.NOT_FOUND")
+	assert.Contains(t, rec.Body.String(), "CALENDAR.CALENDAR.NOT_FOUND")
 }

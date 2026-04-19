@@ -19,7 +19,7 @@ INSERT INTO calendar_invites (
   workspace_id,
   calendar_id,
   created_by_user_id,
-  token,
+  token_hash,
   role,
   max_uses,
   expires_at
@@ -31,7 +31,7 @@ type CreateCalendarInviteParams struct {
 	WorkspaceID     uint32              `json:"-"`
 	CalendarID      uint32              `json:"-"`
 	CreatedByUserID uint32              `json:"-"`
-	Token           string              `json:"token"`
+	TokenHash       string              `json:"tokenHash"`
 	Role            CalendarInvitesRole `json:"role"`
 	MaxUses         sql.NullInt32       `json:"maxUses"`
 	ExpiresAt       sql.NullTime        `json:"expiresAt"`
@@ -44,7 +44,7 @@ func (q *Queries) CreateCalendarInvite(ctx context.Context, arg CreateCalendarIn
 		arg.WorkspaceID,
 		arg.CalendarID,
 		arg.CreatedByUserID,
-		arg.Token,
+		arg.TokenHash,
 		arg.Role,
 		arg.MaxUses,
 		arg.ExpiresAt,
@@ -109,13 +109,13 @@ func (q *Queries) DisableCalendarInvite(ctx context.Context, arg DisableCalendar
 	return err
 }
 
-const findCalendarInviteByToken = `-- name: FindCalendarInviteByToken :one
+const findCalendarInviteByTokenHash = `-- name: FindCalendarInviteByTokenHash :one
 SELECT
   i.id,
   i.public_id,
   i.workspace_id,
   i.calendar_id,
-  i.token,
+  i.token_hash,
   i.role,
   i.max_uses,
   i.use_count,
@@ -127,17 +127,17 @@ SELECT
   i.created_at
 FROM calendar_invites i
 INNER JOIN calendars c ON c.id = i.calendar_id AND c.enabled = TRUE
-WHERE i.token = ?
+WHERE i.token_hash = ?
   AND i.enabled = TRUE
 LIMIT 1
 `
 
-type FindCalendarInviteByTokenRow struct {
+type FindCalendarInviteByTokenHashRow struct {
 	ID               uint32              `json:"-"`
 	PublicID         types.PublicID      `json:"publicId"`
 	WorkspaceID      uint32              `json:"-"`
 	CalendarID       uint32              `json:"-"`
-	Token            string              `json:"token"`
+	TokenHash        string              `json:"tokenHash"`
 	Role             CalendarInvitesRole `json:"role"`
 	MaxUses          sql.NullInt32       `json:"maxUses"`
 	UseCount         uint32              `json:"useCount"`
@@ -149,16 +149,16 @@ type FindCalendarInviteByTokenRow struct {
 	CreatedAt        time.Time           `json:"createdAt"`
 }
 
-// Resolve an invite by its token for the acceptance flow.
-func (q *Queries) FindCalendarInviteByToken(ctx context.Context, token string) (FindCalendarInviteByTokenRow, error) {
-	row := q.db.QueryRowContext(ctx, findCalendarInviteByToken, token)
-	var i FindCalendarInviteByTokenRow
+// Resolve an invite by its token hash for the acceptance flow.
+func (q *Queries) FindCalendarInviteByTokenHash(ctx context.Context, tokenHash string) (FindCalendarInviteByTokenHashRow, error) {
+	row := q.db.QueryRowContext(ctx, findCalendarInviteByTokenHash, tokenHash)
+	var i FindCalendarInviteByTokenHashRow
 	err := row.Scan(
 		&i.ID,
 		&i.PublicID,
 		&i.WorkspaceID,
 		&i.CalendarID,
-		&i.Token,
+		&i.TokenHash,
 		&i.Role,
 		&i.MaxUses,
 		&i.UseCount,
@@ -172,7 +172,7 @@ func (q *Queries) FindCalendarInviteByToken(ctx context.Context, token string) (
 	return i, err
 }
 
-const findCalendarInviteByTokenPublic = `-- name: FindCalendarInviteByTokenPublic :one
+const findCalendarInviteByTokenHashPublic = `-- name: FindCalendarInviteByTokenHashPublic :one
 SELECT
   c.public_id AS calendar_public_id,
   c.name AS calendar_name,
@@ -184,14 +184,14 @@ SELECT
    WHERE cs.calendar_id = c.id AND cs.enabled = TRUE) AS member_count
 FROM calendar_invites i
 INNER JOIN calendars c ON c.id = i.calendar_id AND c.enabled = TRUE
-WHERE i.token = ?
+WHERE i.token_hash = ?
   AND i.enabled = TRUE
   AND (i.expires_at IS NULL OR i.expires_at > NOW())
   AND (i.max_uses IS NULL OR i.use_count < i.max_uses)
 LIMIT 1
 `
 
-type FindCalendarInviteByTokenPublicRow struct {
+type FindCalendarInviteByTokenHashPublicRow struct {
 	CalendarPublicID types.PublicID      `json:"calendarPublicId"`
 	CalendarName     string              `json:"calendarName"`
 	CalendarKind     CalendarsKind       `json:"calendarKind"`
@@ -202,9 +202,9 @@ type FindCalendarInviteByTokenPublicRow struct {
 }
 
 // Public-facing invite lookup (for share page preview, no auth required).
-func (q *Queries) FindCalendarInviteByTokenPublic(ctx context.Context, token string) (FindCalendarInviteByTokenPublicRow, error) {
-	row := q.db.QueryRowContext(ctx, findCalendarInviteByTokenPublic, token)
-	var i FindCalendarInviteByTokenPublicRow
+func (q *Queries) FindCalendarInviteByTokenHashPublic(ctx context.Context, tokenHash string) (FindCalendarInviteByTokenHashPublicRow, error) {
+	row := q.db.QueryRowContext(ctx, findCalendarInviteByTokenHashPublic, tokenHash)
+	var i FindCalendarInviteByTokenHashPublicRow
 	err := row.Scan(
 		&i.CalendarPublicID,
 		&i.CalendarName,
@@ -314,7 +314,7 @@ func (q *Queries) IncrementInviteUseCount(ctx context.Context, id uint32) error 
 const listCalendarInvites = `-- name: ListCalendarInvites :many
 SELECT
   public_id,
-  token,
+  token_hash,
   role,
   max_uses,
   use_count,
@@ -334,7 +334,7 @@ type ListCalendarInvitesParams struct {
 
 type ListCalendarInvitesRow struct {
 	PublicID  types.PublicID      `json:"publicId"`
-	Token     string              `json:"token"`
+	TokenHash string              `json:"tokenHash"`
 	Role      CalendarInvitesRole `json:"role"`
 	MaxUses   sql.NullInt32       `json:"maxUses"`
 	UseCount  uint32              `json:"useCount"`
@@ -354,7 +354,7 @@ func (q *Queries) ListCalendarInvites(ctx context.Context, arg ListCalendarInvit
 		var i ListCalendarInvitesRow
 		if err := rows.Scan(
 			&i.PublicID,
-			&i.Token,
+			&i.TokenHash,
 			&i.Role,
 			&i.MaxUses,
 			&i.UseCount,

@@ -94,10 +94,10 @@ type Querier interface {
 	FindCalendarEventCommentByPublicId(ctx context.Context, arg FindCalendarEventCommentByPublicIdParams) (FindCalendarEventCommentByPublicIdRow, error)
 	// Quick lookup for permission checks: who owns this event?
 	FindCalendarEventOwner(ctx context.Context, publicID types.PublicID) (FindCalendarEventOwnerRow, error)
-	// Resolve an invite by its token for the acceptance flow.
-	FindCalendarInviteByToken(ctx context.Context, token string) (FindCalendarInviteByTokenRow, error)
+	// Resolve an invite by its token hash for the acceptance flow.
+	FindCalendarInviteByTokenHash(ctx context.Context, tokenHash string) (FindCalendarInviteByTokenHashRow, error)
 	// Public-facing invite lookup (for share page preview, no auth required).
-	FindCalendarInviteByTokenPublic(ctx context.Context, token string) (FindCalendarInviteByTokenPublicRow, error)
+	FindCalendarInviteByTokenHashPublic(ctx context.Context, tokenHash string) (FindCalendarInviteByTokenHashPublicRow, error)
 	// Resolve a memo by UUID v7.
 	FindCalendarMemoByPublicId(ctx context.Context, arg FindCalendarMemoByPublicIdParams) (FindCalendarMemoByPublicIdRow, error)
 	// Look up a user's subscription to a specific calendar.

@@ -3,6 +3,7 @@ import { type ReactElement, Suspense, lazy } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 
+import PageSkeleton from '@nodate-flow/ui/primitives/page-skeleton';
 import NotFoundContent from '../components/not-found';
 import type { RouterContext } from '../router/router';
 
@@ -113,7 +114,7 @@ function RootLayout(): ReactElement {
   return (
     <>
       <ErrorBoundary FallbackComponent={FatalFallback}>
-        <Suspense fallback={null}>
+        <Suspense fallback={<PageSkeleton sidebar />}>
           <Outlet />
         </Suspense>
       </ErrorBoundary>

@@ -8,12 +8,14 @@
 import { useStore } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 
-/** Authenticated user profile mirroring MeOutputBody. */
+/** Authenticated user profile mirroring MeBody from the auth-api. */
 export interface AuthUser {
   id: string;
   email: string;
   displayName: string;
   locale: string;
+  themePreference: string;
+  isInstanceAdmin: boolean;
 }
 
 export interface AuthState {

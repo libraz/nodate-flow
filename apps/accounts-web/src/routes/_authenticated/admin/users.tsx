@@ -8,7 +8,7 @@ import { Link, createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { apiRequest } from '../../../lib/api-client';
+import { sdk } from '../../../lib/sdk';
 
 interface AdminUser {
   id: string;
@@ -82,17 +82,29 @@ function UsersPage(): ReactElement {
     if (search) params.set('search', search);
     if (statusFilter !== 'all') params.set('status', statusFilter);
 
-    void apiRequest<UsersResponse>(`/admin/users?${params.toString()}`).then((result) => {
-      if (cancelled) return;
-      if (result.error || !result.data) {
-        setError(t('errors.generic'));
+    void sdk
+      .GET('/admin/users', {
+        params: {
+          query: {
+            page: String(page),
+            perPage: String(perPage),
+            ...(search ? { search } : {}),
+            ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+          },
+        },
+      })
+      .then((result) => {
+        if (cancelled) return;
+        if (result.error || !result.data) {
+          setError(t('errors.generic'));
+          setLoading(false);
+          return;
+        }
+        const body = result.data as UsersResponse;
+        setUsers(body.items);
+        setTotal(body.total);
         setLoading(false);
-        return;
-      }
-      setUsers(result.data.items);
-      setTotal(result.data.total);
-      setLoading(false);
-    });
+      });
 
     return () => {
       cancelled = true;
@@ -145,9 +157,9 @@ function UsersPage(): ReactElement {
             fontSize: 'var(--nf-text-sm, 0.875rem)',
           }}
         >
-          <option value="all">{t('users.allUsers')}</option>
-          <option value="active">{t('users.activeOnly')}</option>
-          <option value="suspended">{t('users.suspendedOnly')}</option>
+          <option value="all">{t('users.all_users')}</option>
+          <option value="active">{t('users.active_only')}</option>
+          <option value="suspended">{t('users.suspended_only')}</option>
         </select>
       </div>
 
@@ -167,7 +179,7 @@ function UsersPage(): ReactElement {
       {loading ? (
         <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('common.loading')}</p>
       ) : users.length === 0 ? (
-        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('users.noResults')}</p>
+        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('users.no_results')}</p>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
@@ -178,8 +190,8 @@ function UsersPage(): ReactElement {
                 <th style={thStyle}>{t('users.status')}</th>
                 <th style={thStyle}>{t('users.admin')}</th>
                 <th style={thStyle}>{t('users.workspaces')}</th>
-                <th style={thStyle}>{t('users.lastLogin')}</th>
-                <th style={thStyle}>{t('users.createdAt')}</th>
+                <th style={thStyle}>{t('users.last_login')}</th>
+                <th style={thStyle}>{t('users.created_at')}</th>
               </tr>
             </thead>
             <tbody>

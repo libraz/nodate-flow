@@ -13,8 +13,8 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/resolve"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 )

@@ -13,6 +13,7 @@ import (
 	generated "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/types"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/tests/helpers"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 )
 
 // createInviteViaAPI creates a calendar invite through the API and returns the token.
@@ -27,6 +28,7 @@ func createInviteViaAPI(t *testing.T, tt *helpers.TestTenant, calID string, body
 }
 
 // createExpiredInviteDirectly inserts an invite with an already-passed expiry into the DB.
+// The token parameter is the plaintext token; it is hashed before storage.
 func createExpiredInviteDirectly(t *testing.T, db *sql.DB, wsID, calID, createdByUserID uint32, token string) {
 	t.Helper()
 	pubID := types.New()
@@ -36,7 +38,7 @@ func createExpiredInviteDirectly(t *testing.T, db *sql.DB, wsID, calID, createdB
 		WorkspaceID:     wsID,
 		CalendarID:      calID,
 		CreatedByUserID: createdByUserID,
-		Token:           token,
+		TokenHash:       authn.HashOpaque(token),
 		Role:            generated.CalendarInvitesRoleViewer,
 		ExpiresAt:       sql.NullTime{Time: time.Now().Add(-24 * time.Hour), Valid: true},
 	})
@@ -44,16 +46,18 @@ func createExpiredInviteDirectly(t *testing.T, db *sql.DB, wsID, calID, createdB
 }
 
 // createExhaustedInviteDirectly inserts an invite that has max_uses=1 and use_count=1.
+// The token parameter is the plaintext token; it is hashed before storage.
 func createExhaustedInviteDirectly(t *testing.T, db *sql.DB, wsID, calID, createdByUserID uint32, token string) {
 	t.Helper()
 	pubID := types.New()
 	q := generated.New(db)
+	tokenHash := authn.HashOpaque(token)
 	_, err := q.CreateCalendarInvite(context.Background(), generated.CreateCalendarInviteParams{
 		PublicID:        pubID,
 		WorkspaceID:     wsID,
 		CalendarID:      calID,
 		CreatedByUserID: createdByUserID,
-		Token:           token,
+		TokenHash:       tokenHash,
 		Role:            generated.CalendarInvitesRoleViewer,
 		MaxUses:         sql.NullInt32{Int32: 1, Valid: true},
 	})
@@ -61,7 +65,7 @@ func createExhaustedInviteDirectly(t *testing.T, db *sql.DB, wsID, calID, create
 
 	// Set use_count to 1 directly.
 	_, err = db.ExecContext(context.Background(),
-		`UPDATE calendar_invites SET use_count = 1 WHERE token = ?`, token)
+		`UPDATE calendar_invites SET use_count = 1 WHERE token_hash = ?`, tokenHash)
 	require.NoError(t, err)
 }
 

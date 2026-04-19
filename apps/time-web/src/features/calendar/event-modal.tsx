@@ -1,25 +1,39 @@
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { DateTime } from 'luxon';
-import { type FormEvent, type ReactElement, useCallback, useEffect, useState } from 'react';
+import { type ReactElement, useEffect } from 'react';
+import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
-import { CustomSelect, DatePickerDropdown, TimePickerDropdown } from '../../components/pickers';
-import { useCalendarUiStore } from '../../stores/calendar-ui-store';
+import Button from '@nodate-flow/ui/primitives/button';
+import DatePicker from '@nodate-flow/ui/primitives/date-picker';
+import Dialog from '@nodate-flow/ui/primitives/dialog';
+import Input from '@nodate-flow/ui/primitives/input';
+import Select from '@nodate-flow/ui/primitives/select';
+import Switch from '@nodate-flow/ui/primitives/switch';
+import Textarea from '@nodate-flow/ui/primitives/textarea';
+import TimePicker from '@nodate-flow/ui/primitives/time-picker';
+
+import { calendarUiStore, useCalendarUi } from '../../stores/calendar-ui-store';
 import { useCalendarsQuery, useCreateEventMutation, useUpdateEventMutation } from './api';
 import type { CalendarEvent, EventKind, ShowAs } from './types';
 
-const eventSchema = z.object({
-  title: z.string().min(1),
-  calendarId: z.string().min(1),
-  startAt: z.string().min(1),
-  endAt: z.string().min(1),
+const eventFormSchema = z.object({
+  title: z.string().min(1, 'event.validation.titleRequired'),
+  calendarId: z.string().min(1, 'event.validation.calendarRequired'),
+  startDate: z.string().min(1),
+  startTime: z.string().min(1),
+  endDate: z.string().min(1),
+  endTime: z.string().min(1),
   allDay: z.boolean(),
   kind: z.enum(['event', 'block', 'free']),
   showAs: z.enum(['busy', 'free', 'tentative', 'oof']),
-  location: z.string().optional(),
-  memo: z.string().optional(),
+  location: z.string(),
+  memo: z.string(),
 });
+
+type EventFormValues = z.infer<typeof eventFormSchema>;
 
 function toRFC3339(value: string, allDay: boolean): string {
   if (allDay) {
@@ -31,13 +45,55 @@ function toRFC3339(value: string, allDay: boolean): string {
   return DateTime.fromISO(value).toISO() ?? `${value}:00Z`;
 }
 
+const WEEKDAYS_JA = ['日', '月', '火', '水', '木', '金', '土'];
+const WEEKDAYS_EN = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+
 export default function EventModal(): ReactElement | null {
-  const { t } = useTranslation();
-  const { eventModalOpen, editingEventId, closeEventModal, selectedDate } = useCalendarUiStore();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language;
+  const eventModalOpen = useCalendarUi((s) => s.eventModalOpen);
+  const editingEventId = useCalendarUi((s) => s.editingEventId);
+  const closeEventModal = useCalendarUi((s) => s.closeEventModal);
+  const selectedDate = useCalendarUi((s) => s.selectedDate);
   const createMutation = useCreateEventMutation();
   const updateMutation = useUpdateEventMutation();
   const { data: calendars } = useCalendarsQuery();
   const queryClient = useQueryClient();
+
+  const defaultDate = selectedDate.toISODate() ?? DateTime.now().toISODate() ?? '';
+
+  const writableCalendars = (calendars ?? []).filter(
+    (c) => c.role === 'owner' || c.role === 'editor' || c.role === 'manager',
+  );
+  const defaultCalendarId = writableCalendars[0]?.id ?? '';
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<EventFormValues>({
+    resolver: zodResolver(eventFormSchema),
+    defaultValues: {
+      title: '',
+      calendarId: defaultCalendarId,
+      startDate: defaultDate,
+      startTime: '09:00',
+      endDate: defaultDate,
+      endTime: '10:00',
+      allDay: true,
+      kind: 'event',
+      showAs: 'busy',
+      location: '',
+      memo: '',
+    },
+  });
+
+  const allDay = watch('allDay');
+  const startDate = watch('startDate');
 
   const eventKinds: { value: EventKind; label: string }[] = [
     { value: 'event', label: t('event.kindEvent') },
@@ -52,102 +108,23 @@ export default function EventModal(): ReactElement | null {
     { value: 'oof', label: t('event.showOof') },
   ];
 
-  const defaultDate = selectedDate.toISODate() ?? DateTime.now().toISODate() ?? '';
+  const weekdayLabels = locale === 'ja' ? WEEKDAYS_JA : WEEKDAYS_EN;
 
-  const writableCalendars = (calendars ?? []).filter(
-    (c) => c.role === 'owner' || c.role === 'editor' || c.role === 'manager',
-  );
-  const defaultCalendarId = writableCalendars[0]?.id ?? '';
+  const formatMonthYear = (year: number, month: number): string => {
+    const dt = DateTime.local(year, month, 1).setLocale(locale);
+    return dt.toLocaleString({ month: 'long', year: 'numeric' });
+  };
 
-  const [title, setTitle] = useState('');
-  const [calendarId, setCalendarId] = useState(defaultCalendarId);
-  const [startAt, setStartAt] = useState(defaultDate);
-  const [startTime, setStartTime] = useState('09:00');
-
+  // Set default calendarId when writable calendars load
   useEffect(() => {
-    if (!calendarId && defaultCalendarId) {
-      setCalendarId(defaultCalendarId);
+    if (defaultCalendarId) {
+      setValue('calendarId', defaultCalendarId);
     }
-  }, [calendarId, defaultCalendarId]);
-  const [endAt, setEndAt] = useState(defaultDate);
-  const [endTime, setEndTime] = useState('10:00');
-  const [allDay, setAllDay] = useState(true);
-  const [kind, setKind] = useState<EventKind>('event');
-  const [showAs, setShowAs] = useState<ShowAs>('busy');
-  const [location, setLocation] = useState('');
-  const [memo, setMemo] = useState('');
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const handleSubmit = useCallback(
-    (e: FormEvent) => {
-      e.preventDefault();
-      const composedStart = allDay ? startAt : `${startAt}T${startTime}`;
-      const composedEnd = allDay ? endAt : `${endAt}T${endTime}`;
-      const result = eventSchema.safeParse({
-        title,
-        calendarId,
-        startAt: composedStart,
-        endAt: composedEnd,
-        allDay,
-        kind,
-        showAs,
-        location: location || undefined,
-        memo: memo || undefined,
-      });
-
-      if (!result.success) {
-        const fieldErrors: Record<string, string> = {};
-        for (const issue of result.error.issues) {
-          const key = issue.path[0];
-          if (typeof key === 'string') {
-            fieldErrors[key] = issue.message;
-          }
-        }
-        setErrors(fieldErrors);
-        return;
-      }
-
-      const timezone = DateTime.local().zoneName;
-
-      const payload = {
-        ...result.data,
-        startAt: toRFC3339(result.data.startAt, result.data.allDay),
-        endAt: toRFC3339(result.data.endAt, result.data.allDay),
-        timezone,
-      };
-
-      if (editingEventId) {
-        updateMutation.mutate(
-          { ...payload, eventId: editingEventId },
-          { onSuccess: () => closeEventModal() },
-        );
-      } else {
-        createMutation.mutate(payload, { onSuccess: () => closeEventModal() });
-      }
-    },
-    [
-      title,
-      calendarId,
-      startAt,
-      startTime,
-      endAt,
-      endTime,
-      allDay,
-      kind,
-      showAs,
-      location,
-      memo,
-      editingEventId,
-      createMutation,
-      updateMutation,
-      closeEventModal,
-    ],
-  );
+  }, [defaultCalendarId, setValue]);
 
   // Prefill form when editing an existing event
   useEffect(() => {
     if (!editingEventId || !eventModalOpen) return;
-    // Search TanStack Query cache for the event
     const queries = queryClient.getQueriesData<CalendarEvent[]>({ queryKey: ['calendars'] });
     let found: CalendarEvent | undefined;
     for (const [, data] of queries) {
@@ -156,383 +133,365 @@ export default function EventModal(): ReactElement | null {
       if (found) break;
     }
     if (!found) return;
-    setTitle(found.title);
-    if (found.calendarId) setCalendarId(found.calendarId);
     const start = DateTime.fromISO(found.startAt);
     const end = DateTime.fromISO(found.endAt);
-    setStartAt(start.toISODate() ?? '');
-    setStartTime(start.toFormat('HH:mm'));
-    setEndAt(end.toISODate() ?? '');
-    setEndTime(end.toFormat('HH:mm'));
-    setAllDay(found.allDay);
-    setKind(found.kind);
-    setShowAs(found.showAs);
-    setLocation(found.location ?? '');
-    setMemo(found.memo ?? '');
-  }, [editingEventId, eventModalOpen, queryClient]);
+    reset({
+      title: found.title,
+      calendarId: found.calendarId ?? defaultCalendarId,
+      startDate: start.toISODate() ?? '',
+      startTime: start.toFormat('HH:mm'),
+      endDate: end.toISODate() ?? '',
+      endTime: end.toFormat('HH:mm'),
+      allDay: found.allDay,
+      kind: found.kind,
+      showAs: found.showAs,
+      location: found.location ?? '',
+      memo: found.memo ?? '',
+    });
+  }, [editingEventId, eventModalOpen, queryClient, reset, defaultCalendarId]);
 
   // Prefill start time from time slot click
   useEffect(() => {
-    const prefill = useCalendarUiStore.getState().prefillStartTime;
+    const prefill = calendarUiStore.getState().prefillStartTime;
     if (!prefill || editingEventId) return;
     const dt = DateTime.fromISO(prefill);
     if (dt.isValid) {
-      setStartAt(dt.toISODate() ?? '');
-      setStartTime(dt.toFormat('HH:mm'));
-      setEndAt(dt.toISODate() ?? '');
-      setEndTime(dt.plus({ hours: 1 }).toFormat('HH:mm'));
-      setAllDay(false);
+      setValue('startDate', dt.toISODate() ?? '');
+      setValue('startTime', dt.toFormat('HH:mm'));
+      setValue('endDate', dt.toISODate() ?? '');
+      setValue('endTime', dt.plus({ hours: 1 }).toFormat('HH:mm'));
+      setValue('allDay', false);
     }
-  }, [editingEventId]);
+  }, [editingEventId, setValue]);
+
+  const onSubmit = (values: EventFormValues): void => {
+    const composedStart = values.allDay
+      ? values.startDate
+      : `${values.startDate}T${values.startTime}`;
+    const composedEnd = values.allDay ? values.endDate : `${values.endDate}T${values.endTime}`;
+
+    const timezone = DateTime.local().zoneName;
+
+    const payload = {
+      title: values.title,
+      calendarId: values.calendarId,
+      startAt: toRFC3339(composedStart, values.allDay),
+      endAt: toRFC3339(composedEnd, values.allDay),
+      allDay: values.allDay,
+      kind: values.kind,
+      showAs: values.showAs,
+      location: values.location || undefined,
+      memo: values.memo || undefined,
+      timezone,
+    };
+
+    if (editingEventId) {
+      updateMutation.mutate(
+        { ...payload, eventId: editingEventId },
+        { onSuccess: () => closeEventModal() },
+      );
+    } else {
+      createMutation.mutate(payload, { onSuccess: () => closeEventModal() });
+    }
+  };
 
   if (!eventModalOpen) return null;
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-50 bg-[var(--nf-color-overlay)]"
-        onClick={closeEventModal}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') closeEventModal();
+    <Dialog
+      open={eventModalOpen}
+      onClose={closeEventModal}
+      title={editingEventId ? t('event.editEvent') : t('event.newEvent')}
+      fullScreenOnMobile
+      style={{ maxInlineSize: '30rem' }}
+    >
+      <form
+        onSubmit={(e) => {
+          void handleSubmit(onSubmit)(e);
         }}
-        role="button"
-        tabIndex={-1}
-        aria-label="Close modal"
-      />
-
-      {/* Mobile: bottom sheet */}
-      <div className="glass-surface-heavy fixed inset-x-0 bottom-0 z-50 flex max-h-[92vh] flex-col overflow-hidden rounded-t-3xl sm:hidden">
-        <div className="mx-auto mt-2 mb-1 h-1 w-10 rounded-full bg-[var(--nf-color-fg-subtle)] opacity-30" />
-        <ModalContent
-          t={t}
-          title={title}
-          setTitle={setTitle}
-          calendarId={calendarId}
-          setCalendarId={setCalendarId}
-          startAt={startAt}
-          setStartAt={setStartAt}
-          startTime={startTime}
-          setStartTime={setStartTime}
-          endAt={endAt}
-          setEndAt={setEndAt}
-          endTime={endTime}
-          setEndTime={setEndTime}
-          allDay={allDay}
-          setAllDay={setAllDay}
-          kind={kind}
-          setKind={setKind}
-          showAs={showAs}
-          setShowAs={setShowAs}
-          location={location}
-          setLocation={setLocation}
-          memo={memo}
-          setMemo={setMemo}
-          errors={errors}
-          writableCalendars={writableCalendars}
-          eventKinds={eventKinds}
-          showAsOptions={showAsOptions}
-          editingEventId={editingEventId}
-          isSubmitting={isSubmitting}
-          handleSubmit={handleSubmit}
-          closeEventModal={closeEventModal}
-        />
-      </div>
-
-      {/* Desktop: centered modal */}
-      <div className="fixed inset-0 z-50 hidden items-center justify-center sm:flex">
-        <div className="glass-surface-heavy flex max-h-[90vh] w-full max-w-[480px] flex-col overflow-hidden rounded-2xl ring-1 ring-[var(--nf-color-border)]">
-          <ModalContent
-            t={t}
-            title={title}
-            setTitle={setTitle}
-            calendarId={calendarId}
-            setCalendarId={setCalendarId}
-            startAt={startAt}
-            setStartAt={setStartAt}
-            startTime={startTime}
-            setStartTime={setStartTime}
-            endAt={endAt}
-            setEndAt={setEndAt}
-            endTime={endTime}
-            setEndTime={setEndTime}
-            allDay={allDay}
-            setAllDay={setAllDay}
-            kind={kind}
-            setKind={setKind}
-            showAs={showAs}
-            setShowAs={setShowAs}
-            location={location}
-            setLocation={setLocation}
-            memo={memo}
-            setMemo={setMemo}
-            errors={errors}
-            writableCalendars={writableCalendars}
-            eventKinds={eventKinds}
-            showAsOptions={showAsOptions}
-            editingEventId={editingEventId}
-            isSubmitting={isSubmitting}
-            handleSubmit={handleSubmit}
-            closeEventModal={closeEventModal}
+        noValidate
+        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}
+      >
+        {/* Title input */}
+        <div>
+          <Textarea
+            rows={1}
+            {...register('title')}
+            placeholder={t('event.title')}
+            invalid={!!errors.title}
+            style={{
+              resize: 'none',
+              fontSize: 'var(--nf-text-xl)',
+              fontWeight: 'var(--nf-weight-light)',
+            }}
           />
-        </div>
-      </div>
-    </>
-  );
-}
-
-interface ModalContentProps {
-  t: (key: string) => string;
-  title: string;
-  setTitle: (v: string) => void;
-  calendarId: string;
-  setCalendarId: (v: string) => void;
-  startAt: string;
-  setStartAt: (v: string) => void;
-  startTime: string;
-  setStartTime: (v: string) => void;
-  endAt: string;
-  setEndAt: (v: string) => void;
-  endTime: string;
-  setEndTime: (v: string) => void;
-  allDay: boolean;
-  setAllDay: (v: boolean) => void;
-  kind: EventKind;
-  setKind: (v: EventKind) => void;
-  showAs: ShowAs;
-  setShowAs: (v: ShowAs) => void;
-  location: string;
-  setLocation: (v: string) => void;
-  memo: string;
-  setMemo: (v: string) => void;
-  errors: Record<string, string>;
-  writableCalendars: { id: string; name: string; color: string }[];
-
-  eventKinds: { value: EventKind; label: string }[];
-  showAsOptions: { value: ShowAs; label: string }[];
-  editingEventId: string | null;
-  isSubmitting: boolean;
-  handleSubmit: (e: FormEvent) => void;
-  closeEventModal: () => void;
-}
-
-function ModalContent({
-  t,
-  title,
-  setTitle,
-  calendarId,
-  setCalendarId,
-  startAt,
-  setStartAt,
-  startTime,
-  setStartTime,
-  endAt,
-  setEndAt,
-  endTime,
-  setEndTime,
-  allDay,
-  setAllDay,
-  kind,
-  setKind,
-  showAs,
-  setShowAs,
-  location,
-  setLocation,
-  memo,
-  setMemo,
-  errors,
-  writableCalendars,
-
-  eventKinds,
-  showAsOptions,
-  editingEventId,
-  isSubmitting,
-  handleSubmit,
-  closeEventModal,
-}: ModalContentProps): ReactElement {
-  return (
-    <form onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-hidden">
-      {/* Title input */}
-      <div className="px-6 pt-4 pb-2">
-        <textarea
-          rows={1}
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder={t('event.title')}
-          className="w-full resize-none border-b-2 border-transparent bg-transparent text-[24px] font-light outline-none transition-colors placeholder:text-[var(--nf-color-fg-subtle)] focus:border-[var(--nf-color-accent)]"
-          style={{ color: 'var(--nf-color-fg)' }}
-        />
-        {errors.title ? (
-          <p className="mt-1 text-[12px]" style={{ color: 'var(--nf-color-danger)' }}>
-            {errors.title}
-          </p>
-        ) : null}
-      </div>
-
-      {/* Scrollable body */}
-      <div className="flex-1 space-y-4 overflow-y-auto px-6 py-4">
-        {/* Date/time card */}
-        <div className="rounded-xl bg-[var(--nf-color-bg-sunken)] p-4">
-          {/* All-day toggle */}
-          <div className="flex items-center justify-between">
-            <span className="text-[14px]" style={{ color: 'var(--nf-color-fg-muted)' }}>
-              {t('event.allDay')}
-            </span>
-            <button
-              type="button"
-              onClick={() => setAllDay(!allDay)}
-              className="relative h-[28px] w-[48px] shrink-0 rounded-full transition-colors"
+          {errors.title?.message ? (
+            <p
               style={{
-                backgroundColor: allDay ? 'var(--nf-color-accent)' : 'var(--nf-color-bg-sunken)',
-                border: allDay ? 'none' : '1px solid var(--nf-color-border)',
+                marginBlockStart: 'var(--nf-space-1)',
+                fontSize: 'var(--nf-text-xs)',
+                color: 'var(--nf-color-danger)',
               }}
             >
-              <span
-                className="absolute left-0 top-[2px] h-[24px] w-[24px] rounded-full shadow-sm transition-transform"
-                style={{
-                  transform: allDay ? 'translateX(22px)' : 'translateX(2px)',
-                  backgroundColor: 'var(--nf-color-bg-elevated, #fff)',
-                }}
-              />
-            </button>
-          </div>
-
-          <div className="my-1 border-t border-[var(--nf-color-border)] opacity-50" />
-
-          {/* Start */}
-          <div className="flex items-center justify-between py-1">
-            <span className="text-[14px]" style={{ color: 'var(--nf-color-fg-muted)' }}>
-              {t('event.start')}
-            </span>
-            <div className="flex items-center gap-2">
-              <DatePickerDropdown value={startAt} onChange={setStartAt} />
-              {!allDay && <TimePickerDropdown value={startTime} onChange={setStartTime} />}
-            </div>
-          </div>
-
-          <div className="my-1 border-t border-[var(--nf-color-border)] opacity-50" />
-
-          {/* End */}
-          <div className="flex items-center justify-between py-1">
-            <span className="text-[14px]" style={{ color: 'var(--nf-color-fg-muted)' }}>
-              {t('event.end')}
-            </span>
-            <div className="flex items-center gap-2">
-              <DatePickerDropdown value={endAt} onChange={setEndAt} />
-              {!allDay && <TimePickerDropdown value={endTime} onChange={setEndTime} />}
-            </div>
-          </div>
-        </div>
-
-        {/* Calendar selector card */}
-        <div className="rounded-xl bg-[var(--nf-color-bg-sunken)] p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-[14px]" style={{ color: 'var(--nf-color-fg-muted)' }}>
-              {t('event.calendar')}
-            </span>
-            <CustomSelect
-              value={calendarId}
-              onChange={setCalendarId}
-              options={writableCalendars.map((cal) => ({
-                value: cal.id,
-                label: cal.name,
-                icon: (
-                  <span
-                    className="inline-block h-3 w-3 shrink-0 rounded-full"
-                    style={{ backgroundColor: cal.color }}
-                  />
-                ),
-              }))}
-              className="w-[200px]"
-            />
-          </div>
-          {errors.calendarId ? (
-            <p className="mt-1 text-[12px]" style={{ color: 'var(--nf-color-danger)' }}>
-              {errors.calendarId}
+              {t(errors.title.message)}
             </p>
           ) : null}
         </div>
 
-        {/* Kind & Show As card */}
-        <div className="rounded-xl bg-[var(--nf-color-bg-sunken)] p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-[14px]" style={{ color: 'var(--nf-color-fg-muted)' }}>
-              {t('event.kind')}
+        {/* Date/time section */}
+        <div
+          style={{
+            borderRadius: 'var(--nf-radius-md)',
+            backgroundColor: 'var(--nf-color-bg-sunken)',
+            padding: 'var(--nf-space-4)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--nf-space-2)',
+          }}
+        >
+          {/* All-day toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 'var(--nf-text-sm)', color: 'var(--nf-color-fg-muted)' }}>
+              {t('event.allDay')}
             </span>
-            <CustomSelect
-              value={kind}
-              onChange={(v) => setKind(v as EventKind)}
-              options={eventKinds}
-              className="w-[160px]"
+            <Controller
+              control={control}
+              name="allDay"
+              render={({ field }) => (
+                <Switch
+                  checked={field.value}
+                  onCheckedChange={(checked) => field.onChange(checked)}
+                />
+              )}
             />
           </div>
 
-          <div className="my-1 border-t border-[var(--nf-color-border)] opacity-50" />
+          <hr
+            style={{
+              border: 'none',
+              borderBlockStart: '1px solid var(--nf-color-border)',
+              opacity: 0.5,
+            }}
+          />
 
-          <div className="flex items-center justify-between">
-            <span className="text-[14px]" style={{ color: 'var(--nf-color-fg-muted)' }}>
-              {t('event.showAs')}
+          {/* Start */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 'var(--nf-text-sm)', color: 'var(--nf-color-fg-muted)' }}>
+              {t('event.start')}
             </span>
-            <CustomSelect
-              value={showAs}
-              onChange={(v) => setShowAs(v as ShowAs)}
-              options={showAsOptions}
-              className="w-[160px]"
-            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-2)' }}>
+              <Controller
+                control={control}
+                name="startDate"
+                render={({ field }) => (
+                  <DatePicker
+                    value={field.value}
+                    onChange={field.onChange}
+                    weekdayLabels={weekdayLabels}
+                    formatMonthYear={formatMonthYear}
+                  />
+                )}
+              />
+              {!allDay && (
+                <Controller
+                  control={control}
+                  name="startTime"
+                  render={({ field }) => (
+                    <TimePicker value={field.value} onChange={field.onChange} />
+                  )}
+                />
+              )}
+            </div>
+          </div>
+
+          <hr
+            style={{
+              border: 'none',
+              borderBlockStart: '1px solid var(--nf-color-border)',
+              opacity: 0.5,
+            }}
+          />
+
+          {/* End */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 'var(--nf-text-sm)', color: 'var(--nf-color-fg-muted)' }}>
+              {t('event.end')}
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-2)' }}>
+              <Controller
+                control={control}
+                name="endDate"
+                render={({ field }) => (
+                  <DatePicker
+                    value={field.value}
+                    onChange={field.onChange}
+                    minDate={startDate}
+                    weekdayLabels={weekdayLabels}
+                    formatMonthYear={formatMonthYear}
+                  />
+                )}
+              />
+              {!allDay && (
+                <Controller
+                  control={control}
+                  name="endTime"
+                  render={({ field }) => (
+                    <TimePicker value={field.value} onChange={field.onChange} />
+                  )}
+                />
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Location & Memo card */}
-        <div className="rounded-xl bg-[var(--nf-color-bg-sunken)] p-4">
+        {/* Calendar selector */}
+        <div
+          style={{
+            borderRadius: 'var(--nf-radius-md)',
+            backgroundColor: 'var(--nf-color-bg-sunken)',
+            padding: 'var(--nf-space-4)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 'var(--nf-text-sm)', color: 'var(--nf-color-fg-muted)' }}>
+              {t('event.calendar')}
+            </span>
+            <Select {...register('calendarId')}>
+              {writableCalendars.map((cal) => (
+                <option key={cal.id} value={cal.id}>
+                  {cal.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+          {errors.calendarId?.message ? (
+            <p
+              style={{
+                marginBlockStart: 'var(--nf-space-1)',
+                fontSize: 'var(--nf-text-xs)',
+                color: 'var(--nf-color-danger)',
+              }}
+            >
+              {t(errors.calendarId.message)}
+            </p>
+          ) : null}
+        </div>
+
+        {/* Kind & Show As */}
+        <div
+          style={{
+            borderRadius: 'var(--nf-radius-md)',
+            backgroundColor: 'var(--nf-color-bg-sunken)',
+            padding: 'var(--nf-space-4)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--nf-space-2)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 'var(--nf-text-sm)', color: 'var(--nf-color-fg-muted)' }}>
+              {t('event.kind')}
+            </span>
+            <Select {...register('kind')}>
+              {eventKinds.map((ek) => (
+                <option key={ek.value} value={ek.value}>
+                  {ek.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <hr
+            style={{
+              border: 'none',
+              borderBlockStart: '1px solid var(--nf-color-border)',
+              opacity: 0.5,
+            }}
+          />
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 'var(--nf-text-sm)', color: 'var(--nf-color-fg-muted)' }}>
+              {t('event.showAs')}
+            </span>
+            <Select {...register('showAs')}>
+              {showAsOptions.map((sa) => (
+                <option key={sa.value} value={sa.value}>
+                  {sa.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </div>
+
+        {/* Location & Memo */}
+        <div
+          style={{
+            borderRadius: 'var(--nf-radius-md)',
+            backgroundColor: 'var(--nf-color-bg-sunken)',
+            padding: 'var(--nf-space-4)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--nf-space-3)',
+          }}
+        >
           <div>
             <label
               htmlFor="event-location"
-              className="text-[14px]"
-              style={{ color: 'var(--nf-color-fg-muted)' }}
+              style={{ fontSize: 'var(--nf-text-sm)', color: 'var(--nf-color-fg-muted)' }}
             >
               {t('event.location')}
             </label>
-            <input
+            <Input
               id="event-location"
               type="text"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              className="input-modern mt-1 w-full"
+              {...register('location')}
+              style={{ marginBlockStart: 'var(--nf-space-1)', width: '100%' }}
             />
           </div>
 
-          <div className="my-1 border-t border-[var(--nf-color-border)] opacity-50" />
+          <hr
+            style={{
+              border: 'none',
+              borderBlockStart: '1px solid var(--nf-color-border)',
+              opacity: 0.5,
+            }}
+          />
 
           <div>
             <label
               htmlFor="event-memo"
-              className="text-[14px]"
-              style={{ color: 'var(--nf-color-fg-muted)' }}
+              style={{ fontSize: 'var(--nf-text-sm)', color: 'var(--nf-color-fg-muted)' }}
             >
               {t('event.memo')}
             </label>
-            <textarea
+            <Textarea
               id="event-memo"
-              value={memo}
-              onChange={(e) => setMemo(e.target.value)}
+              {...register('memo')}
               rows={3}
-              className="input-modern mt-1 w-full resize-none"
+              style={{ marginBlockStart: 'var(--nf-space-1)', width: '100%', resize: 'none' }}
             />
           </div>
         </div>
-      </div>
 
-      {/* Action buttons */}
-      <div className="flex gap-3 border-t border-[var(--nf-color-border)] px-6 py-4">
-        <button type="button" onClick={closeEventModal} className="btn-secondary flex-1 rounded-xl">
-          {t('common.cancel')}
-        </button>
-        <button type="submit" disabled={isSubmitting} className="btn-primary flex-1 rounded-xl">
-          {isSubmitting ? t('common.saving') : editingEventId ? t('common.save') : t('common.save')}
-        </button>
-      </div>
-    </form>
+        {/* Action buttons */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 'var(--nf-space-3)',
+            borderBlockStart: '1px solid var(--nf-color-border)',
+            paddingBlockStart: 'var(--nf-space-4)',
+          }}
+        >
+          <Button type="button" variant="default" onClick={closeEventModal} style={{ flex: 1 }}>
+            {t('common.cancel')}
+          </Button>
+          <Button type="submit" variant="primary" disabled={isSubmitting} style={{ flex: 1 }}>
+            {isSubmitting ? t('common.saving') : t('common.save')}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
   );
 }

@@ -1,23 +1,40 @@
 import i18n from 'i18next';
-import LanguageDetector from 'i18next-browser-languagedetector';
+import ICU from 'i18next-icu';
 import { initReactI18next } from 'react-i18next';
 
 import enCommon from '../locales/en/common.json';
 import jaCommon from '../locales/ja/common.json';
 
+/** Supported UI languages. */
 export const supportedLanguages = ['en', 'ja'] as const;
 
+/** Union of supported UI language codes. */
 export type SupportedLanguage = (typeof supportedLanguages)[number];
 
-const languageStorageKey = 'nt.lang';
+const languageStorageKey = 'nf.lang';
+
+function detectInitialLanguage(): SupportedLanguage {
+  try {
+    const stored = localStorage.getItem(languageStorageKey);
+    if (stored && (supportedLanguages as readonly string[]).includes(stored)) {
+      return stored as SupportedLanguage;
+    }
+  } catch {
+    // ignore
+  }
+  const nav = typeof navigator !== 'undefined' ? navigator.language : 'en';
+  if (nav.toLowerCase().startsWith('ja')) return 'ja';
+  return 'en';
+}
 
 /** Initialize the singleton i18next instance. Safe to call multiple times. */
 export function initI18n(): typeof i18n {
   if (i18n.isInitialized) return i18n;
   void i18n
-    .use(LanguageDetector)
+    .use(ICU)
     .use(initReactI18next)
     .init({
+      lng: detectInitialLanguage(),
       fallbackLng: 'en',
       supportedLngs: supportedLanguages as unknown as string[],
       defaultNS: 'common',
@@ -26,19 +43,9 @@ export function initI18n(): typeof i18n {
         en: { common: enCommon },
         ja: { common: jaCommon },
       },
-      detection: {
-        order: ['localStorage', 'navigator'],
-        lookupLocalStorage: languageStorageKey,
-        caches: ['localStorage'],
-      },
       interpolation: { escapeValue: false },
       react: { useSuspense: true },
     });
-  // Sync <html lang> with detected/configured language
-  document.documentElement.lang = i18n.language;
-  i18n.on('languageChanged', (lng) => {
-    document.documentElement.lang = lng;
-  });
   return i18n;
 }
 
@@ -49,7 +56,6 @@ export function setLanguage(lang: SupportedLanguage): void {
   } catch {
     // ignore
   }
-  document.documentElement.lang = lang;
   void i18n.changeLanguage(lang);
 }
 

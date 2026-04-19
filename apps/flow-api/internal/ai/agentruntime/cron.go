@@ -47,8 +47,8 @@ var ErrAlreadyRunning = errors.New("agentruntime: scheduler already running")
 // runner. It is safe for concurrent Stop calls; only the first
 // observed cancellation actually unwinds.
 type Scheduler struct {
-	Source   Source
-	Runner   Runner
+	Source Source
+	Runner Runner
 	// Queue is optional. When set, tick enqueues Runs instead of
 	// calling Runner directly — this is the scheduler/worker split
 	// path used in multi-replica deployments. When nil, tick falls

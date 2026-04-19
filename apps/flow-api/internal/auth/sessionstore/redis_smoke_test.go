@@ -9,7 +9,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
 )
 
 // TestRedisStoreSmoke exercises the Redis driver end-to-end against a
@@ -31,7 +31,7 @@ func TestRedisStoreSmoke(t *testing.T) {
 
 	store := NewRedisStore(rdb)
 
-	pub := types.New()
+	pub := dbtype.New()
 	hash := "smoke-hash-" + pub.String()
 	expires := time.Now().Add(15 * time.Minute).UTC()
 	_, err := store.Create(ctx, CreateParams{

@@ -3,7 +3,10 @@ import { DateTime } from 'luxon';
 import { type ReactElement, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useCalendarUiStore } from '../../stores/calendar-ui-store';
+import { cx } from '@nodate-flow/ui/lib/cx';
+
+import { useCalendarUi } from '../../stores/calendar-ui-store';
+import styles from './day-cell.module.css';
 import type { CalendarEvent } from './types';
 
 interface DayCellProps {
@@ -31,7 +34,10 @@ function encodeDragData(event: CalendarEvent): string {
 export default function DayCell(props: DayCellProps): ReactElement {
   const { date, events, isCurrentMonth, holiday, onEventDrop } = props;
   const { t } = useTranslation();
-  const { selectedDate, setSelectedDate, openEventModal, openEventDetail } = useCalendarUiStore();
+  const selectedDate = useCalendarUi((s) => s.selectedDate);
+  const setSelectedDate = useCalendarUi((s) => s.setSelectedDate);
+  const openEventModal = useCalendarUi((s) => s.openEventModal);
+  const openEventDetail = useCalendarUi((s) => s.openEventDetail);
   const [dragOver, setDragOver] = useState(false);
 
   const isToday = date.hasSame(DateTime.now(), 'day');
@@ -93,37 +99,28 @@ export default function DayCell(props: DayCellProps): ReactElement {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`day-cell relative flex min-h-[56px] flex-col items-start overflow-hidden border-b border-r border-[var(--nf-color-hairline)] cursor-pointer px-1.5 pt-1.5 pb-1 transition-colors hover:bg-[var(--nf-color-surface-hover)] sm:min-h-[88px] ${
-        isSelected ? 'bg-[var(--nf-color-accent-subtle)]' : ''
-      } ${!isCurrentMonth ? 'opacity-40' : ''} ${dragOver ? 'ring-2 ring-inset ring-[var(--nf-color-accent)]' : ''}`}
+      className={cx(
+        styles.cell,
+        isSelected && styles.cellSelected,
+        !isCurrentMonth && styles.cellFaded,
+        dragOver && styles.cellDragOver,
+      )}
     >
-      <div className="flex items-center gap-1">
+      <div className={styles.header}>
         {isToday ? (
-          <span
-            className="flex h-7 w-7 items-center justify-center rounded-full text-[15px] font-medium"
-            style={{ backgroundColor: 'var(--nf-color-accent)', color: '#ffffff' }}
-          >
-            {date.day}
-          </span>
+          <span className={cx(styles.dayNumber, styles.dayNumberToday)}>{date.day}</span>
         ) : (
           <span
-            className="flex h-7 w-7 items-center justify-center text-[15px] font-medium"
+            className={styles.dayNumber}
             style={dayNumberColor ? { color: dayNumberColor } : undefined}
           >
             {date.day}
           </span>
         )}
-        {holiday ? (
-          <span
-            className="hidden truncate text-[10px] sm:inline"
-            style={{ color: 'var(--nf-cal-sunday)' }}
-          >
-            {holiday.name}
-          </span>
-        ) : null}
+        {holiday ? <span className={styles.holiday}>{holiday.name}</span> : null}
       </div>
 
-      <div className="mt-0.5 w-full space-y-0.5">
+      <div className={styles.events}>
         {visibleEvents.map((event) => {
           const color =
             (event as CalendarEvent & { displayColor?: string }).displayColor || '#47B2F7';
@@ -140,34 +137,31 @@ export default function DayCell(props: DayCellProps): ReactElement {
                 e.stopPropagation();
                 e.dataTransfer.setData('application/x-calendar-event', encodeDragData(event));
                 e.dataTransfer.effectAllowed = 'move';
-                // Slight delay to let browser render drag ghost before dimming source
                 (e.currentTarget as HTMLElement).style.opacity = '0.4';
               }}
               onDragEnd={(e) => {
                 (e.currentTarget as HTMLElement).style.opacity = '1';
               }}
-              className="mx-0.5 w-full cursor-grab truncate rounded-full border-l-[3px] px-1.5 text-left text-[11px] font-semibold leading-[20px] active:cursor-grabbing"
+              className={styles.eventChip}
               style={{
                 backgroundColor: `${color}18`,
                 borderLeftColor: color,
                 color: color,
               }}
             >
-              <span className="hidden sm:inline">
+              <span className={styles.eventLabelDesktop}>
                 {event.allDay
                   ? event.title
                   : `${DateTime.fromISO(event.startAt).toFormat('HH:mm')} ${event.title}`}
               </span>
-              <span className="sm:hidden">
+              <span className={styles.eventLabelMobile}>
                 {event.allDay ? event.title : DateTime.fromISO(event.startAt).toFormat('HH:mm')}
               </span>
             </button>
           );
         })}
         {overflowCount > 0 ? (
-          <span className="block pl-1 text-[10px]" style={{ color: 'var(--nf-color-fg-muted)' }}>
-            {t('event.more', { count: overflowCount })}
-          </span>
+          <span className={styles.overflow}>{t('event.more', { count: overflowCount })}</span>
         ) : null}
       </div>
     </div>

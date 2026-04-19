@@ -57,6 +57,7 @@ func Patch(deps Deps) func(context.Context, *PatchProjectInput) (*PatchProjectOu
 			Name:        newName,
 			Slug:        newSlug,
 			Description: newDesc,
+			WorkspaceID: current.WorkspaceID,
 			PublicID:    types.FromUUID(prj.PublicID),
 		}); err != nil {
 			var mysqlErr *mysql.MySQLError

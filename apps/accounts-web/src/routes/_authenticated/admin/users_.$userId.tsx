@@ -8,7 +8,7 @@ import { Link, createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { apiRequest } from '../../../lib/api-client';
+import { sdk } from '../../../lib/sdk';
 
 interface UserDetail {
   id: string;
@@ -89,17 +89,18 @@ function UserDetailPage(): ReactElement {
     setError(null);
 
     void Promise.all([
-      apiRequest<UserDetail>(`/admin/users/${userId}`),
-      apiRequest<SessionsResponse>(`/admin/users/${userId}/sessions`),
+      sdk.GET('/admin/users/{userId}', { params: { path: { userId } } }),
+      sdk.GET('/admin/users/{userId}/sessions', { params: { path: { userId } } }),
     ]).then(([userResult, sessionsResult]) => {
       if (userResult.error || !userResult.data) {
         setError(t('errors.generic'));
         setLoading(false);
         return;
       }
-      setUser(userResult.data);
+      setUser(userResult.data as UserDetail);
       if (sessionsResult.data) {
-        setSessions(sessionsResult.data.items);
+        const sessBody = sessionsResult.data as SessionsResponse;
+        setSessions(sessBody.items);
       }
       setLoading(false);
     });
@@ -107,20 +108,20 @@ function UserDetailPage(): ReactElement {
 
   const handleToggleEnabled = async () => {
     if (!user) return;
-    const confirmMsg = user.enabled ? t('users.confirmSuspend') : t('users.confirmEnable');
+    const confirmMsg = user.enabled ? t('users.confirm_suspend') : t('users.confirm_enable');
     if (!window.confirm(confirmMsg)) return;
 
     setActionLoading(true);
-    await apiRequest<{ ok: boolean }>(`/admin/users/${userId}`, {
-      method: 'PATCH',
+    await sdk.PATCH('/admin/users/{userId}', {
+      params: { path: { userId } },
       body: { enabled: !user.enabled },
     });
     setActionLoading(false);
 
     // Refetch to get updated state
-    const result = await apiRequest<UserDetail>(`/admin/users/${userId}`);
+    const result = await sdk.GET('/admin/users/{userId}', { params: { path: { userId } } });
     if (result.data) {
-      setUser(result.data);
+      setUser(result.data as UserDetail);
     }
   };
 
@@ -128,33 +129,32 @@ function UserDetailPage(): ReactElement {
     if (!user) return;
 
     if (user.isInstanceAdmin) {
-      if (!window.confirm(t('admins.confirmRevoke'))) return;
+      if (!window.confirm(t('admins.confirm_revoke'))) return;
       setActionLoading(true);
-      await apiRequest(`/admin/admins/${userId}`, { method: 'DELETE' });
+      await sdk.DELETE('/admin/admins/{adminId}', { params: { path: { adminId: userId } } });
     } else {
       setActionLoading(true);
-      await apiRequest('/admin/admins', {
-        method: 'POST',
+      await sdk.POST('/admin/admins', {
         body: { userId: user.id },
       });
     }
     setActionLoading(false);
 
     // Refetch
-    const result = await apiRequest<UserDetail>(`/admin/users/${userId}`);
+    const result = await sdk.GET('/admin/users/{userId}', { params: { path: { userId } } });
     if (result.data) {
-      setUser(result.data);
+      setUser(result.data as UserDetail);
     }
   };
 
   const handleRevokeSession = async (sessionId: string) => {
     setActionLoading(true);
-    const result = await apiRequest(`/admin/sessions/${sessionId}`, {
-      method: 'DELETE',
+    const { error: err } = await sdk.DELETE('/admin/sessions/{sessionId}', {
+      params: { path: { sessionId } },
     });
     setActionLoading(false);
 
-    if (!result.error) {
+    if (!err) {
       setSessions((prev) => prev.filter((s) => s.id !== sessionId));
     }
   };
@@ -242,10 +242,10 @@ function UserDetailPage(): ReactElement {
         <div style={labelStyle}>{t('users.workspaces')}</div>
         <div style={valueStyle}>{user.workspaceCount}</div>
 
-        <div style={labelStyle}>{t('users.lastLogin')}</div>
+        <div style={labelStyle}>{t('users.last_login')}</div>
         <div style={valueStyle}>{formatTimestamp(user.lastLoginAt, t('common.never'))}</div>
 
-        <div style={labelStyle}>{t('users.createdAt')}</div>
+        <div style={labelStyle}>{t('users.created_at')}</div>
         <div style={valueStyle}>{formatTimestamp(user.createdAt, t('common.never'))}</div>
       </div>
 
@@ -258,7 +258,7 @@ function UserDetailPage(): ReactElement {
           {user.enabled ? t('users.suspend') : t('users.enable')}
         </Button>
         <Button variant="default" disabled={actionLoading} onClick={() => void handleToggleAdmin()}>
-          {user.isInstanceAdmin ? t('users.revokeAdmin') : t('users.grantAdmin')}
+          {user.isInstanceAdmin ? t('users.revoke_admin') : t('users.grant_admin')}
         </Button>
       </div>
 
@@ -279,7 +279,7 @@ function UserDetailPage(): ReactElement {
             fontSize: 'var(--nf-text-sm, 0.875rem)',
           }}
         >
-          {t('users.noResults')}
+          {t('users.no_results')}
         </p>
       ) : (
         <div style={{ overflowX: 'auto' }}>
@@ -288,7 +288,7 @@ function UserDetailPage(): ReactElement {
               <tr>
                 <th style={thStyle}>User Agent</th>
                 <th style={thStyle}>IP</th>
-                <th style={thStyle}>{t('users.createdAt')}</th>
+                <th style={thStyle}>{t('users.created_at')}</th>
                 <th style={thStyle} />
               </tr>
             </thead>

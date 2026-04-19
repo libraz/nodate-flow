@@ -5,11 +5,11 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
 
 	generated "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/types"
+	apierrors "github.com/nodate-flow/nodate-flow/apps/time-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/eventbus"
 )
 
@@ -24,11 +24,11 @@ type ListChecklistInput struct {
 
 // ChecklistItemResponse is the JSON representation of a checklist item.
 type ChecklistItemResponse struct {
-	ID         string    `json:"id"`
-	Title      string    `json:"title"`
-	Done       bool      `json:"done"`
-	SortWeight int32     `json:"sortWeight"`
-	CreatedAt  time.Time `json:"createdAt"`
+	ID         string `json:"id"`
+	Title      string `json:"title"`
+	Done       bool   `json:"done"`
+	SortWeight int32  `json:"sortWeight"`
+	CreatedAt  int64  `json:"createdAt"`
 }
 
 // ListChecklistOutput is the response for the list checklist endpoint.
@@ -110,7 +110,7 @@ func ListChecklist(deps Deps) func(context.Context, *ListChecklistInput) (*ListC
 
 		rows, err := deps.Queries.ListCalendarChecklistItems(ctx, evt.ID)
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to list checklist items", err)
+			return nil, httpErr(apierrors.CalendarChecklistListQueryInterrupted)
 		}
 
 		out := &ListChecklistOutput{}
@@ -121,7 +121,7 @@ func ListChecklist(deps Deps) func(context.Context, *ListChecklistInput) (*ListC
 				Title:      r.Title,
 				Done:       r.Done,
 				SortWeight: r.SortWeight,
-				CreatedAt:  r.CreatedAt,
+				CreatedAt:  r.CreatedAt.Unix(),
 			}
 		}
 		return out, nil
@@ -155,7 +155,7 @@ func CreateChecklistItem(deps Deps) func(context.Context, *CreateChecklistItemIn
 			SortWeight:      input.Body.SortWeight,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to create checklist item", err)
+			return nil, httpErr(apierrors.CalendarChecklistStoreWriteInterrupted)
 		}
 
 		out := &CreateChecklistItemOutput{}
@@ -164,7 +164,7 @@ func CreateChecklistItem(deps Deps) func(context.Context, *CreateChecklistItemIn
 			Title:      input.Body.Title,
 			Done:       false,
 			SortWeight: input.Body.SortWeight,
-			CreatedAt:  time.Now().UTC(),
+			CreatedAt:  time.Now().UTC().Unix(),
 		}
 
 		_ = eventbus.Append(ctx, deps.DB, wsID, "calendar.event.checklist.created", &actorID, map[string]any{
@@ -196,7 +196,7 @@ func UpdateChecklistItem(deps Deps) func(context.Context, *UpdateChecklistItemIn
 
 		itemUID, err := uuid.Parse(input.ItemId)
 		if err != nil {
-			return nil, huma.Error404NotFound("Checklist item not found")
+			return nil, httpErr(apierrors.CalendarChecklistItemNotFound)
 		}
 
 		params := generated.UpdateCalendarChecklistItemParams{
@@ -215,7 +215,7 @@ func UpdateChecklistItem(deps Deps) func(context.Context, *UpdateChecklistItemIn
 
 		err = deps.Queries.UpdateCalendarChecklistItem(ctx, params)
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to update checklist item", err)
+			return nil, httpErr(apierrors.CalendarChecklistStoreWriteInterrupted)
 		}
 
 		_ = eventbus.Append(ctx, deps.DB, wsID, "calendar.event.checklist.updated", &actorID, map[string]any{
@@ -249,7 +249,7 @@ func DeleteChecklistItem(deps Deps) func(context.Context, *DeleteChecklistItemIn
 
 		itemUID, err := uuid.Parse(input.ItemId)
 		if err != nil {
-			return nil, huma.Error404NotFound("Checklist item not found")
+			return nil, httpErr(apierrors.CalendarChecklistItemNotFound)
 		}
 
 		err = deps.Queries.DisableCalendarChecklistItem(ctx, generated.DisableCalendarChecklistItemParams{
@@ -257,7 +257,7 @@ func DeleteChecklistItem(deps Deps) func(context.Context, *DeleteChecklistItemIn
 			EventID:  evt.ID,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to delete checklist item", err)
+			return nil, httpErr(apierrors.CalendarChecklistStoreDeleteInterrupted)
 		}
 
 		out := &DeleteChecklistItemOutput{}

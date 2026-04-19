@@ -84,6 +84,16 @@ sql:
               import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
+          - column: "*.resource_public_id"
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+          - column: "*.target_resource_public_id"
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
   # --- nodate-time API (calendar + auth queries only) ---
   - engine: "mysql"
     queries:
@@ -225,6 +235,11 @@ sql:
               package: "types"
               type: "PublicID"
           - column: "*.target_workspace_public_id"
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+          - column: "*.resource_public_id"
             go_type:
               import: "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
               package: "types"

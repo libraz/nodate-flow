@@ -41,20 +41,20 @@ type CalendarDTO struct {
 
 // EventDTO is the public DTO for a calendar event.
 type EventDTO struct {
-	ID         string  `json:"id" doc:"Event public id (UUID v7)"`
-	CalendarID string  `json:"calendarId"`
-	Kind       string  `json:"kind"`
-	Visibility string  `json:"visibility"`
-	ShowAs     string  `json:"showAs"`
-	Title      string  `json:"title"`
-	AllDay     bool    `json:"allDay"`
-	StartAt    string  `json:"startAt"`
-	EndAt      string  `json:"endAt"`
-	Timezone   string  `json:"timezone"`
-	Location   string  `json:"location,omitempty"`
-	Memo       string  `json:"memo,omitempty"`
+	ID          string `json:"id" doc:"Event public id (UUID v7)"`
+	CalendarID  string `json:"calendarId"`
+	Kind        string `json:"kind"`
+	Visibility  string `json:"visibility"`
+	ShowAs      string `json:"showAs"`
+	Title       string `json:"title"`
+	AllDay      bool   `json:"allDay"`
+	StartAt     string `json:"startAt"`
+	EndAt       string `json:"endAt"`
+	Timezone    string `json:"timezone"`
+	Location    string `json:"location,omitempty"`
+	Memo        string `json:"memo,omitempty"`
 	OwnerUserID string `json:"ownerUserId,omitempty"`
-	BlockLabel string  `json:"blockLabel,omitempty"`
+	BlockLabel  string `json:"blockLabel,omitempty"`
 }
 
 // ListCalendarsInput is the path for GET /workspaces/{wsId}/calendars.

@@ -118,7 +118,7 @@ func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType strin
 // from the events table.
 type eventRow struct {
 	actorUserID      sql.NullInt32
-	resourcePublicID sql.NullString
+	resourcePublicID types.PublicID
 }
 
 // latestEvent fetches the most recent event of the given type for the
@@ -128,7 +128,7 @@ func (f *Fanout) latestEvent(ctx context.Context, workspaceID uint32, eventType 
 	const q = `
 		SELECT e.actor_user_id,
 		       CASE
-		         WHEN e.task_id IS NOT NULL THEN (SELECT HEX(t.public_id) FROM tasks t WHERE t.id = e.task_id)
+		         WHEN e.task_id IS NOT NULL THEN (SELECT t.public_id FROM tasks t WHERE t.id = e.task_id)
 		         ELSE NULL
 		       END AS resource_public_id
 		FROM events e

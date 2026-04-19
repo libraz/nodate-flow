@@ -28,12 +28,12 @@ const (
 
 // TaskSnapshot is the compact projection the digest builder consumes.
 type TaskSnapshot struct {
-	TaskID      string
-	Title       string
-	State       State
-	DueOn       time.Time
-	HasDueOn    bool
-	CompletedAt time.Time
+	TaskID       string
+	Title        string
+	State        State
+	DueOn        time.Time
+	HasDueOn     bool
+	CompletedAt  time.Time
 	HasCompleted bool
 }
 

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -96,4 +97,143 @@ func TestIntegrationsUnauthenticated(t *testing.T) {
 		testServerURL+"/me/integrations", "", nil)
 	require.Equal(t, http.StatusUnauthorized, status,
 		"unauthenticated list should return 401")
+}
+
+// TestIntegrationsListStableOrder verifies that the provider catalog
+// is returned in a deterministic order (github, slack, google_calendar)
+// regardless of how many times it is called. The frontend relies on
+// this for stable UI card placement.
+func TestIntegrationsListStableOrder(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tt := newTenant(t)
+
+	expected := []string{"github", "slack", "google_calendar"}
+	for i := 0; i < 3; i++ {
+		var out struct {
+			Providers []struct {
+				Provider string `json:"provider"`
+			} `json:"providers"`
+		}
+		doJSON(t, http.MethodGet, testServerURL+"/me/integrations", tt.AccessToken, nil, &out)
+		require.Len(t, out.Providers, 3)
+		for j, p := range out.Providers {
+			assert.Equal(t, expected[j], p.Provider,
+				"provider order must be stable across calls (iteration %d)", i)
+		}
+	}
+}
+
+// TestIntegrationsCrossTenantIsolation verifies that one tenant's
+// integrations list does not leak into another tenant's view.
+func TestIntegrationsCrossTenantIsolation(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tt1 := newTenant(t)
+	tt2 := newTenant(t)
+
+	var out1, out2 struct {
+		Providers []struct {
+			Provider   string `json:"provider"`
+			Connection *struct {
+				ID string `json:"id"`
+			} `json:"connection"`
+		} `json:"providers"`
+	}
+	doJSON(t, http.MethodGet, testServerURL+"/me/integrations", tt1.AccessToken, nil, &out1)
+	doJSON(t, http.MethodGet, testServerURL+"/me/integrations", tt2.AccessToken, nil, &out2)
+
+	for _, p := range out1.Providers {
+		assert.Nil(t, p.Connection,
+			"tenant 1 must have no connections in a fresh tenant")
+	}
+	for _, p := range out2.Providers {
+		assert.Nil(t, p.Connection,
+			"tenant 2 must have no connections in a fresh tenant")
+	}
+}
+
+// TestIntegrationsConnectBadJSON verifies that malformed JSON in the
+// connect request body is rejected cleanly (not a 500).
+func TestIntegrationsConnectBadJSON(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tt := newTenant(t)
+
+	status, body := doJSONStatus(t, http.MethodPost,
+		testServerURL+"/me/integrations/github/connect",
+		tt.AccessToken, "not json")
+	assert.True(t, status == http.StatusBadRequest || status == http.StatusUnprocessableEntity,
+		"malformed JSON should return 400 or 422, got %d body=%s", status, string(body))
+}
+
+// TestIntegrationsConnectRequiresAuth verifies that the connect
+// endpoint rejects unauthenticated requests.
+func TestIntegrationsConnectRequiresAuth(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	status, _ := doJSONStatus(t, http.MethodPost,
+		testServerURL+"/me/integrations/github/connect", "", map[string]any{})
+	require.Equal(t, http.StatusUnauthorized, status)
+}
+
+// TestIntegrationsDisconnectRequiresAuth verifies that the disconnect
+// endpoint rejects unauthenticated requests.
+func TestIntegrationsDisconnectRequiresAuth(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	fakeUUID := "01961234-5678-7000-8000-000000000000"
+	status, _ := doJSONStatus(t, http.MethodDelete,
+		testServerURL+"/me/integrations/"+fakeUUID, "", nil)
+	require.Equal(t, http.StatusUnauthorized, status)
+}
+
+// TestIntegrationsDisconnectInvalidUUID verifies that a malformed UUID
+// on the disconnect endpoint returns a validation error, not 500.
+func TestIntegrationsDisconnectInvalidUUID(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tt := newTenant(t)
+
+	status, body := doJSONStatus(t, http.MethodDelete,
+		testServerURL+"/me/integrations/not-a-valid-uuid",
+		tt.AccessToken, nil)
+	assert.True(t, status >= 400 && status < 500,
+		"invalid UUID should return a 4xx error, got %d body=%s", status, string(body))
+}
+
+// TestIntegrationsListResponseShape verifies the shape of each
+// provider entry returned by the list endpoint, ensuring that the
+// contract matches what the frontend expects.
+func TestIntegrationsListResponseShape(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tt := newTenant(t)
+
+	var out struct {
+		Providers []struct {
+			Provider   string  `json:"provider"`
+			Configured bool    `json:"configured"`
+			Connection *string `json:"connection"`
+		} `json:"providers"`
+	}
+	doJSON(t, http.MethodGet, testServerURL+"/me/integrations", tt.AccessToken, nil, &out)
+	require.Len(t, out.Providers, 3)
+
+	for _, p := range out.Providers {
+		assert.NotEmpty(t, p.Provider, "provider name must be non-empty")
+		// In the test harness no OAuth credentials are configured,
+		// so configured must be false.
+		assert.False(t, p.Configured,
+			"provider %s should not be configured in test harness", p.Provider)
+		assert.Nil(t, p.Connection,
+			"fresh tenant must have no connections")
+	}
 }

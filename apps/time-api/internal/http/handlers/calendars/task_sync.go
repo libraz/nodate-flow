@@ -6,11 +6,11 @@ import (
 	"errors"
 	"time"
 
-	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
 
 	generated "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/types"
+	apierrors "github.com/nodate-flow/nodate-flow/apps/time-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/eventbus"
 )
 
@@ -31,8 +31,6 @@ type CreateEventFromTaskOutput struct {
 	Body EventResponse
 }
 
-var errTaskNotFound = huma.Error404NotFound("Task not found")
-
 // CreateEventFromTask creates a calendar event from an existing task.
 // It reads the task by public_id using a raw query (since task queries
 // belong to flow-api) and creates a linked calendar event.
@@ -49,12 +47,12 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 
 		// Viewers cannot create events.
 		if sub.Role == generated.CalendarSubscriptionsRoleViewer {
-			return nil, errForbidden
+			return nil, httpErr(apierrors.CalendarTaskSyncViewerRoleInsufficient)
 		}
 
 		taskUID, err := uuid.Parse(input.Body.TaskID)
 		if err != nil {
-			return nil, huma.Error400BadRequest("Invalid taskId format")
+			return nil, httpErr(apierrors.CalendarTaskSyncTaskIdMalformed)
 		}
 		taskPublicID := types.FromUUID(taskUID)
 
@@ -68,9 +66,9 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 		).Scan(&taskID, &title, &eventOn, &dueOn)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return nil, errTaskNotFound
+				return nil, httpErr(apierrors.CalendarTaskSyncTaskNotFound)
 			}
-			return nil, huma.Error500InternalServerError("Failed to look up task", err)
+			return nil, httpErr(apierrors.CalendarTaskSyncTaskLookupInterrupted)
 		}
 
 		// Determine timezone from request or default.
@@ -80,7 +78,7 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 		}
 		loc, locErr := time.LoadLocation(tzName)
 		if locErr != nil {
-			return nil, huma.Error400BadRequest("Invalid timezone: " + tzName)
+			return nil, httpErr(apierrors.CalendarTaskSyncTimezoneUnrecognized)
 		}
 
 		// Determine start time from task dates.
@@ -116,21 +114,21 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 
 		_, err = deps.Queries.CreateCalendarEvent(ctx, params)
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to create event from task", err)
+			return nil, httpErr(apierrors.CalendarTaskSyncStoreWriteInterrupted)
 		}
 
 		out := &CreateEventFromTaskOutput{}
 		out.Body = EventResponse{
-			ID:        eventPublicID.String(),
-			Kind:      string(generated.CalendarEventsKindEvent),
+			ID:         eventPublicID.String(),
+			Kind:       string(generated.CalendarEventsKindEvent),
 			Visibility: string(generated.CalendarEventsVisibilityDefault),
-			ShowAs:    string(generated.CalendarEventsShowAsBusy),
-			Title:     title,
-			AllDay:    false,
-			StartAt:   startAt,
-			EndAt:     endAt,
-			Timezone:  tzName,
-			CreatedAt: time.Now().UTC(),
+			ShowAs:     string(generated.CalendarEventsShowAsBusy),
+			Title:      title,
+			AllDay:     false,
+			StartAt:    startAt.Unix(),
+			EndAt:      endAt.Unix(),
+			Timezone:   tzName,
+			CreatedAt:  time.Now().UTC().Unix(),
 		}
 
 		_ = eventbus.Append(ctx, deps.DB, wsID, "calendar.event.created_from_task", &actorID, map[string]any{

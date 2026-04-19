@@ -56,7 +56,7 @@ type AdminListInstanceAuditLogsRow struct {
 	TargetWorkspacePublicID sql.NullString  `json:"targetWorkspacePublicId"`
 	TargetWorkspaceName     sql.NullString  `json:"targetWorkspaceName"`
 	TargetResourceType      sql.NullString  `json:"targetResourceType"`
-	TargetResourcePublicID  sql.NullString  `json:"targetResourcePublicId"`
+	TargetResourcePublicID  types.PublicID  `json:"targetResourcePublicId"`
 	IpAddress               sql.NullString  `json:"ipAddress"`
 	UserAgent               sql.NullString  `json:"userAgent"`
 	PayloadJson             json.RawMessage `json:"payloadJson"`

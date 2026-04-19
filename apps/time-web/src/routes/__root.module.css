@@ -1,0 +1,12 @@
+.root {
+  display: flex;
+  block-size: 100%;
+  min-block-size: 100vh;
+  flex-direction: column;
+}
+
+.main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}

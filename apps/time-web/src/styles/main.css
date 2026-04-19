@@ -1,5 +1,3 @@
-@import "tailwindcss";
-
 @import "@nodate-flow/ui/tokens/base.css";
 @import "@nodate-flow/ui/tokens/semantic.css";
 @import "@nodate-flow/ui/themes/glass-light.css";
@@ -122,71 +120,6 @@
     ), radial-gradient(ellipse at 80% 20%, rgba(120, 60, 160, 0.1) 0%, transparent 50%);
 }
 
-/* Buttons */
-.btn-primary {
-  height: 50px;
-  border-radius: var(--nf-radius-md);
-  background: var(--nf-color-accent);
-  color: var(--nf-color-fg-on-accent);
-  font-size: var(--nf-text-base);
-  font-weight: var(--nf-weight-semibold);
-  transition: opacity var(--nf-duration-fast) var(--nf-ease-standard);
-}
-
-.btn-primary:hover {
-  opacity: 0.88;
-}
-
-.btn-primary:active {
-  opacity: 0.7;
-  transform: scale(0.98);
-}
-
-.btn-primary:disabled {
-  opacity: 0.35;
-  pointer-events: none;
-}
-
-.btn-secondary {
-  height: 50px;
-  border-radius: var(--nf-radius-md);
-  background: var(--nf-color-bg-sunken);
-  color: var(--nf-color-accent);
-  font-size: var(--nf-text-base);
-  font-weight: var(--nf-weight-semibold);
-  transition: opacity var(--nf-duration-fast) var(--nf-ease-standard);
-}
-
-.btn-secondary:hover {
-  opacity: 0.88;
-}
-
-.btn-secondary:active {
-  opacity: 0.7;
-  transform: scale(0.98);
-}
-
-/* Input */
-.input-modern {
-  height: 44px;
-  border-radius: var(--nf-radius-md);
-  border: none;
-  padding: 0 var(--nf-space-4);
-  font-size: var(--nf-text-base);
-  background: var(--nf-color-bg-sunken);
-  color: var(--nf-color-fg);
-  outline: none;
-  transition: box-shadow var(--nf-duration-fast) var(--nf-ease-standard);
-}
-
-.input-modern::placeholder {
-  color: var(--nf-color-fg-subtle);
-}
-
-.input-modern:focus {
-  box-shadow: 0 0 0 3px var(--nf-color-accent-subtle);
-}
-
 /* Segmented control */
 .segmented-control {
   display: inline-flex;
@@ -215,115 +148,6 @@
 }
 
 /* --------------------------------------------------------------------------
- * Calendar scroll & week rows
- * -------------------------------------------------------------------------- */
-
-:root {
-  --week-row-h: calc((100dvh - 89px) / 6);
-}
-
-.weekday-strip {
-  background: var(--nf-cal-glass-heavy);
-  backdrop-filter: var(--nf-cal-blur);
-  -webkit-backdrop-filter: var(--nf-cal-blur);
-}
-
-.calendar-scroll {
-  scroll-snap-type: y proximity;
-  -webkit-overflow-scrolling: touch;
-}
-
-.week-row {
-  scroll-snap-align: start;
-}
-
-/* Month boundary */
-.month-boundary {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 28px;
-  scroll-snap-align: start;
-}
-
-.month-boundary::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  height: 1px;
-  background: var(--nf-color-border);
-}
-
-.month-boundary-label {
-  position: relative;
-  padding: 2px var(--nf-space-3);
-  font-size: var(--nf-text-xs);
-  font-weight: var(--nf-weight-semibold);
-  color: var(--nf-color-fg-muted);
-  background: var(--nf-cal-glass-heavy);
-  border-radius: var(--nf-radius-sm);
-  letter-spacing: 0.02em;
-}
-
-/* --- Glass: frosted pill label --- */
-[data-theme^="glass"] .month-boundary-label {
-  backdrop-filter: var(--nf-cal-blur);
-  border: 1px solid var(--nf-color-border);
-}
-
-/* --- Dotline: sharp, monospace --- */
-[data-theme^="dotline"] .month-boundary {
-  height: 24px;
-}
-
-[data-theme^="dotline"] .month-boundary::before {
-  height: 1px;
-  background: var(--nf-color-border);
-}
-
-[data-theme^="dotline"] .month-boundary-label {
-  font-family: ui-monospace, "SF Mono", monospace;
-  font-size: var(--nf-text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
-  border-radius: 0;
-  background: var(--nf-color-surface);
-  border: 1px solid var(--nf-color-border);
-}
-
-/* --- Aurora: accent-colored label --- */
-[data-theme^="aurora"] .month-boundary::before {
-  height: 2px;
-  background: linear-gradient(
-    90deg,
-    transparent 10%,
-    var(--nf-color-accent-subtle) 50%,
-    transparent 90%
-  );
-}
-
-[data-theme^="aurora"] .month-boundary-label {
-  color: var(--nf-color-accent);
-  background: var(--nf-color-surface);
-  border-radius: var(--nf-radius-pill);
-}
-
-/* Weekday strip theme variations */
-[data-theme^="dotline"] .weekday-strip {
-  background: var(--nf-color-surface);
-  backdrop-filter: none;
-  font-family: ui-monospace, "SF Mono", monospace;
-}
-
-[data-theme^="aurora"] .weekday-strip {
-  background: var(--nf-color-surface);
-  backdrop-filter: none;
-}
-
-/* --------------------------------------------------------------------------
  * Theme-specific UI/UX variations
  * -------------------------------------------------------------------------- */
 
@@ -348,28 +172,6 @@
   box-shadow: none;
 }
 
-[data-theme^="dotline"] .btn-primary {
-  border-radius: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-size: var(--nf-text-xs);
-}
-
-[data-theme^="dotline"] .btn-secondary {
-  border-radius: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-size: var(--nf-text-xs);
-  border: 1px solid var(--nf-color-border);
-  background: transparent;
-}
-
-[data-theme^="dotline"] .input-modern {
-  border-radius: 0;
-  border: 1px solid var(--nf-color-border);
-  background: transparent;
-}
-
 /* --- Aurora: organic, soft shapes --- */
 [data-theme^="aurora"] .segmented-control {
   border-radius: var(--nf-radius-pill);
@@ -377,18 +179,6 @@
 }
 
 [data-theme^="aurora"] .segmented-control button {
-  border-radius: var(--nf-radius-pill);
-}
-
-[data-theme^="aurora"] .btn-primary {
-  border-radius: var(--nf-radius-pill);
-}
-
-[data-theme^="aurora"] .btn-secondary {
-  border-radius: var(--nf-radius-pill);
-}
-
-[data-theme^="aurora"] .input-modern {
   border-radius: var(--nf-radius-pill);
 }
 

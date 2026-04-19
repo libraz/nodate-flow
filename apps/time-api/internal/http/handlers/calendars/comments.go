@@ -6,11 +6,11 @@ import (
 	"errors"
 	"time"
 
-	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
 
 	generated "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/types"
+	apierrors "github.com/nodate-flow/nodate-flow/apps/time-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/eventbus"
 )
 
@@ -25,13 +25,13 @@ type ListCommentsInput struct {
 
 // CommentResponse is the JSON representation of an event comment.
 type CommentResponse struct {
-	ID          string     `json:"id"`
-	UserID      string     `json:"userId"`
-	DisplayName string     `json:"displayName"`
-	AvatarUrl   *string    `json:"avatarUrl,omitempty"`
-	Body        string     `json:"body"`
-	EditedAt    *time.Time `json:"editedAt,omitempty"`
-	CreatedAt   time.Time  `json:"createdAt"`
+	ID          string  `json:"id"`
+	UserID      string  `json:"userId"`
+	DisplayName string  `json:"displayName"`
+	AvatarUrl   *string `json:"avatarUrl,omitempty"`
+	Body        string  `json:"body"`
+	EditedAt    *int64  `json:"editedAt,omitempty"`
+	CreatedAt   int64   `json:"createdAt"`
 }
 
 // ListCommentsOutput is the response for the list comments endpoint.
@@ -110,7 +110,7 @@ func ListComments(deps Deps) func(context.Context, *ListCommentsInput) (*ListCom
 
 		rows, err := deps.Queries.ListCalendarEventComments(ctx, evt.ID)
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to list comments", err)
+			return nil, httpErr(apierrors.CalendarCommentListQueryInterrupted)
 		}
 
 		out := &ListCommentsOutput{}
@@ -121,13 +121,13 @@ func ListComments(deps Deps) func(context.Context, *ListCommentsInput) (*ListCom
 				UserID:      r.UserPublicID.String(),
 				DisplayName: r.DisplayName,
 				Body:        r.Body,
-				CreatedAt:   r.CreatedAt,
+				CreatedAt:   r.CreatedAt.Unix(),
 			}
 			if r.AvatarUrl.Valid {
 				resp.AvatarUrl = &r.AvatarUrl.String
 			}
 			if r.EditedAt.Valid {
-				resp.EditedAt = &r.EditedAt.Time
+				resp.EditedAt = int64Ptr(r.EditedAt.Time.Unix())
 			}
 			out.Body.Comments[i] = resp
 		}
@@ -161,12 +161,12 @@ func CreateComment(deps Deps) func(context.Context, *CreateCommentInput) (*Creat
 			Body:        input.Body.Body,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to create comment", err)
+			return nil, httpErr(apierrors.CalendarCommentStoreWriteInterrupted)
 		}
 
 		profile, err := deps.Queries.FindUserProfileById(ctx, actorID)
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to get user profile", err)
+			return nil, httpErr(apierrors.CalendarUserProfileLookupInterrupted)
 		}
 
 		out := &CreateCommentOutput{}
@@ -175,7 +175,7 @@ func CreateComment(deps Deps) func(context.Context, *CreateCommentInput) (*Creat
 			UserID:      profile.PublicID.String(),
 			DisplayName: profile.DisplayName,
 			Body:        input.Body.Body,
-			CreatedAt:   time.Now().UTC(),
+			CreatedAt:   time.Now().UTC().Unix(),
 		}
 		if profile.AvatarUrl.Valid {
 			out.Body.AvatarUrl = &profile.AvatarUrl.String
@@ -210,7 +210,7 @@ func EditComment(deps Deps) func(context.Context, *EditCommentInput) (*EditComme
 
 		commentUID, err := uuid.Parse(input.CId)
 		if err != nil {
-			return nil, huma.Error404NotFound("Comment not found")
+			return nil, httpErr(apierrors.CalendarCommentNotFound)
 		}
 
 		err = deps.Queries.UpdateCalendarEventComment(ctx, generated.UpdateCalendarEventCommentParams{
@@ -220,7 +220,7 @@ func EditComment(deps Deps) func(context.Context, *EditCommentInput) (*EditComme
 			AuthorID: actorID,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to update comment", err)
+			return nil, httpErr(apierrors.CalendarCommentStoreWriteInterrupted)
 		}
 
 		_ = eventbus.Append(ctx, deps.DB, wsID, "calendar.event.comment.updated", &actorID, map[string]any{
@@ -254,7 +254,7 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteCommentInput) (*Delet
 
 		commentUID, err := uuid.Parse(input.CId)
 		if err != nil {
-			return nil, huma.Error404NotFound("Comment not found")
+			return nil, httpErr(apierrors.CalendarCommentNotFound)
 		}
 
 		comment, err := deps.Queries.FindCalendarEventCommentByPublicId(ctx, generated.FindCalendarEventCommentByPublicIdParams{
@@ -263,15 +263,15 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteCommentInput) (*Delet
 		})
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return nil, huma.Error404NotFound("Comment not found")
+				return nil, httpErr(apierrors.CalendarCommentNotFound)
 			}
-			return nil, huma.Error500InternalServerError("Failed to find comment", err)
+			return nil, httpErr(apierrors.CalendarCommentStoreReadInterrupted)
 		}
 
 		isAuthor := comment.AuthorID == actorID
 		isCalOwner := sub.Role == generated.CalendarSubscriptionsRoleOwner
 		if !isAuthor && !isCalOwner {
-			return nil, errForbidden
+			return nil, httpErr(apierrors.CalendarCommentAuthorOrOwnerRequired)
 		}
 
 		err = deps.Queries.DisableCalendarEventComment(ctx, generated.DisableCalendarEventCommentParams{
@@ -279,7 +279,7 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteCommentInput) (*Delet
 			EventID:  evt.ID,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to delete comment", err)
+			return nil, httpErr(apierrors.CalendarCommentStoreDeleteInterrupted)
 		}
 
 		out := &DeleteCommentOutput{}

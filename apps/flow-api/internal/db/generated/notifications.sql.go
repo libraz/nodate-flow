@@ -95,7 +95,7 @@ type CreateNotificationParams struct {
 	ActorUserID      sql.NullInt32         `json:"-"`
 	EventType        string                `json:"eventType"`
 	ResourceType     string                `json:"resourceType"`
-	ResourcePublicID sql.NullString        `json:"resourcePublicId"`
+	ResourcePublicID types.PublicID        `json:"resourcePublicId"`
 	Title            string                `json:"title"`
 	Body             sql.NullString        `json:"body"`
 	Severity         NotificationsSeverity `json:"severity"`
@@ -167,7 +167,7 @@ type ListNotificationsForUserRow struct {
 	ActorDisplayName  sql.NullString        `json:"actorDisplayName"`
 	EventType         string                `json:"eventType"`
 	ResourceType      string                `json:"resourceType"`
-	ResourcePublicID  sql.NullString        `json:"resourcePublicId"`
+	ResourcePublicID  types.PublicID        `json:"resourcePublicId"`
 	Title             string                `json:"title"`
 	Body              sql.NullString        `json:"body"`
 	Severity          NotificationsSeverity `json:"severity"`
@@ -267,7 +267,7 @@ type ListNotificationsForWorkspaceRow struct {
 	ActorDisplayName  sql.NullString        `json:"actorDisplayName"`
 	EventType         string                `json:"eventType"`
 	ResourceType      string                `json:"resourceType"`
-	ResourcePublicID  sql.NullString        `json:"resourcePublicId"`
+	ResourcePublicID  types.PublicID        `json:"resourcePublicId"`
 	Title             string                `json:"title"`
 	Body              sql.NullString        `json:"body"`
 	Severity          NotificationsSeverity `json:"severity"`

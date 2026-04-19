@@ -7,6 +7,7 @@
  * (see api.ts — backend transitions go through the constraint engine).
  */
 
+import { cx } from '@nodate-flow/ui/lib/cx';
 import Card from '@nodate-flow/ui/primitives/card';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { useNavigate } from '@tanstack/react-router';
@@ -25,6 +26,7 @@ import {
   useTransitionTask,
 } from './api';
 import { STATE_KEY } from './constants';
+import css from './task-board-view.module.css';
 import TaskCard from './task-card';
 import { useTaskFilters } from './use-task-filters';
 
@@ -170,16 +172,8 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
     <div
       role="region"
       aria-label={t('tasks.views.board')}
-      style={{
-        display: 'grid',
-        gridAutoFlow: 'column',
-        gridAutoColumns: 'minmax(12rem, 1fr)',
-        gridTemplateColumns: `repeat(${TASK_STATES.length}, minmax(12rem, 1fr))`,
-        gap: '1rem',
-        overflowX: 'auto',
-        paddingBlockEnd: '1rem',
-        maxInlineSize: '100%',
-      }}
+      className={css.board}
+      style={{ '--col-count': TASK_STATES.length } as React.CSSProperties}
     >
       {TASK_STATES.map((state) => {
         const items = groups[state];
@@ -188,6 +182,7 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
           <section
             key={state}
             aria-label={t(STATE_KEY[state])}
+            className={css.column}
             onDragEnter={(e) => {
               handleDragEnter(e, state);
             }}
@@ -200,12 +195,6 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
             onDrop={(e) => {
               handleDrop(e, state);
             }}
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.75rem',
-              minBlockSize: '24rem',
-            }}
           >
             <Card
               style={{
@@ -214,51 +203,18 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
                 borderColor: isHover ? 'var(--nf-color-accent)' : undefined,
               }}
             >
-              <header
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                }}
-              >
-                <span style={{ fontWeight: 600 }}>{t(STATE_KEY[state])}</span>
-                <span
-                  style={{ color: 'var(--nf-color-fg-muted)', fontVariantNumeric: 'tabular-nums' }}
-                >
-                  {items.length}
-                </span>
+              <header className={css.columnHeader}>
+                <span className={css.columnHeaderLabel}>{t(STATE_KEY[state])}</span>
+                <span className={css.columnHeaderCount}>{items.length}</span>
               </header>
             </Card>
             <div
               role="list"
               aria-label={t(STATE_KEY[state])}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.75rem',
-                padding: '0.25rem',
-                border: isHover ? '2px dashed var(--nf-color-accent)' : '2px dashed transparent',
-                borderRadius: '0.75rem',
-                minBlockSize: '6rem',
-                transition: 'border-color 120ms ease',
-              }}
+              className={cx(css.dropZone, isHover && css.dropZoneHover)}
             >
               {items.length === 0 ? (
-                <p
-                  style={{
-                    margin: 0,
-                    padding: '1.25rem 0.75rem',
-                    textAlign: 'center',
-                    color: 'var(--nf-color-fg-muted, var(--nf-color-fg-muted))',
-                    fontSize: '0.8125rem',
-                    border: '1px dashed var(--nf-color-border, var(--nf-color-border))',
-                    borderRadius: '0.5rem',
-                    background: 'var(--nf-color-bg-sunken, transparent)',
-                  }}
-                >
-                  {t('tasks.board.empty_column')}
-                </p>
+                <p className={css.emptyColumn}>{t('tasks.board.empty_column')}</p>
               ) : (
                 items.map((task) => (
                   <div key={task.id} role="listitem">

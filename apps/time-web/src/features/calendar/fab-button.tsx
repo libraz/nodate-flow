@@ -2,28 +2,21 @@ import { Plus } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useCalendarUiStore } from '../../stores/calendar-ui-store';
+import { useCalendarUi } from '../../stores/calendar-ui-store';
+import styles from './fab-button.module.css';
 
 export default function FabButton(): ReactElement {
   const { t } = useTranslation();
-  const openEventModal = useCalendarUiStore((s) => s.openEventModal);
+  const openEventModal = useCalendarUi((s) => s.openEventModal);
 
   return (
     <button
       type="button"
       onClick={() => openEventModal()}
-      className="fab-button fixed z-20 flex h-14 w-14 items-center justify-center transition-transform hover:scale-105 active:scale-90 sm:hidden"
-      style={{
-        bottom: 'calc(60px + env(safe-area-inset-bottom))',
-        right: '16px',
-        borderRadius: 'var(--nf-radius-lg, 20px)',
-        background: 'var(--nf-color-accent)',
-        color: '#ffffff',
-        boxShadow: 'var(--nf-shadow-lg)',
-      }}
+      className={styles.fab}
       aria-label={t('calendar.createNewEvent')}
     >
-      <Plus className="h-6 w-6" />
+      <Plus size={24} />
     </button>
   );
 }

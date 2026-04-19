@@ -6,11 +6,11 @@ import (
 	"errors"
 	"time"
 
-	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
 
 	generated "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/types"
+	apierrors "github.com/nodate-flow/nodate-flow/apps/time-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/eventbus"
 )
 
@@ -34,7 +34,7 @@ type AttendeeResponse struct {
 	AvatarUrl   *string `json:"avatarUrl,omitempty"`
 	Rsvp        string  `json:"rsvp"`
 	CanEdit     bool    `json:"canEdit"`
-	CreatedAt   time.Time `json:"createdAt"`
+	CreatedAt   int64   `json:"createdAt"`
 }
 
 // AddAttendeesOutput is the response for the add attendees endpoint.
@@ -141,7 +141,7 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 
 		// Only the event owner or calendar owner/manager can add attendees.
 		if evt.OwnerUserID != actorID && !isOwnerOrManager(sub) {
-			return nil, errForbidden
+			return nil, httpErr(apierrors.CalendarEventEditPermissionRequired)
 		}
 
 		out := &AddAttendeesOutput{}
@@ -181,7 +181,7 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 				DisplayName: profile.DisplayName,
 				Rsvp:        string(generated.CalendarEventAttendeesRsvpPending),
 				CanEdit:     false,
-				CreatedAt:   time.Now().UTC(),
+				CreatedAt:   time.Now().UTC().Unix(),
 			}
 			if profile.AvatarUrl.Valid {
 				resp.AvatarUrl = &profile.AvatarUrl.String
@@ -218,16 +218,16 @@ func RemoveAttendee(deps Deps) func(context.Context, *RemoveAttendeeInput) (*Rem
 		}
 
 		if evt.OwnerUserID != actorID && !isOwnerOrManager(sub) {
-			return nil, errForbidden
+			return nil, httpErr(apierrors.CalendarEventEditPermissionRequired)
 		}
 
 		targetUID, err := uuid.Parse(input.UserId)
 		if err != nil {
-			return nil, huma.Error400BadRequest("Invalid user ID")
+			return nil, httpErr(apierrors.CalendarAttendeeUserIdMalformed)
 		}
 		targetUserID, err := deps.Queries.FindUserInternalIdByPublicId(ctx, types.FromUUID(targetUID))
 		if err != nil {
-			return nil, huma.Error404NotFound("User not found")
+			return nil, httpErr(apierrors.CalendarAttendeeUserNotFound)
 		}
 
 		err = deps.Queries.DisableCalendarEventAttendee(ctx, generated.DisableCalendarEventAttendeeParams{
@@ -235,7 +235,7 @@ func RemoveAttendee(deps Deps) func(context.Context, *RemoveAttendeeInput) (*Rem
 			UserID:  targetUserID,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to remove attendee", err)
+			return nil, httpErr(apierrors.CalendarAttendeeStoreRemoveInterrupted)
 		}
 
 		_ = eventbus.Append(ctx, deps.DB, wsID, "calendar.event.attendee.removed", &actorID, map[string]any{
@@ -273,7 +273,7 @@ func UpdateRsvp(deps Deps) func(context.Context, *UpdateRsvpInput) (*UpdateRsvpO
 			UserID:  actorID,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to update RSVP", err)
+			return nil, httpErr(apierrors.CalendarAttendeeRsvpUpdateInterrupted)
 		}
 
 		out := &UpdateRsvpOutput{}
@@ -308,16 +308,16 @@ func ToggleCanEdit(deps Deps) func(context.Context, *ToggleCanEditInput) (*Toggl
 		}
 
 		if evt.OwnerUserID != actorID {
-			return nil, errForbidden
+			return nil, httpErr(apierrors.CalendarAttendeeOwnerRequiredToToggleEdit)
 		}
 
 		targetUID, err := uuid.Parse(input.UserId)
 		if err != nil {
-			return nil, huma.Error400BadRequest("Invalid user ID")
+			return nil, httpErr(apierrors.CalendarAttendeeUserIdMalformed)
 		}
 		targetUserID, err := deps.Queries.FindUserInternalIdByPublicId(ctx, types.FromUUID(targetUID))
 		if err != nil {
-			return nil, huma.Error404NotFound("User not found")
+			return nil, httpErr(apierrors.CalendarAttendeeUserNotFound)
 		}
 
 		err = deps.Queries.UpdateAttendeeCanEdit(ctx, generated.UpdateAttendeeCanEditParams{
@@ -326,7 +326,7 @@ func ToggleCanEdit(deps Deps) func(context.Context, *ToggleCanEditInput) (*Toggl
 			UserID:  targetUserID,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to update can_edit", err)
+			return nil, httpErr(apierrors.CalendarAttendeeCanEditUpdateInterrupted)
 		}
 
 		out := &ToggleCanEditOutput{}

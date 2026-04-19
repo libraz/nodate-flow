@@ -6,9 +6,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/danielgtaylor/huma/v2"
-
+	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/auth"
 	generated "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/generated"
+	apierrors "github.com/nodate-flow/nodate-flow/apps/time-api/internal/errors"
 )
 
 // --- Input/Output types ---
@@ -20,13 +20,13 @@ type GetSharePageInput struct {
 
 // SharePageResponse is the JSON representation of a calendar share page.
 type SharePageResponse struct {
-	CalendarID    string     `json:"calendarId"`
-	CalendarName  string     `json:"calendarName"`
-	CalendarKind  string     `json:"calendarKind"`
-	CalendarColor string     `json:"calendarColor"`
-	Role          string     `json:"role"`
-	ExpiresAt     *time.Time `json:"expiresAt,omitempty"`
-	MemberCount   int64      `json:"memberCount"`
+	CalendarID    string `json:"calendarId"`
+	CalendarName  string `json:"calendarName"`
+	CalendarKind  string `json:"calendarKind"`
+	CalendarColor string `json:"calendarColor"`
+	Role          string `json:"role"`
+	ExpiresAt     *int64 `json:"expiresAt,omitempty"`
+	MemberCount   int64  `json:"memberCount"`
 }
 
 // GetSharePageOutput is the response for the share page endpoint.
@@ -53,12 +53,12 @@ type GetShareEventsOutput struct {
 // GetSharePage returns the public-facing calendar preview for an invite token.
 func GetSharePage(deps Deps) func(context.Context, *GetSharePageInput) (*GetSharePageOutput, error) {
 	return func(ctx context.Context, input *GetSharePageInput) (*GetSharePageOutput, error) {
-		row, err := deps.Queries.FindCalendarInviteByTokenPublic(ctx, input.Token)
+		row, err := deps.Queries.FindCalendarInviteByTokenHashPublic(ctx, auth.HashOpaque(input.Token))
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, errInviteNotFound
 			}
-			return nil, huma.Error500InternalServerError("Failed to look up invite", err)
+			return nil, httpErr(apierrors.CalendarInviteStoreLookupInterrupted)
 		}
 
 		out := &GetSharePageOutput{}
@@ -71,7 +71,7 @@ func GetSharePage(deps Deps) func(context.Context, *GetSharePageInput) (*GetShar
 			MemberCount:   row.MemberCount,
 		}
 		if row.ExpiresAt.Valid {
-			out.Body.ExpiresAt = &row.ExpiresAt.Time
+			out.Body.ExpiresAt = int64Ptr(row.ExpiresAt.Time.Unix())
 		}
 		return out, nil
 	}
@@ -80,12 +80,12 @@ func GetSharePage(deps Deps) func(context.Context, *GetSharePageInput) (*GetShar
 // GetShareEvents returns events visible through an invite token.
 func GetShareEvents(deps Deps) func(context.Context, *GetShareEventsInput) (*GetShareEventsOutput, error) {
 	return func(ctx context.Context, input *GetShareEventsInput) (*GetShareEventsOutput, error) {
-		invite, err := deps.Queries.FindCalendarInviteByToken(ctx, input.Token)
+		invite, err := deps.Queries.FindCalendarInviteByTokenHash(ctx, auth.HashOpaque(input.Token))
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, errInviteNotFound
 			}
-			return nil, huma.Error500InternalServerError("Failed to look up invite", err)
+			return nil, httpErr(apierrors.CalendarInviteStoreLookupInterrupted)
 		}
 
 		if err := validateInvite(invite.ExpiresAt, invite.MaxUses, invite.UseCount); err != nil {
@@ -98,7 +98,7 @@ func GetShareEvents(deps Deps) func(context.Context, *GetShareEventsInput) (*Get
 			EndAt:      input.Start,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to list events", err)
+			return nil, httpErr(apierrors.CalendarEventListQueryInterrupted)
 		}
 
 		out := &GetShareEventsOutput{}

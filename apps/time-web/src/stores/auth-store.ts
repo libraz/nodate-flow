@@ -1,31 +1,52 @@
-import { create } from 'zustand';
+/**
+ * Auth slice (Zustand). Holds the in-memory access token and the
+ * authenticated user profile. The access token is intentionally NOT
+ * persisted to localStorage; on a fresh page load we re-establish the
+ * session via the httpOnly nf_rt refresh cookie.
+ */
 
-interface User {
+import { useStore } from 'zustand';
+import { createStore } from 'zustand/vanilla';
+
+/** Authenticated user profile returned by GET /me. */
+export interface AuthUser {
   id: string;
   email: string;
   displayName: string;
 }
 
-interface AuthState {
+export interface AuthState {
   accessToken: string | null;
-  user: User | null;
-  isAuthenticated: boolean;
-  setAuth: (token: string, user: User) => void;
-  clearAuth: () => void;
-  setUser: (user: User) => void;
+  user: AuthUser | null;
+  setSession: (token: string, user: AuthUser) => void;
+  setAccessToken: (token: string) => void;
+  clearSession: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  accessToken: localStorage.getItem('nt_token'),
+/**
+ * Vanilla store, exported so non-React modules (e.g. the API client
+ * middleware) can read the access token without going through React.
+ */
+export const authStore = createStore<AuthState>((set) => ({
+  accessToken: null,
   user: null,
-  isAuthenticated: !!localStorage.getItem('nt_token'),
-  setAuth: (token, user) => {
-    localStorage.setItem('nt_token', token);
-    set({ accessToken: token, user, isAuthenticated: true });
+  setSession: (token, user) => {
+    set({ accessToken: token, user });
   },
-  setUser: (user) => set({ user }),
-  clearAuth: () => {
-    localStorage.removeItem('nt_token');
-    set({ accessToken: null, user: null, isAuthenticated: false });
+  setAccessToken: (token) => {
+    set({ accessToken: token });
+  },
+  clearSession: () => {
+    set({ accessToken: null, user: null });
   },
 }));
+
+/** React hook with selector. Always pass a selector to avoid over-rendering. */
+export function useAuth<T>(selector: (state: AuthState) => T): T {
+  return useStore(authStore, selector);
+}
+
+/** Convenience selectors. */
+export const selectAccessToken = (s: AuthState): string | null => s.accessToken;
+export const selectUser = (s: AuthState): AuthUser | null => s.user;
+export const selectIsAuthenticated = (s: AuthState): boolean => s.accessToken !== null;

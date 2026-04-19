@@ -1,5 +1,12 @@
+/**
+ * Calendar UI slice (Zustand). Controls navigation, view state, modals,
+ * panels, and theme for the calendar app. Uses vanilla createStore so
+ * non-React code can access state when needed.
+ */
+
 import { DateTime } from 'luxon';
-import { create } from 'zustand';
+import { useStore } from 'zustand';
+import { createStore } from 'zustand/vanilla';
 
 import {
   type ColorMode,
@@ -10,13 +17,13 @@ import {
   loadPreference,
   savePreference,
 } from '../lib/theme';
-import { useAuthStore } from './auth-store';
+import { authStore } from './auth-store';
 
 const AUTH_API_URL = import.meta.env.VITE_AUTH_API_BASE_URL ?? 'http://localhost:8082';
 
 /** Fire-and-forget server sync of theme preference. */
 function syncThemeToServer(theme: Theme, colorMode: ColorMode): void {
-  const token = useAuthStore.getState().accessToken;
+  const token = authStore.getState().accessToken;
   if (!token) return;
   const pref = combinePreference(theme, colorMode);
   void fetch(`${AUTH_API_URL}/me`, {
@@ -34,7 +41,7 @@ export type CalendarView = 'month' | 'week';
 export type RightPanel = 'memo' | 'members' | 'share' | 'notifications';
 export type MobileTab = 'calendar' | 'memo' | 'search' | 'settings';
 
-interface CalendarUiState {
+export interface CalendarUiState {
   selectedDate: DateTime;
   displayMonth: DateTime;
   currentView: CalendarView;
@@ -82,7 +89,10 @@ interface CalendarUiState {
   setColorMode: (mode: ColorMode) => void;
 }
 
-export const useCalendarUiStore = create<CalendarUiState>((set) => ({
+/**
+ * Vanilla store, exported so non-React code can read calendar UI state.
+ */
+export const calendarUiStore = createStore<CalendarUiState>((set) => ({
   selectedDate: DateTime.now(),
   displayMonth: DateTime.now().startOf('month'),
   currentView: 'month',
@@ -190,3 +200,8 @@ export const useCalendarUiStore = create<CalendarUiState>((set) => ({
     });
   },
 }));
+
+/** React hook with selector. Always pass a selector to avoid over-rendering. */
+export function useCalendarUi<T>(selector: (state: CalendarUiState) => T): T {
+  return useStore(calendarUiStore, selector);
+}

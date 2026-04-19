@@ -14,6 +14,16 @@ export interface EventCardProps {
   event: TimelineEvent;
 }
 
+/** Brand colors for external sources and event categories (fixed, not theme-dependent). */
+const SOURCE_COLOR = {
+  github: '#6e5494',
+  slack: '#4a154b',
+  google: '#4285f4',
+  signal: '#0ea5e9',
+  ai: '#10b981',
+  task: '#f59e0b',
+} as const;
+
 /**
  * eventSourceTag returns a short category label derived from the event
  * type prefix. It powers the 4.WEB-1 timeline source-mix color coding
@@ -34,16 +44,17 @@ export function eventSourceTag(
       payload && typeof payload === 'object' && 'source' in payload
         ? String((payload as { source?: unknown }).source ?? '')
         : '';
-    if (src === 'github') return { label: 'github', color: '#6e5494' };
-    if (src === 'slack') return { label: 'slack', color: '#4a154b' };
-    if (src === 'google' || src === 'webhook') return { label: 'google', color: '#4285f4' };
-    return { label: 'signal', color: '#0ea5e9' };
+    if (src === 'github') return { label: 'github', color: SOURCE_COLOR.github };
+    if (src === 'slack') return { label: 'slack', color: SOURCE_COLOR.slack };
+    if (src === 'google' || src === 'webhook')
+      return { label: 'google', color: SOURCE_COLOR.google };
+    return { label: 'signal', color: SOURCE_COLOR.signal };
   }
   if (type.startsWith('ai.') || type.startsWith('mcp.')) {
-    return { label: 'ai', color: '#10b981' };
+    return { label: 'ai', color: SOURCE_COLOR.ai };
   }
   if (type.startsWith('task.')) {
-    return { label: 'task', color: '#f59e0b' };
+    return { label: 'task', color: SOURCE_COLOR.task };
   }
   return { label: 'system', color: 'var(--nf-color-fg-muted)' };
 }

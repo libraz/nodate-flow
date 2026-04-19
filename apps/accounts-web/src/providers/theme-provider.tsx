@@ -7,6 +7,7 @@ import {
   useState,
 } from 'react';
 
+import { sdk } from '../lib/sdk';
 import { authStore } from '../stores/auth-store';
 
 /** Concrete theme names (no `system`). */
@@ -37,7 +38,26 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 const storageKey = 'nf.theme';
 
+/**
+ * Legacy / foreign theme keys that may exist in localStorage from prior
+ * implementations or sibling tools sharing the dev origin. We proactively
+ * clear them on boot so only `nf.theme` is authoritative.
+ */
+const legacyThemeKeys = ['libsonare-theme', 'vitepress-theme-appearance'] as const;
+
+function clearLegacyThemeKeys(): void {
+  if (typeof window === 'undefined') return;
+  for (const key of legacyThemeKeys) {
+    try {
+      window.localStorage.removeItem(key);
+    } catch {
+      // ignore
+    }
+  }
+}
+
 function readStored(): ThemePreference {
+  clearLegacyThemeKeys();
   try {
     const v = localStorage.getItem(storageKey);
     if (v === 'system') return 'system';
@@ -99,7 +119,18 @@ export function ThemeProvider({ children }: { children: ReactNode }): ReactEleme
     } catch {
       // ignore
     }
-  }, [preference]);
+    // Background-sync to the server when authenticated. Fire-and-forget;
+    // the form-driven path is the source of truth for explicit saves.
+    if (hydratedFromUser && authStore.getState().accessToken) {
+      void sdk
+        .PATCH('/auth/me', {
+          body: { themePreference: preference },
+        })
+        .catch(() => {
+          // ignore — local state is the fast path
+        });
+    }
+  }, [preference, hydratedFromUser]);
 
   useEffect(() => {
     if (preference !== 'system') return;

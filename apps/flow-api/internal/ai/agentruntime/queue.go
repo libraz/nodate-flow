@@ -15,8 +15,8 @@ type Run struct {
 	// DedupeKey prevents double-enqueue across scheduler replicas. A
 	// typical shape is "<agentId>:<scheduledAt.Unix()>". Queues MUST
 	// reject a second Enqueue with the same key.
-	DedupeKey string
-	Job       Job
+	DedupeKey   string
+	Job         Job
 	ScheduledAt time.Time
 	Attempts    int
 }

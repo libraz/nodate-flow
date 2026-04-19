@@ -124,4 +124,3 @@ func (s *metricsStatusCapture) Unwrap() http.ResponseWriter {
 // ensure interface compliance at compile time.
 var _ http.ResponseWriter = (*metricsStatusCapture)(nil)
 var _ http.Flusher = (*metricsStatusCapture)(nil)
-

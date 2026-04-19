@@ -513,13 +513,13 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
           <div className={css.headerCell} role="columnheader">
             {t('tasks.columns.priority')}
           </div>
-          <div className={css.headerCell} role="columnheader">
+          <div className={`${css.headerCell} ${css.colAssignee}`} role="columnheader">
             {t('tasks.columns.assignee')}
           </div>
-          <div className={css.headerCell} role="columnheader">
+          <div className={`${css.headerCell} ${css.colDue}`} role="columnheader">
             {t('tasks.columns.due')}
           </div>
-          <div className={css.headerCell} role="columnheader">
+          <div className={`${css.headerCell} ${css.colUpdated}`} role="columnheader">
             {t('tasks.columns.updated')}
           </div>
         </div>
@@ -610,13 +610,16 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
                   </div>
 
                   {/* Assignee */}
-                  <div className={cellClassName(rowIdx, 'assignee', false)} role="gridcell">
+                  <div
+                    className={`${cellClassName(rowIdx, 'assignee', false)} ${css.colAssignee}`}
+                    role="gridcell"
+                  >
                     {renderAssigneeCell(task)}
                   </div>
 
                   {/* Due */}
                   <div
-                    className={cellClassName(rowIdx, 'due', true)}
+                    className={`${cellClassName(rowIdx, 'due', true)} ${css.colDue}`}
                     role="gridcell"
                     onClick={() => startEdit(rowIdx, 'due')}
                     onKeyDown={(e) => {
@@ -631,7 +634,7 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
                   </div>
 
                   {/* Updated */}
-                  <div className={css.cell} role="gridcell">
+                  <div className={`${css.cell} ${css.colUpdated}`} role="gridcell">
                     {renderUpdatedCell(task)}
                   </div>
                 </div>

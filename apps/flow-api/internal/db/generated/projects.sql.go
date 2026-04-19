@@ -324,7 +324,8 @@ UPDATE projects
 SET name = ?,
     slug = ?,
     description = ?
-WHERE public_id = ?
+WHERE workspace_id = ?
+  AND public_id = ?
   AND enabled = TRUE
 `
 
@@ -332,6 +333,7 @@ type UpdateProjectFullParams struct {
 	Name        string         `json:"name"`
 	Slug        string         `json:"slug"`
 	Description sql.NullString `json:"description"`
+	WorkspaceID uint32         `json:"-"`
 	PublicID    types.PublicID `json:"publicId"`
 }
 
@@ -341,6 +343,7 @@ func (q *Queries) UpdateProjectFull(ctx context.Context, arg UpdateProjectFullPa
 		arg.Name,
 		arg.Slug,
 		arg.Description,
+		arg.WorkspaceID,
 		arg.PublicID,
 	)
 	return err

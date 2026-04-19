@@ -4,9 +4,14 @@ import { Calendar as CalendarIcon } from 'lucide-react';
 import { DateTime } from 'luxon';
 import type { ReactElement } from 'react';
 
+import Button from '@nodate-flow/ui/primitives/button';
+import Card from '@nodate-flow/ui/primitives/card';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
+
 import { useAcceptInviteMutation } from '../../features/calendar/api';
-import { api } from '../../lib/api-client';
-import { useAuthStore } from '../../stores/auth-store';
+import { toApiError } from '../../lib/api-error';
+import { sdk } from '../../lib/sdk';
+import { selectIsAuthenticated, useAuth } from '../../stores/auth-store';
 
 interface SharedCalendar {
   id: string;
@@ -25,15 +30,31 @@ interface SharedEvent {
 function useShareCalendarQuery(token: string) {
   return useQuery({
     queryKey: ['share', token, 'calendar'],
-    queryFn: () => api.get<SharedCalendar>(`/share/${token}`),
+    queryFn: async () => {
+      const result = await sdk.GET('/share/{token}', {
+        params: { path: { token } },
+      });
+      if (result.error || !result.data) {
+        throw toApiError(result.error, 'Failed to fetch shared calendar');
+      }
+      return result.data as SharedCalendar;
+    },
   });
 }
 
 function useShareEventsQuery(token: string) {
   return useQuery({
     queryKey: ['share', token, 'events'],
-    queryFn: () =>
-      api.get<{ events: SharedEvent[] }>(`/share/${token}/events`).then((r) => r.events),
+    queryFn: async () => {
+      const result = await sdk.GET('/share/{token}/events', {
+        params: { path: { token } },
+      });
+      if (result.error || !result.data) {
+        throw toApiError(result.error, 'Failed to fetch shared events');
+      }
+      const body = result.data as { events: SharedEvent[] };
+      return body.events;
+    },
   });
 }
 
@@ -43,25 +64,46 @@ export const Route = createFileRoute('/share/$token')({
 
 function SharePage(): ReactElement {
   const { token } = Route.useParams();
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isAuthenticated = useAuth(selectIsAuthenticated);
   const { data: calendar, isLoading: calLoading, error: calError } = useShareCalendarQuery(token);
   const { data: events, isLoading: eventsLoading } = useShareEventsQuery(token);
   const acceptMutation = useAcceptInviteMutation();
 
   if (calLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-gray-500">Loading shared calendar...</p>
+      <div
+        style={{
+          display: 'flex',
+          minHeight: '100vh',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <p style={{ color: 'var(--nf-color-fg-muted)' }}>Loading shared calendar...</p>
       </div>
     );
   }
 
   if (calError || !calendar) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4">
-        <CalendarIcon className="h-12 w-12 text-gray-300" />
-        <p className="text-gray-500">This shared calendar link is invalid or has expired.</p>
-        <Link to="/login" className="text-sm text-blue-600 hover:underline">
+      <div
+        style={{
+          display: 'flex',
+          minHeight: '100vh',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 'var(--nf-space-4)',
+        }}
+      >
+        <CalendarIcon size={48} style={{ color: 'var(--nf-color-fg-subtle)' }} />
+        <p style={{ color: 'var(--nf-color-fg-muted)' }}>
+          This shared calendar link is invalid or has expired.
+        </p>
+        <Link
+          to="/login"
+          style={{ fontSize: 'var(--nf-text-sm)', color: 'var(--nf-color-accent)' }}
+        >
           Sign in
         </Link>
       </div>
@@ -77,30 +119,60 @@ function SharePage(): ReactElement {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="border-b border-gray-200 bg-white px-4 py-4">
-        <div className="mx-auto flex max-w-3xl items-center justify-between">
-          <div className="flex items-center gap-3">
+    <div style={{ minHeight: '100vh', backgroundColor: 'var(--nf-color-bg)' }}>
+      <header
+        style={{
+          borderBlockEnd: '1px solid var(--nf-color-border)',
+          backgroundColor: 'var(--nf-color-bg-elevated)',
+          padding: 'var(--nf-space-4)',
+        }}
+      >
+        <div
+          style={{
+            maxWidth: '48rem',
+            marginInline: 'auto',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-3)' }}>
             <div
-              className="h-4 w-4 rounded-full"
-              style={{ backgroundColor: calendar.color || '#3b82f6' }}
+              style={{
+                width: '1rem',
+                height: '1rem',
+                borderRadius: 'var(--nf-radius-pill)',
+                backgroundColor: calendar.color || 'var(--nf-color-accent)',
+              }}
             />
-            <h1 className="text-lg font-semibold">{calendar.name}</h1>
+            <h1 style={{ fontSize: 'var(--nf-text-lg)', fontWeight: 'var(--nf-weight-semibold)' }}>
+              {calendar.name}
+            </h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-2)' }}>
             {isAuthenticated ? (
-              <button
-                type="button"
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={handleJoin}
                 disabled={acceptMutation.isPending}
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 {acceptMutation.isPending ? 'Joining...' : 'Join Calendar'}
-              </button>
+              </Button>
             ) : (
               <Link
                 to="/login"
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  borderRadius: 'var(--nf-radius-md)',
+                  backgroundColor: 'var(--nf-color-accent)',
+                  color: 'var(--nf-color-fg-on-accent)',
+                  padding: 'var(--nf-space-2) var(--nf-space-4)',
+                  fontSize: 'var(--nf-text-sm)',
+                  fontWeight: 'var(--nf-weight-medium)',
+                  textDecoration: 'none',
+                }}
               >
                 Sign in to join
               </Link>
@@ -109,44 +181,86 @@ function SharePage(): ReactElement {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 py-6">
+      <main
+        style={{
+          maxWidth: '48rem',
+          marginInline: 'auto',
+          padding: 'var(--nf-space-6) var(--nf-space-4)',
+        }}
+      >
         {acceptMutation.isSuccess ? (
-          <div className="mb-4 rounded-md bg-green-50 px-4 py-3 text-sm text-green-700">
+          <div
+            style={{
+              marginBlockEnd: 'var(--nf-space-4)',
+              borderRadius: 'var(--nf-radius-md)',
+              backgroundColor: 'var(--nf-color-success-subtle)',
+              color: 'var(--nf-color-success)',
+              padding: 'var(--nf-space-3) var(--nf-space-4)',
+              fontSize: 'var(--nf-text-sm)',
+            }}
+          >
             Successfully joined the calendar! Redirecting...
           </div>
         ) : null}
 
         {acceptMutation.isError ? (
-          <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div
+            style={{
+              marginBlockEnd: 'var(--nf-space-4)',
+              borderRadius: 'var(--nf-radius-md)',
+              backgroundColor: 'var(--nf-color-danger-subtle)',
+              color: 'var(--nf-color-danger)',
+              padding: 'var(--nf-space-3) var(--nf-space-4)',
+              fontSize: 'var(--nf-text-sm)',
+            }}
+          >
             {acceptMutation.error.message}
           </div>
         ) : null}
 
         {eventsLoading ? (
-          <div className="space-y-3">
-            {['sk-1', 'sk-2', 'sk-3'].map((id) => (
-              <div key={id} className="h-16 animate-pulse rounded-md bg-gray-100" />
-            ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3)' }}>
+            <Skeleton style={{ height: '4rem' }} />
+            <Skeleton style={{ height: '4rem' }} />
+            <Skeleton style={{ height: '4rem' }} />
           </div>
         ) : events?.length === 0 ? (
-          <p className="py-12 text-center text-gray-400">No upcoming events</p>
+          <p
+            style={{
+              padding: 'var(--nf-space-12) 0',
+              textAlign: 'center',
+              color: 'var(--nf-color-fg-subtle)',
+            }}
+          >
+            No upcoming events
+          </p>
         ) : (
-          <div className="space-y-2">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
             {events?.map((event) => {
               const start = DateTime.fromISO(event.startAt);
               const end = DateTime.fromISO(event.endAt);
               return (
-                <div
-                  key={event.id}
-                  className="rounded-md border border-gray-200 bg-white px-4 py-3"
-                >
-                  <p className="font-medium text-gray-900">{event.title}</p>
-                  <p className="mt-1 text-sm text-gray-500">
+                <Card key={event.id}>
+                  <p
+                    style={{
+                      fontWeight: 'var(--nf-weight-medium)',
+                      color: 'var(--nf-color-fg)',
+                    }}
+                  >
+                    {event.title}
+                  </p>
+                  <p
+                    style={{
+                      marginBlockStart: 'var(--nf-space-1)',
+                      fontSize: 'var(--nf-text-sm)',
+                      color: 'var(--nf-color-fg-muted)',
+                    }}
+                  >
                     {event.allDay
                       ? start.toLocaleString(DateTime.DATE_MED)
                       : `${start.toLocaleString(DateTime.DATETIME_MED)} - ${end.toLocaleString(DateTime.TIME_SIMPLE)}`}
                   </p>
-                </div>
+                </Card>
               );
             })}
           </div>

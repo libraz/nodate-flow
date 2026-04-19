@@ -16,3 +16,12 @@
   outline: none;
   box-shadow: var(--nf-shadow-focus);
 }
+
+/* Touch-friendly sizing on mobile */
+@media (max-width: 767px) {
+  .popover {
+    min-inline-size: 16rem;
+    max-inline-size: calc(100vw - var(--nf-space-4) * 2);
+    font-size: var(--nf-text-base);
+  }
+}

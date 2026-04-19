@@ -70,12 +70,22 @@ jobs:
       - name: Install JS dependencies
         run: bun install --frozen-lockfile
 
-      - name: Go test (short)
-        run: go test -short -race -count=1 ./...
+      - name: Go test (short) with coverage
+        run: go test -short -race -count=1 -coverprofile=coverage.out -covermode=atomic ./...
         working-directory: apps/flow-api
 
-      - name: Vitest
-        run: bun run test
+      - name: Check Go coverage threshold (80%)
+        working-directory: apps/flow-api
+        run: |
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          echo "Total coverage: ${COVERAGE}%"
+          if [ "$(echo "${COVERAGE} < 80" | bc -l)" -eq 1 ]; then
+            echo "::error::Go coverage ${COVERAGE}% is below 80% threshold"
+            exit 1
+          fi
+
+      - name: Vitest with coverage
+        run: bun run test -- --coverage
         working-directory: apps/flow-web
 
   # ---------- Job 3: Integration tests (Go E2E + Playwright) ----------
@@ -102,9 +112,19 @@ jobs:
         run: bunx playwright install --with-deps chromium
         working-directory: apps/flow-web
 
-      - name: Go test (full, with testcontainers)
-        run: go test -race -count=1 -timeout=10m ./...
+      - name: Go test (full, with testcontainers) with coverage
+        run: go test -race -count=1 -timeout=10m -coverprofile=coverage.out -covermode=atomic ./...
         working-directory: apps/flow-api
+
+      - name: Check Go coverage threshold (80%)
+        working-directory: apps/flow-api
+        run: |
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          echo "Total coverage: ${COVERAGE}%"
+          if [ "$(echo "${COVERAGE} < 80" | bc -l)" -eq 1 ]; then
+            echo "::error::Go coverage ${COVERAGE}% is below 80% threshold"
+            exit 1
+          fi
 
       - name: Build web for E2E
         run: bun run build
@@ -166,3 +186,33 @@ jobs:
 
       - name: Bun dependency audit
         run: bunx npm-audit --production
+
+  # ---------- Job 5: Contract tests (Schemathesis against OpenAPI spec) ----------
+  contract-tests:
+    name: Contract tests
+    runs-on: ubuntu-latest
+    needs: [test-integration]
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Schemathesis
+        run: pip install schemathesis
+
+      - name: Validate OpenAPI spec (offline)
+        run: |
+          schemathesis run packages/sdk/openapi.json \
+            --dry-run \
+            --checks all \
+            --validate-schema=true
+
+      - name: Run contract tests against OpenAPI spec
+        run: |
+          schemathesis run packages/sdk/openapi.json \
+            --stateful=links \
+            --checks all \
+            --hypothesis-max-examples=50

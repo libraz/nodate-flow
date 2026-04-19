@@ -51,10 +51,21 @@ export interface DialogProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title
   children: ReactNode;
   /** When true, clicking the overlay closes the dialog. Defaults to `true`. */
   dismissOnOverlayClick?: boolean;
+  /** When true, renders as bottom sheet on mobile (< 768px). Defaults to `false`. */
+  fullScreenOnMobile?: boolean;
 }
 
 function DialogImpl(
-  { open, onClose, title, children, className, dismissOnOverlayClick = true, ...rest }: DialogProps,
+  {
+    open,
+    onClose,
+    title,
+    children,
+    className,
+    dismissOnOverlayClick = true,
+    fullScreenOnMobile = false,
+    ...rest
+  }: DialogProps,
   ref: Ref<HTMLDivElement>,
 ): ReactElement | null {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -90,13 +101,16 @@ function DialogImpl(
   return createPortal(
     // biome-ignore lint/a11y/useKeyWithClickEvents: overlay dismissal; keyboard handled by document keydown Escape
     // biome-ignore lint/a11y/useSemanticElements: native <dialog> is not used; div+role is intentional for happy-dom compat
-    <div className={styles.overlay} onClick={dismissOnOverlayClick ? onClose : undefined}>
+    <div
+      className={cx(styles.overlay, fullScreenOnMobile && styles.overlayMobile)}
+      onClick={dismissOnOverlayClick ? onClose : undefined}
+    >
       <div
         ref={handleRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={cx(styles.dialog, className)}
+        className={cx(styles.dialog, fullScreenOnMobile && styles.dialogMobile, className)}
         onClick={(e) => e.stopPropagation()}
         {...rest}
       >

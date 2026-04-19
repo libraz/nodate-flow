@@ -71,3 +71,17 @@
   color: var(--nf-color-fg);
   overflow: auto;
 }
+
+/* Mobile: side drawers expand to near full-width, block drawers expand */
+@media (max-width: 767px) {
+  .inlineEnd,
+  .inlineStart {
+    inline-size: calc(100vw - var(--nf-space-8));
+  }
+
+  .blockStart,
+  .blockEnd {
+    block-size: auto;
+    max-block-size: 80vh;
+  }
+}

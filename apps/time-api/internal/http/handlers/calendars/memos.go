@@ -6,11 +6,11 @@ import (
 	"errors"
 	"time"
 
-	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
 
 	generated "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/types"
+	apierrors "github.com/nodate-flow/nodate-flow/apps/time-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/eventbus"
 )
 
@@ -24,14 +24,14 @@ type ListMemosInput struct {
 
 // MemoResponse is the JSON representation of a calendar memo.
 type MemoResponse struct {
-	ID              string     `json:"id"`
-	Title           string     `json:"title"`
-	Done            bool       `json:"done"`
-	SortWeight      int32      `json:"sortWeight"`
-	UserPublicID    string     `json:"userPublicId"`
-	UserDisplayName string     `json:"userDisplayName"`
-	UpdatedAt       *time.Time `json:"updatedAt,omitempty"`
-	CreatedAt       time.Time  `json:"createdAt"`
+	ID              string `json:"id"`
+	Title           string `json:"title"`
+	Done            bool   `json:"done"`
+	SortWeight      int32  `json:"sortWeight"`
+	UserPublicID    string `json:"userPublicId"`
+	UserDisplayName string `json:"userDisplayName"`
+	UpdatedAt       *int64 `json:"updatedAt,omitempty"`
+	CreatedAt       int64  `json:"createdAt"`
 }
 
 // ListMemosOutput is the response for the list memos endpoint.
@@ -105,7 +105,7 @@ func ListMemos(deps Deps) func(context.Context, *ListMemosInput) (*ListMemosOutp
 
 		rows, err := deps.Queries.ListCalendarMemos(ctx, cal.ID)
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to list memos", err)
+			return nil, httpErr(apierrors.CalendarMemoListQueryInterrupted)
 		}
 
 		out := &ListMemosOutput{}
@@ -118,10 +118,10 @@ func ListMemos(deps Deps) func(context.Context, *ListMemosInput) (*ListMemosOutp
 				SortWeight:      r.SortWeight,
 				UserPublicID:    r.UserPublicID.String(),
 				UserDisplayName: r.DisplayName,
-				CreatedAt:       r.CreatedAt,
+				CreatedAt:       r.CreatedAt.Unix(),
 			}
 			if r.UpdatedAt.Valid {
-				resp.UpdatedAt = &r.UpdatedAt.Time
+				resp.UpdatedAt = int64Ptr(r.UpdatedAt.Time.Unix())
 			}
 			out.Body.Memos[i] = resp
 		}
@@ -151,7 +151,7 @@ func CreateMemo(deps Deps) func(context.Context, *CreateMemoInput) (*CreateMemoO
 			SortWeight:      input.Body.SortWeight,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to create memo", err)
+			return nil, httpErr(apierrors.CalendarMemoStoreWriteInterrupted)
 		}
 
 		out := &CreateMemoOutput{}
@@ -160,7 +160,7 @@ func CreateMemo(deps Deps) func(context.Context, *CreateMemoInput) (*CreateMemoO
 			Title:      input.Body.Title,
 			Done:       false,
 			SortWeight: input.Body.SortWeight,
-			CreatedAt:  time.Now().UTC(),
+			CreatedAt:  time.Now().UTC().Unix(),
 		}
 
 		_ = eventbus.Append(ctx, deps.DB, wsID, "calendar.memo.created", &actorID, map[string]any{
@@ -187,7 +187,7 @@ func UpdateMemo(deps Deps) func(context.Context, *UpdateMemoInput) (*UpdateMemoO
 
 		memoUID, err := uuid.Parse(input.MemoId)
 		if err != nil {
-			return nil, huma.Error404NotFound("Memo not found")
+			return nil, httpErr(apierrors.CalendarMemoNotFound)
 		}
 
 		_, err = deps.Queries.FindCalendarMemoByPublicId(ctx, generated.FindCalendarMemoByPublicIdParams{
@@ -196,9 +196,9 @@ func UpdateMemo(deps Deps) func(context.Context, *UpdateMemoInput) (*UpdateMemoO
 		})
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return nil, huma.Error404NotFound("Memo not found")
+				return nil, httpErr(apierrors.CalendarMemoNotFound)
 			}
-			return nil, huma.Error500InternalServerError("Failed to find memo", err)
+			return nil, httpErr(apierrors.CalendarMemoStoreReadInterrupted)
 		}
 
 		params := generated.UpdateCalendarMemoParams{
@@ -217,7 +217,7 @@ func UpdateMemo(deps Deps) func(context.Context, *UpdateMemoInput) (*UpdateMemoO
 
 		err = deps.Queries.UpdateCalendarMemo(ctx, params)
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to update memo", err)
+			return nil, httpErr(apierrors.CalendarMemoStoreWriteInterrupted)
 		}
 
 		out := &UpdateMemoOutput{}
@@ -246,7 +246,7 @@ func DeleteMemo(deps Deps) func(context.Context, *DeleteMemoInput) (*DeleteMemoO
 
 		memoUID, err := uuid.Parse(input.MemoId)
 		if err != nil {
-			return nil, huma.Error404NotFound("Memo not found")
+			return nil, httpErr(apierrors.CalendarMemoNotFound)
 		}
 
 		_, err = deps.Queries.FindCalendarMemoByPublicId(ctx, generated.FindCalendarMemoByPublicIdParams{
@@ -255,9 +255,9 @@ func DeleteMemo(deps Deps) func(context.Context, *DeleteMemoInput) (*DeleteMemoO
 		})
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return nil, huma.Error404NotFound("Memo not found")
+				return nil, httpErr(apierrors.CalendarMemoNotFound)
 			}
-			return nil, huma.Error500InternalServerError("Failed to find memo", err)
+			return nil, httpErr(apierrors.CalendarMemoStoreReadInterrupted)
 		}
 
 		err = deps.Queries.DisableCalendarMemo(ctx, generated.DisableCalendarMemoParams{
@@ -265,7 +265,7 @@ func DeleteMemo(deps Deps) func(context.Context, *DeleteMemoInput) (*DeleteMemoO
 			CalendarID: cal.ID,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to delete memo", err)
+			return nil, httpErr(apierrors.CalendarMemoStoreDeleteInterrupted)
 		}
 
 		out := &DeleteMemoOutput{}

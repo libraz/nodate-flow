@@ -1,13 +1,13 @@
-// Package crypto is the only place in the api binary that holds the symmetric
-// master key used to seal LLM provider API keys at rest.
+// Package crypto is the only place that holds the symmetric master key used
+// to seal LLM provider API keys at rest.
 //
-// SECURITY POLICY
+// # SECURITY POLICY
 //
 // Decrypt MUST NOT be called from anywhere outside this package and the
-// internal/ai/providers/* package family. The depguard linter in
-// apps/flow-api/.golangci.yml enforces that. The plaintext returned by Decrypt
-// must be passed straight to the upstream provider's Authorization header
-// and never stored in long-lived structs, logs, errors, or responses.
+// internal/ai/providers/* package family. The depguard linter in each app's
+// .golangci.yml enforces that. The plaintext returned by Decrypt must be
+// passed straight to the upstream provider's Authorization header and never
+// stored in long-lived structs, logs, errors, or responses.
 package crypto
 
 import (

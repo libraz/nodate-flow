@@ -20,17 +20,17 @@ type ListInvocationsInput struct {
 // response bodies are already redacted at write time; this endpoint
 // only forwards what the orchestrator persisted.
 type AiInvocation struct {
-	ID               string  `json:"id" doc:"Invocation public id (UUID v7)"`
-	Purpose          string  `json:"purpose"`
-	Model            string  `json:"model"`
-	PromptRedacted   string  `json:"promptRedacted"`
-	ResponseRedacted string  `json:"responseRedacted,omitempty"`
-	TokensInput      int32   `json:"tokensInput,omitempty"`
-	TokensOutput     int32   `json:"tokensOutput,omitempty"`
-	CostEstimate     string  `json:"costEstimate,omitempty"`
-	Status           string  `json:"status"`
-	ErrorCode        string  `json:"errorCode,omitempty"`
-	InvokedAt        int64   `json:"invokedAt"`
+	ID               string `json:"id" doc:"Invocation public id (UUID v7)"`
+	Purpose          string `json:"purpose"`
+	Model            string `json:"model"`
+	PromptRedacted   string `json:"promptRedacted"`
+	ResponseRedacted string `json:"responseRedacted,omitempty"`
+	TokensInput      int32  `json:"tokensInput,omitempty"`
+	TokensOutput     int32  `json:"tokensOutput,omitempty"`
+	CostEstimate     string `json:"costEstimate,omitempty"`
+	Status           string `json:"status"`
+	ErrorCode        string `json:"errorCode,omitempty"`
+	InvokedAt        int64  `json:"invokedAt"`
 }
 
 // ListInvocationsOutput wraps the paginated invocation list.

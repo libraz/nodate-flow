@@ -15,6 +15,7 @@ CREATE TABLE oauth_states (
   redirect_to VARCHAR(512) NULL COMMENT 'Optional client-supplied return URL to send the user to after the callback completes',
 
   expires_at DATETIME NOT NULL COMMENT 'Hard expiry; callback handler rejects rows past this timestamp',
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   KEY idx_oauth_states_expires_at (expires_at),

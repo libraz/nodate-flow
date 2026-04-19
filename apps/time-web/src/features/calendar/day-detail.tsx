@@ -3,12 +3,14 @@ import { DateTime } from 'luxon';
 import { type ReactElement, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useCalendarUiStore } from '../../stores/calendar-ui-store';
+import { useCalendarUi } from '../../stores/calendar-ui-store';
 import { useCalendarEventsQuery } from './api';
+import styles from './day-detail.module.css';
 import type { CalendarEvent } from './types';
 
 function useEventsForSelectedDay(): CalendarEvent[] {
-  const { selectedDate, currentView } = useCalendarUiStore();
+  const selectedDate = useCalendarUi((s) => s.selectedDate);
+  const currentView = useCalendarUi((s) => s.currentView);
 
   const rangeStart = useMemo(() => {
     if (currentView === 'week') {
@@ -41,54 +43,54 @@ function useEventsForSelectedDay(): CalendarEvent[] {
 
 export default function DayDetail(): ReactElement | null {
   const { t, i18n } = useTranslation();
-  const { showDayDetail, closeDayDetail, selectedDate, openEventDetail } = useCalendarUiStore();
+  const showDayDetail = useCalendarUi((s) => s.showDayDetail);
+  const closeDayDetail = useCalendarUi((s) => s.closeDayDetail);
+  const selectedDate = useCalendarUi((s) => s.selectedDate);
+  const openEventDetail = useCalendarUi((s) => s.openEventDetail);
   const events = useEventsForSelectedDay();
 
   if (!showDayDetail) return null;
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col justify-end sm:hidden">
+    <div className={styles.overlay}>
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismissal */}
       <div
-        className="flex-1"
+        className={styles.backdrop}
         onClick={closeDayDetail}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') closeDayDetail();
-        }}
         role="button"
         tabIndex={-1}
         aria-label={t('calendar.closeDayDetail')}
       />
 
-      <div
-        className="glass-surface-heavy rounded-t-[var(--nf-radius-lg)]"
-        style={{ boxShadow: 'var(--nf-shadow-lg)' }}
-      >
-        <div className="flex items-center justify-center py-2">
+      <div className={`glass-surface-heavy ${styles.sheet}`}>
+        <div className={styles.handle}>
           <button
             type="button"
             onClick={closeDayDetail}
-            className="flex items-center justify-center"
+            style={{
+              all: 'unset',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
             aria-label={t('common.close')}
           >
-            <ChevronDown className="h-5 w-5" style={{ color: 'var(--nf-color-fg-subtle)' }} />
+            <ChevronDown size={20} className={styles.handleIcon} />
           </button>
         </div>
 
-        <div className="px-4 pb-2">
-          <h3 className="text-sm font-semibold" style={{ color: 'var(--nf-color-fg)' }}>
-            {selectedDate
-              .setLocale(i18n.language)
-              .toLocaleString({ weekday: 'long', month: 'long', day: 'numeric' })}
-          </h3>
-        </div>
+        <h3 className={styles.dateTitle}>
+          {selectedDate
+            .setLocale(i18n.language)
+            .toLocaleString({ weekday: 'long', month: 'long', day: 'numeric' })}
+        </h3>
 
-        <div className="max-h-[50vh] overflow-y-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+        <div className={styles.scrollArea}>
           {events.length === 0 ? (
-            <p className="py-8 text-center text-sm" style={{ color: 'var(--nf-color-fg-subtle)' }}>
-              {t('calendar.noEventsForDay')}
-            </p>
+            <p className={styles.emptyText}>{t('calendar.noEventsForDay')}</p>
           ) : (
-            <div className="space-y-2 pb-2">
+            <div className={styles.eventList}>
               {events.map((event) => {
                 const start = DateTime.fromISO(event.startAt);
                 return (
@@ -99,17 +101,12 @@ export default function DayDetail(): ReactElement | null {
                       closeDayDetail();
                       openEventDetail(event.id);
                     }}
-                    className="flex w-full items-center gap-3 rounded-[var(--nf-radius-sm)] px-3 py-2.5 text-left hover:bg-[var(--nf-color-surface-hover)]"
+                    className={styles.eventItem}
                   >
-                    <div className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--nf-color-accent)]" />
-                    <div className="min-w-0 flex-1">
-                      <p
-                        className="truncate text-sm font-medium"
-                        style={{ color: 'var(--nf-color-fg)' }}
-                      >
-                        {event.title}
-                      </p>
-                      <p className="text-xs" style={{ color: 'var(--nf-color-fg-muted)' }}>
+                    <div className={styles.eventDot} />
+                    <div className={styles.eventContent}>
+                      <p className={styles.eventTitle}>{event.title}</p>
+                      <p className={styles.eventTime}>
                         {event.allDay
                           ? t('event.allDay')
                           : start.setLocale(i18n.language).toLocaleString(DateTime.TIME_SIMPLE)}

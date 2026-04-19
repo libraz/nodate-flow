@@ -7,7 +7,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { apiRequest } from '../../../lib/api-client';
+import { sdk } from '../../../lib/sdk';
 
 interface InstanceSetting {
   key: string;
@@ -56,9 +56,10 @@ function SettingsPage(): ReactElement {
   const [maxMembersPerWorkspace, setMaxMembersPerWorkspace] = useState('');
 
   useEffect(() => {
-    void apiRequest<SettingsResponse>('/admin/settings').then((result) => {
+    void sdk.GET('/admin/settings').then((result) => {
       if (result.data) {
-        for (const s of result.data.items) {
+        const body = result.data as SettingsResponse;
+        for (const s of body.items) {
           switch (s.key) {
             case 'registration_open':
               setRegistrationOpen(s.value);
@@ -89,19 +90,18 @@ function SettingsPage(): ReactElement {
       mfaEnforcement: mfaEnforcement,
     };
     if (maxWorkspacesPerUser) {
-      settings.maxWorkspacesPerUser = maxWorkspacesPerUser;
+      settings.max_workspaces_per_user = maxWorkspacesPerUser;
     }
     if (maxMembersPerWorkspace) {
-      settings.maxMembersPerWorkspace = maxMembersPerWorkspace;
+      settings.max_members_per_workspace = maxMembersPerWorkspace;
     }
 
-    const result = await apiRequest<{ ok: boolean }>('/admin/settings', {
-      method: 'PATCH',
+    const { error: err } = await sdk.PATCH('/admin/settings', {
       body: { settings },
     });
     setSaving(false);
 
-    if (result.error) {
+    if (err) {
       setError(t('errors.generic'));
     } else {
       setSuccess(true);
@@ -126,8 +126,8 @@ function SettingsPage(): ReactElement {
 
       <div style={fieldStyle}>
         <label style={labelStyle}>
-          {t('settings.registrationOpen')}
-          <p style={descStyle}>{t('settings.registrationOpenDesc')}</p>
+          {t('settings.registration_open')}
+          <p style={descStyle}>{t('settings.registration_open_desc')}</p>
           <select
             value={registrationOpen}
             onChange={(e) => setRegistrationOpen(e.target.value)}
@@ -141,23 +141,23 @@ function SettingsPage(): ReactElement {
 
       <div style={fieldStyle}>
         <label style={labelStyle}>
-          {t('settings.mfaEnforcement')}
-          <p style={descStyle}>{t('settings.mfaEnforcementDesc')}</p>
+          {t('settings.mfa_enforcement')}
+          <p style={descStyle}>{t('settings.mfa_enforcement_desc')}</p>
           <select
             value={mfaEnforcement}
             onChange={(e) => setMfaEnforcement(e.target.value)}
             style={inputStyle}
           >
-            <option value="none">{t('settings.mfaNone')}</option>
-            <option value="optional">{t('settings.mfaOptional')}</option>
-            <option value="required">{t('settings.mfaRequired')}</option>
+            <option value="none">{t('settings.mfa_none')}</option>
+            <option value="optional">{t('settings.mfa_optional')}</option>
+            <option value="required">{t('settings.mfa_required')}</option>
           </select>
         </label>
       </div>
 
       <div style={fieldStyle}>
         <label style={labelStyle}>
-          {t('settings.maxWorkspacesPerUser')}
+          {t('settings.max_workspaces_per_user')}
           <input
             type="number"
             min="0"
@@ -171,7 +171,7 @@ function SettingsPage(): ReactElement {
 
       <div style={fieldStyle}>
         <label style={labelStyle}>
-          {t('settings.maxMembersPerWorkspace')}
+          {t('settings.max_members_per_workspace')}
           <input
             type="number"
             min="0"

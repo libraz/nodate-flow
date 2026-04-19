@@ -27,6 +27,7 @@ CREATE TABLE mcp_invocations (
   UNIQUE KEY uniq_mcp_invocations_public_id (public_id),
   KEY idx_mcp_invocations_workspace_id_invoked_at (workspace_id, invoked_at),
   KEY idx_mcp_invocations_workspace_id_user_id (workspace_id, user_id),
+  KEY idx_mcp_invocations_created_at (created_at),
 
   CONSTRAINT fk_mcp_invocations_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_mcp_invocations_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,

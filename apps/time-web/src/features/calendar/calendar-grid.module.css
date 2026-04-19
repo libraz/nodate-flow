@@ -1,0 +1,134 @@
+.wrapper {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ---- Weekday strip ---- */
+
+.weekdayStrip {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border-block-end: 1px solid var(--nf-color-hairline);
+  background: var(--nf-cal-glass-heavy);
+  backdrop-filter: var(--nf-cal-blur);
+  -webkit-backdrop-filter: var(--nf-cal-blur);
+}
+
+:global([data-theme^="dotline"]) .weekdayStrip {
+  background: var(--nf-color-surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  font-family: ui-monospace, "SF Mono", monospace;
+}
+
+:global([data-theme^="aurora"]) .weekdayStrip {
+  background: var(--nf-color-surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.weekdayCell {
+  padding-block: var(--nf-space-2);
+  text-align: center;
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ---- Scroll area & week rows ---- */
+
+.scrollArea {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  inset-block-start: 33px;
+  scroll-behavior: auto;
+  scroll-snap-type: y proximity;
+  -webkit-overflow-scrolling: touch;
+}
+
+.weekRow {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  scroll-snap-align: start;
+}
+
+/* ---- Month boundary ---- */
+
+.boundary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  block-size: 28px;
+  scroll-snap-align: start;
+}
+
+.boundary::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 50%;
+  block-size: 1px;
+  background: var(--nf-color-border);
+}
+
+.boundaryLabel {
+  position: relative;
+  padding: 2px var(--nf-space-3);
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg-muted);
+  background: var(--nf-cal-glass-heavy);
+  border-radius: var(--nf-radius-sm);
+  letter-spacing: 0.02em;
+}
+
+/* Glass: frosted pill label */
+:global([data-theme^="glass"]) .boundaryLabel {
+  backdrop-filter: var(--nf-cal-blur);
+  border: 1px solid var(--nf-color-border);
+}
+
+/* Dotline: sharp, monospace */
+:global([data-theme^="dotline"]) .boundary {
+  block-size: 24px;
+}
+
+:global([data-theme^="dotline"]) .boundary::before {
+  block-size: 1px;
+  background: var(--nf-color-border);
+}
+
+:global([data-theme^="dotline"]) .boundaryLabel {
+  font-family: ui-monospace, "SF Mono", monospace;
+  font-size: var(--nf-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  border-radius: 0;
+  background: var(--nf-color-surface);
+  border: 1px solid var(--nf-color-border);
+}
+
+/* Aurora: accent-colored label */
+:global([data-theme^="aurora"]) .boundary::before {
+  block-size: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 10%,
+    var(--nf-color-accent-subtle) 50%,
+    transparent 90%
+  );
+}
+
+:global([data-theme^="aurora"]) .boundaryLabel {
+  color: var(--nf-color-accent);
+  background: var(--nf-color-surface);
+  border-radius: var(--nf-radius-pill);
+}

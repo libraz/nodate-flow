@@ -135,6 +135,12 @@ func resolveProject(ctx context.Context, deps Deps, s *session, publicID string)
 
 // resolveTask resolves a task public id to its internal id and verifies
 // it belongs to the session workspace.
+//
+// NOTE: raw SQL is intentional here. The only sqlc query that resolves a
+// task by public_id (FindTaskByPublicId) queries v_task_detail and does
+// not expose the internal id column — it is designed for the API response
+// mapper. This helper only needs the internal id for downstream sqlc
+// calls, so a lightweight single-column lookup is appropriate.
 func resolveTask(ctx context.Context, deps Deps, s *session, publicID string) (uint32, types.PublicID, error) {
 	pub, err := types.Parse(publicID)
 	if err != nil {
@@ -158,15 +164,17 @@ func resolvePage(ctx context.Context, deps Deps, s *session, publicID string) (u
 	if err != nil {
 		return 0, types.PublicID{}, apierrors.New(apierrors.PagePageNotFound)
 	}
-	const q = `SELECT id FROM pages WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE LIMIT 1`
-	var id uint32
-	if err := deps.DB.QueryRowContext(ctx, q, s.workspaceID, pub).Scan(&id); err != nil {
+	row, err := deps.Queries.GetPageByPublicId(ctx, generated.GetPageByPublicIdParams{
+		WorkspaceID: s.workspaceID,
+		PublicID:    pub,
+	})
+	if err != nil {
 		if stderrors.Is(err, sql.ErrNoRows) {
 			return 0, types.PublicID{}, apierrors.New(apierrors.PagePageNotFound)
 		}
 		return 0, types.PublicID{}, err
 	}
-	return id, pub, nil
+	return row.ID, pub, nil
 }
 
 // resolveCalendar resolves a calendar public id to its internal id and

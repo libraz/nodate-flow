@@ -1,0 +1,563 @@
+domain: calendar
+breadcrumb: "Calendar"
+
+resources:
+  workspace:
+    breadcrumb: "Calendar > Workspace"
+    errors:
+      not_found:
+        code: CALENDAR.WORKSPACE.NOT_FOUND
+        status: 404
+        message: "Workspace not found"
+        description: "Returned when the workspace public_id in the request path does not match any active workspace."
+        userAction: "Verify the workspace ID in the URL."
+
+  calendar:
+    breadcrumb: "Calendar"
+    errors:
+      not_found:
+        code: CALENDAR.CALENDAR.NOT_FOUND
+        status: 404
+        message: "Calendar not found"
+        description: "Returned when a calendar with the given public_id does not exist or the actor has no visibility into it."
+        userAction: "Verify the calendar ID, or ask the calendar owner to share it with you."
+
+      access_denied:
+        code: CALENDAR.CALENDAR.ACCESS_DENIED
+        status: 403
+        message: "You do not have access to this calendar"
+        description: "Returned when the actor is authenticated but does not hold an active subscription to the target calendar."
+        userAction: "Ask the calendar owner or an admin to grant you access."
+
+      owner_role_required:
+        code: CALENDAR.CALENDAR.OWNER_ROLE_REQUIRED
+        status: 403
+        message: "Only calendar owners can perform this action"
+        description: "Returned when a non-owner attempts an owner-only operation such as deleting a calendar."
+        userAction: "Ask a calendar owner to perform this action on your behalf."
+
+      manager_role_required:
+        code: CALENDAR.CALENDAR.MANAGER_ROLE_REQUIRED
+        status: 403
+        message: "You do not have permission to perform this action"
+        description: "Returned when the actor lacks the owner or manager role required for the operation (e.g., editing calendar settings, managing members, or creating invites)."
+        userAction: "Ask a calendar owner or manager to perform this action or upgrade your role."
+
+      list_query_interrupted:
+        code: CALENDAR.CALENDAR.LIST_QUERY_INTERRUPTED
+        status: 500
+        message: "Could not retrieve calendars"
+        description: "Returned when the database query to list the user's subscribed calendars encounters an unexpected error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      store_write_interrupted:
+        code: CALENDAR.CALENDAR.STORE_WRITE_INTERRUPTED
+        status: 500
+        message: "Could not save calendar"
+        description: "Returned when inserting or updating a calendar row encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      store_read_interrupted:
+        code: CALENDAR.CALENDAR.STORE_READ_INTERRUPTED
+        status: 500
+        message: "Could not read calendar after update"
+        description: "Returned when re-reading the calendar row after a successful patch encounters an unexpected error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      store_delete_interrupted:
+        code: CALENDAR.CALENDAR.STORE_DELETE_INTERRUPTED
+        status: 500
+        message: "Could not delete calendar"
+        description: "Returned when the soft-delete query for a calendar encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+  event:
+    breadcrumb: "Calendar > Event"
+    errors:
+      not_found:
+        code: CALENDAR.EVENT.NOT_FOUND
+        status: 404
+        message: "Event not found"
+        description: "Returned when an event with the given public_id does not exist in the specified calendar."
+        userAction: "Verify the event ID, or refresh the calendar to see current events."
+
+      edit_permission_required:
+        code: CALENDAR.EVENT.EDIT_PERMISSION_REQUIRED
+        status: 403
+        message: "You do not have permission to edit this event"
+        description: "Returned when the actor is neither the event owner, a calendar owner/manager, nor an attendee with edit rights."
+        userAction: "Ask the event owner to grant you edit access or to make the change."
+
+      list_query_interrupted:
+        code: CALENDAR.EVENT.LIST_QUERY_INTERRUPTED
+        status: 500
+        message: "Could not retrieve events"
+        description: "Returned when the database query to list events (including recurring events) encounters an unexpected error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      store_write_interrupted:
+        code: CALENDAR.EVENT.STORE_WRITE_INTERRUPTED
+        status: 500
+        message: "Could not save event"
+        description: "Returned when inserting or updating an event row encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      store_read_interrupted:
+        code: CALENDAR.EVENT.STORE_READ_INTERRUPTED
+        status: 500
+        message: "Could not read event"
+        description: "Returned when reading an event row (including after a patch) encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      store_delete_interrupted:
+        code: CALENDAR.EVENT.STORE_DELETE_INTERRUPTED
+        status: 500
+        message: "Could not delete event"
+        description: "Returned when the soft-delete query for an event encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      owner_user_id_malformed:
+        code: CALENDAR.EVENT.OWNER_USER_ID_MALFORMED
+        status: 400
+        message: "Invalid ownerUserId"
+        description: "Returned when the ownerUserId field is not a valid UUID."
+        userAction: "Provide a valid UUID for the owner user."
+
+      owner_user_not_found:
+        code: CALENDAR.EVENT.OWNER_USER_NOT_FOUND
+        status: 400
+        message: "Owner user not found"
+        description: "Returned when the specified ownerUserId does not match any active user."
+        userAction: "Verify the owner user ID and ensure the user account is active."
+
+      owner_user_resolve_interrupted:
+        code: CALENDAR.EVENT.OWNER_USER_RESOLVE_INTERRUPTED
+        status: 500
+        message: "Could not resolve owner user"
+        description: "Returned when looking up the owner user's internal ID encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      date_range_unparseable:
+        code: CALENDAR.EVENT.DATE_RANGE_UNPARSEABLE
+        status: 422
+        message: "Could not parse date or datetime parameter"
+        description: "Returned when the start or end query parameter cannot be parsed as an RFC 3339 datetime or YYYY-MM-DD date."
+        userAction: "Provide dates in YYYY-MM-DD or RFC 3339 format (e.g. 2024-01-15 or 2024-01-15T09:00:00Z)."
+
+  memo:
+    breadcrumb: "Calendar > Memo"
+    errors:
+      not_found:
+        code: CALENDAR.MEMO.NOT_FOUND
+        status: 404
+        message: "Memo not found"
+        description: "Returned when a memo with the given public_id does not exist in the specified calendar."
+        userAction: "Verify the memo ID, or refresh the list to see current memos."
+
+      list_query_interrupted:
+        code: CALENDAR.MEMO.LIST_QUERY_INTERRUPTED
+        status: 500
+        message: "Could not retrieve memos"
+        description: "Returned when the database query to list memos encounters an unexpected error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      store_write_interrupted:
+        code: CALENDAR.MEMO.STORE_WRITE_INTERRUPTED
+        status: 500
+        message: "Could not save memo"
+        description: "Returned when inserting or updating a memo row encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      store_read_interrupted:
+        code: CALENDAR.MEMO.STORE_READ_INTERRUPTED
+        status: 500
+        message: "Could not find memo"
+        description: "Returned when looking up a memo row encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      store_delete_interrupted:
+        code: CALENDAR.MEMO.STORE_DELETE_INTERRUPTED
+        status: 500
+        message: "Could not delete memo"
+        description: "Returned when the soft-delete query for a memo encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+  comment:
+    breadcrumb: "Calendar > Comment"
+    errors:
+      not_found:
+        code: CALENDAR.COMMENT.NOT_FOUND
+        status: 404
+        message: "Comment not found"
+        description: "Returned when a comment with the given public_id does not exist on the specified event."
+        userAction: "Verify the comment ID."
+
+      author_or_owner_required:
+        code: CALENDAR.COMMENT.AUTHOR_OR_OWNER_REQUIRED
+        status: 403
+        message: "Only the comment author or calendar owner can delete this comment"
+        description: "Returned when a user who is neither the comment author nor the calendar owner attempts to delete the comment."
+        userAction: "Ask the comment author or calendar owner to delete the comment."
+
+      list_query_interrupted:
+        code: CALENDAR.COMMENT.LIST_QUERY_INTERRUPTED
+        status: 500
+        message: "Could not retrieve comments"
+        description: "Returned when the database query to list comments encounters an unexpected error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      store_write_interrupted:
+        code: CALENDAR.COMMENT.STORE_WRITE_INTERRUPTED
+        status: 500
+        message: "Could not save comment"
+        description: "Returned when inserting or updating a comment row encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      store_read_interrupted:
+        code: CALENDAR.COMMENT.STORE_READ_INTERRUPTED
+        status: 500
+        message: "Could not find comment"
+        description: "Returned when looking up a comment row encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      store_delete_interrupted:
+        code: CALENDAR.COMMENT.STORE_DELETE_INTERRUPTED
+        status: 500
+        message: "Could not delete comment"
+        description: "Returned when the soft-delete query for a comment encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+  attachment:
+    breadcrumb: "Calendar > Attachment"
+    errors:
+      not_found:
+        code: CALENDAR.ATTACHMENT.NOT_FOUND
+        status: 404
+        message: "Attachment not found"
+        description: "Returned when an attachment with the given public_id does not exist on the specified event."
+        userAction: "Verify the attachment ID."
+
+      uploader_or_owner_required:
+        code: CALENDAR.ATTACHMENT.UPLOADER_OR_OWNER_REQUIRED
+        status: 403
+        message: "Only the uploader or calendar owner can delete this attachment"
+        description: "Returned when a user who is neither the attachment uploader nor the calendar owner attempts to delete the attachment."
+        userAction: "Ask the uploader or calendar owner to delete the attachment."
+
+      list_query_interrupted:
+        code: CALENDAR.ATTACHMENT.LIST_QUERY_INTERRUPTED
+        status: 500
+        message: "Could not retrieve attachments"
+        description: "Returned when the database query to list attachments encounters an unexpected error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      store_write_interrupted:
+        code: CALENDAR.ATTACHMENT.STORE_WRITE_INTERRUPTED
+        status: 500
+        message: "Could not save attachment"
+        description: "Returned when inserting an attachment row encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      store_read_interrupted:
+        code: CALENDAR.ATTACHMENT.STORE_READ_INTERRUPTED
+        status: 500
+        message: "Could not find attachment"
+        description: "Returned when looking up an attachment row encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      store_delete_interrupted:
+        code: CALENDAR.ATTACHMENT.STORE_DELETE_INTERRUPTED
+        status: 500
+        message: "Could not delete attachment"
+        description: "Returned when the soft-delete query for an attachment encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+  checklist:
+    breadcrumb: "Calendar > Checklist"
+    errors:
+      item_not_found:
+        code: CALENDAR.CHECKLIST.ITEM_NOT_FOUND
+        status: 404
+        message: "Checklist item not found"
+        description: "Returned when a checklist item with the given public_id does not exist on the specified event."
+        userAction: "Verify the checklist item ID."
+
+      list_query_interrupted:
+        code: CALENDAR.CHECKLIST.LIST_QUERY_INTERRUPTED
+        status: 500
+        message: "Could not retrieve checklist items"
+        description: "Returned when the database query to list checklist items encounters an unexpected error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      store_write_interrupted:
+        code: CALENDAR.CHECKLIST.STORE_WRITE_INTERRUPTED
+        status: 500
+        message: "Could not save checklist item"
+        description: "Returned when inserting or updating a checklist item row encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      store_delete_interrupted:
+        code: CALENDAR.CHECKLIST.STORE_DELETE_INTERRUPTED
+        status: 500
+        message: "Could not delete checklist item"
+        description: "Returned when the soft-delete query for a checklist item encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+  attendee:
+    breadcrumb: "Calendar > Attendee"
+    errors:
+      user_id_malformed:
+        code: CALENDAR.ATTENDEE.USER_ID_MALFORMED
+        status: 400
+        message: "Invalid user ID"
+        description: "Returned when the user ID path parameter is not a valid UUID."
+        userAction: "Provide a valid UUID for the user."
+
+      user_not_found:
+        code: CALENDAR.ATTENDEE.USER_NOT_FOUND
+        status: 404
+        message: "User not found"
+        description: "Returned when the specified user public_id does not match any active user."
+        userAction: "Verify the user ID."
+
+      store_remove_interrupted:
+        code: CALENDAR.ATTENDEE.STORE_REMOVE_INTERRUPTED
+        status: 500
+        message: "Could not remove attendee"
+        description: "Returned when the query to remove an attendee encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      rsvp_update_interrupted:
+        code: CALENDAR.ATTENDEE.RSVP_UPDATE_INTERRUPTED
+        status: 500
+        message: "Could not update RSVP"
+        description: "Returned when the query to update an attendee's RSVP status encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      can_edit_update_interrupted:
+        code: CALENDAR.ATTENDEE.CAN_EDIT_UPDATE_INTERRUPTED
+        status: 500
+        message: "Could not update edit permission"
+        description: "Returned when the query to toggle an attendee's can_edit flag encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      owner_required_to_toggle_edit:
+        code: CALENDAR.ATTENDEE.OWNER_REQUIRED_TO_TOGGLE_EDIT
+        status: 403
+        message: "Only the event owner can change edit permissions"
+        description: "Returned when a non-owner attempts to toggle the can_edit permission on an attendee."
+        userAction: "Ask the event owner to change the attendee's edit permission."
+
+  invite:
+    breadcrumb: "Calendar > Invite"
+    errors:
+      not_found:
+        code: CALENDAR.INVITE.NOT_FOUND
+        status: 404
+        message: "Invite not found or expired"
+        description: "Returned when the invite token or public_id does not match any active invite, or the invite has expired or exhausted its use limit."
+        userAction: "Ask the calendar owner for a new invite link."
+
+      token_generate_interrupted:
+        code: CALENDAR.INVITE.TOKEN_GENERATE_INTERRUPTED
+        status: 500
+        message: "Could not generate invite token"
+        description: "Returned when cryptographic random generation for the invite token encounters an error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      store_write_interrupted:
+        code: CALENDAR.INVITE.STORE_WRITE_INTERRUPTED
+        status: 500
+        message: "Could not save invite"
+        description: "Returned when inserting an invite row encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      list_query_interrupted:
+        code: CALENDAR.INVITE.LIST_QUERY_INTERRUPTED
+        status: 500
+        message: "Could not retrieve invites"
+        description: "Returned when the database query to list invites encounters an unexpected error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      store_revoke_interrupted:
+        code: CALENDAR.INVITE.STORE_REVOKE_INTERRUPTED
+        status: 500
+        message: "Could not revoke invite"
+        description: "Returned when the disable query for an invite encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      store_lookup_interrupted:
+        code: CALENDAR.INVITE.STORE_LOOKUP_INTERRUPTED
+        status: 500
+        message: "Could not look up invite"
+        description: "Returned when looking up an invite by token hash encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+  member:
+    breadcrumb: "Calendar > Member"
+    errors:
+      user_not_found:
+        code: CALENDAR.MEMBER.USER_NOT_FOUND
+        status: 404
+        message: "User not found"
+        description: "Returned when the specified user (by email or public_id) does not match any active user."
+        userAction: "Verify the user email or ID."
+
+      user_id_malformed:
+        code: CALENDAR.MEMBER.USER_ID_MALFORMED
+        status: 400
+        message: "Invalid user ID"
+        description: "Returned when the user ID path parameter is not a valid UUID."
+        userAction: "Provide a valid UUID for the user."
+
+      already_subscribed:
+        code: CALENDAR.MEMBER.ALREADY_SUBSCRIBED
+        status: 409
+        message: "User is already a member of this calendar"
+        description: "Returned when attempting to add a user who already has an active subscription to the calendar."
+        userAction: "The user is already a member. Update their role instead if needed."
+
+      not_found:
+        code: CALENDAR.MEMBER.NOT_FOUND
+        status: 404
+        message: "Member not found"
+        description: "Returned when the target user does not have a subscription to the specified calendar."
+        userAction: "Verify the user is a member of this calendar."
+
+      last_owner_removal_blocked:
+        code: CALENDAR.MEMBER.LAST_OWNER_REMOVAL_BLOCKED
+        status: 409
+        message: "Cannot remove the last owner of a calendar"
+        description: "Returned when attempting to remove or downgrade the sole remaining owner of a calendar. At least one owner must remain."
+        userAction: "Transfer ownership to another member before removing the current owner."
+
+      list_query_interrupted:
+        code: CALENDAR.MEMBER.LIST_QUERY_INTERRUPTED
+        status: 500
+        message: "Could not retrieve members"
+        description: "Returned when the database query to list calendar subscribers encounters an unexpected error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      store_write_interrupted:
+        code: CALENDAR.MEMBER.STORE_WRITE_INTERRUPTED
+        status: 500
+        message: "Could not add member"
+        description: "Returned when inserting a subscription row encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      store_read_interrupted:
+        code: CALENDAR.MEMBER.STORE_READ_INTERRUPTED
+        status: 500
+        message: "Could not look up member"
+        description: "Returned when looking up a subscription row encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      store_role_update_interrupted:
+        code: CALENDAR.MEMBER.STORE_ROLE_UPDATE_INTERRUPTED
+        status: 500
+        message: "Could not update member role"
+        description: "Returned when the query to patch a subscription role encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      store_remove_interrupted:
+        code: CALENDAR.MEMBER.STORE_REMOVE_INTERRUPTED
+        status: 500
+        message: "Could not remove member"
+        description: "Returned when the disable query for a subscription encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      owner_count_query_interrupted:
+        code: CALENDAR.MEMBER.OWNER_COUNT_QUERY_INTERRUPTED
+        status: 500
+        message: "Could not verify owner count"
+        description: "Returned when the query to count remaining calendar owners encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+  task_sync:
+    breadcrumb: "Calendar > Task Sync"
+    errors:
+      task_not_found:
+        code: CALENDAR.TASK_SYNC.TASK_NOT_FOUND
+        status: 404
+        message: "Task not found"
+        description: "Returned when the specified task public_id does not match any active task in the workspace."
+        userAction: "Verify the task ID and ensure it belongs to the current workspace."
+
+      task_id_malformed:
+        code: CALENDAR.TASK_SYNC.TASK_ID_MALFORMED
+        status: 400
+        message: "Invalid taskId format"
+        description: "Returned when the taskId field is not a valid UUID."
+        userAction: "Provide a valid UUID for the task."
+
+      timezone_unrecognized:
+        code: CALENDAR.TASK_SYNC.TIMEZONE_UNRECOGNIZED
+        status: 400
+        message: "Unrecognized timezone"
+        description: "Returned when the timezone field is not a valid IANA timezone name."
+        userAction: "Provide a valid IANA timezone (e.g. America/New_York, Asia/Tokyo)."
+
+      task_lookup_interrupted:
+        code: CALENDAR.TASK_SYNC.TASK_LOOKUP_INTERRUPTED
+        status: 500
+        message: "Could not look up task"
+        description: "Returned when the raw query to read the task row encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      store_write_interrupted:
+        code: CALENDAR.TASK_SYNC.STORE_WRITE_INTERRUPTED
+        status: 500
+        message: "Could not create event from task"
+        description: "Returned when inserting the calendar event for the linked task encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      viewer_role_insufficient:
+        code: CALENDAR.TASK_SYNC.VIEWER_ROLE_INSUFFICIENT
+        status: 403
+        message: "Viewers cannot create events"
+        description: "Returned when a calendar viewer attempts to create a task-synced event. At least editor role is required."
+        userAction: "Ask a calendar owner or manager to upgrade your role."
+
+  smart_create:
+    breadcrumb: "Calendar > Smart Create"
+    errors:
+      text_unparseable:
+        code: CALENDAR.SMART_CREATE.TEXT_UNPARSEABLE
+        status: 422
+        message: "Could not parse event from text"
+        description: "Returned when the natural language parser cannot extract event parameters from the submitted text."
+        userAction: "Try rephrasing the event description with clearer date, time, and title information."
+
+  user_profile:
+    breadcrumb: "Calendar > User Profile"
+    errors:
+      lookup_interrupted:
+        code: CALENDAR.USER_PROFILE.LOOKUP_INTERRUPTED
+        status: 500
+        message: "Could not retrieve user profile"
+        description: "Returned when looking up the actor's user profile encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      user_lookup_interrupted:
+        code: CALENDAR.USER_PROFILE.USER_LOOKUP_INTERRUPTED
+        status: 500
+        message: "Could not look up user"
+        description: "Returned when resolving a user by email encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+  subscription:
+    breadcrumb: "Calendar > Subscription"
+    errors:
+      store_write_interrupted:
+        code: CALENDAR.SUBSCRIPTION.STORE_WRITE_INTERRUPTED
+        status: 500
+        message: "Could not create calendar subscription"
+        description: "Returned when inserting a calendar subscription row encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
+      membership_check_interrupted:
+        code: CALENDAR.SUBSCRIPTION.MEMBERSHIP_CHECK_INTERRUPTED
+        status: 500
+        message: "Could not verify membership"
+        description: "Returned when checking whether a user already has a subscription encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."

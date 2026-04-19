@@ -7,7 +7,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/danielgtaylor/huma/v2"
+	apierrors "github.com/nodate-flow/nodate-flow/apps/time-api/internal/errors"
 )
 
 // --- Input/Output types ---
@@ -24,11 +24,11 @@ type SmartCreateInput struct {
 
 // EventProposal is a proposed event extracted from natural language text.
 type EventProposal struct {
-	Title   string    `json:"title"`
-	StartAt time.Time `json:"startAt"`
-	EndAt   time.Time `json:"endAt"`
-	Kind    string    `json:"kind"`
-	ShowAs  string    `json:"showAs"`
+	Title   string `json:"title"`
+	StartAt int64  `json:"startAt"`
+	EndAt   int64  `json:"endAt"`
+	Kind    string `json:"kind"`
+	ShowAs  string `json:"showAs"`
 }
 
 // SmartCreateOutput is the response for the smart event creation endpoint.
@@ -58,7 +58,7 @@ func SmartCreate(deps Deps) func(context.Context, *SmartCreateInput) (*SmartCrea
 		}
 		proposal, err := ParseEventFromText(input.Body.Text, time.Now(), tz)
 		if err != nil {
-			return nil, huma.Error422UnprocessableEntity("Could not parse event from text", err)
+			return nil, httpErr(apierrors.CalendarSmartCreateTextUnparseable)
 		}
 
 		out := &SmartCreateOutput{}
@@ -111,8 +111,8 @@ func ParseEventFromText(text string, now time.Time, timezone string) (*EventProp
 
 	return &EventProposal{
 		Title:   title,
-		StartAt: date,
-		EndAt:   endAt,
+		StartAt: date.Unix(),
+		EndAt:   endAt.Unix(),
 		Kind:    "event",
 		ShowAs:  "busy",
 	}, nil
@@ -128,12 +128,12 @@ var (
 	reWeekday     = regexp.MustCompile(`(月|火|水|木|金|土|日)曜日?`)
 
 	// Time patterns
-	reTimeJP      = regexp.MustCompile(`(\d{1,2})時(?:(\d{1,2})分)?`)
-	reTimeColon   = regexp.MustCompile(`(\d{1,2}):(\d{2})`)
-	reEndTimeJP   = regexp.MustCompile(`(?:〜|～|から|まで)(\d{1,2})時(?:(\d{1,2})分)?(?:まで)?`)
-	reEndColon    = regexp.MustCompile(`(?:〜|～|から|まで)(\d{1,2}):(\d{2})`)
-	reRangeJP     = regexp.MustCompile(`(\d{1,2})時(?:(\d{1,2})分)?(?:〜|～|から)(\d{1,2})時(?:(\d{1,2})分)?`)
-	reRangeColon  = regexp.MustCompile(`(\d{1,2}):(\d{2})(?:〜|～|から)(\d{1,2}):(\d{2})`)
+	reTimeJP     = regexp.MustCompile(`(\d{1,2})時(?:(\d{1,2})分)?`)
+	reTimeColon  = regexp.MustCompile(`(\d{1,2}):(\d{2})`)
+	reEndTimeJP  = regexp.MustCompile(`(?:〜|～|から|まで)(\d{1,2})時(?:(\d{1,2})分)?(?:まで)?`)
+	reEndColon   = regexp.MustCompile(`(?:〜|～|から|まで)(\d{1,2}):(\d{2})`)
+	reRangeJP    = regexp.MustCompile(`(\d{1,2})時(?:(\d{1,2})分)?(?:〜|～|から)(\d{1,2})時(?:(\d{1,2})分)?`)
+	reRangeColon = regexp.MustCompile(`(\d{1,2}):(\d{2})(?:〜|～|から)(\d{1,2}):(\d{2})`)
 
 	// All time/date patterns for title cleanup
 	reAllPatterns = regexp.MustCompile(

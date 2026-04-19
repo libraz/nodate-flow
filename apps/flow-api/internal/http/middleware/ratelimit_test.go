@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 	"github.com/stretchr/testify/require"
 )
 
@@ -30,6 +31,9 @@ func TestIPRateLimiter_Middleware_AllowsUnderLimit(t *testing.T) {
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 		require.Equal(t, http.StatusOK, rec.Code, "request %d should be allowed", i+1)
+		require.NotEmpty(t, rec.Header().Get("X-RateLimit-Limit"), "X-RateLimit-Limit must be set")
+		require.NotEmpty(t, rec.Header().Get("X-RateLimit-Remaining"), "X-RateLimit-Remaining must be set")
+		require.NotEmpty(t, rec.Header().Get("X-RateLimit-Reset"), "X-RateLimit-Reset must be set")
 	}
 }
 
@@ -67,6 +71,7 @@ func TestIPRateLimiter_Middleware_BlocksOverLimit(t *testing.T) {
 
 	require.Equal(t, http.StatusTooManyRequests, rec.Code, "over-limit request must be 429")
 	require.NotEmpty(t, rec.Header().Get("Retry-After"), "Retry-After header must be set")
+	require.Equal(t, "0", rec.Header().Get("X-RateLimit-Remaining"), "Remaining must be 0")
 }
 
 func TestIPRateLimiter_Middleware_DifferentIPsAreIndependent(t *testing.T) {
@@ -153,19 +158,96 @@ func TestIPRateLimiter_Stop(t *testing.T) {
 			rl.Stop()
 		})
 	})
+}
 
-	t.Run("done channel is closed after stop", func(t *testing.T) {
-		t.Parallel()
-		rl := NewIPRateLimiter(RateLimitConfig{
-			MaxRequests: 10,
-			Window:      time.Second,
-		})
-		rl.Stop()
-		select {
-		case <-rl.done:
-			// expected — channel is closed
-		default:
-			t.Fatal("done channel should be closed after Stop()")
-		}
+func TestAPIRateLimiter_Middleware_AuthedUser(t *testing.T) {
+	t.Parallel()
+
+	rl := NewAPIRateLimiter(APIRateLimitConfig{
+		AuthedMaxRequests:   3,
+		UnauthedMaxRequests: 1,
+		Window:              time.Minute,
 	})
+	t.Cleanup(rl.Stop)
+
+	handler := rl.Middleware()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// Authenticated user gets the higher limit.
+	for i := 0; i < 3; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		ctx := authn.WithActor(req.Context(), 42)
+		ctx = WithClientIP(ctx, "10.0.0.1")
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		require.Equal(t, http.StatusOK, rec.Code, "authed request %d should pass", i+1)
+		require.Equal(t, "3", rec.Header().Get("X-RateLimit-Limit"))
+	}
+
+	// 4th request from same user should be blocked.
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	ctx := authn.WithActor(req.Context(), 42)
+	ctx = WithClientIP(ctx, "10.0.0.1")
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusTooManyRequests, rec.Code)
+}
+
+func TestAPIRateLimiter_Middleware_UnauthedFallsToIP(t *testing.T) {
+	t.Parallel()
+
+	rl := NewAPIRateLimiter(APIRateLimitConfig{
+		AuthedMaxRequests:   100,
+		UnauthedMaxRequests: 2,
+		Window:              time.Minute,
+	})
+	t.Cleanup(rl.Stop)
+
+	handler := rl.Middleware()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// Unauthenticated requests use the lower IP-based limit.
+	for i := 0; i < 2; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		ctx := WithClientIP(req.Context(), "10.0.0.1")
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		require.Equal(t, http.StatusOK, rec.Code)
+		require.Equal(t, "2", rec.Header().Get("X-RateLimit-Limit"))
+	}
+
+	// 3rd unauthenticated request should be blocked.
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	ctx := WithClientIP(req.Context(), "10.0.0.1")
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusTooManyRequests, rec.Code)
+}
+
+func TestAPIRateLimiter_Middleware_NoIPNoAuth_PassesThrough(t *testing.T) {
+	t.Parallel()
+
+	rl := NewAPIRateLimiter(APIRateLimitConfig{
+		UnauthedMaxRequests: 1,
+		Window:              time.Minute,
+	})
+	t.Cleanup(rl.Stop)
+
+	handler := rl.Middleware()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// No auth, no IP — should pass through.
+	for i := 0; i < 5; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		require.Equal(t, http.StatusOK, rec.Code)
+	}
 }

@@ -61,27 +61,27 @@ func RequireCalendarMember(db ACLDB) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			actorID, ok := ActorFromContext(r.Context())
 			if !ok {
-				writeError(w, http.StatusForbidden, apierrors.CalendarAccessDenied.Code,
-					apierrors.CalendarAccessDenied.Message)
+				writeError(w, http.StatusForbidden, apierrors.CalendarCalendarAccessDenied.Code,
+					apierrors.CalendarCalendarAccessDenied.Message)
 				return
 			}
 
 			raw := chi.URLParam(r, "calId")
 			pub, err := uuid.Parse(raw)
 			if err != nil {
-				writeError(w, http.StatusNotFound, apierrors.CalendarNotFound.Code,
-					apierrors.CalendarNotFound.Message)
+				writeError(w, http.StatusNotFound, apierrors.CalendarCalendarNotFound.Code,
+					apierrors.CalendarCalendarNotFound.Message)
 				return
 			}
 
 			var calID uint32
 			if err := db.QueryRowContext(r.Context(), calQuery, types.FromUUID(pub)).Scan(&calID); err != nil {
 				if errors.Is(err, sql.ErrNoRows) {
-					writeError(w, http.StatusNotFound, apierrors.CalendarNotFound.Code,
-						apierrors.CalendarNotFound.Message)
+					writeError(w, http.StatusNotFound, apierrors.CalendarCalendarNotFound.Code,
+						apierrors.CalendarCalendarNotFound.Message)
 					return
 				}
-				writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Internal error")
+				writeError(w, http.StatusInternalServerError, apierrors.InternalUnexpected.Code, apierrors.InternalUnexpected.Message)
 				return
 			}
 
@@ -90,11 +90,11 @@ func RequireCalendarMember(db ACLDB) func(http.Handler) http.Handler {
 			var role string
 			if err := db.QueryRowContext(r.Context(), subQuery, calID, actorID).Scan(&subID, &role); err != nil {
 				if errors.Is(err, sql.ErrNoRows) {
-					writeError(w, http.StatusForbidden, apierrors.CalendarAccessDenied.Code,
-						apierrors.CalendarAccessDenied.Message)
+					writeError(w, http.StatusForbidden, apierrors.CalendarCalendarAccessDenied.Code,
+						apierrors.CalendarCalendarAccessDenied.Message)
 					return
 				}
-				writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Internal error")
+				writeError(w, http.StatusInternalServerError, apierrors.InternalUnexpected.Code, apierrors.InternalUnexpected.Message)
 				return
 			}
 

@@ -17,9 +17,10 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
 import AuthCard from '../components/auth-card';
-import { apiRequest } from '../lib/api-client';
+import type { ProblemJson } from '../lib/api-error';
 import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../lib/auth-errors';
 import { type LoginFormValues, loginSchema } from '../lib/auth-schemas';
+import { sdk } from '../lib/sdk';
 import { type AuthUser, authStore, selectIsAuthenticated, useAuth } from '../stores/auth-store';
 
 export interface LoginSearch {
@@ -83,19 +84,20 @@ function LoginPage(): ReactElement {
 
   const completeSignIn = async (accessToken: string): Promise<void> => {
     authStore.getState().setAccessToken(accessToken);
-    const me = await apiRequest<MeResponse>('/auth/me');
-    if (me.error || !me.data) {
-      setServerError(mapAuthError(me.error));
+    const { data, error } = await sdk.GET('/auth/me');
+    if (error || !data) {
+      setServerError(mapAuthError(error as ProblemJson | undefined));
       authStore.getState().clearSession();
       return;
     }
+    const me = data as MeResponse;
     const user: AuthUser = {
-      id: me.data.id,
-      email: me.data.email,
-      displayName: me.data.displayName,
-      locale: me.data.locale,
-      themePreference: me.data.themePreference,
-      isInstanceAdmin: me.data.isInstanceAdmin,
+      id: me.id,
+      email: me.email,
+      displayName: me.displayName,
+      locale: me.locale,
+      themePreference: me.themePreference,
+      isInstanceAdmin: me.isInstanceAdmin,
     };
     authStore.getState().setSession(accessToken, user);
     redirectAfterLogin();
@@ -104,23 +106,23 @@ function LoginPage(): ReactElement {
   const onSubmit = async (values: LoginFormValues): Promise<void> => {
     setServerError(null);
     try {
-      const result = await apiRequest<LoginResponse>('/auth/login', {
-        method: 'POST',
+      const { data, error } = await sdk.POST('/auth/login', {
         body: { email: values.email, password: values.password },
       });
-      if (result.error || !result.data) {
-        setServerError(mapAuthError(result.error));
+      if (error || !data) {
+        setServerError(mapAuthError(error as ProblemJson | undefined));
         return;
       }
-      if (result.data.step === 'totp_required') {
-        setChallengeToken(result.data.challengeToken ?? '');
+      const login = data as LoginResponse;
+      if (login.step === 'totp_required') {
+        setChallengeToken(login.challengeToken ?? '');
         return;
       }
-      if (!result.data.accessToken) {
+      if (!login.accessToken) {
         setServerError('auth:errors.generic');
         return;
       }
-      await completeSignIn(result.data.accessToken);
+      await completeSignIn(login.accessToken);
     } catch (err) {
       setServerError(mapAuthThrown(err));
     }
@@ -133,17 +135,17 @@ function LoginPage(): ReactElement {
     if (useRecovery ? recoveryCode.trim().length < 10 : totpCode.length !== 6) return;
     setTotpSubmitting(true);
     try {
-      const result = await apiRequest<TotpResponse>('/auth/login/totp', {
-        method: 'POST',
+      const { data, error } = await sdk.POST('/auth/login/totp', {
         body: useRecovery
           ? { challengeToken, recoveryCode: recoveryCode.trim() }
           : { challengeToken, code: totpCode },
       });
-      if (result.error || !result.data) {
-        setServerError(mapAuthError(result.error));
+      if (error || !data) {
+        setServerError(mapAuthError(error as ProblemJson | undefined));
         return;
       }
-      await completeSignIn(result.data.accessToken);
+      const totp = data as TotpResponse;
+      await completeSignIn(totp.accessToken);
     } catch (err) {
       setServerError(mapAuthThrown(err));
     } finally {
@@ -176,7 +178,7 @@ function LoginPage(): ReactElement {
               margin: 0,
             }}
           >
-            {t('login.totpTitle')}
+            {t('login.totp_title')}
           </h1>
           <p
             style={{
@@ -185,10 +187,10 @@ function LoginPage(): ReactElement {
               fontSize: 'var(--nf-text-sm, 0.875rem)',
             }}
           >
-            {t('login.totpInstructions')}
+            {t('login.totp_instructions')}
           </p>
           {useRecovery ? (
-            <FormField label={t('login.recoveryCode')} required>
+            <FormField label={t('login.recovery_code')} required>
               {(control) => (
                 <Input
                   {...control}
@@ -202,7 +204,7 @@ function LoginPage(): ReactElement {
               )}
             </FormField>
           ) : (
-            <FormField label={t('login.totpCode')} required>
+            <FormField label={t('login.totp_code')} required>
               {(control) => (
                 <Input
                   {...control}
@@ -228,7 +230,7 @@ function LoginPage(): ReactElement {
             }}
             disabled={totpSubmitting}
           >
-            {useRecovery ? t('login.totpUseCode') : t('login.totpUseRecovery')}
+            {useRecovery ? t('login.totp_use_code') : t('login.totp_use_recovery')}
           </Button>
           {serverError ? (
             <p
@@ -250,7 +252,7 @@ function LoginPage(): ReactElement {
               (useRecovery ? recoveryCode.trim().length < 10 : totpCode.length !== 6)
             }
           >
-            {useRecovery ? t('login.recoverySubmit') : t('login.totpSubmit')}
+            {useRecovery ? t('login.recovery_submit') : t('login.totp_submit')}
           </Button>
           <Button
             type="button"
@@ -258,7 +260,7 @@ function LoginPage(): ReactElement {
             onClick={handleCancelTotp}
             disabled={totpSubmitting}
           >
-            {t('login.totpCancel')}
+            {t('login.totp_cancel')}
           </Button>
         </form>
       </AuthCard>
@@ -347,7 +349,7 @@ function LoginPage(): ReactElement {
             color: 'var(--nf-color-fg-muted)',
           }}
         >
-          {t('login.noAccount')} <Link to="/signup">{t('login.signupLink')}</Link>
+          {t('login.no_account')} <Link to="/signup">{t('login.signup_link')}</Link>
         </p>
       </form>
     </AuthCard>

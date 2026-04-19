@@ -9,6 +9,8 @@ import (
 	"os"
 	"runtime/debug"
 	"strings"
+
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
 // Config controls logger construction. Zero values select sensible
@@ -58,7 +60,7 @@ func New(cfg Config) *slog.Logger {
 		base = slog.NewJSONHandler(cfg.Writer, opts)
 	}
 
-	h := NewRedactHandler(base)
+	h := logutil.NewRedactHandler(base)
 	version := cfg.Version
 	if version == "" {
 		version = resolveVersion()

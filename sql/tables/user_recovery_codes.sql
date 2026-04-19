@@ -10,6 +10,7 @@ CREATE TABLE user_recovery_codes (
   user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
   code_hash BINARY(32) NOT NULL COMMENT 'SHA-256 of the normalized recovery code',
   used_at DATETIME NULL COMMENT 'Set when the code is consumed at login',
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   UNIQUE KEY uniq_user_recovery_codes_user_hash (user_id, code_hash),

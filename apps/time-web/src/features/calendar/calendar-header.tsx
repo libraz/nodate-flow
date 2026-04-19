@@ -3,22 +3,23 @@ import { DateTime } from 'luxon';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useCalendarUiStore } from '../../stores/calendar-ui-store';
+import Button from '@nodate-flow/ui/primitives/button';
+
+import { useCalendarUi } from '../../stores/calendar-ui-store';
+import styles from './calendar-header.module.css';
 
 export default function CalendarHeader(): ReactElement {
   const { t, i18n } = useTranslation();
-  const {
-    selectedDate,
-    displayMonth,
-    currentView,
-    setCurrentView,
-    goToPrevious,
-    goToNext,
-    goToToday,
-    toggleSidebar,
-    toggleSearch,
-    openEventModal,
-  } = useCalendarUiStore();
+  const selectedDate = useCalendarUi((s) => s.selectedDate);
+  const displayMonth = useCalendarUi((s) => s.displayMonth);
+  const currentView = useCalendarUi((s) => s.currentView);
+  const setCurrentView = useCalendarUi((s) => s.setCurrentView);
+  const goToPrevious = useCalendarUi((s) => s.goToPrevious);
+  const goToNext = useCalendarUi((s) => s.goToNext);
+  const goToToday = useCalendarUi((s) => s.goToToday);
+  const toggleSidebar = useCalendarUi((s) => s.toggleSidebar);
+  const toggleSearch = useCalendarUi((s) => s.toggleSearch);
+  const openEventModal = useCalendarUi((s) => s.openEventModal);
 
   const title =
     currentView === 'week'
@@ -30,64 +31,71 @@ export default function CalendarHeader(): ReactElement {
   const nextLabel = currentView === 'week' ? t('calendar.nextWeek') : t('calendar.nextMonth');
 
   return (
-    <header className="glass-surface-heavy sticky top-0 z-30 flex h-[56px] items-center justify-between px-3">
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={toggleSidebar}
-          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-[var(--nf-color-surface-hover)] sm:hidden"
-          aria-label={t('calendar.toggleSidebar')}
-        >
-          <Menu className="h-5 w-5" />
-        </button>
-        <button
-          type="button"
-          onClick={goToPrevious}
-          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-[var(--nf-color-surface-hover)]"
-          aria-label={prevLabel}
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </button>
-        <button
-          type="button"
-          onClick={goToNext}
-          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-[var(--nf-color-surface-hover)]"
-          aria-label={nextLabel}
-        >
-          <ChevronRight className="h-5 w-5" />
-        </button>
-        <button
-          type="button"
+    <header className={`glass-surface-heavy ${styles.header}`}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-1)' }}>
+        <span className={styles.mobileOnly}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleSidebar}
+            aria-label={t('calendar.toggleSidebar')}
+          >
+            <Menu size={20} />
+          </Button>
+        </span>
+        <Button variant="ghost" size="sm" onClick={goToPrevious} aria-label={prevLabel}>
+          <ChevronLeft size={20} />
+        </Button>
+        <Button variant="ghost" size="sm" onClick={goToNext} aria-label={nextLabel}>
+          <ChevronRight size={20} />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={goToToday}
-          className="ml-1 rounded-full bg-[var(--nf-color-accent-subtle)] px-3 text-sm font-medium text-[var(--nf-color-accent)]"
+          style={{
+            marginInlineStart: 'var(--nf-space-1)',
+            borderRadius: 'var(--nf-radius-pill)',
+            backgroundColor: 'var(--nf-color-accent-subtle)',
+            color: 'var(--nf-color-accent)',
+            fontWeight: 'var(--nf-weight-medium)',
+          }}
         >
           {t('calendar.today')}
-        </button>
+        </Button>
       </div>
 
-      <h1 className="text-[16px] font-semibold" style={{ color: 'var(--nf-color-fg)' }}>
+      <h1
+        style={{
+          fontSize: 'var(--nf-text-base)',
+          fontWeight: 'var(--nf-weight-semibold)',
+          color: 'var(--nf-color-fg)',
+        }}
+      >
         {title}
       </h1>
 
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => openEventModal()}
-          className="hidden items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90 sm:flex"
-          style={{ background: 'var(--nf-color-accent)' }}
-        >
-          <Plus className="h-4 w-4" />
-          {t('calendar.createNewEvent')}
-        </button>
-        <button
-          type="button"
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-2)' }}>
+        <span className={styles.desktopOnly}>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => openEventModal()}
+            style={{ borderRadius: 'var(--nf-radius-pill)' }}
+          >
+            <Plus size={16} />
+            {t('calendar.createNewEvent')}
+          </Button>
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={toggleSearch}
-          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-[var(--nf-color-surface-hover)]"
           aria-label={t('search.searchEvents')}
         >
-          <Search className="h-5 w-5" />
-        </button>
-        <div className="segmented-control hidden sm:flex">
+          <Search size={20} />
+        </Button>
+        <div className={`segmented-control ${styles.segmented}`}>
           {(['month', 'week'] as const).map((view) => (
             <button
               key={view}

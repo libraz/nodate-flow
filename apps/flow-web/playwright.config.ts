@@ -20,6 +20,13 @@ export default defineConfig({
   retries: isCI ? 2 : 0,
   ...(isCI ? { workers: 2 } : {}),
   reporter: [['html', { open: 'never' }]],
+  snapshotDir: './e2e/snapshots',
+  snapshotPathTemplate: '{snapshotDir}/{arg}{ext}',
+  expect: {
+    toHaveScreenshot: {
+      maxDiffPixelRatio: 0.01,
+    },
+  },
   use: {
     baseURL: WEB_BASE_URL,
     trace: 'on-first-retry',

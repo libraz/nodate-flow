@@ -119,15 +119,15 @@ type CreateLensOutput struct {
 
 // ListLensesInput is the query for GET /workspaces/{wsId}/lenses.
 type ListLensesInput struct {
-	WsID      string  `path:"wsId"`
+	WsID      string `path:"wsId"`
 	ProjectID string `query:"projectId" doc:"Filter by project public id"`
-	Limit     int32   `query:"limit" minimum:"1" maximum:"200" default:"50"`
-	Offset    int32   `query:"offset" minimum:"0" default:"0"`
+	Limit     int32  `query:"limit" minimum:"1" maximum:"200" default:"50"`
+	Offset    int32  `query:"offset" minimum:"0" default:"0"`
 }
 
 // ListLensesBody is the response body for GET /workspaces/{wsId}/lenses.
 type ListLensesBody struct {
-	Total  int64  `json:"total"`
+	Total  int64       `json:"total"`
 	Lenses []SavedLens `json:"lenses"`
 }
 

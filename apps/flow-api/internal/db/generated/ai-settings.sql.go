@@ -7,6 +7,8 @@ package generated
 
 import (
 	"context"
+	"database/sql"
+	"time"
 )
 
 const getAiSettings = `-- name: GetAiSettings :one
@@ -28,6 +30,20 @@ WHERE workspace_id = ?
 LIMIT 1
 `
 
+type GetAiSettingsRow struct {
+	ID                        uint32       `json:"-"`
+	WorkspaceID               uint32       `json:"-"`
+	EmbedModel                string       `json:"embedModel"`
+	EmbedBudgetCentsDay       uint32       `json:"embedBudgetCentsDay"`
+	DuplicateThresholdHigh    string       `json:"duplicateThresholdHigh"`
+	DuplicateThresholdLow     string       `json:"duplicateThresholdLow"`
+	AutoActionEnabled         bool         `json:"autoActionEnabled"`
+	AutoActionIntervalMinutes uint32       `json:"autoActionIntervalMinutes"`
+	AutoActionThreshold       string       `json:"autoActionThreshold"`
+	UpdatedAt                 sql.NullTime `json:"updatedAt"`
+	CreatedAt                 time.Time    `json:"createdAt"`
+}
+
 // ============================================================================
 // ai_settings queries (ADR 0003)
 // Per-workspace AI knobs: embed model, daily embed budget, and the
@@ -36,9 +52,9 @@ LIMIT 1
 // Fetch the ai_settings row for a workspace. Returns sql.ErrNoRows when the
 // workspace has never written a row; the caller should fall back to the
 // column defaults (mock-768 / 100 cents/day / 0.870 / 0.750).
-func (q *Queries) GetAiSettings(ctx context.Context, workspaceID uint32) (AiSetting, error) {
+func (q *Queries) GetAiSettings(ctx context.Context, workspaceID uint32) (GetAiSettingsRow, error) {
 	row := q.db.QueryRowContext(ctx, getAiSettings, workspaceID)
-	var i AiSetting
+	var i GetAiSettingsRow
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,

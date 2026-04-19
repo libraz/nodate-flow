@@ -41,18 +41,18 @@ var totalAsInt64 = handlerutil.TotalAsInt64
 
 // TimeboxDTO is the public DTO for a timebox row.
 type TimeboxDTO struct {
-	ID                 string  `json:"id" doc:"Timebox public id (UUID v7)"`
-	ProjectID          string  `json:"projectId,omitempty"`
-	ProjectName        string  `json:"projectName,omitempty"`
-	CreatorID          string  `json:"creatorId"`
-	CreatorDisplayName string  `json:"creatorDisplayName"`
-	Name               string  `json:"name"`
-	Description        string  `json:"description,omitempty"`
-	StartsOn           string  `json:"startsOn" doc:"YYYY-MM-DD"`
-	EndsOn             string  `json:"endsOn" doc:"YYYY-MM-DD"`
-	Status             string  `json:"status"`
-	UpdatedAt          int64   `json:"updatedAt"`
-	CreatedAt          int64   `json:"createdAt"`
+	ID                 string `json:"id" doc:"Timebox public id (UUID v7)"`
+	ProjectID          string `json:"projectId,omitempty"`
+	ProjectName        string `json:"projectName,omitempty"`
+	CreatorID          string `json:"creatorId"`
+	CreatorDisplayName string `json:"creatorDisplayName"`
+	Name               string `json:"name"`
+	Description        string `json:"description,omitempty"`
+	StartsOn           string `json:"startsOn" doc:"YYYY-MM-DD"`
+	EndsOn             string `json:"endsOn" doc:"YYYY-MM-DD"`
+	Status             string `json:"status"`
+	UpdatedAt          int64  `json:"updatedAt"`
+	CreatedAt          int64  `json:"createdAt"`
 }
 
 // TimeboxTaskDTO is the public DTO for a task within a timebox.

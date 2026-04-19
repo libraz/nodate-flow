@@ -67,10 +67,10 @@ func (r *Recorder) Record(ctx context.Context, e Entry) {
 		actorID = sql.NullInt32{Int32: int32(e.ActorID), Valid: true}
 	}
 
-	resourcePublicID := sql.NullString{}
+	var resourcePublicID types.PublicID
 	if e.ResourceID != "" {
 		if parsed, perr := types.Parse(e.ResourceID); perr == nil {
-			resourcePublicID = sql.NullString{String: string(parsed[:]), Valid: true}
+			resourcePublicID = parsed
 		}
 	}
 
@@ -81,13 +81,13 @@ func (r *Recorder) Record(ctx context.Context, e Entry) {
 	// instance_audit_logs so the FK on workspace_id is never violated.
 	if e.WorkspaceID == 0 {
 		_, err := r.q.AppendInstanceAuditLog(ctx, generated.AppendInstanceAuditLogParams{
-			PublicID:           types.New(),
-			ActorUserID:        actorID,
-			Action:             e.Action,
-			TargetResourceType: sql.NullString{String: e.ResourceType, Valid: e.ResourceType != ""},
+			PublicID:               types.New(),
+			ActorUserID:            actorID,
+			Action:                 e.Action,
+			TargetResourceType:     sql.NullString{String: e.ResourceType, Valid: e.ResourceType != ""},
 			TargetResourcePublicID: resourcePublicID,
-			PayloadJson:        metaJSON,
-			OccurredAt:         now,
+			PayloadJson:            metaJSON,
+			OccurredAt:             now,
 		})
 		if err != nil {
 			slog.WarnContext(ctx, "audit: failed to append instance log", slog.String("action", e.Action), slog.String("err", err.Error()))

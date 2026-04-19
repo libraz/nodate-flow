@@ -20,16 +20,19 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/config"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/crypto"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/router"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/integrations"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	logger := slog.New(logutil.NewRedactHandler(
+		slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}),
+	)).With(slog.String("service", "auth-api"))
 	slog.SetDefault(logger)
 
 	cfg, err := config.Load()
@@ -179,6 +182,7 @@ func buildCORS(allowed []string) func(http.Handler) http.Handler {
 	allowCreds := true
 	if len(allowed) == 1 && strings.TrimSpace(allowed[0]) == "*" {
 		allowCreds = false
+		slog.Warn("CORS configured with wildcard origin: credentials (cookies, Authorization header) are disabled per the CORS spec")
 	}
 	return cors.Handler(cors.Options{
 		AllowedOrigins:   allowed,

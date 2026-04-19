@@ -33,6 +33,7 @@ CREATE TABLE ai_invocations (
   KEY idx_ai_invocations_workspace_id_invoked_at (workspace_id, invoked_at),
   KEY idx_ai_invocations_workspace_id_provider_id (workspace_id, provider_id),
   KEY idx_ai_invocations_agent_id_invoked_at (agent_id, invoked_at),
+  KEY idx_ai_invocations_created_at (created_at),
 
   CONSTRAINT fk_ai_invocations_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_ai_invocations_provider FOREIGN KEY (provider_id) REFERENCES ai_providers(id) ON DELETE CASCADE,

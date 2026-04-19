@@ -1674,9 +1674,11 @@ type AiSetting struct {
 	// How often the executor evaluates tasks (minutes); 0 disables
 	AutoActionIntervalMinutes uint32 `json:"autoActionIntervalMinutes"`
 	// Minimum confidence score for an action to be applied automatically
-	AutoActionThreshold string       `json:"autoActionThreshold"`
-	UpdatedAt           sql.NullTime `json:"updatedAt"`
-	CreatedAt           time.Time    `json:"createdAt"`
+	AutoActionThreshold string `json:"autoActionThreshold"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
 }
 
 // Task file attachments metadata
@@ -1979,8 +1981,8 @@ type CalendarInvite struct {
 	CalendarID uint32 `json:"-"`
 	// Internal FK to users.id (invite creator)
 	CreatedByUserID uint32 `json:"-"`
-	// Unique invite token (hex)
-	Token string `json:"token"`
+	// SHA-256 hex of invite token plaintext
+	TokenHash string `json:"tokenHash"`
 	// Role granted on acceptance
 	Role CalendarInvitesRole `json:"role"`
 	// Max number of uses; NULL = unlimited
@@ -2432,8 +2434,9 @@ type OauthState struct {
 	// Optional client-supplied return URL to send the user to after the callback completes
 	RedirectTo sql.NullString `json:"redirectTo"`
 	// Hard expiry; callback handler rejects rows past this timestamp
-	ExpiresAt time.Time `json:"expiresAt"`
-	CreatedAt time.Time `json:"createdAt"`
+	ExpiresAt time.Time    `json:"expiresAt"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
 }
 
 // Wiki/documentation pages with tree structure
@@ -2580,6 +2583,7 @@ type RelationSuggestion struct {
 	ResolvedBy sql.NullInt32 `json:"resolvedBy"`
 	// When the suggestion was accepted or dismissed
 	ResolvedAt sql.NullTime `json:"resolvedAt"`
+	UpdatedAt  sql.NullTime `json:"updatedAt"`
 	CreatedAt  time.Time    `json:"createdAt"`
 }
 
@@ -2808,7 +2812,8 @@ type TaskEmbedding struct {
 	// SHA-256 hex of embedded text
 	ContentHash string `json:"contentHash"`
 	// Last embed time
-	EmbeddedAt time.Time `json:"embeddedAt"`
+	EmbeddedAt time.Time    `json:"embeddedAt"`
+	UpdatedAt  sql.NullTime `json:"updatedAt"`
 }
 
 // Time-bounded work containers
@@ -2951,6 +2956,7 @@ type UserRecoveryCode struct {
 	CodeHash []byte `json:"codeHash"`
 	// Set when the code is consumed at login
 	UsedAt    sql.NullTime `json:"usedAt"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
 	CreatedAt time.Time    `json:"createdAt"`
 }
 

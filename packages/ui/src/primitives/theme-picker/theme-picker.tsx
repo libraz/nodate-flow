@@ -156,7 +156,8 @@ export default function ThemePicker({
                         className={styles.previewBar}
                         style={{
                           flex: i === 2 ? 2 : 1,
-                          backgroundColor: i === 1 ? entry.preview.accent : 'oklch(0% 0 0 / 0.08)',
+                          backgroundColor:
+                            i === 1 ? entry.preview.accent : 'var(--nf-color-border)',
                           borderRadius: entry.preview.radius === '0' ? '0' : '3px',
                         }}
                       />

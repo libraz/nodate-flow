@@ -11,6 +11,7 @@
 import { expect, test } from '@playwright/test';
 
 import { type TestTenant, cleanupTenant, createTestTenant, injectAuth } from './fixtures/tenant';
+import { checkA11y } from './helpers/a11y';
 
 test.describe('keyboard shortcuts', () => {
   let tenant: TestTenant | null = null;
@@ -31,6 +32,9 @@ test.describe('keyboard shortcuts', () => {
 
     // Wait for the app to fully hydrate
     await page.waitForLoadState('networkidle');
+
+    // Accessibility check on the main authenticated view
+    await checkA11y(page);
 
     // The command palette should not be visible initially
     const palette = page

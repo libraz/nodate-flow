@@ -20,14 +20,14 @@ linters-settings:
       crypto-internal:
         list-mode: lax
         files:
-          - "!**/internal/crypto/**"
           - "!**/internal/ai/**"
           - "!**/internal/http/handlers/ai/**"
           - "!**/cmd/secrets-rotate/**"
           - "!**/cmd/api/**"
+          - "!**/tests/**"
         deny:
-          - pkg: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/crypto"
-            desc: "crypto package may only be imported from internal/crypto, internal/ai, internal/http/handlers/ai, and cmd/secrets-rotate"
+          - pkg: "github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
+            desc: "crypto package may only be imported from internal/ai, internal/http/handlers/ai, cmd/api, cmd/secrets-rotate, and tests"
 
 issues:
   exclude-dirs:

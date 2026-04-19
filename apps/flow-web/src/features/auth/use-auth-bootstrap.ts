@@ -39,12 +39,16 @@ async function runBootstrap(): Promise<AuthBootstrapStatus> {
     email: string;
     displayName: string;
     locale: string;
+    themePreference: string;
+    isInstanceAdmin: boolean;
   };
   const user: AuthUser = {
     id: data.id,
     email: data.email,
     displayName: data.displayName,
     locale: data.locale,
+    themePreference: data.themePreference,
+    isInstanceAdmin: data.isInstanceAdmin,
   };
   authStore.getState().setSession(token, user);
   // Seed the react-query cache so ThemeProvider can hydrate from the server

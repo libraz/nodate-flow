@@ -12,7 +12,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { apiRequest, refreshAccessToken } from '../lib/api-client';
+import { refreshAccessToken, sdk } from '../lib/sdk';
 import type { AuthUser } from '../stores/auth-store';
 import { authStore } from '../stores/auth-store';
 
@@ -36,18 +36,19 @@ let bootstrapPromise: Promise<AuthBootstrapStatus> | null = null;
 async function runBootstrap(): Promise<AuthBootstrapStatus> {
   const token = await refreshAccessToken();
   if (!token) return 'unauthenticated';
-  const result = await apiRequest<MeResponse>('/auth/me');
-  if (result.error || !result.data) {
+  const { data, error } = await sdk.GET('/auth/me');
+  if (error || !data) {
     authStore.getState().clearSession();
     return 'unauthenticated';
   }
+  const me = data as MeResponse;
   const user: AuthUser = {
-    id: result.data.id,
-    email: result.data.email,
-    displayName: result.data.displayName,
-    locale: result.data.locale,
-    themePreference: result.data.themePreference,
-    isInstanceAdmin: result.data.isInstanceAdmin,
+    id: me.id,
+    email: me.email,
+    displayName: me.displayName,
+    locale: me.locale,
+    themePreference: me.themePreference,
+    isInstanceAdmin: me.isInstanceAdmin,
   };
   authStore.getState().setSession(token, user);
   return 'authenticated';

@@ -1,267 +1,141 @@
-import { Globe, Monitor, Moon, Sun, X } from 'lucide-react';
-import { type ReactElement, useCallback } from 'react';
+import { Globe } from 'lucide-react';
+import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import Dialog from '@nodate-flow/ui/primitives/dialog';
+import ThemePicker, {
+  DEFAULT_THEME_PREVIEWS,
+  type ThemeFamilyEntry,
+} from '@nodate-flow/ui/primitives/theme-picker';
+import type { ColorMode, ThemeFamily } from '@nodate-flow/ui/providers/theme-provider';
+
 import { type SupportedLanguage, i18n, setLanguage } from '../../i18n';
-import type { ColorMode, Theme } from '../../lib/theme';
-import { useCalendarUiStore } from '../../stores/calendar-ui-store';
+import type { Theme } from '../../lib/theme';
+import { useCalendarUi } from '../../stores/calendar-ui-store';
 
 const LANGUAGES: { value: SupportedLanguage; label: string }[] = [
   { value: 'en', label: 'English' },
   { value: 'ja', label: '\u65E5\u672C\u8A9E' },
 ];
 
-/** Visual theme preview cards */
-function ThemeCard({
-  themeId,
-  label,
-  selected,
-  onSelect,
-}: {
-  themeId: Theme;
-  label: string;
-  selected: boolean;
-  onSelect: () => void;
-}): ReactElement {
-  const previewStyles: Record<
-    Theme,
-    { bg: string; accent: string; radius: string; extra?: string }
-  > = {
-    glass: {
-      bg: 'linear-gradient(135deg, rgba(200,220,255,0.4), rgba(255,200,255,0.3))',
-      accent: '#007aff',
-      radius: '12px',
-    },
-    aurora: { bg: 'linear-gradient(135deg, #e8f5e9, #e0f2f1)', accent: '#2ecc87', radius: '16px' },
-    dotline: { bg: '#f5f5f5', accent: '#ef4444', radius: '0' },
-  };
-
-  const s = previewStyles[themeId];
-
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className="group relative flex flex-col items-center gap-2 rounded-[var(--nf-radius-md)] p-3 transition-all"
-      style={{
-        border: selected ? '2px solid var(--nf-color-accent)' : '2px solid var(--nf-color-border)',
-        backgroundColor: selected ? 'var(--nf-color-accent-subtle)' : 'transparent',
-      }}
-    >
-      {/* Mini preview */}
-      <div
-        className="flex h-[52px] w-full items-end overflow-hidden"
-        style={{ background: s.bg, borderRadius: s.radius }}
-      >
-        <div className="flex w-full gap-1 p-1.5">
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="h-2"
-              style={{
-                flex: i === 2 ? 2 : 1,
-                backgroundColor: i === 1 ? s.accent : 'rgba(0,0,0,0.1)',
-                borderRadius: s.radius === '0' ? '0' : '4px',
-              }}
-            />
-          ))}
-        </div>
-      </div>
-      <span
-        className="text-[12px] font-medium"
-        style={{ color: selected ? 'var(--nf-color-accent)' : 'var(--nf-color-fg-muted)' }}
-      >
-        {label}
-      </span>
-    </button>
-  );
-}
-
-/** Color mode selector with icons */
-function ColorModeButton({
-  mode,
-  label,
-  selected,
-  onSelect,
-}: {
-  mode: ColorMode;
-  label: string;
-  selected: boolean;
-  onSelect: () => void;
-}): ReactElement {
-  const Icon = mode === 'light' ? Sun : mode === 'dark' ? Moon : Monitor;
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className="flex flex-1 flex-col items-center gap-1.5 rounded-[var(--nf-radius-md)] py-2.5 transition-all"
-      style={{
-        border: selected ? '2px solid var(--nf-color-accent)' : '2px solid var(--nf-color-border)',
-        backgroundColor: selected ? 'var(--nf-color-accent-subtle)' : 'transparent',
-      }}
-    >
-      <Icon
-        className="h-5 w-5"
-        style={{ color: selected ? 'var(--nf-color-accent)' : 'var(--nf-color-fg-subtle)' }}
-      />
-      <span
-        className="text-[12px] font-medium"
-        style={{ color: selected ? 'var(--nf-color-accent)' : 'var(--nf-color-fg-muted)' }}
-      >
-        {label}
-      </span>
-    </button>
-  );
-}
-
 export default function SettingsModal(): ReactElement | null {
   const { t } = useTranslation();
-  const showSettings = useCalendarUiStore((s) => s.showSettings);
-  const toggleSettings = useCalendarUiStore((s) => s.toggleSettings);
-  const theme = useCalendarUiStore((s) => s.theme);
-  const colorMode = useCalendarUiStore((s) => s.colorMode);
-  const setTheme = useCalendarUiStore((s) => s.setTheme);
-  const setColorMode = useCalendarUiStore((s) => s.setColorMode);
+  const showSettings = useCalendarUi((s) => s.showSettings);
+  const toggleSettings = useCalendarUi((s) => s.toggleSettings);
+  const theme = useCalendarUi((s) => s.theme);
+  const colorMode = useCalendarUi((s) => s.colorMode);
+  const setTheme = useCalendarUi((s) => s.setTheme);
+  const setColorMode = useCalendarUi((s) => s.setColorMode);
 
   const currentLang = (i18n.language?.substring(0, 2) ?? 'en') as SupportedLanguage;
 
-  const themes: { value: Theme; label: string }[] = [
-    { value: 'glass', label: t('settings.themeGlass') },
-    { value: 'aurora', label: t('settings.themeAurora') },
-    { value: 'dotline', label: t('settings.themeDotline') },
-  ];
-
-  const colorModes: { value: ColorMode; label: string }[] = [
-    { value: 'light', label: t('settings.modeLight') },
-    { value: 'dark', label: t('settings.modeDark') },
-    { value: 'system', label: t('settings.modeSystem') },
-  ];
-
-  const handleBackdropClick = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if (e.target === e.currentTarget) toggleSettings();
+  const themes: ThemeFamilyEntry[] = [
+    {
+      id: 'glass' as ThemeFamily,
+      label: t('settings.themeGlass'),
+      preview: DEFAULT_THEME_PREVIEWS.glass,
     },
-    [toggleSettings],
-  );
+    {
+      id: 'aurora' as ThemeFamily,
+      label: t('settings.themeAurora'),
+      preview: DEFAULT_THEME_PREVIEWS.aurora,
+    },
+    {
+      id: 'dotline' as ThemeFamily,
+      label: t('settings.themeDotline'),
+      preview: DEFAULT_THEME_PREVIEWS.dotline,
+    },
+  ];
+
+  const colorModes = [
+    { mode: 'light' as ColorMode, label: t('settings.modeLight') },
+    { mode: 'dark' as ColorMode, label: t('settings.modeDark') },
+    { mode: 'system' as ColorMode, label: t('settings.modeSystem') },
+  ];
 
   if (!showSettings) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--nf-color-overlay)]"
-      onClick={handleBackdropClick}
-      onKeyDown={undefined}
-      role="presentation"
+    <Dialog
+      open={showSettings}
+      onClose={toggleSettings}
+      title={t('settings.title')}
+      fullScreenOnMobile
+      style={{ maxInlineSize: '26rem' }}
     >
-      <div className="glass-surface-heavy w-full max-w-[420px] rounded-[var(--nf-radius-lg)] ring-1 ring-[var(--nf-color-border)]">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-1">
-          <h2 className="text-[18px] font-semibold" style={{ color: 'var(--nf-color-fg)' }}>
-            {t('settings.title')}
-          </h2>
-          <button
-            type="button"
-            onClick={toggleSettings}
-            className="flex h-8 w-8 items-center justify-center rounded-[var(--nf-radius-sm)] transition-colors hover:bg-[var(--nf-color-surface-hover)]"
-            style={{ color: 'var(--nf-color-fg-subtle)' }}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}>
+        <ThemePicker
+          themes={themes}
+          selectedTheme={theme as ThemeFamily}
+          colorModes={colorModes}
+          selectedColorMode={colorMode as ColorMode}
+          onThemeChange={(t) => setTheme(t as Theme)}
+          onColorModeChange={(m) => setColorMode(m as ColorMode)}
+          themeLabel={t('settings.theme')}
+          colorModeLabel={t('settings.colorMode')}
+        />
+
+        {/* Language */}
+        <div>
+          <span
+            style={{
+              display: 'block',
+              marginBlockEnd: 'var(--nf-space-2)',
+              fontSize: 'var(--nf-text-xs)',
+              fontWeight: 'var(--nf-weight-medium)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              color: 'var(--nf-color-fg-subtle)',
+            }}
           >
-            <X className="h-4.5 w-4.5" />
-          </button>
-        </div>
-
-        <div className="space-y-5 px-6 pt-4 pb-6">
-          {/* Theme selection */}
-          <div>
-            <span
-              className="mb-2.5 block text-[13px] font-medium uppercase tracking-wider"
-              style={{ color: 'var(--nf-color-fg-subtle)' }}
-            >
-              {t('settings.theme')}
-            </span>
-            <div className="grid grid-cols-3 gap-2.5">
-              {themes.map((th) => (
-                <ThemeCard
-                  key={th.value}
-                  themeId={th.value}
-                  label={th.label}
-                  selected={theme === th.value}
-                  onSelect={() => setTheme(th.value)}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Color mode */}
-          <div>
-            <span
-              className="mb-2.5 block text-[13px] font-medium uppercase tracking-wider"
-              style={{ color: 'var(--nf-color-fg-subtle)' }}
-            >
-              {t('settings.colorMode')}
-            </span>
-            <div className="flex gap-2.5">
-              {colorModes.map((cm) => (
-                <ColorModeButton
-                  key={cm.value}
-                  mode={cm.value}
-                  label={cm.label}
-                  selected={colorMode === cm.value}
-                  onSelect={() => setColorMode(cm.value)}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Language */}
-          <div>
-            <span
-              className="mb-2.5 block text-[13px] font-medium uppercase tracking-wider"
-              style={{ color: 'var(--nf-color-fg-subtle)' }}
-            >
-              {t('settings.language')}
-            </span>
-            <div className="flex gap-2.5">
-              {LANGUAGES.map((lang) => (
+            {t('settings.language')}
+          </span>
+          <div style={{ display: 'flex', gap: 'var(--nf-space-2)' }}>
+            {LANGUAGES.map((lang) => {
+              const selected = currentLang === lang.value;
+              return (
                 <button
                   key={lang.value}
                   type="button"
                   onClick={() => setLanguage(lang.value)}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-[var(--nf-radius-md)] py-2.5 transition-all"
                   style={{
-                    border:
-                      currentLang === lang.value
-                        ? '2px solid var(--nf-color-accent)'
-                        : '2px solid var(--nf-color-border)',
-                    backgroundColor:
-                      currentLang === lang.value ? 'var(--nf-color-accent-subtle)' : 'transparent',
+                    all: 'unset',
+                    cursor: 'pointer',
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 'var(--nf-space-2)',
+                    padding: 'var(--nf-space-2) 0',
+                    borderRadius: 'var(--nf-radius-md)',
+                    border: selected
+                      ? '2px solid var(--nf-color-accent)'
+                      : '2px solid var(--nf-color-border)',
+                    backgroundColor: selected ? 'var(--nf-color-accent-subtle)' : 'transparent',
+                    transition: 'background var(--nf-duration-fast) var(--nf-ease-standard)',
                   }}
                 >
                   <Globe
-                    className="h-4 w-4"
+                    size={16}
                     style={{
-                      color:
-                        currentLang === lang.value
-                          ? 'var(--nf-color-accent)'
-                          : 'var(--nf-color-fg-subtle)',
+                      color: selected ? 'var(--nf-color-accent)' : 'var(--nf-color-fg-subtle)',
                     }}
                   />
                   <span
-                    className="text-[13px] font-medium"
                     style={{
-                      color:
-                        currentLang === lang.value
-                          ? 'var(--nf-color-accent)'
-                          : 'var(--nf-color-fg-muted)',
+                      fontSize: 'var(--nf-text-xs)',
+                      fontWeight: 'var(--nf-weight-medium)',
+                      color: selected ? 'var(--nf-color-accent)' : 'var(--nf-color-fg-muted)',
                     }}
                   >
                     {lang.label}
                   </span>
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

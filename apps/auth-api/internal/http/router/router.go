@@ -15,15 +15,15 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth/sessionstore"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	adminhandlers "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/admin"
 	authhandlers "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/auth"
 	inthandlers "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/integrations"
 	wshandlers "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/workspace"
-	integrationspkg "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/integrations"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/middleware"
+	integrationspkg "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/integrations"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
 )
 
@@ -74,6 +74,18 @@ func BuildResult(deps Deps) Result {
 	r := chi.NewRouter()
 	r.Use(middleware.ClientIP())
 	r.Use(middleware.SecurityHeaders())
+	// Global per-IP rate limiter: defence-in-depth against floods
+	// from a single source. Auth-specific endpoints (login, register)
+	// have their own stricter per-group limiters below. Disabled in
+	// integration tests where many parallel tenants hit the same
+	// loopback address.
+	if !deps.DisableRateLimit {
+		globalRL := middleware.NewIPRateLimiter(middleware.RateLimitConfig{
+			MaxRequests: 200,
+			Window:      time.Minute,
+		})
+		r.Use(globalRL.Middleware())
+	}
 
 	newConfig := func() huma.Config {
 		return huma.DefaultConfig("nodate-auth", "0.0.0")

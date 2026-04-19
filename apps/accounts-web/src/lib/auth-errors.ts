@@ -1,30 +1,46 @@
 /**
- * Maps backend error codes (RFC 7807 `type` URI suffix) to i18n keys
- * under `auth:errors.*`.
+ * Maps backend error codes (RFC 7807 `type` URI suffix or matching
+ * substring on `detail`/`title`) to i18n keys under `auth:errors.*`.
+ *
+ * The Huma backend serialises errors as application/problem+json with
+ * the canonical code embedded in the `type` URI (e.g.
+ * `https://nodate-flow.dev/errors/AUTH.LOGIN.INVALID_CREDENTIALS`).
+ * We match by suffix to stay independent of the host portion.
  */
 
-import type { ProblemJson } from './api-client';
+import { AuthErrors } from '@nodate-flow/sdk';
+
+import type { ProblemJson } from './api-error';
 
 export type AuthErrorI18nKey =
-  | 'auth:errors.invalidCredentials'
-  | 'auth:errors.emailTaken'
-  | 'auth:errors.accountLocked'
-  | 'auth:errors.rateLimited'
-  | 'auth:errors.passwordTooWeak'
-  | 'auth:errors.registrationDisabled'
+  | 'auth:errors.invalid_credentials'
+  | 'auth:errors.email_taken'
+  | 'auth:errors.account_locked'
+  | 'auth:errors.rate_limited'
+  | 'auth:errors.password_too_weak'
+  | 'auth:errors.registration_disabled'
   | 'auth:errors.network'
-  | 'auth:errors.totpCodeRequired'
-  | 'auth:errors.totpCodeMismatch'
-  | 'auth:errors.totpChallengeExpired'
-  | 'auth:errors.totpRecoveryInvalid'
-  | 'auth:errors.totpAlreadyEnrolled'
-  | 'auth:errors.totpNotEnrolled'
-  | 'auth:errors.passwordCurrentMismatch'
-  | 'auth:errors.passwordNoLocalIdentity'
-  | 'auth:errors.sessionExpired'
-  | 'auth:errors.sessionRevoked'
-  | 'auth:errors.tokenRefreshInvalid'
-  | 'auth:errors.tokenRefreshExpired'
+  | 'auth:errors.totp_code_required'
+  | 'auth:errors.totp_code_mismatch'
+  | 'auth:errors.totp_challenge_expired'
+  | 'auth:errors.totp_recovery_invalid'
+  | 'auth:errors.totp_recovery_required'
+  | 'auth:errors.totp_already_enrolled'
+  | 'auth:errors.totp_not_enrolled'
+  | 'auth:errors.totp_not_configured'
+  | 'auth:errors.password_current_mismatch'
+  | 'auth:errors.password_no_local_identity'
+  | 'auth:errors.session_expired'
+  | 'auth:errors.session_revoked'
+  | 'auth:errors.oidc_state_mismatch'
+  | 'auth:errors.oidc_nonce_mismatch'
+  | 'auth:errors.oidc_id_token_invalid'
+  | 'auth:errors.oidc_provider_unreachable'
+  | 'auth:errors.pat_token_unknown'
+  | 'auth:errors.pat_expired'
+  | 'auth:errors.token_refresh_invalid'
+  | 'auth:errors.token_refresh_expired'
+  | 'auth:errors.token_signature_invalid'
   | 'auth:errors.generic'
   | 'auth:errors.unknown';
 
@@ -38,32 +54,55 @@ export function extractErrorCode(problem: ProblemJson | null | undefined): strin
   const candidates: Array<string | undefined> = [problem.type, problem.detail, problem.title];
   for (const c of candidates) {
     if (!c) continue;
+    // Match the last URI segment, e.g. ".../errors/AUTH.LOGIN.X" -> "AUTH.LOGIN.X".
+    // Then strip any trailing human-readable suffix like "CODE: Something went wrong".
     const lastSegment = c.split('/').pop()?.split(':')[0]?.trim();
     if (lastSegment?.includes('.')) return lastSegment;
   }
   return null;
 }
 
+/**
+ * Maps an error code to its corresponding i18n key. Covers all auth error
+ * codes defined in errors/auth.yaml.
+ */
 const AUTH_ERROR_MAP: Record<string, AuthErrorI18nKey> = {
-  'AUTH.LOGIN.INVALID_CREDENTIALS': 'auth:errors.invalidCredentials',
-  'AUTH.LOGIN.ACCOUNT_LOCKED': 'auth:errors.accountLocked',
-  'AUTH.LOGIN.RATE_LIMITED_AFTER_RETRIES': 'auth:errors.rateLimited',
-  'AUTH.REGISTER.EMAIL_ALREADY_TAKEN': 'auth:errors.emailTaken',
-  'AUTH.REGISTER.PASSWORD_TOO_WEAK': 'auth:errors.passwordTooWeak',
-  'AUTH.REGISTER.INSTANCE_REGISTRATION_DISABLED': 'auth:errors.registrationDisabled',
-  'AUTH.TOTP.CODE_REQUIRED': 'auth:errors.totpCodeRequired',
-  'AUTH.TOTP.CODE_MISMATCH': 'auth:errors.totpCodeMismatch',
-  'AUTH.TOTP.CHALLENGE_EXPIRED': 'auth:errors.totpChallengeExpired',
-  'AUTH.TOTP.RECOVERY_CODE_INVALID': 'auth:errors.totpRecoveryInvalid',
-  'AUTH.TOTP.ALREADY_ENROLLED': 'auth:errors.totpAlreadyEnrolled',
-  'AUTH.TOTP.NOT_ENROLLED': 'auth:errors.totpNotEnrolled',
-  'AUTH.PASSWORD.CURRENT_MISMATCH': 'auth:errors.passwordCurrentMismatch',
-  'AUTH.PASSWORD.TOO_WEAK': 'auth:errors.passwordTooWeak',
-  'AUTH.PASSWORD.NO_LOCAL_IDENTITY': 'auth:errors.passwordNoLocalIdentity',
-  'AUTH.SESSION.EXPIRED': 'auth:errors.sessionExpired',
-  'AUTH.SESSION.REVOKED': 'auth:errors.sessionRevoked',
-  'AUTH.TOKEN.REFRESH_INVALID': 'auth:errors.tokenRefreshInvalid',
-  'AUTH.TOKEN.REFRESH_EXPIRED': 'auth:errors.tokenRefreshExpired',
+  // login
+  [AuthErrors.AUTH_LOGIN_INVALID_CREDENTIALS.code]: 'auth:errors.invalid_credentials',
+  [AuthErrors.AUTH_LOGIN_ACCOUNT_LOCKED.code]: 'auth:errors.account_locked',
+  [AuthErrors.AUTH_LOGIN_RATE_LIMITED_AFTER_RETRIES.code]: 'auth:errors.rate_limited',
+  // register
+  [AuthErrors.AUTH_REGISTER_EMAIL_ALREADY_TAKEN.code]: 'auth:errors.email_taken',
+  [AuthErrors.AUTH_REGISTER_PASSWORD_TOO_WEAK.code]: 'auth:errors.password_too_weak',
+  [AuthErrors.AUTH_REGISTER_INSTANCE_REGISTRATION_DISABLED.code]:
+    'auth:errors.registration_disabled',
+  // totp
+  [AuthErrors.AUTH_TOTP_CODE_REQUIRED.code]: 'auth:errors.totp_code_required',
+  [AuthErrors.AUTH_TOTP_CODE_MISMATCH.code]: 'auth:errors.totp_code_mismatch',
+  [AuthErrors.AUTH_TOTP_RECOVERY_CODE_INVALID.code]: 'auth:errors.totp_recovery_invalid',
+  [AuthErrors.AUTH_TOTP_RECOVERY_CODE_REQUIRED.code]: 'auth:errors.totp_recovery_required',
+  [AuthErrors.AUTH_TOTP_ALREADY_ENROLLED.code]: 'auth:errors.totp_already_enrolled',
+  [AuthErrors.AUTH_TOTP_NOT_ENROLLED.code]: 'auth:errors.totp_not_enrolled',
+  [AuthErrors.AUTH_TOTP_NOT_CONFIGURED.code]: 'auth:errors.totp_not_configured',
+  // password
+  [AuthErrors.AUTH_PASSWORD_CURRENT_MISMATCH.code]: 'auth:errors.password_current_mismatch',
+  [AuthErrors.AUTH_PASSWORD_TOO_WEAK.code]: 'auth:errors.password_too_weak',
+  [AuthErrors.AUTH_PASSWORD_NO_LOCAL_IDENTITY.code]: 'auth:errors.password_no_local_identity',
+  // session
+  [AuthErrors.AUTH_SESSION_EXPIRED.code]: 'auth:errors.session_expired',
+  [AuthErrors.AUTH_SESSION_REVOKED.code]: 'auth:errors.session_revoked',
+  // oidc
+  [AuthErrors.AUTH_OIDC_STATE_MISMATCH.code]: 'auth:errors.oidc_state_mismatch',
+  [AuthErrors.AUTH_OIDC_NONCE_MISMATCH.code]: 'auth:errors.oidc_nonce_mismatch',
+  [AuthErrors.AUTH_OIDC_ID_TOKEN_INVALID.code]: 'auth:errors.oidc_id_token_invalid',
+  [AuthErrors.AUTH_OIDC_PROVIDER_UNREACHABLE.code]: 'auth:errors.oidc_provider_unreachable',
+  // pat
+  [AuthErrors.AUTH_PAT_TOKEN_UNKNOWN.code]: 'auth:errors.pat_token_unknown',
+  [AuthErrors.AUTH_PAT_EXPIRED.code]: 'auth:errors.pat_expired',
+  // token
+  [AuthErrors.AUTH_TOKEN_REFRESH_INVALID.code]: 'auth:errors.token_refresh_invalid',
+  [AuthErrors.AUTH_TOKEN_REFRESH_EXPIRED.code]: 'auth:errors.token_refresh_expired',
+  [AuthErrors.AUTH_TOKEN_SIGNATURE_INVALID.code]: 'auth:errors.token_signature_invalid',
 };
 
 /** Maps a problem+json payload to an i18n key. */

@@ -14,9 +14,10 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
 import AuthCard from '../components/auth-card';
-import { apiRequest } from '../lib/api-client';
+import type { ProblemJson } from '../lib/api-error';
 import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../lib/auth-errors';
 import { type SignupFormValues, signupSchema } from '../lib/auth-schemas';
+import { sdk } from '../lib/sdk';
 import { type AuthUser, authStore, selectIsAuthenticated, useAuth } from '../stores/auth-store';
 
 interface RegisterResponse {
@@ -57,34 +58,35 @@ function SignupPage(): ReactElement {
   const onSubmit = async (values: SignupFormValues): Promise<void> => {
     setServerError(null);
     try {
-      const result = await apiRequest<RegisterResponse>('/auth/register', {
-        method: 'POST',
+      const { data, error } = await sdk.POST('/auth/register', {
         body: {
           email: values.email,
           password: values.password,
           displayName: values.displayName,
         },
       });
-      if (result.error || !result.data) {
-        setServerError(mapAuthError(result.error));
+      if (error || !data) {
+        setServerError(mapAuthError(error as ProblemJson | undefined));
         return;
       }
-      authStore.getState().setAccessToken(result.data.accessToken);
-      const me = await apiRequest<MeResponse>('/auth/me');
-      if (me.error || !me.data) {
-        setServerError(mapAuthError(me.error));
+      const reg = data as RegisterResponse;
+      authStore.getState().setAccessToken(reg.accessToken);
+      const { data: meData, error: meError } = await sdk.GET('/auth/me');
+      if (meError || !meData) {
+        setServerError(mapAuthError(meError as ProblemJson | undefined));
         authStore.getState().clearSession();
         return;
       }
+      const me = meData as MeResponse;
       const user: AuthUser = {
-        id: me.data.id,
-        email: me.data.email,
-        displayName: me.data.displayName,
-        locale: me.data.locale,
-        themePreference: me.data.themePreference,
-        isInstanceAdmin: me.data.isInstanceAdmin,
+        id: me.id,
+        email: me.email,
+        displayName: me.displayName,
+        locale: me.locale,
+        themePreference: me.themePreference,
+        isInstanceAdmin: me.isInstanceAdmin,
       };
-      authStore.getState().setSession(result.data.accessToken, user);
+      authStore.getState().setSession(reg.accessToken, user);
       void navigate({ to: '/profile', replace: true });
     } catch (err) {
       setServerError(mapAuthThrown(err));
@@ -177,7 +179,7 @@ function SignupPage(): ReactElement {
             color: 'var(--nf-color-fg-muted)',
           }}
         >
-          {t('signup.haveAccount')} <Link to="/login">{t('signup.loginLink')}</Link>
+          {t('signup.have_account')} <Link to="/login">{t('signup.login_link')}</Link>
         </p>
       </form>
     </AuthCard>

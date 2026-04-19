@@ -10,8 +10,9 @@ import {
   useState,
 } from 'react';
 
-import { useCalendarUiStore } from '../../stores/calendar-ui-store';
+import { useCalendarUi } from '../../stores/calendar-ui-store';
 import { useCalendarEventsQuery, useUpdateEventMutation } from './api';
+import styles from './calendar-grid.module.css';
 import DayCell from './day-cell';
 import type { CalendarEvent } from './types';
 
@@ -29,7 +30,6 @@ function buildMonthGrid(year: number, month: number): MonthDay[] {
   const startDow = firstOfMonth.weekday % 7;
   const startDate = firstOfMonth.minus({ days: startDow });
   const daysInMonth = firstOfMonth.daysInMonth ?? 30;
-  // Use 5 weeks (35 cells) when possible, 6 weeks (42) only when needed
   const totalCells = startDow + daysInMonth > 35 ? 42 : 35;
 
   const days: MonthDay[] = [];
@@ -68,7 +68,6 @@ function groupEventsByDay(events: CalendarEvent[]): Map<string, CalendarEvent[]>
   return map;
 }
 
-/** Split days into week arrays of 7 */
 function toWeeks(days: MonthDay[]): MonthDay[][] {
   const weeks: MonthDay[][] = [];
   for (let i = 0; i < days.length; i += 7) {
@@ -91,10 +90,7 @@ function WeekRow({
   onEventDrop: (event: CalendarEvent, targetDate: DateTime) => void;
 }): ReactElement {
   return (
-    <div
-      className="week-row grid grid-cols-7"
-      style={{ height: `calc((100dvh - 89px) / ${weekCount})` }}
-    >
+    <div className={styles.weekRow} style={{ height: `calc((100dvh - 89px) / ${weekCount})` }}>
       {week.map((day) => {
         const isoDate = day.date.toISODate() ?? '';
         const dow = day.date.weekday % 7;
@@ -146,11 +142,10 @@ function MonthSection({
   );
 }
 
-/** Thin month boundary marker shown between month sections */
 function MonthBoundary({ month }: { month: DateTime }): ReactElement {
   return (
-    <div className="month-boundary" data-boundary-month={month.toFormat('yyyy-MM')}>
-      <span className="month-boundary-label">
+    <div className={styles.boundary} data-boundary-month={month.toFormat('yyyy-MM')}>
+      <span className={styles.boundaryLabel}>
         {month.toLocaleString({ month: 'long', year: 'numeric' })}
       </span>
     </div>
@@ -158,7 +153,8 @@ function MonthBoundary({ month }: { month: DateTime }): ReactElement {
 }
 
 export default function CalendarGrid(): ReactElement {
-  const { displayMonth, setDisplayMonth } = useCalendarUiStore();
+  const displayMonth = useCalendarUi((s) => s.displayMonth);
+  const setDisplayMonth = useCalendarUi((s) => s.setDisplayMonth);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastDisplayKey = useRef(displayMonth.toFormat('yyyy-MM'));
   const programmaticScroll = useRef(false);
@@ -171,7 +167,6 @@ export default function CalendarGrid(): ReactElement {
     );
   }, [renderCenter]);
 
-  // Event data for the full range
   const rangeStart = months[0]?.startOf('month').minus({ days: 6 }).toISODate() ?? '';
   const rangeEnd = months[months.length - 1]?.endOf('month').plus({ days: 7 }).toISODate() ?? '';
 
@@ -180,13 +175,12 @@ export default function CalendarGrid(): ReactElement {
   const holidayProvider = useMemo(() => getOrCreateProvider('JP'), []);
   const updateMutation = useUpdateEventMutation();
 
-  /** Handle event drop: shift start/end by the date delta and persist. */
   const handleEventDrop = useCallback(
     (dragData: CalendarEvent, targetDate: DateTime) => {
       const origStart = DateTime.fromISO(dragData.startAt);
       const origEnd = DateTime.fromISO(dragData.endAt);
       const dayDelta = targetDate.startOf('day').diff(origStart.startOf('day'), 'days').days;
-      if (dayDelta === 0) return; // dropped on same day
+      if (dayDelta === 0) return;
       const newStart = origStart.plus({ days: dayDelta });
       const newEnd = origEnd.plus({ days: dayDelta });
       const timezone = DateTime.local().zoneName;
@@ -201,7 +195,6 @@ export default function CalendarGrid(): ReactElement {
     [updateMutation],
   );
 
-  // Scroll to a specific month
   const scrollToMonth = useCallback((monthKey: string, behavior: ScrollBehavior = 'smooth') => {
     const el = scrollRef.current?.querySelector(`[data-month="${monthKey}"]`);
     if (el && scrollRef.current) {
@@ -216,7 +209,6 @@ export default function CalendarGrid(): ReactElement {
     }
   }, []);
 
-  // When displayMonth changes externally (nav buttons), scroll to it
   useEffect(() => {
     const monthKey = displayMonth.toFormat('yyyy-MM');
     if (monthKey === lastDisplayKey.current) return;
@@ -238,17 +230,13 @@ export default function CalendarGrid(): ReactElement {
     }
   }, [displayMonth, months, scrollToMonth]);
 
-  // Detect which month is most visible on scroll using scrollTop
   useEffect(() => {
     const scroll = scrollRef.current;
     if (!scroll) return;
 
     const handleScroll = () => {
       if (programmaticScroll.current) return;
-
-      // Probe point: 35% down from the visible scroll area top
       const probeOffset = scroll.scrollTop + scroll.clientHeight * 0.35;
-
       const sections = scroll.querySelectorAll('[data-month-section]');
       for (const section of sections) {
         const el = section as HTMLElement;
@@ -274,7 +262,6 @@ export default function CalendarGrid(): ReactElement {
     return () => scroll.removeEventListener('scroll', handleScroll);
   }, [setDisplayMonth]);
 
-  // Initial scroll to current month on mount
   const initialKey = useRef(displayMonth.toFormat('yyyy-MM'));
   const hasScrolledInitial = useRef(false);
   useEffect(() => {
@@ -296,32 +283,23 @@ export default function CalendarGrid(): ReactElement {
   }, [scrollToMonth]);
 
   return (
-    <div className="relative flex-1 overflow-hidden">
+    <div className={styles.wrapper}>
       {/* Sticky weekday header */}
-      <div className="weekday-strip absolute inset-x-0 top-0 z-10 grid grid-cols-7 border-b border-[var(--nf-color-hairline)]">
+      <div className={styles.weekdayStrip}>
         {SUNDAY_FIRST.map((name, i) => {
           let colorStyle: string;
           if (i === 0) colorStyle = 'var(--nf-cal-sunday)';
           else if (i === 6) colorStyle = 'var(--nf-cal-saturday)';
           else colorStyle = 'var(--nf-color-fg-muted)';
           return (
-            <div
-              key={name}
-              className="py-2 text-center text-[12px] font-medium uppercase tracking-wider"
-              style={{ color: colorStyle }}
-            >
+            <div key={name} className={styles.weekdayCell} style={{ color: colorStyle }}>
               {name}
             </div>
           );
         })}
       </div>
 
-      {/* Scrollable content — snaps to week rows */}
-      <div
-        ref={scrollRef}
-        className="calendar-scroll absolute inset-0 overflow-y-auto"
-        style={{ top: '33px' }}
-      >
+      <div ref={scrollRef} className={styles.scrollArea}>
         {months.map((month, idx) => (
           <Fragment key={month.toFormat('yyyy-MM')}>
             {idx > 0 && <MonthBoundary month={month} />}

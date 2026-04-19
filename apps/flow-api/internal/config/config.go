@@ -68,10 +68,10 @@ type Config struct {
 	// (requests per second) applied uniformly to every configured LLM
 	// destination. 0 disables the limiter (fail-open). The burst size
 	// defaults to max(1, rps).
-	OutboundLlmRps float64 `env:"NF_FLOW_OUTBOUNF_LLM_RPS" envDefault:"0"`
+	OutboundLlmRps float64 `env:"NF_FLOW_OUTBOUND_LLM_RPS" envDefault:"0"`
 	// OutboundLlmBurst overrides the burst size for the per-provider
 	// egress limiter. 0 → derived from OutboundLlmRps.
-	OutboundLlmBurst int `env:"NF_FLOW_OUTBOUNF_LLM_BURST" envDefault:"0"`
+	OutboundLlmBurst int `env:"NF_FLOW_OUTBOUND_LLM_BURST" envDefault:"0"`
 
 	// SessionStore selects the refresh-token session driver.
 	//   mysql (default) — wraps sqlc queries against the sessions table.
@@ -87,7 +87,7 @@ type Config struct {
 	StreamBackend string `env:"NF_FLOW_STREAM_BACKEND" envDefault:"memory"`
 	// OutboundBackend selects the egress rate limiter driver: "memory"
 	// (default) or "redis" (requires NF_REDIS_ADDR).
-	OutboundBackend string `env:"NF_FLOW_OUTBOUNF_BACKEND" envDefault:"memory"`
+	OutboundBackend string `env:"NF_FLOW_OUTBOUND_BACKEND" envDefault:"memory"`
 
 	// AgentTickInterval is the global period at which the agent
 	// scheduler fires interval-scheduled agents. There is no per-agent
@@ -133,6 +133,11 @@ type Config struct {
 	// AutoActionDryRun logs what auto-actions would be applied without
 	// actually mutating the database. Useful for tuning thresholds.
 	AutoActionDryRun bool `env:"NF_FLOW_AUTO_ACTION_DRY_RUN" envDefault:"false"`
+
+	// MetricsPort is the port for the internal-only Prometheus metrics
+	// HTTP server. Metrics are served on a separate listener so they are
+	// never exposed through the public-facing API port.
+	MetricsPort string `env:"NF_FLOW_METRICS_PORT" envDefault:"9090"`
 
 	// OtelEndpoint is the OTLP HTTP collector endpoint (e.g.
 	// "localhost:4318"). When empty, tracing is disabled and the server

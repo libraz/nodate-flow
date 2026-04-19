@@ -12,8 +12,6 @@ export type ColorMode = 'light' | 'dark' | 'system';
 export type ThemePreference = `${Theme}-${'light' | 'dark'}` | 'system';
 
 const STORAGE_KEY = 'nf.theme';
-const LEGACY_THEME_KEY = 'nt_theme';
-const LEGACY_COLOR_MODE_KEY = 'nt_color_mode';
 
 function resolveSystemColorScheme(): 'light' | 'dark' {
   if (typeof window === 'undefined') return 'light';
@@ -48,30 +46,6 @@ export function watchSystemColorScheme(callback: (isDark: boolean) => void): () 
   return () => mql.removeEventListener('change', handler);
 }
 
-/**
- * Migrate legacy localStorage keys (nt_theme + nt_color_mode) to the
- * shared nf.theme key. Called once on boot.
- */
-function migrateLegacyKeys(): void {
-  try {
-    const legacyTheme = localStorage.getItem(LEGACY_THEME_KEY);
-    const legacyMode = localStorage.getItem(LEGACY_COLOR_MODE_KEY);
-    if (legacyTheme || legacyMode) {
-      const theme = legacyTheme ?? 'glass';
-      const mode = legacyMode ?? 'system';
-      if (mode === 'system') {
-        localStorage.setItem(STORAGE_KEY, 'system');
-      } else {
-        localStorage.setItem(STORAGE_KEY, `${theme}-${mode}`);
-      }
-      localStorage.removeItem(LEGACY_THEME_KEY);
-      localStorage.removeItem(LEGACY_COLOR_MODE_KEY);
-    }
-  } catch {
-    // ignore
-  }
-}
-
 /** Split a stored preference into theme + colorMode. */
 export function splitPreference(pref: string): { theme: Theme; colorMode: ColorMode } {
   if (pref === 'system') return { theme: 'glass', colorMode: 'system' };
@@ -88,7 +62,6 @@ export function combinePreference(theme: Theme, colorMode: ColorMode): ThemePref
 
 /** Read persisted theme + colorMode from the shared localStorage key. */
 export function loadPreference(): { theme: Theme; colorMode: ColorMode } {
-  migrateLegacyKeys();
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) return splitPreference(stored);

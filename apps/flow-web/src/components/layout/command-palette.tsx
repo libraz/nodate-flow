@@ -11,6 +11,7 @@
  */
 
 import Icon from '@nodate-flow/ui/icon';
+import { cx } from '@nodate-flow/ui/lib/cx';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
 import { useQueries } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
@@ -45,6 +46,7 @@ import type { TaskListItem } from '../../features/tasks/api';
 import { useWorkspacesQuery } from '../../features/workspaces/api';
 import { sdk } from '../../lib/sdk';
 import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
+import css from './command-palette.module.css';
 
 interface CommandItem {
   id: string;
@@ -120,36 +122,18 @@ function CommandModeBody({ prompt, wsId, onSelect }: CommandModeBodyProps): Reac
   };
 
   if (!wsId) {
-    return (
-      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
-        {t('dock.command_palette.no_workspace')}
-      </p>
-    );
+    return <p className={css.emptyText}>{t('dock.command_palette.no_workspace')}</p>;
   }
 
   return (
     // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard trap for command result
     <div onKeyDown={handleKeyDown} tabIndex={0} style={{ outline: 'none' }}>
-      <div
-        style={{
-          fontSize: '0.6875rem',
-          textTransform: 'uppercase',
-          letterSpacing: '0.04em',
-          color: 'var(--nf-color-fg-subtle)',
-          padding: '0.25rem 0.5rem',
-        }}
-      >
-        {t('dock.command_palette.group_command')}
-      </div>
+      <div className={css.groupLabel}>{t('dock.command_palette.group_command')}</div>
 
       {resolveCommand.isPending && (
         <p
-          style={{
-            margin: 0,
-            padding: '0.5rem 0.75rem',
-            color: 'var(--nf-color-fg-muted)',
-            fontSize: '0.875rem',
-          }}
+          className={css.emptyText}
+          style={{ padding: 'var(--nf-space-2) var(--nf-space-3)' }}
           aria-live="polite"
         >
           {t('dock.command_palette.resolving')}
@@ -158,11 +142,10 @@ function CommandModeBody({ prompt, wsId, onSelect }: CommandModeBodyProps): Reac
 
       {resolveCommand.isError && (
         <p
+          className={css.emptyText}
           style={{
-            margin: 0,
-            padding: '0.5rem 0.75rem',
+            padding: 'var(--nf-space-2) var(--nf-space-3)',
             color: 'var(--nf-color-danger)',
-            fontSize: '0.875rem',
           }}
           aria-live="assertive"
         >
@@ -171,14 +154,7 @@ function CommandModeBody({ prompt, wsId, onSelect }: CommandModeBodyProps): Reac
       )}
 
       {!resolveCommand.isPending && !result && !resolveCommand.isError && (
-        <p
-          style={{
-            margin: 0,
-            padding: '0.5rem 0.75rem',
-            color: 'var(--nf-color-fg-muted)',
-            fontSize: '0.875rem',
-          }}
-        >
+        <p className={css.emptyText} style={{ padding: 'var(--nf-space-2) var(--nf-space-3)' }}>
           {prompt.length > 0
             ? t('dock.command_palette.hint_select')
             : t('dock.command_palette.placeholder_command')}
@@ -186,38 +162,14 @@ function CommandModeBody({ prompt, wsId, onSelect }: CommandModeBodyProps): Reac
       )}
 
       {result && (
-        <div
-          style={{
-            padding: '0.5rem 0.75rem',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.5rem',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div className={css.commandResult}>
+          <div className={css.commandToolRow}>
+            <span className={css.commandToolName}>{result.tool}</span>
             <span
-              style={{
-                fontWeight: 600,
-                fontSize: '0.875rem',
-                color: 'var(--nf-color-fg)',
-              }}
-            >
-              {result.tool}
-            </span>
-            <span
-              style={{
-                fontSize: '0.6875rem',
-                padding: '0.125rem 0.375rem',
-                borderRadius: '0.25rem',
-                background:
-                  result.confidence >= 0.8
-                    ? 'var(--nf-color-success-subtle, oklch(0.85 0.15 145))'
-                    : 'var(--nf-color-warning-subtle, oklch(0.85 0.15 85))',
-                color:
-                  result.confidence >= 0.8
-                    ? 'var(--nf-color-success, oklch(0.35 0.15 145))'
-                    : 'var(--nf-color-warning, oklch(0.35 0.15 85))',
-              }}
+              className={cx(
+                css.confidenceBadge,
+                result.confidence >= 0.8 ? css.confidenceHigh : css.confidenceLow,
+              )}
             >
               {t('dock.command_palette.confidence', {
                 score: String(Math.round(result.confidence * 100)),
@@ -225,27 +177,9 @@ function CommandModeBody({ prompt, wsId, onSelect }: CommandModeBodyProps): Reac
             </span>
           </div>
 
-          <pre
-            style={{
-              margin: 0,
-              fontSize: '0.75rem',
-              color: 'var(--nf-color-fg-muted)',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              fontFamily: 'var(--font-mono, monospace)',
-            }}
-          >
-            {JSON.stringify(result.args, null, 2)}
-          </pre>
+          <pre className={css.commandArgs}>{JSON.stringify(result.args, null, 2)}</pre>
 
-          <p
-            style={{
-              margin: 0,
-              fontSize: '0.8125rem',
-              color: 'var(--nf-color-fg)',
-            }}
-            aria-live="polite"
-          >
+          <p className={css.emptyText} style={{ color: 'var(--nf-color-fg)' }} aria-live="polite">
             {result.confidence >= 0.8
               ? t('dock.command_palette.confirm_execute')
               : t('dock.command_palette.confirm_low', { tool: result.tool })}
@@ -489,9 +423,7 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
 
   let flatIdx = -1;
   return (
-    <div
-      style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', minInlineSize: '22rem' }}
-    >
+    <div className={css.body}>
       <input
         ref={inputRef}
         type="text"
@@ -504,14 +436,7 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
             : t('dock.command_palette.placeholder')
         }
         aria-label={t('dock.command_palette.title')}
-        style={{
-          padding: '0.5rem 0.75rem',
-          borderRadius: '0.375rem',
-          border: '1px solid var(--nf-color-border)',
-          background: 'var(--nf-color-bg)',
-          color: 'var(--nf-color-fg)',
-          fontSize: '0.875rem',
-        }}
+        className={css.input}
       />
 
       {mode === 'command' ? (
@@ -519,25 +444,13 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
       ) : (
         <>
           {filtered.length === 0 ? (
-            <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
-              {t('dock.command_palette.empty')}
-            </p>
+            <p className={css.emptyText}>{t('dock.command_palette.empty')}</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {grouped.map(([group, its]) => (
                 <div key={group}>
-                  <div
-                    style={{
-                      fontSize: '0.6875rem',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.04em',
-                      color: 'var(--nf-color-fg-subtle)',
-                      padding: '0.25rem 0.5rem',
-                    }}
-                  >
-                    {group}
-                  </div>
-                  <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                  <div className={css.groupLabel}>{group}</div>
+                  <ul className={css.resultList}>
                     {its.map((it) => {
                       flatIdx += 1;
                       const isActive = flatIdx === active;
@@ -551,22 +464,7 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
                               const idx = filtered.findIndex((f) => f.id === it.id);
                               if (idx >= 0) setActive(idx);
                             }}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.5rem',
-                              inlineSize: '100%',
-                              textAlign: 'start',
-                              padding: '0.5rem 0.75rem',
-                              borderRadius: '0.375rem',
-                              border: 'none',
-                              background: isActive
-                                ? 'var(--nf-color-surface-hover)'
-                                : 'transparent',
-                              color: 'var(--nf-color-fg)',
-                              cursor: 'pointer',
-                              fontSize: '0.875rem',
-                            }}
+                            className={cx(css.resultItem, isActive && css.resultItemActive)}
                           >
                             {it.icon ? (
                               <Icon
@@ -588,40 +486,23 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
         </>
       )}
 
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.875rem',
-          paddingBlockStart: '0.5rem',
-          borderBlockStart: '1px solid var(--nf-color-border)',
-          fontSize: '0.6875rem',
-          color: 'var(--nf-color-fg-subtle, var(--nf-color-fg-muted))',
-        }}
-      >
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}>
-          <kbd style={kbdStyle}>↑</kbd>
-          <kbd style={kbdStyle}>↓</kbd>
+      <div className={css.hintBar}>
+        <span className={css.hintGroup}>
+          <kbd className={css.kbd}>↑</kbd>
+          <kbd className={css.kbd}>↓</kbd>
           {t('dock.command_palette.hint_nav')}
         </span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}>
-          <kbd style={kbdStyle}>↵</kbd>
+        <span className={css.hintGroup}>
+          <kbd className={css.kbd}>↵</kbd>
           {t('dock.command_palette.hint_select')}
         </span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}>
-          <kbd style={kbdStyle}>Esc</kbd>
+        <span className={css.hintGroup}>
+          <kbd className={css.kbd}>Esc</kbd>
           {t('dock.command_palette.hint_close')}
         </span>
         {mode === 'search' && (
-          <span
-            style={{
-              marginInlineStart: 'auto',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.375rem',
-            }}
-          >
-            <kbd style={kbdStyle}>&gt;</kbd>
+          <span className={css.hintGroupEnd}>
+            <kbd className={css.kbd}>&gt;</kbd>
             {t('dock.command_palette.command_hint')}
           </span>
         )}
@@ -629,17 +510,6 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
     </div>
   );
 }
-
-const kbdStyle = {
-  fontFamily: 'var(--font-mono, monospace)',
-  fontSize: '0.6875rem',
-  padding: '0.0625rem 0.375rem',
-  borderRadius: '0.25rem',
-  border: '1px solid var(--nf-color-border)',
-  background: 'var(--nf-color-surface, transparent)',
-  color: 'var(--nf-color-fg, var(--nf-color-fg))',
-  lineHeight: 1.4,
-} as const;
 
 export interface CommandPaletteProps {
   open: boolean;

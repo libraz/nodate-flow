@@ -2,14 +2,14 @@
 // endpoints (/workspaces/{wsId}/ai/providers) and the per-user MCP token
 // endpoints (/workspaces/{wsId}/me/mcp-tokens).
 //
-// SECURITY POLICY
+// # SECURITY POLICY
 //
 // Plaintext LLM API keys flow through this package only as inbound request
-// bodies. They are encrypted via internal/crypto and the plaintext is
+// bodies. They are encrypted via go-shared/crypto and the plaintext is
 // dropped before any handler returns. NO handler in this package may call
 // Queries.FindProviderForDecrypt; that query is reserved for
 // internal/ai/providers/. The depguard rule in apps/flow-api/.golangci.yml
-// keeps internal/crypto importable here for Encrypt only.
+// keeps go-shared/crypto importable here for Encrypt only.
 package ai
 
 import (
@@ -20,7 +20,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/nlcommand"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/nlquery"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/crypto"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
@@ -28,10 +28,10 @@ import (
 
 // Deps is the dependency bundle for handlers in this package.
 type Deps struct {
-	DB       *sql.DB
-	Queries  *generated.Queries
-	Cipher   *crypto.Cipher
-	NlQuery  *nlquery.Compiler
+	DB      *sql.DB
+	Queries *generated.Queries
+	Cipher  *crypto.Cipher
+	NlQuery *nlquery.Compiler
 	// NlCommand resolves natural language commands into MCP tool calls.
 	// Nil when no AI provider is configured (NF_AI_MOCK=0 and no provider row).
 	NlCommand *nlcommand.Resolver

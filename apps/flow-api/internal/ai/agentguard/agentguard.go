@@ -17,7 +17,7 @@ type Agent struct {
 	PublicID            string
 	Enabled             bool
 	Paused              bool
-	MonthlyCostCapCents *int64 // nil = no cap
+	MonthlyCostCapCents *int64   // nil = no cap
 	AllowedScopes       []string // nil = inherit from caller token
 }
 

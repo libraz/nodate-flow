@@ -14,8 +14,8 @@ import { useTranslation } from 'react-i18next';
 
 import AuthCard from '../../components/auth-card';
 import { type SupportedLanguage, setLanguage } from '../../i18n';
-import { apiRequest } from '../../lib/api-client';
 import { type ProfileFormValues, profileSchema } from '../../lib/auth-schemas';
+import { sdk } from '../../lib/sdk';
 import { type ThemePreference, useTheme } from '../../providers/theme-provider';
 import { type AuthUser, authStore, selectUser, useAuth } from '../../stores/auth-store';
 
@@ -52,24 +52,24 @@ function ProfilePage(): ReactElement {
     setServerError(null);
     setSuccess(false);
     try {
-      const result = await apiRequest<MeResponse>('/auth/me', {
-        method: 'PATCH',
+      const { data, error } = await sdk.PATCH('/auth/me', {
         body: {
           displayName: values.displayName,
           locale: values.locale,
           themePreference: values.themePreference,
         },
       });
-      if (result.error || !result.data) {
+      if (error || !data) {
         setServerError(t('errors.generic'));
         return;
       }
+      const me = data as MeResponse;
       const updatedUser: AuthUser = {
-        id: result.data.id,
-        email: result.data.email,
-        displayName: result.data.displayName,
-        locale: result.data.locale,
-        themePreference: result.data.themePreference,
+        id: me.id,
+        email: me.email,
+        displayName: me.displayName,
+        locale: me.locale,
+        themePreference: me.themePreference,
         isInstanceAdmin: authStore.getState().user?.isInstanceAdmin ?? false,
       };
       authStore.getState().setSession(authStore.getState().accessToken ?? '', updatedUser);
@@ -101,7 +101,7 @@ function ProfilePage(): ReactElement {
         </h1>
 
         <FormField
-          label={t('profile.displayName')}
+          label={t('profile.display_name')}
           required
           {...(errors.displayName?.message ? { error: t(errors.displayName.message) } : {})}
         >
@@ -129,7 +129,7 @@ function ProfilePage(): ReactElement {
                 }}
               >
                 <option value="en">English</option>
-                <option value="ja">{t('profile.localeJa')}</option>
+                <option value="ja">{t('profile.locale_ja')}</option>
               </select>
             );
           }}
@@ -152,11 +152,11 @@ function ProfilePage(): ReactElement {
                   fontSize: 'var(--nf-text-sm, 0.875rem)',
                 }}
               >
-                <option value="system">{t('profile.themeSystem')}</option>
-                <option value="aurora-light">{t('profile.themeAuroraLight')}</option>
-                <option value="aurora-dark">{t('profile.themeAuroraDark')}</option>
-                <option value="dotline-light">{t('profile.themeDotlineLight')}</option>
-                <option value="dotline-dark">{t('profile.themeDotlineDark')}</option>
+                <option value="system">{t('profile.theme_system')}</option>
+                <option value="aurora-light">{t('profile.theme_aurora_light')}</option>
+                <option value="aurora-dark">{t('profile.theme_aurora_dark')}</option>
+                <option value="dotline-light">{t('profile.theme_dotline_light')}</option>
+                <option value="dotline-dark">{t('profile.theme_dotline_dark')}</option>
               </select>
             );
           }}
@@ -198,7 +198,7 @@ function ProfilePage(): ReactElement {
             color: 'var(--nf-color-fg-muted)',
           }}
         >
-          <Link to="/security">{t('profile.securityLink')}</Link>
+          <Link to="/security">{t('profile.security_link')}</Link>
         </p>
       </form>
     </AuthCard>

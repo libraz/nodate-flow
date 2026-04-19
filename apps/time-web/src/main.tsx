@@ -1,15 +1,16 @@
-import type React from 'react';
-import { StrictMode } from 'react';
+import ConfirmProvider from '@nodate-flow/ui/primitives/confirm';
+import { RouterProvider } from '@tanstack/react-router';
+import { type ReactElement, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ErrorBoundary } from 'react-error-boundary';
 
-import App from './app';
-import { initI18n } from './i18n';
+import { I18nProvider } from './providers/i18n-provider';
+import { QueryProvider } from './providers/query-provider';
+import { ThemeProvider } from './providers/theme-provider';
+import { router } from './router/router';
 import './styles/main.css';
 
-initI18n();
-
-function FatalError(): React.ReactElement {
+function FatalError(): ReactElement {
   return (
     <main style={{ padding: '2rem' }}>
       <p>Failed to initialize the application.</p>
@@ -25,7 +26,14 @@ if (!container) {
 createRoot(container).render(
   <StrictMode>
     <ErrorBoundary fallback={<FatalError />}>
-      <App />
+      <I18nProvider>
+        <QueryProvider>
+          <ThemeProvider>
+            <RouterProvider router={router} />
+            <ConfirmProvider />
+          </ThemeProvider>
+        </QueryProvider>
+      </I18nProvider>
     </ErrorBoundary>
   </StrictMode>,
 );

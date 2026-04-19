@@ -39,10 +39,17 @@ const EDGES: { from: GraphState; to: GraphState; label: string }[] = [
  * Phase 4 state graph (4.WEB-2) shows clearly that github / slack /
  * google can drive transitions from outside.
  */
+/** Brand colors for external integration sources (fixed, not theme-dependent). */
+const BRAND_COLOR = {
+  github: '#6e5494',
+  slack: '#4a154b',
+  google: '#4285f4',
+} as const;
+
 const EXTERNAL_SOURCES: { id: string; label: string; color: string; y: number }[] = [
-  { id: 'github', label: 'github', color: '#6e5494', y: 30 },
-  { id: 'slack', label: 'slack', color: '#4a154b', y: 120 },
-  { id: 'google', label: 'google', color: '#4285f4', y: 210 },
+  { id: 'github', label: 'github', color: BRAND_COLOR.github, y: 30 },
+  { id: 'slack', label: 'slack', color: BRAND_COLOR.slack, y: 120 },
+  { id: 'google', label: 'google', color: BRAND_COLOR.google, y: 210 },
 ];
 
 export interface StateGraphProps {

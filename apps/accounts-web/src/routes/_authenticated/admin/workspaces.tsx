@@ -8,7 +8,7 @@ import { Link, createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { apiRequest } from '../../../lib/api-client';
+import { sdk } from '../../../lib/sdk';
 
 interface AdminWorkspace {
   id: string;
@@ -81,17 +81,29 @@ function WorkspacesPage(): ReactElement {
     if (search) params.set('search', search);
     if (statusFilter !== 'all') params.set('status', statusFilter);
 
-    void apiRequest<WorkspacesResponse>(`/admin/workspaces?${params.toString()}`).then((result) => {
-      if (cancelled) return;
-      if (result.error || !result.data) {
-        setError(t('errors.generic'));
+    void sdk
+      .GET('/admin/workspaces', {
+        params: {
+          query: {
+            page: String(page),
+            perPage: String(perPage),
+            ...(search ? { search } : {}),
+            ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+          },
+        },
+      })
+      .then((result) => {
+        if (cancelled) return;
+        if (result.error || !result.data) {
+          setError(t('errors.generic'));
+          setLoading(false);
+          return;
+        }
+        const body = result.data as WorkspacesResponse;
+        setWorkspaces(body.items);
+        setTotal(body.total);
         setLoading(false);
-        return;
-      }
-      setWorkspaces(result.data.items);
-      setTotal(result.data.total);
-      setLoading(false);
-    });
+      });
 
     return () => {
       cancelled = true;
@@ -144,9 +156,9 @@ function WorkspacesPage(): ReactElement {
             fontSize: 'var(--nf-text-sm, 0.875rem)',
           }}
         >
-          <option value="all">{t('workspaces.allWorkspaces')}</option>
-          <option value="active">{t('workspaces.activeOnly')}</option>
-          <option value="suspended">{t('workspaces.suspendedOnly')}</option>
+          <option value="all">{t('workspaces.all_workspaces')}</option>
+          <option value="active">{t('workspaces.active_only')}</option>
+          <option value="suspended">{t('workspaces.suspended_only')}</option>
         </select>
       </div>
 
@@ -166,7 +178,7 @@ function WorkspacesPage(): ReactElement {
       {loading ? (
         <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('common.loading')}</p>
       ) : workspaces.length === 0 ? (
-        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('workspaces.noResults')}</p>
+        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('workspaces.no_results')}</p>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
@@ -177,7 +189,7 @@ function WorkspacesPage(): ReactElement {
                 <th style={thStyle}>{t('workspaces.members')}</th>
                 <th style={thStyle}>{t('workspaces.projects')}</th>
                 <th style={thStyle}>{t('workspaces.status')}</th>
-                <th style={thStyle}>{t('workspaces.createdAt')}</th>
+                <th style={thStyle}>{t('workspaces.created_at')}</th>
               </tr>
             </thead>
             <tbody>

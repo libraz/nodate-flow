@@ -388,6 +388,196 @@ func TestGoogle_Refresh_RotatedRefreshToken(t *testing.T) {
 		"when provider issues a new refresh token, must adopt it")
 }
 
+// --- Revoke HTTP semantics ---
+
+func TestGithub_Revoke_204IsSuccess(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Contains(t, r.URL.Path, "/applications/")
+		assert.Equal(t, http.MethodDelete, r.Method)
+		// Verify Basic auth is used (client credentials).
+		user, pass, ok := r.BasicAuth()
+		assert.True(t, ok, "revoke must use HTTP Basic auth")
+		assert.Equal(t, "my-id", user)
+		assert.Equal(t, "my-secret", pass)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	p := &GithubProvider{clientID: "my-id", clientSecret: "my-secret",
+		hc: rewriteClient(srv.URL, map[string]string{"https://api.github.com": ""})}
+	err := p.Revoke(context.Background(), TokenSet{AccessToken: "gho_tok"})
+	require.NoError(t, err, "HTTP 204 means token was revoked successfully")
+}
+
+func TestGithub_Revoke_404IsSuccess(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	p := &GithubProvider{clientID: "id", clientSecret: "secret",
+		hc: rewriteClient(srv.URL, map[string]string{"https://api.github.com": ""})}
+	err := p.Revoke(context.Background(), TokenSet{AccessToken: "gho_tok"})
+	require.NoError(t, err,
+		"HTTP 404 means token is already gone — must be treated as success")
+}
+
+func TestGithub_Revoke_500IsError(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("internal error"))
+	}))
+	defer srv.Close()
+
+	p := &GithubProvider{clientID: "id", clientSecret: "secret",
+		hc: rewriteClient(srv.URL, map[string]string{"https://api.github.com": ""})}
+	err := p.Revoke(context.Background(), TokenSet{AccessToken: "gho_tok"})
+	require.Error(t, err, "server error must propagate so caller can log it")
+}
+
+func TestSlack_Revoke_OkTrueIsSuccess(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "Bearer xoxp-tok", r.Header.Get("Authorization"),
+			"Slack revoke must send the user token as Bearer")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer srv.Close()
+
+	p := &SlackProvider{clientID: "id", clientSecret: "secret",
+		hc: rewriteClient(srv.URL, map[string]string{"https://slack.com": ""})}
+	err := p.Revoke(context.Background(), TokenSet{AccessToken: "xoxp-tok"})
+	require.NoError(t, err)
+}
+
+func TestSlack_Revoke_NotAuthedIsSuccess(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":false,"error":"not_authed"}`))
+	}))
+	defer srv.Close()
+
+	p := &SlackProvider{clientID: "id", clientSecret: "secret",
+		hc: rewriteClient(srv.URL, map[string]string{"https://slack.com": ""})}
+	err := p.Revoke(context.Background(), TokenSet{AccessToken: "xoxp-tok"})
+	require.NoError(t, err,
+		"not_authed means token is already invalid — treat as success")
+}
+
+func TestSlack_Revoke_TokenRevokedIsSuccess(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":false,"error":"token_revoked"}`))
+	}))
+	defer srv.Close()
+
+	p := &SlackProvider{clientID: "id", clientSecret: "secret",
+		hc: rewriteClient(srv.URL, map[string]string{"https://slack.com": ""})}
+	err := p.Revoke(context.Background(), TokenSet{AccessToken: "xoxp-tok"})
+	require.NoError(t, err,
+		"token_revoked means already revoked — treat as success")
+}
+
+func TestSlack_Revoke_InvalidAuthIsSuccess(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":false,"error":"invalid_auth"}`))
+	}))
+	defer srv.Close()
+
+	p := &SlackProvider{clientID: "id", clientSecret: "secret",
+		hc: rewriteClient(srv.URL, map[string]string{"https://slack.com": ""})}
+	err := p.Revoke(context.Background(), TokenSet{AccessToken: "xoxp-tok"})
+	require.NoError(t, err,
+		"invalid_auth means token is already unusable — treat as success")
+}
+
+func TestSlack_Revoke_UnknownErrorIsError(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":false,"error":"internal_error"}`))
+	}))
+	defer srv.Close()
+
+	p := &SlackProvider{clientID: "id", clientSecret: "secret",
+		hc: rewriteClient(srv.URL, map[string]string{"https://slack.com": ""})}
+	err := p.Revoke(context.Background(), TokenSet{AccessToken: "xoxp-tok"})
+	require.Error(t, err, "unknown Slack error must propagate")
+	assert.Contains(t, err.Error(), "internal_error")
+}
+
+func TestGoogle_Revoke_200IsSuccess(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		assert.Equal(t, "my-refresh", r.FormValue("token"),
+			"Google revoke must prefer refresh token over access token")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	p := &GoogleCalendarProvider{clientID: "id", clientSecret: "secret",
+		hc: rewriteClient(srv.URL, map[string]string{"https://oauth2.googleapis.com": ""})}
+	err := p.Revoke(context.Background(), TokenSet{
+		AccessToken: "access", RefreshToken: "my-refresh",
+	})
+	require.NoError(t, err)
+}
+
+func TestGoogle_Revoke_FallsBackToAccessToken(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		assert.Equal(t, "access-only", r.FormValue("token"),
+			"must use access token when no refresh token exists")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	p := &GoogleCalendarProvider{clientID: "id", clientSecret: "secret",
+		hc: rewriteClient(srv.URL, map[string]string{"https://oauth2.googleapis.com": ""})}
+	err := p.Revoke(context.Background(), TokenSet{AccessToken: "access-only"})
+	require.NoError(t, err)
+}
+
+func TestGoogle_Revoke_InvalidTokenIsSuccess(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":"invalid_token"}`))
+	}))
+	defer srv.Close()
+
+	p := &GoogleCalendarProvider{clientID: "id", clientSecret: "secret",
+		hc: rewriteClient(srv.URL, map[string]string{"https://oauth2.googleapis.com": ""})}
+	err := p.Revoke(context.Background(), TokenSet{AccessToken: "already-gone"})
+	require.NoError(t, err,
+		"Google 400 + invalid_token means token is already revoked — treat as success")
+}
+
+func TestGoogle_Revoke_OtherErrorIsError(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("server error"))
+	}))
+	defer srv.Close()
+
+	p := &GoogleCalendarProvider{clientID: "id", clientSecret: "secret",
+		hc: rewriteClient(srv.URL, map[string]string{"https://oauth2.googleapis.com": ""})}
+	err := p.Revoke(context.Background(), TokenSet{RefreshToken: "rt"})
+	require.Error(t, err, "non-success/non-invalid_token responses must propagate")
+}
+
 // --- Sentinel errors ---
 
 func TestErrNotConfigured_IsDistinct(t *testing.T) {

@@ -66,7 +66,7 @@ function AdminLayout(): ReactElement | null {
           {t('nav.workspaces')}
         </Link>
         <Link to="/admin/audit-logs" style={navLinkStyle}>
-          {t('nav.auditLogs')}
+          {t('nav.audit_logs')}
         </Link>
         <Link to="/admin/admins" style={navLinkStyle}>
           {t('nav.admins')}

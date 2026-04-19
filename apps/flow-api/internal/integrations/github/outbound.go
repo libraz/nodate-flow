@@ -17,10 +17,10 @@ import (
 // MCP surface needs and routes every request through the package
 // rate limiter so a runaway agent cannot flood github.com.
 type OutboundClient struct {
-	Token    string
-	BaseURL  string // defaults to https://api.github.com
-	HTTP     *http.Client
-	Limiter  outbound.RateLimiter
+	Token     string
+	BaseURL   string // defaults to https://api.github.com
+	HTTP      *http.Client
+	Limiter   outbound.RateLimiter
 	UserAgent string
 }
 

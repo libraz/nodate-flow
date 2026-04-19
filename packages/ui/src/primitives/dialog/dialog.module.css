@@ -23,6 +23,26 @@
   gap: var(--nf-space-4);
 }
 
+/* Mobile bottom-sheet variant (< 768px) */
+@media (max-width: 767px) {
+  .dialogMobile {
+    position: fixed;
+    inset-inline: 0;
+    inset-block-end: 0;
+    max-inline-size: 100%;
+    max-block-size: 92vh;
+    border-radius: var(--nf-radius-lg) var(--nf-radius-lg) 0 0;
+    border-block-end: none;
+    overflow-y: auto;
+    padding-block-end: calc(var(--nf-space-6) + env(safe-area-inset-bottom));
+  }
+
+  .overlayMobile {
+    align-items: flex-end;
+    padding: 0;
+  }
+}
+
 .dialog:focus-visible {
   outline: none;
   box-shadow: var(--nf-shadow-focus);

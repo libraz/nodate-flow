@@ -11,6 +11,7 @@
 # Allowed locations (excluded from scan):
 #   - packages/ui/src/themes/    (theme definitions must use raw colors)
 #   - packages/ui/src/tokens/    (token definitions)
+#   - apps/time-web/src/styles/main.css (calendar token definitions --nf-cal-*)
 #   - *.test.* / *.spec.*        (test files)
 #   - node_modules/
 
@@ -57,6 +58,7 @@ for dir in "${SCAN_DIRS[@]}"; do
     2>/dev/null \
     | grep -v 'themes/' \
     | grep -v 'tokens/' \
+    | grep -v 'styles/main.css' \
     | grep -v '\/\*.*\*\/' \
     | grep -v 'var(--' \
     || true)
@@ -67,6 +69,10 @@ for dir in "${SCAN_DIRS[@]}"; do
     if echo "$line" | grep -qE 'var\(--nf-'; then
       continue
     fi
+    # Filter out typed brand color constant declarations (intentionally hardcoded)
+    if echo "$line" | grep -qE "^\s*(github|slack|google|signal|ai|task):.*'#|BRAND_COLOR|SOURCE_COLOR"; then
+      continue
+    fi
     count=$((count + 1))
     found_files="$found_files\n$line"
   done < <(grep -rnE "(color|background|border-color|fill|stroke).*$COLOR_PATTERN" "$dir" "${EXCLUDES[@]}" \
@@ -75,6 +81,7 @@ for dir in "${SCAN_DIRS[@]}"; do
     2>/dev/null \
     | grep -v '\.d\.ts' \
     | grep -v '\/\/' \
+    | grep -v 'var(--nf-' \
     || true)
 done
 

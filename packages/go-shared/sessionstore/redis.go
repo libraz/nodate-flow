@@ -1,4 +1,4 @@
-// Package sessionstore — Redis driver.
+// Package sessionstore -- Redis driver.
 //
 // Keyspace:
 //
@@ -21,7 +21,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
 )
 
 // RedisStore is the Redis-backed [Store] implementation.
@@ -33,9 +33,11 @@ type RedisStore struct {
 // *redis.Client. The caller owns the client lifecycle.
 func NewRedisStore(rdb *redis.Client) *RedisStore { return &RedisStore{rdb: rdb} }
 
-func sessionKey(hash string) string   { return "session:" + hash }
-func userKey(userID uint32) string    { return "user:" + strconv.FormatUint(uint64(userID), 10) + ":sessions" }
-func pubKey(publicID types.PublicID) string {
+func sessionKey(hash string) string { return "session:" + hash }
+func userKey(userID uint32) string {
+	return "user:" + strconv.FormatUint(uint64(userID), 10) + ":sessions"
+}
+func pubKey(publicID dbtype.PublicID) string {
 	return "session:pub:" + hex.EncodeToString(publicID[:])
 }
 
@@ -90,7 +92,7 @@ func (s *RedisStore) FindByRefreshHash(ctx context.Context, hash string) (*Sessi
 	if err != nil {
 		return nil, fmt.Errorf("sessionstore/redis: invalid publicId %q: %w", m["publicId"], err)
 	}
-	var pub types.PublicID
+	var pub dbtype.PublicID
 	copy(pub[:], pubBytes)
 	var lastUsed *time.Time
 	if raw, ok := m["lastUsedAt"]; ok && raw != "" {
@@ -152,7 +154,7 @@ func (s *RedisStore) RotateRefreshHash(ctx context.Context, oldHash, newHash str
 	}
 
 	// We need the publicId and userId from the old session to build
-	// the correct key names. Read them first — the Lua script will
+	// the correct key names. Read them first -- the Lua script will
 	// atomically verify the key still exists.
 	old, err := s.FindByRefreshHash(ctx, oldHash)
 	if err != nil {
@@ -170,10 +172,10 @@ func (s *RedisStore) RotateRefreshHash(ctx context.Context, oldHash, newHash str
 			pubKey(old.PublicID),
 		},
 		expiresAt.Format(time.RFC3339Nano), // ARGV[1]
-		now,                                 // ARGV[2]
-		ttlSec,                              // ARGV[3]
-		oldHash,                             // ARGV[4]
-		newHash,                             // ARGV[5]
+		now,                                // ARGV[2]
+		ttlSec,                             // ARGV[3]
+		oldHash,                            // ARGV[4]
+		newHash,                            // ARGV[5]
 	).Text()
 	if err != nil {
 		if err.Error() == "NOT_FOUND" {
@@ -210,7 +212,7 @@ func (s *RedisStore) ListActive(ctx context.Context, userID uint32) ([]Session, 
 }
 
 // RevokeAllExcept implements [Store].
-func (s *RedisStore) RevokeAllExcept(ctx context.Context, userID uint32, keep types.PublicID) error {
+func (s *RedisStore) RevokeAllExcept(ctx context.Context, userID uint32, keep dbtype.PublicID) error {
 	sessions, err := s.ListActive(ctx, userID)
 	if err != nil {
 		return err
@@ -230,7 +232,7 @@ func (s *RedisStore) RevokeAllExcept(ctx context.Context, userID uint32, keep ty
 // current refresh hash so we can delete the HASH and pop it from the
 // user's set in one pipeline. The session's userID is validated before
 // deletion to prevent cross-user revocation.
-func (s *RedisStore) Revoke(ctx context.Context, userID uint32, publicID types.PublicID) error {
+func (s *RedisStore) Revoke(ctx context.Context, userID uint32, publicID dbtype.PublicID) error {
 	hash, err := s.rdb.Get(ctx, pubKey(publicID)).Result()
 	if errors.Is(err, redis.Nil) {
 		return nil

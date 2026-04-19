@@ -76,15 +76,9 @@ export default function TaskCard({
         // clicks that reach here come from the card's padding / badges.
         onSelect(task.id);
       }}
-      style={{
-        padding: '0.875rem',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.5rem',
-        cursor: 'grab',
-      }}
+      className="flex flex-col gap-2 cursor-grab p-3.5"
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.25rem' }}>
+      <div className="flex items-start gap-1">
         <Link
           to="/tasks/$taskId"
           params={{ taskId: task.id }}
@@ -100,14 +94,7 @@ export default function TaskCard({
             e.stopPropagation();
             onSelect(task.id);
           }}
-          style={{
-            flex: 1,
-            fontWeight: 600,
-            color: 'var(--nf-color-fg)',
-            lineHeight: 1.3,
-            wordBreak: 'break-word',
-            textDecoration: 'none',
-          }}
+          className="flex-1 font-semibold text-[var(--nf-color-fg)] leading-[1.3] break-words no-underline"
         >
           {task.title}
         </Link>
@@ -118,7 +105,7 @@ export default function TaskCard({
           }
         />
       </div>
-      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+      <div className="flex gap-2 items-center flex-wrap">
         {priority > 0 ? <Badge tone={tone}>{priorityLabel}</Badge> : null}
         {task.dueOn ? (
           <Badge

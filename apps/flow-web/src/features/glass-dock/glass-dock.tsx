@@ -13,6 +13,7 @@ import Icon from '@nodate-flow/ui/icon';
 import Badge from '@nodate-flow/ui/primitives/badge';
 import Card from '@nodate-flow/ui/primitives/card';
 import { useMatches, useNavigate } from '@tanstack/react-router';
+import type { TFunction } from 'i18next';
 import { Sparkles, X } from 'lucide-react';
 import { type ReactElement, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -45,12 +46,6 @@ const BADGE_STYLE: React.CSSProperties = {
   lineHeight: 1.6,
 };
 
-const PRIORITY_LABELS: Record<number, string> = {
-  1: '\u4F4E',
-  2: '\u4E2D',
-  3: '\u9AD8',
-};
-
 /** Map a 0-1 confidence score to a qualitative i18n key. */
 function confidenceLabel(score: number, t: (key: string) => string): string {
   if (score >= 0.8) return t('confidence.high');
@@ -59,8 +54,7 @@ function confidenceLabel(score: number, t: (key: string) => string): string {
 }
 
 /** Format a YYYY-MM-DD date as a relative expression. */
-// biome-ignore lint/suspicious/noExplicitAny: i18next TFunction overloads are complex
-function formatRelativeDate(dateStr: string, t: any): string {
+function formatRelativeDate(dateStr: string, t: TFunction): string {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const target = new Date(`${dateStr}T00:00:00`);
@@ -72,19 +66,24 @@ function formatRelativeDate(dateStr: string, t: any): string {
 }
 
 /** Produce a human-readable label for a single filter condition. */
-function formatFilterCondition(field: string, operator: string, value: unknown): string {
+function formatFilterCondition(
+  field: string,
+  operator: string,
+  value: unknown,
+  t: TFunction,
+): string {
   if (field === 'priority' && operator === 'eq' && typeof value === 'number') {
-    const label = PRIORITY_LABELS[value] ?? String(value);
-    return `\u512A\u5148\u5EA6: ${label}`;
+    const label = String(t(`priority_label.${value}`));
+    return String(t('filter_condition.priority', { label }));
   }
   if (field === 'blocked' && operator === 'eq' && value === true) {
-    return '\u30D6\u30ED\u30C3\u30AF\u4E2D';
+    return String(t('filter_condition.blocked'));
   }
   if (field === 'due_on' && operator === 'between' && value === 'this_week') {
-    return '\u671F\u65E5: \u4ECA\u9031';
+    return String(t('filter_condition.due_this_week'));
   }
   if (field === 'status' && operator === 'in' && Array.isArray(value)) {
-    return `\u30B9\u30C6\u30FC\u30BF\u30B9: ${(value as string[]).join(', ')}`;
+    return String(t('filter_condition.status', { values: (value as string[]).join(', ') }));
   }
   const display = Array.isArray(value) ? (value as unknown[]).join(', ') : String(value ?? '');
   return `${field} ${operator} ${display}`;
@@ -183,7 +182,7 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
         for (const [op, value] of Object.entries(conditions)) {
           filterBadges.push({
             key: `${field}-${op}`,
-            label: formatFilterCondition(field, op, value),
+            label: formatFilterCondition(field, op, value, t),
           });
         }
       }

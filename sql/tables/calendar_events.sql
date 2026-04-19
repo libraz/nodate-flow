@@ -54,6 +54,7 @@ CREATE TABLE calendar_events (
   KEY idx_calendar_events_calendar_range (calendar_id, start_at, end_at),
   KEY idx_calendar_events_workspace_owner (workspace_id, owner_user_id, start_at),
   KEY idx_calendar_events_calendar_recurrence (calendar_id, recurrence_end),
+  KEY idx_calendar_events_workspace_range (workspace_id, start_at, end_at),
   KEY idx_calendar_events_task (task_id),
   FULLTEXT KEY ft_calendar_events_title_memo (title, memo),
 

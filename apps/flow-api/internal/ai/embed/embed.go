@@ -82,11 +82,11 @@ func (c *Client) EmbedTask(ctx context.Context, taskID uint32, title, descriptio
 	Normalize(raw)
 
 	return c.Queries.UpsertTaskEmbedding(ctx, generated.UpsertTaskEmbeddingParams{
-		TaskID:      taskID,
-		Model:       model,
-		Dim:         uint16(len(raw)),
+		TaskID:         taskID,
+		Model:          model,
+		Dim:            uint16(len(raw)),
 		StringToVector: Encode(raw),
-		ContentHash: hash,
+		ContentHash:    hash,
 	})
 }
 

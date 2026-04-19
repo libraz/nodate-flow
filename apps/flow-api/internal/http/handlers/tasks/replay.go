@@ -22,7 +22,7 @@ type ReplayOutput struct {
 		// Equivalent is true when the replayed state matches the
 		// stored tasks.derived_state, false when drift is detected
 		// (replay equivalence).
-		Equivalent bool `json:"equivalent"`
+		Equivalent bool   `json:"equivalent"`
 		Stored     string `json:"stored"`
 	}
 }

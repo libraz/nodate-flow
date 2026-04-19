@@ -62,22 +62,27 @@ func TestParseEventFromText_TimezoneRespected(t *testing.T) {
 	t.Run("Asia/Tokyo timezone", func(t *testing.T) {
 		proposal, err := ParseEventFromText("明日14時ミーティング", now, "Asia/Tokyo")
 		assert.NoError(t, err)
-		assert.Equal(t, "Asia/Tokyo", proposal.StartAt.Location().String())
-		assert.Equal(t, 14, proposal.StartAt.Hour())
+		loc, _ := time.LoadLocation("Asia/Tokyo")
+		startTime := time.Unix(proposal.StartAt, 0).In(loc)
+		assert.Equal(t, "Asia/Tokyo", startTime.Location().String())
+		assert.Equal(t, 14, startTime.Hour())
 	})
 
 	t.Run("America/New_York timezone", func(t *testing.T) {
 		proposal, err := ParseEventFromText("明日14時ミーティング", now, "America/New_York")
 		assert.NoError(t, err)
-		assert.Equal(t, "America/New_York", proposal.StartAt.Location().String())
-		assert.Equal(t, 14, proposal.StartAt.Hour())
+		loc, _ := time.LoadLocation("America/New_York")
+		startTime := time.Unix(proposal.StartAt, 0).In(loc)
+		assert.Equal(t, "America/New_York", startTime.Location().String())
+		assert.Equal(t, 14, startTime.Hour())
 	})
 
 	t.Run("UTC timezone", func(t *testing.T) {
 		proposal, err := ParseEventFromText("明日14時ミーティング", now, "UTC")
 		assert.NoError(t, err)
-		assert.Equal(t, "UTC", proposal.StartAt.Location().String())
-		assert.Equal(t, 14, proposal.StartAt.Hour())
+		startTime := time.Unix(proposal.StartAt, 0).In(time.UTC)
+		assert.Equal(t, "UTC", startTime.Location().String())
+		assert.Equal(t, 14, startTime.Hour())
 	})
 
 	t.Run("invalid timezone returns error", func(t *testing.T) {
@@ -88,7 +93,9 @@ func TestParseEventFromText_TimezoneRespected(t *testing.T) {
 	t.Run("default hour is 9 in given timezone", func(t *testing.T) {
 		proposal, err := ParseEventFromText("明日ミーティング", now, "Europe/London")
 		assert.NoError(t, err)
-		assert.Equal(t, "Europe/London", proposal.StartAt.Location().String())
-		assert.Equal(t, 9, proposal.StartAt.Hour())
+		loc, _ := time.LoadLocation("Europe/London")
+		startTime := time.Unix(proposal.StartAt, 0).In(loc)
+		assert.Equal(t, "Europe/London", startTime.Location().String())
+		assert.Equal(t, 9, startTime.Hour())
 	})
 }

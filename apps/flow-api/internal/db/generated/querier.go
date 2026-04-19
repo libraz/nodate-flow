@@ -289,10 +289,10 @@ type Querier interface {
 	FindCalendarEventCommentByPublicId(ctx context.Context, arg FindCalendarEventCommentByPublicIdParams) (FindCalendarEventCommentByPublicIdRow, error)
 	// Quick lookup for permission checks: who owns this event?
 	FindCalendarEventOwner(ctx context.Context, publicID types.PublicID) (FindCalendarEventOwnerRow, error)
-	// Resolve an invite by its token for the acceptance flow.
-	FindCalendarInviteByToken(ctx context.Context, token string) (FindCalendarInviteByTokenRow, error)
+	// Resolve an invite by its token hash for the acceptance flow.
+	FindCalendarInviteByTokenHash(ctx context.Context, tokenHash string) (FindCalendarInviteByTokenHashRow, error)
 	// Public-facing invite lookup (for share page preview, no auth required).
-	FindCalendarInviteByTokenPublic(ctx context.Context, token string) (FindCalendarInviteByTokenPublicRow, error)
+	FindCalendarInviteByTokenHashPublic(ctx context.Context, tokenHash string) (FindCalendarInviteByTokenHashPublicRow, error)
 	// Resolve a memo by UUID v7.
 	FindCalendarMemoByPublicId(ctx context.Context, arg FindCalendarMemoByPublicIdParams) (FindCalendarMemoByPublicIdRow, error)
 	// Look up a user's subscription to a specific calendar.
@@ -386,7 +386,7 @@ type Querier interface {
 	// Fetch the ai_settings row for a workspace. Returns sql.ErrNoRows when the
 	// workspace has never written a row; the caller should fall back to the
 	// column defaults (mock-768 / 100 cents/day / 0.870 / 0.750).
-	GetAiSettings(ctx context.Context, workspaceID uint32) (AiSetting, error)
+	GetAiSettings(ctx context.Context, workspaceID uint32) (GetAiSettingsRow, error)
 	// Fetch a single attachment by its public id within a workspace.
 	GetAttachmentByPublicID(ctx context.Context, arg GetAttachmentByPublicIDParams) (GetAttachmentByPublicIDRow, error)
 	// Return the most recent succeeded run time for a given agent.

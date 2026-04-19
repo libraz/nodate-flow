@@ -176,9 +176,9 @@ func RegisterAutoActionSettings(api huma.API, deps Deps) {
 
 // --- mapper helpers ---
 
-// autoActionBodyFromRow converts the auto-action columns of an AiSetting
-// DB row into the API response body.
-func autoActionBodyFromRow(row generated.AiSetting) AutoActionSettingsBody {
+// autoActionBodyFromRow converts the auto-action columns of a
+// GetAiSettingsRow into the API response body.
+func autoActionBodyFromRow(row generated.GetAiSettingsRow) AutoActionSettingsBody {
 	return AutoActionSettingsBody{
 		Enabled:         row.AutoActionEnabled,
 		IntervalMinutes: int(row.AutoActionIntervalMinutes),

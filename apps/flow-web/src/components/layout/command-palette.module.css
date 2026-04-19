@@ -1,0 +1,142 @@
+/* Command palette styles */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  min-inline-size: 22rem;
+}
+
+.input {
+  padding: var(--nf-space-2) var(--nf-space-3);
+  border-radius: var(--nf-radius-md);
+  border: 1px solid var(--nf-color-border);
+  background: var(--nf-color-bg);
+  color: var(--nf-color-fg);
+  font-size: var(--nf-text-sm);
+}
+
+.groupLabel {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--nf-color-fg-subtle);
+  padding: var(--nf-space-1) var(--nf-space-2);
+}
+
+.resultList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.resultItem {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  inline-size: 100%;
+  text-align: start;
+  padding: var(--nf-space-2) var(--nf-space-3);
+  border-radius: var(--nf-radius-md);
+  border: none;
+  background: transparent;
+  color: var(--nf-color-fg);
+  cursor: pointer;
+  font-size: var(--nf-text-sm);
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.resultItem:hover,
+.resultItemActive {
+  background: var(--nf-color-surface-hover);
+}
+
+.emptyText {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+}
+
+.hintBar {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+  padding-block-start: var(--nf-space-2);
+  border-block-start: 1px solid var(--nf-color-border);
+  font-size: 0.6875rem;
+  color: var(--nf-color-fg-subtle);
+}
+
+.hintGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.hintGroupEnd {
+  composes: hintGroup;
+  margin-inline-start: auto;
+}
+
+.kbd {
+  font-family: var(--nf-font-mono, monospace);
+  font-size: 0.6875rem;
+  padding: 0.0625rem 0.375rem;
+  border-radius: var(--nf-radius-sm);
+  border: 1px solid var(--nf-color-border);
+  background: var(--nf-color-surface);
+  color: var(--nf-color-fg);
+  line-height: 1.4;
+}
+
+/* ── Command mode ───────────────────────────────── */
+
+.commandResult {
+  padding: var(--nf-space-2) var(--nf-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.commandToolRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+}
+
+.commandToolName {
+  font-weight: 600;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg);
+}
+
+.commandArgs {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--nf-font-mono, monospace);
+}
+
+.confidenceBadge {
+  font-size: 0.6875rem;
+  padding: 0.125rem 0.375rem;
+  border-radius: var(--nf-radius-sm);
+}
+
+.confidenceHigh {
+  background: var(--nf-color-success-subtle, oklch(0.85 0.15 145));
+  color: var(--nf-color-success, oklch(0.35 0.15 145));
+}
+
+.confidenceLow {
+  background: var(--nf-color-warning-subtle, oklch(0.85 0.15 85));
+  color: var(--nf-color-warning, oklch(0.35 0.15 85));
+}
+
+@media (max-width: 767px) {
+  .body {
+    min-inline-size: 0;
+  }
+}

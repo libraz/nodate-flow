@@ -6,11 +6,11 @@ import (
 	"errors"
 	"time"
 
-	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
 
 	generated "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/types"
+	apierrors "github.com/nodate-flow/nodate-flow/apps/time-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/eventbus"
 )
 
@@ -34,13 +34,13 @@ type AddMemberInput struct {
 
 // MemberResponse is the JSON representation of a calendar member.
 type MemberResponse struct {
-	ID          string     `json:"id"`
-	UserID      string     `json:"userId"`
-	DisplayName string     `json:"displayName"`
-	AvatarUrl   *string    `json:"avatarUrl,omitempty"`
-	MemberColor string     `json:"memberColor"`
-	Role        string     `json:"role"`
-	CreatedAt   time.Time  `json:"createdAt"`
+	ID          string  `json:"id"`
+	UserID      string  `json:"userId"`
+	DisplayName string  `json:"displayName"`
+	AvatarUrl   *string `json:"avatarUrl,omitempty"`
+	MemberColor string  `json:"memberColor"`
+	Role        string  `json:"role"`
+	CreatedAt   int64   `json:"createdAt"`
 }
 
 // AddMemberOutput is the response for the add member endpoint.
@@ -106,15 +106,15 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 			return nil, err
 		}
 		if !isOwnerOrManager(sub) {
-			return nil, errForbidden
+			return nil, httpErr(apierrors.CalendarCalendarManagerRoleRequired)
 		}
 
 		user, err := deps.Queries.FindUserByEmail(ctx, input.Body.Email)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return nil, huma.Error404NotFound("User not found with that email")
+				return nil, httpErr(apierrors.CalendarMemberUserNotFound)
 			}
-			return nil, huma.Error500InternalServerError("Failed to look up user", err)
+			return nil, httpErr(apierrors.CalendarMemberStoreReadInterrupted)
 		}
 
 		// Check if already subscribed.
@@ -123,7 +123,7 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 			UserID:     user.ID,
 		})
 		if err == nil {
-			return nil, huma.Error409Conflict("User is already a member of this calendar")
+			return nil, httpErr(apierrors.CalendarMemberAlreadySubscribed)
 		}
 
 		// Determine member color based on current member count.
@@ -132,7 +132,7 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 			WorkspaceID: wsID,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to list members", err)
+			return nil, httpErr(apierrors.CalendarMemberListQueryInterrupted)
 		}
 		color := memberColors[len(members)%len(memberColors)]
 
@@ -147,7 +147,7 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 			DisplayColor: color,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to add member", err)
+			return nil, httpErr(apierrors.CalendarMemberStoreWriteInterrupted)
 		}
 
 		out := &AddMemberOutput{}
@@ -157,7 +157,7 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 			DisplayName: user.DisplayName,
 			MemberColor: color,
 			Role:        input.Body.Role,
-			CreatedAt:   time.Now().UTC(),
+			CreatedAt:   time.Now().UTC().Unix(),
 		}
 		if user.AvatarUrl.Valid {
 			out.Body.AvatarUrl = &user.AvatarUrl.String
@@ -190,7 +190,7 @@ func ListMembers(deps Deps) func(context.Context, *ListMembersInput) (*ListMembe
 			WorkspaceID: wsID,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to list members", err)
+			return nil, httpErr(apierrors.CalendarMemberListQueryInterrupted)
 		}
 
 		out := &ListMembersOutput{}
@@ -202,7 +202,7 @@ func ListMembers(deps Deps) func(context.Context, *ListMembersInput) (*ListMembe
 				DisplayName: r.DisplayName,
 				MemberColor: r.MemberColor,
 				Role:        string(r.Role),
-				CreatedAt:   r.CreatedAt,
+				CreatedAt:   r.CreatedAt.Unix(),
 			}
 			if r.AvatarUrl.Valid {
 				resp.AvatarUrl = &r.AvatarUrl.String
@@ -225,16 +225,16 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 			return nil, err
 		}
 		if sub.Role != generated.CalendarSubscriptionsRoleOwner {
-			return nil, errForbidden
+			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
 
 		targetUID, err := uuid.Parse(input.UserId)
 		if err != nil {
-			return nil, huma.Error400BadRequest("Invalid user ID")
+			return nil, httpErr(apierrors.CalendarMemberUserIdMalformed)
 		}
 		targetUserID, err := deps.Queries.FindUserInternalIdByPublicId(ctx, types.FromUUID(targetUID))
 		if err != nil {
-			return nil, huma.Error404NotFound("User not found")
+			return nil, httpErr(apierrors.CalendarMemberUserNotFound)
 		}
 
 		err = deps.Queries.PatchCalendarSubscription(ctx, generated.PatchCalendarSubscriptionParams{
@@ -246,7 +246,7 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 			UserID:     targetUserID,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to update role", err)
+			return nil, httpErr(apierrors.CalendarMemberStoreRoleUpdateInterrupted)
 		}
 
 		out := &UpdateMemberRoleOutput{}
@@ -277,18 +277,18 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 
 		targetUID, err := uuid.Parse(input.UserId)
 		if err != nil {
-			return nil, huma.Error400BadRequest("Invalid user ID")
+			return nil, httpErr(apierrors.CalendarMemberUserIdMalformed)
 		}
 		targetUserID, err := deps.Queries.FindUserInternalIdByPublicId(ctx, types.FromUUID(targetUID))
 		if err != nil {
-			return nil, huma.Error404NotFound("User not found")
+			return nil, httpErr(apierrors.CalendarMemberUserNotFound)
 		}
 
 		isSelf := targetUserID == actorID
 		isOwner := sub.Role == generated.CalendarSubscriptionsRoleOwner
 
 		if !isSelf && !isOwner {
-			return nil, errForbidden
+			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
 
 		// Check if target is an owner - prevent removing the last owner.
@@ -298,18 +298,18 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 		})
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return nil, huma.Error404NotFound("Member not found")
+				return nil, httpErr(apierrors.CalendarMemberNotFound)
 			}
-			return nil, huma.Error500InternalServerError("Failed to find member", err)
+			return nil, httpErr(apierrors.CalendarMemberStoreReadInterrupted)
 		}
 
 		if targetSub.Role == generated.CalendarSubscriptionsRoleOwner {
 			count, err := deps.Queries.CountCalendarOwners(ctx, cal.ID)
 			if err != nil {
-				return nil, huma.Error500InternalServerError("Failed to count owners", err)
+				return nil, httpErr(apierrors.CalendarMemberOwnerCountQueryInterrupted)
 			}
 			if count <= 1 {
-				return nil, huma.Error409Conflict("Cannot remove the last owner of a calendar")
+				return nil, httpErr(apierrors.CalendarMemberLastOwnerRemovalBlocked)
 			}
 		}
 
@@ -318,7 +318,7 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 			UserID:     targetUserID,
 		})
 		if err != nil {
-			return nil, huma.Error500InternalServerError("Failed to remove member", err)
+			return nil, httpErr(apierrors.CalendarMemberStoreRemoveInterrupted)
 		}
 
 		out := &RemoveMemberOutput{}

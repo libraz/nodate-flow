@@ -23,6 +23,7 @@ import {
   createTestTenant,
   injectAuth,
 } from './fixtures/tenant';
+import { checkA11y } from './helpers/a11y';
 
 test.describe('auth smoke', () => {
   let tenant: TestTenant | null = null;
@@ -44,6 +45,10 @@ test.describe('auth smoke', () => {
     const uiTenant = await createTestTenant();
 
     await page.goto('/signup');
+
+    // Accessibility check on the signup page before interaction
+    await checkA11y(page);
+
     await page.getByLabel(/name/i).fill(uiTenant.displayName);
     await page.getByLabel(/email/i).fill(uiTenant.email);
     await page.getByLabel(/password/i).fill(uiTenant.password);

@@ -31,7 +31,6 @@ import (
 	airelations "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/relations"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
@@ -55,6 +54,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/obs"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/storage"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/stream"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
 )
 
@@ -172,6 +172,18 @@ func BuildResult(deps Deps) Result {
 	r.Use(middleware.ClientIP())
 	// Security response headers: CSP, HSTS, X-Content-Type-Options, etc.
 	r.Use(middleware.SecurityHeaders())
+	// Global per-IP rate limiter: defence-in-depth against floods
+	// from a single source. The limit is generous (200 req/min)
+	// because authenticated routes additionally enforce per-user
+	// limits inside their groups. Disabled in integration tests
+	// where many parallel tenants hit the same loopback address.
+	if !deps.DisableRateLimit {
+		globalRL := middleware.NewIPRateLimiter(middleware.RateLimitConfig{
+			MaxRequests: 200,
+			Window:      time.Minute,
+		})
+		r.Use(globalRL.Middleware())
+	}
 	// Each huma.API needs its own huma.Config so it gets a fresh
 	// schema registry and its own *OpenAPI document; sharing one
 	// config between sub-APIs would point every group at the same

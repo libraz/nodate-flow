@@ -262,3 +262,23 @@
   inset-inline-start: 0;
   inline-size: 100%;
 }
+
+/* ── Responsive: hide non-essential columns on mobile ──────── */
+
+.colAssignee,
+.colUpdated {
+  /* default: visible */
+}
+
+@media (max-width: 767px) {
+  .headerRow,
+  .bodyRow {
+    grid-template-columns: 2.5rem 1fr 5.5rem 5rem;
+  }
+
+  .colAssignee,
+  .colDue,
+  .colUpdated {
+    display: none;
+  }
+}

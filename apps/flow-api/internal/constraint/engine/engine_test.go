@@ -9,10 +9,10 @@ import (
 )
 
 type fakeStore struct {
-	facts      constraint.Facts
-	rows       []Row
-	satisfied  map[string]int
-	failed     map[string]int
+	facts     constraint.Facts
+	rows      []Row
+	satisfied map[string]int
+	failed    map[string]int
 }
 
 func newFake(facts constraint.Facts, rows []Row) *fakeStore {

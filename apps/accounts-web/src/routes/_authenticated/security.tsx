@@ -13,9 +13,10 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
 import AuthCard from '../../components/auth-card';
-import { apiRequest } from '../../lib/api-client';
+import type { ProblemJson } from '../../lib/api-error';
 import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../../lib/auth-errors';
 import { type ChangePasswordFormValues, changePasswordSchema } from '../../lib/auth-schemas';
+import { sdk } from '../../lib/sdk';
 
 interface Session {
   id: string;
@@ -54,15 +55,14 @@ function SecurityPage(): ReactElement {
     setPasswordError(null);
     setPasswordSuccess(false);
     try {
-      const result = await apiRequest<null>('/auth/password', {
-        method: 'PUT',
+      const { error } = await sdk.PUT('/auth/password', {
         body: {
           currentPassword: values.currentPassword,
           newPassword: values.newPassword,
         },
       });
-      if (result.error) {
-        setPasswordError(mapAuthError(result.error));
+      if (error) {
+        setPasswordError(mapAuthError(error as ProblemJson | undefined));
         return;
       }
       setPasswordSuccess(true);
@@ -78,9 +78,10 @@ function SecurityPage(): ReactElement {
 
   useEffect(() => {
     let cancelled = false;
-    void apiRequest<TotpStatusResponse>('/auth/totp/status').then((res) => {
+    void sdk.GET('/auth/totp/status').then((res) => {
       if (!cancelled && res.data) {
-        setTotpEnrolled(res.data.enrolled);
+        const status = res.data as TotpStatusResponse;
+        setTotpEnrolled(status.enrolled);
       }
     });
     return () => {
@@ -95,9 +96,10 @@ function SecurityPage(): ReactElement {
 
   useEffect(() => {
     let cancelled = false;
-    void apiRequest<SessionsResponse>('/auth/sessions').then((res) => {
+    void sdk.GET('/auth/sessions').then((res) => {
       if (!cancelled) {
-        setSessions(res.data?.sessions ?? []);
+        const body = res.data as SessionsResponse | undefined;
+        setSessions(body?.sessions ?? []);
         setSessionsLoading(false);
       }
     });
@@ -109,7 +111,9 @@ function SecurityPage(): ReactElement {
   const handleRevokeSession = async (sessionId: string): Promise<void> => {
     setRevokingId(sessionId);
     try {
-      await apiRequest<null>(`/auth/sessions/${sessionId}`, { method: 'DELETE' });
+      await sdk.DELETE('/auth/sessions/{sessionId}', {
+        params: { path: { sessionId } },
+      });
       setSessions((prev) => prev.filter((s) => s.id !== sessionId));
     } catch {
       // ignore
@@ -122,13 +126,13 @@ function SecurityPage(): ReactElement {
     setTotpLoading(true);
     try {
       if (totpEnrolled) {
-        const result = await apiRequest<null>('/auth/totp', { method: 'DELETE' });
-        if (!result.error) {
+        const { error } = await sdk.DELETE('/auth/totp');
+        if (!error) {
           setTotpEnrolled(false);
         }
       } else {
-        const result = await apiRequest<null>('/auth/totp', { method: 'POST' });
-        if (!result.error) {
+        const { error } = await sdk.POST('/auth/totp');
+        if (!error) {
           setTotpEnrolled(true);
         }
       }
@@ -171,7 +175,7 @@ function SecurityPage(): ReactElement {
 
       {/* Password change */}
       <section style={sectionStyle}>
-        <h2 style={headingStyle}>{t('security.passwordTitle')}</h2>
+        <h2 style={headingStyle}>{t('security.password_title')}</h2>
         <form
           onSubmit={(e) => {
             void handleSubmit(onChangePassword)(e);
@@ -180,7 +184,7 @@ function SecurityPage(): ReactElement {
           style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4, 1rem)' }}
         >
           <FormField
-            label={t('security.currentPassword')}
+            label={t('security.current_password')}
             required
             {...(errors.currentPassword?.message
               ? { error: t(errors.currentPassword.message) }
@@ -201,7 +205,7 @@ function SecurityPage(): ReactElement {
           </FormField>
 
           <FormField
-            label={t('security.newPassword')}
+            label={t('security.new_password')}
             required
             {...(errors.newPassword?.message ? { error: t(errors.newPassword.message) } : {})}
           >
@@ -240,12 +244,12 @@ function SecurityPage(): ReactElement {
                 fontSize: 'var(--nf-text-sm, 0.875rem)',
               }}
             >
-              {t('security.passwordChanged')}
+              {t('security.password_changed')}
             </output>
           ) : null}
 
           <Button type="submit" variant="primary" disabled={isSubmitting}>
-            {isSubmitting ? t('security.passwordChanging') : t('security.passwordChange')}
+            {isSubmitting ? t('security.password_changing') : t('security.password_change')}
           </Button>
         </form>
       </section>
@@ -254,7 +258,7 @@ function SecurityPage(): ReactElement {
 
       {/* TOTP management */}
       <section style={sectionStyle}>
-        <h2 style={headingStyle}>{t('security.totpTitle')}</h2>
+        <h2 style={headingStyle}>{t('security.totp_title')}</h2>
         <p
           style={{
             margin: 0,
@@ -263,10 +267,10 @@ function SecurityPage(): ReactElement {
           }}
         >
           {totpEnrolled === null
-            ? t('security.totpLoading')
+            ? t('security.totp_loading')
             : totpEnrolled
-              ? t('security.totpEnabled')
-              : t('security.totpDisabled')}
+              ? t('security.totp_enabled')
+              : t('security.totp_disabled')}
         </p>
         {totpEnrolled !== null ? (
           <Button
@@ -277,7 +281,7 @@ function SecurityPage(): ReactElement {
               void handleToggleTotp();
             }}
           >
-            {totpEnrolled ? t('security.totpDisable') : t('security.totpEnable')}
+            {totpEnrolled ? t('security.totp_disable') : t('security.totp_enable')}
           </Button>
         ) : null}
       </section>
@@ -286,7 +290,7 @@ function SecurityPage(): ReactElement {
 
       {/* Active sessions */}
       <section style={sectionStyle}>
-        <h2 style={headingStyle}>{t('security.sessionsTitle')}</h2>
+        <h2 style={headingStyle}>{t('security.sessions_title')}</h2>
         {sessionsLoading ? (
           <p
             style={{
@@ -295,7 +299,7 @@ function SecurityPage(): ReactElement {
               color: 'var(--nf-color-fg-muted)',
             }}
           >
-            {t('security.sessionsLoading')}
+            {t('security.sessions_loading')}
           </p>
         ) : sessions.length === 0 ? (
           <p
@@ -305,7 +309,7 @@ function SecurityPage(): ReactElement {
               color: 'var(--nf-color-fg-muted)',
             }}
           >
-            {t('security.sessionsEmpty')}
+            {t('security.sessions_empty')}
           </p>
         ) : (
           <ul
@@ -339,8 +343,8 @@ function SecurityPage(): ReactElement {
                       fontWeight: session.current ? 600 : 400,
                     }}
                   >
-                    {session.userAgent || t('security.sessionUnknownAgent')}
-                    {session.current ? ` (${t('security.sessionCurrent')})` : ''}
+                    {session.userAgent || t('security.session_unknown_agent')}
+                    {session.current ? ` (${t('security.session_current')})` : ''}
                   </p>
                   <p
                     style={{
@@ -361,7 +365,7 @@ function SecurityPage(): ReactElement {
                       void handleRevokeSession(session.id);
                     }}
                   >
-                    {t('security.sessionRevoke')}
+                    {t('security.session_revoke')}
                   </Button>
                 ) : null}
               </li>
@@ -379,7 +383,7 @@ function SecurityPage(): ReactElement {
           color: 'var(--nf-color-fg-muted)',
         }}
       >
-        <Link to="/profile">{t('security.profileLink')}</Link>
+        <Link to="/profile">{t('security.profile_link')}</Link>
       </p>
     </AuthCard>
   );
