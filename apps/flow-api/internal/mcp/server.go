@@ -26,6 +26,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -292,6 +293,12 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 			return
 		}
 	}
+	// Validate individual argument sizes before execution to prevent
+	// excessively large payloads from reaching tool handlers.
+	if valErr := validateToolArgs(params.Arguments); valErr != nil {
+		writeRPCError(w, req.ID, apierrors.McpProtocolFrameMalformed, valErr.Error())
+		return
+	}
 	args := params.Arguments
 	if len(args) == 0 {
 		args = json.RawMessage("{}")
@@ -433,6 +440,31 @@ func bearerFromHeader(h string) (string, bool) {
 	}
 	tok := strings.TrimSpace(h[len(prefix):])
 	return tok, tok != ""
+}
+
+// maxToolArgBytes is the maximum size of a single MCP tool argument
+// value. 256 KB is generous for any reasonable parameter while
+// protecting against accidental or malicious multi-MB payloads.
+const maxToolArgBytes = 256 * 1024 // 256 KB
+
+// validateToolArgs checks that no individual argument exceeds the size
+// limit. It parses the top-level arguments object and inspects each
+// value's byte length.
+func validateToolArgs(raw json.RawMessage) error {
+	if len(raw) == 0 {
+		return nil
+	}
+	var args map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &args); err != nil {
+		// Not a JSON object — let the tool handler deal with it.
+		return nil
+	}
+	for k, v := range args {
+		if len(v) > maxToolArgBytes {
+			return fmt.Errorf("argument %q exceeds maximum size (%d > %d bytes)", k, len(v), maxToolArgBytes)
+		}
+	}
+	return nil
 }
 
 // hashToken returns a hex-encoded SHA-256 of the token. Used as the

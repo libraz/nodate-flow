@@ -137,6 +137,9 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		if ident.LockedUntilAt.Valid && ident.LockedUntilAt.Time.After(time.Now()) {
+			return nil, httpErr(apierrors.AuthLoginAccountLocked)
+		}
 		if !ident.MfaConfirmedAt.Valid || len(ident.MfaSecretCiphertext.String) == 0 {
 			// TOTP was disabled between /auth/login and here. Refuse
 			// the challenge so the client retries single-factor
@@ -155,6 +158,15 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
 			if !auth.VerifyTotp(secret, in.Body.Code, time.Now()) {
+				bumpFailedByID(ctx, deps, ident.ID, ident.FailedAttempts)
+				deps.Audit.Record(ctx, audit.Entry{
+					Action:       "auth.login_totp_failed",
+					ActorID:      uint32(uid),
+					ResourceType: "user",
+				})
+				if ident.FailedAttempts+1 >= maxFailedBeforeLock {
+					return nil, httpErr(apierrors.AuthLoginRateLimitedAfterRetries)
+				}
 				return nil, httpErr(apierrors.AuthTotpCodeMismatch)
 			}
 		} else {
@@ -162,6 +174,16 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 			rcID, lerr := deps.Queries.FindUnusedRecoveryCode(ctx, generated.FindUnusedRecoveryCodeParams{UserID: uid, CodeHash: hash})
 			if lerr != nil {
 				if errors.Is(lerr, sql.ErrNoRows) {
+					bumpFailedByID(ctx, deps, ident.ID, ident.FailedAttempts)
+					deps.Audit.Record(ctx, audit.Entry{
+						Action:       "auth.login_totp_failed",
+						ActorID:      uint32(uid),
+						ResourceType: "user",
+						Metadata:     map[string]any{"method": "recovery_code"},
+					})
+					if ident.FailedAttempts+1 >= maxFailedBeforeLock {
+						return nil, httpErr(apierrors.AuthLoginRateLimitedAfterRetries)
+					}
 					return nil, httpErr(apierrors.AuthTotpRecoveryCodeInvalid)
 				}
 				return nil, httpErr(apierrors.InternalUnexpected)
@@ -169,6 +191,15 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 			if merr := deps.Queries.MarkRecoveryCodeUsed(ctx, rcID); merr != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "auth.recovery_code_used",
+				ActorID:      uint32(uid),
+				ResourceType: "user",
+			})
+		}
+		// 2FA succeeded — clear any accumulated failed attempts.
+		if err := deps.Queries.ResetIdentityFailedAttempts(ctx, ident.ID); err != nil {
+			slog.ErrorContext(ctx, "login_totp: failed to reset failed attempts", slog.Any("err", err))
 		}
 		u, err := deps.Queries.FindUserProfileById(ctx, uid)
 		if err != nil {
@@ -177,6 +208,11 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 		if err := deps.Queries.UpdateUserLastLoginAt(ctx, uid); err != nil {
 			slog.ErrorContext(ctx, "login_totp: failed to update last_login_at", slog.Any("err", err), slog.String("user_public_id", u.PublicID.String()))
 		}
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "auth.login_totp",
+			ActorID:      uint32(uid),
+			ResourceType: "user",
+		})
 		tokens, refresh, err := issueTokens(ctx, deps, uid, u.PublicID, in.UserAgent, authn.ClientIPFromContext(ctx))
 		if err != nil {
 			return nil, err
@@ -185,6 +221,24 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 			SetCookie: newRefreshCookie(refresh, deps.CookieSecure),
 			Body:      tokens,
 		}, nil
+	}
+}
+
+// bumpFailedByID increments the failed-attempts counter on an identity
+// identified by its internal ID. Used by the TOTP login path where we
+// already have the identity row from FindLocalIdentityByUserId.
+func bumpFailedByID(ctx context.Context, deps Deps, identityID uint32, currentAttempts uint32) {
+	next := currentAttempts + 1
+	var lock sql.NullTime
+	if next >= maxFailedBeforeLock {
+		lock = sql.NullTime{Time: time.Now().Add(15 * time.Minute), Valid: true}
+	}
+	if err := deps.Queries.UpdateIdentityFailedAttempts(ctx, generated.UpdateIdentityFailedAttemptsParams{
+		FailedAttempts: next,
+		LockedUntilAt:  lock,
+		ID:             identityID,
+	}); err != nil {
+		slog.ErrorContext(ctx, "login_totp: failed to bump failed attempts counter", slog.Any("err", err))
 	}
 }
 

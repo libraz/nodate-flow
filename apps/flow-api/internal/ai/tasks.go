@@ -181,6 +181,7 @@ func (o *Orchestrator) ProposeTasksFrom(ctx context.Context, workspaceID uint32,
 	if prov == nil {
 		return nil, ErrNoProvider
 	}
+	ctx = providers.WithWorkspaceID(ctx, workspaceID)
 
 	// Truncate user input to limit prompt-injection surface and prevent
 	// prompt-size abuse. See maxDescLen for the rationale.
@@ -221,6 +222,7 @@ func (o *Orchestrator) ProposePriority(ctx context.Context, workspaceID uint32, 
 	if prov == nil {
 		return "", ErrNoProvider
 	}
+	ctx = providers.WithWorkspaceID(ctx, workspaceID)
 	req := providers.Request{
 		System: proposePrioritySystem,
 		Prompt: sanitizeDesc(taskSummary),
@@ -327,6 +329,7 @@ func (o *Orchestrator) ProposeSteps(
 	if prov == nil {
 		return nil, ErrNoProvider
 	}
+	ctx = providers.WithWorkspaceID(ctx, workspaceID)
 
 	// ---- cache check ----
 	cacheKey := ProposalCacheKey(workspaceID, "propose_steps", title, description, string(granularity))

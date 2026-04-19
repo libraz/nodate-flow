@@ -82,6 +82,7 @@ func (w *WorkspaceProvider) ResolveCommand(ctx context.Context, prompt string, t
 	if prov == nil {
 		return nil, fmt.Errorf("nlcommand: no provider configured for workspace")
 	}
+	ctx = providers.WithWorkspaceID(ctx, wsID)
 
 	// Build tool catalogue for the system prompt.
 	toolsJSON, err := json.MarshalIndent(tools, "", "  ")

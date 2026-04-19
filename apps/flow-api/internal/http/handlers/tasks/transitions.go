@@ -86,9 +86,24 @@ func Transition(deps Deps) func(context.Context, *TransitionTaskInput) (*Transit
 			return nil, httpErr(apierrors.WsTaskTransitionUnknown)
 		}
 
-		current, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
+		// Start the transaction first, then lock the row with FOR UPDATE so
+		// that concurrent transition requests serialize. Without this, two
+		// requests can read the same derived_state outside the transaction,
+		// both validate the transition, and both apply — producing an
+		// invalid state.
+		tx, err := deps.DB.BeginTx(ctx, nil)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		defer func() { _ = tx.Rollback() }()
+
+		qtx := generated.New(tx)
+
+		// Lock the task row for the duration of this transaction so that
+		// only one transition can read + validate + apply at a time.
+		locked, err := qtx.LockTaskForTransition(ctx, generated.LockTaskForTransitionParams{
+			ID:          task.ID,
 			WorkspaceID: ws.ID,
-			PublicID:    types.FromUUID(task.PublicID),
 		})
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -97,18 +112,11 @@ func Transition(deps Deps) func(context.Context, *TransitionTaskInput) (*Transit
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		nextDerived, ok := nextState(current.DerivedState, in.Body.Transition)
+		nextDerived, ok := nextState(locked.DerivedState, in.Body.Transition)
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskTransitionRejected)
 		}
 
-		tx, err := deps.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		defer func() { _ = tx.Rollback() }()
-
-		qtx := generated.New(tx)
 		if err := qtx.TransitionTaskState(ctx, generated.TransitionTaskStateParams{
 			DerivedState: nextDerived,
 			Column2:      string(nextDerived),
@@ -127,7 +135,7 @@ func Transition(deps Deps) func(context.Context, *TransitionTaskInput) (*Transit
 			Payload: map[string]any{
 				"taskId":     task.PublicID.String(),
 				"transition": in.Body.Transition,
-				"fromState":  string(current.DerivedState),
+				"fromState":  string(locked.DerivedState),
 				"toState":    string(nextDerived),
 				"reason":     in.Body.Reason,
 				"occurredAt": in.Body.OccurredAt,
@@ -149,7 +157,7 @@ func Transition(deps Deps) func(context.Context, *TransitionTaskInput) (*Transit
 				ResourceID:   task.PublicID.String(),
 				Metadata: map[string]any{
 					"transition": in.Body.Transition,
-					"fromState":  string(current.DerivedState),
+					"fromState":  string(locked.DerivedState),
 					"toState":    string(nextDerived),
 				},
 			})

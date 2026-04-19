@@ -1490,7 +1490,8 @@ CREATE TABLE task_dependencies (
 
   UNIQUE KEY uniq_task_dependencies_public_id (public_id),
   UNIQUE KEY uniq_task_dependencies_edge (from_task_id, to_task_id, kind, enabled),
-  KEY idx_task_dependencies_workspace_id_to_task_id (workspace_id, to_task_id),
+  KEY idx_task_dependencies_workspace_from (workspace_id, from_task_id),
+  KEY idx_task_dependencies_workspace_to (workspace_id, to_task_id),
 
   CONSTRAINT fk_task_dependencies_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_task_dependencies_from FOREIGN KEY (from_task_id) REFERENCES tasks(id) ON DELETE CASCADE,

@@ -88,6 +88,7 @@ func (w *WorkspaceProvider) CompileLens(ctx context.Context, prompt string) ([]b
 	if prov == nil {
 		return nil, fmt.Errorf("nlquery: no provider configured for workspace")
 	}
+	ctx = providers.WithWorkspaceID(ctx, wsID)
 
 	resp, err := prov.Complete(ctx, providers.Request{
 		System:    compileLensSystem,

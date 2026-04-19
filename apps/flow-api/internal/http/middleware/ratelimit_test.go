@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/httputil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -343,7 +344,7 @@ func TestWriteJSONError_EnvelopeStructure(t *testing.T) {
 	t.Parallel()
 
 	rec := httptest.NewRecorder()
-	writeJSONError(rec, http.StatusForbidden, "WS.WORKSPACE.NOT_FOUND", "workspace context missing")
+	httputil.WriteJSONError(rec, http.StatusForbidden, "WS.WORKSPACE.NOT_FOUND", "workspace context missing")
 
 	require.Equal(t, http.StatusForbidden, rec.Code)
 	require.Equal(t, "application/json", rec.Header().Get("Content-Type"))

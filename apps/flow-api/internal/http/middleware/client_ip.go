@@ -6,27 +6,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/httputil"
 )
 
-// clientIPMaxLen caps the stored IP string to avoid unbounded
-// X-Forwarded-For header abuse (legitimate IPv6 is <= 45 chars).
-const clientIPMaxLen = 64
-
-// ClientIP is a chi-compatible middleware that extracts the caller's
-// IP address from X-Forwarded-For (first hop) when present, falling
-// back to r.RemoteAddr with the port stripped. The result is stashed
-// on the request context via [WithClientIP] for downstream handlers.
-//
-// Mount this as the outermost layer of the router so every handler
-// (including the auth handlers, which need it for session creation)
-// observes a populated client ip.
+// ClientIP delegates to [httputil.ClientIPMiddleware].
 func ClientIP() func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip := httputil.ExtractClientIP(r)
-			if len(ip) > clientIPMaxLen {
-				ip = ip[:clientIPMaxLen]
-			}
-			ctx := WithClientIP(r.Context(), ip)
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	}
+	return httputil.ClientIPMiddleware()
 }

@@ -140,7 +140,7 @@ func TestSSEHubBroadcast(t *testing.T) {
 
 // TestBuildEventNotification verifies the JSON-RPC notification shape.
 func TestBuildEventNotification(t *testing.T) {
-	data := buildEventNotification("task.created")
+	data := buildEventNotification("task.created", 42)
 	var parsed map[string]any
 	if err := json.Unmarshal([]byte(data), &parsed); err != nil {
 		t.Fatalf("unmarshal: %v", err)
@@ -157,6 +157,9 @@ func TestBuildEventNotification(t *testing.T) {
 	}
 	if params["type"] != "task.created" {
 		t.Errorf("want type task.created, got %v", params["type"])
+	}
+	if seq, ok := params["seq"].(float64); !ok || int64(seq) != 42 {
+		t.Errorf("want seq 42, got %v", params["seq"])
 	}
 }
 

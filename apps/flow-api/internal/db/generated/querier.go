@@ -663,6 +663,11 @@ type Querier interface {
 	ListWorkspaceMembersForSmartCreate(ctx context.Context, workspaceID uint32) ([]ListWorkspaceMembersForSmartCreateRow, error)
 	// List workspaces a user belongs to.
 	ListWorkspacesForUser(ctx context.Context, arg ListWorkspacesForUserParams) ([]ListWorkspacesForUserRow, error)
+	// Acquire a row-level lock on the task inside an open transaction so that
+	// concurrent transition requests serialize correctly. Without FOR UPDATE two
+	// requests can read the same derived_state, both validate the transition,
+	// and both apply — producing an invalid state.
+	LockTaskForTransition(ctx context.Context, arg LockTaskForTransitionParams) (LockTaskForTransitionRow, error)
 	// Append a redacted record of an LLM call. Both prompt_redacted and
 	// response_redacted MUST already be filtered through the redaction layer.
 	LogAiInvocation(ctx context.Context, arg LogAiInvocationParams) (int64, error)

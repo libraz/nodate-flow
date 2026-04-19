@@ -13,6 +13,7 @@ func TestExtractClientIP(t *testing.T) {
 	tests := []struct {
 		name       string
 		xff        string
+		xri        string
 		remoteAddr string
 		want       string
 	}{
@@ -35,20 +36,36 @@ func TestExtractClientIP(t *testing.T) {
 			want:       "198.51.100.1",
 		},
 		{
-			name:       "no XFF falls back to RemoteAddr host",
-			xff:        "",
+			name:       "X-Forwarded-For takes precedence over X-Real-Ip",
+			xff:        "203.0.113.50",
+			xri:        "10.0.0.99",
+			remoteAddr: "10.0.0.1:12345",
+			want:       "203.0.113.50",
+		},
+		{
+			name:       "X-Real-Ip used when no X-Forwarded-For",
+			xri:        "10.0.0.99",
+			remoteAddr: "172.16.0.5:8080",
+			want:       "10.0.0.99",
+		},
+		{
+			name:       "X-Real-Ip with whitespace",
+			xri:        "  10.0.0.99 ",
+			remoteAddr: "172.16.0.5:8080",
+			want:       "10.0.0.99",
+		},
+		{
+			name:       "no XFF or XRI falls back to RemoteAddr host",
 			remoteAddr: "172.16.0.5:8080",
 			want:       "172.16.0.5",
 		},
 		{
 			name:       "RemoteAddr without port",
-			xff:        "",
 			remoteAddr: "172.16.0.5",
 			want:       "172.16.0.5",
 		},
 		{
 			name:       "IPv6 RemoteAddr with port",
-			xff:        "",
 			remoteAddr: "[::1]:8080",
 			want:       "::1",
 		},
@@ -62,6 +79,9 @@ func TestExtractClientIP(t *testing.T) {
 			}
 			if tc.xff != "" {
 				r.Header.Set("X-Forwarded-For", tc.xff)
+			}
+			if tc.xri != "" {
+				r.Header.Set("X-Real-Ip", tc.xri)
 			}
 			got := ExtractClientIP(r)
 			assert.Equal(t, tc.want, got)

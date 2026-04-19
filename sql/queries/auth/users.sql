@@ -110,11 +110,14 @@ LIMIT 1;
 
 -- name: FindLocalIdentityByUserId :one
 -- Resolve a local-password identity by internal user id. Used by
--- /me/password to verify the caller's current password and by the
--- TOTP handlers to read / write mfa_secret_ciphertext.
+-- /me/password to verify the caller's current password, by the
+-- TOTP handlers to read / write mfa_secret_ciphertext, and by
+-- LoginTotp to enforce brute-force lockout on 2FA attempts.
 SELECT
   id,
   password_hash,
+  failed_attempts,
+  locked_until_at,
   mfa_secret_ciphertext,
   mfa_confirmed_at
 FROM identities

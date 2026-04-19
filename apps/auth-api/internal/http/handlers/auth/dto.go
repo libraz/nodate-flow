@@ -150,7 +150,6 @@ type OIDCCallbackInput struct {
 	UserAgent string `header:"User-Agent"`
 	Code      string `query:"code"`
 	State     string `query:"state"`
-	Nonce     string `query:"nonce"`
 }
 
 // OIDCCallbackOutput is the response for OIDC callback.

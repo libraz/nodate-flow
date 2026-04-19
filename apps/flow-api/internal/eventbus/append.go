@@ -13,11 +13,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 )
+
+// globalSeq is a monotonically increasing counter that assigns a
+// sequence number to every event notification. SSE subscribers include
+// the sequence in their payload so clients can detect gaps and reorder
+// events that arrive out of order from concurrent goroutines.
+var globalSeq atomic.Int64
 
 // DBTX is the minimal sqlc DBTX surface needed by [Append]. Both *sql.DB
 // and *sql.Tx satisfy it; passing a *sql.Tx keeps the event row in the
@@ -95,6 +102,25 @@ func ClearNotifyHooks() {
 	notifyHooks = nil
 }
 
+type seqCtxKey struct{}
+
+// WithSeq returns a copy of ctx carrying the event sequence number.
+// Hooks can retrieve it via SeqFromContext to include in their
+// notifications, allowing clients to detect gaps and reorder.
+func WithSeq(ctx context.Context, seq int64) context.Context {
+	return context.WithValue(ctx, seqCtxKey{}, seq)
+}
+
+// SeqFromContext returns the event sequence number set by Append,
+// or zero if the context was not tagged.
+func SeqFromContext(ctx context.Context) int64 {
+	if ctx == nil {
+		return 0
+	}
+	v, _ := ctx.Value(seqCtxKey{}).(int64)
+	return v
+}
+
 func fireNotifyHooks(ctx context.Context, workspaceInternalID uint32, eventType string) {
 	notifyMu.RLock()
 	hooks := notifyHooks
@@ -136,7 +162,9 @@ func Append(ctx context.Context, db DBTX, evt Event) error {
 		OccurredAt:  time.Now().UTC(),
 	})
 	if err == nil {
-		fireNotifyHooks(ctx, evt.WorkspaceID, evt.Type)
+		seq := globalSeq.Add(1)
+		seqCtx := WithSeq(ctx, seq)
+		fireNotifyHooks(seqCtx, evt.WorkspaceID, evt.Type)
 	}
 	return err
 }

@@ -49,9 +49,9 @@ func main() {
 		logger.Error("db open failed", "err", err)
 		os.Exit(1)
 	}
-	db.SetMaxOpenConns(16)
-	db.SetMaxIdleConns(4)
-	db.SetConnMaxLifetime(30 * time.Minute)
+	db.SetMaxOpenConns(cfg.DbMaxOpenConns)
+	db.SetMaxIdleConns(cfg.DbMaxIdleConns)
+	db.SetConnMaxLifetime(cfg.DbConnMaxLifetime)
 	if err := db.Ping(); err != nil {
 		logger.Error("db ping failed", "err", err)
 		os.Exit(1)
@@ -118,10 +118,23 @@ func main() {
 	go integrationsRefresher.Run(refresherCtx)
 	logger.Info("integrations refresher goroutine launched")
 
+	var oidcClient *auth.OIDCClient
+	if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
+		oidcClient = auth.NewOIDCClient(auth.OIDCConfig{
+			ClientID:     cfg.GoogleClientID,
+			ClientSecret: cfg.GoogleClientSecret,
+			RedirectURL:  cfg.PublicBaseURL + "/auth/oidc/google/callback",
+		})
+		logger.Info("google OIDC client configured")
+	} else {
+		logger.Warn("google OIDC disabled (NF_AUTH_GOOGLE_CLIENT_ID / NF_AUTH_GOOGLE_CLIENT_SECRET not set)")
+	}
+
 	inner := router.Build(router.Deps{
 		DB:               db,
 		Queries:          queries,
 		JWT:              jwtIssuer,
+		OIDC:             oidcClient,
 		Cipher:           cipher,
 		CookieSecure:     cfg.CookieSecure,
 		RegistrationOpen: cfg.RegistrationOpen,

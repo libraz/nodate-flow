@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/caarlos0/env/v11"
 )
@@ -17,8 +18,17 @@ type Config struct {
 	// flow-api; only the env prefix differs.
 	DbDsn string `env:"NF_DB_DSN,required"`
 
+	// DbMaxOpenConns is the maximum number of open connections to the database.
+	DbMaxOpenConns int `env:"NF_DB_MAX_OPEN_CONNS" envDefault:"32"`
+	// DbMaxIdleConns is the maximum number of idle connections in the pool.
+	DbMaxIdleConns int `env:"NF_DB_MAX_IDLE_CONNS" envDefault:"8"`
+	// DbConnMaxLifetime is the maximum time a connection can be reused.
+	DbConnMaxLifetime time.Duration `env:"NF_DB_CONN_MAX_LIFETIME" envDefault:"30m"`
+
 	// CookieSecure toggles the Secure flag on the nd_rt refresh cookie.
-	CookieSecure bool `env:"NF_COOKIE_SECURE" envDefault:"false"`
+	// Defaults to true; local http development should set
+	// NF_COOKIE_SECURE=false explicitly.
+	CookieSecure bool `env:"NF_COOKIE_SECURE" envDefault:"true"`
 
 	// CorsAllowedOrigins is the comma-separated list of origins allowed
 	// to call the API with credentials.
@@ -29,7 +39,9 @@ type Config struct {
 	S3AccessKey string `env:"NF_S3_ACCESS_KEY" envDefault:""`
 	S3SecretKey string `env:"NF_S3_SECRET_KEY" envDefault:""`
 	S3Bucket    string `env:"NF_S3_BUCKET" envDefault:"nodate"`
-	S3UseSSL    bool   `env:"NF_S3_USE_SSL" envDefault:"false"`
+	// S3UseSSL enables TLS for the S3 connection. Defaults to true;
+	// local MinIO development should set NF_S3_USE_SSL=false.
+	S3UseSSL bool `env:"NF_S3_USE_SSL" envDefault:"true"`
 }
 
 // Load parses NF_* environment variables into a Config and validates

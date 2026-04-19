@@ -153,6 +153,7 @@ services:
       NF_FLOW_PORT: "8080"
       NF_FLOW_LOG_LEVEL: ${NF_FLOW_LOG_LEVEL:-info}
       NF_DB_DSN: ${NF_DB_DSN:-nodate:nodatepw@tcp(mysql:3306)/nodate_flow?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci}
+      NF_COOKIE_SECURE: "false"
       NF_REDIS_ADDR: ${NF_REDIS_ADDR:-redis:6379}
       NF_FLOW_SESSION_STORE: ${NF_FLOW_SESSION_STORE:-mysql}
       NF_FLOW_STREAM_BACKEND: ${NF_FLOW_STREAM_BACKEND:-memory}
@@ -167,7 +168,7 @@ services:
       NF_S3_ACCESS_KEY: ${NF_S3_ACCESS_KEY:-minioadmin}
       NF_S3_SECRET_KEY: ${NF_S3_SECRET_KEY:-minioadmin}
       NF_S3_BUCKET: ${NF_S3_BUCKET:-nodate-flow}
-      NF_S3_USE_SSL: ${NF_S3_USE_SSL:-false}
+      NF_S3_USE_SSL: "false"
       NF_FLOW_SMTP_HOST: ${NF_FLOW_SMTP_HOST:-mailpit}
       NF_FLOW_SMTP_PORT: ${NF_FLOW_SMTP_PORT:-1025}
       NF_FLOW_SMTP_USERNAME: ${NF_FLOW_SMTP_USERNAME:-}
@@ -202,7 +203,7 @@ services:
       NF_AUTH_PORT: "8082"
       NF_AUTH_LOG_LEVEL: ${NF_AUTH_LOG_LEVEL:-info}
       NF_DB_DSN: ${NF_DB_DSN:-nodate:nodatepw@tcp(mysql:3306)/nodate_flow?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci}
-      NF_COOKIE_SECURE: ${NF_COOKIE_SECURE:-false}
+      NF_COOKIE_SECURE: "false"
       NF_REGISTRATION_OPEN: ${NF_REGISTRATION_OPEN:-true}
       NF_AUTH_CORS: ${NF_AUTH_CORS:-http://localhost:5173,http://localhost:5174,http://localhost:5175,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:5175}
       NF_AUTH_SESSION_STORE: ${NF_AUTH_SESSION_STORE:-mysql}
@@ -241,12 +242,19 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      minio:
+        condition: service_healthy
     environment:
       NF_TIME_PORT: "8081"
       NF_TIME_LOG_LEVEL: ${NF_TIME_LOG_LEVEL:-info}
       NF_DB_DSN: ${NF_DB_DSN:-nodate:nodatepw@tcp(mysql:3306)/nodate_flow?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci}
       NF_TIME_CORS: ${NF_TIME_CORS:-http://localhost:5174,http://127.0.0.1:5174}
-      NF_COOKIE_SECURE: ${NF_COOKIE_SECURE:-false}
+      NF_COOKIE_SECURE: "false"
+      NF_S3_ENDPOINT: ${NF_S3_ENDPOINT:-minio:9000}
+      NF_S3_ACCESS_KEY: ${NF_S3_ACCESS_KEY:-minioadmin}
+      NF_S3_SECRET_KEY: ${NF_S3_SECRET_KEY:-minioadmin}
+      NF_S3_BUCKET: ${NF_S3_BUCKET:-nodate-flow}
+      NF_S3_USE_SSL: "false"
     ports:
       - "${NF_TIME_PORT:-8081}:8081"
     healthcheck:

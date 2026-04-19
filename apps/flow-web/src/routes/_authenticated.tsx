@@ -5,24 +5,9 @@
  * the user is redirected to /login.
  */
 
+import { isSafeRedirect } from '@nodate-flow/sdk';
 import { Outlet, createFileRoute, useRouterState } from '@tanstack/react-router';
 import { type ReactElement, useCallback, useEffect, useState } from 'react';
-
-/**
- * isSafeRedirect returns true when the URL is a relative path (starting
- * with a single slash) or points to the same origin as the current page.
- * Protocol-relative URLs ("//evil.com") and foreign origins are rejected
- * to prevent open-redirect attacks.
- */
-function isSafeRedirect(url: string): boolean {
-  if (url.startsWith('/') && !url.startsWith('//')) return true;
-  try {
-    const parsed = new URL(url);
-    return parsed.origin === window.location.origin;
-  } catch {
-    return false;
-  }
-}
 
 import AppShell from '../components/layout/app-shell';
 import NotFound from '../components/not-found';

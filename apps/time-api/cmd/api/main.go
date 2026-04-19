@@ -41,9 +41,9 @@ func main() {
 		logger.Error("db open failed", "err", err)
 		os.Exit(1)
 	}
-	db.SetMaxOpenConns(32)
-	db.SetMaxIdleConns(8)
-	db.SetConnMaxLifetime(30 * time.Minute)
+	db.SetMaxOpenConns(cfg.DbMaxOpenConns)
+	db.SetMaxIdleConns(cfg.DbMaxIdleConns)
+	db.SetConnMaxLifetime(cfg.DbConnMaxLifetime)
 	if err := db.Ping(); err != nil {
 		logger.Error("db ping failed", "err", err)
 		os.Exit(1)

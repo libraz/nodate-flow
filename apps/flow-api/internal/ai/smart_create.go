@@ -154,6 +154,7 @@ func (o *Orchestrator) ProposeSmartCreate(
 	if prov == nil {
 		return nil, ErrNoProvider
 	}
+	ctx = providers.WithWorkspaceID(ctx, workspaceID)
 
 	// ---- cache check ----
 	cacheKey := ProposalCacheKey(workspaceID, "smart_create", title, description)

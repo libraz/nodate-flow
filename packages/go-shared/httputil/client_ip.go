@@ -19,6 +19,9 @@ func ExtractClientIP(r *http.Request) string {
 		}
 		return strings.TrimSpace(xff)
 	}
+	if xri := r.Header.Get("X-Real-Ip"); xri != "" {
+		return strings.TrimSpace(xri)
+	}
 	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
 		return host
 	}

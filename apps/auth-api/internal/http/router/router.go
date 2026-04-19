@@ -33,6 +33,7 @@ type Deps struct {
 	DB               *sql.DB
 	Queries          *generated.Queries
 	JWT              *auth.JWTIssuer
+	OIDC             *auth.OIDCClient
 	Sessions         sessionstore.Store
 	Cipher           *crypto.Cipher
 	CookieSecure     bool
@@ -122,6 +123,7 @@ func BuildResult(deps Deps) Result {
 		Queries:          deps.Queries,
 		Sessions:         sessionStore,
 		JWT:              deps.JWT,
+		OIDC:             deps.OIDC,
 		Cipher:           deps.Cipher,
 		CookieSecure:     deps.CookieSecure,
 		RegistrationOpen: deps.RegistrationOpen,

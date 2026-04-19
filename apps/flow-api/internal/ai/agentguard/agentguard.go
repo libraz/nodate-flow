@@ -72,13 +72,21 @@ func Decide(agent Agent, req Request) Decision {
 		}
 	}
 	if cap := agent.MonthlyCostCapCents; cap != nil {
-		if req.SpentCentsMonth >= *cap {
+		// Apply a 95% safety margin to the effective cap. Concurrent
+		// tool calls may read the same spend value before any of them
+		// record their cost, so capping at 95% prevents budget overrun
+		// from the resulting race window.
+		effectiveCap := *cap * 95 / 100
+		if effectiveCap <= 0 && *cap > 0 {
+			effectiveCap = 1
+		}
+		if req.SpentCentsMonth >= effectiveCap {
 			return Decision{
 				Outcome: OutcomePause,
 				Reason:  "monthly cost cap exhausted",
 			}
 		}
-		if req.SpentCentsMonth+req.EstimatedCents > *cap {
+		if req.SpentCentsMonth+req.EstimatedCents > effectiveCap {
 			return Decision{
 				Outcome: OutcomePause,
 				Reason:  "call would exceed monthly cost cap",

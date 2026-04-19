@@ -34,3 +34,6 @@ export { QueryProvider } from './query-provider.js';
 
 // Shared i18n provider
 export { I18nProvider, type I18nProviderProps } from './i18n-provider.js';
+
+// Redirect safety utilities
+export { isSafeRedirect } from './redirect.js';

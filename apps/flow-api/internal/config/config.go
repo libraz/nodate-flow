@@ -3,6 +3,7 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"strconv"
 	"time"
 
@@ -33,16 +34,10 @@ type Config struct {
 	// repo_workspace_mappings table has no entry for the repository.
 	DefaultWorkspaceID string `env:"NF_FLOW_DEFAULT_WORKSPACE_ID" envDefault:""`
 
-	// CookieSecure toggles the Secure flag on the nd_rt refresh cookie
-	// and selects the paired SameSite mode (None when secure, Lax
-	// otherwise; see auth.refreshCookieSameSite).
-	//
-	// It defaults to false so the out-of-the-box `make dev` flow on
-	// http://localhost works without extra env wiring; every non-local
-	// deployment must explicitly set NF_COOKIE_SECURE=true so the
-	// cookie survives the cross-site fetch from the web origin to the
-	// api origin over https.
-	CookieSecure bool `env:"NF_COOKIE_SECURE" envDefault:"false"`
+	// CookieSecure toggles the Secure flag on the nd_rt refresh cookie.
+	// Defaults to true; local http development should set
+	// NF_COOKIE_SECURE=false explicitly.
+	CookieSecure bool `env:"NF_COOKIE_SECURE" envDefault:"true"`
 
 	// AiMock toggles the deterministic in-memory AI provider. When true,
 	// every workspace.ai_providers row is ignored and ai.Orchestrator
@@ -176,6 +171,13 @@ type Config struct {
 	// this to use Azure OpenAI, LiteLLM, or any compatible endpoint.
 	EmbedBaseURL string `env:"NF_FLOW_EMBED_BASE_URL" envDefault:""`
 
+	// DbMaxOpenConns is the maximum number of open connections to the database.
+	DbMaxOpenConns int `env:"NF_DB_MAX_OPEN_CONNS" envDefault:"32"`
+	// DbMaxIdleConns is the maximum number of idle connections in the pool.
+	DbMaxIdleConns int `env:"NF_DB_MAX_IDLE_CONNS" envDefault:"8"`
+	// DbConnMaxLifetime is the maximum time a connection can be reused.
+	DbConnMaxLifetime time.Duration `env:"NF_DB_CONN_MAX_LIFETIME" envDefault:"30m"`
+
 	// S3Endpoint is the host:port of the S3-compatible object store
 	// (e.g. "minio:9000" or "s3.amazonaws.com"). When empty, file
 	// upload endpoints return INTERNAL.NOT_CONFIGURED.
@@ -186,9 +188,9 @@ type Config struct {
 	S3SecretKey string `env:"NF_S3_SECRET_KEY" envDefault:""`
 	// S3Bucket is the bucket name used for all uploads.
 	S3Bucket string `env:"NF_S3_BUCKET" envDefault:"nodate"`
-	// S3UseSSL enables TLS for the S3 connection. Defaults to false
-	// for local MinIO; production deployments should set true.
-	S3UseSSL bool `env:"NF_S3_USE_SSL" envDefault:"false"`
+	// S3UseSSL enables TLS for the S3 connection. Defaults to true;
+	// local MinIO development should set NF_S3_USE_SSL=false.
+	S3UseSSL bool `env:"NF_S3_USE_SSL" envDefault:"true"`
 }
 
 // Load parses NF_* environment variables into a Config and validates
@@ -232,6 +234,19 @@ func validateEnums(cfg *Config) error {
 	case "memory", "mysql":
 	default:
 		return fmt.Errorf("config: NF_FLOW_AGENT_QUEUE_BACKEND must be \"memory\" or \"mysql\", got %q", cfg.AgentQueueBackend)
+	}
+
+	// Warn when webhook signature verification secrets are not configured.
+	// These are not fatal because the server can still boot, but inbound
+	// webhook payloads will not be authenticated.
+	if cfg.GhWebhookSecret == "" {
+		slog.Warn("config: NF_FLOW_GH_WEBHOOK_SECRET is empty; GitHub webhook signature verification is disabled")
+	}
+	if cfg.SlackSigningSecret == "" {
+		slog.Warn("config: NF_FLOW_SLACK_SIGNING_SECRET is empty; Slack signature verification is disabled")
+	}
+	if cfg.GoogleChannelToken == "" {
+		slog.Warn("config: NF_FLOW_GOOGLE_CHANNEL_TOKEN is empty; Google push notification token verification is disabled")
 	}
 
 	return nil

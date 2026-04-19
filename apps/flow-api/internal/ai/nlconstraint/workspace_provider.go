@@ -83,6 +83,7 @@ func (w *WorkspaceProvider) CompileConstraint(ctx context.Context, prompt string
 	if prov == nil {
 		return nil, fmt.Errorf("nlconstraint: no provider configured for workspace")
 	}
+	ctx = providers.WithWorkspaceID(ctx, wsID)
 
 	resp, err := prov.Complete(ctx, providers.Request{
 		System:    compileConstraintSystem,

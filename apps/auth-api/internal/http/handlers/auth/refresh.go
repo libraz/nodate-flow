@@ -11,7 +11,7 @@ import (
 )
 
 // Refresh handles POST /auth/refresh. It reads the refresh token from
-// the nf_rt httpOnly cookie, rotates it, and issues a new access JWT.
+// the nd_rt httpOnly cookie, rotates it, and issues a new access JWT.
 // The rotated refresh token is returned via a Set-Cookie header; only
 // the access token appears in the JSON body.
 func Refresh(deps Deps) func(context.Context, *RefreshInput) (*RefreshOutput, error) {

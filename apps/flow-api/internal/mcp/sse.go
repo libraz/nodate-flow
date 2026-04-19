@@ -16,6 +16,7 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 )
 
 // sseConn represents a single SSE client connection. Events are
@@ -206,13 +207,15 @@ func writeSSEComment(w http.ResponseWriter, f http.Flusher, text string) error {
 
 // buildEventNotification constructs a JSON-RPC 2.0 notification
 // payload for a workspace event. Notifications have no id per the
-// JSON-RPC 2.0 spec.
-func buildEventNotification(eventType string) string {
+// JSON-RPC 2.0 spec. The seq field is a monotonically increasing
+// counter that clients can use to detect gaps and reorder events.
+func buildEventNotification(eventType string, seq int64) string {
 	payload := map[string]any{
 		"jsonrpc": "2.0",
 		"method":  "notifications/event",
 		"params": map[string]any{
 			"type": eventType,
+			"seq":  seq,
 		},
 	}
 	b, _ := json.Marshal(payload)
@@ -221,9 +224,10 @@ func buildEventNotification(eventType string) string {
 
 // onWorkspaceEvent is the eventbus.NotifyHook callback that broadcasts
 // events to SSE-connected MCP clients. It must be non-blocking.
-func (h *Handler) onWorkspaceEvent(_ context.Context, workspaceID uint32, eventType string) {
+func (h *Handler) onWorkspaceEvent(ctx context.Context, workspaceID uint32, eventType string) {
+	seq := eventbus.SeqFromContext(ctx)
 	h.sse.broadcast(workspaceID, sseEvent{
 		EventType: "workspace.event",
-		Data:      buildEventNotification(eventType),
+		Data:      buildEventNotification(eventType, seq),
 	})
 }

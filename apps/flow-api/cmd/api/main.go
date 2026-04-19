@@ -23,7 +23,6 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/providers"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/config"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/router"
@@ -35,6 +34,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/stream"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/webhook"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/httputil"
 )
@@ -81,9 +81,9 @@ func main() {
 		logger.Error("db open failed", "err", err)
 		os.Exit(1)
 	}
-	db.SetMaxOpenConns(32)
-	db.SetMaxIdleConns(8)
-	db.SetConnMaxLifetime(30 * time.Minute)
+	db.SetMaxOpenConns(cfg.DbMaxOpenConns)
+	db.SetMaxIdleConns(cfg.DbMaxIdleConns)
+	db.SetConnMaxLifetime(cfg.DbConnMaxLifetime)
 	if err := db.Ping(); err != nil {
 		logger.Error("db ping failed", "err", err)
 		os.Exit(1)
@@ -145,21 +145,31 @@ func main() {
 		providers.DestOllama,
 	}
 	if cfg.OutboundLlmRps > 0 {
-		if !configureOutboundLimiters(cfg, logger, llmDests) {
-			burst := cfg.OutboundLlmBurst
-			if burst <= 0 {
-				if b := int(cfg.OutboundLlmRps); b > 0 {
-					burst = b
-				} else {
-					burst = 1
-				}
+		burst := cfg.OutboundLlmBurst
+		if burst <= 0 {
+			if b := int(cfg.OutboundLlmRps); b > 0 {
+				burst = b
+			} else {
+				burst = 1
 			}
+		}
+		if !configureOutboundLimiters(cfg, logger, llmDests) {
 			for _, dest := range llmDests {
 				providers.ConfigureLimiter(dest, outbound.NewLimiter(cfg.OutboundLlmRps, burst))
 			}
 			logger.Info("outbound llm rate limit enabled",
 				"rps", cfg.OutboundLlmRps, "burst", burst)
 		}
+		// Per-workspace egress cap: half the global rate so a single
+		// tenant cannot exhaust the shared provider quota.
+		wsRps := cfg.OutboundLlmRps / 2
+		wsBurst := burst / 2
+		if wsBurst <= 0 {
+			wsBurst = 1
+		}
+		providers.ConfigureWorkspaceLimiter(wsRps, wsBurst)
+		logger.Info("per-workspace llm rate limit enabled",
+			"rps", wsRps, "burst", wsBurst)
 	}
 
 	jwtPriv, err := authn.DeriveEd25519Key(os.Getenv("NF_SECRET_KEY"), "nodate-flow:jwt:v1")

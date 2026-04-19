@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/caarlos0/env/v11"
 )
@@ -16,8 +17,17 @@ type Config struct {
 	// DbDsn is the MySQL DSN shared with flow-api and time-api.
 	DbDsn string `env:"NF_DB_DSN,required"`
 
+	// DbMaxOpenConns is the maximum number of open connections to the database.
+	DbMaxOpenConns int `env:"NF_DB_MAX_OPEN_CONNS" envDefault:"16"`
+	// DbMaxIdleConns is the maximum number of idle connections in the pool.
+	DbMaxIdleConns int `env:"NF_DB_MAX_IDLE_CONNS" envDefault:"4"`
+	// DbConnMaxLifetime is the maximum time a connection can be reused.
+	DbConnMaxLifetime time.Duration `env:"NF_DB_CONN_MAX_LIFETIME" envDefault:"30m"`
+
 	// CookieSecure toggles the Secure flag on the nd_rt refresh cookie.
-	CookieSecure bool `env:"NF_COOKIE_SECURE" envDefault:"false"`
+	// Defaults to true; local http development should set
+	// NF_COOKIE_SECURE=false explicitly.
+	CookieSecure bool `env:"NF_COOKIE_SECURE" envDefault:"true"`
 
 	// RegistrationOpen controls whether new user sign-up is allowed.
 	RegistrationOpen bool `env:"NF_REGISTRATION_OPEN" envDefault:"true"`

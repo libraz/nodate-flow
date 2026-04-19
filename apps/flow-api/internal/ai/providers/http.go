@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/outbound"
@@ -35,6 +36,91 @@ const (
 // [ConfigureLimiter].
 var outboundRegistry = outbound.NewRegistry()
 
+// --------------------------------------------------------------------------
+// Per-workspace egress rate limiting
+// --------------------------------------------------------------------------
+
+type wsCtxKey struct{}
+
+// WithWorkspaceID returns a copy of ctx tagged with the internal
+// workspace ID. The Orchestrator sets this before calling
+// prov.Complete so doLimited can enforce per-workspace egress caps
+// without coupling the Provider interface to workspace semantics.
+func WithWorkspaceID(ctx context.Context, workspaceID uint32) context.Context {
+	if workspaceID == 0 {
+		return ctx
+	}
+	return context.WithValue(ctx, wsCtxKey{}, workspaceID)
+}
+
+// WorkspaceIDFromContext returns the workspace ID previously set via
+// WithWorkspaceID, or zero when the context was never tagged.
+func WorkspaceIDFromContext(ctx context.Context) uint32 {
+	if ctx == nil {
+		return 0
+	}
+	v, _ := ctx.Value(wsCtxKey{}).(uint32)
+	return v
+}
+
+// wsLimiterStore holds per-workspace rate limiters keyed by workspace
+// internal ID. Each entry is a token-bucket scoped to half the global
+// per-provider rate, so a single tenant cannot starve other workspaces.
+type wsLimiterStore struct {
+	mu       sync.RWMutex
+	limiters map[uint32]*outbound.Limiter
+	rps      float64
+	burst    int
+}
+
+var wsStore = &wsLimiterStore{
+	limiters: make(map[uint32]*outbound.Limiter),
+}
+
+// ConfigureWorkspaceLimiter sets the per-workspace rate and burst.
+// Typically called from main right after configuring the global
+// limiter, with rps = global_rps/2 and burst = max(1, global_burst/2).
+func ConfigureWorkspaceLimiter(rps float64, burst int) {
+	if rps <= 0 {
+		return
+	}
+	if burst <= 0 {
+		burst = 1
+	}
+	wsStore.mu.Lock()
+	wsStore.rps = rps
+	wsStore.burst = burst
+	wsStore.mu.Unlock()
+}
+
+// getOrCreateWSLimiter returns the rate limiter for the given workspace,
+// creating one lazily if it does not exist. Returns nil when
+// per-workspace limiting is not configured.
+func getOrCreateWSLimiter(wsID uint32) *outbound.Limiter {
+	if wsID == 0 {
+		return nil
+	}
+	wsStore.mu.RLock()
+	if wsStore.rps <= 0 {
+		wsStore.mu.RUnlock()
+		return nil
+	}
+	l := wsStore.limiters[wsID]
+	wsStore.mu.RUnlock()
+	if l != nil {
+		return l
+	}
+	wsStore.mu.Lock()
+	defer wsStore.mu.Unlock()
+	// Double-check after acquiring write lock.
+	if l = wsStore.limiters[wsID]; l != nil {
+		return l
+	}
+	l = outbound.NewLimiter(wsStore.rps, wsStore.burst)
+	wsStore.limiters[wsID] = l
+	return l
+}
+
 // ConfigureLimiter attaches a token-bucket limiter to the given
 // destination key. Call from main at startup to enforce per-provider
 // egress caps. Passing nil clears the slot.
@@ -52,11 +138,22 @@ func OutboundSnapshot() map[string]outbound.LimiterStats {
 // maxRetries is the number of additional attempts after the first 429.
 const maxRetries = 3
 
-// doLimited runs req through sharedClient after waiting on the
-// destination's outbound limiter. On HTTP 429, it retries with
-// exponential backoff up to maxRetries times, honoring the
-// Retry-After header when present.
+// doLimited runs req through sharedClient after waiting on both the
+// per-workspace limiter (if a workspace ID is on the context) and the
+// global per-destination outbound limiter. The workspace limiter is
+// checked first so a single tenant cannot exhaust the global quota.
+// On HTTP 429, it retries with exponential backoff up to maxRetries
+// times, honoring the Retry-After header when present.
 func doLimited(ctx context.Context, destination string, req *http.Request) (*http.Response, error) {
+	// Per-workspace egress cap (checked first).
+	if wsID := WorkspaceIDFromContext(ctx); wsID != 0 {
+		if wl := getOrCreateWSLimiter(wsID); wl != nil {
+			if err := wl.Wait(ctx); err != nil {
+				return nil, fmt.Errorf("workspace rate limit: %w", err)
+			}
+		}
+	}
+	// Global per-destination cap.
 	if err := outboundRegistry.Wait(ctx, destination); err != nil {
 		return nil, err
 	}

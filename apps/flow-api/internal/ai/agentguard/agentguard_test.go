@@ -57,8 +57,10 @@ func TestDecide_PausesWhenCapAlreadyExhausted(t *testing.T) {
 
 func TestDecide_PausesWhenCallWouldExceedCap(t *testing.T) {
 	t.Parallel()
+	// The effective cap is 95% of 10_000 = 9_500. Spent 9_000 is under
+	// the effective cap, but 9_000 + 600 = 9_600 exceeds it.
 	d := Decide(Agent{Enabled: true, MonthlyCostCapCents: capOf(10_000)},
-		Request{SpentCentsMonth: 9_900, EstimatedCents: 200})
+		Request{SpentCentsMonth: 9_000, EstimatedCents: 600})
 	if d.Outcome != OutcomePause || d.Reason != "call would exceed monthly cost cap" {
 		t.Fatalf("expected would-exceed pause, got %+v", d)
 	}

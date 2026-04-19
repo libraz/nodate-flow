@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
+	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
@@ -91,6 +92,12 @@ func OIDCGoogleCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*O
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "auth.login_oidc",
+			ActorID:      userID,
+			ResourceType: "user",
+			Metadata:     map[string]any{"provider": "google", "email": claims.Email},
+		})
 		tokens, refresh, err := issueTokens(ctx, deps, userID, userPub, in.UserAgent, authn.ClientIPFromContext(ctx))
 		if err != nil {
 			return nil, err

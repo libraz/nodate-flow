@@ -76,6 +76,7 @@ func (e *AgentExecutor) ExecuteAgent(ctx context.Context, workspaceID, agentID u
 	if prov == nil {
 		return ErrNoProvider
 	}
+	ctx = providers.WithWorkspaceID(ctx, workspaceID)
 	req := providers.Request{
 		System: row.SystemPrompt,
 		// The tick prompt is intentionally empty — interval agents

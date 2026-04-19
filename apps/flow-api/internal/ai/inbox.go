@@ -49,6 +49,7 @@ func (o *Orchestrator) ProposeInboxTriage(ctx context.Context, workspaceID uint3
 	if prov == nil {
 		return nil, ErrNoProvider
 	}
+	ctx = providers.WithWorkspaceID(ctx, workspaceID)
 
 	if limit <= 0 {
 		limit = 20

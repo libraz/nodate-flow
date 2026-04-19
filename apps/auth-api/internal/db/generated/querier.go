@@ -114,8 +114,9 @@ type Querier interface {
 	// to issue session tokens directly or return a totp-challenge.
 	FindLocalIdentityByEmail(ctx context.Context, email string) (FindLocalIdentityByEmailRow, error)
 	// Resolve a local-password identity by internal user id. Used by
-	// /me/password to verify the caller's current password and by the
-	// TOTP handlers to read / write mfa_secret_ciphertext.
+	// /me/password to verify the caller's current password, by the
+	// TOTP handlers to read / write mfa_secret_ciphertext, and by
+	// LoginTotp to enforce brute-force lockout on 2FA attempts.
 	FindLocalIdentityByUserId(ctx context.Context, userID uint32) (FindLocalIdentityByUserIdRow, error)
 	// Resolve a PAT row from its SHA-256 hash for bearer auth.
 	FindPatByHash(ctx context.Context, tokenHash string) (FindPatByHashRow, error)

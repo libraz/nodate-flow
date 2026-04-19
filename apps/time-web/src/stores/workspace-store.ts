@@ -1,7 +1,8 @@
 /**
  * Workspace slice (Zustand). Holds the active workspace ID and name.
- * Persisted to localStorage under `nf_workspace_id` / `nf_workspace_name`
- * so the selection survives page reloads.
+ * Persisted to sessionStorage under `nf_workspace_id` / `nf_workspace_name`
+ * so the selection survives page reloads within a tab. Uses sessionStorage
+ * (not localStorage) to prevent cross-tab data leakage.
  */
 
 import { useStore } from 'zustand';
@@ -19,16 +20,16 @@ export interface WorkspaceState {
  * can read the workspace ID without going through React.
  */
 export const workspaceStore = createStore<WorkspaceState>((set) => ({
-  workspaceId: localStorage.getItem('nf_workspace_id'),
-  workspaceName: localStorage.getItem('nf_workspace_name'),
+  workspaceId: sessionStorage.getItem('nf_workspace_id'),
+  workspaceName: sessionStorage.getItem('nf_workspace_name'),
   setWorkspace: (id, name) => {
-    localStorage.setItem('nf_workspace_id', id);
-    localStorage.setItem('nf_workspace_name', name);
+    sessionStorage.setItem('nf_workspace_id', id);
+    sessionStorage.setItem('nf_workspace_name', name);
     set({ workspaceId: id, workspaceName: name });
   },
   clearWorkspace: () => {
-    localStorage.removeItem('nf_workspace_id');
-    localStorage.removeItem('nf_workspace_name');
+    sessionStorage.removeItem('nf_workspace_id');
+    sessionStorage.removeItem('nf_workspace_name');
     set({ workspaceId: null, workspaceName: null });
   },
 }));
