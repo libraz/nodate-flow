@@ -7,8 +7,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth/sessionstore"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth/sessadapter"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/sessionstore"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 )
 
@@ -23,7 +24,7 @@ func TestSessionstoreMySQLDriver(t *testing.T) {
 
 	tt := newTenant(t)
 	queries := generated.New(testDB)
-	store := sessionstore.NewMySQLStore(testDB, queries)
+	store := sessadapter.NewMySQLStore(testDB, queries)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

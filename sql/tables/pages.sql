@@ -26,6 +26,7 @@ CREATE TABLE pages (
   KEY idx_pages_workspace_id_enabled_sort_weight (workspace_id, enabled, sort_weight),
   KEY idx_pages_workspace_id_project_id (workspace_id, project_id),
   KEY idx_pages_parent_page_id (parent_page_id),
+  FULLTEXT KEY ft_pages_title (title),
 
   CONSTRAINT fk_pages_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_pages_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL,

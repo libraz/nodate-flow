@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -180,7 +179,7 @@ func buildCORS(allowed []string) func(http.Handler) http.Handler {
 		return func(next http.Handler) http.Handler { return next }
 	}
 	allowCreds := true
-	if len(allowed) == 1 && strings.TrimSpace(allowed[0]) == "*" {
+	if len(allowed) == 1 && allowed[0] == "*" {
 		allowCreds = false
 		slog.Warn("CORS configured with wildcard origin: credentials (cookies, Authorization header) are disabled per the CORS spec")
 	}

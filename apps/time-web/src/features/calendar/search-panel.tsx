@@ -134,7 +134,7 @@ function SearchResults({
   const { t, i18n } = useTranslation();
 
   if (results.length === 0) {
-    return <p className={styles.noResults}>{t('search.noResults')}</p>;
+    return <p className={styles.noResults}>{t('search.no_results')}</p>;
   }
 
   return (

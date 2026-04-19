@@ -1,5 +1,17 @@
 import { QueryClient } from '@tanstack/react-query';
 
+interface MaybeCodedError {
+  code?: string;
+}
+
+function hasCode(err: unknown): err is MaybeCodedError {
+  return typeof err === 'object' && err !== null && 'code' in err;
+}
+
+/**
+ * Create the singleton QueryClient with project defaults aligned with
+ * flow-web configuration.
+ */
 export function createQueryClient(): QueryClient {
   return new QueryClient({
     defaultOptions: {
@@ -7,7 +19,11 @@ export function createQueryClient(): QueryClient {
         staleTime: 30_000,
         gcTime: 5 * 60_000,
         refetchOnWindowFocus: false,
-        retry: 1,
+        throwOnError: true,
+        retry: (failureCount, error) => {
+          if (hasCode(error) && error.code === 'AUTH.TOKEN.EXPIRED') return false;
+          return failureCount < 1;
+        },
       },
       mutations: {
         throwOnError: false,
@@ -16,4 +32,5 @@ export function createQueryClient(): QueryClient {
   });
 }
 
+/** Module-level singleton QueryClient instance. */
 export const queryClient = createQueryClient();

@@ -145,16 +145,16 @@ export default function EventDetail(): ReactElement | null {
   const event = useEventById(eventDetailId ?? '');
 
   const kindLabels: Record<EventKind, string> = {
-    event: t('event.kindEvent'),
-    block: t('event.kindBlock'),
-    free: t('event.kindFree'),
+    event: t('event.kind_event'),
+    block: t('event.kind_block'),
+    free: t('event.kind_free'),
   };
 
   const showAsLabels: Record<ShowAs, string> = {
-    busy: t('event.showBusy'),
-    free: t('event.showFree'),
-    tentative: t('event.showTentative'),
-    oof: t('event.showOof'),
+    busy: t('event.show_busy'),
+    free: t('event.show_free'),
+    tentative: t('event.show_tentative'),
+    oof: t('event.show_oof'),
   };
 
   const rsvpLabels: Record<Rsvp, string> = {
@@ -194,7 +194,7 @@ export default function EventDetail(): ReactElement | null {
       <div className={detailStyles.loadingOverlay}>
         <div className={detailStyles.loadingCard}>
           <p style={{ fontSize: 'var(--nf-text-sm)', color: 'var(--nf-color-fg-muted)' }}>
-            {t('event.loadingEvent')}
+            {t('event.loading_event')}
           </p>
         </div>
       </div>
@@ -383,7 +383,7 @@ export default function EventDetail(): ReactElement | null {
                 color: 'var(--nf-color-fg-subtle)',
               }}
             >
-              {t('detail.noAttendees')}
+              {t('detail.no_attendees')}
             </p>
           ) : (
             <div
@@ -455,7 +455,7 @@ export default function EventDetail(): ReactElement | null {
                 color: 'var(--nf-color-fg-subtle)',
               }}
             >
-              {t('detail.noChecklist')}
+              {t('detail.no_checklist')}
             </p>
           ) : (
             <div
@@ -525,7 +525,7 @@ export default function EventDetail(): ReactElement | null {
                 color: 'var(--nf-color-fg-subtle)',
               }}
             >
-              {t('detail.noComments')}
+              {t('detail.no_comments')}
             </p>
           ) : (
             <div
@@ -581,7 +581,7 @@ export default function EventDetail(): ReactElement | null {
           >
             <Input
               type="text"
-              placeholder={t('detail.addComment')}
+              placeholder={t('detail.add_comment')}
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
               style={{ flex: 1 }}
@@ -621,7 +621,7 @@ export default function EventDetail(): ReactElement | null {
                 color: 'var(--nf-color-fg-subtle)',
               }}
             >
-              {t('detail.noAttachments')}
+              {t('detail.no_attachments')}
             </p>
           ) : (
             <div
@@ -687,7 +687,7 @@ export default function EventDetail(): ReactElement | null {
           style={{ flex: 1 }}
         >
           <Trash2 size={16} />
-          {confirmDelete ? t('common.confirmDelete') : t('common.delete')}
+          {confirmDelete ? t('common.confirm_delete') : t('common.delete')}
         </Button>
       </div>
     </div>

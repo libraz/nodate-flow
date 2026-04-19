@@ -32,25 +32,25 @@ export default function SettingsModal(): ReactElement | null {
   const themes: ThemeFamilyEntry[] = [
     {
       id: 'glass' as ThemeFamily,
-      label: t('settings.themeGlass'),
+      label: t('settings.theme_glass'),
       preview: DEFAULT_THEME_PREVIEWS.glass,
     },
     {
       id: 'aurora' as ThemeFamily,
-      label: t('settings.themeAurora'),
+      label: t('settings.theme_aurora'),
       preview: DEFAULT_THEME_PREVIEWS.aurora,
     },
     {
       id: 'dotline' as ThemeFamily,
-      label: t('settings.themeDotline'),
+      label: t('settings.theme_dotline'),
       preview: DEFAULT_THEME_PREVIEWS.dotline,
     },
   ];
 
   const colorModes = [
-    { mode: 'light' as ColorMode, label: t('settings.modeLight') },
-    { mode: 'dark' as ColorMode, label: t('settings.modeDark') },
-    { mode: 'system' as ColorMode, label: t('settings.modeSystem') },
+    { mode: 'light' as ColorMode, label: t('settings.mode_light') },
+    { mode: 'dark' as ColorMode, label: t('settings.mode_dark') },
+    { mode: 'system' as ColorMode, label: t('settings.mode_system') },
   ];
 
   if (!showSettings) return null;
@@ -72,7 +72,7 @@ export default function SettingsModal(): ReactElement | null {
           onThemeChange={(t) => setTheme(t as Theme)}
           onColorModeChange={(m) => setColorMode(m as ColorMode)}
           themeLabel={t('settings.theme')}
-          colorModeLabel={t('settings.colorMode')}
+          colorModeLabel={t('settings.color_mode')}
         />
 
         {/* Language */}

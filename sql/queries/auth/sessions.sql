@@ -11,6 +11,7 @@ INSERT INTO sessions (
 
 -- name: FindSessionByRefreshHash :one
 -- Resolve a session from its SHA-256 refresh hash. Caller validates expiry.
+-- id is required: used by RotateSessionRefreshHash (WHERE id = ?).
 SELECT
   id,
   public_id,
@@ -58,6 +59,7 @@ LIMIT ? OFFSET ?;
 
 -- name: FindSessionByPublicId :one
 -- Resolve a session by its external public_id (UUID v7).
+-- id is required: used internally for session operations.
 SELECT
   id,
   public_id,

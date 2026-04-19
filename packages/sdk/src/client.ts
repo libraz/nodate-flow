@@ -7,7 +7,7 @@
 
 import createOpenapiFetch, { type Client, type ClientOptions } from 'openapi-fetch';
 
-import type { paths } from './openapi';
+import type { paths } from './openapi.js';
 
 /** Options accepted by createClient. */
 export interface CreateClientOptions {

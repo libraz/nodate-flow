@@ -35,10 +35,10 @@ export default function MembersDialog({
   const removeMutation = useRemoveMemberMutation(wsId, calendarId);
 
   const roles: { value: SubscriptionRole; label: string }[] = [
-    { value: 'owner', label: t('members.roleOwner') },
-    { value: 'manager', label: t('members.roleManager') },
-    { value: 'editor', label: t('members.roleEditor') },
-    { value: 'viewer', label: t('members.roleViewer') },
+    { value: 'owner', label: t('members.role_owner') },
+    { value: 'manager', label: t('members.role_manager') },
+    { value: 'editor', label: t('members.role_editor') },
+    { value: 'viewer', label: t('members.role_viewer') },
   ];
 
   const [email, setEmail] = useState('');
@@ -66,7 +66,7 @@ export default function MembersDialog({
       >
         <Input
           type="email"
-          placeholder={t('members.emailPlaceholder')}
+          placeholder={t('members.email_placeholder')}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           style={{ flex: 1 }}

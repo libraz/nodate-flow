@@ -1,5 +1,5 @@
+import { getOrCreateProvider } from '@nodate-flow/holidays';
 import { BP } from '@nodate-flow/ui/tokens/breakpoints';
-import { getOrCreateProvider } from '@nodate/holidays';
 import { DateTime } from 'luxon';
 import {
   type ReactElement,
@@ -254,7 +254,7 @@ export default function WeekView(): ReactElement {
       {/* All-day events bar */}
       {hasAnyAllDay(allDay) ? (
         <div className={styles.allDayGrid} style={{ gridTemplateColumns: gridCols }}>
-          <div className={styles.allDayLabel}>{t('calendar.allDay')}</div>
+          <div className={styles.allDayLabel}>{t('calendar.all_day')}</div>
           {visibleDays.map((day) => {
             const iso = day.toISODate() ?? '';
             const dayAllDay = allDay.get(iso) ?? [];

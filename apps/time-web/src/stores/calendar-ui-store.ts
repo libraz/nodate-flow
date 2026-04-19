@@ -8,6 +8,7 @@ import { DateTime } from 'luxon';
 import { useStore } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 
+import { authStore } from '../features/auth/auth-store';
 import {
   type ColorMode,
   type Theme,
@@ -17,7 +18,6 @@ import {
   loadPreference,
   savePreference,
 } from '../lib/theme';
-import { authStore } from './auth-store';
 
 const AUTH_API_URL = import.meta.env.VITE_AUTH_API_BASE_URL ?? 'http://localhost:8082';
 

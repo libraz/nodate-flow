@@ -1,7 +1,7 @@
 import { Navigate, createFileRoute } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 
-import { selectIsAuthenticated, useAuth } from '../stores/auth-store';
+import { selectIsAuthenticated, useAuth } from '../features/auth/auth-store';
 import { selectWorkspaceId, useWorkspace } from '../stores/workspace-store';
 
 export const Route = createFileRoute('/')({

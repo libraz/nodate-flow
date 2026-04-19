@@ -12,9 +12,9 @@
 
 import { useEffect, useState } from 'react';
 
+import type { AuthUser } from '../features/auth/auth-store';
+import { authStore } from '../features/auth/auth-store';
 import { refreshAccessToken, sdk } from '../lib/sdk';
-import type { AuthUser } from '../stores/auth-store';
-import { authStore } from '../stores/auth-store';
 
 export type AuthBootstrapStatus = 'loading' | 'authenticated' | 'unauthenticated';
 

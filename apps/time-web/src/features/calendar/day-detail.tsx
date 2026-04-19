@@ -59,7 +59,7 @@ export default function DayDetail(): ReactElement | null {
         onClick={closeDayDetail}
         role="button"
         tabIndex={-1}
-        aria-label={t('calendar.closeDayDetail')}
+        aria-label={t('calendar.close_day_detail')}
       />
 
       <div className={`glass-surface-heavy ${styles.sheet}`}>
@@ -88,7 +88,7 @@ export default function DayDetail(): ReactElement | null {
 
         <div className={styles.scrollArea}>
           {events.length === 0 ? (
-            <p className={styles.emptyText}>{t('calendar.noEventsForDay')}</p>
+            <p className={styles.emptyText}>{t('calendar.no_events_for_day')}</p>
           ) : (
             <div className={styles.eventList}>
               {events.map((event) => {
@@ -108,7 +108,7 @@ export default function DayDetail(): ReactElement | null {
                       <p className={styles.eventTitle}>{event.title}</p>
                       <p className={styles.eventTime}>
                         {event.allDay
-                          ? t('event.allDay')
+                          ? t('event.all_day')
                           : start.setLocale(i18n.language).toLocaleString(DateTime.TIME_SIMPLE)}
                       </p>
                     </div>

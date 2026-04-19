@@ -12,11 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danielgtaylor/huma/v2"
-
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/handlerutil"
 	integrationspkg "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/integrations"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 )
@@ -30,9 +29,8 @@ const oauthStateTTL = 15 * time.Minute
 // cards in a deterministic left-to-right order.
 var supportedProviders = []string{"github", "slack", "google_calendar"}
 
-func httpErr(spec *apierrors.Spec) error {
-	return huma.NewError(spec.Status, spec.Code+": "+spec.Message)
-}
+// httpErr delegates to handlerutil.HTTPErr.
+var httpErr = handlerutil.HTTPErr
 
 // List handles GET /me/integrations. It merges the three supported
 // providers with the user's existing rows so the UI can render all

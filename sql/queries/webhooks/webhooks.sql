@@ -35,6 +35,7 @@ WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE;
 -- name: ListActiveSubscriptionsForEvent :many
 -- Find all active subscriptions in a workspace. Event type filtering
 -- is done in Go since JSON_CONTAINS is not sqlc-friendly.
+-- id is required: used as subscription_id FK in CreateWebhookDelivery.
 SELECT id, public_id, url, secret, event_types
 FROM webhook_subscriptions
 WHERE workspace_id = ? AND is_active = TRUE AND enabled = TRUE;
@@ -61,6 +62,7 @@ LIMIT ? OFFSET ?;
 
 -- name: FindPendingDeliveries :many
 -- Find deliveries ready for (re)delivery. Used by the background worker.
+-- d.id is required: used by MarkDeliveryDelivered/Failed/Dead (WHERE id = ?).
 SELECT d.id, d.public_id, d.workspace_id, d.subscription_id,
   d.event_type, d.payload_json, d.attempts, d.max_attempts,
   ws.url, ws.secret

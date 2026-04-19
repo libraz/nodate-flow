@@ -12,14 +12,10 @@ include .env
 export
 endif
 
-# Package manager used for JS scripts. Override with `make PKG=bun dev` etc.
-PKG ?= bun
-PKG_RUN := $(PKG) run
-ifeq ($(PKG),npm)
-PKG_X := npx --yes
-else
-PKG_X := $(PKG) x
-endif
+# Package manager — bun only. Do not override.
+PKG := bun
+PKG_RUN := bun run
+PKG_X := bunx
 
 .DEFAULT_GOAL := help
 

@@ -7,7 +7,7 @@ import { Link, Outlet, createFileRoute, useNavigate } from '@tanstack/react-rout
 import { type ReactElement, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { selectUser, useAuth } from '../../stores/auth-store';
+import { selectUser, useAuth } from '../../features/auth/auth-store';
 
 function AdminLayout(): ReactElement | null {
   const user = useAuth(selectUser);

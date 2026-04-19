@@ -10,7 +10,7 @@ CREATE TABLE ai_providers (
 
   kind ENUM('anthropic','openai','google','ollama','openai_compat') NOT NULL COMMENT 'Provider kind',
   name VARCHAR(255) NOT NULL COMMENT 'Human-readable label',
-  base_url VARCHAR(1024) NULL COMMENT 'API base URL (required for openai_compat/ollama)',
+  base_url VARCHAR(2048) NULL COMMENT 'API base URL (required for openai_compat/ollama)',
   api_key_ciphertext VARBINARY(512) NOT NULL COMMENT 'AES-256-GCM nonce+tag+ciphertext',
   api_key_prefix CHAR(8) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Leading chars for display masking',
   api_key_suffix CHAR(4) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Trailing chars for display masking',

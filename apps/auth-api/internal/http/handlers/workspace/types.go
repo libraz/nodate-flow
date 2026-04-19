@@ -5,11 +5,9 @@ package workspace
 import (
 	"database/sql"
 
-	"github.com/danielgtaylor/huma/v2"
-
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
 )
 
@@ -31,11 +29,8 @@ type InviteDeps struct {
 	WebURL      string
 }
 
-// httpErr converts an APIError Spec into a Huma status error so the
-// canonical error envelope is emitted by the framework.
-func httpErr(spec *apierrors.Spec) error {
-	return huma.NewError(spec.Status, spec.Code+": "+spec.Message)
-}
+// httpErr delegates to handlerutil.HTTPErr.
+var httpErr = handlerutil.HTTPErr
 
 // Workspace is the public DTO for a workspace row.
 type Workspace struct {

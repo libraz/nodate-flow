@@ -8,12 +8,14 @@ WORKDIR /src
 # Copy workspace + module manifests first for layer caching.
 COPY go.work go.work.sum* ./
 COPY apps/flow-api/go.mod apps/flow-api/go.sum ./apps/flow-api/
+COPY packages/go-shared/go.mod packages/go-shared/go.sum ./packages/go-shared/
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     cd apps/flow-api && go mod download
 
-# Copy the api source tree.
+# Copy the api and shared source trees.
 COPY apps/flow-api ./apps/flow-api
+COPY packages/go-shared ./packages/go-shared
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \

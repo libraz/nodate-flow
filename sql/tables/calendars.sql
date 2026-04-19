@@ -13,7 +13,7 @@ CREATE TABLE calendars (
   name VARCHAR(255) NOT NULL COMMENT 'Display name',
   description TEXT NULL COMMENT 'Optional description',
   color VARCHAR(7) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT '#4285F4' COMMENT 'Default hex color',
-  cover_url VARCHAR(1024) NULL COMMENT 'Cover image URL',
+  cover_url VARCHAR(2048) NULL COMMENT 'Cover image URL',
 
   owner_user_id INT UNSIGNED NULL COMMENT 'For personal calendars: the owning user. NULL for shared/system',
   system_slug VARCHAR(100) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'For system calendars: provider identifier (e.g., holidays.jp)',

@@ -63,6 +63,7 @@ LIMIT ? OFFSET ?;
 -- name: FindAgentIDByPublicIDForWorkspace :one
 -- Resolve an ai_agents public id to its internal id, scoped to the
 -- workspace. Used by task actor handlers to bind by public id.
+-- id is required: returned as FK value for task_actors.agent_id.
 SELECT id
 FROM ai_agents
 WHERE workspace_id = ?

@@ -47,9 +47,9 @@ export default function InviteDialog({
     <Dialog open={open} onClose={onClose} title={t('invite.title')} fullScreenOnMobile>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-2)' }}>
         <Select value={role} onChange={(e) => setRole(e.target.value)} style={{ flex: 1 }}>
-          <option value="manager">{t('members.roleManager')}</option>
-          <option value="editor">{t('members.roleEditor')}</option>
-          <option value="viewer">{t('members.roleViewer')}</option>
+          <option value="manager">{t('members.role_manager')}</option>
+          <option value="editor">{t('members.role_editor')}</option>
+          <option value="viewer">{t('members.role_viewer')}</option>
         </Select>
         <Button
           variant="primary"
@@ -57,7 +57,7 @@ export default function InviteDialog({
           onClick={handleCreate}
           disabled={createMutation.isPending}
         >
-          {t('invite.createLink')}
+          {t('invite.create_link')}
         </Button>
       </div>
 
@@ -76,7 +76,7 @@ export default function InviteDialog({
           </p>
         ) : invites?.length === 0 ? (
           <p style={{ fontSize: 'var(--nf-text-sm)', color: 'var(--nf-color-fg-subtle)' }}>
-            {t('invite.noLinks')}
+            {t('invite.no_links')}
           </p>
         ) : (
           invites?.map((invite) => (
@@ -131,7 +131,7 @@ export default function InviteDialog({
                   variant="ghost"
                   size="sm"
                   onClick={() => handleCopy(invite.token)}
-                  aria-label={t('invite.copyLink')}
+                  aria-label={t('invite.copy_link')}
                 >
                   {copiedToken === invite.token ? (
                     <Check size={16} style={{ color: 'var(--nf-color-accent)' }} />

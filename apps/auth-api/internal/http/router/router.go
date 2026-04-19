@@ -14,8 +14,9 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth/sessionstore"
+	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth/sessadapter"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/sessionstore"
 	adminhandlers "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/admin"
 	authhandlers "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/auth"
 	inthandlers "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/integrations"
@@ -113,7 +114,7 @@ func BuildResult(deps Deps) Result {
 
 	sessionStore := deps.Sessions
 	if sessionStore == nil {
-		sessionStore = sessionstore.NewMySQLStore(deps.DB, deps.Queries)
+		sessionStore = sessadapter.NewMySQLStore(deps.DB, deps.Queries)
 	}
 	auditRec := audit.New(deps.Queries)
 	authDeps := authhandlers.Deps{

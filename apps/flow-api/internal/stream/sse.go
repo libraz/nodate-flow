@@ -9,6 +9,19 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
+// writeJSONError writes a structured JSON error response for the SSE
+// handler. It matches the standard apierrors envelope shape so clients
+// receive a consistent error format even on upgrade-time failures.
+func writeJSONError(w http.ResponseWriter, status int, code, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"status":  status,
+		"code":    code,
+		"message": message,
+	})
+}
+
 // heartbeatInterval is the idle cadence at which the SSE writer
 // emits a comment line (": ping") so intermediaries don't close the
 // connection. ADR 0005 fixes this at 20 seconds.
@@ -42,7 +55,7 @@ func SSEHandler(notifier Notifier, remember RememberWorkspaceFunc) http.HandlerF
 	return func(w http.ResponseWriter, r *http.Request) {
 		ws, ok := middleware.WorkspaceFromContext(r.Context())
 		if !ok {
-			http.Error(w, "workspace context missing", http.StatusForbidden)
+			writeJSONError(w, http.StatusForbidden, "WS.WORKSPACE.NOT_FOUND", "workspace context missing")
 			return
 		}
 		if remember != nil {

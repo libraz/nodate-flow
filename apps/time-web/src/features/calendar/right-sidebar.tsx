@@ -35,7 +35,7 @@ function MemoTab(): ReactElement {
           onKeyDown={(e) => {
             if (e.key === 'Enter') handleAdd();
           }}
-          placeholder={t('rightPanel.addMemo')}
+          placeholder={t('right_panel.add_memo')}
           style={{ flex: 1 }}
         />
         <Button variant="primary" size="sm" onClick={handleAdd} disabled={!newMemo.trim()}>
@@ -44,7 +44,7 @@ function MemoTab(): ReactElement {
       </div>
       {memos.length === 0 ? (
         <p style={{ fontSize: 'var(--nf-text-sm)', color: 'var(--nf-color-fg-subtle)' }}>
-          {t('rightPanel.noMemos')}
+          {t('right_panel.no_memos')}
         </p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
@@ -89,7 +89,7 @@ function MembersTab(): ReactElement {
   if (!calendarId) {
     return (
       <p style={{ fontSize: 'var(--nf-text-sm)', color: 'var(--nf-color-fg-subtle)' }}>
-        {t('rightPanel.noSharedCalendar')}
+        {t('right_panel.no_shared_calendar')}
       </p>
     );
   }
@@ -97,7 +97,7 @@ function MembersTab(): ReactElement {
   if (isLoading) {
     return (
       <p style={{ fontSize: 'var(--nf-text-sm)', color: 'var(--nf-color-fg-muted)' }}>
-        {t('rightPanel.loadingMembers')}
+        {t('right_panel.loading_members')}
       </p>
     );
   }
@@ -106,7 +106,7 @@ function MembersTab(): ReactElement {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
       {members?.length === 0 ? (
         <p style={{ fontSize: 'var(--nf-text-sm)', color: 'var(--nf-color-fg-subtle)' }}>
-          {t('rightPanel.noMembers')}
+          {t('right_panel.no_members')}
         </p>
       ) : (
         members?.map((member) => (
@@ -157,7 +157,7 @@ function ShareTab(): ReactElement {
   if (!firstShared) {
     return (
       <p style={{ fontSize: 'var(--nf-text-sm)', color: 'var(--nf-color-fg-subtle)' }}>
-        {t('rightPanel.noSharedCalendarAvailable')}
+        {t('right_panel.no_shared_calendar_available')}
       </p>
     );
   }
@@ -167,7 +167,7 @@ function ShareTab(): ReactElement {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3)' }}>
       <p style={{ fontSize: 'var(--nf-text-sm)', color: 'var(--nf-color-fg-muted)' }}>
-        {t('rightPanel.shareDescription')}
+        {t('right_panel.share_description')}
       </p>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-2)' }}>
         <Input type="text" readOnly value={shareUrl} style={{ flex: 1 }} />
@@ -178,11 +178,11 @@ function ShareTab(): ReactElement {
             void navigator.clipboard.writeText(shareUrl);
           }}
         >
-          {t('rightPanel.copy')}
+          {t('right_panel.copy')}
         </Button>
       </div>
       <p style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-fg-subtle)' }}>
-        {t('rightPanel.shareLinkHint')}
+        {t('right_panel.share_link_hint')}
       </p>
     </div>
   );
@@ -192,7 +192,7 @@ function NotificationsTab(): ReactElement {
   const { t } = useTranslation();
   return (
     <p style={{ fontSize: 'var(--nf-text-sm)', color: 'var(--nf-color-fg-subtle)' }}>
-      {t('rightPanel.noNotifications')}
+      {t('right_panel.no_notifications')}
     </p>
   );
 }
@@ -203,17 +203,17 @@ export default function RightSidebar(): ReactElement | null {
   const setRightPanel = useCalendarUi((s) => s.setRightPanel);
 
   const tabs: { panel: RightPanel; icon: typeof NotebookPen; label: string }[] = [
-    { panel: 'memo', icon: NotebookPen, label: t('rightPanel.memo') },
-    { panel: 'members', icon: Users, label: t('rightPanel.members') },
-    { panel: 'share', icon: Link, label: t('rightPanel.share') },
-    { panel: 'notifications', icon: Bell, label: t('rightPanel.notifications') },
+    { panel: 'memo', icon: NotebookPen, label: t('right_panel.memo') },
+    { panel: 'members', icon: Users, label: t('right_panel.members') },
+    { panel: 'share', icon: Link, label: t('right_panel.share') },
+    { panel: 'notifications', icon: Bell, label: t('right_panel.notifications') },
   ];
 
   const panelLabels: Record<RightPanel, string> = {
-    memo: t('rightPanel.memo'),
-    members: t('rightPanel.members'),
-    share: t('rightPanel.share'),
-    notifications: t('rightPanel.notifications'),
+    memo: t('right_panel.memo'),
+    members: t('right_panel.members'),
+    share: t('right_panel.share'),
+    notifications: t('right_panel.notifications'),
   };
 
   if (!rightPanel) return null;
@@ -259,7 +259,7 @@ export default function RightSidebar(): ReactElement | null {
           variant="ghost"
           size="sm"
           onClick={() => setRightPanel(null)}
-          aria-label={t('rightPanel.close')}
+          aria-label={t('right_panel.close')}
         >
           <X size={16} />
         </Button>

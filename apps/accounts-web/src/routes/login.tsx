@@ -17,11 +17,16 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
 import AuthCard from '../components/auth-card';
+import { type LoginFormValues, loginSchema } from '../features/auth/auth-schemas';
+import {
+  type AuthUser,
+  authStore,
+  selectIsAuthenticated,
+  useAuth,
+} from '../features/auth/auth-store';
 import type { ProblemJson } from '../lib/api-error';
 import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../lib/auth-errors';
-import { type LoginFormValues, loginSchema } from '../lib/auth-schemas';
 import { sdk } from '../lib/sdk';
-import { type AuthUser, authStore, selectIsAuthenticated, useAuth } from '../stores/auth-store';
 
 export interface LoginSearch {
   redirect?: string;

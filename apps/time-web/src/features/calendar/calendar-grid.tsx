@@ -1,4 +1,4 @@
-import { getOrCreateProvider } from '@nodate/holidays';
+import { getOrCreateProvider } from '@nodate-flow/holidays';
 import { DateTime, Info } from 'luxon';
 import {
   Fragment,

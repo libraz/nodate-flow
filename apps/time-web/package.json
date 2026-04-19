@@ -1,5 +1,5 @@
 {
-  "name": "@nodate/time-web",
+  "name": "@nodate-flow/time-web",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -29,7 +29,7 @@
   },
   "devDependencies": {
     "@nodate-flow/ui": "workspace:*",
-    "@nodate/holidays": "workspace:*",
+    "@nodate-flow/holidays": "workspace:*",
     "@tanstack/router-devtools": "1.166.11",
     "@tanstack/router-plugin": "1.167.12",
     "@types/luxon": "^3.4.2",
@@ -39,6 +39,6 @@
     "typescript": "5.6.3",
     "vite": "5.4.10",
     "happy-dom": "^20.8.9",
-    "vitest": "2.1.4"
+    "vitest": "^4.1.3"
   }
 }

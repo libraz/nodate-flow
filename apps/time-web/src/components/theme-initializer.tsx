@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
 
+import { authStore } from '../features/auth/auth-store';
 import { authSdk } from '../lib/sdk';
 import { applyColorMode, applyTheme, splitPreference, watchSystemColorScheme } from '../lib/theme';
-import { authStore } from '../stores/auth-store';
 import { useCalendarUi } from '../stores/calendar-ui-store';
 
 /** ThemeInitializer applies the active theme to the DOM and hydrates from the server on auth. */

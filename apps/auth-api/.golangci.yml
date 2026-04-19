@@ -1,0 +1,35 @@
+run:
+  timeout: 5m
+  go: "1.25"
+
+linters:
+  disable-all: true
+  enable:
+    - gofmt
+    - goimports
+    - govet
+    - staticcheck
+    - errcheck
+    - depguard
+    - revive
+    - gosec
+
+linters-settings:
+  depguard:
+    rules:
+      crypto-internal:
+        list-mode: lax
+        files:
+          - "!**/internal/http/handlers/auth/**"
+          - "!**/internal/crypto/**"
+          - "!**/cmd/api/**"
+          - "!**/tests/**"
+          - "!**/testutil/**"
+        deny:
+          - pkg: "github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
+            desc: "crypto package may only be imported from internal/http/handlers/auth, internal/crypto, cmd/api, and tests"
+
+issues:
+  exclude-dirs:
+    - apps/auth-api/internal/db/generated
+    - apps/auth-api/internal/errors

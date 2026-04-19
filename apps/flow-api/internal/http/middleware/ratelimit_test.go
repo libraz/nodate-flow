@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -250,4 +251,109 @@ func TestAPIRateLimiter_Middleware_NoIPNoAuth_PassesThrough(t *testing.T) {
 		handler.ServeHTTP(rec, req)
 		require.Equal(t, http.StatusOK, rec.Code)
 	}
+}
+
+func TestIPRateLimiter_Middleware_BlockedResponseIsJSON(t *testing.T) {
+	t.Parallel()
+
+	rl := NewIPRateLimiter(RateLimitConfig{
+		MaxRequests: 1,
+		Window:      time.Minute,
+	})
+	t.Cleanup(rl.Stop)
+
+	handler := rl.Middleware()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	ip := "10.99.0.1"
+
+	// Exhaust the single-request limit.
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	ctx := WithClientIP(req.Context(), ip)
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	// Second request should be rejected with a structured JSON body.
+	req2 := httptest.NewRequest(http.MethodGet, "/", nil)
+	ctx2 := WithClientIP(req2.Context(), ip)
+	req2 = req2.WithContext(ctx2)
+	rec2 := httptest.NewRecorder()
+	handler.ServeHTTP(rec2, req2)
+
+	require.Equal(t, http.StatusTooManyRequests, rec2.Code)
+	require.Equal(t, "application/json", rec2.Header().Get("Content-Type"))
+
+	var body map[string]any
+	err := json.NewDecoder(rec2.Body).Decode(&body)
+	require.NoError(t, err, "response body must be valid JSON")
+
+	// Verify the envelope fields.
+	require.Equal(t, float64(http.StatusTooManyRequests), body["status"], "status field must be 429")
+	require.Equal(t, "RATE.LIMIT_EXCEEDED", body["code"], "code field must match")
+	require.Equal(t, "429 Too Many Requests", body["message"], "message field must match")
+}
+
+func TestAPIRateLimiter_Middleware_BlockedResponseIsJSON(t *testing.T) {
+	t.Parallel()
+
+	rl := NewAPIRateLimiter(APIRateLimitConfig{
+		AuthedMaxRequests:   1,
+		UnauthedMaxRequests: 1,
+		Window:              time.Minute,
+	})
+	t.Cleanup(rl.Stop)
+
+	handler := rl.Middleware()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// Exhaust the authenticated user limit.
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	ctx := authn.WithActor(req.Context(), 999)
+	ctx = WithClientIP(ctx, "10.99.0.2")
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	// Second request from same user should return JSON 429.
+	req2 := httptest.NewRequest(http.MethodGet, "/", nil)
+	ctx2 := authn.WithActor(req2.Context(), 999)
+	ctx2 = WithClientIP(ctx2, "10.99.0.2")
+	req2 = req2.WithContext(ctx2)
+	rec2 := httptest.NewRecorder()
+	handler.ServeHTTP(rec2, req2)
+
+	require.Equal(t, http.StatusTooManyRequests, rec2.Code)
+	require.Equal(t, "application/json", rec2.Header().Get("Content-Type"))
+
+	var body map[string]any
+	err := json.NewDecoder(rec2.Body).Decode(&body)
+	require.NoError(t, err, "response body must be valid JSON")
+
+	require.Equal(t, float64(http.StatusTooManyRequests), body["status"])
+	require.Equal(t, "RATE.LIMIT_EXCEEDED", body["code"])
+	require.Equal(t, "429 Too Many Requests", body["message"])
+}
+
+func TestWriteJSONError_EnvelopeStructure(t *testing.T) {
+	t.Parallel()
+
+	rec := httptest.NewRecorder()
+	writeJSONError(rec, http.StatusForbidden, "WS.WORKSPACE.NOT_FOUND", "workspace context missing")
+
+	require.Equal(t, http.StatusForbidden, rec.Code)
+	require.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+
+	var body map[string]any
+	err := json.NewDecoder(rec.Body).Decode(&body)
+	require.NoError(t, err, "response body must be valid JSON")
+
+	require.Len(t, body, 3, "JSON envelope should have exactly 3 fields")
+	require.Equal(t, float64(http.StatusForbidden), body["status"])
+	require.Equal(t, "WS.WORKSPACE.NOT_FOUND", body["code"])
+	require.Equal(t, "workspace context missing", body["message"])
 }

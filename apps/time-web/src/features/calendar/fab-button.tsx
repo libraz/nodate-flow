@@ -14,7 +14,7 @@ export default function FabButton(): ReactElement {
       type="button"
       onClick={() => openEventModal()}
       className={styles.fab}
-      aria-label={t('calendar.createNewEvent')}
+      aria-label={t('calendar.create_new_event')}
     >
       <Plus size={24} />
     </button>

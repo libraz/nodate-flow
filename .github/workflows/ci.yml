@@ -25,7 +25,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: apps/flow-api/go.sum
+          cache-dependency-path: |
+            apps/flow-api/go.sum
+            apps/auth-api/go.sum
+            apps/time-api/go.sum
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -40,15 +43,35 @@ jobs:
       - name: TypeScript typecheck
         run: bun run typecheck
 
-      - name: golangci-lint
+      - name: golangci-lint (flow-api)
         uses: golangci/golangci-lint-action@v8
         with:
           version: latest
           working-directory: apps/flow-api
 
-      - name: Go vet
+      - name: Go vet (flow-api)
         run: go vet ./...
         working-directory: apps/flow-api
+
+      - name: golangci-lint (auth-api)
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+          working-directory: apps/auth-api
+
+      - name: Go vet (auth-api)
+        run: go vet ./...
+        working-directory: apps/auth-api
+
+      - name: golangci-lint (time-api)
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+          working-directory: apps/time-api
+
+      - name: Go vet (time-api)
+        run: go vet ./...
+        working-directory: apps/time-api
 
   # ---------- Job 2: Unit tests (Go short + Vitest) ----------
   test-unit:
@@ -61,7 +84,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: apps/flow-api/go.sum
+          cache-dependency-path: |
+            apps/flow-api/go.sum
+            apps/auth-api/go.sum
+            apps/time-api/go.sum
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -70,11 +96,11 @@ jobs:
       - name: Install JS dependencies
         run: bun install --frozen-lockfile
 
-      - name: Go test (short) with coverage
+      - name: Go test (short) — flow-api
         run: go test -short -race -count=1 -coverprofile=coverage.out -covermode=atomic ./...
         working-directory: apps/flow-api
 
-      - name: Check Go coverage threshold (80%)
+      - name: Check Go coverage threshold (80%) — flow-api
         working-directory: apps/flow-api
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
@@ -83,6 +109,14 @@ jobs:
             echo "::error::Go coverage ${COVERAGE}% is below 80% threshold"
             exit 1
           fi
+
+      - name: Go test (short) — auth-api
+        run: go test -short -race -count=1 -coverprofile=coverage.out -covermode=atomic ./...
+        working-directory: apps/auth-api
+
+      - name: Go test (short) — time-api
+        run: go test -short -race -count=1 -coverprofile=coverage.out -covermode=atomic ./...
+        working-directory: apps/time-api
 
       - name: Vitest with coverage
         run: bun run test -- --coverage
@@ -99,7 +133,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: apps/flow-api/go.sum
+          cache-dependency-path: |
+            apps/flow-api/go.sum
+            apps/auth-api/go.sum
+            apps/time-api/go.sum
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -112,11 +149,14 @@ jobs:
         run: bunx playwright install --with-deps chromium
         working-directory: apps/flow-web
 
-      - name: Go test (full, with testcontainers) with coverage
+      # Integration tests use testcontainers (MySQL, MinIO, Redis).
+      # The containers are started automatically by Go test helpers.
+
+      - name: Go test (full, with testcontainers) — flow-api
         run: go test -race -count=1 -timeout=10m -coverprofile=coverage.out -covermode=atomic ./...
         working-directory: apps/flow-api
 
-      - name: Check Go coverage threshold (80%)
+      - name: Check Go coverage threshold (80%) — flow-api
         working-directory: apps/flow-api
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
@@ -125,6 +165,14 @@ jobs:
             echo "::error::Go coverage ${COVERAGE}% is below 80% threshold"
             exit 1
           fi
+
+      - name: Go test (full, with testcontainers) — auth-api
+        run: go test -race -count=1 -timeout=10m -coverprofile=coverage.out -covermode=atomic ./...
+        working-directory: apps/auth-api
+
+      - name: Go test (full, with testcontainers) — time-api
+        run: go test -race -count=1 -timeout=10m -coverprofile=coverage.out -covermode=atomic ./...
+        working-directory: apps/time-api
 
       - name: Build web for E2E
         run: bun run build
@@ -154,7 +202,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: apps/flow-api/go.sum
+          cache-dependency-path: |
+            apps/flow-api/go.sum
+            apps/auth-api/go.sum
+            apps/time-api/go.sum
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -177,9 +228,17 @@ jobs:
       - name: Install govulncheck
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
 
-      - name: Go vulnerability check
+      - name: Go vulnerability check — flow-api
         run: govulncheck ./...
         working-directory: apps/flow-api
+
+      - name: Go vulnerability check — auth-api
+        run: govulncheck ./...
+        working-directory: apps/auth-api
+
+      - name: Go vulnerability check — time-api
+        run: govulncheck ./...
+        working-directory: apps/time-api
 
       - name: Install JS dependencies
         run: bun install --frozen-lockfile
@@ -195,6 +254,27 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: |
+            apps/flow-api/go.sum
+            apps/auth-api/go.sum
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install JS dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Regenerate OpenAPI spec
+        run: |
+          cd apps/flow-api && go run ./cmd/dump-openapi -o ../../packages/sdk/openapi-flow.json
+          cd ../../apps/auth-api && go run ./cmd/dump-openapi -o ../../packages/sdk/openapi-auth.json
+          cd ../../scripts && go run merge-openapi.go -o ../packages/sdk/openapi.json ../packages/sdk/openapi-flow.json ../packages/sdk/openapi-auth.json
+          rm -f packages/sdk/openapi-flow.json packages/sdk/openapi-auth.json
 
       - uses: actions/setup-python@v5
         with:

@@ -7,8 +7,8 @@
 import { Link, Outlet, createFileRoute, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useEffect } from 'react';
 
+import { selectIsAuthenticated, selectUser, useAuth } from '../features/auth/auth-store';
 import { useAuthBootstrap } from '../hooks/use-auth-bootstrap';
-import { selectIsAuthenticated, selectUser, useAuth } from '../stores/auth-store';
 
 function AuthenticatedLayout(): ReactElement | null {
   const { status } = useAuthBootstrap();

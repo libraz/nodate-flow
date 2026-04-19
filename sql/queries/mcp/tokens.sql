@@ -20,6 +20,8 @@ LIMIT 1;
 
 -- name: FindMcpTokenByHash :one
 -- Resolve an MCP token by its SHA-256 hash for bearer auth.
+-- id, workspace_id, user_id are required: used internally by auth middleware
+-- to establish session context (not exposed to API).
 SELECT
   id,
   public_id,

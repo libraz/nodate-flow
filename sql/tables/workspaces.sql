@@ -10,7 +10,7 @@ CREATE TABLE workspaces (
   slug VARCHAR(63) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'DNS-label slug (RFC 1035)',
   name VARCHAR(255) NOT NULL COMMENT 'Display name',
   description TEXT NULL COMMENT 'Optional description',
-  icon_url VARCHAR(1024) NULL COMMENT 'Icon image URL',
+  icon_url VARCHAR(2048) NULL COMMENT 'Icon image URL',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',

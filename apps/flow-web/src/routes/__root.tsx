@@ -67,7 +67,7 @@ function FatalFallback({
             margin: 0,
             padding: '0.75rem 1rem',
             borderRadius: '0.5rem',
-            background: 'var(--nf-color-surface))',
+            background: 'var(--nf-color-surface)',
             color: 'var(--nf-color-fg-muted)',
             fontSize: '0.8125rem',
             maxInlineSize: '48rem',

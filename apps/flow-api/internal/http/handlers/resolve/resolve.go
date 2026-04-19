@@ -5,19 +5,13 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/danielgtaylor/huma/v2"
-
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
-// httpErr converts an apierrors.Spec into a huma error. This duplicates the
-// per-package helper intentionally so that the resolve package stays
-// self-contained.
-func httpErr(spec *apierrors.Spec) error {
-	return huma.NewError(spec.Status, spec.Code+": "+spec.Message)
-}
+// httpErr delegates to handlerutil.HTTPErr.
+var httpErr = handlerutil.HTTPErr
 
 // WorkspaceMember validates that the given actor is an enabled member of the
 // workspace identified by wsPublic (a UUID v7 string). It returns the internal

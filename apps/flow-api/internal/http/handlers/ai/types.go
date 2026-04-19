@@ -15,14 +15,11 @@ package ai
 import (
 	"database/sql"
 
-	"github.com/danielgtaylor/huma/v2"
-
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/nlcommand"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/nlquery"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
@@ -39,9 +36,8 @@ type Deps struct {
 	Audit *audit.Recorder
 }
 
-func httpErr(spec *apierrors.Spec) error {
-	return huma.NewError(spec.Status, spec.Code+": "+spec.Message)
-}
+// httpErr delegates to handlerutil.HTTPErr.
+var httpErr = handlerutil.HTTPErr
 
 // Provider is the public DTO for an ai_providers row. It NEVER carries
 // the ciphertext nor the plaintext API key.

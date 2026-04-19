@@ -3,6 +3,7 @@ import { Calendar, ListTodo, Search, Settings } from 'lucide-react';
 import type { ReactElement, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { selectIsAuthenticated, useAuth } from '../features/auth/auth-store';
 import CalendarGrid from '../features/calendar/calendar-grid';
 import CalendarHeader from '../features/calendar/calendar-header';
 import DayDetail from '../features/calendar/day-detail';
@@ -14,7 +15,6 @@ import SearchPanel from '../features/calendar/search-panel';
 import SettingsModal from '../features/calendar/settings-modal';
 import CalendarSidebar from '../features/calendar/sidebar';
 import WeekView from '../features/calendar/week-view';
-import { selectIsAuthenticated, useAuth } from '../stores/auth-store';
 import { useCalendarUi } from '../stores/calendar-ui-store';
 import styles from './calendar.module.css';
 
@@ -76,7 +76,7 @@ function CalendarPage(): ReactElement {
               onClick={() => setSidebarOpen(false)}
               role="button"
               tabIndex={-1}
-              aria-label={t('calendar.closeSidebar')}
+              aria-label={t('calendar.close_sidebar')}
             />
             <div className={styles.sidebarDrawer}>
               <CalendarSidebar />

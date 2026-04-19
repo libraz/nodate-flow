@@ -126,15 +126,8 @@ task
     if (workspaceId) query.workspaceId = workspaceId;
     if (status) query.state = [status];
 
-    const { data, error } = await client.GET('/tasks', {
-      params: {
-        query: query as Parameters<typeof client.GET<'/tasks'>>[1] extends {
-          params?: { query?: infer Q };
-        }
-          ? Q
-          : never,
-      },
-    });
+    // biome-ignore lint/suspicious/noExplicitAny: query is built dynamically
+    const { data, error } = await client.GET('/tasks', { params: { query } } as any);
 
     if (error) {
       const msg =
@@ -152,13 +145,21 @@ task
       return;
     }
 
-    const rows = tasks.map((t) => ({
-      id: t.id.slice(0, 8),
-      title: t.title.length > 50 ? `${t.title.slice(0, 47)}...` : t.title,
-      state: t.derivedState,
-      priority: String(t.priority),
-      due: t.dueOn ?? '-',
-    }));
+    const rows = tasks.map(
+      (t: {
+        id: string;
+        title: string;
+        derivedState: string;
+        priority: number;
+        dueOn?: string | null;
+      }) => ({
+        id: t.id.slice(0, 8),
+        title: t.title.length > 50 ? `${t.title.slice(0, 47)}...` : t.title,
+        state: t.derivedState,
+        priority: String(t.priority),
+        due: t.dueOn ?? '-',
+      }),
+    );
 
     const output = table(rows, {
       columns: ['id', 'title', 'state', 'priority', 'due'],
@@ -236,11 +237,8 @@ task
     if (dueOn) body.dueOn = dueOn;
     if (startOn) body.startOn = startOn;
 
-    const { data, error } = await client.POST('/tasks', {
-      body: body as Parameters<typeof client.POST<'/tasks'>>[1] extends { body: infer B }
-        ? B
-        : never,
-    });
+    // biome-ignore lint/suspicious/noExplicitAny: body is built dynamically
+    const { data, error } = await client.POST('/tasks', { body } as any);
 
     if (error) {
       const msg =
@@ -308,12 +306,9 @@ task
 
     const client = createFlowClient();
 
-    const { data, error } = await client.PATCH('/tasks/{id}', {
-      params: { path: { id } },
-      body: body as Parameters<typeof client.PATCH<'/tasks/{id}'>>[1] extends { body: infer B }
-        ? B
-        : never,
-    });
+    const patchOpts = { params: { path: { id } }, body };
+    // biome-ignore lint/suspicious/noExplicitAny: body is built dynamically
+    const { data, error } = await client.PATCH('/tasks/{id}', patchOpts as any);
 
     if (error) {
       const msg =

@@ -13,11 +13,11 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
 import AuthCard from '../../components/auth-card';
+import { type ProfileFormValues, profileSchema } from '../../features/auth/auth-schemas';
+import { type AuthUser, authStore, selectUser, useAuth } from '../../features/auth/auth-store';
 import { type SupportedLanguage, setLanguage } from '../../i18n';
-import { type ProfileFormValues, profileSchema } from '../../lib/auth-schemas';
 import { sdk } from '../../lib/sdk';
 import { type ThemePreference, useTheme } from '../../providers/theme-provider';
-import { type AuthUser, authStore, selectUser, useAuth } from '../../stores/auth-store';
 
 interface MeResponse {
   id: string;

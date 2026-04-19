@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -63,7 +64,7 @@ func (rl *IPRateLimiter) Middleware() func(http.Handler) http.Handler {
 
 			if !res.Allowed {
 				w.Header().Set("Retry-After", ratelimit.FormatRetryAfter(res.RetryAfter))
-				http.Error(w, "429 Too Many Requests", http.StatusTooManyRequests)
+				writeJSONError(w, http.StatusTooManyRequests, "RATE.LIMIT_EXCEEDED", "429 Too Many Requests")
 				return
 			}
 
@@ -151,7 +152,7 @@ func (rl *APIRateLimiter) Middleware() func(http.Handler) http.Handler {
 
 			if !res.Allowed {
 				w.Header().Set("Retry-After", ratelimit.FormatRetryAfter(res.RetryAfter))
-				http.Error(w, "429 Too Many Requests", http.StatusTooManyRequests)
+				writeJSONError(w, http.StatusTooManyRequests, "RATE.LIMIT_EXCEEDED", "429 Too Many Requests")
 				return
 			}
 
@@ -167,4 +168,17 @@ func setRateLimitHeaders(w http.ResponseWriter, res ratelimit.Result) {
 	h.Set("X-RateLimit-Limit", strconv.Itoa(res.Limit))
 	h.Set("X-RateLimit-Remaining", strconv.Itoa(res.Remaining))
 	h.Set("X-RateLimit-Reset", strconv.FormatInt(res.ResetUnix, 10))
+}
+
+// writeJSONError writes a structured JSON error response matching the
+// standard apierrors envelope. It is used by middleware that runs
+// before Huma and therefore cannot return a huma.StatusError.
+func writeJSONError(w http.ResponseWriter, status int, code, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"status":  status,
+		"code":    code,
+		"message": message,
+	})
 }

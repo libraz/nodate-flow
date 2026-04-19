@@ -1,5 +1,5 @@
 {
-  "name": "@nodate/time-sdk",
+  "name": "@nodate-flow/time-sdk",
   "version": "0.0.1",
   "private": true,
   "type": "module",

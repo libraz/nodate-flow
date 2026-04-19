@@ -8,10 +8,10 @@ import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 
+import { selectIsAuthenticated, useAuth } from '../../features/auth/auth-store';
 import { useAcceptInviteMutation } from '../../features/calendar/api';
 import { toApiError } from '../../lib/api-error';
 import { sdk } from '../../lib/sdk';
-import { selectIsAuthenticated, useAuth } from '../../stores/auth-store';
 
 interface SharedCalendar {
   id: string;

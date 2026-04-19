@@ -96,16 +96,16 @@ export default function EventModal(): ReactElement | null {
   const startDate = watch('startDate');
 
   const eventKinds: { value: EventKind; label: string }[] = [
-    { value: 'event', label: t('event.kindEvent') },
-    { value: 'block', label: t('event.kindBlock') },
-    { value: 'free', label: t('event.kindFree') },
+    { value: 'event', label: t('event.kind_event') },
+    { value: 'block', label: t('event.kind_block') },
+    { value: 'free', label: t('event.kind_free') },
   ];
 
   const showAsOptions: { value: ShowAs; label: string }[] = [
-    { value: 'busy', label: t('event.showBusy') },
-    { value: 'free', label: t('event.showFree') },
-    { value: 'tentative', label: t('event.showTentative') },
-    { value: 'oof', label: t('event.showOof') },
+    { value: 'busy', label: t('event.show_busy') },
+    { value: 'free', label: t('event.show_free') },
+    { value: 'tentative', label: t('event.show_tentative') },
+    { value: 'oof', label: t('event.show_oof') },
   ];
 
   const weekdayLabels = locale === 'ja' ? WEEKDAYS_JA : WEEKDAYS_EN;
@@ -203,7 +203,7 @@ export default function EventModal(): ReactElement | null {
     <Dialog
       open={eventModalOpen}
       onClose={closeEventModal}
-      title={editingEventId ? t('event.editEvent') : t('event.newEvent')}
+      title={editingEventId ? t('event.edit_event') : t('event.new_event')}
       fullScreenOnMobile
       style={{ maxInlineSize: '30rem' }}
     >
@@ -254,7 +254,7 @@ export default function EventModal(): ReactElement | null {
           {/* All-day toggle */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 'var(--nf-text-sm)', color: 'var(--nf-color-fg-muted)' }}>
-              {t('event.allDay')}
+              {t('event.all_day')}
             </span>
             <Controller
               control={control}
@@ -413,7 +413,7 @@ export default function EventModal(): ReactElement | null {
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 'var(--nf-text-sm)', color: 'var(--nf-color-fg-muted)' }}>
-              {t('event.showAs')}
+              {t('event.show_as')}
             </span>
             <Select {...register('showAs')}>
               {showAsOptions.map((sa) => (

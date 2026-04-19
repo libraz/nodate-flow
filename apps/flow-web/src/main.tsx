@@ -10,6 +10,11 @@ import { ThemeProvider } from './providers/theme-provider';
 import { router } from './router/router';
 import './styles/main.css';
 
+/**
+ * Pre-i18n bootstrap error fallback. This text is intentionally hardcoded
+ * English because the i18n provider has not been initialized when this
+ * component renders (it sits outside <I18nProvider>).
+ */
 function FatalError(): ReactElement {
   return (
     <main style={{ padding: '2rem' }}>

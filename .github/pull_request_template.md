@@ -12,8 +12,8 @@
 
 ## Checklist
 
-- [ ] Tests pass (`go test ./...` and `pnpm typecheck`)
-- [ ] Lint passes (`pnpm lint` and `golangci-lint run`)
+- [ ] Tests pass (`go test ./...` and `bun typecheck`)
+- [ ] Lint passes (`bun lint` and `golangci-lint run`)
 - [ ] i18n: no hardcoded strings in UI
 - [ ] Error codes: new errors added to `errors/*.yaml`
 - [ ] Commits follow Conventional Commits format

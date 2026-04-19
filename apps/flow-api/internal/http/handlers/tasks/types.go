@@ -5,16 +5,16 @@ package tasks
 import (
 	"database/sql"
 
-	"github.com/danielgtaylor/huma/v2"
-
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/nlconstraint"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/storage"
 )
+
+// httpErr delegates to handlerutil.HTTPErr.
+var httpErr = handlerutil.HTTPErr
 
 // Deps is the dependency bundle passed to each handler in this package.
 type Deps struct {
@@ -36,10 +36,6 @@ type Deps struct {
 	// Audit records audit log entries for task mutations.
 	// Optional: nil disables audit logging.
 	Audit *audit.Recorder
-}
-
-func httpErr(spec *apierrors.Spec) error {
-	return huma.NewError(spec.Status, spec.Code+": "+spec.Message)
 }
 
 // nullStr delegates to handlerutil.NullStr.

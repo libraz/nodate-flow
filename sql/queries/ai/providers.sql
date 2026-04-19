@@ -43,6 +43,7 @@ LIMIT ? OFFSET ?;
 -- Return the internal id of the most recently created enabled provider
 -- for a workspace. Used by the ai_invocations logger when the
 -- orchestrator does not track which provider handled the call.
+-- id is required: returned as FK value for ai_invocations.provider_id.
 SELECT id
 FROM ai_providers
 WHERE workspace_id = ?
@@ -54,6 +55,7 @@ LIMIT 1;
 -- INTERNAL USE ONLY. Returns api_key_ciphertext for the providers package
 -- to decrypt before calling the upstream LLM. Must NOT be called from
 -- handlers, MCP tools, or any code outside apps/flow-api/internal/ai/providers/.
+-- id is required: used internally by the providers package for logging/tracking.
 SELECT
   id,
   public_id,

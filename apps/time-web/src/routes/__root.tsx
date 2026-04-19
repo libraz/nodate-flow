@@ -34,7 +34,7 @@ function NotFound(): ReactElement {
       >
         404
       </h1>
-      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{t('notFound.description')}</p>
+      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{t('not_found.description')}</p>
       <Link
         to="/"
         style={{
@@ -45,7 +45,7 @@ function NotFound(): ReactElement {
           textDecoration: 'none',
         }}
       >
-        {t('notFound.backHome')}
+        {t('not_found.back_home')}
       </Link>
     </main>
   );
@@ -130,7 +130,7 @@ function FatalFallback({
             textDecoration: 'none',
           }}
         >
-          {t('fatal.backHome')}
+          {t('fatal.back_home')}
         </Link>
       </div>
     </main>

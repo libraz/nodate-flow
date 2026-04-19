@@ -58,12 +58,12 @@ describe('calendar aria-label i18n', () => {
     const content = header?.content ?? '';
 
     // Previous/next buttons must use translated labels
-    expect(content).toContain("t('calendar.previousMonth')");
-    expect(content).toContain("t('calendar.nextMonth')");
-    expect(content).toContain("t('calendar.previousWeek')");
-    expect(content).toContain("t('calendar.nextWeek')");
-    expect(content).toContain("t('calendar.toggleSidebar')");
-    expect(content).toContain("t('search.searchEvents')");
+    expect(content).toContain("t('calendar.previous_month')");
+    expect(content).toContain("t('calendar.next_month')");
+    expect(content).toContain("t('calendar.previous_week')");
+    expect(content).toContain("t('calendar.next_week')");
+    expect(content).toContain("t('calendar.toggle_sidebar')");
+    expect(content).toContain("t('search.search_events')");
   });
 
   it('all t() keys used in aria-labels exist in en/common.json', () => {

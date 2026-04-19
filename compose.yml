@@ -93,6 +93,10 @@ services:
     depends_on:
       api:
         condition: service_healthy
+      auth-api:
+        condition: service_healthy
+      time-api:
+        condition: service_healthy
       otel-collector:
         condition: service_healthy
     volumes:
@@ -182,6 +186,53 @@ services:
       retries: 10
       start_period: 10s
 
+  auth-api:
+    build:
+      context: .
+      dockerfile: apps/auth-api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+    environment:
+      NF_AUTH_PORT: "8082"
+      NF_AUTH_LOG_LEVEL: ${NF_AUTH_LOG_LEVEL:-info}
+      NF_DB_DSN: ${NF_DB_DSN:-nodate:nodatepw@tcp(mysql:3306)/nodate_flow?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci}
+      NF_COOKIE_SECURE: ${NF_COOKIE_SECURE:-false}
+      NF_REGISTRATION_OPEN: ${NF_REGISTRATION_OPEN:-true}
+      NF_AUTH_CORS: ${NF_AUTH_CORS:-http://localhost:5173,http://localhost:5174,http://localhost:5175,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:5175}
+      NF_AUTH_SESSION_STORE: ${NF_AUTH_SESSION_STORE:-mysql}
+      NF_REDIS_ADDR: ${NF_REDIS_ADDR:-redis:6379}
+      NF_AUTH_PUBLIC_URL: ${NF_AUTH_PUBLIC_URL:-http://localhost:8082}
+      NF_AUTH_WEB_URL: ${NF_AUTH_WEB_URL:-http://localhost:5175}
+      NF_AUTH_FLOW_WEB_URL: ${NF_AUTH_FLOW_WEB_URL:-http://localhost:5173}
+      NF_SECRET_KEY: ${NF_SECRET_KEY:-}
+      NF_AUTH_GOOGLE_CLIENT_ID: ${NF_AUTH_GOOGLE_CLIENT_ID:-}
+      NF_AUTH_GOOGLE_CLIENT_SECRET: ${NF_AUTH_GOOGLE_CLIENT_SECRET:-}
+      NF_AUTH_GITHUB_CLIENT_ID: ${NF_AUTH_GITHUB_CLIENT_ID:-}
+      NF_AUTH_GITHUB_CLIENT_SECRET: ${NF_AUTH_GITHUB_CLIENT_SECRET:-}
+      NF_AUTH_SLACK_CLIENT_ID: ${NF_AUTH_SLACK_CLIENT_ID:-}
+      NF_AUTH_SLACK_CLIENT_SECRET: ${NF_AUTH_SLACK_CLIENT_SECRET:-}
+      NF_AUTH_GOOGLE_INTEGRATION_CLIENT_ID: ${NF_AUTH_GOOGLE_INTEGRATION_CLIENT_ID:-}
+      NF_AUTH_GOOGLE_INTEGRATION_CLIENT_SECRET: ${NF_AUTH_GOOGLE_INTEGRATION_CLIENT_SECRET:-}
+      NF_AUTH_SMTP_HOST: ${NF_AUTH_SMTP_HOST:-mailpit}
+      NF_AUTH_SMTP_PORT: ${NF_AUTH_SMTP_PORT:-1025}
+      NF_AUTH_SMTP_USERNAME: ${NF_AUTH_SMTP_USERNAME:-}
+      NF_AUTH_SMTP_PASSWORD: ${NF_AUTH_SMTP_PASSWORD:-}
+      NF_AUTH_SMTP_FROM: ${NF_AUTH_SMTP_FROM:-noreply@nodate-flow.local}
+    ports:
+      - "${NF_AUTH_PORT:-8082}:8082"
+    healthcheck:
+      test: ["CMD", "/healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
   time-api:
     build:
       context: .
@@ -192,8 +243,9 @@ services:
         condition: service_healthy
     environment:
       NF_TIME_PORT: "8081"
+      NF_TIME_LOG_LEVEL: ${NF_TIME_LOG_LEVEL:-info}
       NF_DB_DSN: ${NF_DB_DSN:-nodate:nodatepw@tcp(mysql:3306)/nodate_flow?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci}
-      NF_TIME_CORS: ${NF_TIME_CORS:-http://localhost:5174}
+      NF_TIME_CORS: ${NF_TIME_CORS:-http://localhost:5174,http://127.0.0.1:5174}
       NF_COOKIE_SECURE: ${NF_COOKIE_SECURE:-false}
     ports:
       - "${NF_TIME_PORT:-8081}:8081"

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth/sessionstore"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/sessionstore"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
 )
 

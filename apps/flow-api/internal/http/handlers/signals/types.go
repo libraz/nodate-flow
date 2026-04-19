@@ -8,11 +8,9 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/danielgtaylor/huma/v2"
-
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
 // Deps is the dependency bundle passed to each handler in this package.
@@ -36,9 +34,8 @@ type Deps struct {
 	DefaultWorkspaceID string
 }
 
-func httpErr(spec *apierrors.Spec) error {
-	return huma.NewError(spec.Status, spec.Code+": "+spec.Message)
-}
+// httpErr delegates to handlerutil.HTTPErr.
+var httpErr = handlerutil.HTTPErr
 
 // Signal is the public DTO for a signals row.
 type Signal struct {

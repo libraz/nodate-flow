@@ -27,8 +27,8 @@ export default function CalendarHeader(): ReactElement {
       : displayMonth.toLocaleString({ month: 'long', year: 'numeric' });
 
   const prevLabel =
-    currentView === 'week' ? t('calendar.previousWeek') : t('calendar.previousMonth');
-  const nextLabel = currentView === 'week' ? t('calendar.nextWeek') : t('calendar.nextMonth');
+    currentView === 'week' ? t('calendar.previous_week') : t('calendar.previous_month');
+  const nextLabel = currentView === 'week' ? t('calendar.next_week') : t('calendar.next_month');
 
   return (
     <header className={`glass-surface-heavy ${styles.header}`}>
@@ -38,7 +38,7 @@ export default function CalendarHeader(): ReactElement {
             variant="ghost"
             size="sm"
             onClick={toggleSidebar}
-            aria-label={t('calendar.toggleSidebar')}
+            aria-label={t('calendar.toggle_sidebar')}
           >
             <Menu size={20} />
           </Button>
@@ -84,14 +84,14 @@ export default function CalendarHeader(): ReactElement {
             style={{ borderRadius: 'var(--nf-radius-pill)' }}
           >
             <Plus size={16} />
-            {t('calendar.createNewEvent')}
+            {t('calendar.create_new_event')}
           </Button>
         </span>
         <Button
           variant="ghost"
           size="sm"
           onClick={toggleSearch}
-          aria-label={t('search.searchEvents')}
+          aria-label={t('search.search_events')}
         >
           <Search size={20} />
         </Button>

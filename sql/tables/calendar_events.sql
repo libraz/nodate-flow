@@ -24,7 +24,7 @@ CREATE TABLE calendar_events (
 
   location VARCHAR(500) NULL COMMENT 'Location text',
   memo MEDIUMTEXT NULL COMMENT 'Free-form notes (markdown)',
-  url VARCHAR(2000) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'Meeting link or related URL',
+  url VARCHAR(2048) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'Meeting link or related URL',
 
   -- Ownership: determines whose layer this event belongs to
   owner_user_id INT UNSIGNED NOT NULL COMMENT 'Event owner (whose color/layer). Only owner, managers, or can_edit attendees may edit',

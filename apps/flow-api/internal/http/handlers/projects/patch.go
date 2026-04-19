@@ -12,6 +12,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
@@ -60,10 +61,11 @@ func Patch(deps Deps) func(context.Context, *PatchProjectInput) (*PatchProjectOu
 			WorkspaceID: current.WorkspaceID,
 			PublicID:    types.FromUUID(prj.PublicID),
 		}); err != nil {
-			var mysqlErr *mysql.MySQLError
-			if errors.As(err, &mysqlErr) && mysqlErr.Number == mysqlErrDuplicateEntry &&
-				strings.Contains(mysqlErr.Message, "uniq_projects_workspace_id_slug") {
-				return nil, httpErr(apierrors.WsProjectSlugAlreadyTaken)
+			if handlerutil.IsDuplicateEntry(err) {
+				var mysqlErr *mysql.MySQLError
+				if errors.As(err, &mysqlErr) && strings.Contains(mysqlErr.Message, "uniq_projects_workspace_id_slug") {
+					return nil, httpErr(apierrors.WsProjectSlugAlreadyTaken)
+				}
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}

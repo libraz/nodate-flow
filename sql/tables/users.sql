@@ -10,7 +10,7 @@ CREATE TABLE users (
   email VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Primary email, ASCII only',
   email_verified_at DATETIME NULL COMMENT 'Email verification timestamp',
   display_name VARCHAR(255) NOT NULL COMMENT 'Human-readable name',
-  avatar_url VARCHAR(1024) NULL COMMENT 'Avatar image URL',
+  avatar_url VARCHAR(2048) NULL COMMENT 'Avatar image URL',
   locale VARCHAR(16) NOT NULL DEFAULT 'en' COMMENT 'Preferred locale tag (BCP 47)',
   theme_preference ENUM('aurora-light','aurora-dark','dotline-light','dotline-dark','glass-light','glass-dark','system') NOT NULL DEFAULT 'system' COMMENT 'UI theme preference',
   last_login_at DATETIME NULL COMMENT 'Last successful login',

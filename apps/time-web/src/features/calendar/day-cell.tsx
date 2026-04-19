@@ -1,4 +1,4 @@
-import type { HolidayEntry } from '@nodate/holidays';
+import type { HolidayEntry } from '@nodate-flow/holidays';
 import { DateTime } from 'luxon';
 import { type ReactElement, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';

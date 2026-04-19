@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { OPEN_COMMAND_PALETTE_EVENT } from '../components/layout/glass-dock';
 import type { TaskDerivedState, TaskPriority } from '../features/tasks/api';
 import { PRIORITY_COLOR, PRIORITY_KEY, STATE_COLOR } from '../features/tasks/constants';
+import { dateKey } from '../lib/date-utils';
 import { sdk } from '../lib/sdk';
 
 type AssignedTask = components['schemas']['MyTaskListItem'];
@@ -32,14 +33,6 @@ const SECTION_ORDER: readonly SectionKey[] = [
   'later',
   'noDue',
 ];
-
-/** Local-time YYYY-MM-DD for the start of `d`. */
-function dateKey(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
 
 function classifyDue(dueOn: string | undefined, todayKey: string): SectionKey {
   if (!dueOn) return 'noDue';

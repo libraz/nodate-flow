@@ -23,7 +23,7 @@ yarn-error.log*
 .pnpm-store/
 .yarn/
 .bun/
-bun.lock
+pnpm-lock.yaml
 
 # ---- Go ----
 bin/

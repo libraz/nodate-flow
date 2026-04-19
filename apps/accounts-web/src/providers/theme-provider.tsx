@@ -7,8 +7,8 @@ import {
   useState,
 } from 'react';
 
+import { authStore } from '../features/auth/auth-store';
 import { sdk } from '../lib/sdk';
-import { authStore } from '../stores/auth-store';
 
 /** Concrete theme names (no `system`). */
 export const concreteThemes = [

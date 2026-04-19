@@ -5,8 +5,8 @@ import { useTranslation } from 'react-i18next';
 import Button from '@nodate-flow/ui/primitives/button';
 import Input from '@nodate-flow/ui/primitives/input';
 
+import { selectIsAuthenticated, useAuth } from '../features/auth/auth-store';
 import { authSdk } from '../lib/sdk';
-import { selectIsAuthenticated, useAuth } from '../stores/auth-store';
 import { useWorkspace } from '../stores/workspace-store';
 
 export const Route = createFileRoute('/setup')({
@@ -95,7 +95,7 @@ function SetupPage(): ReactElement {
         body: { name: name.trim(), slug: slug.trim() },
       });
       if (err || !data) {
-        const msg = (err as { detail?: string })?.detail ?? t('workspace.createFailed');
+        const msg = (err as { detail?: string })?.detail ?? t('workspace.create_failed');
         setError(msg);
         return;
       }
@@ -103,7 +103,7 @@ function SetupPage(): ReactElement {
       setWorkspace(ws.id, ws.name);
       void navigate({ to: '/calendar' });
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('workspace.createFailed'));
+      setError(err instanceof Error ? err.message : t('workspace.create_failed'));
     } finally {
       setLoading(false);
     }
@@ -179,7 +179,7 @@ function SetupPage(): ReactElement {
               required
               value={name}
               onChange={(e) => handleNameChange(e.target.value)}
-              placeholder={t('workspace.namePlaceholder')}
+              placeholder={t('workspace.name_placeholder')}
               style={{ width: '100%' }}
             />
           </div>
@@ -205,7 +205,7 @@ function SetupPage(): ReactElement {
                 setSlug(e.target.value);
                 setSlugEdited(true);
               }}
-              placeholder={t('workspace.slugPlaceholder')}
+              placeholder={t('workspace.slug_placeholder')}
               style={{ width: '100%' }}
             />
             <p
@@ -215,7 +215,7 @@ function SetupPage(): ReactElement {
                 color: 'var(--nf-color-fg-subtle)',
               }}
             >
-              {t('workspace.slugHint')}
+              {t('workspace.slug_hint')}
             </p>
           </div>
           <Button
@@ -224,7 +224,7 @@ function SetupPage(): ReactElement {
             disabled={loading || !name.trim() || !slug.trim()}
             style={{ width: '100%' }}
           >
-            {loading ? t('workspace.creating') : t('workspace.createButton')}
+            {loading ? t('workspace.creating') : t('workspace.create_button')}
           </Button>
         </form>
       </div>

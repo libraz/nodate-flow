@@ -7,8 +7,9 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/providers"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth/sessionstore"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth/sessadapter"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/config"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/sessionstore"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/outbound"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/stream"
@@ -19,11 +20,11 @@ import (
 // MySQL driver.
 func buildSessionStore(cfg *config.Config, db *sql.DB, q *generated.Queries, logger *slog.Logger) sessionstore.Store {
 	if cfg.SessionStore != "redis" {
-		return sessionstore.NewMySQLStore(db, q)
+		return sessadapter.NewMySQLStore(db, q)
 	}
 	rdb := dialRedis(cfg, logger)
 	if rdb == nil {
-		return sessionstore.NewMySQLStore(db, q)
+		return sessadapter.NewMySQLStore(db, q)
 	}
 	logger.Info("session store: redis", "addr", cfg.RedisAddr)
 	return sessionstore.NewRedisStore(rdb)

@@ -72,7 +72,9 @@ export function useAuditLogsQuery(
       if (filters.dateFrom !== undefined) queryParams.dateFrom = filters.dateFrom;
       if (filters.dateTo !== undefined) queryParams.dateTo = filters.dateTo;
 
-      // TODO: Remove type suppression once /workspaces/{wsId}/audit-logs is added to OpenAPI spec
+      // TODO(openapi): Remove type suppression once GET /workspaces/{wsId}/audit-logs
+      // is registered as a Huma operation and included in the merged OpenAPI spec.
+      // Tracked by the audit-logs endpoint not yet being defined in flow-api handlers.
       const untypedSdk = sdk as unknown as {
         // biome-ignore lint/style/useNamingConvention: SDK method name
         GET: (

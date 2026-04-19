@@ -13,9 +13,12 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
 import AuthCard from '../../components/auth-card';
+import {
+  type ChangePasswordFormValues,
+  changePasswordSchema,
+} from '../../features/auth/auth-schemas';
 import type { ProblemJson } from '../../lib/api-error';
 import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../../lib/auth-errors';
-import { type ChangePasswordFormValues, changePasswordSchema } from '../../lib/auth-schemas';
 import { sdk } from '../../lib/sdk';
 
 interface Session {

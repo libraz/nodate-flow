@@ -6,9 +6,9 @@ import Button from '@nodate-flow/ui/primitives/button';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 
 import { authSdk } from '../../lib/sdk';
-import { selectUser, useAuth } from '../../stores/auth-store';
 import { useCalendarUi } from '../../stores/calendar-ui-store';
 import { useWorkspace } from '../../stores/workspace-store';
+import { selectUser, useAuth } from '../auth/auth-store';
 import { useCalendarsQuery } from './api';
 import styles from './sidebar.module.css';
 import type { Calendar } from './types';
@@ -102,13 +102,13 @@ export default function CalendarSidebar(): ReactElement {
         {hasNoCalendars ? (
           <div className={styles.empty}>
             <p className={styles.emptyText}>
-              {isError ? t('sidebar.loadError') : t('sidebar.noCalendars')}
+              {isError ? t('sidebar.load_error') : t('sidebar.no_calendars')}
             </p>
           </div>
         ) : (
           <>
-            <CalendarSection title={t('sidebar.sharedCalendars')} calendars={shared} />
-            <CalendarSection title={t('sidebar.myCalendar')} calendars={personal} />
+            <CalendarSection title={t('sidebar.shared_calendars')} calendars={shared} />
+            <CalendarSection title={t('sidebar.my_calendar')} calendars={personal} />
             <CalendarSection title={t('sidebar.other')} calendars={system} />
           </>
         )}
@@ -131,7 +131,7 @@ export default function CalendarSidebar(): ReactElement {
           style={{ width: '100%', justifyContent: 'flex-start', gap: 'var(--nf-space-3)' }}
         >
           <LogOut size={16} />
-          {t('auth.signOut')}
+          {t('auth.sign_out')}
         </Button>
       </div>
     </aside>

@@ -13,12 +13,9 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 )
-
-// mysqlErrDuplicateEntry is the MySQL error number for a unique-constraint
-// violation (ER_DUP_ENTRY). See https://dev.mysql.com/doc/mysql-errors/8.4/en/
-const mysqlErrDuplicateEntry = 1062
 
 // Create handles POST /workspaces/{wsId}/projects.
 func Create(deps Deps) func(context.Context, *CreateProjectInput) (*CreateProjectOutput, error) {
@@ -44,12 +41,12 @@ func Create(deps Deps) func(context.Context, *CreateProjectInput) (*CreateProjec
 			Color:       color,
 		})
 		if err != nil {
-			var mysqlErr *mysql.MySQLError
-			if errors.As(err, &mysqlErr) && mysqlErr.Number == mysqlErrDuplicateEntry {
+			if handlerutil.IsDuplicateEntry(err) {
 				// Only the (workspace_id, slug) unique key should map to
 				// SLUG_ALREADY_TAKEN. Other unique violations (e.g. a
 				// public_id collision) must surface as INTERNAL.
-				if strings.Contains(mysqlErr.Message, "uniq_projects_workspace_id_slug") {
+				var mysqlErr *mysql.MySQLError
+				if errors.As(err, &mysqlErr) && strings.Contains(mysqlErr.Message, "uniq_projects_workspace_id_slug") {
 					return nil, httpErr(apierrors.WsProjectSlugAlreadyTaken)
 				}
 			}

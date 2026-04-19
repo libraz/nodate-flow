@@ -33,19 +33,12 @@ import type { Project } from '../features/projects/api';
 import { TASK_PRIORITIES, type TaskDerivedState, type TaskPriority } from '../features/tasks/api';
 import { PRIORITY_KEY, STATE_COLOR } from '../features/tasks/constants';
 import { useWorkspacesQuery } from '../features/workspaces/api';
+import { dateKey } from '../lib/date-utils';
 import { sdk } from '../lib/sdk';
 
 type CalendarTask = components['schemas']['TaskListItem'] & { workspaceName?: string };
 
 const WEEKDAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
-
-/** Local-time YYYY-MM-DD for the start of `d`. */
-function dateKey(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
 
 /** Number of days in a given (year, monthIndex). */
 function daysInMonth(year: number, monthIndex: number): number {

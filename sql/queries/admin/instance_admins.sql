@@ -46,7 +46,8 @@ WHERE enabled = TRUE AND revoked_at IS NULL;
 
 -- name: AdminFindInstanceAdminByUserId :one
 -- Find instance admin grant for a specific user.
-SELECT id, public_id, user_id, granted_at, revoked_at
+-- Used as an existence check by grant/revoke handlers (result is discarded).
+SELECT public_id, user_id, granted_at, revoked_at
 FROM instance_admins
 WHERE user_id = ? AND enabled = TRUE AND revoked_at IS NULL
 LIMIT 1;
