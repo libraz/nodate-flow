@@ -17,6 +17,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth/sessionstore"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
+	adminhandlers "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/admin"
 	authhandlers "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/auth"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/middleware"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
@@ -146,6 +147,13 @@ func Build(deps Deps) http.Handler {
 	// Bearer-protected auth endpoints.
 	jwtResolver := &authn.JWTResolver{JWT: deps.JWT.JWTIssuer, DB: passthroughDB{deps.DB}}
 	authMW := authn.RequireAuth(jwtResolver)
+	adminACL := middleware.RequireInstanceAdmin(passthroughDB{deps.DB})
+	adminDeps := adminhandlers.Deps{
+		DB:      deps.DB,
+		Queries: deps.Queries,
+		Audit:   auditRec,
+	}
+
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
 		subAPI := newSubAPI(sub)
@@ -229,6 +237,21 @@ func Build(deps Deps) http.Handler {
 			Path:        "/me/totp/recovery-codes",
 			Summary:     "Regenerate TOTP recovery codes",
 		}, authhandlers.TotpRegenerateRecoveryCodes(authDeps))
+	})
+
+	// Admin setup endpoint (auth-only, no admin check — for bootstrap).
+	r.Group(func(sub chi.Router) {
+		sub.Use(authMW)
+		subAPI := newSubAPI(sub)
+		adminhandlers.RegisterSetup(subAPI, adminDeps)
+	})
+
+	// Admin endpoints (auth + instance admin required).
+	r.Group(func(sub chi.Router) {
+		sub.Use(authMW)
+		sub.Use(adminACL)
+		subAPI := newSubAPI(sub)
+		adminhandlers.Register(subAPI, adminDeps)
 	})
 
 	return r

@@ -48,7 +48,8 @@
     "./primitives/confirm": "./src/primitives/confirm/confirm.tsx",
     "./primitives/tabs": "./src/primitives/tabs/tabs.tsx",
     "./primitives/scroll-area": "./src/primitives/scroll-area/scroll-area.tsx",
-    "./primitives/data-grid": "./src/primitives/data-grid/data-grid.tsx"
+    "./primitives/data-grid": "./src/primitives/data-grid/data-grid.tsx",
+    "./primitives/auth-card": "./src/primitives/auth-card/auth-card.tsx"
   },
   "scripts": {
     "typecheck": "tsc -b",

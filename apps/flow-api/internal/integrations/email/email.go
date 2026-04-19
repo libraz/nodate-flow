@@ -1,5 +1,5 @@
 // Package email provides an outbound transport interface for the
-// 4.OUT-3 email reply loop. Implementations send a single message;
+// email reply loop. Implementations send a single message;
 // the loop that converts inbound replies back into signals is handled
 // at the integration layer (parsing inbound MIME is out of scope for
 // this interface).

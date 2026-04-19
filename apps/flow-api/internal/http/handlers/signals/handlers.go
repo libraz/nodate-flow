@@ -115,8 +115,8 @@ func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error
 			Kind:       in.Body.Kind,
 			ExternalID: in.Body.ExternalID,
 			Payload:    payload,
-			ReceivedAt: now,
-			CreatedAt:  now,
+			ReceivedAt: now.Unix(),
+			CreatedAt:  now.Unix(),
 		}}
 		return out, nil
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
@@ -35,10 +36,7 @@ func Reorder(deps Deps) func(context.Context, *ReorderTasksInput) (*ReorderTasks
 		}
 
 		// Workspace membership check.
-		const wsMemQuery = `SELECT 1 FROM workspace_members
-WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
-		var one int
-		if err := deps.DB.QueryRowContext(ctx, wsMemQuery, prj.WorkspaceID, actorID).Scan(&one); err != nil {
+		if err := handlerutil.CheckWorkspaceMember(ctx, deps.DB, prj.WorkspaceID, actorID); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, httpErr(apierrors.WsProjectAccessDenied)
 			}

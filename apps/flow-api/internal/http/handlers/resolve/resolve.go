@@ -9,6 +9,7 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
 // httpErr converts an apierrors.Spec into a huma error. This duplicates the
@@ -37,10 +38,7 @@ func WorkspaceMember(ctx context.Context, db *sql.DB, wsPublic string, actorID u
 		}
 		return 0, httpErr(apierrors.InternalUnexpected)
 	}
-	const wsMemQuery = `SELECT 1 FROM workspace_members
-WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
-	var one int
-	if err := db.QueryRowContext(ctx, wsMemQuery, wsID, actorID).Scan(&one); err != nil {
+	if err := handlerutil.CheckWorkspaceMember(ctx, db, wsID, actorID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, httpErr(apierrors.WsWorkspaceAccessDenied)
 		}

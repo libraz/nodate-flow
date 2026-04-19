@@ -12,10 +12,10 @@ import (
 )
 
 // MinIOInstance is a running MinIO container and the connection
-// parameters that the storage.Client / ND_S3_* env vars need.
+// parameters that the storage.Client / NF_S3_* env vars need.
 type MinIOInstance struct {
 	Container *minio.MinioContainer
-	// Endpoint is the host:port suitable for ND_S3_ENDPOINT.
+	// Endpoint is the host:port suitable for NF_S3_ENDPOINT.
 	Endpoint  string
 	AccessKey string
 	SecretKey string

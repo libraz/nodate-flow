@@ -22,19 +22,12 @@ import { type ReactElement, Suspense, useCallback, useMemo, useState } from 'rea
 import { useTranslation } from 'react-i18next';
 
 import { useProjectDependenciesQuery } from '../features/projects/api';
+import { STATE_COLOR } from '../features/tasks/constants';
 import { sdk } from '../lib/sdk';
 
 type TaskListItem = components['schemas']['TaskListItem'];
 
 const routeApi = getRouteApi('/_authenticated/projects/$projectId/gantt');
-
-const STATE_COLOR: Record<string, string> = {
-  open: 'var(--color-info, #3498db)',
-  waiting: 'var(--color-warning, #f39c12)',
-  review: 'var(--color-accent, #9b59b6)',
-  done: 'var(--color-success, #27ae60)',
-  cancelled: 'var(--color-muted, #95a5a6)',
-};
 
 const ROW_HEIGHT = 28;
 const ROW_GAP = 4;

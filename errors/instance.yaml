@@ -21,6 +21,60 @@ resources:
         message: "Instance administrator privileges are required"
         description: "Returned when an endpoint that requires the instance-admin role is called by a non-admin user."
         userAction: "Ask an instance administrator to perform this operation."
+      not_found:
+        code: INSTANCE.ADMIN.NOT_FOUND
+        status: 404
+        message: "User is not an instance administrator"
+        description: "Returned when attempting to revoke admin privileges from a user who is not an instance admin."
+        userAction: "Verify the user is listed as an instance administrator."
+      self_revoke:
+        code: INSTANCE.ADMIN.SELF_REVOKE
+        status: 409
+        message: "Cannot revoke your own administrator privileges"
+        description: "Returned when an instance admin tries to revoke their own admin grant."
+        userAction: "Ask another instance administrator to revoke your privileges."
+      last_admin:
+        code: INSTANCE.ADMIN.LAST_ADMIN
+        status: 409
+        message: "Cannot revoke the last remaining administrator"
+        description: "Returned when revoking would leave the instance with zero admins."
+        userAction: "Grant admin privileges to another user first."
+
+  user:
+    breadcrumb: "Instance > User"
+    errors:
+      not_found:
+        code: INSTANCE.USER.NOT_FOUND
+        status: 404
+        message: "User not found"
+        description: "Returned when an admin endpoint references a user that does not exist."
+        userAction: "Verify the user ID."
+
+  workspace:
+    breadcrumb: "Instance > Workspace"
+    errors:
+      not_found:
+        code: INSTANCE.WORKSPACE.NOT_FOUND
+        status: 404
+        message: "Workspace not found"
+        description: "Returned when an admin endpoint references a workspace that does not exist."
+        userAction: "Verify the workspace ID."
+
+  settings:
+    breadcrumb: "Instance > Settings"
+    errors:
+      invalid_key:
+        code: INSTANCE.SETTINGS.INVALID_KEY
+        status: 400
+        message: "Unknown setting key"
+        description: "Returned when a PATCH /admin/settings request references a setting key that is not recognized."
+        userAction: "Use one of the supported setting keys."
+      invalid_value:
+        code: INSTANCE.SETTINGS.INVALID_VALUE
+        status: 400
+        message: "Invalid value for setting"
+        description: "Returned when a setting value does not pass validation for its key."
+        userAction: "Check the expected format for this setting."
 
   quota:
     breadcrumb: "Instance > Quota"

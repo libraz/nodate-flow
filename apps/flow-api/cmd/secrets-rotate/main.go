@@ -1,12 +1,12 @@
 // Command secrets-rotate re-encrypts ai_providers.api_key_ciphertext rows
-// from an old ND_SECRET_KEY master key to a new one.
+// from an old NF_SECRET_KEY master key to a new one.
 //
 // Usage:
 //
 //	secrets-rotate \
 //	  --old-key <hex-or-base64> \
 //	  --new-key <hex-or-base64> \
-//	  --dsn <mysql-dsn>           # or ND_DB_DSN env
+//	  --dsn <mysql-dsn>           # or NF_DB_DSN env
 //	  [--dry-run] \
 //	  [--batch-size 100]
 //
@@ -51,9 +51,9 @@ func run() error {
 		dryRun    bool
 		batchSize int
 	)
-	flag.StringVar(&oldKeyRaw, "old-key", "", "old ND_SECRET_KEY (hex or base64, 32 bytes)")
-	flag.StringVar(&newKeyRaw, "new-key", "", "new ND_SECRET_KEY (hex or base64, 32 bytes)")
-	flag.StringVar(&dsn, "dsn", os.Getenv("ND_DB_DSN"), "MySQL DSN (defaults to ND_DB_DSN env)")
+	flag.StringVar(&oldKeyRaw, "old-key", "", "old NF_SECRET_KEY (hex or base64, 32 bytes)")
+	flag.StringVar(&newKeyRaw, "new-key", "", "new NF_SECRET_KEY (hex or base64, 32 bytes)")
+	flag.StringVar(&dsn, "dsn", os.Getenv("NF_DB_DSN"), "MySQL DSN (defaults to NF_DB_DSN env)")
 	flag.BoolVar(&dryRun, "dry-run", false, "report how many rows would be rotated without writing")
 	flag.IntVar(&batchSize, "batch-size", 100, "rows per transaction")
 	flag.Parse()
@@ -62,7 +62,7 @@ func run() error {
 		return errors.New("--old-key and --new-key are required")
 	}
 	if dsn == "" {
-		return errors.New("--dsn or ND_DB_DSN is required")
+		return errors.New("--dsn or NF_DB_DSN is required")
 	}
 	if batchSize <= 0 {
 		return errors.New("--batch-size must be > 0")

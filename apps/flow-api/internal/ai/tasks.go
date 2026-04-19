@@ -112,7 +112,7 @@ type InvocationLogger func(ctx context.Context, rec InvocationRecord)
 // rows are append-only; status is one of "ok", "error".
 type InvocationRecord struct {
 	WorkspaceID      uint32
-	AgentID          uint32 // non-zero when the call was made on behalf of an AI agent (2.MCP-2)
+	AgentID          uint32 // non-zero when the call was made on behalf of an AI agent
 	Purpose          string
 	Model            string
 	PromptRedacted   string

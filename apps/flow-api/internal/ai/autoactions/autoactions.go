@@ -1,4 +1,4 @@
-// Package autoactions implements the "auto actions" stream (2.AI-3).
+// Package autoactions implements the "auto actions" stream.
 // Given a compact view of a task's state, staleness,
 // assignment, and due date, it proposes at most one concrete next
 // action a workspace operator should take (nudge the assignee, assign

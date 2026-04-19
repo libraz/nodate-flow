@@ -82,7 +82,7 @@ func Create(deps Deps) func(context.Context, *CreateLensInput) (*CreateLensOutpu
 			Sort:      in.Body.Sort,
 			GroupBy:   in.Body.GroupBy,
 			IsDefault: in.Body.IsDefault,
-			CreatedAt: time.Now(),
+			CreatedAt: time.Now().Unix(),
 		}}, nil
 	}
 }
@@ -254,8 +254,8 @@ func Update(deps Deps) func(context.Context, *UpdateLensInput) (*UpdateLensOutpu
 			SharedAt:           nullTimeUnix(existing.SharedAt),
 			SafetyCheckedAt:    nullTimeUnix(existing.SafetyCheckedAt),
 			SortWeight:         existing.SortWeight,
-			UpdatedAt:          nullTime(existing.UpdatedAt),
-			CreatedAt:          existing.CreatedAt,
+			UpdatedAt:          nullTimeUnix(existing.UpdatedAt),
+			CreatedAt:          existing.CreatedAt.Unix(),
 		}}, nil
 	}
 }

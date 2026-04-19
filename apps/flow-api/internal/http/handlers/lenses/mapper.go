@@ -61,8 +61,8 @@ func rowToLensFromList(r generated.ListLensesForProjectRow) SavedLens {
 		SharedAt:           nullTimeUnix(r.SharedAt),
 		SafetyCheckedAt:    nullTimeUnix(r.SafetyCheckedAt),
 		SortWeight:         r.SortWeight,
-		UpdatedAt:          nullTime(r.UpdatedAt),
-		CreatedAt:          r.CreatedAt,
+		UpdatedAt:          nullTimeUnix(r.UpdatedAt),
+		CreatedAt:          r.CreatedAt.Unix(),
 	}
 }
 
@@ -83,8 +83,8 @@ func rowToLensFromGet(r generated.GetLensByPublicIDRow) SavedLens {
 		SharedAt:           nullTimeUnix(r.SharedAt),
 		SafetyCheckedAt:    nullTimeUnix(r.SafetyCheckedAt),
 		SortWeight:         r.SortWeight,
-		UpdatedAt:          nullTime(r.UpdatedAt),
-		CreatedAt:          r.CreatedAt,
+		UpdatedAt:          nullTimeUnix(r.UpdatedAt),
+		CreatedAt:          r.CreatedAt.Unix(),
 	}
 }
 

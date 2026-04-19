@@ -16,6 +16,7 @@ import type { ColumnDef, RowSelectionState } from '@tanstack/react-table';
 import { type DragEvent, type ReactElement, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatDate, isOverdue } from '../../lib/format';
 import { computeBlockedByOpen, useProjectDependenciesQuery } from '../projects/api';
 
 import {
@@ -27,58 +28,12 @@ import {
   useTasksQuery,
   useUpdateTask,
 } from './api';
+import { PRIORITY_COLOR, PRIORITY_KEY, STATE_COLOR, STATE_KEY } from './constants';
 import { useInlineEdit } from './use-inline-edit';
 import { useTaskFilters } from './use-task-filters';
 
 export interface TaskListViewProps {
   projectId: string;
-}
-
-const PRIORITY_KEY: Record<TaskPriority, string> = {
-  0: 'tasks.priority.none',
-  1: 'tasks.priority.low',
-  2: 'tasks.priority.medium',
-  3: 'tasks.priority.high',
-  4: 'tasks.priority.urgent',
-};
-
-const PRIORITY_COLOR: Record<TaskPriority, string> = {
-  0: 'var(--color-muted)',
-  1: '#3498db',
-  2: '#e67e22',
-  3: '#e74c3c',
-  4: '#c0392b',
-};
-
-const STATE_KEY: Record<TaskDerivedState, string> = {
-  open: 'tasks.status.open',
-  waiting: 'tasks.status.waiting',
-  review: 'tasks.status.review',
-  done: 'tasks.status.done',
-  cancelled: 'tasks.status.cancelled',
-};
-
-const STATE_COLOR: Record<TaskDerivedState, string> = {
-  open: '#3498db',
-  waiting: '#e67e22',
-  review: '#9b59b6',
-  done: '#27ae60',
-  cancelled: '#95a5a6',
-};
-
-function formatDate(iso: string, locale: string): string {
-  try {
-    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(iso));
-  } catch {
-    return iso;
-  }
-}
-
-function isOverdue(dueOn: string | undefined | null): boolean {
-  if (!dueOn) return false;
-  const now = new Date();
-  const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  return dueOn < todayKey;
 }
 
 /* ── Bulk action toolbar ────────────────────────────────────── */

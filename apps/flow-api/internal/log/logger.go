@@ -25,10 +25,10 @@ type Config struct {
 	Version string
 }
 
-// LevelFromEnv parses ND_FLOW_LOG_LEVEL (debug/info/warn/error), defaulting
+// LevelFromEnv parses NF_FLOW_LOG_LEVEL (debug/info/warn/error), defaulting
 // to info.
 func LevelFromEnv() slog.Level {
-	switch strings.ToLower(strings.TrimSpace(os.Getenv("ND_FLOW_LOG_LEVEL"))) {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("NF_FLOW_LOG_LEVEL"))) {
 	case "debug":
 		return slog.LevelDebug
 	case "warn", "warning":
@@ -72,7 +72,7 @@ func New(cfg Config) *slog.Logger {
 // resolveVersion returns NF_VERSION, the Go build main module version, or
 // "dev".
 func resolveVersion() string {
-	if v := strings.TrimSpace(os.Getenv("ND_VERSION")); v != "" {
+	if v := strings.TrimSpace(os.Getenv("NF_VERSION")); v != "" {
 		return v
 	}
 	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {

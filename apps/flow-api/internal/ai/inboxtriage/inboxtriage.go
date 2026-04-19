@@ -1,5 +1,5 @@
-// Package inboxtriage implements the Phase 2 Wave 2 deterministic
-// path for the "inbox triage" stream (2.AI-7). Given a list of raw
+// Package inboxtriage implements the deterministic path for the
+// "inbox triage" stream. Given a list of raw
 // inbox signals, it assigns a score in [0, 1] and a recommended
 // action from a closed set {open, snooze, archive}.
 //

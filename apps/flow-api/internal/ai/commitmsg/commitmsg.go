@@ -1,5 +1,5 @@
 // Package commitmsg implements the "commit message proposal" stream
-// (2.AI-8). Given a compact view of a change set — file paths, their
+// Given a compact view of a change set — file paths, their
 // status (added / modified / deleted), and an optional summary — it
 // proposes a Conventional Commits message (type(scope): subject).
 //

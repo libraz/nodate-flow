@@ -14,16 +14,9 @@ import { useTranslation } from 'react-i18next';
 
 import { confirmAction } from '../../lib/confirm-action';
 import { type TaskDerivedState, useTasksQuery } from '../tasks/api';
+import { STATE_COLOR } from '../tasks/constants';
 import { useDisableProject, useProjectQuery, useUpdateProject } from './api';
 import ProjectMembersTable from './project-members-table';
-
-const STATE_COLOR: Record<TaskDerivedState, string> = {
-  open: '#3498db',
-  waiting: '#e67e22',
-  review: '#9b59b6',
-  done: '#27ae60',
-  cancelled: '#95a5a6',
-};
 
 const STATE_ORDER: readonly TaskDerivedState[] = ['open', 'waiting', 'review', 'done', 'cancelled'];
 

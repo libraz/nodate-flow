@@ -8,20 +8,12 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatDate } from '../../lib/format';
 import { type ProjectMember, useProjectMembersQuery } from './api';
 import ProjectAddMemberDialog from './project-add-member-dialog';
 
 export interface ProjectMembersTableProps {
   projectId: string;
-}
-
-function formatDate(iso: string | undefined, locale: string): string {
-  if (!iso) return '';
-  try {
-    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(iso));
-  } catch {
-    return iso;
-  }
 }
 
 export default function ProjectMembersTable({ projectId }: ProjectMembersTableProps): ReactElement {

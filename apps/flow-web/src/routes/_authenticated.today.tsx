@@ -17,35 +17,12 @@ import { useTranslation } from 'react-i18next';
 
 import { OPEN_COMMAND_PALETTE_EVENT } from '../components/layout/glass-dock';
 import type { TaskPriority } from '../features/tasks/api';
+import { PRIORITY_COLOR, PRIORITY_KEY, STATE_COLOR } from '../features/tasks/constants';
 import { sdk } from '../lib/sdk';
 
 type AssignedTask = components['schemas']['MyTaskListItem'];
 
 type SectionKey = 'overdue' | 'today' | 'tomorrow' | 'thisWeek' | 'later' | 'noDue';
-
-const STATE_COLOR: Record<string, string> = {
-  open: 'var(--color-info, #3498db)',
-  waiting: 'var(--color-warning, #f39c12)',
-  review: 'var(--color-accent, #9b59b6)',
-  done: 'var(--color-success, #27ae60)',
-  cancelled: 'var(--color-muted, #95a5a6)',
-};
-
-const PRIORITY_LABEL: Record<TaskPriority, string> = {
-  0: 'tasks.priority.none',
-  1: 'tasks.priority.low',
-  2: 'tasks.priority.medium',
-  3: 'tasks.priority.high',
-  4: 'tasks.priority.urgent',
-};
-
-const PRIORITY_COLOR: Record<TaskPriority, string> = {
-  0: 'transparent',
-  1: 'var(--color-info, #3498db)',
-  2: 'var(--color-warning, #f39c12)',
-  3: 'var(--nf-color-danger, #e67e22)',
-  4: 'var(--nf-color-danger, #c0392b)',
-};
 
 const SECTION_ORDER: readonly SectionKey[] = [
   'overdue',
@@ -283,7 +260,7 @@ function TodayRoute(): ReactElement {
                           lineHeight: 1.3,
                         }}
                       >
-                        {t(PRIORITY_LABEL[pri])}
+                        {t(PRIORITY_KEY[pri])}
                       </span>
                     ) : null}
                     <span

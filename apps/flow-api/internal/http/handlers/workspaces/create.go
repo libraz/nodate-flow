@@ -75,7 +75,7 @@ func Create(deps Deps) func(context.Context, *CreateWorkspaceInput) (*CreateWork
 			Description: in.Body.Description,
 			IconURL:     in.Body.IconURL,
 			Role:        string(generated.WorkspaceMembersRoleOwner),
-			CreatedAt:   time.Now(),
+			CreatedAt:   time.Now().Unix(),
 		}}
 		return out, nil
 	}

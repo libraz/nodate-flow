@@ -14,7 +14,6 @@ package ai
 
 import (
 	"database/sql"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -47,14 +46,14 @@ func httpErr(spec *apierrors.Spec) error {
 // Provider is the public DTO for an ai_providers row. It NEVER carries
 // the ciphertext nor the plaintext API key.
 type Provider struct {
-	ID           string    `json:"id"`
-	Kind         string    `json:"kind"`
-	Name         string    `json:"name"`
-	BaseURL      string    `json:"baseUrl,omitempty"`
-	DefaultModel string    `json:"defaultModel,omitempty"`
-	APIKeyMasked string    `json:"apiKeyMasked"`
-	UpdatedAt    *time.Time `json:"updatedAt,omitempty"`
-	CreatedAt    time.Time  `json:"createdAt"`
+	ID           string `json:"id" doc:"Provider public id (UUID v7)"`
+	Kind         string `json:"kind"`
+	Name         string `json:"name"`
+	BaseURL      string `json:"baseUrl,omitempty"`
+	DefaultModel string `json:"defaultModel,omitempty"`
+	APIKeyMasked string `json:"apiKeyMasked"`
+	UpdatedAt    *int64 `json:"updatedAt,omitempty"`
+	CreatedAt    int64  `json:"createdAt"`
 }
 
 // CreateProviderInput is the body for POST /workspaces/{wsId}/ai/providers.
@@ -128,7 +127,7 @@ type DeleteProviderOutput struct {
 // Per docs/conventions/api-types.md §17 all `*_at` fields are emitted
 // as int64 unix seconds. Nullable timestamps use *int64 (nil → null).
 type McpTokenSummary struct {
-	ID          string   `json:"id"`
+	ID          string   `json:"id" doc:"McpToken public id (UUID v7)"`
 	Name        string   `json:"name"`
 	TokenPrefix string   `json:"tokenPrefix"`
 	Scopes      []string `json:"scopes"`
@@ -154,7 +153,7 @@ type CreateMcpTokenInput struct {
 // returned, and only on this single response.
 type CreateMcpTokenOutput struct {
 	Body struct {
-		ID          string   `json:"id"`
+		ID          string   `json:"id" doc:"McpToken public id (UUID v7)"`
 		Name        string   `json:"name"`
 		Token       string   `json:"token" doc:"Plaintext bearer token, shown only once"`
 		TokenPrefix string   `json:"tokenPrefix"`
@@ -194,9 +193,6 @@ type DeleteMcpTokenOutput struct {
 
 // nullStr delegates to handlerutil.NullStr.
 var nullStr = handlerutil.NullStr
-
-// nullTime delegates to handlerutil.NullTime.
-var nullTime = handlerutil.NullTime
 
 // nullTimeUnix delegates to handlerutil.NullTimeUnix (returns *int64, nil for NULL).
 var nullTimeUnix = handlerutil.NullTimeUnix

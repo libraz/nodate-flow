@@ -437,7 +437,9 @@
     "board": {
       "empty_column": "No tasks",
       "drop_hint": "Drop here to move",
-      "moved_to": "Moved to {state}"
+      "moved_to": "Moved to {state}",
+      "move_menu": "Move task",
+      "move_to": "Move to {state}"
     },
     "assignee": {
       "plus_n": "+{n, plural, one {# more} other {# more}}",

@@ -50,7 +50,7 @@ func rowToCalendar(r generated.ListCalendarsForUserRow) CalendarDTO {
 		CoverURL:     nullStr(r.CoverUrl),
 		Role:         string(r.Role),
 		Visible:      r.Visible,
-		UpdatedAt:    nullTime(r.UpdatedAt),
-		CreatedAt:    r.CreatedAt,
+		UpdatedAt:    nullTimeUnix(r.UpdatedAt),
+		CreatedAt:    r.CreatedAt.Unix(),
 	}
 }

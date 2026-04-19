@@ -10,6 +10,7 @@ import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { confirmAction } from '../../lib/confirm-action';
+import { formatDateTime } from '../../lib/format';
 import { type McpTokenSummary, useMcpTokensQuery, useRevokeMcpToken } from './api';
 import TokenCreateDialog from './token-create-dialog';
 
@@ -17,19 +18,22 @@ export interface TokenListProps {
   workspaceId: string;
 }
 
-function formatDate(unixSec: number | undefined | null, fallback: string): string {
+/** Format a unix-seconds timestamp, returning `fallback` when absent. */
+function formatUnixDateTime(
+  unixSec: number | undefined | null,
+  locale: string,
+  fallback: string,
+): string {
   if (unixSec === undefined || unixSec === null) return fallback;
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(unixSec * 1000));
+  return formatDateTime(new Date(unixSec * 1000).toISOString(), locale);
 }
 
 export default function TokenList({ workspaceId }: TokenListProps): ReactElement {
-  const { t } = useTranslation('settings');
+  const { t, i18n } = useTranslation('settings');
   const { data: tokens } = useMcpTokensQuery(workspaceId);
   const revoke = useRevokeMcpToken(workspaceId);
   const [createOpen, setCreateOpen] = useState(false);
+  const locale = i18n.resolvedLanguage ?? 'en';
 
   const handleRevoke = async (token: McpTokenSummary): Promise<void> => {
     if (!(await confirmAction({ message: t('workspace.mcp_tokens.revoke_confirm') }))) return;
@@ -112,9 +116,15 @@ export default function TokenList({ workspaceId }: TokenListProps): ReactElement
                     {token.tokenPrefix}
                   </td>
                   <td style={{ padding: '0.75rem' }}>{(token.scopes ?? []).join(' ') || '—'}</td>
-                  <td style={{ padding: '0.75rem' }}>{formatDate(token.createdAt, '—')}</td>
                   <td style={{ padding: '0.75rem' }}>
-                    {formatDate(token.lastUsedAt, t('workspace.mcp_tokens.never_used'))}
+                    {formatUnixDateTime(token.createdAt, locale, '—')}
+                  </td>
+                  <td style={{ padding: '0.75rem' }}>
+                    {formatUnixDateTime(
+                      token.lastUsedAt,
+                      locale,
+                      t('workspace.mcp_tokens.never_used'),
+                    )}
                   </td>
                   <td style={{ padding: '0.75rem', textAlign: 'end' }}>
                     <Button

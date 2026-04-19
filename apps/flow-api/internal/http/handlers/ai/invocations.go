@@ -20,7 +20,7 @@ type ListInvocationsInput struct {
 // response bodies are already redacted at write time; this endpoint
 // only forwards what the orchestrator persisted.
 type AiInvocation struct {
-	ID               string  `json:"id"`
+	ID               string  `json:"id" doc:"Invocation public id (UUID v7)"`
 	Purpose          string  `json:"purpose"`
 	Model            string  `json:"model"`
 	PromptRedacted   string  `json:"promptRedacted"`

@@ -131,7 +131,7 @@ func Triage(deps TriageDeps) func(context.Context, *InboxTriageInput) (*InboxTri
 
 		// Try the LLM-backed path first. On ErrNoProvider or
 		// ErrDailyBudgetExceeded we fall back to the deterministic
-		// rule engine (2.AI-7) so the triage UI is never empty.
+		// rule engine so the triage UI is never empty.
 		// Other errors (parse failures, upstream errors) bubble up
 		// as before — those indicate a misconfigured provider, not
 		// the "no LLM" case.

@@ -64,7 +64,7 @@ func rowToMyTaskListItem(r generated.ListMyTasksGlobalRow) MyTaskListItem {
 		DueOn:         nullDate(r.DueOn),
 		EventOn:       nullDate(r.EventOn),
 		ActorRole:     string(r.ActorRole),
-		UpdatedAt:     nullTime(r.UpdatedAt),
-		CreatedAt:     r.CreatedAt,
+		UpdatedAt:     nullTimeUnix(r.UpdatedAt),
+		CreatedAt:     r.CreatedAt.Unix(),
 	}
 }

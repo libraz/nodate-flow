@@ -9,7 +9,7 @@ import (
 )
 
 // TestAiAutoActions creates two tasks — one with a past due date and
-// one without — and hits the workspace auto-actions endpoint (2.AI-3).
+// one without — and hits the workspace auto-actions endpoint.
 // The overdue task must surface as an "escalate_overdue" action; the
 // other task, being fresh and without a due date, must not produce an
 // action.

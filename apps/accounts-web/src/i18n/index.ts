@@ -2,7 +2,9 @@ import i18n from 'i18next';
 import ICU from 'i18next-icu';
 import { initReactI18next } from 'react-i18next';
 
+import enAdmin from '../../locales/en/admin.json';
 import enAuth from '../../locales/en/auth.json';
+import jaAdmin from '../../locales/ja/admin.json';
 import jaAuth from '../../locales/ja/auth.json';
 
 /** Supported UI languages. */
@@ -38,13 +40,15 @@ export function initI18n(): typeof i18n {
       fallbackLng: 'en',
       supportedLngs: supportedLanguages as unknown as string[],
       defaultNS: 'auth',
-      ns: ['auth'],
+      ns: ['auth', 'admin'],
       resources: {
         en: {
           auth: enAuth,
+          admin: enAdmin,
         },
         ja: {
           auth: jaAuth,
+          admin: jaAdmin,
         },
       },
       interpolation: { escapeValue: false },

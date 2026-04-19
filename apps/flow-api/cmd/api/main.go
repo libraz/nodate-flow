@@ -49,7 +49,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// OpenTelemetry tracing. When ND_FLOW_OTEL_ENDPOINT is empty the provider
+	// OpenTelemetry tracing. When NF_FLOW_OTEL_ENDPOINT is empty the provider
 	// is a no-op so the rest of the codebase can call otel.Tracer() freely.
 	traceShutdown, err := obs.InitTracer(context.Background(), obs.TracerConfig{
 		Endpoint:       cfg.OtelEndpoint,
@@ -73,7 +73,7 @@ func main() {
 	}
 
 	if cfg.DbDsn == "" {
-		logger.Error("ND_DB_DSN is not set")
+		logger.Error("NF_DB_DSN is not set")
 		os.Exit(1)
 	}
 	db, err := sql.Open("mysql", cfg.DbDsn)
@@ -97,7 +97,7 @@ func main() {
 
 	queries := generated.New(db)
 
-	// Cipher is optional at scaffold time: if ND_SECRET_KEY is unset the
+	// Cipher is optional at scaffold time: if NF_SECRET_KEY is unset the
 	// AI provider endpoints will return AI.PROVIDER.NOT_CONFIGURED for
 	// any write call, but the rest of the api boots normally so MVP
 	// flows that don't touch LLMs keep working.
@@ -108,7 +108,7 @@ func main() {
 		logger.Warn("ai cipher disabled", "err", cerr)
 	}
 
-	// S3-compatible object storage for file uploads. When ND_S3_ENDPOINT
+	// S3-compatible object storage for file uploads. When NF_S3_ENDPOINT
 	// is empty the presign endpoints return INTERNAL.UNEXPECTED but the
 	// rest of the API still boots normally.
 	var storageClient *storage.Client
@@ -131,10 +131,10 @@ func main() {
 		storageClient = sc
 		logger.Info("s3 storage enabled", "endpoint", cfg.S3Endpoint, "bucket", cfg.S3Bucket)
 	} else {
-		logger.Warn("s3 storage disabled: ND_S3_ENDPOINT is not set")
+		logger.Warn("s3 storage disabled: NF_S3_ENDPOINT is not set")
 	}
 
-	// Per-provider egress rate limits (4.SEC-2). When ND_FLOW_OUTBOUND_BACKEND=redis
+	// Per-provider egress rate limits. When NF_FLOW_OUTBOUNF_BACKEND=redis
 	// is set and the binary is built with -tags redis, the limiters are
 	// swapped for RedisLimiter so the budget is shared across replicas.
 	// Otherwise the default in-process token bucket applies.
@@ -250,7 +250,7 @@ func main() {
 	}
 	eventbus.AddNotifyHook(eventTrigger.NotifyHook())
 
-	// Outbound email transport. When ND_FLOW_SMTP_HOST is set the sender
+	// Outbound email transport. When NF_FLOW_SMTP_HOST is set the sender
 	// relays through the configured SMTP server; otherwise a NoopSender
 	// is used so handlers can always call Send and check for
 	// email.ErrNotConfigured on the return path.
@@ -271,7 +271,7 @@ func main() {
 		logger.Info("smtp email enabled", "host", cfg.SmtpHost, "port", cfg.SmtpPort)
 	} else {
 		emailSender = email.NoopSender{}
-		logger.Warn("smtp email disabled: ND_FLOW_SMTP_HOST is not set")
+		logger.Warn("smtp email disabled: NF_FLOW_SMTP_HOST is not set")
 	}
 
 	// Notification fan-out: creates per-user notification rows whenever
@@ -351,7 +351,7 @@ func main() {
 
 	outer.Mount("/", inner)
 
-	// 4.AGENT-1: interval scheduler. Ticks every ND_FLOW_AGENT_TICK_INTERVAL
+	// Interval scheduler. Ticks every NF_FLOW_AGENT_TICK_INTERVAL
 	// and dispatches due agents to the runner built above. When
 	// AgentQueueBackend=mysql the scheduler enqueues into agent_runs
 	// instead, and separate Worker goroutines pull and execute.
@@ -405,7 +405,7 @@ func main() {
 	// Autonomous auto-action executor: periodically evaluates tasks and
 	// applies deterministic actions (escalate overdue, close stale
 	// reviews) without human intervention. Controlled by
-	// ND_FLOW_AUTO_ACTION_INTERVAL (0 disables).
+	// NF_FLOW_AUTO_ACTION_INTERVAL (0 disables).
 	autoActionExec := &autoactions.Executor{
 		DB:     db,
 		Config: autoactions.ExecutorConfig{
@@ -497,10 +497,10 @@ func buildCORS(allowed []string) func(http.Handler) http.Handler {
 	})
 }
 
-// resolveVersion returns ND_FLOW_VERSION, the Go build main module version, or
+// resolveVersion returns NF_FLOW_VERSION, the Go build main module version, or
 // "dev". Used for OTel service.version.
 func resolveVersion() string {
-	if v := strings.TrimSpace(os.Getenv("ND_FLOW_VERSION")); v != "" {
+	if v := strings.TrimSpace(os.Getenv("NF_FLOW_VERSION")); v != "" {
 		return v
 	}
 	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {

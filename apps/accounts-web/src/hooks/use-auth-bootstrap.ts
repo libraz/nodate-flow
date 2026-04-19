@@ -28,6 +28,7 @@ interface MeResponse {
   displayName: string;
   locale: string;
   themePreference: string;
+  isInstanceAdmin: boolean;
 }
 
 let bootstrapPromise: Promise<AuthBootstrapStatus> | null = null;
@@ -46,6 +47,7 @@ async function runBootstrap(): Promise<AuthBootstrapStatus> {
     displayName: result.data.displayName,
     locale: result.data.locale,
     themePreference: result.data.themePreference,
+    isInstanceAdmin: result.data.isInstanceAdmin,
   };
   authStore.getState().setSession(token, user);
   return 'authenticated';

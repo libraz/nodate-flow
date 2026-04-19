@@ -19,7 +19,7 @@ import (
 // out NF_SESSION_STORE=redis. Works against both redis:7+ and
 // valkey:8+ because the wire protocol is identical.
 func TestRedisStoreSmoke(t *testing.T) {
-	addr := os.Getenv("ND_TEST_REDIS_ADDR")
+	addr := os.Getenv("NF_TEST_REDIS_ADDR")
 	if addr == "" {
 		t.Skip("set NF_TEST_REDIS_ADDR=host:port to run the redis smoke test")
 	}

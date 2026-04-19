@@ -1551,7 +1551,7 @@ type AiInvocation struct {
 	ProviderID uint32 `json:"-"`
 	// Internal FK to users.id (if user-initiated)
 	UserID sql.NullInt32 `json:"-"`
-	// Internal FK to ai_agents.id when the call was made on behalf of an AI agent (2.MCP-2)
+	// Internal FK to ai_agents.id when the call was made on behalf of an AI agent
 	AgentID sql.NullInt32 `json:"agentId"`
 	// Internal FK to tasks.id if applicable
 	TaskID sql.NullInt32 `json:"taskId"`
@@ -2198,7 +2198,7 @@ type InstanceAdmin struct {
 	// Internal FK to users.id
 	UserID uint32 `json:"-"`
 	// Internal FK to users.id (granter, null for bootstrap)
-	GrantedByUserID sql.NullInt32 `json:"grantedByUserId"`
+	GrantedByUserID sql.NullInt32 `json:"-"`
 	// Time the grant was created
 	GrantedAt time.Time `json:"grantedAt"`
 	// Explicit revocation time
@@ -2228,7 +2228,7 @@ type InstanceAuditLog struct {
 	// Target resource type
 	TargetResourceType sql.NullString `json:"targetResourceType"`
 	// Target resource public_id when available
-	TargetResourcePublicID sql.NullString `json:"targetResourcePublicId"`
+	TargetResourcePublicID types.PublicID `json:"targetResourcePublicId"`
 	// Packed IPv4/IPv6 address
 	IpAddress sql.NullString `json:"ipAddress"`
 	// Client user agent
@@ -2237,6 +2237,28 @@ type InstanceAuditLog struct {
 	PayloadJson json.RawMessage `json:"payloadJson"`
 	// Logical occurrence time (second precision; ties broken by id)
 	OccurredAt time.Time `json:"occurredAt"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
+// Instance-level dynamic settings
+type InstanceSetting struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Setting identifier
+	SettingKey string `json:"settingKey"`
+	// Current value as text
+	SettingValue string `json:"settingValue"`
+	// Last modifier user.id
+	UpdatedByUserID sql.NullInt32 `json:"-"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
@@ -2329,7 +2351,7 @@ type McpToken struct {
 	WorkspaceID uint32 `json:"-"`
 	// Internal FK to users.id (token owner)
 	UserID uint32 `json:"-"`
-	// Internal FK to ai_agents.id when the token acts on behalf of an AI agent (2.MCP-2)
+	// Internal FK to ai_agents.id when the token acts on behalf of an AI agent
 	AgentID sql.NullInt32 `json:"agentId"`
 	// Human-readable label
 	Name string `json:"name"`
@@ -2705,7 +2727,7 @@ type TaskActor struct {
 	UserID sql.NullInt32 `json:"-"`
 	// Internal FK to ai_agents.id (null when this row is a human actor)
 	AgentID sql.NullInt32 `json:"agentId"`
-	// Actor kind — user or AI agent (2.MCP-2)
+	// Actor kind — user or AI agent
 	Kind TaskActorsKind `json:"kind"`
 	// Actor role on the task
 	Role TaskActorsRole `json:"role"`
@@ -2930,10 +2952,26 @@ type UserRecoveryCode struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
+type VAdminUser struct {
+	ID              uint32         `json:"-"`
+	PublicID        types.PublicID `json:"publicId"`
+	Email           string         `json:"email"`
+	DisplayName     string         `json:"displayName"`
+	AvatarUrl       sql.NullString `json:"avatarUrl"`
+	Locale          string         `json:"locale"`
+	LastLoginAt     sql.NullTime   `json:"lastLoginAt"`
+	EmailVerifiedAt sql.NullTime   `json:"emailVerifiedAt"`
+	Enabled         bool           `json:"enabled"`
+	CreatedAt       time.Time      `json:"createdAt"`
+	UpdatedAt       sql.NullTime   `json:"updatedAt"`
+	WorkspaceCount  int64          `json:"workspaceCount"`
+	IsInstanceAdmin bool           `json:"isInstanceAdmin"`
+}
+
 type VAuditRecent struct {
 	WorkspaceID       uint32          `json:"-"`
 	PublicID          types.PublicID  `json:"publicId"`
-	ActorUserPublicID sql.NullString  `json:"actorUserPublicId"`
+	ActorUserPublicID types.PublicID  `json:"actorUserPublicId"`
 	ActorDisplayName  sql.NullString  `json:"actorDisplayName"`
 	Action            string          `json:"action"`
 	ResourceType      string          `json:"resourceType"`
@@ -2957,6 +2995,21 @@ type VInbox struct {
 	ReceivedAt        time.Time       `json:"receivedAt"`
 	UpdatedAt         sql.NullTime    `json:"updatedAt"`
 	CreatedAt         time.Time       `json:"createdAt"`
+}
+
+type VInstanceAuditLog struct {
+	PublicID                types.PublicID  `json:"publicId"`
+	ActorUserPublicID       types.PublicID  `json:"actorUserPublicId"`
+	ActorDisplayName        sql.NullString  `json:"actorDisplayName"`
+	Action                  string          `json:"action"`
+	TargetWorkspacePublicID types.PublicID  `json:"targetWorkspacePublicId"`
+	TargetWorkspaceName     sql.NullString  `json:"targetWorkspaceName"`
+	TargetResourceType      sql.NullString  `json:"targetResourceType"`
+	TargetResourcePublicID  types.PublicID  `json:"targetResourcePublicId"`
+	IpAddress               sql.NullString  `json:"ipAddress"`
+	UserAgent               sql.NullString  `json:"userAgent"`
+	PayloadJson             json.RawMessage `json:"payloadJson"`
+	OccurredAt              time.Time       `json:"occurredAt"`
 }
 
 type VMyTask struct {
@@ -3060,7 +3113,7 @@ type VTaskTimeline struct {
 	PublicID          types.PublicID  `json:"publicId"`
 	TaskPublicID      sql.NullString  `json:"taskPublicId"`
 	ProjectPublicID   sql.NullString  `json:"projectPublicId"`
-	ActorUserPublicID sql.NullString  `json:"actorUserPublicId"`
+	ActorUserPublicID types.PublicID  `json:"actorUserPublicId"`
 	ActorDisplayName  sql.NullString  `json:"actorDisplayName"`
 	Type              string          `json:"type"`
 	PayloadJson       json.RawMessage `json:"payloadJson"`

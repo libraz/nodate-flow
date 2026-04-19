@@ -61,7 +61,7 @@ DROP TABLE IF EXISTS `workspaces`;
 -- >>> agent_runs.sql
 -- ====================================
 -- agent_runs
--- Queue + history for AI agent executions (4.AGENT-1 scheduler/worker
+-- Queue + history for AI agent executions (scheduler/worker
 -- split). The scheduler enqueues one row per due (agent, scheduled_at)
 -- pair with a UNIQUE dedupe_key so multiple scheduler replicas cannot
 -- double-fire a job. Workers claim rows with SELECT ... FOR UPDATE
@@ -148,7 +148,7 @@ CREATE TABLE ai_invocations (
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   provider_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to ai_providers.id',
   user_id INT UNSIGNED NULL COMMENT 'Internal FK to users.id (if user-initiated)',
-  agent_id INT UNSIGNED NULL COMMENT 'Internal FK to ai_agents.id when the call was made on behalf of an AI agent (2.MCP-2)',
+  agent_id INT UNSIGNED NULL COMMENT 'Internal FK to ai_agents.id when the call was made on behalf of an AI agent',
   task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id if applicable',
 
   purpose VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Logical call purpose (e.g., propose_tasks)',
@@ -1017,7 +1017,7 @@ CREATE TABLE mcp_tokens (
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id (token owner)',
-  agent_id INT UNSIGNED NULL COMMENT 'Internal FK to ai_agents.id when the token acts on behalf of an AI agent (2.MCP-2)',
+  agent_id INT UNSIGNED NULL COMMENT 'Internal FK to ai_agents.id when the token acts on behalf of an AI agent',
 
   name VARCHAR(255) NOT NULL COMMENT 'Human-readable label',
   token_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'SHA-256 hex of the bearer token',
@@ -1385,7 +1385,7 @@ CREATE TABLE task_actors (
   task_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to tasks.id',
   user_id INT UNSIGNED NULL COMMENT 'Internal FK to users.id (null when this row is an AI agent actor)',
   agent_id INT UNSIGNED NULL COMMENT 'Internal FK to ai_agents.id (null when this row is a human actor)',
-  kind ENUM('user','agent') NOT NULL DEFAULT 'user' COMMENT 'Actor kind — user or AI agent (2.MCP-2)',
+  kind ENUM('user','agent') NOT NULL DEFAULT 'user' COMMENT 'Actor kind — user or AI agent',
 
   role ENUM('assignee','reviewer','watcher','approver') NOT NULL DEFAULT 'assignee' COMMENT 'Actor role on the task',
 

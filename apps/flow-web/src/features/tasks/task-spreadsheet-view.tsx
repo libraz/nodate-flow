@@ -14,6 +14,8 @@ import type { ReactElement } from 'react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatDate, isOverdue } from '../../lib/format';
+
 import {
   type TaskDerivedState,
   type TaskListItem,
@@ -22,6 +24,7 @@ import {
   useTasksQuery,
   useUpdateTask,
 } from './api';
+import { PRIORITY_COLOR, PRIORITY_KEY, STATE_COLOR, STATE_KEY } from './constants';
 import { useTaskFilters } from './use-task-filters';
 
 import css from './task-spreadsheet-view.module.css';
@@ -34,59 +37,12 @@ export interface TaskSpreadsheetViewProps {
 
 const ROW_HEIGHT = 36;
 
-const PRIORITY_KEY: Record<TaskPriority, string> = {
-  0: 'tasks.priority.none',
-  1: 'tasks.priority.low',
-  2: 'tasks.priority.medium',
-  3: 'tasks.priority.high',
-  4: 'tasks.priority.urgent',
-};
-
-const PRIORITY_COLOR: Record<TaskPriority, string> = {
-  0: 'var(--nf-color-fg-muted)',
-  1: '#3498db',
-  2: '#e67e22',
-  3: '#e74c3c',
-  4: '#c0392b',
-};
-
-const STATE_KEY: Record<TaskDerivedState, string> = {
-  open: 'tasks.status.open',
-  waiting: 'tasks.status.waiting',
-  review: 'tasks.status.review',
-  done: 'tasks.status.done',
-  cancelled: 'tasks.status.cancelled',
-};
-
-const STATE_COLOR: Record<TaskDerivedState, string> = {
-  open: '#3498db',
-  waiting: '#e67e22',
-  review: '#9b59b6',
-  done: '#27ae60',
-  cancelled: '#95a5a6',
-};
-
 const EDITABLE_COLUMNS = ['title', 'status', 'priority', 'assignee', 'due'] as const;
 type EditableColumn = (typeof EDITABLE_COLUMNS)[number];
 
 interface CellAddress {
   rowIdx: number;
   column: EditableColumn;
-}
-
-function formatDate(iso: string, locale: string): string {
-  try {
-    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(iso));
-  } catch {
-    return iso;
-  }
-}
-
-function isOverdue(dueOn: string | undefined | null): boolean {
-  if (!dueOn) return false;
-  const now = new Date();
-  const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  return dueOn < todayKey;
 }
 
 function nextEditableColumn(col: EditableColumn, direction: 1 | -1): EditableColumn | null {

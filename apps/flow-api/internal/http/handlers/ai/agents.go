@@ -20,7 +20,7 @@ import (
 // internal ids stay hidden; system_prompt round-trips so the edit UI
 // can show the existing text without a separate detail endpoint.
 type AgentSummary struct {
-	ID           string `json:"id"`
+	ID           string `json:"id" doc:"Agent public id (UUID v7)"`
 	Name         string `json:"name"`
 	Description  string `json:"description,omitempty"`
 	SystemPrompt string `json:"systemPrompt"`
@@ -435,7 +435,7 @@ func TriggerAgent(deps Deps, queue agentruntime.Queue, runner agentruntime.Runne
 
 // ModelSummary is the public DTO for an ai_models row.
 type ModelSummary struct {
-	ID           string `json:"id"`
+	ID           string `json:"id" doc:"Model public id (UUID v7)"`
 	Name         string `json:"name"`
 	DisplayName  string `json:"displayName"`
 	ProviderID   string `json:"providerId"`

@@ -95,7 +95,7 @@ func Create(deps Deps) func(context.Context, *CreateProjectInput) (*CreateProjec
 			Name:        in.Body.Name,
 			Description: in.Body.Description,
 			Color:       in.Body.Color,
-			CreatedAt:   time.Now(),
+			CreatedAt:   time.Now().Unix(),
 		}}, nil
 	}
 }

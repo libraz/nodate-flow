@@ -429,7 +429,7 @@ func BuildResult(deps Deps) Result {
 			OperationID: "ai-agent-pause",
 			Method:      http.MethodPost,
 			Path:        "/workspaces/{wsId}/ai/agents/{agentId}/pause",
-			Summary:     "Toggle the kill switch on an AI agent (4.AGENT-3)",
+			Summary:     "Toggle the kill switch on an AI agent",
 		}, aihandlers.PauseAgent(aiDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-agents-list",
@@ -483,25 +483,25 @@ func BuildResult(deps Deps) Result {
 			OperationID: "ai-state-suggestions",
 			Method:      http.MethodGet,
 			Path:        "/workspaces/{wsId}/ai/state-suggestions",
-			Summary:     "Workspace-wide deterministic state inference proposals (2.AI-1)",
+			Summary:     "Workspace-wide deterministic state inference proposals",
 		}, aihandlers.ListStateSuggestions(aiDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-reminders",
 			Method:      http.MethodGet,
 			Path:        "/workspaces/{wsId}/ai/reminders",
-			Summary:     "Workspace-wide deterministic reminder engine proposals (2.AI-4)",
+			Summary:     "Workspace-wide deterministic reminder engine proposals",
 		}, aihandlers.ListReminders(aiDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-auto-actions",
 			Method:      http.MethodGet,
 			Path:        "/workspaces/{wsId}/ai/auto-actions",
-			Summary:     "Workspace-wide deterministic auto-action proposals (2.AI-3)",
+			Summary:     "Workspace-wide deterministic auto-action proposals",
 		}, aihandlers.ListAutoActions(aiDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-weekly-digest",
 			Method:      http.MethodGet,
 			Path:        "/workspaces/{wsId}/ai/weekly-digest",
-			Summary:     "Deterministic weekly digest markdown for a workspace (2.AI-9)",
+			Summary:     "Deterministic weekly digest markdown for a workspace",
 		}, aihandlers.WeeklyDigest(aiDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-invocations-list",

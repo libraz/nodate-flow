@@ -14,14 +14,14 @@ import (
 // asserts the returned profile matches the registered values.
 //
 // The test is skipped under `go test -short` and unless
-// ND_TEST_INTEGRATION is set, so unit-only runs (and machines without
+// NF_TEST_INTEGRATION is set, so unit-only runs (and machines without
 // Docker) stay fast.
 func TestTenantSmoke(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration smoke test in -short mode")
 	}
-	if os.Getenv("ND_TEST_INTEGRATION") == "" {
-		t.Skip("set ND_TEST_INTEGRATION=1 to run integration smoke test")
+	if os.Getenv("NF_TEST_INTEGRATION") == "" {
+		t.Skip("set NF_TEST_INTEGRATION=1 to run integration smoke test")
 	}
 	t.Parallel()
 

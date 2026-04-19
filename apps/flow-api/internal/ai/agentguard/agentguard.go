@@ -1,4 +1,4 @@
-// Package agentguard implements the 2.MCP-2 cost / scope guard for AI
+// Package agentguard implements the cost / scope guard for AI
 // agents. Given an agent's configuration (cost cap, allowed scopes,
 // paused flag) and its current month-to-date spend, it decides whether
 // a prospective MCP tool invocation should be allowed, denied, or

@@ -9,7 +9,7 @@ import (
 
 // TestAiMetricsExposesOutboundLimits hits GET /workspaces/{wsId}/ai/metrics
 // and asserts the response payload includes the new `outboundLimits`
-// field added in 4.AGENT-2. The default test server does not configure
+// field. The default test server does not configure
 // any limiters, so the slice must be present and empty (not null).
 func TestAiMetricsExposesOutboundLimits(t *testing.T) {
 	bootstrap(t)

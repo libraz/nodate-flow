@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Property tests (3.TEST-1). Go has no fast-check; instead we
+// Property tests. Go has no fast-check; instead we
 // enumerate a small, deterministic fact matrix and assert that
 // every algebraic law we care about holds across every (fact,
 // primitive) pair.

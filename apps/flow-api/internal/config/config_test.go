@@ -46,8 +46,8 @@ func TestValidateEnumsRejectsInvalidPort(t *testing.T) {
 			t.Errorf("port %q should be rejected", port)
 			continue
 		}
-		if !strings.Contains(err.Error(), "ND_FLOW_PORT") {
-			t.Errorf("port %q error should mention ND_FLOW_PORT: %v", port, err)
+		if !strings.Contains(err.Error(), "NF_FLOW_PORT") {
+			t.Errorf("port %q error should mention NF_FLOW_PORT: %v", port, err)
 		}
 	}
 }

@@ -1,5 +1,5 @@
 // Package agentruntime hosts the lightweight in-process scheduler that
-// fires AI agents on cron / on-event / manual triggers (4.AGENT-1).
+// fires AI agents on cron / on-event / manual triggers.
 //
 // The scheduler is intentionally minimal: a single goroutine ticks
 // once a minute, asks a [Source] for due agents, and hands each one to
@@ -62,7 +62,7 @@ type Scheduler struct {
 	cancel  context.CancelFunc
 	running bool
 
-	// Observability counters (4.AGENT-2).
+	// Observability counters.
 	ticks    uint64
 	dispatch uint64
 	errors   uint64

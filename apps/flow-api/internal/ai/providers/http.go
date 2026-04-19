@@ -22,7 +22,7 @@ var sharedClient = &http.Client{Timeout: defaultHTTPTimeout}
 
 // Destination constants for the outbound rate limiter registry.
 // Each provider routes its Do() through these keys so operators can
-// configure per-provider egress caps (4.SEC-2).
+// configure per-provider egress caps.
 const (
 	DestAnthropic = "llm.anthropic"
 	DestOpenAI    = "llm.openai"
@@ -44,7 +44,7 @@ func ConfigureLimiter(destination string, l outbound.RateLimiter) {
 
 // OutboundSnapshot returns a copy of the per-destination limiter
 // counters. Empty when no limiter has been configured. Surfaced via
-// the AI metrics endpoint for ops dashboards (4.AGENT-2).
+// the AI metrics endpoint for ops dashboards.
 func OutboundSnapshot() map[string]outbound.LimiterStats {
 	return outboundRegistry.Snapshot()
 }

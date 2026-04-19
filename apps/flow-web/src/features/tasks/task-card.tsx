@@ -5,13 +5,16 @@
  * (HTML5 native) so the parent board can intercept dragstart/drop events.
  */
 
-import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
+import Badge from '@nodate-flow/ui/primitives/badge';
 import Card from '@nodate-flow/ui/primitives/card';
 import { Link } from '@tanstack/react-router';
 import { type DragEvent, type ReactElement, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { TaskListItem, TaskPriority } from './api';
+import { formatDate, isOverdue } from '../../lib/format';
+import type { TaskDerivedState, TaskListItem, TaskPriority, TransitionName } from './api';
+import { PRIORITY_KEY, PRIORITY_TONE } from './constants';
+import TaskMoveMenu from './task-move-menu';
 
 export interface TaskCardProps {
   task: TaskListItem;
@@ -20,38 +23,13 @@ export interface TaskCardProps {
   onDragStart: (e: DragEvent<HTMLDivElement>, taskId: string) => void;
   onDragEnd: () => void;
   onSelect: (taskId: string) => void;
+  /** Keyboard-accessible transition handler (from the move menu). */
+  onTransition: (
+    taskId: string,
+    transition: TransitionName,
+    landingState: TaskDerivedState,
+  ) => void;
 }
-
-function formatDateShort(iso: string, locale: string): string {
-  try {
-    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(iso));
-  } catch {
-    return iso;
-  }
-}
-
-function isOverdue(dueOn: string | null | undefined, state: string): boolean {
-  if (!dueOn || state === 'done' || state === 'cancelled') return false;
-  const now = new Date();
-  const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  return dueOn < todayKey;
-}
-
-const PRIORITY_TONE: Record<TaskPriority, BadgeTone> = {
-  0: 'neutral',
-  1: 'info',
-  2: 'accent',
-  3: 'warning',
-  4: 'danger',
-};
-
-const PRIORITY_KEY: Record<TaskPriority, string> = {
-  0: 'tasks.priority.none',
-  1: 'tasks.priority.low',
-  2: 'tasks.priority.medium',
-  3: 'tasks.priority.high',
-  4: 'tasks.priority.urgent',
-};
 
 export default function TaskCard({
   task,
@@ -59,6 +37,7 @@ export default function TaskCard({
   onDragStart,
   onDragEnd,
   onSelect,
+  onTransition,
 }: TaskCardProps): ReactElement {
   const { t, i18n } = useTranslation('common');
   const locale = i18n.resolvedLanguage ?? 'en';
@@ -105,39 +84,54 @@ export default function TaskCard({
         cursor: 'grab',
       }}
     >
-      <Link
-        to="/tasks/$taskId"
-        params={{ taskId: task.id }}
-        draggable={false}
-        onClick={(e) => {
-          // Let modifier-click / middle-click go through natively so
-          // the user can open the task in a new tab. Plain click is
-          // intercepted so we don't race the board's onSelect handler.
-          if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-          e.preventDefault();
-          // Stop the click from bubbling to the parent <Card>'s onClick
-          // handler, which would otherwise call onSelect a second time.
-          e.stopPropagation();
-          onSelect(task.id);
-        }}
-        style={{
-          fontWeight: 600,
-          color: 'var(--color-fg)',
-          lineHeight: 1.3,
-          wordBreak: 'break-word',
-          textDecoration: 'none',
-        }}
-      >
-        {task.title}
-      </Link>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.25rem' }}>
+        <Link
+          to="/tasks/$taskId"
+          params={{ taskId: task.id }}
+          draggable={false}
+          onClick={(e) => {
+            // Let modifier-click / middle-click go through natively so
+            // the user can open the task in a new tab. Plain click is
+            // intercepted so we don't race the board's onSelect handler.
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+            e.preventDefault();
+            // Stop the click from bubbling to the parent <Card>'s onClick
+            // handler, which would otherwise call onSelect a second time.
+            e.stopPropagation();
+            onSelect(task.id);
+          }}
+          style={{
+            flex: 1,
+            fontWeight: 600,
+            color: 'var(--color-fg)',
+            lineHeight: 1.3,
+            wordBreak: 'break-word',
+            textDecoration: 'none',
+          }}
+        >
+          {task.title}
+        </Link>
+        <TaskMoveMenu
+          state={task.derivedState as TaskDerivedState}
+          onTransition={(transition, landingState) =>
+            onTransition(task.id, transition, landingState)
+          }
+        />
+      </div>
       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
         {priority > 0 ? <Badge tone={tone}>{priorityLabel}</Badge> : null}
         {task.dueOn ? (
           <Badge
-            tone={isOverdue(task.dueOn, task.derivedState) ? 'danger' : 'neutral'}
+            tone={
+              isOverdue(task.dueOn) &&
+              task.derivedState !== 'done' &&
+              task.derivedState !== 'cancelled'
+                ? 'danger'
+                : 'neutral'
+            }
             aria-label={t('tasks.columns.due')}
           >
-            {formatDateShort(task.dueOn, locale)}
+            {formatDate(task.dueOn, locale)}
           </Badge>
         ) : null}
         {blockedByOpenCount > 0 ? (

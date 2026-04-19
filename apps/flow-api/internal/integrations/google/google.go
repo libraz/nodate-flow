@@ -1,5 +1,5 @@
 // Package google contains helpers for ingesting Google Drive / Docs
-// push notifications (4.SIG-3). Drive does not sign payloads with an
+// push notifications. Drive does not sign payloads with an
 // HMAC; instead each channel is registered with a unique
 // X-Goog-Channel-Token that the receiver checks against its store.
 package google

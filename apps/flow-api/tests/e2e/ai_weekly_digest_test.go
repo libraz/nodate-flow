@@ -10,7 +10,7 @@ import (
 )
 
 // TestAiWeeklyDigest creates two tasks — one with a past due date and
-// one without — and hits the weekly digest endpoint (2.AI-9). The
+// one without — and hits the weekly digest endpoint. The
 // overdue task must appear in overdueOpen and in the rendered
 // markdown, counts must include both, and the markdown header must
 // carry today's date.

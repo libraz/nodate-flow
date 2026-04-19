@@ -67,10 +67,12 @@ func (r *Recorder) Record(ctx context.Context, e Entry) {
 		actorID = sql.NullInt32{Int32: int32(e.ActorID), Valid: true}
 	}
 
-	resourcePublicID := sql.NullString{}
+	var resourcePublicIDParsed types.PublicID
+	resourcePublicIDStr := sql.NullString{}
 	if e.ResourceID != "" {
 		if parsed, perr := types.Parse(e.ResourceID); perr == nil {
-			resourcePublicID = sql.NullString{String: string(parsed[:]), Valid: true}
+			resourcePublicIDParsed = parsed
+			resourcePublicIDStr = sql.NullString{String: e.ResourceID, Valid: true}
 		}
 	}
 
@@ -85,7 +87,7 @@ func (r *Recorder) Record(ctx context.Context, e Entry) {
 			ActorUserID:        actorID,
 			Action:             e.Action,
 			TargetResourceType: sql.NullString{String: e.ResourceType, Valid: e.ResourceType != ""},
-			TargetResourcePublicID: resourcePublicID,
+			TargetResourcePublicID: resourcePublicIDParsed,
 			PayloadJson:        metaJSON,
 			OccurredAt:         now,
 		})
@@ -101,7 +103,7 @@ func (r *Recorder) Record(ctx context.Context, e Entry) {
 		ActorUserID:      actorID,
 		Action:           e.Action,
 		ResourceType:     e.ResourceType,
-		ResourcePublicID: resourcePublicID,
+		ResourcePublicID: resourcePublicIDStr,
 		MetadataJson:     metaJSON,
 		OccurredAt:       now,
 	})

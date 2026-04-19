@@ -64,7 +64,7 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 			writeError(w, apierrors.IntegrationGhWebhookEventUnsupported)
 			return
 		}
-		// 4.SIG-1: normalize event + action into a stable kind so the
+		// Normalize event + action into a stable kind so the
 		// constraint engine and timeline filters can rely on a single
 		// shape across every github source.
 		var actionEnv struct {

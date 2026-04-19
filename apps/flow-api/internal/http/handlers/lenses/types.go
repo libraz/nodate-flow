@@ -5,14 +5,12 @@ package lenses
 import (
 	"database/sql"
 	"encoding/json"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
 // Deps is the dependency bundle passed to each handler in this package.
@@ -41,8 +39,8 @@ type SavedLens struct {
 	SharedAt           *int64          `json:"sharedAt,omitempty" doc:"Unix seconds when first shared publicly"`
 	SafetyCheckedAt    *int64          `json:"safetyCheckedAt,omitempty" doc:"Unix seconds of last AI safety check"`
 	SortWeight         int32           `json:"sortWeight"`
-	UpdatedAt          *time.Time      `json:"updatedAt,omitempty"`
-	CreatedAt          time.Time       `json:"createdAt"`
+	UpdatedAt          *int64          `json:"updatedAt,omitempty"`
+	CreatedAt          int64           `json:"createdAt"`
 }
 
 // PublicLens is the read-only DTO returned by the unauthenticated
@@ -186,5 +184,4 @@ type DeleteLensBody struct {
 	Ok bool `json:"ok"`
 }
 
-// nullTime delegates to handlerutil.NullTime.
-var nullTime = handlerutil.NullTime
+// nullTimeUnix and nullString are defined in mapper.go.

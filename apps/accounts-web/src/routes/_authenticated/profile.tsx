@@ -25,6 +25,7 @@ interface MeResponse {
   displayName: string;
   locale: string;
   themePreference: string;
+  isInstanceAdmin: boolean;
 }
 
 function ProfilePage(): ReactElement {
@@ -69,6 +70,7 @@ function ProfilePage(): ReactElement {
         displayName: result.data.displayName,
         locale: result.data.locale,
         themePreference: result.data.themePreference,
+        isInstanceAdmin: authStore.getState().user?.isInstanceAdmin ?? false,
       };
       authStore.getState().setSession(authStore.getState().accessToken ?? '', updatedUser);
       setPreference(values.themePreference as ThemePreference);

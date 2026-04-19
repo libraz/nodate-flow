@@ -15,7 +15,7 @@ import (
 // Valkey instance and asserts a local Subscribe call receives it.
 // Gated on NF_TEST_REDIS_ADDR so the default CI matrix skips it.
 func TestRedisNotifierSmoke(t *testing.T) {
-	addr := os.Getenv("ND_TEST_REDIS_ADDR")
+	addr := os.Getenv("NF_TEST_REDIS_ADDR")
 	if addr == "" {
 		t.Skip("set NF_TEST_REDIS_ADDR=host:port to run the redis stream smoke test")
 	}

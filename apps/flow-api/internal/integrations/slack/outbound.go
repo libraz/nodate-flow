@@ -12,8 +12,8 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/outbound"
 )
 
-// OutboundClient posts messages back into Slack via the Web API
-// (4.OUT-2). Only the operations the MCP surface needs are exposed.
+// OutboundClient posts messages back into Slack via the Web API.
+// Only the operations the MCP surface needs are exposed.
 type OutboundClient struct {
 	Token   string
 	BaseURL string // defaults to https://slack.com/api

@@ -6,7 +6,7 @@
  * scoped to the current workspace; results are debounced client-side.
  */
 
-import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
+import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import Input from '@nodate-flow/ui/primitives/input';
 import Select from '@nodate-flow/ui/primitives/select';
@@ -24,14 +24,7 @@ import {
   useTaskDependenciesQuery,
   useTaskSearch,
 } from './api';
-
-const STATE_TONE: Record<string, BadgeTone> = {
-  open: 'info',
-  waiting: 'warning',
-  review: 'accent',
-  done: 'success',
-  cancelled: 'neutral',
-};
+import { STATE_TONE } from './constants';
 
 interface DependenciesSectionProps {
   taskId: string;

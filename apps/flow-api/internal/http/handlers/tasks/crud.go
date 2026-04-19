@@ -228,10 +228,7 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 		}
 		// Workspace membership check (handler-level since /tasks has no
 		// workspace path parameter to attach RequireWorkspaceMember to).
-		const wsMemQuery = `SELECT 1 FROM workspace_members
-WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
-		var one int
-		if err := deps.DB.QueryRowContext(ctx, wsMemQuery, prj.WorkspaceID, actorID).Scan(&one); err != nil {
+		if err := handlerutil.CheckWorkspaceMember(ctx, deps.DB, prj.WorkspaceID, actorID); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, httpErr(apierrors.WsProjectAccessDenied)
 			}
@@ -326,9 +323,6 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 		out := &ListTasksOutput{}
 		out.Body.Tasks = []TaskListItem{}
 
-		const wsMemQuery = `SELECT role FROM workspace_members
-WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
-
 		if in.ProjectID != "" {
 			prjPub, err := types.Parse(in.ProjectID)
 			if err != nil {
@@ -341,8 +335,8 @@ WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 				}
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
-			var wsRoleStr string
-			if err := deps.DB.QueryRowContext(ctx, wsMemQuery, prj.WorkspaceID, actorID).Scan(&wsRoleStr); err != nil {
+			wsRoleStr, err := handlerutil.WorkspaceMemberRole(ctx, deps.DB, prj.WorkspaceID, actorID)
+			if err != nil {
 				if errors.Is(err, sql.ErrNoRows) {
 					return nil, httpErr(apierrors.WsProjectAccessDenied)
 				}
@@ -398,8 +392,8 @@ WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		var wsRoleStr2 string
-		if err := deps.DB.QueryRowContext(ctx, wsMemQuery, wsInternal, actorID).Scan(&wsRoleStr2); err != nil {
+		wsRoleStr2, err := handlerutil.WorkspaceMemberRole(ctx, deps.DB, wsInternal, actorID)
+		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
 			}

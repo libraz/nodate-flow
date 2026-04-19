@@ -60,7 +60,7 @@ func AddComment(deps Deps) func(context.Context, *AddTaskCommentInput) (*AddTask
 		return &AddTaskCommentOutput{Body: TaskComment{
 			ID:        pub.String(),
 			Body:      in.Body.Body,
-			CreatedAt: time.Now(),
+			CreatedAt: time.Now().Unix(),
 		}}, nil
 	}
 }
@@ -169,7 +169,7 @@ func EditComment(deps Deps) func(context.Context, *EditTaskCommentInput) (*EditT
 		return &EditTaskCommentOutput{Body: TaskComment{
 			ID:       cid.String(),
 			Body:     in.Body.Body,
-			EditedAt: timePtr(time.Now()),
+			EditedAt: int64Ptr(time.Now().Unix()),
 		}}, nil
 	}
 }

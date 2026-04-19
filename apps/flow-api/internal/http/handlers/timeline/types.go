@@ -51,7 +51,7 @@ func uuidFromBytes(b []byte) string {
 // fields use the project-wide convention: *At = int64 unix seconds.
 type TimelineEvent struct {
 	// ID is the event public_id (UUID v7 string).
-	ID string `json:"id"`
+	ID string `json:"id" doc:"TimelineEvent public id (UUID v7)"`
 	// Type is the canonical dotted event kind, e.g. "task.created".
 	Type string `json:"type"`
 	// TaskID is the owning task's public_id, omitted when nil.

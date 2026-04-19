@@ -1,5 +1,5 @@
 // Package ai — priority.go exposes the priority-optimization stream
-// (2.AI-2). It walks the workspace's open tasks, runs the
+// It walks the workspace's open tasks, runs the
 // deterministic priorityopt rules on each row, and returns only the
 // rows whose suggested priority differs from the current priority.
 package ai

@@ -13,6 +13,161 @@ import (
 	types "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 )
 
+const adminEnableWorkspace = `-- name: AdminEnableWorkspace :exec
+UPDATE workspaces SET enabled = TRUE WHERE public_id = ? AND enabled = FALSE
+`
+
+// Re-enable a previously suspended workspace.
+func (q *Queries) AdminEnableWorkspace(ctx context.Context, publicID types.PublicID) error {
+	_, err := q.db.ExecContext(ctx, adminEnableWorkspace, publicID)
+	return err
+}
+
+const adminGetWorkspace = `-- name: AdminGetWorkspace :one
+SELECT
+  w.public_id,
+  w.slug,
+  w.name,
+  w.description,
+  w.icon_url,
+  w.enabled,
+  w.created_at,
+  w.updated_at,
+  (SELECT COUNT(*) FROM workspace_members wm WHERE wm.workspace_id = w.id AND wm.enabled = TRUE) AS member_count,
+  (SELECT COUNT(*) FROM projects p WHERE p.workspace_id = w.id AND p.enabled = TRUE) AS project_count
+FROM workspaces w
+WHERE w.public_id = ?
+`
+
+type AdminGetWorkspaceRow struct {
+	PublicID     types.PublicID `json:"publicId"`
+	Slug         string         `json:"slug"`
+	Name         string         `json:"name"`
+	Description  sql.NullString `json:"description"`
+	IconUrl      sql.NullString `json:"iconUrl"`
+	Enabled      bool           `json:"enabled"`
+	CreatedAt    time.Time      `json:"createdAt"`
+	UpdatedAt    sql.NullTime   `json:"updatedAt"`
+	MemberCount  int64          `json:"memberCount"`
+	ProjectCount int64          `json:"projectCount"`
+}
+
+// Find a single workspace by public_id for admin detail view.
+func (q *Queries) AdminGetWorkspace(ctx context.Context, publicID types.PublicID) (AdminGetWorkspaceRow, error) {
+	row := q.db.QueryRowContext(ctx, adminGetWorkspace, publicID)
+	var i AdminGetWorkspaceRow
+	err := row.Scan(
+		&i.PublicID,
+		&i.Slug,
+		&i.Name,
+		&i.Description,
+		&i.IconUrl,
+		&i.Enabled,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.MemberCount,
+		&i.ProjectCount,
+	)
+	return i, err
+}
+
+const adminListWorkspaces = `-- name: AdminListWorkspaces :many
+SELECT
+  w.public_id,
+  w.slug,
+  w.name,
+  w.description,
+  w.icon_url,
+  w.enabled,
+  w.created_at,
+  w.updated_at,
+  (SELECT COUNT(*) FROM workspace_members wm WHERE wm.workspace_id = w.id AND wm.enabled = TRUE) AS member_count,
+  COUNT(*) OVER() AS total
+FROM workspaces w
+WHERE (? = '' OR w.name LIKE CONCAT('%', ?, '%') OR w.slug LIKE CONCAT('%', ?, '%'))
+  AND (? IS NULL OR w.enabled = ?)
+ORDER BY w.created_at DESC, w.public_id DESC
+LIMIT ? OFFSET ?
+`
+
+type AdminListWorkspacesParams struct {
+	Column1  interface{} `json:"column1"`
+	CONCAT   interface{} `json:"CONCAT"`
+	CONCAT_2 interface{} `json:"CONCAT2"`
+	Column4  interface{} `json:"column4"`
+	Enabled  bool        `json:"enabled"`
+	Limit    int32       `json:"limit"`
+	Offset   int32       `json:"offset"`
+}
+
+type AdminListWorkspacesRow struct {
+	PublicID    types.PublicID `json:"publicId"`
+	Slug        string         `json:"slug"`
+	Name        string         `json:"name"`
+	Description sql.NullString `json:"description"`
+	IconUrl     sql.NullString `json:"iconUrl"`
+	Enabled     bool           `json:"enabled"`
+	CreatedAt   time.Time      `json:"createdAt"`
+	UpdatedAt   sql.NullTime   `json:"updatedAt"`
+	MemberCount int64          `json:"memberCount"`
+	Total       interface{}    `json:"total"`
+}
+
+// Paginated workspace list for instance admin panel.
+// search: pass ” to skip, otherwise matches name or slug.
+// filter_enabled: pass NULL to skip, otherwise filters by enabled flag.
+func (q *Queries) AdminListWorkspaces(ctx context.Context, arg AdminListWorkspacesParams) ([]AdminListWorkspacesRow, error) {
+	rows, err := q.db.QueryContext(ctx, adminListWorkspaces,
+		arg.Column1,
+		arg.CONCAT,
+		arg.CONCAT_2,
+		arg.Column4,
+		arg.Enabled,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AdminListWorkspacesRow{}
+	for rows.Next() {
+		var i AdminListWorkspacesRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.Slug,
+			&i.Name,
+			&i.Description,
+			&i.IconUrl,
+			&i.Enabled,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.MemberCount,
+			&i.Total,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const adminSuspendWorkspace = `-- name: AdminSuspendWorkspace :exec
+UPDATE workspaces SET enabled = FALSE WHERE public_id = ? AND enabled = TRUE
+`
+
+// Disable a workspace (soft-delete).
+func (q *Queries) AdminSuspendWorkspace(ctx context.Context, publicID types.PublicID) error {
+	_, err := q.db.ExecContext(ctx, adminSuspendWorkspace, publicID)
+	return err
+}
+
 const createWorkspace = `-- name: CreateWorkspace :execlastid
 INSERT INTO workspaces (
   public_id,

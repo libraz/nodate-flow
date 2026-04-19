@@ -9,7 +9,7 @@ import (
 // constraint expression. It is NOT a localized string: the result is
 // a compact pseudo-sentence built from stable tokens so the web
 // layer can either render it directly (dev) or map tokens to
-// i18n messages (prod, 3.DSL-4).
+// i18n messages (prod).
 //
 // The output is deliberately pure — no clock reads, no map
 // iteration order — so replay tools can diff "what this constraint

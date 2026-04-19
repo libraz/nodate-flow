@@ -13,6 +13,102 @@ import (
 	types "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 )
 
+const adminFindUserIdByPublicId = `-- name: AdminFindUserIdByPublicId :one
+SELECT id FROM users WHERE public_id = ?
+`
+
+// Resolve internal user_id from public_id for admin session lookup.
+func (q *Queries) AdminFindUserIdByPublicId(ctx context.Context, publicID types.PublicID) (uint32, error) {
+	row := q.db.QueryRowContext(ctx, adminFindUserIdByPublicId, publicID)
+	var id uint32
+	err := row.Scan(&id)
+	return id, err
+}
+
+const adminListUserSessions = `-- name: AdminListUserSessions :many
+SELECT
+  s.public_id,
+  s.user_agent,
+  s.ip_address,
+  s.expires_at,
+  s.revoked_at,
+  s.last_used_at,
+  s.enabled,
+  s.created_at,
+  COUNT(*) OVER() AS total
+FROM sessions s
+WHERE s.user_id = ?
+ORDER BY s.created_at DESC, s.public_id DESC
+LIMIT ? OFFSET ?
+`
+
+type AdminListUserSessionsParams struct {
+	UserID uint32 `json:"-"`
+	Limit  int32  `json:"limit"`
+	Offset int32  `json:"offset"`
+}
+
+type AdminListUserSessionsRow struct {
+	PublicID   types.PublicID `json:"publicId"`
+	UserAgent  sql.NullString `json:"userAgent"`
+	IpAddress  sql.NullString `json:"ipAddress"`
+	ExpiresAt  time.Time      `json:"expiresAt"`
+	RevokedAt  sql.NullTime   `json:"revokedAt"`
+	LastUsedAt sql.NullTime   `json:"lastUsedAt"`
+	Enabled    bool           `json:"enabled"`
+	CreatedAt  time.Time      `json:"createdAt"`
+	Total      interface{}    `json:"total"`
+}
+
+// List all sessions for a user by their internal user_id.
+func (q *Queries) AdminListUserSessions(ctx context.Context, arg AdminListUserSessionsParams) ([]AdminListUserSessionsRow, error) {
+	rows, err := q.db.QueryContext(ctx, adminListUserSessions, arg.UserID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AdminListUserSessionsRow{}
+	for rows.Next() {
+		var i AdminListUserSessionsRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.UserAgent,
+			&i.IpAddress,
+			&i.ExpiresAt,
+			&i.RevokedAt,
+			&i.LastUsedAt,
+			&i.Enabled,
+			&i.CreatedAt,
+			&i.Total,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const adminRevokeSession = `-- name: AdminRevokeSession :exec
+UPDATE sessions
+SET revoked_at = CURRENT_TIMESTAMP,
+    enabled = FALSE
+WHERE public_id = ?
+  AND enabled = TRUE
+  AND revoked_at IS NULL
+`
+
+// Revoke any session by its public_id (admin override, no user scoping).
+func (q *Queries) AdminRevokeSession(ctx context.Context, publicID types.PublicID) error {
+	_, err := q.db.ExecContext(ctx, adminRevokeSession, publicID)
+	return err
+}
+
 const createSession = `-- name: CreateSession :execlastid
 INSERT INTO sessions (
   public_id,

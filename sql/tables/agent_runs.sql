@@ -1,6 +1,6 @@
 -- ====================================
 -- agent_runs
--- Queue + history for AI agent executions (4.AGENT-1 scheduler/worker
+-- Queue + history for AI agent executions (scheduler/worker
 -- split). The scheduler enqueues one row per due (agent, scheduled_at)
 -- pair with a UNIQUE dedupe_key so multiple scheduler replicas cannot
 -- double-fire a job. Workers claim rows with SELECT ... FOR UPDATE

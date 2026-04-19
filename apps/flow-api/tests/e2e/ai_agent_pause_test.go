@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestAiAgentPauseNotFound exercises the 4.AGENT-3 kill-switch route.
+// TestAiAgentPauseNotFound exercises the kill-switch route.
 // It only verifies the 404 branch (unknown agentId) because creating
 // a real ai_agents row requires the full ai_providers / ai_models
 // dependency chain, which is out of scope for this smoke test. The

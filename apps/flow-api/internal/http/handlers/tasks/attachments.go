@@ -69,7 +69,7 @@ func AddAttachment(deps Deps) func(context.Context, *AddTaskAttachmentInput) (*A
 			ContentType: in.Body.ContentType,
 			ByteSize:    in.Body.ByteSize,
 			StorageKey:  in.Body.StorageKey,
-			CreatedAt:   time.Now(),
+			CreatedAt:   time.Now().Unix(),
 		}}, nil
 	}
 }

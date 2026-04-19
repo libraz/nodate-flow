@@ -17,8 +17,8 @@ import (
 // AI.NL_QUERY.UNPARSEABLE (ADR 0004).
 func TestAiCompileLensHappyAndSad(t *testing.T) {
 	bootstrap(t)
-	if os.Getenv("ND_FLOW_AI_MOCK") == "" {
-		t.Skip("set ND_FLOW_AI_MOCK=1 to run NL query e2e tests")
+	if os.Getenv("NF_FLOW_AI_MOCK") == "" {
+		t.Skip("set NF_FLOW_AI_MOCK=1 to run NL query e2e tests")
 	}
 	t.Parallel()
 

@@ -31,7 +31,7 @@
   cursor: pointer;
 }
 
-.radioOption input[type='radio'] {
+.radioOption input[type="radio"] {
   accent-color: var(--nf-color-accent);
 }
 

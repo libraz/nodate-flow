@@ -94,7 +94,7 @@ LIMIT 1
 `
 
 // Return the internal id of the most recently created enabled provider
-// for a workspace. Used by the ai_invocations logger (2.MCP-2) when the
+// for a workspace. Used by the ai_invocations logger when the
 // orchestrator does not track which provider handled the call.
 func (q *Queries) FindDefaultProviderIDForWorkspace(ctx context.Context, workspaceID uint32) (uint32, error) {
 	row := q.db.QueryRowContext(ctx, findDefaultProviderIDForWorkspace, workspaceID)

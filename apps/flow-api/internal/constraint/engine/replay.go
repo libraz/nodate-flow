@@ -53,8 +53,7 @@ var ErrIllegalTransition = errors.New("engine: illegal transition")
 // Replay derives a task's final state by applying events in order
 // from the initial "open" state, using the ADR 0001 v1 state
 // machine. The result must match the task's current
-// tasks.derived_state — any drift proves a write-path bug
-// (3.TEST-3 replay equivalence).
+// tasks.derived_state — any drift proves a write-path bug.
 //
 // Replay is a pure function of its input slice.
 func Replay(events []TransitionEvent) (DerivedState, error) {

@@ -13,8 +13,8 @@ func rowToWorkspaceFromFind(r generated.FindWorkspaceByPublicIdRow) Workspace {
 		Name:        r.Name,
 		Description: nullStr(r.Description),
 		IconURL:     nullStr(r.IconUrl),
-		UpdatedAt:   nullTime(r.UpdatedAt),
-		CreatedAt:   r.CreatedAt,
+		UpdatedAt:   nullTimeUnix(r.UpdatedAt),
+		CreatedAt:   r.CreatedAt.Unix(),
 	}
 }
 
@@ -28,8 +28,8 @@ func rowToWorkspaceFromList(r generated.ListWorkspacesForUserRow) Workspace {
 		IconURL:     nullStr(r.IconUrl),
 		Role:        string(r.Role),
 		MemberCount: r.MemberCount,
-		UpdatedAt:   nullTime(r.UpdatedAt),
-		CreatedAt:   r.CreatedAt,
+		UpdatedAt:   nullTimeUnix(r.UpdatedAt),
+		CreatedAt:   r.CreatedAt.Unix(),
 	}
 }
 
@@ -42,9 +42,9 @@ func rowToMember(r generated.ListWorkspaceMembersRow) WorkspaceMember {
 		DisplayName: r.DisplayName,
 		AvatarURL:   nullStr(r.AvatarUrl),
 		Role:        string(r.Role),
-		InvitedAt:   nullTime(r.InvitedAt),
-		JoinedAt:    nullTime(r.JoinedAt),
-		UpdatedAt:   nullTime(r.UpdatedAt),
-		CreatedAt:   r.CreatedAt,
+		InvitedAt:   nullTimeUnix(r.InvitedAt),
+		JoinedAt:    nullTimeUnix(r.JoinedAt),
+		UpdatedAt:   nullTimeUnix(r.UpdatedAt),
+		CreatedAt:   r.CreatedAt.Unix(),
 	}
 }

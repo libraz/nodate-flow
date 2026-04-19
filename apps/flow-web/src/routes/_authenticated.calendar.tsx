@@ -30,31 +30,14 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import type { Project } from '../features/projects/api';
-import type { TaskPriority } from '../features/tasks/api';
+import { TASK_PRIORITIES } from '../features/tasks/api';
+import { PRIORITY_KEY, STATE_COLOR } from '../features/tasks/constants';
 import { useWorkspacesQuery } from '../features/workspaces/api';
 import { sdk } from '../lib/sdk';
 
 type CalendarTask = components['schemas']['TaskListItem'] & { workspaceName?: string };
 
 const WEEKDAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
-
-const STATE_COLOR: Record<string, string> = {
-  open: 'var(--color-info, #3498db)',
-  waiting: 'var(--color-warning, #f39c12)',
-  review: 'var(--color-accent, #9b59b6)',
-  done: 'var(--color-success, #27ae60)',
-  cancelled: 'var(--color-muted, #95a5a6)',
-};
-
-const PRIORITIES: readonly TaskPriority[] = [0, 1, 2, 3, 4];
-
-const PRIORITY_KEY: Record<TaskPriority, string> = {
-  0: 'tasks.priority.none',
-  1: 'tasks.priority.low',
-  2: 'tasks.priority.medium',
-  3: 'tasks.priority.high',
-  4: 'tasks.priority.urgent',
-};
 
 /** Local-time YYYY-MM-DD for the start of `d`. */
 function dateKey(d: Date): string {

@@ -437,7 +437,9 @@
     "board": {
       "empty_column": "タスクなし",
       "drop_hint": "ここにドロップして移動",
-      "moved_to": "{state} に移動しました"
+      "moved_to": "{state} に移動しました",
+      "move_menu": "タスクを移動",
+      "move_to": "{state} に移動"
     },
     "assignee": {
       "plus_n": "+他{n}件",

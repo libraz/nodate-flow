@@ -36,7 +36,7 @@ var totalAsInt64 = handlerutil.TotalAsInt64
 
 // NotificationDTO is the public DTO for a notification row.
 type NotificationDTO struct {
-	ID               string `json:"id"`
+	ID               string `json:"id" doc:"Notification public id (UUID v7)"`
 	WorkspaceID      string `json:"workspaceId"`
 	ActorID          string `json:"actorId,omitempty"`
 	ActorDisplayName string `json:"actorDisplayName,omitempty"`

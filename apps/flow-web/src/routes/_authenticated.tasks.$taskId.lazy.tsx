@@ -7,7 +7,7 @@
  * title / priority / due edits go through `useUpdateTask`.
  */
 
-import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
+import Badge from '@nodate-flow/ui/primitives/badge';
 import Button, { type ButtonVariant } from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
 import Combobox from '@nodate-flow/ui/primitives/combobox';
@@ -28,6 +28,7 @@ import ConstraintEditor from '../features/constraints/constraint-editor';
 import StateGraph from '../features/constraints/state-graph';
 import { useProjectQuery } from '../features/projects/api';
 import {
+  TASK_PRIORITIES,
   TRANSITIONS_BY_STATE,
   type TaskDerivedState,
   type TaskPriority,
@@ -44,6 +45,7 @@ import {
   useTransitionTask,
   useUpdateTask,
 } from '../features/tasks/api';
+import { PRIORITY_COLOR, PRIORITY_KEY, STATE_KEY, STATE_TONE } from '../features/tasks/constants';
 import DependenciesSection from '../features/tasks/dependencies-section';
 import MarkdownEditor from '../features/tasks/markdown-editor';
 import TaskAttachments from '../features/tasks/task-attachments';
@@ -52,32 +54,9 @@ import { useTaskTimelineQuery } from '../features/timeline/api';
 import ReplayPanel from '../features/timeline/replay-panel';
 import TaskMiniTimeline from '../features/timeline/task-mini-timeline';
 import { useWorkspaceMembersQuery, useWorkspaceQuery } from '../features/workspaces/api';
+import { formatDateTime } from '../lib/format';
 
 const routeApi = getRouteApi('/_authenticated/tasks/$taskId');
-
-const PRIORITY_KEY: Record<TaskPriority, string> = {
-  0: 'tasks.priority.none',
-  1: 'tasks.priority.low',
-  2: 'tasks.priority.medium',
-  3: 'tasks.priority.high',
-  4: 'tasks.priority.urgent',
-};
-
-const STATE_KEY: Record<TaskDerivedState, string> = {
-  open: 'tasks.status.open',
-  waiting: 'tasks.status.waiting',
-  review: 'tasks.status.review',
-  done: 'tasks.status.done',
-  cancelled: 'tasks.status.cancelled',
-};
-
-const STATE_TONE: Record<TaskDerivedState, BadgeTone> = {
-  open: 'info',
-  waiting: 'warning',
-  review: 'accent',
-  done: 'success',
-  cancelled: 'neutral',
-};
 
 const TRANSITION_KEY: Record<TransitionName, string> = {
   start: 'tasks.detail.transitions.start',
@@ -89,30 +68,10 @@ const TRANSITION_KEY: Record<TransitionName, string> = {
   cancel: 'tasks.detail.transitions.cancel',
 };
 
-const PRIORITY_COLOR: Record<TaskPriority, string> = {
-  0: 'var(--color-muted, #95a5a6)',
-  1: '#3498db',
-  2: '#e67e22',
-  3: '#e74c3c',
-  4: '#c0392b',
-};
-
 const TRANSITION_VARIANT: Partial<Record<TransitionName, ButtonVariant>> = {
   complete: 'primary',
   cancel: 'danger',
 };
-
-const PRIORITIES: readonly TaskPriority[] = [0, 1, 2, 3, 4];
-
-function formatDate(iso: string, locale: string): string {
-  try {
-    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(
-      new Date(iso),
-    );
-  } catch {
-    return iso;
-  }
-}
 
 interface TaskDetailPanelProps {
   id: string;
@@ -359,7 +318,7 @@ function CommentsFeed({ taskId }: { taskId: string }): ReactElement {
                       fontSize: '0.875rem',
                     }}
                   >
-                    {formatDate(c.createdAt, locale)}
+                    {formatDateTime(c.createdAt, locale)}
                   </span>
                 </header>
                 <Markdown>{c.body}</Markdown>
@@ -618,7 +577,7 @@ function Sidebar({
                 void handlePriorityChange(next);
               }}
             >
-              {PRIORITIES.map((p) => (
+              {TASK_PRIORITIES.map((p) => (
                 <option key={p} value={String(p)}>
                   {t(PRIORITY_KEY[p])}
                 </option>
@@ -903,7 +862,7 @@ function AiActivitySection({ taskId }: { taskId: string }): ReactElement {
                   fontVariantNumeric: 'tabular-nums',
                 }}
               >
-                {formatDate(new Date(inv.invokedAt * 1000).toISOString(), locale)}
+                {formatDateTime(new Date(inv.invokedAt * 1000).toISOString(), locale)}
               </span>
             </div>
             {inv.promptRedacted ? (

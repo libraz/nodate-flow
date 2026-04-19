@@ -30,8 +30,8 @@ func rowToProvider(r generated.ListProvidersForWorkspaceRow) Provider {
 		BaseURL:      nullStr(r.BaseUrl),
 		DefaultModel: nullStr(r.DefaultModel),
 		APIKeyMasked: maskKey(r.ApiKeyPrefix, r.ApiKeySuffix),
-		UpdatedAt:    nullTime(r.UpdatedAt),
-		CreatedAt:    r.CreatedAt,
+		UpdatedAt:    nullTimeUnix(r.UpdatedAt),
+		CreatedAt:    r.CreatedAt.Unix(),
 	}
 }
 

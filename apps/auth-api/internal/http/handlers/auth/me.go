@@ -20,7 +20,12 @@ func Me(deps Deps) func(context.Context, *struct{}) (*MeOutput, error) {
 		if err != nil {
 			return nil, httpErr(apierrors.AuthSessionRevoked)
 		}
-		return &MeOutput{Body: rowToMe(row)}, nil
+		me := rowToMe(row)
+		isAdmin, err := deps.Queries.AdminIsInstanceAdmin(ctx, uid)
+		if err == nil {
+			me.IsInstanceAdmin = isAdmin
+		}
+		return &MeOutput{Body: me}, nil
 	}
 }
 

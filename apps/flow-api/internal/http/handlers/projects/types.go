@@ -4,7 +4,6 @@ package projects
 
 import (
 	"database/sql"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -29,29 +28,29 @@ func httpErr(spec *apierrors.Spec) error {
 
 // Project is the public DTO for a project row.
 type Project struct {
-	ID          string     `json:"id"`
-	WorkspaceID string     `json:"workspaceId"`
-	Slug        string     `json:"slug"`
-	Name        string     `json:"name"`
-	Description string     `json:"description,omitempty"`
-	Color       string     `json:"color,omitempty"`
-	IsArchived  bool       `json:"isArchived"`
-	StartedOn   *time.Time `json:"startedOn,omitempty"`
-	EndedOn     *time.Time `json:"endedOn,omitempty"`
-	UpdatedAt   *time.Time `json:"updatedAt,omitempty"`
-	CreatedAt   time.Time  `json:"createdAt"`
+	ID          string  `json:"id" doc:"Project public id (UUID v7)"`
+	WorkspaceID string  `json:"workspaceId"`
+	Slug        string  `json:"slug"`
+	Name        string  `json:"name"`
+	Description string  `json:"description,omitempty"`
+	Color       string  `json:"color,omitempty"`
+	IsArchived  bool    `json:"isArchived"`
+	StartedOn   *string `json:"startedOn,omitempty" doc:"YYYY-MM-DD"`
+	EndedOn     *string `json:"endedOn,omitempty" doc:"YYYY-MM-DD"`
+	UpdatedAt   *int64  `json:"updatedAt,omitempty"`
+	CreatedAt   int64   `json:"createdAt"`
 }
 
 // ProjectMember is the public DTO for a project_members row.
 type ProjectMember struct {
-	ID          string    `json:"id"`
-	UserID      string    `json:"userId"`
-	Email       string    `json:"email"`
-	DisplayName string    `json:"displayName"`
-	AvatarURL   string    `json:"avatarUrl,omitempty"`
-	Role        string    `json:"role"`
-	AddedAt     *time.Time `json:"addedAt,omitempty"`
-	CreatedAt   time.Time  `json:"createdAt"`
+	ID          string `json:"id" doc:"ProjectMember public id (UUID v7)"`
+	UserID      string `json:"userId"`
+	Email       string `json:"email"`
+	DisplayName string `json:"displayName"`
+	AvatarURL   string `json:"avatarUrl,omitempty"`
+	Role        string `json:"role"`
+	AddedAt     *int64 `json:"addedAt,omitempty"`
+	CreatedAt   int64  `json:"createdAt"`
 }
 
 // CreateProjectBody is the request body for POST /workspaces/{wsId}/projects.
@@ -139,7 +138,7 @@ type DisableProjectOutput struct {
 // Both endpoints are tasks that belong to the same project, so the web
 // client can render arrows between their corresponding rows / bars.
 type ProjectDependencyEdge struct {
-	ID                   string `json:"id"`
+	ID                   string `json:"id" doc:"Dependency public id (UUID v7)"`
 	Kind                 string `json:"kind"`
 	FromTaskID           string `json:"fromTaskId"`
 	FromTaskDerivedState string `json:"fromTaskDerivedState"`
@@ -217,11 +216,13 @@ type RemoveProjectMemberOutput struct {
 // nullStr delegates to handlerutil.NullStr.
 var nullStr = handlerutil.NullStr
 
-// nullTime delegates to handlerutil.NullTime.
-var nullTime = handlerutil.NullTime
+// nullTimeUnix delegates to handlerutil.NullTimeUnix (returns *int64, nil for NULL).
+var nullTimeUnix = handlerutil.NullTimeUnix
 
-// timePtr returns a pointer to a time.Time value, for assigning non-null
-// times into DTO fields declared as *time.Time.
-func timePtr(t time.Time) *time.Time {
-	return &t
+// nullTimeDate delegates to handlerutil.NullTimeDate (returns *string YYYY-MM-DD, nil for NULL).
+var nullTimeDate = handlerutil.NullTimeDate
+
+// int64Ptr returns a pointer to an int64 value.
+func int64Ptr(v int64) *int64 {
+	return &v
 }

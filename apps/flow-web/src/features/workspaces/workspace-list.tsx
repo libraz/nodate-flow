@@ -12,16 +12,9 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatDate } from '../../lib/format';
 import { type Workspace, useWorkspacesQuery } from './api';
 import WorkspaceCreateDialog from './workspace-create-dialog';
-
-function formatDate(iso: string, locale: string): string {
-  try {
-    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(iso));
-  } catch {
-    return iso;
-  }
-}
 
 export default function WorkspaceList(): ReactElement {
   const { t, i18n } = useTranslation('common');

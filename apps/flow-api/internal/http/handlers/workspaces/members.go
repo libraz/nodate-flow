@@ -107,9 +107,9 @@ func InviteMember(deps Deps) func(context.Context, *AddWorkspaceMemberInput) (*A
 				Email:       email,
 				DisplayName: displayName,
 				Role:        string(existingMem.Role),
-				InvitedAt:   nullTime(existingMem.InvitedAt),
-				JoinedAt:    nullTime(existingMem.JoinedAt),
-				CreatedAt:   existingMem.CreatedAt,
+				InvitedAt:   nullTimeUnix(existingMem.InvitedAt),
+				JoinedAt:    nullTimeUnix(existingMem.JoinedAt),
+				CreatedAt:   existingMem.CreatedAt.Unix(),
 			}}, nil
 		} else if !errors.Is(merr, sql.ErrNoRows) {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -134,8 +134,8 @@ func InviteMember(deps Deps) func(context.Context, *AddWorkspaceMemberInput) (*A
 			Email:       email,
 			DisplayName: displayName,
 			Role:        string(role),
-			InvitedAt:   timePtr(now),
-			CreatedAt:   now,
+			InvitedAt:   int64Ptr(now.Unix()),
+			CreatedAt:   now.Unix(),
 		}}, nil
 	}
 }
@@ -180,9 +180,9 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateWorkspaceMemberRol
 			ID:        mem.PublicID.String(),
 			UserID:    userPub.String(),
 			Role:      string(role),
-			InvitedAt: nullTime(mem.InvitedAt),
-			JoinedAt:  nullTime(mem.JoinedAt),
-			CreatedAt: mem.CreatedAt,
+			InvitedAt: nullTimeUnix(mem.InvitedAt),
+			JoinedAt:  nullTimeUnix(mem.JoinedAt),
+			CreatedAt: mem.CreatedAt.Unix(),
 		}}, nil
 	}
 }

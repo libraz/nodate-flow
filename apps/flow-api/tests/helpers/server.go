@@ -61,7 +61,7 @@ func StartTestServer(t *testing.T, db *sql.DB) *TestServer {
 		SlackSigningSecret: "",
 		DefaultWorkspaceID: "",
 		DisableRateLimit:   true,
-		AiMock:             os.Getenv("ND_FLOW_AI_MOCK") != "" && os.Getenv("ND_FLOW_AI_MOCK") != "0" && os.Getenv("ND_FLOW_AI_MOCK") != "false",
+		AiMock:             os.Getenv("NF_FLOW_AI_MOCK") != "" && os.Getenv("NF_FLOW_AI_MOCK") != "0" && os.Getenv("NF_FLOW_AI_MOCK") != "false",
 		StreamNotifier:     notifier,
 		StreamRemember:     tap.RememberWorkspace,
 	})
@@ -103,7 +103,7 @@ func NewTestServer(db *sql.DB) (*TestServer, func(), error) {
 		SlackSigningSecret: "",
 		DefaultWorkspaceID: "",
 		DisableRateLimit:   true,
-		AiMock:             os.Getenv("ND_FLOW_AI_MOCK") != "" && os.Getenv("ND_FLOW_AI_MOCK") != "0" && os.Getenv("ND_FLOW_AI_MOCK") != "false",
+		AiMock:             os.Getenv("NF_FLOW_AI_MOCK") != "" && os.Getenv("NF_FLOW_AI_MOCK") != "0" && os.Getenv("NF_FLOW_AI_MOCK") != "false",
 		StreamNotifier:     notifier,
 		StreamRemember:     tap.RememberWorkspace,
 	})

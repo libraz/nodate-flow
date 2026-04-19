@@ -1,5 +1,5 @@
 // Package priorityopt implements the "priority optimization" stream
-// (2.AI-2). Given a compact view of a workspace's open tasks, it
+// Given a compact view of a workspace's open tasks, it
 // proposes a suggested priority in [0, 4] for each task so humans can
 // triage the backlog against a single consistent ranking.
 //

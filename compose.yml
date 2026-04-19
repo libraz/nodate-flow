@@ -146,32 +146,32 @@ services:
       mailpit:
         condition: service_healthy
     environment:
-      NF_PORT: "8080"
-      NF_LOG_LEVEL: ${NF_LOG_LEVEL:-info}
+      NF_FLOW_PORT: "8080"
+      NF_FLOW_LOG_LEVEL: ${NF_FLOW_LOG_LEVEL:-info}
       NF_DB_DSN: ${NF_DB_DSN:-nodate:nodatepw@tcp(mysql:3306)/nodate_flow?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci}
       NF_REDIS_ADDR: ${NF_REDIS_ADDR:-redis:6379}
-      NF_SESSION_STORE: ${NF_SESSION_STORE:-mysql}
-      NF_STREAM_BACKEND: ${NF_STREAM_BACKEND:-memory}
-      NF_OUTBOUND_BACKEND: ${NF_OUTBOUND_BACKEND:-memory}
-      NF_AGENT_TICK_INTERVAL: ${NF_AGENT_TICK_INTERVAL:-1m}
+      NF_FLOW_SESSION_STORE: ${NF_FLOW_SESSION_STORE:-mysql}
+      NF_FLOW_STREAM_BACKEND: ${NF_FLOW_STREAM_BACKEND:-memory}
+      NF_FLOW_OUTBOUND_BACKEND: ${NF_FLOW_OUTBOUND_BACKEND:-memory}
+      NF_FLOW_AGENT_TICK_INTERVAL: ${NF_FLOW_AGENT_TICK_INTERVAL:-1m}
       NF_SECRET_KEY: ${NF_SECRET_KEY:-}
-      NF_DEFAULT_WORKSPACE_ID: ${NF_DEFAULT_WORKSPACE_ID:-}
-      NF_GH_WEBHOOK_SECRET: ${NF_GH_WEBHOOK_SECRET:-}
-      NF_SLACK_SIGNING_SECRET: ${NF_SLACK_SIGNING_SECRET:-}
-      NF_AI_DAILY_BUDGET_CENTS: ${NF_AI_DAILY_BUDGET_CENTS:-}
+      NF_FLOW_DEFAULT_WORKSPACE_ID: ${NF_FLOW_DEFAULT_WORKSPACE_ID:-}
+      NF_FLOW_GH_WEBHOOK_SECRET: ${NF_FLOW_GH_WEBHOOK_SECRET:-}
+      NF_FLOW_SLACK_SIGNING_SECRET: ${NF_FLOW_SLACK_SIGNING_SECRET:-}
+      NF_FLOW_AI_DAILY_BUDGET_CENTS: ${NF_FLOW_AI_DAILY_BUDGET_CENTS:-}
       NF_S3_ENDPOINT: ${NF_S3_ENDPOINT:-minio:9000}
       NF_S3_ACCESS_KEY: ${NF_S3_ACCESS_KEY:-minioadmin}
       NF_S3_SECRET_KEY: ${NF_S3_SECRET_KEY:-minioadmin}
       NF_S3_BUCKET: ${NF_S3_BUCKET:-nodate-flow}
       NF_S3_USE_SSL: ${NF_S3_USE_SSL:-false}
-      NF_SMTP_HOST: ${NF_SMTP_HOST:-mailpit}
-      NF_SMTP_PORT: ${NF_SMTP_PORT:-1025}
-      NF_SMTP_USERNAME: ${NF_SMTP_USERNAME:-}
-      NF_SMTP_PASSWORD: ${NF_SMTP_PASSWORD:-}
-      NF_SMTP_FROM: ${NF_SMTP_FROM:-noreply@nodate-flow.local}
+      NF_FLOW_SMTP_HOST: ${NF_FLOW_SMTP_HOST:-mailpit}
+      NF_FLOW_SMTP_PORT: ${NF_FLOW_SMTP_PORT:-1025}
+      NF_FLOW_SMTP_USERNAME: ${NF_FLOW_SMTP_USERNAME:-}
+      NF_FLOW_SMTP_PASSWORD: ${NF_FLOW_SMTP_PASSWORD:-}
+      NF_FLOW_SMTP_FROM: ${NF_FLOW_SMTP_FROM:-noreply@nodate-flow.local}
       # OTLP collector endpoint (gRPC). Traces and metrics are sent here.
-      NF_OTEL_ENDPOINT: ${NF_OTEL_ENDPOINT:-otel-collector:4317}
-      NF_OTEL_INSECURE: ${NF_OTEL_INSECURE:-true}
+      NF_FLOW_OTEL_ENDPOINT: ${NF_FLOW_OTEL_ENDPOINT:-otel-collector:4317}
+      NF_FLOW_OTEL_INSECURE: ${NF_FLOW_OTEL_INSECURE:-true}
       NF_VERSION: ${NF_VERSION:-dev}
     ports:
       - "${NF_API_PORT:-8080}:8080"
@@ -191,13 +191,12 @@ services:
       mysql:
         condition: service_healthy
     environment:
-      NT_PORT: "8081"
-      NT_DB_DSN: ${NT_DB_DSN:-nodate:nodatepw@tcp(mysql:3306)/nodate_flow?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci}
-      NT_JWT_ED25519_SEED: "${NF_JWT_ED25519_SEED:-}"
-      NT_CORS_ALLOWED_ORIGINS: ${NT_CORS_ALLOWED_ORIGINS:-http://localhost:5174}
-      NT_COOKIE_SECURE: ${NT_COOKIE_SECURE:-false}
+      NF_TIME_PORT: "8081"
+      NF_DB_DSN: ${NF_DB_DSN:-nodate:nodatepw@tcp(mysql:3306)/nodate_flow?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci}
+      NF_TIME_CORS: ${NF_TIME_CORS:-http://localhost:5174}
+      NF_COOKIE_SECURE: ${NF_COOKIE_SECURE:-false}
     ports:
-      - "${NT_PORT:-8081}:8081"
+      - "${NF_TIME_PORT:-8081}:8081"
     healthcheck:
       test: ["CMD", "/healthcheck"]
       interval: 5s

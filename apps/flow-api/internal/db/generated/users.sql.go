@@ -13,6 +13,181 @@ import (
 	types "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 )
 
+const adminEnableUser = `-- name: AdminEnableUser :exec
+UPDATE users SET enabled = TRUE WHERE public_id = ? AND enabled = FALSE
+`
+
+// Re-enable a previously suspended user account.
+func (q *Queries) AdminEnableUser(ctx context.Context, publicID types.PublicID) error {
+	_, err := q.db.ExecContext(ctx, adminEnableUser, publicID)
+	return err
+}
+
+const adminGetUser = `-- name: AdminGetUser :one
+SELECT
+  v.id,
+  v.public_id,
+  v.email,
+  v.display_name,
+  v.avatar_url,
+  v.locale,
+  v.last_login_at,
+  v.email_verified_at,
+  v.enabled,
+  v.created_at,
+  v.updated_at,
+  v.workspace_count,
+  v.is_instance_admin
+FROM v_admin_users v
+WHERE v.public_id = ?
+`
+
+// Find a single user by public_id for admin detail view.
+func (q *Queries) AdminGetUser(ctx context.Context, publicID types.PublicID) (VAdminUser, error) {
+	row := q.db.QueryRowContext(ctx, adminGetUser, publicID)
+	var i VAdminUser
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.Email,
+		&i.DisplayName,
+		&i.AvatarUrl,
+		&i.Locale,
+		&i.LastLoginAt,
+		&i.EmailVerifiedAt,
+		&i.Enabled,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.WorkspaceCount,
+		&i.IsInstanceAdmin,
+	)
+	return i, err
+}
+
+const adminIsInstanceAdmin = `-- name: AdminIsInstanceAdmin :one
+SELECT EXISTS(
+  SELECT 1 FROM instance_admins
+  WHERE user_id = ? AND enabled = TRUE AND revoked_at IS NULL
+) AS is_admin
+`
+
+// Check if a user_id has an active instance admin grant. Used by GET /me.
+func (q *Queries) AdminIsInstanceAdmin(ctx context.Context, userID uint32) (bool, error) {
+	row := q.db.QueryRowContext(ctx, adminIsInstanceAdmin, userID)
+	var is_admin bool
+	err := row.Scan(&is_admin)
+	return is_admin, err
+}
+
+const adminListUsers = `-- name: AdminListUsers :many
+SELECT
+  v.id,
+  v.public_id,
+  v.email,
+  v.display_name,
+  v.avatar_url,
+  v.locale,
+  v.last_login_at,
+  v.email_verified_at,
+  v.enabled,
+  v.created_at,
+  v.updated_at,
+  v.workspace_count,
+  v.is_instance_admin,
+  COUNT(*) OVER() AS total
+FROM v_admin_users v
+WHERE (? = '' OR v.email LIKE CONCAT('%', ?, '%') OR v.display_name LIKE CONCAT('%', ?, '%'))
+  AND (? IS NULL OR v.enabled = ?)
+ORDER BY v.created_at DESC, v.public_id DESC
+LIMIT ? OFFSET ?
+`
+
+type AdminListUsersParams struct {
+	Column1  interface{} `json:"column1"`
+	CONCAT   interface{} `json:"CONCAT"`
+	CONCAT_2 interface{} `json:"CONCAT2"`
+	Column4  interface{} `json:"column4"`
+	Enabled  bool        `json:"enabled"`
+	Limit    int32       `json:"limit"`
+	Offset   int32       `json:"offset"`
+}
+
+type AdminListUsersRow struct {
+	ID              uint32         `json:"-"`
+	PublicID        types.PublicID `json:"publicId"`
+	Email           string         `json:"email"`
+	DisplayName     string         `json:"displayName"`
+	AvatarUrl       sql.NullString `json:"avatarUrl"`
+	Locale          string         `json:"locale"`
+	LastLoginAt     sql.NullTime   `json:"lastLoginAt"`
+	EmailVerifiedAt sql.NullTime   `json:"emailVerifiedAt"`
+	Enabled         bool           `json:"enabled"`
+	CreatedAt       time.Time      `json:"createdAt"`
+	UpdatedAt       sql.NullTime   `json:"updatedAt"`
+	WorkspaceCount  int64          `json:"workspaceCount"`
+	IsInstanceAdmin bool           `json:"isInstanceAdmin"`
+	Total           interface{}    `json:"total"`
+}
+
+// Paginated user list for instance admin panel.
+// search: pass ” to skip, otherwise matches email or display_name.
+// filter_enabled: pass NULL to skip, otherwise filters by enabled flag.
+func (q *Queries) AdminListUsers(ctx context.Context, arg AdminListUsersParams) ([]AdminListUsersRow, error) {
+	rows, err := q.db.QueryContext(ctx, adminListUsers,
+		arg.Column1,
+		arg.CONCAT,
+		arg.CONCAT_2,
+		arg.Column4,
+		arg.Enabled,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AdminListUsersRow{}
+	for rows.Next() {
+		var i AdminListUsersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicID,
+			&i.Email,
+			&i.DisplayName,
+			&i.AvatarUrl,
+			&i.Locale,
+			&i.LastLoginAt,
+			&i.EmailVerifiedAt,
+			&i.Enabled,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.WorkspaceCount,
+			&i.IsInstanceAdmin,
+			&i.Total,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const adminSuspendUser = `-- name: AdminSuspendUser :exec
+UPDATE users SET enabled = FALSE WHERE public_id = ? AND enabled = TRUE
+`
+
+// Disable a user account (soft-delete).
+func (q *Queries) AdminSuspendUser(ctx context.Context, publicID types.PublicID) error {
+	_, err := q.db.ExecContext(ctx, adminSuspendUser, publicID)
+	return err
+}
+
 const clearIdentityMfa = `-- name: ClearIdentityMfa :exec
 UPDATE identities
 SET mfa_secret_ciphertext = NULL,

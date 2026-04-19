@@ -1,4 +1,4 @@
-// 2.MCP-2 — AI agent assignment on tasks via task_actors (kind='agent').
+// AI agent assignment on tasks via task_actors (kind='agent').
 // DELETE reuses RemoveActor since task_actors rows are addressed by
 // public_id regardless of kind.
 
@@ -117,9 +117,9 @@ func ListAgentActors(deps Deps) func(context.Context, *ListTaskAgentActorsInput)
 				AgentID:   r.AgentPublicID.String(),
 				AgentName: r.AgentName,
 				Role:      string(r.Role),
-				CreatedAt: r.CreatedAt,
+				CreatedAt: r.CreatedAt.Unix(),
 			}
-			entry.UpdatedAt = nullTime(r.UpdatedAt)
+			entry.UpdatedAt = nullTimeUnix(r.UpdatedAt)
 			out.Body.Agents = append(out.Body.Agents, entry)
 		}
 		if len(rows) > 0 {

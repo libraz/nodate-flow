@@ -98,8 +98,8 @@ func AddMember(deps Deps) func(context.Context, *AddProjectMemberInput) (*AddPro
 				ID:        existing.PublicID.String(),
 				UserID:    userPub.String(),
 				Role:      string(existing.Role),
-				AddedAt:   nullTime(existing.AddedAt),
-				CreatedAt: existing.CreatedAt,
+				AddedAt:   nullTimeUnix(existing.AddedAt),
+				CreatedAt: existing.CreatedAt.Unix(),
 			}}, nil
 		} else if !errors.Is(err, sql.ErrNoRows) {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -122,8 +122,8 @@ func AddMember(deps Deps) func(context.Context, *AddProjectMemberInput) (*AddPro
 			ID:        memPub.String(),
 			UserID:    userPub.String(),
 			Role:      string(role),
-			AddedAt:   timePtr(now),
-			CreatedAt: now,
+			AddedAt:   int64Ptr(now.Unix()),
+			CreatedAt: now.Unix(),
 		}}, nil
 	}
 }

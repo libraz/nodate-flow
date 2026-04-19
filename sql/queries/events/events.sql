@@ -30,8 +30,8 @@ LIMIT ? OFFSET ?;
 
 -- name: ListTransitionEventsForReplay :many
 -- Ordered list of task.transition.* events for a single task,
--- ascending by occurred_at + id. Used by the Phase 3 replay tool
--- (3.ENG-1) to derive the expected derived_state from scratch.
+-- ascending by occurred_at + id. Used by the replay tool to derive
+-- the expected derived_state from scratch.
 SELECT type, occurred_at
 FROM events
 WHERE workspace_id = ?
@@ -84,7 +84,7 @@ LIMIT 100;
 -- name: CountAiSuggestionOutcomesForWorkspace :one
 -- Count ai.suggestion.{proposed,applied,dismissed} events for a workspace
 -- within the given time window. Used by the AI metrics endpoint
--- (2.OBS-1) to compute acceptance rate.
+-- to compute acceptance rate.
 SELECT
   COALESCE(SUM(CASE WHEN type = 'ai.suggestion.proposed'  THEN 1 ELSE 0 END), 0) AS proposed,
   COALESCE(SUM(CASE WHEN type = 'ai.suggestion.applied'   THEN 1 ELSE 0 END), 0) AS applied,

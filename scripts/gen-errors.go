@@ -148,18 +148,47 @@ func run() error {
 	}
 	sort.Slice(all, func(i, j int) bool { return all[i].Code < all[j].Code })
 
-	// Generate Go per-domain files.
-	goDir := filepath.Join(root, "apps", "api", "internal", "errors")
-	if err := os.MkdirAll(goDir, 0o755); err != nil {
-		return err
+	// Generate Go per-domain files for all app directories that have
+	// an internal/errors/ directory. The canonical output is apps/api/;
+	// flow-api, auth-api, and time-api receive the same per-domain files
+	// but only for domains they already track (existing files are updated,
+	// new domain files are added only to apps/api/ and apps/flow-api/).
+	// The errors.go runtime helper is only written for apps/api/ (the
+	// others use go-shared/apierr type aliases).
+	goTargets := []struct {
+		dir     string
+		allDoms bool // true = write all domains; false = update existing only
+		runtime bool // true = write errors.go runtime helper
+	}{
+		{filepath.Join(root, "apps", "api", "internal", "errors"), true, true},
+		{filepath.Join(root, "apps", "flow-api", "internal", "errors"), true, false},
+		{filepath.Join(root, "apps", "auth-api", "internal", "errors"), false, false},
+		{filepath.Join(root, "apps", "time-api", "internal", "errors"), false, false},
 	}
-	for _, name := range fileNames {
-		if err := writeFile(filepath.Join(goDir, fileBase(name)+".go"), genGoFile(byFile[name])); err != nil {
+	for _, tgt := range goTargets {
+		if _, err := os.Stat(tgt.dir); os.IsNotExist(err) {
+			continue
+		}
+		if err := os.MkdirAll(tgt.dir, 0o755); err != nil {
 			return err
 		}
-	}
-	if err := writeFile(filepath.Join(goDir, "errors.go"), genGoRuntime()); err != nil {
-		return err
+		for _, name := range fileNames {
+			outPath := filepath.Join(tgt.dir, fileBase(name)+".go")
+			if !tgt.allDoms {
+				// Only update files that already exist in this app.
+				if _, err := os.Stat(outPath); os.IsNotExist(err) {
+					continue
+				}
+			}
+			if err := writeFile(outPath, genGoFile(byFile[name])); err != nil {
+				return err
+			}
+		}
+		if tgt.runtime {
+			if err := writeFile(filepath.Join(tgt.dir, "errors.go"), genGoRuntime()); err != nil {
+				return err
+			}
+		}
 	}
 
 	// Generate TS per-domain files + barrel.
@@ -176,20 +205,27 @@ func run() error {
 		return err
 	}
 
-	// Locale files.
-	enDir := filepath.Join(root, "apps", "web", "locales", "en")
-	jaDir := filepath.Join(root, "apps", "web", "locales", "ja")
-	if err := os.MkdirAll(enDir, 0o755); err != nil {
-		return err
-	}
-	if err := os.MkdirAll(jaDir, 0o755); err != nil {
-		return err
-	}
-	if err := writeFile(filepath.Join(enDir, "errors.json"), genLocale(all, false)); err != nil {
-		return err
-	}
-	if err := writeFile(filepath.Join(jaDir, "errors.json"), genLocale(all, true)); err != nil {
-		return err
+	// Locale files — write to all web app directories that have locales/.
+	localeApps := []string{"apps/web", "apps/flow-web"}
+	for _, app := range localeApps {
+		enDir := filepath.Join(root, app, "locales", "en")
+		jaDir := filepath.Join(root, app, "locales", "ja")
+		// Skip apps whose locales directory doesn't exist yet.
+		if _, err := os.Stat(enDir); os.IsNotExist(err) {
+			continue
+		}
+		if err := os.MkdirAll(enDir, 0o755); err != nil {
+			return err
+		}
+		if err := os.MkdirAll(jaDir, 0o755); err != nil {
+			return err
+		}
+		if err := writeFile(filepath.Join(enDir, "errors.json"), genLocale(all, false)); err != nil {
+			return err
+		}
+		if err := writeFile(filepath.Join(jaDir, "errors.json"), genLocale(all, true)); err != nil {
+			return err
+		}
 	}
 
 	// Docs.

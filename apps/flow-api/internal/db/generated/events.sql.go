@@ -78,7 +78,7 @@ type CountAiSuggestionOutcomesForWorkspaceRow struct {
 
 // Count ai.suggestion.{proposed,applied,dismissed} events for a workspace
 // within the given time window. Used by the AI metrics endpoint
-// (2.OBS-1) to compute acceptance rate.
+// to compute acceptance rate.
 func (q *Queries) CountAiSuggestionOutcomesForWorkspace(ctx context.Context, arg CountAiSuggestionOutcomesForWorkspaceParams) (CountAiSuggestionOutcomesForWorkspaceRow, error) {
 	row := q.db.QueryRowContext(ctx, countAiSuggestionOutcomesForWorkspace, arg.WorkspaceID, arg.OccurredAt)
 	var i CountAiSuggestionOutcomesForWorkspaceRow
@@ -1160,8 +1160,8 @@ type ListTransitionEventsForReplayRow struct {
 }
 
 // Ordered list of task.transition.* events for a single task,
-// ascending by occurred_at + id. Used by the Phase 3 replay tool
-// (3.ENG-1) to derive the expected derived_state from scratch.
+// ascending by occurred_at + id. Used by the replay tool to derive
+// the expected derived_state from scratch.
 func (q *Queries) ListTransitionEventsForReplay(ctx context.Context, arg ListTransitionEventsForReplayParams) ([]ListTransitionEventsForReplayRow, error) {
 	rows, err := q.db.QueryContext(ctx, listTransitionEventsForReplay, arg.WorkspaceID, arg.TaskID)
 	if err != nil {

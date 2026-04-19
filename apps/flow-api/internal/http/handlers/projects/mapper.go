@@ -14,10 +14,10 @@ func rowToProjectFromFind(r generated.FindProjectByPublicIdGlobalRow) Project {
 		Description: nullStr(r.Description),
 		Color:       nullStr(r.Color),
 		IsArchived:  r.IsArchived,
-		StartedOn:   nullTime(r.StartedOn),
-		EndedOn:     nullTime(r.EndedOn),
-		UpdatedAt:   nullTime(r.UpdatedAt),
-		CreatedAt:   r.CreatedAt,
+		StartedOn:   nullTimeDate(r.StartedOn),
+		EndedOn:     nullTimeDate(r.EndedOn),
+		UpdatedAt:   nullTimeUnix(r.UpdatedAt),
+		CreatedAt:   r.CreatedAt.Unix(),
 	}
 }
 
@@ -33,10 +33,10 @@ func rowToProjectFromList(r generated.ListProjectsForWorkspaceRow, workspacePubl
 		Description: nullStr(r.Description),
 		Color:       nullStr(r.Color),
 		IsArchived:  r.IsArchived,
-		StartedOn:   nullTime(r.StartedOn),
-		EndedOn:     nullTime(r.EndedOn),
-		UpdatedAt:   nullTime(r.UpdatedAt),
-		CreatedAt:   r.CreatedAt,
+		StartedOn:   nullTimeDate(r.StartedOn),
+		EndedOn:     nullTimeDate(r.EndedOn),
+		UpdatedAt:   nullTimeUnix(r.UpdatedAt),
+		CreatedAt:   r.CreatedAt.Unix(),
 	}
 }
 
@@ -48,8 +48,8 @@ func rowToProjectMember(r generated.ListProjectMembersRow) ProjectMember {
 		DisplayName: r.DisplayName,
 		AvatarURL:   nullStr(r.AvatarUrl),
 		Role:        string(r.Role),
-		AddedAt:     nullTime(r.AddedAt),
-		CreatedAt:   r.CreatedAt,
+		AddedAt:     nullTimeUnix(r.AddedAt),
+		CreatedAt:   r.CreatedAt.Unix(),
 	}
 }
 

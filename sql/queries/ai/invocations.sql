@@ -43,7 +43,7 @@ LIMIT ? OFFSET ?;
 
 -- name: ListAiInvocationsForTask :many
 -- Recent redacted LLM call records scoped to a single task. Used by
--- the task detail AI reasoning panel (2.WEB-2). workspace_id is
+-- the task detail AI reasoning panel. workspace_id is
 -- included so tenant isolation is enforced at the query level.
 SELECT
   public_id,
@@ -74,7 +74,7 @@ WHERE workspace_id = ?
 
 -- name: SumAiCostForAgentSince :one
 -- Sum the estimated cost (cents) of LLM calls attributed to a given AI
--- agent since a lower bound. Used by 2.MCP-2 agentguard to enforce the
+-- agent since a lower bound. Used by agentguard to enforce the
 -- agent's monthly cost cap.
 SELECT CAST(COALESCE(ROUND(SUM(cost_estimate) * 100), 0) AS SIGNED) AS total_cents
 FROM ai_invocations

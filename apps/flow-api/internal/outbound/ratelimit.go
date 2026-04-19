@@ -1,7 +1,6 @@
 // Package outbound provides primitives for making egress calls to
 // external services (GitHub / Slack / Google / LLM providers) with
-// uniform rate limiting, so a buggy agent can't flood a third party
-// (4.SEC-2 outbound rate limit).
+// uniform rate limiting, so a buggy agent can't flood a third party.
 package outbound
 
 import (
@@ -37,7 +36,7 @@ type Limiter struct {
 	last     time.Time
 	now      func() time.Time
 
-	// Observability counters (4.AGENT-2). Atomic so Stats() is lock
+	// Observability counters. Atomic so Stats() is lock
 	// free.
 	allowed atomic.Uint64
 	waited  atomic.Uint64

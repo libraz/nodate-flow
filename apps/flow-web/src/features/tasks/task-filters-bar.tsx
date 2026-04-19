@@ -14,13 +14,8 @@ import { useTranslation } from 'react-i18next';
 import LensPicker from './lens-picker';
 
 import { useWorkspaceUsersQuery } from '../workspaces/api';
-import {
-  PRIORITY_I18N_KEY,
-  TASK_PRIORITIES,
-  TASK_STATES,
-  type TaskDerivedState,
-  type TaskPriority,
-} from './api';
+import { TASK_PRIORITIES, TASK_STATES, type TaskDerivedState, type TaskPriority } from './api';
+import { PRIORITY_KEY, STATE_KEY } from './constants';
 import {
   resetTaskFilters,
   setTaskFilterAssignee,
@@ -93,14 +88,6 @@ export default function TaskFiltersBar({
 }: TaskFiltersBarProps): ReactElement {
   const { t } = useTranslation('common');
   const filters = useTaskFilters(projectId);
-
-  const STATE_KEY: Record<TaskDerivedState, string> = {
-    open: 'tasks.status.open',
-    waiting: 'tasks.status.waiting',
-    review: 'tasks.status.review',
-    done: 'tasks.status.done',
-    cancelled: 'tasks.status.cancelled',
-  };
 
   const selectedStates = new Set(filters.states ?? []);
   const selectedPriorities = new Set(filters.priority ?? []);
@@ -233,7 +220,7 @@ export default function TaskFiltersBar({
                   cursor: 'pointer',
                 }}
               >
-                {t(PRIORITY_I18N_KEY[p])}
+                {t(PRIORITY_KEY[p])}
               </button>
             );
           })}
@@ -329,7 +316,7 @@ export default function TaskFiltersBar({
                     setTaskFilterPriority(projectId, next);
                   }}
                 >
-                  {t('tasks.filters.chip_priority', { value: t(PRIORITY_I18N_KEY[p]) })}
+                  {t('tasks.filters.chip_priority', { value: t(PRIORITY_KEY[p]) })}
                 </Chip>
               ))
             : null}

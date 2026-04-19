@@ -13,6 +13,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatDateNullable } from '../../lib/format';
 import { selectUser, useAuth } from '../auth/auth-store';
 import {
   type WorkspaceMember,
@@ -30,21 +31,6 @@ export interface WorkspaceMembersTableProps {
 
 type MemberRole = 'owner' | 'admin' | 'member' | 'guest';
 const ROLES: readonly MemberRole[] = ['owner', 'admin', 'member', 'guest'];
-
-function isZeroTime(iso: string): boolean {
-  if (iso === '0001-01-01T00:00:00Z') return true;
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) || d.getFullYear() < 2000;
-}
-
-function formatDate(iso: string | null | undefined, locale: string): string | null {
-  if (!iso || isZeroTime(iso)) return null;
-  try {
-    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(iso));
-  } catch {
-    return null;
-  }
-}
 
 export default function WorkspaceMembersTable({
   workspaceId,
@@ -135,7 +121,8 @@ export default function WorkspaceMembersTable({
       header: () => t('workspaces.members.added_at'),
       cell: ({ row }) => {
         const formatted =
-          formatDate(row.original.joinedAt, locale) ?? formatDate(row.original.createdAt, locale);
+          formatDateNullable(row.original.joinedAt, locale) ??
+          formatDateNullable(row.original.createdAt, locale);
         return <span>{formatted ?? t('workspaces.members.pending')}</span>;
       },
     },

@@ -1,5 +1,5 @@
 // Package nlconstraint compiles natural-language prose into a
-// validated constraint DSL expression (Phase 3, 3.AI-1). It mirrors
+// validated constraint DSL expression. It mirrors
 // the shape of [nlquery]: a single-round LLM call whose raw JSON
 // output is validated server-side against the closed constraint
 // grammar before it reaches the caller. Invalid output surfaces as

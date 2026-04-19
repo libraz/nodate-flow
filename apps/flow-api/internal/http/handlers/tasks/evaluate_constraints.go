@@ -29,10 +29,9 @@ type EvaluateConstraintsOutput struct {
 }
 
 // EvaluateConstraints handles POST /tasks/{id}/constraints/evaluate.
-// It runs the Phase 3 constraint engine against the current task
-// facts and persists satisfied_at / failed_at markers as a
-// side-effect. The response is a per-constraint outcome list for
-// the State Graph UI (3.WEB-2).
+// It runs the constraint engine against the current task facts and
+// persists satisfied_at / failed_at markers as a side-effect. The
+// response is a per-constraint outcome list for the State Graph UI.
 func EvaluateConstraints(deps Deps) func(context.Context, *EvaluateConstraintsInput) (*EvaluateConstraintsOutput, error) {
 	return func(ctx context.Context, _ *EvaluateConstraintsInput) (*EvaluateConstraintsOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)

@@ -4,7 +4,7 @@
 // rather than reaching into the database directly.
 //
 // Helpers in this package require Docker. Tests that import them must
-// guard their use behind testing.Short() / ND_TEST_INTEGRATION so that
+// guard their use behind testing.Short() / NF_TEST_INTEGRATION so that
 // `go test -short` stays fast on machines without Docker.
 package helpers
 

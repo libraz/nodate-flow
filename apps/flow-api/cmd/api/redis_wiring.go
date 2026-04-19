@@ -14,7 +14,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/stream"
 )
 
-// buildSessionStore selects the Redis driver when ND_FLOW_SESSION_STORE=redis
+// buildSessionStore selects the Redis driver when NF_FLOW_SESSION_STORE=redis
 // and a Redis client is available; otherwise it falls through to the
 // MySQL driver.
 func buildSessionStore(cfg *config.Config, db *sql.DB, q *generated.Queries, logger *slog.Logger) sessionstore.Store {
@@ -44,7 +44,7 @@ func buildStreamNotifier(cfg *config.Config, logger *slog.Logger) stream.Notifie
 }
 
 // configureOutboundLimiters swaps in RedisLimiter for each LLM
-// destination when ND_FLOW_OUTBOUND_BACKEND=redis. Called from main.go
+// destination when NF_FLOW_OUTBOUNF_BACKEND=redis. Called from main.go
 // instead of the default in-process ConfigureLimiter branch.
 func configureOutboundLimiters(cfg *config.Config, logger *slog.Logger, dests []string) bool {
 	if cfg.OutboundBackend != "redis" {
@@ -70,11 +70,11 @@ func configureOutboundLimiters(cfg *config.Config, logger *slog.Logger, dests []
 	return true
 }
 
-// dialRedis constructs a client from ND_REDIS_ADDR. On an empty addr
+// dialRedis constructs a client from NF_REDIS_ADDR. On an empty addr
 // it logs and returns nil so the caller can fall back gracefully.
 func dialRedis(cfg *config.Config, logger *slog.Logger) *redis.Client {
 	if cfg.RedisAddr == "" {
-		logger.Error("redis backend requested but ND_REDIS_ADDR is empty; falling back")
+		logger.Error("redis backend requested but NF_REDIS_ADDR is empty; falling back")
 		return nil
 	}
 	return redis.NewClient(&redis.Options{Addr: cfg.RedisAddr})

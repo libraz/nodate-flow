@@ -2,7 +2,7 @@ package github
 
 // NormalizeEventKind maps an inbound GitHub webhook event header
 // (X-GitHub-Event) plus the JSON action field to a stable, canonical
-// kind that we store in `signals.kind` (4.SIG-1). The output is
+// kind that we store in `signals.kind`. The output is
 // dot-separated and lower-snake so it can be used as both a metric
 // label and a constraint signal name.
 //

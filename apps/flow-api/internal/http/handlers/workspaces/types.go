@@ -4,7 +4,6 @@ package workspaces
 
 import (
 	"database/sql"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -31,29 +30,29 @@ func httpErr(spec *apierrors.Spec) error {
 
 // Workspace is the public DTO for a workspace row.
 type Workspace struct {
-	ID          string     `json:"id" doc:"Workspace public id (UUID v7)"`
-	Slug        string     `json:"slug"`
-	Name        string     `json:"name"`
-	Description string     `json:"description,omitempty"`
-	IconURL     string     `json:"iconUrl,omitempty"`
-	Role        string     `json:"role,omitempty" doc:"Caller's role in this workspace"`
-	MemberCount int64      `json:"memberCount" doc:"Number of enabled members in this workspace"`
-	UpdatedAt   *time.Time `json:"updatedAt,omitempty"`
-	CreatedAt   time.Time  `json:"createdAt"`
+	ID          string `json:"id" doc:"Workspace public id (UUID v7)"`
+	Slug        string `json:"slug"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	IconURL     string `json:"iconUrl,omitempty"`
+	Role        string `json:"role,omitempty" doc:"Caller's role in this workspace"`
+	MemberCount int64  `json:"memberCount" doc:"Number of enabled members in this workspace"`
+	UpdatedAt   *int64 `json:"updatedAt,omitempty"`
+	CreatedAt   int64  `json:"createdAt"`
 }
 
 // WorkspaceMember is the public DTO for a workspace_members row.
 type WorkspaceMember struct {
-	ID          string     `json:"id"`
-	UserID      string     `json:"userId"`
-	Email       string     `json:"email"`
-	DisplayName string     `json:"displayName"`
-	AvatarURL   string     `json:"avatarUrl,omitempty"`
-	Role        string     `json:"role"`
-	InvitedAt   *time.Time `json:"invitedAt,omitempty"`
-	JoinedAt    *time.Time `json:"joinedAt,omitempty"`
-	UpdatedAt   *time.Time `json:"updatedAt,omitempty"`
-	CreatedAt   time.Time  `json:"createdAt"`
+	ID          string `json:"id" doc:"WorkspaceMember public id (UUID v7)"`
+	UserID      string `json:"userId"`
+	Email       string `json:"email"`
+	DisplayName string `json:"displayName"`
+	AvatarURL   string `json:"avatarUrl,omitempty"`
+	Role        string `json:"role"`
+	InvitedAt   *int64 `json:"invitedAt,omitempty"`
+	JoinedAt    *int64 `json:"joinedAt,omitempty"`
+	UpdatedAt   *int64 `json:"updatedAt,omitempty"`
+	CreatedAt   int64  `json:"createdAt"`
 }
 
 // CreateWorkspaceInput is the body for POST /workspaces.
@@ -231,14 +230,14 @@ type RemoveWorkspaceMemberOutputBody struct {
 
 // WorkspaceInvite is the public DTO for a workspace_invites row.
 type WorkspaceInvite struct {
-	ID            string     `json:"id" doc:"Invite public id (UUID v7)"`
-	Role          string     `json:"role"`
-	MaxUses       *int32     `json:"maxUses"`
-	UseCount      uint32     `json:"useCount"`
-	Label         string     `json:"label,omitempty"`
-	CreatedByName string     `json:"createdByName"`
-	ExpiresAt     *time.Time `json:"expiresAt,omitempty"`
-	CreatedAt     time.Time  `json:"createdAt"`
+	ID            string `json:"id" doc:"Invite public id (UUID v7)"`
+	Role          string `json:"role"`
+	MaxUses       *int32 `json:"maxUses"`
+	UseCount      uint32 `json:"useCount"`
+	Label         string `json:"label,omitempty"`
+	CreatedByName string `json:"createdByName"`
+	ExpiresAt     *int64 `json:"expiresAt,omitempty"`
+	CreatedAt     int64  `json:"createdAt"`
 }
 
 // CreateWorkspaceInviteInput is the body for POST /workspaces/{wsId}/invites.
@@ -332,19 +331,18 @@ type InviteInfoOutput struct {
 
 // InviteInfoOutputBody is the response body for GET /invites/{token}/info.
 type InviteInfoOutputBody struct {
-	WorkspaceName string     `json:"workspaceName"`
-	Role          string     `json:"role"`
-	ExpiresAt     *time.Time `json:"expiresAt,omitempty"`
+	WorkspaceName string `json:"workspaceName"`
+	Role          string `json:"role"`
+	ExpiresAt     *int64 `json:"expiresAt,omitempty"`
 }
 
 // nullStr delegates to handlerutil.NullStr.
 var nullStr = handlerutil.NullStr
 
-// nullTime delegates to handlerutil.NullTime.
-var nullTime = handlerutil.NullTime
+// nullTimeUnix delegates to handlerutil.NullTimeUnix (returns *int64, nil for NULL).
+var nullTimeUnix = handlerutil.NullTimeUnix
 
-// timePtr wraps a non-null time.Time so it can be assigned to a
-// *time.Time DTO field.
-func timePtr(t time.Time) *time.Time {
-	return &t
+// int64Ptr returns a pointer to an int64 value.
+func int64Ptr(v int64) *int64 {
+	return &v
 }

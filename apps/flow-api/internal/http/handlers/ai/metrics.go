@@ -1,5 +1,5 @@
 // Package ai — metrics.go exposes workspace-scoped AI suggestion
-// acceptance metrics (2.OBS-1). The numbers are derived from the
+// acceptance metrics. The numbers are derived from the
 // append-only events log (`ai.suggestion.{proposed,applied,dismissed}`)
 // so they stay consistent with the audit trail and survive restarts
 // without a separate counter store.
@@ -43,7 +43,7 @@ type AiMetricsOutputBody struct {
 	Applied        int64               `json:"applied"`
 	Dismissed      int64               `json:"dismissed"`
 	AcceptanceRate float64             `json:"acceptanceRate" doc:"applied / (applied + dismissed), 0 when no decisions"`
-	OutboundLimits []OutboundLimitStat `json:"outboundLimits" doc:"Per-provider egress rate limiter counters (4.AGENT-2)"`
+	OutboundLimits []OutboundLimitStat `json:"outboundLimits" doc:"Per-provider egress rate limiter counters"`
 }
 
 // AiMetricsOutput is the Huma envelope for AiMetricsOutputBody.

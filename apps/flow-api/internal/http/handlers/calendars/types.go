@@ -4,7 +4,6 @@ package calendars
 
 import (
 	"database/sql"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -26,18 +25,18 @@ func httpErr(spec *apierrors.Spec) error {
 
 // CalendarDTO is the public DTO for a calendar row.
 type CalendarDTO struct {
-	ID           string     `json:"id" doc:"Calendar public id (UUID v7)"`
-	Kind         string     `json:"kind"`
-	Name         string     `json:"name"`
-	Description  string     `json:"description,omitempty"`
-	Color        string     `json:"color"`
-	MemberColor  string     `json:"memberColor,omitempty"`
-	DisplayColor string     `json:"displayColor,omitempty"`
-	CoverURL     string     `json:"coverUrl,omitempty"`
-	Role         string     `json:"role,omitempty"`
-	Visible      bool       `json:"visible"`
-	UpdatedAt    *time.Time `json:"updatedAt,omitempty"`
-	CreatedAt    time.Time  `json:"createdAt"`
+	ID           string `json:"id" doc:"Calendar public id (UUID v7)"`
+	Kind         string `json:"kind"`
+	Name         string `json:"name"`
+	Description  string `json:"description,omitempty"`
+	Color        string `json:"color"`
+	MemberColor  string `json:"memberColor,omitempty"`
+	DisplayColor string `json:"displayColor,omitempty"`
+	CoverURL     string `json:"coverUrl,omitempty"`
+	Role         string `json:"role,omitempty"`
+	Visible      bool   `json:"visible"`
+	UpdatedAt    *int64 `json:"updatedAt,omitempty"`
+	CreatedAt    int64  `json:"createdAt"`
 }
 
 // EventDTO is the public DTO for a calendar event.
@@ -161,5 +160,5 @@ type DeleteEventOutputBody struct {
 // nullStr delegates to handlerutil.NullStr.
 var nullStr = handlerutil.NullStr
 
-// nullTime delegates to handlerutil.NullTime.
-var nullTime = handlerutil.NullTime
+// nullTimeUnix delegates to handlerutil.NullTimeUnix (returns *int64, nil for NULL).
+var nullTimeUnix = handlerutil.NullTimeUnix

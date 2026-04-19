@@ -2,7 +2,7 @@
 set -euo pipefail
 
 API="${TC_API_URL:-http://localhost:8081}"
-LOCALE="${ND_SEED_LOCALE:-en}"
+LOCALE="${NF_SEED_LOCALE:-en}"
 
 echo "=== Seeding nodate-time demo data (locale: $LOCALE) ==="
 echo "API: $API"

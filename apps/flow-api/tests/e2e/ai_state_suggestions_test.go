@@ -8,7 +8,7 @@ import (
 )
 
 // TestAiStateSuggestionsEmpty exercises the workspace-wide state inference
-// batch endpoint (2.AI-1). A freshly created task is not idle, so the
+// batch endpoint. A freshly created task is not idle, so the
 // rule engine yields no proposals — the endpoint must return a Total of
 // at least 1 with an empty Suggestions slice (never nil).
 func TestAiStateSuggestionsEmpty(t *testing.T) {

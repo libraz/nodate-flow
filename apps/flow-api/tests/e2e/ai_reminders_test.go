@@ -9,7 +9,7 @@ import (
 )
 
 // TestAiReminders creates two tasks — one with a past due date and one
-// without — and hits the workspace reminder endpoint (2.AI-4). The
+// without — and hits the workspace reminder endpoint. The
 // overdue task must appear in the reminder list with kind "overdue"
 // and a negative daysUntilDue, while the other must be absent.
 func TestAiReminders(t *testing.T) {

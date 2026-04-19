@@ -41,7 +41,7 @@ LIMIT ? OFFSET ?;
 
 -- name: FindDefaultProviderIDForWorkspace :one
 -- Return the internal id of the most recently created enabled provider
--- for a workspace. Used by the ai_invocations logger (2.MCP-2) when the
+-- for a workspace. Used by the ai_invocations logger when the
 -- orchestrator does not track which provider handled the call.
 SELECT id
 FROM ai_providers

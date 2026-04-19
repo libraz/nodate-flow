@@ -250,7 +250,7 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 		writeRPCError(w, req.ID, apierrors.McpScopeInsufficient, "scope "+t.requiredScope+" required")
 		return
 	}
-	// 2.MCP-2 agent guard: when the session is backed by an AI agent
+	// Agent guard: when the session is backed by an AI agent
 	// token, run agentguard.Decide to enforce enabled / paused /
 	// allowed-scopes. Monthly cost-cap enforcement here is still a
 	// placeholder — ai_invocations.agent_id is a follow-up, so we
@@ -412,7 +412,7 @@ func (h *Handler) loadAgentGuardSnapshot(ctx context.Context, agentID uint32) (a
 
 // loadAgentMonthSpendCents returns the sum of cost_estimate (in cents)
 // for ai_invocations attributed to agentID since the first day of the
-// current UTC month. Used by the 2.MCP-2 dispatch guard.
+// current UTC month. Used by the dispatch guard.
 func (h *Handler) loadAgentMonthSpendCents(ctx context.Context, agentID uint32) (int64, error) {
 	const q = `SELECT CAST(COALESCE(ROUND(SUM(cost_estimate) * 100), 0) AS SIGNED)
 	             FROM ai_invocations WHERE agent_id = ? AND invoked_at >= ?`

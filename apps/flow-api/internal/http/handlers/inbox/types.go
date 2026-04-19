@@ -31,7 +31,7 @@ var totalAsInt64 = handlerutil.TotalAsInt64
 
 // InboxItem is the public DTO for an inbox row (a signal projected through v_inbox).
 type InboxItem struct {
-	ID          string          `json:"id"`
+	ID          string          `json:"id" doc:"InboxItem public id (UUID v7)"`
 	WorkspaceID string          `json:"workspaceId"`
 	TaskID     string          `json:"taskId,omitempty"`
 	TaskTitle  string          `json:"taskTitle,omitempty"`

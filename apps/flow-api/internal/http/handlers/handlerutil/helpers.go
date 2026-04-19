@@ -101,6 +101,40 @@ func NullTimeUnixVal(t sql.NullTime) int64 {
 	return t.Time.Unix()
 }
 
+// NullTimeDate converts a sql.NullTime to a *string formatted as YYYY-MM-DD.
+// Returns nil for the NULL case so the field is omitted from JSON. This is
+// the single conversion point for nullable _on columns (DATE), per the
+// api-types convention.
+func NullTimeDate(t sql.NullTime) *string {
+	if !t.Valid {
+		return nil
+	}
+	s := t.Time.Format("2006-01-02")
+	return &s
+}
+
+// CheckWorkspaceMember verifies that the given user is an enabled member of
+// the workspace. Returns nil on success, sql.ErrNoRows when the user is not
+// a member. This is the single canonical existence check — callers no longer
+// need to inline the query.
+func CheckWorkspaceMember(ctx context.Context, db *sql.DB, workspaceID uint32, userID uint32) error {
+	const q = `SELECT 1 FROM workspace_members
+WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
+	var one int
+	return db.QueryRowContext(ctx, q, workspaceID, userID).Scan(&one)
+}
+
+// WorkspaceMemberRole returns the role string ("owner", "admin", "member",
+// "guest") for the given user in the workspace. Returns sql.ErrNoRows when
+// the user is not an enabled member.
+func WorkspaceMemberRole(ctx context.Context, db *sql.DB, workspaceID uint32, userID uint32) (string, error) {
+	const q = `SELECT role FROM workspace_members
+WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
+	var role string
+	err := db.QueryRowContext(ctx, q, workspaceID, userID).Scan(&role)
+	return role, err
+}
+
 // TotalAsInt64 normalises the COUNT(*) OVER() return type into int64.
 // MySQL drivers may surface the value as int64, int, uint64 or as a
 // decimal byte slice depending on the underlying column type, so all four

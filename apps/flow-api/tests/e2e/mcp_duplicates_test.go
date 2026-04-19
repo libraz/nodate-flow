@@ -15,7 +15,7 @@ import (
 // classification "duplicate".
 func TestMCPProposeDuplicates(t *testing.T) {
 	bootstrap(t)
-	if os.Getenv("ND_FLOW_AI_MOCK") == "" {
+	if os.Getenv("NF_FLOW_AI_MOCK") == "" {
 		t.Skip("set NF_AI_MOCK=1 to run duplicate-detection MCP e2e tests")
 	}
 	t.Parallel()

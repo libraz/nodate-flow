@@ -83,7 +83,7 @@ type AppendInstanceAuditLogParams struct {
 	Action                 string          `json:"action"`
 	TargetWorkspaceID      sql.NullInt32   `json:"targetWorkspaceId"`
 	TargetResourceType     sql.NullString  `json:"targetResourceType"`
-	TargetResourcePublicID sql.NullString  `json:"targetResourcePublicId"`
+	TargetResourcePublicID types.PublicID  `json:"targetResourcePublicId"`
 	IpAddress              sql.NullString  `json:"ipAddress"`
 	UserAgent              sql.NullString  `json:"userAgent"`
 	PayloadJson            json.RawMessage `json:"payloadJson"`
@@ -137,7 +137,7 @@ type ListRecentAuditParams struct {
 
 type ListRecentAuditRow struct {
 	PublicID          types.PublicID  `json:"publicId"`
-	ActorUserPublicID sql.NullString  `json:"actorUserPublicId"`
+	ActorUserPublicID types.PublicID  `json:"actorUserPublicId"`
 	ActorDisplayName  sql.NullString  `json:"actorDisplayName"`
 	Action            string          `json:"action"`
 	ResourceType      string          `json:"resourceType"`

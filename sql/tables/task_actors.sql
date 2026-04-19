@@ -9,7 +9,7 @@ CREATE TABLE task_actors (
   task_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to tasks.id',
   user_id INT UNSIGNED NULL COMMENT 'Internal FK to users.id (null when this row is an AI agent actor)',
   agent_id INT UNSIGNED NULL COMMENT 'Internal FK to ai_agents.id (null when this row is a human actor)',
-  kind ENUM('user','agent') NOT NULL DEFAULT 'user' COMMENT 'Actor kind — user or AI agent (2.MCP-2)',
+  kind ENUM('user','agent') NOT NULL DEFAULT 'user' COMMENT 'Actor kind — user or AI agent',
 
   role ENUM('assignee','reviewer','watcher','approver') NOT NULL DEFAULT 'assignee' COMMENT 'Actor role on the task',
 

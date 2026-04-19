@@ -19,24 +19,18 @@ import {
   TASK_STATES,
   type TaskDerivedState,
   type TaskListItem,
+  type TransitionName,
   transitionForDrop,
   useTasksQuery,
   useTransitionTask,
 } from './api';
+import { STATE_KEY } from './constants';
 import TaskCard from './task-card';
 import { useTaskFilters } from './use-task-filters';
 
 export interface TaskBoardViewProps {
   projectId: string;
 }
-
-const STATE_KEY: Record<TaskDerivedState, string> = {
-  open: 'tasks.status.open',
-  waiting: 'tasks.status.waiting',
-  review: 'tasks.status.review',
-  done: 'tasks.status.done',
-  cancelled: 'tasks.status.cancelled',
-};
 
 const DRAG_MIME = 'application/x-nodate-task-id';
 
@@ -149,13 +143,32 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
     );
   };
 
+  const handleTransition = useCallback(
+    (taskId: string, transitionName: TransitionName, landingState: TaskDerivedState): void => {
+      transition.mutate(
+        {
+          id: taskId,
+          transition: transitionName,
+          projectId,
+          optimisticState: landingState,
+        },
+        {
+          onError: () => {
+            toaster.show({ tone: 'warning', message: t('tasks.errors.move_failed') });
+          },
+        },
+      );
+    },
+    [transition, projectId, t],
+  );
+
   const handleSelect = (taskId: string): void => {
     void navigate({ to: '/tasks/$taskId', params: { taskId } });
   };
 
   return (
     <div
-      role="list"
+      role="region"
       aria-label={t('tasks.views.board')}
       style={{
         display: 'grid',
@@ -174,7 +187,6 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
         return (
           <section
             key={state}
-            role="listitem"
             aria-label={t(STATE_KEY[state])}
             onDragEnter={(e) => {
               handleDragEnter(e, state);
@@ -217,6 +229,8 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
               </header>
             </Card>
             <div
+              role="list"
+              aria-label={t(STATE_KEY[state])}
               style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -245,14 +259,16 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
                 </p>
               ) : (
                 items.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    blockedByOpenCount={blockedByOpen.get(task.id) ?? 0}
-                    onDragStart={handleDragStart}
-                    onDragEnd={handleDragEnd}
-                    onSelect={handleSelect}
-                  />
+                  <div key={task.id} role="listitem">
+                    <TaskCard
+                      task={task}
+                      blockedByOpenCount={blockedByOpen.get(task.id) ?? 0}
+                      onDragStart={handleDragStart}
+                      onDragEnd={handleDragEnd}
+                      onSelect={handleSelect}
+                      onTransition={handleTransition}
+                    />
+                  </div>
                 ))
               )}
             </div>

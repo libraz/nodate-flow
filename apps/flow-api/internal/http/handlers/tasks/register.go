@@ -105,14 +105,14 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		OperationID: "tasks-replay",
 		Method:      http.MethodGet,
 		Path:        "/tasks/{id}/replay",
-		Summary:     "Replay transition events and report drift vs stored derived_state (3.ENG-1)",
+		Summary:     "Replay transition events and report drift vs stored derived_state",
 	}, Replay(deps))
 
 	huma.Register(api, huma.Operation{
 		OperationID: "tasks-constraints-evaluate",
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/constraints/evaluate",
-		Summary:     "Run the Phase 3 constraint engine for a task and persist satisfied/failed markers",
+		Summary:     "Run the constraint engine for a task and persist satisfied/failed markers",
 	}, EvaluateConstraints(deps))
 
 	huma.Register(api, huma.Operation{

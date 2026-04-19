@@ -33,14 +33,14 @@ func rowToTaskFromFind(r generated.FindTaskByPublicIdRow) Task {
 		DueOn:                    nullDate(r.DueOn),
 		StartedOn:                nullDate(r.StartedOn),
 		EventOn:                  nullDate(r.EventOn),
-		CompletedAt:              nullTime(r.CompletedAt),
+		CompletedAt:              nullTimeUnix(r.CompletedAt),
 		ConstraintCount:          r.ConstraintCount,
 		ConstraintSatisfiedCount: r.ConstraintSatisfiedCount,
 		DependencyCount:          r.DependencyCount,
 		ActorCount:               r.ActorCount,
 		SortWeight:               r.SortWeight,
-		UpdatedAt:                nullTime(r.UpdatedAt),
-		CreatedAt:                r.CreatedAt,
+		UpdatedAt:                nullTimeUnix(r.UpdatedAt),
+		CreatedAt:                r.CreatedAt.Unix(),
 	}
 }
 
@@ -87,12 +87,12 @@ func rowToTaskListItemFromProject(r generated.ListTasksForProjectRow) TaskListIt
 		DueOn:             nullDate(r.DueOn),
 		StartedOn:         nullDate(r.StartedOn),
 		EventOn:           nullDate(r.EventOn),
-		CompletedAt:       nullTime(r.CompletedAt),
+		CompletedAt:       nullTimeUnix(r.CompletedAt),
 		SortWeight:        r.SortWeight,
 		PrimaryAssigneeID: rawBytesToUUIDPtr(r.PrimaryAssigneePublicID),
 		AssigneeCount:     r.AssigneeCount,
-		UpdatedAt:         nullTime(r.UpdatedAt),
-		CreatedAt:         r.CreatedAt,
+		UpdatedAt:         nullTimeUnix(r.UpdatedAt),
+		CreatedAt:         r.CreatedAt.Unix(),
 	}
 }
 
@@ -109,12 +109,12 @@ func rowToTaskListItemFromWorkspace(r generated.ListTasksForWorkspaceRow) TaskLi
 		DueOn:             nullDate(r.DueOn),
 		StartedOn:         nullDate(r.StartedOn),
 		EventOn:           nullDate(r.EventOn),
-		CompletedAt:       nullTime(r.CompletedAt),
+		CompletedAt:       nullTimeUnix(r.CompletedAt),
 		SortWeight:        r.SortWeight,
 		PrimaryAssigneeID: rawBytesToUUIDPtr(r.PrimaryAssigneePublicID),
 		AssigneeCount:     r.AssigneeCount,
-		UpdatedAt:         nullTime(r.UpdatedAt),
-		CreatedAt:         r.CreatedAt,
+		UpdatedAt:         nullTimeUnix(r.UpdatedAt),
+		CreatedAt:         r.CreatedAt.Unix(),
 	}
 }
 
@@ -123,11 +123,11 @@ func rowToConstraint(r generated.ListConstraintsForTaskRow) TaskConstraint {
 		ID:          r.PublicID.String(),
 		Kind:        string(r.Kind),
 		Expression:  r.Expression,
-		SatisfiedAt: nullTime(r.SatisfiedAt),
-		FailedAt:    nullTime(r.FailedAt),
+		SatisfiedAt: nullTimeUnix(r.SatisfiedAt),
+		FailedAt:    nullTimeUnix(r.FailedAt),
 		SortWeight:  r.SortWeight,
-		UpdatedAt:   nullTime(r.UpdatedAt),
-		CreatedAt:   r.CreatedAt,
+		UpdatedAt:   nullTimeUnix(r.UpdatedAt),
+		CreatedAt:   r.CreatedAt.Unix(),
 	}
 }
 
@@ -139,8 +139,8 @@ func rowToDependency(r generated.ListDependenciesForTaskRow) TaskDependency {
 		ToTaskID:           r.ToTaskPublicID.String(),
 		ToTaskTitle:        r.ToTaskTitle,
 		ToTaskDerivedState: string(r.ToTaskDerivedState),
-		UpdatedAt:          nullTime(r.UpdatedAt),
-		CreatedAt:          r.CreatedAt,
+		UpdatedAt:          nullTimeUnix(r.UpdatedAt),
+		CreatedAt:          r.CreatedAt.Unix(),
 	}
 }
 
@@ -152,8 +152,8 @@ func rowToActor(r generated.ListActorsForTaskRow) TaskActor {
 		DisplayName: r.DisplayName,
 		AvatarURL:   nullStr(r.AvatarUrl),
 		Role:        string(r.Role),
-		UpdatedAt:   nullTime(r.UpdatedAt),
-		CreatedAt:   r.CreatedAt,
+		UpdatedAt:   nullTimeUnix(r.UpdatedAt),
+		CreatedAt:   r.CreatedAt.Unix(),
 	}
 }
 
@@ -164,9 +164,9 @@ func rowToComment(r generated.ListCommentsForTaskRow) TaskComment {
 		AuthorDisplayName: r.AuthorDisplayName,
 		AuthorAvatarURL:   nullStr(r.AuthorAvatarUrl),
 		Body:              r.Body,
-		EditedAt:          nullTime(r.EditedAt),
-		UpdatedAt:         nullTime(r.UpdatedAt),
-		CreatedAt:         r.CreatedAt,
+		EditedAt:          nullTimeUnix(r.EditedAt),
+		UpdatedAt:         nullTimeUnix(r.UpdatedAt),
+		CreatedAt:         r.CreatedAt.Unix(),
 	}
 }
 
@@ -180,7 +180,7 @@ func rowToAttachment(r generated.ListAttachmentsForTaskRow) TaskAttachment {
 		ByteSize:            r.ByteSize,
 		StorageKey:          r.StorageKey,
 		ChecksumSHA256:      nullStr(r.ChecksumSha256),
-		UpdatedAt:           nullTime(r.UpdatedAt),
-		CreatedAt:           r.CreatedAt,
+		UpdatedAt:           nullTimeUnix(r.UpdatedAt),
+		CreatedAt:           r.CreatedAt.Unix(),
 	}
 }

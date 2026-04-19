@@ -45,7 +45,7 @@ func ListDependencies(deps Deps) func(context.Context, *ListTaskDependenciesInpu
 				OtherTaskID:           r.ToTaskPublicID.String(),
 				OtherTaskTitle:        r.ToTaskTitle,
 				OtherTaskDerivedState: string(r.ToTaskDerivedState),
-				CreatedAt:             r.CreatedAt,
+				CreatedAt:             r.CreatedAt.Unix(),
 			})
 		}
 
@@ -65,7 +65,7 @@ func ListDependencies(deps Deps) func(context.Context, *ListTaskDependenciesInpu
 				OtherTaskID:           r.FromTaskPublicID.String(),
 				OtherTaskTitle:        r.FromTaskTitle,
 				OtherTaskDerivedState: string(r.FromTaskDerivedState),
-				CreatedAt:             r.CreatedAt,
+				CreatedAt:             r.CreatedAt.Unix(),
 			})
 		}
 		return out, nil

@@ -29,6 +29,7 @@ interface MeResponse {
   displayName: string;
   locale: string;
   themePreference: string;
+  isInstanceAdmin: boolean;
 }
 
 function SignupPage(): ReactElement {
@@ -81,6 +82,7 @@ function SignupPage(): ReactElement {
         displayName: me.data.displayName,
         locale: me.data.locale,
         themePreference: me.data.themePreference,
+        isInstanceAdmin: me.data.isInstanceAdmin,
       };
       authStore.getState().setSession(result.data.accessToken, user);
       void navigate({ to: '/profile', replace: true });

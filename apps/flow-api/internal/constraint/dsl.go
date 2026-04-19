@@ -1,16 +1,16 @@
-// Package constraint implements the Phase 3 constraint DSL: a
+// Package constraint implements the constraint DSL: a
 // JSON-structured, side-effect-free expression language that any
 // task_constraints row can embed in its `expression` column.
 //
 // The DSL is intentionally closed-form — no loops, no user-defined
 // functions, no identifiers outside the builtins declared below — so
 // that Evaluate stays a pure function of (Constraint, Facts). This is
-// what makes replay equivalence (docs/plan/phase-3-constraint.md
-// §3.TEST-3) possible: re-running events from scratch must always
+// what makes replay equivalence possible: re-running events from
+// scratch must always
 // produce the same derived_state.
 //
 // The surface is deliberately tiny for the first slice; more builtins
-// land in 3.DSL-3.
+// land in a future release.
 package constraint
 
 import (
@@ -21,10 +21,10 @@ import (
 
 // Op is the discriminator for every Constraint node. Keeping it a
 // string (rather than an int const) makes JSON round-trips obvious in
-// logs and mimics the shape the web editor (3.WEB-1) will emit.
+// logs and mimics the shape the web editor will emit.
 type Op string
 
-// Supported operations for the first Phase 3 slice. Any Op not in
+// Supported operations for the initial constraint slice. Any Op not in
 // this set is rejected by Parse.
 const (
 	OpAnd           Op = "and"
@@ -64,7 +64,7 @@ type Constraint struct {
 
 // ErrParse is the sentinel returned by Parse. Callers compare with
 // errors.Is; the concrete error returned by Parse is always a
-// *ParseError which carries a stable i18n Code (3.DSL-4).
+// *ParseError which carries a stable i18n Code.
 var ErrParse = errors.New("constraint: parse failed")
 
 // ParseError is the structured error produced by Parse. The Code

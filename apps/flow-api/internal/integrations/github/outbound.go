@@ -13,7 +13,7 @@ import (
 )
 
 // OutboundClient is the minimal GitHub REST client used by the
-// outbound MCP tool (4.OUT-1). It exposes only the operations the
+// outbound MCP tool. It exposes only the operations the
 // MCP surface needs and routes every request through the package
 // rate limiter so a runaway agent cannot flood github.com.
 type OutboundClient struct {

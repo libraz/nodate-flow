@@ -1,5 +1,5 @@
 // Package digest implements the "weekly digest" stream
-// (2.AI-9). Given a slice of task snapshots for a workspace, it
+// Given a slice of task snapshots for a workspace, it
 // produces a deterministic markdown summary: counts by state, tasks
 // completed in the last 7 days, and overdue open tasks.
 //

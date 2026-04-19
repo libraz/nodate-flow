@@ -56,7 +56,7 @@ type ListAiInvocationsForTaskRow struct {
 }
 
 // Recent redacted LLM call records scoped to a single task. Used by
-// the task detail AI reasoning panel (2.WEB-2). workspace_id is
+// the task detail AI reasoning panel. workspace_id is
 // included so tenant isolation is enforced at the query level.
 func (q *Queries) ListAiInvocationsForTask(ctx context.Context, arg ListAiInvocationsForTaskParams) ([]ListAiInvocationsForTaskRow, error) {
 	rows, err := q.db.QueryContext(ctx, listAiInvocationsForTask,
@@ -307,7 +307,7 @@ type SumAiCostForAgentSinceParams struct {
 }
 
 // Sum the estimated cost (cents) of LLM calls attributed to a given AI
-// agent since a lower bound. Used by 2.MCP-2 agentguard to enforce the
+// agent since a lower bound. Used by agentguard to enforce the
 // agent's monthly cost cap.
 func (q *Queries) SumAiCostForAgentSince(ctx context.Context, arg SumAiCostForAgentSinceParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, sumAiCostForAgentSince, arg.AgentID, arg.InvokedAt)

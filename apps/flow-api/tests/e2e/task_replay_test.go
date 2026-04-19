@@ -9,7 +9,7 @@ import (
 
 // TestTaskReplayEquivalence drives a task through several transitions and
 // asserts that GET /tasks/{id}/replay recomputes the same derived_state
-// as the one stored on the row (3.TEST-3 replay equivalence).
+// as the one stored on the row (replay equivalence).
 func TestTaskReplayEquivalence(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()

@@ -15,7 +15,7 @@ import (
 // address that go-redis clients should connect to.
 type RedisInstance struct {
 	Container *redis.RedisContainer
-	// Addr is the host:port suitable for ND_REDIS_ADDR / redis.Options.Addr.
+	// Addr is the host:port suitable for NF_REDIS_ADDR / redis.Options.Addr.
 	Addr string
 }
 

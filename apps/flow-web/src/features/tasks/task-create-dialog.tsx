@@ -21,7 +21,8 @@ import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
-import { type TaskPriority, useCreateTask } from './api';
+import { TASK_PRIORITIES, type TaskPriority, useCreateTask } from './api';
+import { PRIORITY_KEY } from './constants';
 import {
   type AssigneeSuggestion,
   type SmartProposal,
@@ -52,16 +53,6 @@ const schema = z.object({
     .regex(/^$|^\d{4}-\d{2}-\d{2}$/, 'tasks.validation.due_format')
     .optional(),
 });
-
-const PRIORITIES: readonly TaskPriority[] = [0, 1, 2, 3, 4];
-
-const PRIORITY_KEY: Record<TaskPriority, string> = {
-  0: 'tasks.priority.none',
-  1: 'tasks.priority.low',
-  2: 'tasks.priority.medium',
-  3: 'tasks.priority.high',
-  4: 'tasks.priority.urgent',
-};
 
 const PRIORITY_TONE: Record<string, BadgeTone> = {
   low: 'info',
@@ -289,7 +280,7 @@ export default function TaskCreateDialog({
                 setPriority(next);
               }}
             >
-              {PRIORITIES.map((p) => (
+              {TASK_PRIORITIES.map((p) => (
                 <option key={p} value={String(p)}>
                   {t(PRIORITY_KEY[p])}
                 </option>

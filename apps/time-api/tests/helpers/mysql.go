@@ -46,7 +46,7 @@ func EnsureShared() (*MySQLInstance, error) {
 
 func startMySQL(ctx context.Context) (*MySQLInstance, error) {
 	// Allow using an external DB via env var (e.g. CI with a sidecar container).
-	if dsn := os.Getenv("ND_TEST_DB_DSN"); dsn != "" {
+	if dsn := os.Getenv("NF_TEST_DB_DSN"); dsn != "" {
 		db, err := sql.Open("mysql", dsn)
 		if err != nil {
 			return nil, fmt.Errorf("open external mysql: %w", err)

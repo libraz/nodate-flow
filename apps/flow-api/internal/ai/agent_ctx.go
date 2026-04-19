@@ -1,6 +1,6 @@
 // Package ai — agent attribution context key.
 //
-// When an MCP tool call is made on behalf of an AI agent (2.MCP-2),
+// When an MCP tool call is made on behalf of an AI agent,
 // the dispatch layer wraps the request context with WithAgentID so
 // downstream orchestrator calls can attribute their ai_invocations
 // rows to that agent. When the context carries no agent id (human

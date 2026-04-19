@@ -7,7 +7,6 @@ package signals
 import (
 	"database/sql"
 	"encoding/json"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -43,14 +42,14 @@ func httpErr(spec *apierrors.Spec) error {
 
 // Signal is the public DTO for a signals row.
 type Signal struct {
-	ID         string          `json:"id"`
+	ID         string          `json:"id" doc:"Signal public id (UUID v7)"`
 	TaskID     string          `json:"taskId,omitempty"`
 	Source     string          `json:"source"`
 	Kind       string          `json:"kind"`
 	ExternalID string          `json:"externalId,omitempty"`
 	Payload    json.RawMessage `json:"payload,omitempty"`
-	ReceivedAt time.Time       `json:"receivedAt"`
-	CreatedAt  time.Time       `json:"createdAt"`
+	ReceivedAt int64           `json:"receivedAt"`
+	CreatedAt  int64           `json:"createdAt"`
 }
 
 // CreateInput is the body for POST /signals.

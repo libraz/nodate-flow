@@ -42,6 +42,7 @@ interface MeResponse {
   displayName: string;
   locale: string;
   themePreference: string;
+  isInstanceAdmin: boolean;
 }
 
 function LoginPage(): ReactElement {
@@ -94,6 +95,7 @@ function LoginPage(): ReactElement {
       displayName: me.data.displayName,
       locale: me.data.locale,
       themePreference: me.data.themePreference,
+      isInstanceAdmin: me.data.isInstanceAdmin,
     };
     authStore.getState().setSession(accessToken, user);
     redirectAfterLogin();

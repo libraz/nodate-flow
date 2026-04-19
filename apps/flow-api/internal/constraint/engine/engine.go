@@ -1,12 +1,11 @@
-// Package engine is the differential constraint evaluator (Phase 3,
-// 3.ENG-2). It takes a task's current facts plus the set of DSL
+// Package engine is the differential constraint evaluator. It takes a task's current facts plus the set of DSL
 // expressions attached to it and writes satisfied/failed markers
 // back through a Store interface.
 //
 // The engine deliberately owns no database coupling: it consumes a
 // [Store] interface and a pure [constraint.Facts] value so it can be
 // unit-tested with an in-memory fake and later wired to sqlc in a
-// thin adapter. That keeps replay equivalence (3.TEST-3) a property
+// thin adapter. That keeps replay equivalence a property
 // of a single, side-effect-free Go package instead of leaking DB
 // quirks into the evaluation path.
 package engine

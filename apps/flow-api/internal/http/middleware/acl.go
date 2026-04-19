@@ -216,7 +216,7 @@ func ProjectFromContext(ctx context.Context) (ProjectContext, bool) {
 // real type lives under apps/flow-api/internal/http/handlers and is generated from
 // the OpenAPI definition.
 //
-// TODO(1.OPENAPI-1): Replace with a shared dto package once it exists.
+// TODO: Replace with a shared dto package once it exists.
 type errorBody struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`

@@ -77,3 +77,6 @@ export type { ConfirmOptions, ConfirmTone } from './confirm/confirm';
 
 export { default as DataGrid } from './data-grid/data-grid';
 export type { DataGridProps } from './data-grid/data-grid';
+
+export { default as AuthCard } from './auth-card/auth-card';
+export type { AuthCardProps } from './auth-card/auth-card';

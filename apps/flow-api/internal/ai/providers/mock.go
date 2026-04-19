@@ -99,7 +99,7 @@ func resolveFixtureDir(override string) (string, error) {
 	if override != "" {
 		return override, nil
 	}
-	if env := os.Getenv("ND_FLOW_AI_MOCK_FIXTURE_DIR"); env != "" {
+	if env := os.Getenv("NF_FLOW_AI_MOCK_FIXTURE_DIR"); env != "" {
 		return env, nil
 	}
 	wd, err := os.Getwd()

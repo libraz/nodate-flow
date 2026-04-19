@@ -11,7 +11,7 @@ import (
 )
 
 // PauseAgentInput is the body for POST /workspaces/{wsId}/ai/agents/{agentId}/pause.
-// (4.AGENT-3 kill switch.)
+//
 type PauseAgentInput struct {
 	WsID    string `path:"wsId"`
 	AgentID string `path:"agentId"`

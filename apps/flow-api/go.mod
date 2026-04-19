@@ -3,10 +3,10 @@ module github.com/nodate-flow/nodate-flow/apps/flow-api
 go 1.25.0
 
 require (
-	github.com/caarlos0/env/v11 v11.2.2
+	github.com/caarlos0/env/v11 v11.4.0
 	github.com/coreos/go-oidc/v3 v3.17.0
-	github.com/danielgtaylor/huma/v2 v2.27.0
-	github.com/go-chi/chi/v5 v5.1.0
+	github.com/danielgtaylor/huma/v2 v2.37.3
+	github.com/go-chi/chi/v5 v5.2.5
 	github.com/go-chi/cors v1.2.2
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -59,8 +59,8 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
-	github.com/klauspost/compress v1.18.2 // indirect
-	github.com/klauspost/cpuid/v2 v2.2.11 // indirect
+	github.com/klauspost/compress v1.18.4 // indirect
+	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/klauspost/crc32 v1.3.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/magiconair/properties v1.8.10 // indirect

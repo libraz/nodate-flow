@@ -15,6 +15,7 @@ export interface AuthUser {
   displayName: string;
   locale: string;
   themePreference: string;
+  isInstanceAdmin: boolean;
 }
 
 export interface AuthState {

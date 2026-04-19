@@ -6,7 +6,7 @@ import (
 )
 
 // TestSprintTemplate demonstrates that the Cycle/sprint concept is
-// fully expressible via Phase 3 constraint primitives (3.MIG-1).
+// fully expressible via constraint primitives.
 func TestSprintTemplate(t *testing.T) {
 	members := []string{"t-a", "t-b"}
 	c := Sprint("2026-05-01", members)
@@ -43,7 +43,7 @@ func TestSprintTemplate(t *testing.T) {
 }
 
 // TestGoalTemplate demonstrates that the Goal concept is fully
-// expressible via dependency.all_done (3.MIG-2).
+// expressible via dependency.all_done.
 func TestGoalTemplate(t *testing.T) {
 	c := Goal([]string{"child-1", "child-2", "child-3"})
 

@@ -20,7 +20,7 @@ WHERE id = ? AND enabled = TRUE
 LIMIT 1
 `
 
-// Queries dedicated to the constraint engine (Phase 3, 3.ENG-2).
+// Queries dedicated to the constraint engine.
 // Keyed off the internal task_id so the engine never has to know
 // about public_id resolution. All workspace scoping is enforced by
 // the caller before it lands here.

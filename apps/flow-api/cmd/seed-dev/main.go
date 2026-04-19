@@ -5,16 +5,16 @@
 //
 // Usage:
 //
-//	ND_DB_DSN=... \
-//	ND_SEED_LOCALE=en \
-//	ND_SEED_EMAIL=admin@example.com \
-//	ND_SEED_PASSWORD=password123 \
-//	ND_SEED_DISPLAY_NAME=Admin \
-//	ND_SEED_WORKSPACE_SLUG=demo \
-//	ND_SEED_WORKSPACE_NAME="Demo Workspace" \
+//	NF_DB_DSN=... \
+//	NF_SEED_LOCALE=en \
+//	NF_SEED_EMAIL=admin@example.com \
+//	NF_SEED_PASSWORD=password123 \
+//	NF_SEED_DISPLAY_NAME=Admin \
+//	NF_SEED_WORKSPACE_SLUG=demo \
+//	NF_SEED_WORKSPACE_NAME="Demo Workspace" \
 //	  go run ./cmd/seed-dev
 //
-// ND_SEED_LOCALE selects the language for display names, project names,
+// NF_SEED_LOCALE selects the language for display names, project names,
 // and task titles. Supported values: "en" (default), "ja".
 //
 // Re-running is safe: existing rows (matched by email / slug) are
@@ -79,7 +79,7 @@ type seedTask struct {
 func loadLocale(name string) (seedLocale, error) {
 	data, err := localesFS.ReadFile("locales/" + name + ".json")
 	if err != nil {
-		return seedLocale{}, fmt.Errorf("unsupported ND_SEED_LOCALE %q (add locales/%s.json to support it)", name, name)
+		return seedLocale{}, fmt.Errorf("unsupported NF_SEED_LOCALE %q (add locales/%s.json to support it)", name, name)
 	}
 	var l seedLocale
 	if err := json.Unmarshal(data, &l); err != nil {
@@ -89,25 +89,25 @@ func loadLocale(name string) (seedLocale, error) {
 }
 
 func loadConfig() (seedConfig, seedLocale, error) {
-	locale := envOr("ND_SEED_LOCALE", "en")
+	locale := envOr("NF_SEED_LOCALE", "en")
 	l, err := loadLocale(locale)
 	if err != nil {
 		return seedConfig{}, seedLocale{}, err
 	}
 	c := seedConfig{
-		dsn:           os.Getenv("ND_DB_DSN"),
-		email:         envOr("ND_SEED_EMAIL", "admin@example.com"),
-		password:      envOr("ND_SEED_PASSWORD", "password123"),
-		displayName:   envOr("ND_SEED_DISPLAY_NAME", l.DisplayName),
-		workspaceSlug: envOr("ND_SEED_WORKSPACE_SLUG", "demo"),
-		workspaceName: envOr("ND_SEED_WORKSPACE_NAME", l.WorkspaceName),
+		dsn:           os.Getenv("NF_DB_DSN"),
+		email:         envOr("NF_SEED_EMAIL", "admin@example.com"),
+		password:      envOr("NF_SEED_PASSWORD", "password123"),
+		displayName:   envOr("NF_SEED_DISPLAY_NAME", l.DisplayName),
+		workspaceSlug: envOr("NF_SEED_WORKSPACE_SLUG", "demo"),
+		workspaceName: envOr("NF_SEED_WORKSPACE_NAME", l.WorkspaceName),
 		locale:        locale,
 	}
 	if c.dsn == "" {
-		return c, seedLocale{}, errors.New("ND_DB_DSN is required")
+		return c, seedLocale{}, errors.New("NF_DB_DSN is required")
 	}
 	if len(c.password) < 8 {
-		return c, seedLocale{}, errors.New("ND_SEED_PASSWORD must be >= 8 chars")
+		return c, seedLocale{}, errors.New("NF_SEED_PASSWORD must be >= 8 chars")
 	}
 	return c, l, nil
 }

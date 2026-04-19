@@ -35,7 +35,7 @@ var totalAsInt64 = handlerutil.TotalAsInt64
 
 // WebhookSubscriptionDTO is the public DTO for a webhook subscription.
 type WebhookSubscriptionDTO struct {
-	ID                 string          `json:"id"`
+	ID                 string          `json:"id" doc:"WebhookSubscription public id (UUID v7)"`
 	URL                string          `json:"url"`
 	Description        string          `json:"description"`
 	EventTypes         json.RawMessage `json:"eventTypes"`
@@ -55,7 +55,7 @@ type WebhookSubscriptionDetailDTO struct {
 
 // WebhookDeliveryDTO is the public DTO for a webhook delivery log entry.
 type WebhookDeliveryDTO struct {
-	ID          string `json:"id"`
+	ID          string `json:"id" doc:"WebhookDelivery public id (UUID v7)"`
 	EventType   string `json:"eventType"`
 	Status      string `json:"status"`
 	HttpStatus  *int16 `json:"httpStatus"`

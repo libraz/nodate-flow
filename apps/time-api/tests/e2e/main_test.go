@@ -18,7 +18,7 @@ var (
 // for the whole package. When NT_TEST_INTEGRATION is unset, tests skip
 // via skipIfNoIntegration.
 func TestMain(m *testing.M) {
-	if os.Getenv("ND_TEST_INTEGRATION") == "" {
+	if os.Getenv("NF_TEST_INTEGRATION") == "" {
 		os.Exit(m.Run())
 	}
 	inst, err := helpers.EnsureShared()
@@ -43,7 +43,7 @@ func skipIfNoIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in -short mode")
 	}
-	if os.Getenv("ND_TEST_INTEGRATION") == "" {
+	if os.Getenv("NF_TEST_INTEGRATION") == "" {
 		t.Skip("set NT_TEST_INTEGRATION=1 to run e2e tests")
 	}
 }

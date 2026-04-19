@@ -36,8 +36,7 @@ type InferStateOutput struct {
 
 // InferState handles GET /tasks/{id}/infer-state. It reads the current
 // task detail view, folds it into stateinfer.Signals, and returns the
-// (possibly nil) proposal from the rule-based inference engine
-// (2.AI-1).
+// (possibly nil) proposal from the rule-based inference engine.
 func InferState(deps Deps) func(context.Context, *InferStateInput) (*InferStateOutput, error) {
 	return func(ctx context.Context, _ *InferStateInput) (*InferStateOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)

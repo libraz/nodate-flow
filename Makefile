@@ -51,14 +51,13 @@ dev-time: db-schema .env ## Start MySQL (compose) + auth API + time API + time w
 	@sed -i.bak 's|@tcp(mysql:3306)|@tcp(127.0.0.1:3306)|' .env && rm -f .env.bak
 
 dev-api: ## Run Go flow API against the local MySQL (reads .env)
-	@# Map NF_* env vars to ND_* expected by the Go app
 	cd apps/flow-api && \
-	  ND_DB_DSN="$${NF_DB_DSN:-$(NF_DB_USER):$(NF_DB_PASSWORD)@tcp($(NF_DB_HOST):$(NF_DB_PORT))/$(NF_DB_NAME)?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci}" \
+	  NF_DB_DSN="$${NF_DB_DSN:-$(NF_DB_USER):$(NF_DB_PASSWORD)@tcp($(NF_DB_HOST):$(NF_DB_PORT))/$(NF_DB_NAME)?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci}" \
 	  go run ./cmd/api
 
 dev-auth-api: ## Run Go auth API against the local MySQL (reads .env)
 	cd apps/auth-api && \
-	  ND_DB_DSN="$${NF_DB_DSN:-$(NF_DB_USER):$(NF_DB_PASSWORD)@tcp($(NF_DB_HOST):$(NF_DB_PORT))/$(NF_DB_NAME)?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci}" \
+	  NF_DB_DSN="$${NF_DB_DSN:-$(NF_DB_USER):$(NF_DB_PASSWORD)@tcp($(NF_DB_HOST):$(NF_DB_PORT))/$(NF_DB_NAME)?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci}" \
 	  go run ./cmd/api
 
 dev-web: ## Run Vite dev server
@@ -191,11 +190,11 @@ db-reset: ## Drop the compose mysql volume and re-init from schema.sql
 db-shell: ## Open a mysql shell against the compose mysql
 	docker compose exec mysql mysql -u $(NF_DB_USER) -p$(NF_DB_PASSWORD) $(NF_DB_NAME)
 
-seed-flow: ## Insert dev admin user + demo workspace (idempotent; ND_SEED_LOCALE=en|ja)
+seed-flow: ## Insert dev admin user + demo workspace (idempotent; NF_SEED_LOCALE=en|ja)
 	@dsn="$${NF_DB_DSN:-$(NF_DB_USER):$(NF_DB_PASSWORD)@tcp($(NF_DB_HOST):$(NF_DB_PORT))/$(NF_DB_NAME)?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci}"; \
-	cd apps/flow-api && ND_DB_DSN="$$dsn" go run ./cmd/seed-dev
+	cd apps/flow-api && NF_DB_DSN="$$dsn" go run ./cmd/seed-dev
 
-seed-time: ## Seed nodate-time calendar demo data via REST API (ND_SEED_LOCALE=en|ja)
+seed-time: ## Seed nodate-time calendar demo data via REST API (NF_SEED_LOCALE=en|ja)
 	./scripts/seed-time.sh
 
 # ---------- clean ----------

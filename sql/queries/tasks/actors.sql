@@ -30,7 +30,7 @@ ORDER BY ta.created_at ASC, ta.public_id ASC
 LIMIT ? OFFSET ?;
 
 -- name: AddAgentActor :execlastid
--- Attach an AI agent to a task in the given role (2.MCP-2).
+-- Attach an AI agent to a task in the given role.
 INSERT INTO task_actors (
   public_id,
   workspace_id,

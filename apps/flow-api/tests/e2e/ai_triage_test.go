@@ -13,12 +13,12 @@ import (
 // suggestions, GET /ai/suggestions returns 3 pending, applying one
 // drops the pending count to 2.
 //
-// Requires ND_FLOW_AI_MOCK=1 because the test server only wires the mock AI
+// Requires NF_FLOW_AI_MOCK=1 because the test server only wires the mock AI
 // orchestrator when AiMock is true at router.Build time.
 func TestAiTriageSuggestionLifecycle(t *testing.T) {
 	bootstrap(t)
-	if os.Getenv("ND_FLOW_AI_MOCK") == "" {
-		t.Skip("set ND_FLOW_AI_MOCK=1 to run AI triage e2e tests")
+	if os.Getenv("NF_FLOW_AI_MOCK") == "" {
+		t.Skip("set NF_FLOW_AI_MOCK=1 to run AI triage e2e tests")
 	}
 	t.Parallel()
 

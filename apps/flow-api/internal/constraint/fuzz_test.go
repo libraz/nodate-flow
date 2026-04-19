@@ -9,7 +9,7 @@ import (
 // FuzzParse ensures the DSL parser never panics on arbitrary bytes and
 // that any returned error is always *ParseError / errors.Is(ErrParse).
 // When parsing succeeds, re-evaluating the result must also never panic
-// (3.TEST-2 fuzz coverage).
+// (fuzz coverage).
 func FuzzParse(f *testing.F) {
 	seeds := []string{
 		`{"op":"and","terms":[{"op":"time.due_before","arg":"2026-01-01"}]}`,

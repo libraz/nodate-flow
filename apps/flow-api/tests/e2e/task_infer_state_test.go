@@ -9,7 +9,7 @@ import (
 
 // TestTaskInferState creates a fresh task and hits GET
 // /tasks/{id}/infer-state. A just-created task is in "open" state with
-// no idle time, so the deterministic rule engine (2.AI-1) must return a
+// no idle time, so the deterministic rule engine must return a
 // nil proposal. The endpoint must still echo the task id + state so
 // the glass dock can distinguish "no suggestion" from "lookup failed".
 func TestTaskInferState(t *testing.T) {

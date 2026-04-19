@@ -1,5 +1,5 @@
 // Package judge is the scaffold for the "LLM-as-judge" test harness
-// (2.TEST-1). It gives the rest of the AI test suite a single place to
+// It gives the rest of the AI test suite a single place to
 // describe quality expectations for a model output — required phrases,
 // required JSON keys, a score floor — and evaluate a candidate answer
 // against them without pulling in a live LLM provider.

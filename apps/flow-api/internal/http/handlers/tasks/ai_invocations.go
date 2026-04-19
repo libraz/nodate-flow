@@ -1,5 +1,5 @@
 // Package tasks — ai_invocations.go exposes the per-task AI reasoning
-// panel feed (2.WEB-2). It returns the most recent redacted
+// panel feed. It returns the most recent redacted
 // ai_invocations rows scoped to the task so the frontend can render
 // "why did AI touch this task?" without leaking workspace-wide data.
 package tasks

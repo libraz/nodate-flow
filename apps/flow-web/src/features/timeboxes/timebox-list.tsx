@@ -12,24 +12,13 @@ import Button from '@nodate-flow/ui/primitives/button';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatDateOnly } from '../../lib/format';
 import { type TimeboxItem, type TimeboxStatus, useTimeboxesQuery } from './api';
 import TimeboxCreateDialog from './timebox-create-dialog';
 import styles from './timeboxes.module.css';
 
 export interface TimeboxListProps {
   workspaceId: string;
-}
-
-/** Format a YYYY-MM-DD date string for display using Intl. */
-function formatDate(dateStr: string, locale: string): string {
-  try {
-    // Append T00:00 to avoid timezone-shift issues with date-only strings
-    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(
-      new Date(`${dateStr}T00:00`),
-    );
-  } catch {
-    return dateStr;
-  }
 }
 
 /** Ordered status groups: active first, then planned, completed, cancelled. */
@@ -63,7 +52,7 @@ function TimeboxCard({
       </div>
       <div className={styles.cardMeta}>
         <span className={styles.dateRange}>
-          {formatDate(item.startsOn, locale)} – {formatDate(item.endsOn, locale)}
+          {formatDateOnly(item.startsOn, locale)} – {formatDateOnly(item.endsOn, locale)}
         </span>
         {item.projectName ? <span className={styles.projectName}>{item.projectName}</span> : null}
       </div>

@@ -11,6 +11,56 @@ import (
 )
 
 type Querier interface {
+	// Check if any active instance admin exists (for bootstrap guard).
+	AdminCheckInstanceAdminExists(ctx context.Context) (bool, error)
+	// Count active instance admins (for last-admin guard).
+	AdminCountActiveInstanceAdmins(ctx context.Context) (int64, error)
+	// Re-enable a previously suspended user account.
+	AdminEnableUser(ctx context.Context, publicID types.PublicID) error
+	// Re-enable a previously suspended workspace.
+	AdminEnableWorkspace(ctx context.Context, publicID types.PublicID) error
+	// Find instance admin grant for a specific user.
+	AdminFindInstanceAdminByUserId(ctx context.Context, userID uint32) (AdminFindInstanceAdminByUserIdRow, error)
+	// Resolve internal user_id from public_id for admin session lookup.
+	AdminFindUserIdByPublicId(ctx context.Context, publicID types.PublicID) (uint32, error)
+	// Get a single setting by key.
+	AdminGetInstanceSetting(ctx context.Context, settingKey string) (AdminGetInstanceSettingRow, error)
+	// Find a single user by public_id for admin detail view.
+	AdminGetUser(ctx context.Context, publicID types.PublicID) (VAdminUser, error)
+	// Find a single workspace by public_id for admin detail view.
+	AdminGetWorkspace(ctx context.Context, publicID types.PublicID) (AdminGetWorkspaceRow, error)
+	// Grant instance admin to a user.
+	AdminGrantInstanceAdmin(ctx context.Context, arg AdminGrantInstanceAdminParams) (int64, error)
+	// Check if a user_id has an active instance admin grant. Used by GET /me.
+	AdminIsInstanceAdmin(ctx context.Context, userID uint32) (bool, error)
+	// List all instance admin grants with user details.
+	AdminListInstanceAdmins(ctx context.Context, arg AdminListInstanceAdminsParams) ([]AdminListInstanceAdminsRow, error)
+	// Paginated instance audit log with optional action and date filters.
+	// filter_action: pass '' to skip, otherwise exact match on action.
+	// filter_from / filter_to: pass NULL to skip date bounds.
+	AdminListInstanceAuditLogs(ctx context.Context, arg AdminListInstanceAuditLogsParams) ([]AdminListInstanceAuditLogsRow, error)
+	// List all instance settings.
+	AdminListInstanceSettings(ctx context.Context) ([]AdminListInstanceSettingsRow, error)
+	// List all sessions for a user by their internal user_id.
+	AdminListUserSessions(ctx context.Context, arg AdminListUserSessionsParams) ([]AdminListUserSessionsRow, error)
+	// Paginated user list for instance admin panel.
+	// search: pass '' to skip, otherwise matches email or display_name.
+	// filter_enabled: pass NULL to skip, otherwise filters by enabled flag.
+	AdminListUsers(ctx context.Context, arg AdminListUsersParams) ([]AdminListUsersRow, error)
+	// Paginated workspace list for instance admin panel.
+	// search: pass '' to skip, otherwise matches name or slug.
+	// filter_enabled: pass NULL to skip, otherwise filters by enabled flag.
+	AdminListWorkspaces(ctx context.Context, arg AdminListWorkspacesParams) ([]AdminListWorkspacesRow, error)
+	// Revoke an instance admin grant by setting revoked_at.
+	AdminRevokeInstanceAdmin(ctx context.Context, userID uint32) error
+	// Revoke any session by its public_id (admin override, no user scoping).
+	AdminRevokeSession(ctx context.Context, publicID types.PublicID) error
+	// Disable a user account (soft-delete).
+	AdminSuspendUser(ctx context.Context, publicID types.PublicID) error
+	// Disable a workspace (soft-delete).
+	AdminSuspendWorkspace(ctx context.Context, publicID types.PublicID) error
+	// Insert or update an instance setting.
+	AdminUpsertInstanceSetting(ctx context.Context, arg AdminUpsertInstanceSettingParams) error
 	// Append a workspace-scoped audit row. metadata_json MUST be redacted.
 	AppendAuditLog(ctx context.Context, arg AppendAuditLogParams) (int64, error)
 	// Append an instance-wide audit row. payload_json MUST be redacted.

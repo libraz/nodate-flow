@@ -78,6 +78,11 @@
       "semicolons": "always"
     }
   },
+  "css": {
+    "parser": {
+      "cssModules": true
+    }
+  },
   "json": {
     "formatter": {
       "trailingCommas": "none"

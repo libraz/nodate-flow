@@ -1,6 +1,6 @@
 // Package e2e contains REST API end-to-end tests that drive the full
 // nodate-flow HTTP router against a real MySQL testcontainer. Every
-// test in this package is gated on ND_TEST_INTEGRATION=1 and requires
+// test in this package is gated on NF_TEST_INTEGRATION=1 and requires
 // Docker; `go test -short` skips them entirely.
 package e2e
 
@@ -28,10 +28,10 @@ var (
 
 // TestMain bootstraps the shared MySQL testcontainer and HTTP server
 // once for the whole package so parallel tests all talk to the same
-// harness. When ND_TEST_INTEGRATION is unset, it simply runs m.Run()
+// harness. When NF_TEST_INTEGRATION is unset, it simply runs m.Run()
 // and every test skips via skipIfNoIntegration.
 func TestMain(m *testing.M) {
-	if os.Getenv("ND_TEST_INTEGRATION") == "" {
+	if os.Getenv("NF_TEST_INTEGRATION") == "" {
 		os.Exit(m.Run())
 	}
 	inst, err := helpers.EnsureShared()
@@ -56,7 +56,7 @@ func mustStartHarness(t *testing.T) {
 	require.NotEmpty(t, testServerURL, "shared test server failed to start")
 }
 
-// skipIfNoIntegration skips the current test unless ND_TEST_INTEGRATION
+// skipIfNoIntegration skips the current test unless NF_TEST_INTEGRATION
 // is set. Every test in this package calls it at the top so unit-only
 // runs stay green without Docker.
 func skipIfNoIntegration(t *testing.T) {
@@ -64,8 +64,8 @@ func skipIfNoIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in -short mode")
 	}
-	if os.Getenv("ND_TEST_INTEGRATION") == "" {
-		t.Skip("set ND_TEST_INTEGRATION=1 to run e2e tests")
+	if os.Getenv("NF_TEST_INTEGRATION") == "" {
+		t.Skip("set NF_TEST_INTEGRATION=1 to run e2e tests")
 	}
 }
 
@@ -118,7 +118,7 @@ func newTenant(t *testing.T) *helpers.TestTenant {
 }
 
 // bootstrap runs the two setup steps every e2e test needs: it skips
-// the test when ND_TEST_INTEGRATION is unset and lazily starts the
+// the test when NF_TEST_INTEGRATION is unset and lazily starts the
 // shared harness.
 func bootstrap(t *testing.T) {
 	t.Helper()

@@ -36,7 +36,7 @@ func main() {
 	}
 
 	if cfg.DbDsn == "" {
-		logger.Error("ND_DB_DSN is not set")
+		logger.Error("NF_DB_DSN is not set")
 		os.Exit(1)
 	}
 	db, err := sql.Open("mysql", cfg.DbDsn)

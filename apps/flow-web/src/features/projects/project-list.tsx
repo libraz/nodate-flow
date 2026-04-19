@@ -12,19 +12,12 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatDate } from '../../lib/format';
 import { type Project, useProjectsQuery } from './api';
 import ProjectCreateDialog from './project-create-dialog';
 
 export interface ProjectListProps {
   workspaceId: string;
-}
-
-function formatDate(iso: string, locale: string): string {
-  try {
-    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(iso));
-  } catch {
-    return iso;
-  }
 }
 
 export default function ProjectList({ workspaceId }: ProjectListProps): ReactElement {

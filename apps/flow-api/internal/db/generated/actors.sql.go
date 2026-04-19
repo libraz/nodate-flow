@@ -65,7 +65,7 @@ type AddAgentActorParams struct {
 	Role        TaskActorsRole `json:"role"`
 }
 
-// Attach an AI agent to a task in the given role (2.MCP-2).
+// Attach an AI agent to a task in the given role.
 func (q *Queries) AddAgentActor(ctx context.Context, arg AddAgentActorParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, addAgentActor,
 		arg.PublicID,

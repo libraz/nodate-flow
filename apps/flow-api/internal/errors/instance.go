@@ -4,10 +4,24 @@ package errors
 
 // Error codes and specs.
 var (
+	// INSTANCE.ADMIN.LAST_ADMIN — Cannot revoke the last remaining administrator
+	InstanceAdminLastAdmin = &Spec{Code: "INSTANCE.ADMIN.LAST_ADMIN", Status: 409, Message: "Cannot revoke the last remaining administrator"}
+	// INSTANCE.ADMIN.NOT_FOUND — User is not an instance administrator
+	InstanceAdminNotFound = &Spec{Code: "INSTANCE.ADMIN.NOT_FOUND", Status: 404, Message: "User is not an instance administrator"}
 	// INSTANCE.ADMIN.REQUIRED — Instance administrator privileges are required
 	InstanceAdminRequired = &Spec{Code: "INSTANCE.ADMIN.REQUIRED", Status: 403, Message: "Instance administrator privileges are required"}
+	// INSTANCE.ADMIN.SELF_REVOKE — Cannot revoke your own administrator privileges
+	InstanceAdminSelfRevoke = &Spec{Code: "INSTANCE.ADMIN.SELF_REVOKE", Status: 409, Message: "Cannot revoke your own administrator privileges"}
 	// INSTANCE.QUOTA.EXCEEDED — Instance quota has been exceeded
 	InstanceQuotaExceeded = &Spec{Code: "INSTANCE.QUOTA.EXCEEDED", Status: 429, Message: "Instance quota has been exceeded"}
+	// INSTANCE.SETTINGS.INVALID_KEY — Unknown setting key
+	InstanceSettingsInvalidKey = &Spec{Code: "INSTANCE.SETTINGS.INVALID_KEY", Status: 400, Message: "Unknown setting key"}
+	// INSTANCE.SETTINGS.INVALID_VALUE — Invalid value for setting
+	InstanceSettingsInvalidValue = &Spec{Code: "INSTANCE.SETTINGS.INVALID_VALUE", Status: 400, Message: "Invalid value for setting"}
 	// INSTANCE.SETUP.ALREADY_INITIALIZED — Instance has already been initialized
 	InstanceSetupAlreadyInitialized = &Spec{Code: "INSTANCE.SETUP.ALREADY_INITIALIZED", Status: 409, Message: "Instance has already been initialized"}
+	// INSTANCE.USER.NOT_FOUND — User not found
+	InstanceUserNotFound = &Spec{Code: "INSTANCE.USER.NOT_FOUND", Status: 404, Message: "User not found"}
+	// INSTANCE.WORKSPACE.NOT_FOUND — Workspace not found
+	InstanceWorkspaceNotFound = &Spec{Code: "INSTANCE.WORKSPACE.NOT_FOUND", Status: 404, Message: "Workspace not found"}
 )

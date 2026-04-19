@@ -94,8 +94,8 @@ func CreateInvite(deps InviteDeps) func(context.Context, *CreateWorkspaceInviteI
 			MaxUses:   nullInt32Ptr(maxUses),
 			UseCount:  0,
 			Label:     in.Body.Label,
-			ExpiresAt: nullTime(expiresAt),
-			CreatedAt: now,
+			ExpiresAt: nullTimeUnix(expiresAt),
+			CreatedAt: now.Unix(),
 		}
 
 		return &CreateWorkspaceInviteOutput{Body: CreateWorkspaceInviteOutputBody{
@@ -272,7 +272,7 @@ func InviteInfo(deps InviteDeps) func(context.Context, *InviteInfoInput) (*Invit
 		return &InviteInfoOutput{Body: InviteInfoOutputBody{
 			WorkspaceName: wsRow.Name,
 			Role:          string(invite.Role),
-			ExpiresAt:     nullTime(invite.ExpiresAt),
+			ExpiresAt:     nullTimeUnix(invite.ExpiresAt),
 		}}, nil
 	}
 }
@@ -286,8 +286,8 @@ func rowToInvite(r generated.ListWorkspaceInvitesRow) WorkspaceInvite {
 		UseCount:      r.UseCount,
 		Label:         nullStr(r.Label),
 		CreatedByName: r.CreatedByName,
-		ExpiresAt:     nullTime(r.ExpiresAt),
-		CreatedAt:     r.CreatedAt,
+		ExpiresAt:     nullTimeUnix(r.ExpiresAt),
+		CreatedAt:     r.CreatedAt.Unix(),
 	}
 }
 

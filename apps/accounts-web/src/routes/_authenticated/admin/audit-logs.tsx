@@ -1,0 +1,269 @@
+/**
+ * /admin/audit-logs -- Instance audit log viewer with filters and pagination.
+ */
+
+import Button from '@nodate-flow/ui/primitives/button';
+import Input from '@nodate-flow/ui/primitives/input';
+import { createFileRoute } from '@tanstack/react-router';
+import { type ReactElement, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import { apiRequest } from '../../../lib/api-client';
+
+interface AuditLogEntry {
+  id: string;
+  action: string;
+  actorEmail: string;
+  targetType: string;
+  targetId: string;
+  workspaceName: string | null;
+  ipAddress: string;
+  occurredAt: number;
+}
+
+interface AuditLogsResponse {
+  items: AuditLogEntry[];
+  total: number;
+}
+
+const tableStyle: React.CSSProperties = {
+  width: '100%',
+  borderCollapse: 'collapse',
+  fontSize: 'var(--nf-text-sm, 0.875rem)',
+};
+
+const thStyle: React.CSSProperties = {
+  textAlign: 'start',
+  padding: 'var(--nf-space-2, 0.5rem) var(--nf-space-3, 0.75rem)',
+  borderBlockEnd: '2px solid var(--nf-color-border, var(--color-hairline))',
+  fontWeight: 600,
+  color: 'var(--nf-color-fg-muted, var(--color-muted))',
+};
+
+const tdStyle: React.CSSProperties = {
+  padding: 'var(--nf-space-2, 0.5rem) var(--nf-space-3, 0.75rem)',
+  borderBlockEnd: '1px solid var(--nf-color-border, var(--color-hairline))',
+};
+
+function formatTimestamp(ts: number): string {
+  return new Date(ts * 1000).toLocaleString();
+}
+
+function AuditLogsPage(): ReactElement {
+  const { t } = useTranslation('admin');
+  const [entries, setEntries] = useState<AuditLogEntry[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [perPage] = useState(20);
+  const [actionFilter, setActionFilter] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    params.set('perPage', String(perPage));
+    if (actionFilter) params.set('action', actionFilter);
+    if (fromDate) params.set('from', fromDate);
+    if (toDate) params.set('to', toDate);
+
+    void apiRequest<AuditLogsResponse>(`/admin/audit-logs?${params.toString()}`).then((result) => {
+      if (cancelled) return;
+      if (result.error || !result.data) {
+        setError(t('errors.generic'));
+        setLoading(false);
+        return;
+      }
+      setEntries(result.data.items);
+      setTotal(result.data.total);
+      setLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [page, perPage, actionFilter, fromDate, toDate, t]);
+
+  const totalPages = Math.max(1, Math.ceil(total / perPage));
+
+  const handleActionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setActionFilter(e.target.value);
+    setPage(1);
+  };
+
+  const handleFromChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFromDate(e.target.value);
+    setPage(1);
+  };
+
+  const handleToChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setToDate(e.target.value);
+    setPage(1);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6, 1.5rem)' }}>
+      <h1
+        style={{
+          fontFamily: 'var(--nf-font-display, var(--font-display))',
+          fontSize: 'var(--nf-text-2xl, 1.5rem)',
+          margin: 0,
+        }}
+      >
+        {t('auditLogs.title')}
+      </h1>
+
+      <div
+        style={{
+          display: 'flex',
+          gap: 'var(--nf-space-3, 0.75rem)',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ flex: 1, minWidth: '200px' }}>
+          <Input
+            type="text"
+            placeholder={t('auditLogs.filterAction')}
+            value={actionFilter}
+            onChange={handleActionChange}
+          />
+        </div>
+        <div>
+          <label
+            style={{
+              fontSize: 'var(--nf-text-xs, 0.75rem)',
+              color: 'var(--nf-color-fg-muted, var(--color-muted))',
+            }}
+          >
+            {t('auditLogs.filterFrom')}
+            <input
+              type="date"
+              value={fromDate}
+              onChange={handleFromChange}
+              style={{
+                display: 'block',
+                padding: '0.375rem 0.5rem',
+                borderRadius: 'var(--nf-radius-md, 0.375rem)',
+                border:
+                  'var(--nf-space-px, 1px) solid var(--nf-color-border, var(--color-hairline))',
+                background: 'var(--nf-color-bg, var(--color-bg))',
+                color: 'var(--nf-color-fg, var(--color-fg))',
+                fontSize: 'var(--nf-text-sm, 0.875rem)',
+              }}
+            />
+          </label>
+        </div>
+        <div>
+          <label
+            style={{
+              fontSize: 'var(--nf-text-xs, 0.75rem)',
+              color: 'var(--nf-color-fg-muted, var(--color-muted))',
+            }}
+          >
+            {t('auditLogs.filterTo')}
+            <input
+              type="date"
+              value={toDate}
+              onChange={handleToChange}
+              style={{
+                display: 'block',
+                padding: '0.375rem 0.5rem',
+                borderRadius: 'var(--nf-radius-md, 0.375rem)',
+                border:
+                  'var(--nf-space-px, 1px) solid var(--nf-color-border, var(--color-hairline))',
+                background: 'var(--nf-color-bg, var(--color-bg))',
+                color: 'var(--nf-color-fg, var(--color-fg))',
+                fontSize: 'var(--nf-text-sm, 0.875rem)',
+              }}
+            />
+          </label>
+        </div>
+      </div>
+
+      {error ? (
+        <p
+          role="alert"
+          style={{
+            margin: 0,
+            color: 'var(--nf-color-fg-danger, var(--color-danger))',
+            fontSize: 'var(--nf-text-sm, 0.875rem)',
+          }}
+        >
+          {error}
+        </p>
+      ) : null}
+
+      {loading ? (
+        <p style={{ color: 'var(--nf-color-fg-muted, var(--color-muted))' }}>
+          {t('common.loading')}
+        </p>
+      ) : entries.length === 0 ? (
+        <p style={{ color: 'var(--nf-color-fg-muted, var(--color-muted))' }}>
+          {t('auditLogs.noResults')}
+        </p>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={tableStyle}>
+            <thead>
+              <tr>
+                <th style={thStyle}>{t('auditLogs.occurredAt')}</th>
+                <th style={thStyle}>{t('auditLogs.action')}</th>
+                <th style={thStyle}>{t('auditLogs.actor')}</th>
+                <th style={thStyle}>{t('auditLogs.target')}</th>
+                <th style={thStyle}>{t('auditLogs.ipAddress')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((entry) => (
+                <tr key={entry.id}>
+                  <td style={tdStyle}>{formatTimestamp(entry.occurredAt)}</td>
+                  <td style={tdStyle}>{entry.action}</td>
+                  <td style={tdStyle}>{entry.actorEmail}</td>
+                  <td style={tdStyle}>
+                    {entry.targetType}
+                    {entry.workspaceName ? ` (${entry.workspaceName})` : ''}
+                  </td>
+                  <td style={tdStyle}>{entry.ipAddress}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          fontSize: 'var(--nf-text-sm, 0.875rem)',
+        }}
+      >
+        <Button variant="default" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+          {t('common.previous')}
+        </Button>
+        <span style={{ color: 'var(--nf-color-fg-muted, var(--color-muted))' }}>
+          {t('common.page', { page, total: totalPages })}
+        </span>
+        <Button
+          variant="default"
+          disabled={page >= totalPages}
+          onClick={() => setPage((p) => p + 1)}
+        >
+          {t('common.next')}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+export const Route = createFileRoute('/_authenticated/admin/audit-logs')({
+  component: AuditLogsPage,
+});

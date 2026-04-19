@@ -175,6 +175,9 @@ type MeBody struct {
 	NotifEmailAssignment bool `json:"notifEmailAssignment"`
 	NotifEmailDueSoon    bool `json:"notifEmailDueSoon"`
 	NotifWebPush         bool `json:"notifWebPush"`
+
+	// IsInstanceAdmin is true when the user has an active instance admin grant.
+	IsInstanceAdmin bool `json:"isInstanceAdmin"`
 }
 
 // MeOutput is the response for GET /me.

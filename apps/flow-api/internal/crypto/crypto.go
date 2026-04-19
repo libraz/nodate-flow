@@ -26,7 +26,7 @@ import (
 )
 
 // EnvVar is the name of the environment variable that holds the master key.
-const EnvVar = "ND_SECRET_KEY"
+const EnvVar = "NF_SECRET_KEY"
 
 // hkdfInfo is the domain-separation label used when deriving the AES key
 // from the master secret. Bump the version suffix when rotating the
@@ -37,14 +37,14 @@ const hkdfInfo = "nodate-flow:ai:v1"
 const nonceSize = 12
 
 // Cipher seals and opens secret blobs with AES-256-GCM under a key derived
-// from ND_SECRET_KEY via HKDF-SHA256. The returned blob layout is
+// from NF_SECRET_KEY via HKDF-SHA256. The returned blob layout is
 // nonce || ciphertext-with-tag, where the GCM tag is appended to the
 // ciphertext by gcm.Seal as the trailing 16 bytes.
 type Cipher struct {
 	gcm cipher.AEAD
 }
 
-// NewFromEnv reads ND_SECRET_KEY from the process environment, derives a
+// NewFromEnv reads NF_SECRET_KEY from the process environment, derives a
 // 32-byte AES key via HKDF-SHA256 with a fixed domain-separation label,
 // and returns a ready Cipher. It is the only public way to construct a
 // Cipher; tests use New for explicit key injection.

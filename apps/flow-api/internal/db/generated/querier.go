@@ -17,7 +17,7 @@ type Querier interface {
 	AckAgentRun(ctx context.Context, arg AckAgentRunParams) error
 	// Attach a user to a task in the given role.
 	AddActor(ctx context.Context, arg AddActorParams) (int64, error)
-	// Attach an AI agent to a task in the given role (2.MCP-2).
+	// Attach an AI agent to a task in the given role.
 	AddAgentActor(ctx context.Context, arg AddAgentActorParams) (int64, error)
 	// Insert metadata for a newly uploaded attachment.
 	AddAttachment(ctx context.Context, arg AddAttachmentParams) (int64, error)
@@ -31,6 +31,56 @@ type Querier interface {
 	AddProjectMember(ctx context.Context, arg AddProjectMemberParams) (int64, error)
 	// Associate a task with a timebox. Caller must resolve IDs beforehand.
 	AddTaskToTimebox(ctx context.Context, arg AddTaskToTimeboxParams) error
+	// Check if any active instance admin exists (for bootstrap guard).
+	AdminCheckInstanceAdminExists(ctx context.Context) (bool, error)
+	// Count active instance admins (for last-admin guard).
+	AdminCountActiveInstanceAdmins(ctx context.Context) (int64, error)
+	// Re-enable a previously suspended user account.
+	AdminEnableUser(ctx context.Context, publicID types.PublicID) error
+	// Re-enable a previously suspended workspace.
+	AdminEnableWorkspace(ctx context.Context, publicID types.PublicID) error
+	// Find instance admin grant for a specific user.
+	AdminFindInstanceAdminByUserId(ctx context.Context, userID uint32) (AdminFindInstanceAdminByUserIdRow, error)
+	// Resolve internal user_id from public_id for admin session lookup.
+	AdminFindUserIdByPublicId(ctx context.Context, publicID types.PublicID) (uint32, error)
+	// Get a single setting by key.
+	AdminGetInstanceSetting(ctx context.Context, settingKey string) (AdminGetInstanceSettingRow, error)
+	// Find a single user by public_id for admin detail view.
+	AdminGetUser(ctx context.Context, publicID types.PublicID) (VAdminUser, error)
+	// Find a single workspace by public_id for admin detail view.
+	AdminGetWorkspace(ctx context.Context, publicID types.PublicID) (AdminGetWorkspaceRow, error)
+	// Grant instance admin to a user.
+	AdminGrantInstanceAdmin(ctx context.Context, arg AdminGrantInstanceAdminParams) (int64, error)
+	// Check if a user_id has an active instance admin grant. Used by GET /me.
+	AdminIsInstanceAdmin(ctx context.Context, userID uint32) (bool, error)
+	// List all instance admin grants with user details.
+	AdminListInstanceAdmins(ctx context.Context, arg AdminListInstanceAdminsParams) ([]AdminListInstanceAdminsRow, error)
+	// Paginated instance audit log with optional action and date filters.
+	// filter_action: pass '' to skip, otherwise exact match on action.
+	// filter_from / filter_to: pass NULL to skip date bounds.
+	AdminListInstanceAuditLogs(ctx context.Context, arg AdminListInstanceAuditLogsParams) ([]AdminListInstanceAuditLogsRow, error)
+	// List all instance settings.
+	AdminListInstanceSettings(ctx context.Context) ([]AdminListInstanceSettingsRow, error)
+	// List all sessions for a user by their internal user_id.
+	AdminListUserSessions(ctx context.Context, arg AdminListUserSessionsParams) ([]AdminListUserSessionsRow, error)
+	// Paginated user list for instance admin panel.
+	// search: pass '' to skip, otherwise matches email or display_name.
+	// filter_enabled: pass NULL to skip, otherwise filters by enabled flag.
+	AdminListUsers(ctx context.Context, arg AdminListUsersParams) ([]AdminListUsersRow, error)
+	// Paginated workspace list for instance admin panel.
+	// search: pass '' to skip, otherwise matches name or slug.
+	// filter_enabled: pass NULL to skip, otherwise filters by enabled flag.
+	AdminListWorkspaces(ctx context.Context, arg AdminListWorkspacesParams) ([]AdminListWorkspacesRow, error)
+	// Revoke an instance admin grant by setting revoked_at.
+	AdminRevokeInstanceAdmin(ctx context.Context, userID uint32) error
+	// Revoke any session by its public_id (admin override, no user scoping).
+	AdminRevokeSession(ctx context.Context, publicID types.PublicID) error
+	// Disable a user account (soft-delete).
+	AdminSuspendUser(ctx context.Context, publicID types.PublicID) error
+	// Disable a workspace (soft-delete).
+	AdminSuspendWorkspace(ctx context.Context, publicID types.PublicID) error
+	// Insert or update an instance setting.
+	AdminUpsertInstanceSetting(ctx context.Context, arg AdminUpsertInstanceSettingParams) error
 	// Append a workspace-scoped audit row. metadata_json MUST be redacted.
 	AppendAuditLog(ctx context.Context, arg AppendAuditLogParams) (int64, error)
 	// Append a single event to the append-only event log. The events table has
@@ -62,7 +112,7 @@ type Querier interface {
 	CountActiveRecoveryCodes(ctx context.Context, userID uint32) (int64, error)
 	// Count ai.suggestion.{proposed,applied,dismissed} events for a workspace
 	// within the given time window. Used by the AI metrics endpoint
-	// (2.OBS-1) to compute acceptance rate.
+	// to compute acceptance rate.
 	CountAiSuggestionOutcomesForWorkspace(ctx context.Context, arg CountAiSuggestionOutcomesForWorkspaceParams) (CountAiSuggestionOutcomesForWorkspaceRow, error)
 	// Count how many owners a calendar has (prevent last-owner removal).
 	CountCalendarOwners(ctx context.Context, calendarID uint32) (int64, error)
@@ -248,7 +298,7 @@ type Querier interface {
 	// Look up a user's subscription to a specific calendar.
 	FindCalendarSubscription(ctx context.Context, arg FindCalendarSubscriptionParams) (FindCalendarSubscriptionRow, error)
 	// Return the internal id of the most recently created enabled provider
-	// for a workspace. Used by the ai_invocations logger (2.MCP-2) when the
+	// for a workspace. Used by the ai_invocations logger when the
 	// orchestrator does not track which provider handled the call.
 	FindDefaultProviderIDForWorkspace(ctx context.Context, workspaceID uint32) (uint32, error)
 	// Resolve an identity by (provider, subject) pair for OIDC login flows.
@@ -356,7 +406,7 @@ type Querier interface {
 	GetRepoMappingByRepoID(ctx context.Context, repoID uint64) (GetRepoMappingByRepoIDRow, error)
 	// Fetch a single suggestion by public_id with source/target task info.
 	GetSuggestionByPublicId(ctx context.Context, arg GetSuggestionByPublicIdParams) (GetSuggestionByPublicIdRow, error)
-	// Queries dedicated to the constraint engine (Phase 3, 3.ENG-2).
+	// Queries dedicated to the constraint engine.
 	// Keyed off the internal task_id so the engine never has to know
 	// about public_id resolution. All workspace scoping is enforced by
 	// the caller before it lands here.
@@ -390,7 +440,7 @@ type Querier interface {
 	// List a workspace's agents joined with the underlying model.
 	ListAgentsForWorkspace(ctx context.Context, arg ListAgentsForWorkspaceParams) ([]ListAgentsForWorkspaceRow, error)
 	// Recent redacted LLM call records scoped to a single task. Used by
-	// the task detail AI reasoning panel (2.WEB-2). workspace_id is
+	// the task detail AI reasoning panel. workspace_id is
 	// included so tenant isolation is enforced at the query level.
 	ListAiInvocationsForTask(ctx context.Context, arg ListAiInvocationsForTaskParams) ([]ListAiInvocationsForTaskRow, error)
 	// Recent redacted LLM call records for a workspace, newest first. Used
@@ -567,8 +617,8 @@ type Querier interface {
 	// List enabled timeboxes for a workspace with creator info and pagination.
 	ListTimeboxesForWorkspace(ctx context.Context, arg ListTimeboxesForWorkspaceParams) ([]ListTimeboxesForWorkspaceRow, error)
 	// Ordered list of task.transition.* events for a single task,
-	// ascending by occurred_at + id. Used by the Phase 3 replay tool
-	// (3.ENG-1) to derive the expected derived_state from scratch.
+	// ascending by occurred_at + id. Used by the replay tool to derive
+	// the expected derived_state from scratch.
 	ListTransitionEventsForReplay(ctx context.Context, arg ListTransitionEventsForReplayParams) ([]ListTransitionEventsForReplayRow, error)
 	// List signals in a workspace that have no task linkage yet.
 	ListUnattachedSignals(ctx context.Context, arg ListUnattachedSignalsParams) ([]ListUnattachedSignalsRow, error)
@@ -688,7 +738,7 @@ type Querier interface {
 	// a dedicated snoozed_until_at column may be added later on.
 	SnoozeInboxItem(ctx context.Context, arg SnoozeInboxItemParams) error
 	// Sum the estimated cost (cents) of LLM calls attributed to a given AI
-	// agent since a lower bound. Used by 2.MCP-2 agentguard to enforce the
+	// agent since a lower bound. Used by agentguard to enforce the
 	// agent's monthly cost cap.
 	SumAiCostForAgentSince(ctx context.Context, arg SumAiCostForAgentSinceParams) (int64, error)
 	// Sum the estimated cost (in whole cents) of LLM calls made today for a

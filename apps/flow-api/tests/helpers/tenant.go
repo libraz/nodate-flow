@@ -137,7 +137,7 @@ func CleanupTenant(t *testing.T, tt *TestTenant) {
 //
 // IMPORTANT: this is the ONLY direct-SQL exception in the test suite.
 // It exists because the workspace API does not yet expose a delete
-// operation. Once 1.API-2 lands, callers should switch to that route
+// operation. Once the workspace delete API lands, callers should switch to that route
 // and PurgeWorkspace should be deleted.
 //
 // The implementation toggles FOREIGN_KEY_CHECKS off so deletion order
