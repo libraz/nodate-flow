@@ -16,6 +16,7 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 )
 
 // Error code locals re-exported from the generated errors package so the
@@ -92,13 +93,13 @@ func (r ProjectRole) AtLeast(min ProjectRole) bool {
 // Context plumbing
 // ----------------------------------------------------------------------------
 
-// ctxKey is an unexported type used as a context key to avoid collisions with
-// other packages stuffing values into the request context.
+// ctxKey is an unexported type used as a context key for ACL-specific
+// values (workspace, project, task). Authentication-level keys
+// (actor, session, client IP) are managed by the shared authn package.
 type ctxKey int
 
 const (
-	ctxKeyActorUserID ctxKey = iota
-	ctxKeyWorkspaceID
+	ctxKeyWorkspaceID ctxKey = iota
 	ctxKeyProjectID
 	ctxKeyWorkspaceRole
 	ctxKeyProjectRole
@@ -106,8 +107,6 @@ const (
 	ctxKeyProjectIDPublic
 	ctxKeyTaskID
 	ctxKeyTaskIDPublic
-	ctxKeySessionIDPublic
-	ctxKeyClientIP
 )
 
 // TaskContext is the task metadata injected by [RequireTaskAccess]. It is
@@ -131,53 +130,34 @@ func TaskFromContext(ctx context.Context) (TaskContext, bool) {
 	return TaskContext{ID: id, PublicID: pub}, true
 }
 
-// WithActor returns a new context carrying the authenticated user's internal
-// numeric id. This is normally called by the auth middleware before any ACL
-// middleware runs.
+// WithActor delegates to [authn.WithActor].
 func WithActor(ctx context.Context, userID uint32) context.Context {
-	return context.WithValue(ctx, ctxKeyActorUserID, userID)
+	return authn.WithActor(ctx, userID)
 }
 
-// ActorFromContext extracts the authenticated user's internal id. The boolean
-// is false when no auth middleware has populated the context.
+// ActorFromContext delegates to [authn.ActorFromContext].
 func ActorFromContext(ctx context.Context) (uint32, bool) {
-	v, ok := ctx.Value(ctxKeyActorUserID).(uint32)
-	return v, ok
+	return authn.ActorFromContext(ctx)
 }
 
-// WithSessionPublicID returns a new context carrying the caller's session
-// public id, resolved from the "sid" claim on the access token.
+// WithSessionPublicID delegates to [authn.WithSessionPublicID].
 func WithSessionPublicID(ctx context.Context, sid types.PublicID) context.Context {
-	return context.WithValue(ctx, ctxKeySessionIDPublic, sid)
+	return authn.WithSessionPublicID(ctx, sid)
 }
 
-// SessionPublicIDFromContext extracts the caller's session public id
-// as populated by [RequireAuth]. The boolean is false when no session
-// id was present on the access token (e.g. legacy PAT/MCP tokens).
+// SessionPublicIDFromContext delegates to [authn.SessionPublicIDFromContext].
 func SessionPublicIDFromContext(ctx context.Context) (types.PublicID, bool) {
-	v, ok := ctx.Value(ctxKeySessionIDPublic).(types.PublicID)
-	if !ok {
-		return types.PublicID{}, false
-	}
-	var zero types.PublicID
-	if v == zero {
-		return zero, false
-	}
-	return v, true
+	return authn.SessionPublicIDFromContext(ctx)
 }
 
-// WithClientIP returns a new context carrying the caller's client IP
-// address (already normalized by [ClientIP]).
+// WithClientIP delegates to [authn.WithClientIP].
 func WithClientIP(ctx context.Context, ip string) context.Context {
-	return context.WithValue(ctx, ctxKeyClientIP, ip)
+	return authn.WithClientIP(ctx, ip)
 }
 
-// ClientIPFromContext extracts the caller's client IP address as
-// populated by [ClientIP]. Returns an empty string when no middleware
-// has populated the context.
+// ClientIPFromContext delegates to [authn.ClientIPFromContext].
 func ClientIPFromContext(ctx context.Context) string {
-	v, _ := ctx.Value(ctxKeyClientIP).(string)
-	return v
+	return authn.ClientIPFromContext(ctx)
 }
 
 // WorkspaceContext is the workspace metadata injected by

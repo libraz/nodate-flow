@@ -23,7 +23,7 @@ type MySQLInstance struct {
 }
 
 const (
-	mysqlImage    = "mysql:9.1"
+	mysqlImage    = "mysql:9.6"
 	mysqlDatabase = "nodate_time_test"
 	mysqlUser     = "nodate"
 	mysqlPassword = "nodate"

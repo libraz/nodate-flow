@@ -25,6 +25,10 @@ const baseUrl =
 /** Resolved base URL for direct fetch fallbacks (refresh middleware). */
 export const apiBaseUrl = baseUrl;
 
+/** Base URL of the centralised auth-api service (token refresh, /me). */
+export const authApiBaseUrl =
+  (import.meta.env.VITE_AUTH_API_BASE_URL as string | undefined) ?? 'http://localhost:8082';
+
 export const sdk: NodateFlowClient = createClient({
   baseUrl,
   tokenProvider: () => authStore.getState().accessToken ?? undefined,
@@ -52,7 +56,7 @@ export function refreshAccessToken(): Promise<string | null> {
   if (refreshInFlight) return refreshInFlight;
   refreshInFlight = (async () => {
     try {
-      const res = await fetch(`${baseUrl}/auth/refresh`, {
+      const res = await fetch(`${authApiBaseUrl}/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
       });

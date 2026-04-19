@@ -13,6 +13,12 @@ const OpaqueTokenBytes = 32
 // PrefixRefresh is the user-visible prefix for refresh tokens.
 const PrefixRefresh = "rfr_"
 
+// PrefixPAT is the user-visible prefix for personal access tokens.
+const PrefixPAT = "pat_"
+
+// PrefixMCP is the user-visible prefix for MCP bearer tokens.
+const PrefixMCP = "mcp_"
+
 // GenerateOpaque returns a (plaintext, hash) pair where plaintext is
 // "<prefix><hex>" and hash is the hex SHA-256 of the plaintext (after
 // the prefix). The hash is what gets stored in the database.
@@ -38,4 +44,14 @@ func HashOpaque(plaintext string) string {
 // GenerateRefresh generates a fresh refresh token.
 func GenerateRefresh() (plaintext string, hash string, err error) {
 	return GenerateOpaque(PrefixRefresh)
+}
+
+// GeneratePAT generates a fresh personal access token.
+func GeneratePAT() (plaintext string, hash string, err error) {
+	return GenerateOpaque(PrefixPAT)
+}
+
+// GenerateMCP generates a fresh MCP bearer token.
+func GenerateMCP() (plaintext string, hash string, err error) {
+	return GenerateOpaque(PrefixMCP)
 }

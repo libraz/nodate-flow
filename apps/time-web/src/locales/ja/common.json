@@ -66,7 +66,9 @@
   "sidebar": {
     "sharedCalendars": "共有カレンダー",
     "myCalendar": "マイカレンダー",
-    "other": "その他"
+    "other": "その他",
+    "noCalendars": "カレンダーがありません",
+    "loadError": "カレンダーの読み込みに失敗しました"
   },
   "event": {
     "newEvent": "新しい予定",
@@ -153,7 +155,7 @@
     "noMemos": "メモはまだありません",
     "loadingMembers": "メンバーを読み込み中...",
     "noMembers": "メンバーなし",
-    "noSharedCalendar": "共有カレンダ��が選択されていません",
+    "noSharedCalendar": "共有カレンダーが選択されていません",
     "noSharedCalendarAvailable": "利用可能な共有カレンダーがありません",
     "shareDescription": "このカレンダーを他の人と共有:",
     "copy": "コピー",

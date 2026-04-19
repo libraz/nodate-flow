@@ -196,12 +196,6 @@ func main() {
 		aiInvocationPublisher = tap.PublishAiInvocation
 	}
 
-	// Session store driver. MySQL is the default; ND_FLOW_SESSION_STORE=redis
-	// selects the redis-tagged driver when the binary is built with
-	// -tags redis. Mis-configured values log and fall back to MySQL
-	// so a bad env never locks users out.
-	sessions := buildSessionStore(cfg, db, queries, logger)
-
 	// Agent runtime wiring. The runner (and optionally the mysql
 	// queue) is constructed before router.Build so the manual
 	// trigger endpoint can enqueue / dispatch through the same
@@ -321,15 +315,12 @@ func main() {
 	inner := router.Build(router.Deps{
 		DB:                    db,
 		Queries:               queries,
-		Sessions:              sessions,
 		JWT:                   jwtIssuer,
 		Cipher:                cipher,
 		GhWebhookSecret:       cfg.GhWebhookSecret,
 		SlackSigningSecret:    cfg.SlackSigningSecret,
 		GoogleChannelToken:    cfg.GoogleChannelToken,
 		DefaultWorkspaceID:    cfg.DefaultWorkspaceID,
-		CookieSecure:          cfg.CookieSecure,
-		RegistrationOpen:      cfg.RegistrationOpen,
 		AiMock:                cfg.AiMock,
 		StreamNotifier:        notifier,
 		StreamRemember:        streamRemember,

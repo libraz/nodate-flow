@@ -1078,7 +1078,7 @@ func runProposePriority(ctx context.Context, deps Deps, s *session, raw json.Raw
 }
 
 // runProposeDuplicates ranks stored embeddings against the source task
-// via Go-side cosine similarity (MySQL 9.1 Community lacks
+// via Go-side cosine similarity (MySQL 9.6 Community lacks
 // VEC_DISTANCE_COSINE). Thresholds come from ai_settings, with ADR 0003
 // defaults when the workspace has no row yet.
 func runProposeDuplicates(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {

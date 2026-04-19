@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
@@ -13,7 +12,6 @@ import (
 
 	generated "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/auth"
-	authhandlers "github.com/nodate-flow/nodate-flow/apps/time-api/internal/http/handlers/auth"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/http/handlers/calendars"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/http/handlers/workspaces"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/http/middleware"
@@ -21,9 +19,8 @@ import (
 
 // Deps is the dependency bundle Build needs to wire every route.
 type Deps struct {
-	DB           *sql.DB
-	JWT          *auth.JWTIssuer
-	CookieSecure bool
+	DB  *sql.DB
+	JWT *auth.JWTIssuer
 }
 
 type healthOutput struct {
@@ -60,14 +57,7 @@ func BuildResult(deps Deps) Result {
 		return humachi.New(sub, newConfig())
 	}
 
-	// Build auth handler dependencies.
 	queries := generated.New(deps.DB)
-	authDeps := authhandlers.Deps{
-		Queries:      queries,
-		DB:           deps.DB,
-		JWT:          deps.JWT,
-		CookieSecure: deps.CookieSecure,
-	}
 
 	// Build calendar handler dependencies.
 	calDeps := calendars.Deps{
@@ -91,42 +81,6 @@ func BuildResult(deps Deps) Result {
 		out := &healthOutput{}
 		out.Body.Status = "ok"
 		return out, nil
-	})
-
-	// Public auth endpoints (rate-limited per IP).
-	var authAPI huma.API
-	r.Group(func(sub chi.Router) {
-		authRateLimiter := middleware.NewIPRateLimiter(middleware.RateLimitConfig{
-			MaxRequests: 10,
-			Window:      time.Minute,
-		})
-		sub.Use(authRateLimiter.Middleware())
-		authAPI = newSubAPI(sub)
-
-		huma.Register(authAPI, huma.Operation{
-			OperationID: "auth-register",
-			Method:      http.MethodPost,
-			Path:        "/auth/register",
-			Summary:     "Register a new account",
-		}, authhandlers.Register(authDeps))
-		huma.Register(authAPI, huma.Operation{
-			OperationID: "auth-login",
-			Method:      http.MethodPost,
-			Path:        "/auth/login",
-			Summary:     "Log in with email and password",
-		}, authhandlers.Login(authDeps))
-		huma.Register(authAPI, huma.Operation{
-			OperationID: "auth-refresh",
-			Method:      http.MethodPost,
-			Path:        "/auth/refresh",
-			Summary:     "Rotate refresh token",
-		}, authhandlers.Refresh(authDeps))
-		huma.Register(authAPI, huma.Operation{
-			OperationID: "auth-logout",
-			Method:      http.MethodPost,
-			Path:        "/auth/logout",
-			Summary:     "Revoke a session",
-		}, authhandlers.Logout(authDeps))
 	})
 
 	// Public share endpoints (no auth).
@@ -161,26 +115,6 @@ func BuildResult(deps Deps) Result {
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
 		subAPI = newSubAPI(sub)
-
-		// /me
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "me",
-			Method:      http.MethodGet,
-			Path:        "/me",
-			Summary:     "Return the authenticated user's profile",
-		}, authhandlers.Me(authDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "me-patch",
-			Method:      http.MethodPatch,
-			Path:        "/me",
-			Summary:     "Patch the authenticated user's profile",
-		}, authhandlers.PatchMe(authDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "me-change-password",
-			Method:      http.MethodPatch,
-			Path:        "/me/password",
-			Summary:     "Change the authenticated user's password",
-		}, authhandlers.ChangePassword(authDeps))
 
 		// Workspaces.
 		huma.Register(subAPI, huma.Operation{
@@ -487,7 +421,7 @@ func BuildResult(deps Deps) Result {
 		}, calendars.DeleteAttachment(calDeps))
 	})
 
-	return Result{Handler: r, APIs: []huma.API{api, authAPI, subAPI, calAPI}}
+	return Result{Handler: r, APIs: []huma.API{api, subAPI, calAPI}}
 }
 
 // passthroughDB adapts *sql.DB to middleware.ACLDB.

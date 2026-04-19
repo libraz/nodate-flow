@@ -69,7 +69,7 @@ func CreateInvite(deps InviteDeps) func(context.Context, *CreateWorkspaceInviteI
 			WorkspaceID:     ws.ID,
 			TokenHash:       hash,
 			Role:            role,
-			CreatedByUserID: actorID,
+			CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
 			MaxUses:         maxUses,
 			ExpiresAt:       expiresAt,
 			Label:           label,

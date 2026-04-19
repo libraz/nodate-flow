@@ -31,13 +31,12 @@ import (
 	airelations "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/relations"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth/sessionstore"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	aihandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/ai"
-	authhandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/auth"
+	calhandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/calendars"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/dashboard"
 	exporthandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/export"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/inbox"
@@ -71,13 +70,8 @@ type Deps struct {
 	// Queries is a sqlc Queries handle wrapping DB. Callers should pass
 	// generated.New(DB) so both handles share the same connection pool.
 	Queries *generated.Queries
-	// JWT is the access-token issuer used by RequireAuth and by the auth
-	// handlers themselves.
+	// JWT is the access-token issuer used by RequireAuth.
 	JWT *auth.JWTIssuer
-	// Sessions is the refresh-token session store driver. When nil,
-	// [Build] falls back to [sessionstore.NewMySQLStore] over the
-	// sqlc query handle so tests do not need to wire it explicitly.
-	Sessions sessionstore.Store
 	// Cipher is optional: when nil, the AI provider endpoints return
 	// AI.PROVIDER.NOT_CONFIGURED and the MCP propose_* tools are degraded,
 	// but the rest of the API still boots. Tests typically pass a fixed
@@ -95,13 +89,6 @@ type Deps struct {
 	// DefaultWorkspaceID is the workspace public id (UUID v7) that
 	// webhook-origin signals are routed to. Empty in tests.
 	DefaultWorkspaceID string
-	// CookieSecure toggles the Secure flag on the refresh cookie. Tests
-	// leave it false so http://127.0.0.1 traffic works; the prod main
-	// wires it from cfg.CookieSecure.
-	CookieSecure bool
-	// RegistrationOpen controls whether POST /auth/register is allowed.
-	// When false the handler returns 403. Defaults to true.
-	RegistrationOpen bool
 	// DisableRateLimit disables all per-IP rate limiters. Used by
 	// integration tests where many parallel tenants register from
 	// the same loopback address.
@@ -227,12 +214,7 @@ func BuildResult(deps Deps) Result {
 		return out, nil
 	})
 
-	sessionStore := deps.Sessions
-	if sessionStore == nil {
-		sessionStore = sessionstore.NewMySQLStore(deps.DB, deps.Queries)
-	}
 	auditRec := audit.New(deps.Queries)
-	authDeps := authhandlers.Deps{DB: deps.DB, Queries: deps.Queries, Sessions: sessionStore, JWT: deps.JWT, Cipher: deps.Cipher, CookieSecure: deps.CookieSecure, RegistrationOpen: deps.RegistrationOpen, Audit: auditRec}
 	integrationsDeps := integrationshandlers.Deps{
 		DB:            deps.DB,
 		Queries:       deps.Queries,
@@ -241,21 +223,6 @@ func BuildResult(deps Deps) Result {
 		PublicBaseURL: deps.PublicBaseURL,
 		WebBaseURL:    deps.WebBaseURL,
 	}
-	// Public auth endpoints (login / register) are behind a per-IP rate
-	// limiter to slow down brute-force and credential-stuffing attacks.
-	// The limiter is disabled in integration tests where many parallel
-	// tenants register from the same loopback address.
-	r.Group(func(sub chi.Router) {
-		if !deps.DisableRateLimit {
-			authRateLimiter := middleware.NewIPRateLimiter(middleware.RateLimitConfig{
-				MaxRequests: 5,
-				Window:      15 * time.Minute,
-			})
-			sub.Use(authRateLimiter.Middleware())
-		}
-		authRateLimitedAPI := newSubAPI(sub)
-		registerPublicAuthRoutes(authRateLimitedAPI, authDeps)
-	})
 	huma.Register(api, huma.Operation{
 		OperationID: "oauth-integration-callback",
 		Method:      http.MethodGet,
@@ -369,31 +336,10 @@ func BuildResult(deps Deps) Result {
 		}
 	}
 
-	// /auth/refresh and /auth/logout authenticate via the nf_rt httpOnly
-	// cookie, not the Bearer access token, so they must sit outside the
-	// authMW group — otherwise a page reload (which starts with no access
-	// token in memory) can never rotate the refresh token.
-	//
-	// A separate, more generous rate limiter protects these routes: refresh
-	// fires on every page load so the window must be wider than the strict
-	// login limiter above.
-	r.Group(func(sub chi.Router) {
-		if !deps.DisableRateLimit {
-			cookieAuthRateLimiter := middleware.NewIPRateLimiter(middleware.RateLimitConfig{
-				MaxRequests: 30,
-				Window:      15 * time.Minute,
-			})
-			sub.Use(cookieAuthRateLimiter.Middleware())
-		}
-		cookieAuthAPI := newSubAPI(sub)
-		registerPublicAuthCookieRoutes(cookieAuthAPI, authDeps)
-	})
-
-	// /me, /workspaces{,list}.
+	// /workspaces, /me/integrations (auth-protected).
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
 		subAPI := newSubAPI(sub)
-		registerProtectedAuthRoutes(subAPI, authDeps)
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "me-integrations-list",
 			Method:      http.MethodGet,
@@ -465,6 +411,8 @@ func BuildResult(deps Deps) Result {
 		dashboard.RegisterWorkspaceScoped(subAPI, dashDeps)
 		pageDeps := pages.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
 		pages.RegisterWorkspaceScoped(subAPI, pageDeps)
+		calDeps := calhandlers.Deps{DB: deps.DB, Queries: deps.Queries}
+		calhandlers.Register(subAPI, calDeps)
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-cost-today",
 			Method:      http.MethodGet,
@@ -798,136 +746,6 @@ type healthOutput struct {
 	Body struct {
 		Status string `json:"status"`
 	}
-}
-
-// registerPublicAuthRoutes wires the unauthenticated auth endpoints.
-func registerPublicAuthRoutes(api huma.API, deps authhandlers.Deps) {
-	huma.Register(api, huma.Operation{
-		OperationID: "auth-register",
-		Method:      http.MethodPost,
-		Path:        "/auth/register",
-		Summary:     "Register a new local-password account",
-	}, authhandlers.Register(deps))
-	huma.Register(api, huma.Operation{
-		OperationID: "auth-login",
-		Method:      http.MethodPost,
-		Path:        "/auth/login",
-		Summary:     "Log in with email and password",
-	}, authhandlers.Login(deps))
-	huma.Register(api, huma.Operation{
-		OperationID: "auth-oidc-google-start",
-		Method:      http.MethodGet,
-		Path:        "/auth/oidc/google/start",
-		Summary:     "Start a Google OIDC login flow",
-	}, authhandlers.OIDCGoogleStart(deps))
-	huma.Register(api, huma.Operation{
-		OperationID: "auth-oidc-google-callback",
-		Method:      http.MethodGet,
-		Path:        "/auth/oidc/google/callback",
-		Summary:     "Complete a Google OIDC login flow",
-	}, authhandlers.OIDCGoogleCallback(deps))
-}
-
-// registerPublicAuthCookieRoutes wires the auth endpoints that
-// authenticate via the nf_rt httpOnly refresh cookie rather than the
-// Bearer access JWT. They must not be behind authMW, otherwise a page
-// reload (which starts with an empty in-memory access token) can never
-// reach /auth/refresh to rotate the session.
-func registerPublicAuthCookieRoutes(api huma.API, deps authhandlers.Deps) {
-	huma.Register(api, huma.Operation{
-		OperationID: "auth-refresh",
-		Method:      http.MethodPost,
-		Path:        "/auth/refresh",
-		Summary:     "Rotate refresh token and issue a new access token",
-	}, authhandlers.Refresh(deps))
-	huma.Register(api, huma.Operation{
-		OperationID: "auth-logout",
-		Method:      http.MethodPost,
-		Path:        "/auth/logout",
-		Summary:     "Revoke a session",
-	}, authhandlers.Logout(deps))
-	huma.Register(api, huma.Operation{
-		OperationID: "auth-login-totp",
-		Method:      http.MethodPost,
-		Path:        "/auth/login/totp",
-		Summary:     "Complete a TOTP step-up login after /auth/login returned totp_required",
-	}, authhandlers.LoginTotp(deps))
-}
-
-// registerProtectedAuthRoutes wires the bearer-protected auth endpoints.
-func registerProtectedAuthRoutes(api huma.API, deps authhandlers.Deps) {
-	huma.Register(api, huma.Operation{
-		OperationID: "me",
-		Method:      http.MethodGet,
-		Path:        "/me",
-		Summary:     "Return the authenticated user's profile",
-	}, authhandlers.Me(deps))
-	huma.Register(api, huma.Operation{
-		OperationID: "me-patch",
-		Method:      http.MethodPatch,
-		Path:        "/me",
-		Summary:     "Patch the authenticated user's profile",
-	}, authhandlers.PatchMe(deps))
-	huma.Register(api, huma.Operation{
-		OperationID: "me-sessions-list",
-		Method:      http.MethodGet,
-		Path:        "/me/sessions",
-		Summary:     "List the authenticated user's active sessions",
-	}, authhandlers.ListSessions(deps))
-	huma.Register(api, huma.Operation{
-		OperationID: "me-sessions-revoke",
-		Method:      http.MethodDelete,
-		Path:        "/me/sessions/{sessionId}",
-		Summary:     "Revoke a single session by public id",
-	}, authhandlers.RevokeOneSession(deps))
-	huma.Register(api, huma.Operation{
-		OperationID: "me-sessions-revoke-others",
-		Method:      http.MethodDelete,
-		Path:        "/me/sessions",
-		Summary:     "Revoke every session except the one on the current request",
-	}, authhandlers.RevokeAllOtherSessions(deps))
-	huma.Register(api, huma.Operation{
-		OperationID: "me-password-change",
-		Method:      http.MethodPost,
-		Path:        "/me/password",
-		Summary:     "Change the authenticated user's password",
-	}, authhandlers.ChangePassword(deps))
-	huma.Register(api, huma.Operation{
-		OperationID: "me-totp-status",
-		Method:      http.MethodGet,
-		Path:        "/me/totp",
-		Summary:     "Return the authenticated user's TOTP 2FA status",
-	}, authhandlers.TotpStatus(deps))
-	huma.Register(api, huma.Operation{
-		OperationID: "me-totp-enroll",
-		Method:      http.MethodPost,
-		Path:        "/me/totp/enroll",
-		Summary:     "Begin TOTP 2FA enrollment (returns otpauth URL)",
-	}, authhandlers.TotpEnroll(deps))
-	huma.Register(api, huma.Operation{
-		OperationID: "me-totp-confirm",
-		Method:      http.MethodPost,
-		Path:        "/me/totp/confirm",
-		Summary:     "Confirm TOTP 2FA enrollment with a generated code",
-	}, authhandlers.TotpConfirm(deps))
-	huma.Register(api, huma.Operation{
-		OperationID: "me-totp-disable",
-		Method:      http.MethodDelete,
-		Path:        "/me/totp",
-		Summary:     "Disable TOTP 2FA after password reverification",
-	}, authhandlers.TotpDisable(deps))
-	huma.Register(api, huma.Operation{
-		OperationID: "me-totp-recovery-status",
-		Method:      http.MethodGet,
-		Path:        "/me/totp/recovery-codes",
-		Summary:     "Return remaining TOTP recovery code count",
-	}, authhandlers.TotpRecoveryCodesStatus(deps))
-	huma.Register(api, huma.Operation{
-		OperationID: "me-totp-recovery-regenerate",
-		Method:      http.MethodPost,
-		Path:        "/me/totp/recovery-codes",
-		Summary:     "Regenerate TOTP recovery codes after password reverification",
-	}, authhandlers.TotpRegenerateRecoveryCodes(deps))
 }
 
 // newDBInvocationLogger returns an ai.InvocationLogger that persists

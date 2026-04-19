@@ -59,11 +59,13 @@ func nullBytesToUUIDPtr(s sql.NullString) *string {
 	return &out
 }
 
-// rawBytesToUUIDPtr is the []byte variant for columns that sqlc exposes
-// as a raw BINARY(16) slice rather than sql.NullString. Returns nil
-// when the slice is empty or not exactly 16 bytes.
-func rawBytesToUUIDPtr(b []byte) *string {
-	if len(b) != 16 {
+// rawBytesToUUIDPtr converts a BINARY(16) column to a UUID string pointer.
+// It accepts interface{} because sqlc may expose the column as either []byte
+// or interface{} depending on the query. Returns nil when the value is not
+// a []byte of exactly 16 bytes.
+func rawBytesToUUIDPtr(v interface{}) *string {
+	b, ok := v.([]byte)
+	if !ok || len(b) != 16 {
 		return nil
 	}
 	var u uuid.UUID

@@ -12,7 +12,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { refreshAccessToken, sdk } from '../../lib/sdk';
+import { authApiBaseUrl, refreshAccessToken } from '../../lib/sdk';
 import { queryClient } from '../../providers/query-client';
 import { type AuthUser, authStore } from './auth-store';
 
@@ -27,11 +27,19 @@ let bootstrapPromise: Promise<AuthBootstrapStatus> | null = null;
 async function runBootstrap(): Promise<AuthBootstrapStatus> {
   const token = await refreshAccessToken();
   if (!token) return 'unauthenticated';
-  const { data, error } = await sdk.GET('/me');
-  if (error || !data) {
+  const meRes = await fetch(`${authApiBaseUrl}/me`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  if (!meRes.ok) {
     authStore.getState().clearSession();
     return 'unauthenticated';
   }
+  const data = (await meRes.json()) as {
+    id: string;
+    email: string;
+    displayName: string;
+    locale: string;
+  };
   const user: AuthUser = {
     id: data.id,
     email: data.email,

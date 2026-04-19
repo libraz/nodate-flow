@@ -154,3 +154,57 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.provider_id"
             go_struct_tag: 'json:"-"'
+  # --- auth-api (auth + audit + workspace queries only) ---
+  - engine: "mysql"
+    queries:
+      - "queries/auth"
+      - "queries/audit"
+      - "queries/workspaces"
+    schema:
+      - "tables"
+      - "views"
+    gen:
+      go:
+        package: "generated"
+        out: "../apps/auth-api/internal/db/generated"
+        sql_package: "database/sql"
+        emit_interface: true
+        emit_json_tags: true
+        json_tags_case_style: "camel"
+        emit_pointers_for_null_types: true
+        emit_db_tags: false
+        emit_prepared_queries: false
+        emit_exact_table_names: false
+        emit_empty_slices: true
+        overrides:
+          - column: "*.public_id"
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+          - column: "*.user_public_id"
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+          - column: "*.calendar_public_id"
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+          - column: "*.id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.workspace_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.actor_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.target_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.created_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.invited_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.provider_id"
+            go_struct_tag: 'json:"-"'

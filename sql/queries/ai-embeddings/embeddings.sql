@@ -8,9 +8,9 @@
 -- VECTOR columns are read/written as []byte. The Go embedding client
 -- L2-normalizes vectors before INSERT and serializes them with
 -- STRING_TO_VECTOR / the native binary protocol. Cosine similarity is
--- computed in Go (dot product on normalized vectors), because MySQL 9.1
--- Community Edition does not expose VEC_DISTANCE_COSINE (HeatWave-only in
--- 9.1; a native distance function is expected in 9.2+). The query layer
+-- computed in Go (dot product on normalized vectors), because MySQL 9.6
+-- Community Edition does not expose VEC_DISTANCE_COSINE (HeatWave-only).
+-- The query layer
 -- therefore returns candidate rows and the application does the ranking.
 -- ============================================================================
 
@@ -59,7 +59,7 @@ LIMIT ?;
 -- name: ListCandidateTaskEmbeddings :many
 -- Return all task_embeddings for (workspace_id, model), excluding a given
 -- task_id (so self-similarity is filtered out). Cosine similarity is
--- computed in Go because MySQL 9.1 Community does not expose
+-- computed in Go because MySQL 9.6 Community does not expose
 -- VEC_DISTANCE_COSINE; the caller dot-products the L2-normalized vectors
 -- and applies the duplicate_threshold_high / low cutoffs from ai_settings.
 SELECT

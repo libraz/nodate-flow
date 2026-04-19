@@ -7,7 +7,7 @@
 // Vectors are stored as MySQL 9.x VECTOR columns; the write/read path
 // uses STRING_TO_VECTOR / VECTOR_TO_STRING so the wire format is the
 // textual "[0.1,0.2,...]" form. Cosine similarity is a dot product on
-// the unit-length vectors, computed in Go (MySQL 9.1 Community does not
+// the unit-length vectors, computed in Go (MySQL 9.6 Community does not
 // ship VEC_DISTANCE_COSINE).
 package embed
 

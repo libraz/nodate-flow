@@ -2,92 +2,93 @@
 
 > **Not a tool to manage tasks — a system where work flows forward on its own.**
 
-nodate-flow is an OSS task platform that starts as a lightweight Asana
-alternative and evolves, natively, into something different: a system where
-LLMs and MCP are not bolted-on features but the execution layer itself.
+An OSS task platform where LLMs and MCP are not add-ons but the execution
+layer. Tasks are processes whose state is derived from constraints and
+events, not rows updated by button clicks.
 
-> **About the name:** "nodate-flow" is a pun on English *"no date"* (work
-> that isn't ruled by deadlines) and Japanese **"野点 (nodate)"** — the
-> practice of informally preparing tea outdoors. The name evokes work that
-> flows lightly and unhurriedly, rather than being driven by rigid due
-> dates.
+A single monorepo ships two products:
 
-**Status:** alpha — under active development, not yet released.
-**License:** [AGPL-3.0](./LICENSE).
-**Stack:** Go (Huma + chi + sqlc) · MySQL 9.1 · React 19 (Vite + TanStack + Tailwind v4) · OpenAPI 3.1 boundary.
+- **nodate-flow** — task management driven by constraints, events, and AI agents.
+- **nodate-time** — a calendar that blends TimeTree's shared-calendar simplicity with Google Calendar's permission model.
+
+> **About the name:** a pun on *"no date"* (work free from deadline pressure) and Japanese **野点 (nodate)** — preparing tea outdoors, unhurried.
+
+**Status:** alpha | **License:** [AGPL-3.0](./LICENSE) | **Stack:** Go · MySQL 9.6 · React 19 · OpenAPI 3.1
 
 ---
 
-## What we're building
+## nodate-flow
 
-Most task managers treat a task as a **row** — a record with a `status`
-column that humans click through. nodate-flow treats a task as a **process**:
-a small autonomous unit whose state is *derived* from constraints and an
-event log, not assigned by a button press.
+| Feature | Detail |
+|---|---|
+| **Views** | Board, timeline, Gantt, dashboard, custom lenses |
+| **Constraints** | Dependencies, auto-evaluation, derived state — no manual status toggling |
+| **AI** | Priority & state suggestions, smart create, embedding-based duplicate detection |
+| **MCP** | Built-in server — GitHub, Slack, and external tools live in the same workspace |
+| **Pages** | Lightweight wiki / docs |
+| **Notifications** | Inbox with weekly digest |
+| **Webhooks** | Outbound event delivery |
+| **Auth** | Password (Argon2id) · OIDC · TOTP 2FA · recovery codes |
+| **Multi-tenant** | Workspaces with role-based access control |
 
-Five design principles sit above every feature decision:
+## nodate-time
 
-1. **A task is a process, not a row.** State is derived, not stored.
-2. **Drive by constraints and events, not by status updates.** No direct
-   `UPDATE tasks SET status = ...`.
-3. **LLMs are execution logic, not garnish.** The system works without an
-   LLM, but behaves dramatically differently with one.
-4. **External services share the same space via MCP.** GitHub issues, Slack
-   threads, Google Docs — all land in a unified `signals` table, not behind
-   bespoke integration code.
-5. **The UI is for observation and intervention, not operation.** Timelines
-   and state graphs first; buttons second.
+| Feature | Detail |
+|---|---|
+| **Calendars** | Shared & personal, per-member visibility control |
+| **Events** | Attendees, invites, checklists, comments, attachments |
+| **Sync** | Two-way task sync with nodate-flow |
+| **Holidays** | Locale-aware holiday scheduling |
 
-## How it differs from existing products
+## Why not Asana / Plane / Linear?
 
-| | Asana / Jira / Linear | Plane / Vikunja / OpenProject | **nodate-flow** |
-|---|---|---|---|
-| Task model | Row with `status` | Row with `status` | Process derived from constraints + events |
-| LLM role | Bolt-on "AI features" | Mostly absent | Core execution logic |
-| External services | REST integrations | Webhooks / REST | MCP as a first-class signal source |
-| UI philosophy | Operate (click to change state) | Operate | Observe + intervene |
-| Hosting model | Proprietary SaaS | OSS, self-host friendly | OSS (AGPL), self-host first |
-| License | Proprietary | AGPL-3.0 (Plane, Vikunja) / GPL (OpenProject) | AGPL-3.0 |
+Most tools treat a task as a database row you click through.
+nodate-flow treats it as a **process** — state is derived from constraints
+and an event log, LLMs act as built-in execution actors, and external
+services land in the workspace via MCP rather than bespoke integrations.
 
-**Closest peer:** Plane. nodate-flow shares the "OSS Asana-alike, AGPL,
-self-host-first" positioning, but diverges on the task model itself —
-Plane is still row-and-status; nodate-flow is constraints-and-events with
-LLM as a built-in actor.
+Closest peer is [Plane](https://plane.so) (OSS, AGPL, self-host-first),
+but Plane stays in the row-and-status paradigm.
 
-**Not trying to be:** a pixel-perfect Asana clone. Heavy add-ons like
-Cycle / Module / Goal / OKR / Portfolio / Form / Wiki / Gantt are
-deliberately **out of scope** — the bet is that most of them either emerge
-naturally from a constraint + event model, or turn out to be unnecessary.
+## Quick start
 
-## Repository layout
+```sh
+git clone <repo> && cd nodate-flow
+make dev          # MySQL (Docker) + auth-api + flow-api + flow-web
+make seed-flow    # demo admin user + workspace
+```
+
+```
+make dev-time     # calendar stack instead
+make test         # Go + TS tests
+make gen          # codegen (sqlc + errors + SDK)
+make help         # all targets
+```
+
+## Repo structure
 
 ```
 apps/
-  api/       # Go backend (Huma + chi + sqlc)
-  web/       # React 19 frontend (Vite + TanStack)
-  cli/       # TypeScript CLI (binary: tnk)
+  flow-api/       # Go backend — tasks, AI, MCP (Huma + chi + sqlc)
+  flow-web/       # React 19 frontend (Vite + TanStack)
+  auth-api/       # Go — auth & sessions (JWT, OIDC, TOTP)
+  accounts-web/   # React 19 — login / signup / account UI
+  time-api/       # Go — calendar backend
+  time-web/       # React 19 — calendar frontend
+  cli/            # CLI (binary: tnk)
 packages/
-  sdk/       # Generated TypeScript SDK (from OpenAPI)
-  ui/        # Design system
-  fixtures/  # Test fixtures
-errors/      # YAML — single source for error codes (→ Go + TS codegen)
-sql/         # Tables, views, sqlc queries
+  sdk/            # TS SDK for flow-api (generated from OpenAPI)
+  time-sdk/       # TS SDK for time-api (generated from OpenAPI)
+  ui/             # Design system (4 themes)
+  go-shared/      # Shared Go packages
+  holidays/       # Holiday data
+  fixtures/       # Test fixtures
+errors/           # Error codes (YAML → Go + TS codegen)
+sql/              # Tables, views, sqlc queries
+infra/            # Docker, Prometheus, Grafana, OTel, Caddy
 ```
 
-## Getting started
+## License
 
-Alpha — no stable releases yet. Development entry point:
-
-```sh
-git clone <repo>
-cd nodate-flow
-cp .env.example .env
-docker compose up
-```
-
-## Licensing
-
-nodate-flow is licensed under **AGPL-3.0**. You are free to self-host,
-modify, and redistribute. If you run a modified version as a network
-service, AGPL §13 requires you to make the corresponding source available
-to its users — the same model used by Plane, Vikunja, and Leantime.
+[AGPL-3.0](./LICENSE) — self-host, modify, redistribute freely. Network
+use requires source availability (same model as Plane and Vikunja).

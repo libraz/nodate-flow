@@ -31,16 +31,16 @@ help: ## Show this help
 
 # ---------- dev (yarn dev equivalent) ----------
 
-.PHONY: dev dev-api dev-web dev-time-api dev-time up down logs
-dev: db-schema .env ## Start MySQL (compose) + flow API + flow web in parallel
-	@echo "starting mysql, flow-api, flow-web..."
+.PHONY: dev dev-api dev-auth-api dev-web dev-time-api dev-time up down logs
+dev: db-schema .env ## Start MySQL (compose) + auth API + flow API + flow web in parallel
+	@echo "starting mysql, auth-api, flow-api, flow-web..."
 	@docker compose up -d mysql
-	@$(MAKE) -j2 dev-api dev-web
+	@$(MAKE) -j3 dev-auth-api dev-api dev-web
 
-dev-time: db-schema .env ## Start MySQL (compose) + time API + time web in parallel
-	@echo "starting mysql, time-api..."
+dev-time: db-schema .env ## Start MySQL (compose) + auth API + time API + time web in parallel
+	@echo "starting mysql, auth-api, time-api..."
 	@docker compose up -d mysql
-	@$(MAKE) dev-time-api
+	@$(MAKE) -j2 dev-auth-api dev-time-api
 
 # Copy .env.example on first run so `make dev` works out of the box.
 .env:
@@ -50,8 +50,16 @@ dev-time: db-schema .env ## Start MySQL (compose) + time API + time web in paral
 	@# `make dev` runs the api on the host so point it at 127.0.0.1.
 	@sed -i.bak 's|@tcp(mysql:3306)|@tcp(127.0.0.1:3306)|' .env && rm -f .env.bak
 
-dev-api: ## Run Go API against the local MySQL (reads .env)
-	cd apps/flow-api && go run ./cmd/api
+dev-api: ## Run Go flow API against the local MySQL (reads .env)
+	@# Map NF_* env vars to ND_* expected by the Go app
+	cd apps/flow-api && \
+	  ND_DB_DSN="$${NF_DB_DSN:-$(NF_DB_USER):$(NF_DB_PASSWORD)@tcp($(NF_DB_HOST):$(NF_DB_PORT))/$(NF_DB_NAME)?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci}" \
+	  go run ./cmd/api
+
+dev-auth-api: ## Run Go auth API against the local MySQL (reads .env)
+	cd apps/auth-api && \
+	  ND_DB_DSN="$${NF_DB_DSN:-$(NF_DB_USER):$(NF_DB_PASSWORD)@tcp($(NF_DB_HOST):$(NF_DB_PORT))/$(NF_DB_NAME)?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci}" \
+	  go run ./cmd/api
 
 dev-web: ## Run Vite dev server
 	cd apps/flow-web && $(PKG_RUN) dev
@@ -71,10 +79,13 @@ logs: ## Tail compose logs
 # ---------- build ----------
 
 .PHONY: build build-api build-web
-build: build-api build-time-api build-web ## Build all apps
+build: build-api build-auth-api build-time-api build-web ## Build all apps
 
 build-api:
 	cd apps/flow-api && go build -o ../../bin/flow-api ./cmd/api
+
+build-auth-api:
+	cd apps/auth-api && go build -o ../../bin/auth-api ./cmd/api
 
 build-time-api:
 	cd apps/time-api && go build -o ../../bin/time-api ./cmd/api
@@ -85,10 +96,13 @@ build-web:
 # ---------- test ----------
 
 .PHONY: test test-api test-web test-e2e test-contract lighthouse
-test: test-api test-time-api test-web ## Run unit/integration tests (Go + TS)
+test: test-api test-auth-api test-time-api test-web ## Run unit/integration tests (Go + TS)
 
 test-api: ## Go tests (flow)
 	cd apps/flow-api && go test ./...
+
+test-auth-api: ## Go tests (auth)
+	cd apps/auth-api && go test ./...
 
 test-time-api: ## Go tests (time)
 	cd apps/time-api && go test ./...
@@ -123,6 +137,7 @@ typecheck: ## tsc -b
 
 vet: ## go vet
 	cd apps/flow-api && go vet ./...
+	cd apps/auth-api && go vet ./...
 	cd apps/time-api && go vet ./...
 
 # ---------- codegen ----------
@@ -178,7 +193,7 @@ db-shell: ## Open a mysql shell against the compose mysql
 
 seed-flow: ## Insert dev admin user + demo workspace (idempotent; ND_SEED_LOCALE=en|ja)
 	@dsn="$${NF_DB_DSN:-$(NF_DB_USER):$(NF_DB_PASSWORD)@tcp($(NF_DB_HOST):$(NF_DB_PORT))/$(NF_DB_NAME)?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci}"; \
-	cd apps/flow-api && NF_DB_DSN="$$dsn" go run ./cmd/seed-dev
+	cd apps/flow-api && ND_DB_DSN="$$dsn" go run ./cmd/seed-dev
 
 seed-time: ## Seed nodate-time calendar demo data via REST API (ND_SEED_LOCALE=en|ja)
 	./scripts/seed-time.sh

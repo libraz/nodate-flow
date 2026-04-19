@@ -63,7 +63,7 @@ function CalendarSection({
 
 export default function CalendarSidebar(): ReactElement {
   const { t } = useTranslation();
-  const { data: calendars, isLoading } = useCalendarsQuery();
+  const { data: calendars, isLoading, isError } = useCalendarsQuery();
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const clearWorkspace = useWorkspaceStore((s) => s.clearWorkspace);
   const user = useAuthStore((s) => s.user);
@@ -80,7 +80,7 @@ export default function CalendarSidebar(): ReactElement {
     window.location.href = '/login';
   }, [clearAuth, clearWorkspace]);
 
-  if (isLoading || !calendars) {
+  if (isLoading) {
     return (
       <aside className="glass-surface flex h-full w-[260px] shrink-0 flex-col border-r border-[var(--color-border)] p-4">
         <div className="space-y-2">
@@ -92,16 +92,28 @@ export default function CalendarSidebar(): ReactElement {
     );
   }
 
-  const shared = calendars.filter((c) => c.kind === 'shared');
-  const personal = calendars.filter((c) => c.kind === 'personal');
-  const system = calendars.filter((c) => c.kind === 'system');
+  const calendarList = calendars ?? [];
+  const shared = calendarList.filter((c) => c.kind === 'shared');
+  const personal = calendarList.filter((c) => c.kind === 'personal');
+  const system = calendarList.filter((c) => c.kind === 'system');
+  const hasNoCalendars = calendarList.length === 0;
 
   return (
     <aside className="glass-surface flex h-full w-[260px] shrink-0 flex-col border-r border-[var(--color-border)]">
       <div className="flex-1 overflow-y-auto">
-        <CalendarSection title={t('sidebar.sharedCalendars')} calendars={shared} />
-        <CalendarSection title={t('sidebar.myCalendar')} calendars={personal} />
-        <CalendarSection title={t('sidebar.other')} calendars={system} />
+        {hasNoCalendars ? (
+          <div className="flex flex-col items-center gap-2 px-4 py-8">
+            <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>
+              {isError ? t('sidebar.loadError') : t('sidebar.noCalendars')}
+            </p>
+          </div>
+        ) : (
+          <>
+            <CalendarSection title={t('sidebar.sharedCalendars')} calendars={shared} />
+            <CalendarSection title={t('sidebar.myCalendar')} calendars={personal} />
+            <CalendarSection title={t('sidebar.other')} calendars={system} />
+          </>
+        )}
       </div>
       <div className="border-t border-[var(--color-border)] px-3 py-2">
         {user && (

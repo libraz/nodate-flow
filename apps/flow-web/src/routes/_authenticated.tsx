@@ -5,7 +5,7 @@
  * the user is redirected to /login.
  */
 
-import { Outlet, createFileRoute, useNavigate, useRouterState } from '@tanstack/react-router';
+import { Outlet, createFileRoute, useRouterState } from '@tanstack/react-router';
 import { type ReactElement, useCallback, useEffect, useState } from 'react';
 
 import AppShell from '../components/layout/app-shell';
@@ -20,7 +20,6 @@ import { useKeyboardShortcuts } from '../lib/use-keyboard-shortcuts';
 function AuthenticatedLayout(): ReactElement | null {
   const { status } = useAuthBootstrap();
   const isAuthenticated = useAuth(selectIsAuthenticated);
-  const navigate = useNavigate();
 
   // Extract projectId from current route if present.
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -47,9 +46,11 @@ function AuthenticatedLayout(): ReactElement | null {
 
   useEffect(() => {
     if (status === 'unauthenticated' && !isAuthenticated) {
-      void navigate({ to: '/login', replace: true });
+      const accountsUrl =
+        (import.meta.env.VITE_ACCOUNTS_WEB_URL as string | undefined) ?? 'http://localhost:5175';
+      window.location.href = `${accountsUrl}/login?redirect=${encodeURIComponent(window.location.href)}`;
     }
-  }, [status, isAuthenticated, navigate]);
+  }, [status, isAuthenticated]);
 
   if (status === 'loading') return null;
   if (!isAuthenticated) return null;

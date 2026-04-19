@@ -57,9 +57,8 @@ func main() {
 	}
 
 	inner := router.Build(router.Deps{
-		DB:           db,
-		JWT:          jwtIssuer,
-		CookieSecure: cfg.CookieSecure,
+		DB:  db,
+		JWT: jwtIssuer,
 	})
 
 	outer := chi.NewRouter()

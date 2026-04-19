@@ -170,7 +170,7 @@ with AI-suggested initial layouts.
 | Layer | Technology |
 |---|---|
 | Backend | Go 1.23+, Huma (chi router), sqlc, `database/sql` |
-| Database | MySQL 8.4 |
+| Database | MySQL 9.6 |
 | Frontend | TypeScript, React 19, Vite, Tailwind v4, TanStack (Router, Query, Table, Virtual) |
 | State management | Zustand |
 | Forms | React Hook Form + Zod |

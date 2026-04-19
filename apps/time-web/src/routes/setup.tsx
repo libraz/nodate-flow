@@ -82,25 +82,41 @@ function SetupPage(): ReactElement {
 
   if (checking) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <p className="text-sm text-gray-500">{t('common.loading')}</p>
+      <div className="app-bg flex min-h-screen items-center justify-center">
+        <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>
+          {t('common.loading')}
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm">
-        <h1 className="mb-2 text-center text-2xl font-bold text-gray-900">
+    <div className="app-bg flex min-h-screen items-center justify-center px-4">
+      <div className="glass-surface w-full max-w-sm rounded-[var(--radius-xl)] p-8">
+        <h1
+          className="mb-2 text-center text-2xl font-bold"
+          style={{ color: 'var(--color-text-primary)' }}
+        >
           {t('workspace.create')}
         </h1>
-        <p className="mb-8 text-center text-sm text-gray-500">{t('workspace.description')}</p>
+        <p className="mb-8 text-center text-sm" style={{ color: 'var(--color-text-tertiary)' }}>
+          {t('workspace.description')}
+        </p>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+            <div
+              className="rounded-[var(--radius-sm)] px-4 py-3 text-sm"
+              style={{ backgroundColor: 'var(--color-danger-bg)', color: 'var(--color-danger)' }}
+            >
+              {error}
+            </div>
           )}
           <div>
-            <label htmlFor="ws-name" className="mb-1 block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="ws-name"
+              className="mb-1 block text-sm font-medium"
+              style={{ color: 'var(--color-text-secondary)' }}
+            >
               {t('workspace.name')}
             </label>
             <input
@@ -109,12 +125,16 @@ function SetupPage(): ReactElement {
               required
               value={name}
               onChange={(e) => handleNameChange(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="input-modern w-full"
               placeholder={t('workspace.namePlaceholder')}
             />
           </div>
           <div>
-            <label htmlFor="ws-slug" className="mb-1 block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="ws-slug"
+              className="mb-1 block text-sm font-medium"
+              style={{ color: 'var(--color-text-secondary)' }}
+            >
               {t('workspace.slug')}
             </label>
             <input
@@ -126,15 +146,17 @@ function SetupPage(): ReactElement {
                 setSlug(e.target.value);
                 setSlugEdited(true);
               }}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="input-modern w-full"
               placeholder={t('workspace.slugPlaceholder')}
             />
-            <p className="mt-1 text-xs text-gray-400">{t('workspace.slugHint')}</p>
+            <p className="mt-1 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+              {t('workspace.slugHint')}
+            </p>
           </div>
           <button
             type="submit"
             disabled={loading || !name.trim() || !slug.trim()}
-            className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+            className="btn-primary w-full"
           >
             {loading ? t('workspace.creating') : t('workspace.createButton')}
           </button>
