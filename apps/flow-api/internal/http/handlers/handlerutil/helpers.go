@@ -12,6 +12,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-sql-driver/mysql"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
@@ -127,21 +128,24 @@ func NullTimeDate(t sql.NullTime) *string {
 // a member. This is the single canonical existence check — callers no longer
 // need to inline the query.
 func CheckWorkspaceMember(ctx context.Context, db *sql.DB, workspaceID uint32, userID uint32) error {
-	const q = `SELECT 1 FROM workspace_members
-WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
-	var one int
-	return db.QueryRowContext(ctx, q, workspaceID, userID).Scan(&one)
+	q := generated.New(db)
+	_, err := q.CheckWorkspaceMemberExists(ctx, generated.CheckWorkspaceMemberExistsParams{
+		WorkspaceID: workspaceID,
+		UserID:      userID,
+	})
+	return err
 }
 
 // WorkspaceMemberRole returns the role string ("owner", "admin", "member",
 // "guest") for the given user in the workspace. Returns sql.ErrNoRows when
 // the user is not an enabled member.
 func WorkspaceMemberRole(ctx context.Context, db *sql.DB, workspaceID uint32, userID uint32) (string, error) {
-	const q = `SELECT role FROM workspace_members
-WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
-	var role string
-	err := db.QueryRowContext(ctx, q, workspaceID, userID).Scan(&role)
-	return role, err
+	q := generated.New(db)
+	role, err := q.GetWorkspaceMemberRole(ctx, generated.GetWorkspaceMemberRoleParams{
+		WorkspaceID: workspaceID,
+		UserID:      userID,
+	})
+	return string(role), err
 }
 
 // TotalAsInt64 normalises the COUNT(*) OVER() return type into int64.

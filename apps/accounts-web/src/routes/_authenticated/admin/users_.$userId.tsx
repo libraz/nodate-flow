@@ -286,7 +286,7 @@ function UserDetailPage(): ReactElement {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                <th style={thStyle}>User Agent</th>
+                <th style={thStyle}>{t('users.user_agent')}</th>
                 <th style={thStyle}>IP</th>
                 <th style={thStyle}>{t('users.created_at')}</th>
                 <th style={thStyle} />

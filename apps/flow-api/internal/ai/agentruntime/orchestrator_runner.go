@@ -3,8 +3,10 @@ package agentruntime
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"time"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 )
 
@@ -49,12 +51,16 @@ func (r *OrchestratorRunner) Run(ctx context.Context, j Job, _ time.Time) error 
 	if r.Now == nil {
 		r.Now = time.Now
 	}
+	// Resolve the agent's public UUID so event payloads never expose
+	// the internal auto-increment ID.
+	agentPubID := r.resolveAgentPublicID(ctx, j.AgentID)
+
 	started := r.Now().UTC()
 	_ = eventbus.Append(ctx, r.DB, eventbus.Event{
 		Type:        eventbus.AiAgentRunStarted,
 		WorkspaceID: j.WsID,
 		Payload: map[string]any{
-			"agentId":   j.AgentID,
+			"agentId":   agentPubID,
 			"startedAt": started.Unix(),
 		},
 	})
@@ -68,7 +74,7 @@ func (r *OrchestratorRunner) Run(ctx context.Context, j Job, _ time.Time) error 
 			Type:        eventbus.AiAgentRunFailed,
 			WorkspaceID: j.WsID,
 			Payload: map[string]any{
-				"agentId":    j.AgentID,
+				"agentId":    agentPubID,
 				"startedAt":  started.Unix(),
 				"finishedAt": finished.Unix(),
 				"error":      runErr.Error(),
@@ -80,10 +86,27 @@ func (r *OrchestratorRunner) Run(ctx context.Context, j Job, _ time.Time) error 
 		Type:        eventbus.AiAgentRunCompleted,
 		WorkspaceID: j.WsID,
 		Payload: map[string]any{
-			"agentId":    j.AgentID,
+			"agentId":    agentPubID,
 			"startedAt":  started.Unix(),
 			"finishedAt": finished.Unix(),
 		},
 	})
 	return nil
+}
+
+// resolveAgentPublicID fetches the public_id (UUID v7) for the given
+// internal agent ID. Returns "unknown" if the lookup fails, so event
+// payloads never contain the raw uint32.
+func (r *OrchestratorRunner) resolveAgentPublicID(ctx context.Context, agentID uint32) string {
+	if r.DB == nil {
+		return "unknown"
+	}
+	const q = `SELECT public_id FROM ai_agents WHERE id = ? LIMIT 1`
+	var pubID types.PublicID
+	if err := r.DB.QueryRowContext(ctx, q, agentID).Scan(&pubID); err != nil {
+		slog.WarnContext(ctx, "agentruntime: failed to resolve agent public_id",
+			slog.Uint64("agent_id", uint64(agentID)), slog.Any("err", err))
+		return "unknown"
+	}
+	return pubID.String()
 }

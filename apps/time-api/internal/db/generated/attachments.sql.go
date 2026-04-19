@@ -63,16 +63,18 @@ UPDATE calendar_event_attachments
 SET enabled = FALSE
 WHERE public_id = ?
   AND event_id = ?
+  AND workspace_id = ?
 `
 
 type DisableCalendarEventAttachmentParams struct {
-	PublicID types.PublicID `json:"publicId"`
-	EventID  uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+	EventID     uint32         `json:"-"`
+	WorkspaceID uint32         `json:"-"`
 }
 
 // Soft-delete an attachment. Actual blob cleanup is deferred.
 func (q *Queries) DisableCalendarEventAttachment(ctx context.Context, arg DisableCalendarEventAttachmentParams) error {
-	_, err := q.db.ExecContext(ctx, disableCalendarEventAttachment, arg.PublicID, arg.EventID)
+	_, err := q.db.ExecContext(ctx, disableCalendarEventAttachment, arg.PublicID, arg.EventID, arg.WorkspaceID)
 	return err
 }
 
@@ -91,13 +93,15 @@ SELECT
 FROM calendar_event_attachments
 WHERE public_id = ?
   AND event_id = ?
+  AND workspace_id = ?
   AND enabled = TRUE
 LIMIT 1
 `
 
 type FindCalendarEventAttachmentByPublicIdParams struct {
-	PublicID types.PublicID `json:"publicId"`
-	EventID  uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+	EventID     uint32         `json:"-"`
+	WorkspaceID uint32         `json:"-"`
 }
 
 type FindCalendarEventAttachmentByPublicIdRow struct {
@@ -115,7 +119,7 @@ type FindCalendarEventAttachmentByPublicIdRow struct {
 
 // Resolve an attachment by UUID v7 for download or deletion.
 func (q *Queries) FindCalendarEventAttachmentByPublicId(ctx context.Context, arg FindCalendarEventAttachmentByPublicIdParams) (FindCalendarEventAttachmentByPublicIdRow, error) {
-	row := q.db.QueryRowContext(ctx, findCalendarEventAttachmentByPublicId, arg.PublicID, arg.EventID)
+	row := q.db.QueryRowContext(ctx, findCalendarEventAttachmentByPublicId, arg.PublicID, arg.EventID, arg.WorkspaceID)
 	var i FindCalendarEventAttachmentByPublicIdRow
 	err := row.Scan(
 		&i.ID,

@@ -61,7 +61,8 @@ WHERE id = ?;
 UPDATE calendar_invites
 SET enabled = FALSE
 WHERE public_id = ?
-  AND calendar_id = ?;
+  AND calendar_id = ?
+  AND workspace_id = ?;
 
 -- name: FindCalendarInviteByTokenHashPublic :one
 -- Public-facing invite lookup (for share page preview, no auth required).

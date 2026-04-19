@@ -271,7 +271,7 @@ func mapSuggestionKindToDependencyKind(kind generated.RelationSuggestionsSuggest
 	case generated.RelationSuggestionsSuggestedKindDuplicates:
 		return generated.TaskDependenciesKindDuplicates, nil
 	default:
-		return "", errors.New("unknown suggestion kind")
+		return "", apierrors.Newf(apierrors.InternalUnexpected, "unknown suggestion kind %q", kind)
 	}
 }
 

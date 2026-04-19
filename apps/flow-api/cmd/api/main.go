@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/cors"
 	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai"
@@ -37,6 +36,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/webhook"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/httputil"
 )
 
 func main() {
@@ -318,7 +318,7 @@ func main() {
 	outer.Use(nflog.RequestLogger(logger))
 	outer.Use(obs.TraceMiddleware())
 	outer.Use(obs.MetricsMiddleware())
-	outer.Use(buildCORS(cfg.CorsAllowedOrigins))
+	outer.Use(httputil.BuildCORS(cfg.CorsAllowedOrigins))
 
 	outer.Mount("/", inner)
 
@@ -462,30 +462,6 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Info("shutdown complete")
-}
-
-// buildCORS returns a chi CORS middleware configured from the runtime
-// allowlist. Credentials are enabled so the refresh cookie and
-// Authorization header round-trip to the browser; a single "*" entry
-// disables credentials (per the CORS spec wildcard rules) and allows
-// any origin. An empty allowlist disables CORS entirely.
-func buildCORS(allowed []string) func(http.Handler) http.Handler {
-	if len(allowed) == 0 {
-		return func(next http.Handler) http.Handler { return next }
-	}
-	allowCreds := true
-	if len(allowed) == 1 && allowed[0] == "*" {
-		allowCreds = false
-		slog.Warn("CORS configured with wildcard origin: credentials (cookies, Authorization header) are disabled per the CORS spec")
-	}
-	return cors.Handler(cors.Options{
-		AllowedOrigins:   allowed,
-		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Requested-With"},
-		ExposedHeaders:   []string{"X-Request-Id"},
-		AllowCredentials: allowCreds,
-		MaxAge:           600,
-	})
 }
 
 // resolveVersion returns NF_FLOW_VERSION, the Go build main module version, or

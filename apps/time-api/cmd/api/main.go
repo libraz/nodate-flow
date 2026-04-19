@@ -13,13 +13,13 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/cors"
 	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/config"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/http/router"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/notifications"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/httputil"
 )
 
 func main() {
@@ -62,7 +62,7 @@ func main() {
 	})
 
 	outer := chi.NewRouter()
-	outer.Use(buildCORS(cfg.CorsAllowedOrigins))
+	outer.Use(httputil.BuildCORS(cfg.CorsAllowedOrigins))
 	outer.Mount("/", inner)
 
 	addr := ":" + cfg.Port
@@ -105,20 +105,3 @@ func main() {
 	logger.Info("shutdown complete")
 }
 
-func buildCORS(allowed []string) func(http.Handler) http.Handler {
-	if len(allowed) == 0 {
-		return func(next http.Handler) http.Handler { return next }
-	}
-	allowCreds := true
-	if len(allowed) == 1 && allowed[0] == "*" {
-		allowCreds = false
-	}
-	return cors.Handler(cors.Options{
-		AllowedOrigins:   allowed,
-		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Requested-With"},
-		ExposedHeaders:   []string{"X-Request-Id"},
-		AllowCredentials: allowCreds,
-		MaxAge:           600,
-	})
-}

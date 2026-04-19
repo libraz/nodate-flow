@@ -147,6 +147,8 @@ type GetPageByPublicIdRow struct {
 }
 
 // Fetch a single page by workspace_id + public_id, including parent page info.
+// pg.id is required: used by MCP resolvePage and page handlers for
+// parent_page_id resolution and circular-reference checks.
 func (q *Queries) GetPageByPublicId(ctx context.Context, arg GetPageByPublicIdParams) (GetPageByPublicIdRow, error) {
 	row := q.db.QueryRowContext(ctx, getPageByPublicId, arg.WorkspaceID, arg.PublicID)
 	var i GetPageByPublicIdRow

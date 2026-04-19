@@ -600,7 +600,7 @@ export default function GlassDock(): ReactElement {
           background: 'var(--nf-color-surface)',
           border: '1px solid var(--nf-color-border)',
           color: 'var(--nf-color-fg)',
-          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
+          boxShadow: 'var(--nf-shadow-lg)',
           cursor: 'pointer',
           zIndex: 50,
         }}
@@ -628,7 +628,7 @@ export default function GlassDock(): ReactElement {
         background: 'var(--nf-color-bg-elevated)',
         border: '1px solid var(--nf-color-border)',
         borderRadius: '0.75rem',
-        boxShadow: '0 16px 48px rgba(0, 0, 0, 0.18)',
+        boxShadow: 'var(--nf-shadow-lg)',
         zIndex: 50,
       }}
     >

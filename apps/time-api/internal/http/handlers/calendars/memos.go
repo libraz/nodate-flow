@@ -191,8 +191,9 @@ func UpdateMemo(deps Deps) func(context.Context, *UpdateMemoInput) (*UpdateMemoO
 		}
 
 		_, err = deps.Queries.FindCalendarMemoByPublicId(ctx, generated.FindCalendarMemoByPublicIdParams{
-			PublicID:   types.FromUUID(memoUID),
-			CalendarID: cal.ID,
+			PublicID:    types.FromUUID(memoUID),
+			CalendarID:  cal.ID,
+			WorkspaceID: wsID,
 		})
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -202,8 +203,9 @@ func UpdateMemo(deps Deps) func(context.Context, *UpdateMemoInput) (*UpdateMemoO
 		}
 
 		params := generated.UpdateCalendarMemoParams{
-			PublicID:   types.FromUUID(memoUID),
-			CalendarID: cal.ID,
+			PublicID:    types.FromUUID(memoUID),
+			CalendarID:  cal.ID,
+			WorkspaceID: wsID,
 		}
 		if input.Body.Title != nil {
 			params.Title = sql.NullString{String: *input.Body.Title, Valid: true}
@@ -250,8 +252,9 @@ func DeleteMemo(deps Deps) func(context.Context, *DeleteMemoInput) (*DeleteMemoO
 		}
 
 		_, err = deps.Queries.FindCalendarMemoByPublicId(ctx, generated.FindCalendarMemoByPublicIdParams{
-			PublicID:   types.FromUUID(memoUID),
-			CalendarID: cal.ID,
+			PublicID:    types.FromUUID(memoUID),
+			CalendarID:  cal.ID,
+			WorkspaceID: wsID,
 		})
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -261,8 +264,9 @@ func DeleteMemo(deps Deps) func(context.Context, *DeleteMemoInput) (*DeleteMemoO
 		}
 
 		err = deps.Queries.DisableCalendarMemo(ctx, generated.DisableCalendarMemoParams{
-			PublicID:   types.FromUUID(memoUID),
-			CalendarID: cal.ID,
+			PublicID:    types.FromUUID(memoUID),
+			CalendarID:  cal.ID,
+			WorkspaceID: wsID,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarMemoStoreDeleteInterrupted)

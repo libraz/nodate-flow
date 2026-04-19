@@ -43,6 +43,7 @@ SELECT
 FROM calendar_memos
 WHERE public_id = ?
   AND calendar_id = ?
+  AND workspace_id = ?
   AND enabled = TRUE
 LIMIT 1;
 
@@ -54,6 +55,7 @@ SET title       = COALESCE(sqlc.narg('title'), title),
     sort_weight = COALESCE(sqlc.narg('sort_weight'), sort_weight)
 WHERE public_id = ?
   AND calendar_id = ?
+  AND workspace_id = ?
   AND enabled = TRUE;
 
 -- name: DisableCalendarMemo :exec
@@ -61,4 +63,5 @@ WHERE public_id = ?
 UPDATE calendar_memos
 SET enabled = FALSE
 WHERE public_id = ?
-  AND calendar_id = ?;
+  AND calendar_id = ?
+  AND workspace_id = ?;

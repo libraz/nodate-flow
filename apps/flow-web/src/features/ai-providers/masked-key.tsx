@@ -4,15 +4,17 @@
  */
 
 import type { ReactElement } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export interface MaskedKeyProps {
   value: string;
 }
 
 export default function MaskedKey({ value }: MaskedKeyProps): ReactElement {
+  const { t } = useTranslation('ai');
   return (
     <span
-      aria-label="API key (masked)"
+      aria-label={t('providers.masked_key_label')}
       style={{
         display: 'inline-flex',
         alignItems: 'center',

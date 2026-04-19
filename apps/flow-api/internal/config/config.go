@@ -17,7 +17,7 @@ type Config struct {
 	// DbDsn is the MySQL DSN used by the api process. Required for the
 	// server to boot; handlers that touch the database panic on a nil
 	// *sql.DB otherwise.
-	DbDsn string `env:"NF_DB_DSN"`
+	DbDsn string `env:"NF_DB_DSN,required"`
 
 	// GhWebhookSecret is the shared HMAC secret used to verify inbound
 	// GitHub webhook deliveries (X-Hub-Signature-256).

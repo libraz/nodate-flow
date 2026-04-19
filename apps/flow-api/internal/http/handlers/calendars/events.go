@@ -182,8 +182,9 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		}
 
 		params := generated.PatchCalendarEventParams{
-			PublicID:   evtPub,
-			CalendarID: cal.ID,
+			PublicID:    evtPub,
+			CalendarID:  cal.ID,
+			WorkspaceID: ws.ID,
 		}
 		if in.Body.Title != nil {
 			params.Title = sql.NullString{String: *in.Body.Title, Valid: true}
@@ -233,8 +234,9 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 
 		// Re-fetch to return updated row.
 		row, err := deps.Queries.FindCalendarEventByPublicId(ctx, generated.FindCalendarEventByPublicIdParams{
-			PublicID:   evtPub,
-			CalendarID: cal.ID,
+			PublicID:    evtPub,
+			CalendarID:  cal.ID,
+			WorkspaceID: ws.ID,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -290,8 +292,9 @@ func DeleteEvent(deps Deps) func(context.Context, *DeleteEventInput) (*DeleteEve
 		}
 
 		if err := deps.Queries.DisableCalendarEvent(ctx, generated.DisableCalendarEventParams{
-			PublicID:   evtPub,
-			CalendarID: cal.ID,
+			PublicID:    evtPub,
+			CalendarID:  cal.ID,
+			WorkspaceID: ws.ID,
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}

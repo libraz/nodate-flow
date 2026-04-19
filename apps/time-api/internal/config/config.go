@@ -1,7 +1,12 @@
 // Package config loads runtime configuration from NF_* environment variables.
 package config
 
-import "github.com/caarlos0/env/v11"
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/caarlos0/env/v11"
+)
 
 // Config holds runtime configuration for the nodate-time API server.
 type Config struct {
@@ -10,7 +15,7 @@ type Config struct {
 
 	// DbDsn is the MySQL DSN. The time-api shares the same database as
 	// flow-api; only the env prefix differs.
-	DbDsn string `env:"NF_DB_DSN"`
+	DbDsn string `env:"NF_DB_DSN,required"`
 
 	// CookieSecure toggles the Secure flag on the nd_rt refresh cookie.
 	CookieSecure bool `env:"NF_COOKIE_SECURE" envDefault:"false"`
@@ -27,11 +32,26 @@ type Config struct {
 	S3UseSSL    bool   `env:"NF_S3_USE_SSL" envDefault:"false"`
 }
 
-// Load parses NF_* environment variables into a Config.
+// Load parses NF_* environment variables into a Config and validates
+// enum-like fields.
 func Load() (*Config, error) {
 	cfg := &Config{}
 	if err := env.Parse(cfg); err != nil {
 		return nil, err
 	}
+	if err := validateEnums(cfg); err != nil {
+		return nil, err
+	}
 	return cfg, nil
+}
+
+// validateEnums checks that enum-like configuration fields contain one of
+// the allowed values.
+func validateEnums(cfg *Config) error {
+	// Port must be a valid integer in the 1-65535 range.
+	port, err := strconv.Atoi(cfg.Port)
+	if err != nil || port < 1 || port > 65535 {
+		return fmt.Errorf("config: NF_TIME_PORT must be an integer between 1 and 65535, got %q", cfg.Port)
+	}
+	return nil
 }

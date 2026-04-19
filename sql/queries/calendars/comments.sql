@@ -39,6 +39,7 @@ SELECT
 FROM calendar_event_comments
 WHERE public_id = ?
   AND event_id = ?
+  AND workspace_id = ?
   AND enabled = TRUE
 LIMIT 1;
 
@@ -49,6 +50,7 @@ SET body = ?,
     edited_at = NOW()
 WHERE public_id = ?
   AND event_id = ?
+  AND workspace_id = ?
   AND author_id = ?
   AND enabled = TRUE;
 
@@ -57,4 +59,5 @@ WHERE public_id = ?
 UPDATE calendar_event_comments
 SET enabled = FALSE
 WHERE public_id = ?
-  AND event_id = ?;
+  AND event_id = ?
+  AND workspace_id = ?;

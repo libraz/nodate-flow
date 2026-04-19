@@ -2558,21 +2558,22 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	if err != nil {
 		return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid eventId")
 	}
-	owner, err := deps.Queries.FindCalendarEventOwner(ctx, eventPub)
+	owner, err := deps.Queries.FindCalendarEventOwner(ctx, generated.FindCalendarEventOwnerParams{
+		PublicID:    eventPub,
+		WorkspaceID: s.workspaceID,
+	})
 	if err != nil {
 		if stderrors.Is(err, sql.ErrNoRows) {
 			return nil, apierrors.Newf(apierrors.McpToolExecutionFailed, "event not found")
 		}
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-	if owner.WorkspaceID != s.workspaceID {
-		return nil, apierrors.Newf(apierrors.McpToolExecutionFailed, "event not found")
-	}
 
 	// Resolve event internal id for permission check.
 	evt, err := deps.Queries.FindCalendarEventByPublicId(ctx, generated.FindCalendarEventByPublicIdParams{
-		PublicID:   eventPub,
-		CalendarID: owner.CalendarID,
+		PublicID:    eventPub,
+		CalendarID:  owner.CalendarID,
+		WorkspaceID: s.workspaceID,
 	})
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
@@ -2583,8 +2584,9 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	}
 
 	params := generated.PatchCalendarEventParams{
-		PublicID:   eventPub,
-		CalendarID: owner.CalendarID,
+		PublicID:    eventPub,
+		CalendarID:  owner.CalendarID,
+		WorkspaceID: s.workspaceID,
 	}
 	if in.Title != nil {
 		params.Title = sql.NullString{String: *in.Title, Valid: true}
@@ -2655,20 +2657,21 @@ func runDeleteCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	if err != nil {
 		return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid eventId")
 	}
-	owner, err := deps.Queries.FindCalendarEventOwner(ctx, eventPub)
+	owner, err := deps.Queries.FindCalendarEventOwner(ctx, generated.FindCalendarEventOwnerParams{
+		PublicID:    eventPub,
+		WorkspaceID: s.workspaceID,
+	})
 	if err != nil {
 		if stderrors.Is(err, sql.ErrNoRows) {
 			return nil, apierrors.Newf(apierrors.McpToolExecutionFailed, "event not found")
 		}
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-	if owner.WorkspaceID != s.workspaceID {
-		return nil, apierrors.Newf(apierrors.McpToolExecutionFailed, "event not found")
-	}
 
 	evt, err := deps.Queries.FindCalendarEventByPublicId(ctx, generated.FindCalendarEventByPublicIdParams{
-		PublicID:   eventPub,
-		CalendarID: owner.CalendarID,
+		PublicID:    eventPub,
+		CalendarID:  owner.CalendarID,
+		WorkspaceID: s.workspaceID,
 	})
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
@@ -2679,8 +2682,9 @@ func runDeleteCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	}
 
 	if err := deps.Queries.DisableCalendarEvent(ctx, generated.DisableCalendarEventParams{
-		PublicID:   eventPub,
-		CalendarID: owner.CalendarID,
+		PublicID:    eventPub,
+		CalendarID:  owner.CalendarID,
+		WorkspaceID: s.workspaceID,
 	}); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
@@ -2928,9 +2932,10 @@ func runToggleCalendarMemo(ctx context.Context, deps Deps, s *session, raw json.
 		return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid memoId")
 	}
 	if err := deps.Queries.UpdateCalendarMemo(ctx, generated.UpdateCalendarMemoParams{
-		Done:       sql.NullBool{Bool: *in.Done, Valid: true},
-		PublicID:   memoPub,
-		CalendarID: calID,
+		Done:        sql.NullBool{Bool: *in.Done, Valid: true},
+		PublicID:    memoPub,
+		CalendarID:  calID,
+		WorkspaceID: s.workspaceID,
 	}); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}

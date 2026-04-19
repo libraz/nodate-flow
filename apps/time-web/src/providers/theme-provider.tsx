@@ -1,128 +1,65 @@
+/**
+ * App-specific ThemeProvider that delegates to the shared ThemeProvider
+ * from @nodate-flow/ui and supplies time-web's server sync callbacks.
+ *
+ * Re-exports useThemeContext as useTheme and the shared types/constants
+ * so existing imports continue to resolve.
+ */
+
 import {
-  type ReactElement,
-  type ReactNode,
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-} from 'react';
+  ThemeProvider as SharedThemeProvider,
+  type ThemePreference,
+  useThemeContext,
+} from '@nodate-flow/ui/providers/theme-provider';
+import type { ReactElement, ReactNode } from 'react';
 
 import { authStore } from '../features/auth/auth-store';
+import { authSdk } from '../lib/sdk';
 
-/** Concrete theme names (no `system`). */
-export const concreteThemes = [
-  'aurora-light',
-  'aurora-dark',
-  'dotline-light',
-  'dotline-dark',
-  'glass-light',
-  'glass-dark',
-] as const;
+export {
+  type ThemePreference,
+  type ColorMode,
+  type ThemeFamily,
+  type ThemeId,
+  type ThemeContextValue,
+  splitThemeId,
+  joinThemeId,
+  THEME_PREFERENCES,
+} from '@nodate-flow/ui/providers/theme-provider';
 
-/** Concrete theme name. */
-export type ConcreteTheme = (typeof concreteThemes)[number];
-
-/** User-selectable theme preference (concrete or `system`). */
-export type ThemePreference = ConcreteTheme | 'system';
-
-/** All preference values, for UI switchers. */
-export const themePreferences = [...concreteThemes, 'system'] as const;
-
-interface ThemeContextValue {
-  preference: ThemePreference;
-  resolved: ConcreteTheme;
-  setPreference: (p: ThemePreference) => void;
+async function fetchServerTheme(): Promise<ThemePreference | null> {
+  const token = authStore.getState().accessToken;
+  if (!token) return null;
+  const res = await authSdk.GET('/auth/me');
+  const me = res.data as { themePreference?: string } | undefined;
+  if (me?.themePreference) return me.themePreference as ThemePreference;
+  return null;
 }
 
-const ThemeContext = createContext<ThemeContextValue | null>(null);
-const storageKey = 'nf.theme';
+const AUTH_API_URL = import.meta.env.VITE_AUTH_API_BASE_URL ?? 'http://localhost:8082';
 
-function readStored(): ThemePreference {
-  try {
-    const v = localStorage.getItem(storageKey);
-    if (v === 'system') return 'system';
-    if (v && (concreteThemes as readonly string[]).includes(v)) {
-      return v as ConcreteTheme;
-    }
-  } catch {
-    // ignore
-  }
-  return 'system';
+async function syncServerTheme(pref: ThemePreference): Promise<void> {
+  const token = authStore.getState().accessToken;
+  if (!token) return;
+  await fetch(`${AUTH_API_URL}/me`, {
+    method: 'PATCH',
+    // biome-ignore lint/style/useNamingConvention: HTTP header
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    credentials: 'include',
+    body: JSON.stringify({ themePreference: pref }),
+  });
 }
 
-function resolveSystem(): ConcreteTheme {
-  if (typeof window === 'undefined') return 'aurora-dark';
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'aurora-dark' : 'aurora-light';
-}
-
-function resolve(pref: ThemePreference): ConcreteTheme {
-  return pref === 'system' ? resolveSystem() : pref;
-}
-
-/**
- * ThemeProvider persists theme preference to localStorage and applies
- * `data-theme` on `document.documentElement`. When authenticated, the
- * user's server-side preference is adopted on first load.
- */
+/** ThemeProvider wired with time-web's server sync. */
 export function ThemeProvider({ children }: { children: ReactNode }): ReactElement {
-  const [preference, setPreferenceState] = useState<ThemePreference>(() => readStored());
-  const [resolved, setResolved] = useState<ConcreteTheme>(() => resolve(readStored()));
-  const [hydratedFromUser, setHydratedFromUser] = useState(false);
-
-  // After auth bootstrap populates the user in the store, adopt the
-  // server-side theme preference (one-shot).
-  useEffect(() => {
-    if (hydratedFromUser) return;
-    const tryHydrate = (): void => {
-      if (hydratedFromUser) return;
-      const user = authStore.getState().user;
-      if (!user) return;
-      setHydratedFromUser(true);
-    };
-    tryHydrate();
-    const unsub = authStore.subscribe(tryHydrate);
-    return () => {
-      unsub();
-    };
-  }, [hydratedFromUser]);
-
-  useEffect(() => {
-    const next = resolve(preference);
-    setResolved(next);
-    document.documentElement.setAttribute('data-theme', next);
-    try {
-      localStorage.setItem(storageKey, preference);
-    } catch {
-      // ignore
-    }
-  }, [preference]);
-
-  useEffect(() => {
-    if (preference !== 'system') return;
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const onChange = (): void => {
-      const next = resolveSystem();
-      setResolved(next);
-      document.documentElement.setAttribute('data-theme', next);
-    };
-    mq.addEventListener('change', onChange);
-    return () => {
-      mq.removeEventListener('change', onChange);
-    };
-  }, [preference]);
-
-  const value: ThemeContextValue = {
-    preference,
-    resolved,
-    setPreference: setPreferenceState,
-  };
-
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  return (
+    <SharedThemeProvider fetchServerTheme={fetchServerTheme} syncServerTheme={syncServerTheme}>
+      {children}
+    </SharedThemeProvider>
+  );
 }
 
-/** Access the current theme preference and setter. */
-export function useTheme(): ThemeContextValue {
-  const ctx = useContext(ThemeContext);
-  if (!ctx) throw new Error('useTheme must be used within ThemeProvider');
-  return ctx;
+/** Access the current theme preference and setter. Re-export of useThemeContext. */
+export function useTheme() {
+  return useThemeContext();
 }

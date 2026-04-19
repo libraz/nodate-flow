@@ -59,6 +59,19 @@ WHERE a.enabled = TRUE
   AND a.workspace_id = ?
   AND JSON_CONTAINS(a.event_trigger_types, JSON_QUOTE(?));
 
+-- name: GetAgentGuardSnapshot :one
+-- Fetch the minimal fields the agent guard needs to make an allow/deny
+-- decision. Returns enabled, paused, allowed_scopes_json, and the
+-- monthly cost cap. Used by the MCP dispatch guard.
+SELECT
+  enabled,
+  paused,
+  allowed_scopes_json,
+  monthly_cost_cap_cents
+FROM ai_agents
+WHERE id = ?
+LIMIT 1;
+
 -- name: GetAgentForExec :one
 -- Fetch the minimal fields an agent runner needs to invoke an LLM.
 SELECT

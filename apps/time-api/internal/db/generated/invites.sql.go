@@ -96,16 +96,18 @@ UPDATE calendar_invites
 SET enabled = FALSE
 WHERE public_id = ?
   AND calendar_id = ?
+  AND workspace_id = ?
 `
 
 type DisableCalendarInviteParams struct {
-	PublicID   types.PublicID `json:"publicId"`
-	CalendarID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+	CalendarID  uint32         `json:"-"`
+	WorkspaceID uint32         `json:"-"`
 }
 
 // Revoke an invite link.
 func (q *Queries) DisableCalendarInvite(ctx context.Context, arg DisableCalendarInviteParams) error {
-	_, err := q.db.ExecContext(ctx, disableCalendarInvite, arg.PublicID, arg.CalendarID)
+	_, err := q.db.ExecContext(ctx, disableCalendarInvite, arg.PublicID, arg.CalendarID, arg.WorkspaceID)
 	return err
 }
 

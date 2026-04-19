@@ -1,9 +1,9 @@
 package middleware
 
 import (
-	"net"
 	"net/http"
-	"strings"
+
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/httputil"
 )
 
 // clientIPMaxLen caps the stored IP string to avoid unbounded
@@ -21,7 +21,7 @@ const clientIPMaxLen = 64
 func ClientIP() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip := extractClientIP(r)
+			ip := httputil.ExtractClientIP(r)
 			if len(ip) > clientIPMaxLen {
 				ip = ip[:clientIPMaxLen]
 			}
@@ -29,18 +29,4 @@ func ClientIP() func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
-}
-
-func extractClientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// First hop is the original client.
-		if comma := strings.IndexByte(xff, ','); comma >= 0 {
-			return strings.TrimSpace(xff[:comma])
-		}
-		return strings.TrimSpace(xff)
-	}
-	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
-		return host
-	}
-	return r.RemoteAddr
 }

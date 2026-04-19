@@ -31,7 +31,6 @@ func OIDCGoogleStart(deps Deps) func(context.Context, *struct{}) (*OIDCStartOutp
 		out := &OIDCStartOutput{}
 		out.Body.AuthorizationURL = url
 		out.Body.State = state
-		out.Body.Nonce = nonce
 		return out, nil
 	}
 }

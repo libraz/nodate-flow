@@ -140,7 +140,7 @@ export default function WidgetCard({
             width="16"
             height="16"
             role="img"
-            aria-label="Resize"
+            aria-label={t('resize_label')}
           >
             <path d="M14 14H10V12H12V10H14V14ZM14 8H12V6H14V8ZM8 14H6V12H8V14Z" />
           </svg>

@@ -21,15 +21,20 @@ import (
 var SecretPrefixes = []string{
 	"sk-ant-",
 	"sk-",
+	"sk_live_",
 	"mcp_",
 	"pat_",
 	"rfr_",
 	"ghp_",
 	"gho_",
 	"github_pat_",
+	"glpat-",
 	"xoxb-",
 	"xoxp-",
+	"AKIA",
 	"AIza",
+	"SG.",
+	"rk_live_",
 }
 
 // redactedSensitiveJSONKeys lists the JSON object field names whose values

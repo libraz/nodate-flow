@@ -189,8 +189,10 @@ LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
 }
 
 // errInvalidAssignee is a sentinel surfaced by listTasksFiltered when the
-// caller passes a malformed assignee UUID; the handler maps it to a 404
-// so presence information never leaks.
+// caller passes a malformed assignee UUID; the handler maps it to an empty
+// result set so presence information never leaks. This is an internal-only
+// sentinel — it is never returned to the client; the handler swallows it
+// and returns a 200 with zero items.
 var errInvalidAssignee = errors.New("tasks: invalid assignee uuid")
 
 func parseDateOrNullTime(s string) (sql.NullTime, error) {

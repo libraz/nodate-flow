@@ -102,16 +102,18 @@ UPDATE calendar_event_comments
 SET enabled = FALSE
 WHERE public_id = ?
   AND event_id = ?
+  AND workspace_id = ?
 `
 
 type DisableCalendarEventCommentParams struct {
-	PublicID types.PublicID `json:"publicId"`
-	EventID  uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+	EventID     uint32         `json:"-"`
+	WorkspaceID uint32         `json:"-"`
 }
 
 // Soft-delete a comment (author or calendar owner).
 func (q *Queries) DisableCalendarEventComment(ctx context.Context, arg DisableCalendarEventCommentParams) error {
-	_, err := q.db.ExecContext(ctx, disableCalendarEventComment, arg.PublicID, arg.EventID)
+	_, err := q.db.ExecContext(ctx, disableCalendarEventComment, arg.PublicID, arg.EventID, arg.WorkspaceID)
 	return err
 }
 
@@ -156,13 +158,15 @@ SELECT
 FROM calendar_event_comments
 WHERE public_id = ?
   AND event_id = ?
+  AND workspace_id = ?
   AND enabled = TRUE
 LIMIT 1
 `
 
 type FindCalendarEventCommentByPublicIdParams struct {
-	PublicID types.PublicID `json:"publicId"`
-	EventID  uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+	EventID     uint32         `json:"-"`
+	WorkspaceID uint32         `json:"-"`
 }
 
 type FindCalendarEventCommentByPublicIdRow struct {
@@ -178,7 +182,7 @@ type FindCalendarEventCommentByPublicIdRow struct {
 
 // Resolve a comment by UUID v7.
 func (q *Queries) FindCalendarEventCommentByPublicId(ctx context.Context, arg FindCalendarEventCommentByPublicIdParams) (FindCalendarEventCommentByPublicIdRow, error) {
-	row := q.db.QueryRowContext(ctx, findCalendarEventCommentByPublicId, arg.PublicID, arg.EventID)
+	row := q.db.QueryRowContext(ctx, findCalendarEventCommentByPublicId, arg.PublicID, arg.EventID, arg.WorkspaceID)
 	var i FindCalendarEventCommentByPublicIdRow
 	err := row.Scan(
 		&i.ID,
@@ -339,15 +343,17 @@ SET body = ?,
     edited_at = NOW()
 WHERE public_id = ?
   AND event_id = ?
+  AND workspace_id = ?
   AND author_id = ?
   AND enabled = TRUE
 `
 
 type UpdateCalendarEventCommentParams struct {
-	Body     string         `json:"body"`
-	PublicID types.PublicID `json:"publicId"`
-	EventID  uint32         `json:"-"`
-	AuthorID uint32         `json:"-"`
+	Body        string         `json:"body"`
+	PublicID    types.PublicID `json:"publicId"`
+	EventID     uint32         `json:"-"`
+	WorkspaceID uint32         `json:"-"`
+	AuthorID    uint32         `json:"-"`
 }
 
 // Edit a comment's body and stamp edited_at.
@@ -356,6 +362,7 @@ func (q *Queries) UpdateCalendarEventComment(ctx context.Context, arg UpdateCale
 		arg.Body,
 		arg.PublicID,
 		arg.EventID,
+		arg.WorkspaceID,
 		arg.AuthorID,
 	)
 	return err

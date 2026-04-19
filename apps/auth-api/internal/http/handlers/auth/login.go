@@ -14,6 +14,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
 )
 
 // maxFailedBeforeLock is the failed-login threshold that triggers a
@@ -70,7 +71,7 @@ func Login(deps Deps) func(context.Context, *LoginInput) (*LoginOutput, error) {
 		// client must finish at POST /auth/login/totp. last_login_at
 		// is deferred to that happy path.
 		if row.MfaConfirmedAt.Valid && len(row.MfaSecretCiphertext.String) > 0 {
-			challenge, _, cerr := deps.JWT.SignTotpChallenge(row.UserID)
+			challenge, _, cerr := deps.JWT.SignTotpChallenge(row.UserPublicID.String())
 			if cerr != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
@@ -117,9 +118,17 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 		if deps.Cipher == nil {
 			return nil, httpErr(apierrors.AuthTotpNotConfigured)
 		}
-		uid, err := deps.JWT.VerifyTotpChallenge(in.Body.ChallengeToken)
+		pubStr, err := deps.JWT.VerifyTotpChallenge(in.Body.ChallengeToken)
 		if err != nil {
 			return nil, httpErr(apierrors.AuthSessionExpired)
+		}
+		pubID, perr := dbtype.Parse(pubStr)
+		if perr != nil {
+			return nil, httpErr(apierrors.AuthSessionExpired)
+		}
+		uid, err := deps.Queries.FindUserInternalIdByPublicId(ctx, pubID)
+		if err != nil {
+			return nil, httpErr(apierrors.AuthLoginInvalidCredentials)
 		}
 		ident, err := deps.Queries.FindLocalIdentityByUserId(ctx, uid)
 		if err != nil {

@@ -116,6 +116,39 @@ func (q *Queries) GetAgentForExec(ctx context.Context, arg GetAgentForExecParams
 	return i, err
 }
 
+const getAgentGuardSnapshot = `-- name: GetAgentGuardSnapshot :one
+SELECT
+  enabled,
+  paused,
+  allowed_scopes_json,
+  monthly_cost_cap_cents
+FROM ai_agents
+WHERE id = ?
+LIMIT 1
+`
+
+type GetAgentGuardSnapshotRow struct {
+	Enabled             bool            `json:"enabled"`
+	Paused              bool            `json:"paused"`
+	AllowedScopesJson   json.RawMessage `json:"allowedScopesJson"`
+	MonthlyCostCapCents sql.NullInt32   `json:"monthlyCostCapCents"`
+}
+
+// Fetch the minimal fields the agent guard needs to make an allow/deny
+// decision. Returns enabled, paused, allowed_scopes_json, and the
+// monthly cost cap. Used by the MCP dispatch guard.
+func (q *Queries) GetAgentGuardSnapshot(ctx context.Context, id uint32) (GetAgentGuardSnapshotRow, error) {
+	row := q.db.QueryRowContext(ctx, getAgentGuardSnapshot, id)
+	var i GetAgentGuardSnapshotRow
+	err := row.Scan(
+		&i.Enabled,
+		&i.Paused,
+		&i.AllowedScopesJson,
+		&i.MonthlyCostCapCents,
+	)
+	return i, err
+}
+
 const listAgentsForWorkspace = `-- name: ListAgentsForWorkspace :many
 SELECT
   a.public_id,

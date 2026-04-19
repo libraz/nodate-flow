@@ -1,41 +1,15 @@
 /**
  * Calendar UI slice (Zustand). Controls navigation, view state, modals,
- * panels, and theme for the calendar app. Uses vanilla createStore so
+ * panels, and mobile tab for the calendar app. Uses vanilla createStore so
  * non-React code can access state when needed.
+ *
+ * Theme management has been moved to the shared ThemeProvider from
+ * @nodate-flow/ui (see providers/theme-provider.tsx).
  */
 
 import { DateTime } from 'luxon';
 import { useStore } from 'zustand';
 import { createStore } from 'zustand/vanilla';
-
-import { authStore } from '../features/auth/auth-store';
-import {
-  type ColorMode,
-  type Theme,
-  applyColorMode,
-  applyTheme,
-  combinePreference,
-  loadPreference,
-  savePreference,
-} from '../lib/theme';
-
-const AUTH_API_URL = import.meta.env.VITE_AUTH_API_BASE_URL ?? 'http://localhost:8082';
-
-/** Fire-and-forget server sync of theme preference. */
-function syncThemeToServer(theme: Theme, colorMode: ColorMode): void {
-  const token = authStore.getState().accessToken;
-  if (!token) return;
-  const pref = combinePreference(theme, colorMode);
-  void fetch(`${AUTH_API_URL}/me`, {
-    method: 'PATCH',
-    // biome-ignore lint/style/useNamingConvention: HTTP header
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    credentials: 'include',
-    body: JSON.stringify({ themePreference: pref }),
-  }).catch(() => {
-    /* ignore — local state is the fast path */
-  });
-}
 
 export type CalendarView = 'month' | 'week';
 export type RightPanel = 'memo' | 'members' | 'share' | 'notifications';
@@ -56,8 +30,6 @@ export interface CalendarUiState {
   searchQuery: string;
   leftSidebarExpanded: boolean;
   showDayDetail: boolean;
-  theme: Theme;
-  colorMode: ColorMode;
   showSettings: boolean;
   mobileTab: MobileTab;
 
@@ -85,8 +57,6 @@ export interface CalendarUiState {
   closeDayDetail: () => void;
   toggleSettings: () => void;
   setMobileTab: (tab: MobileTab) => void;
-  setTheme: (theme: Theme) => void;
-  setColorMode: (mode: ColorMode) => void;
 }
 
 /**
@@ -107,8 +77,6 @@ export const calendarUiStore = createStore<CalendarUiState>((set) => ({
   searchQuery: '',
   leftSidebarExpanded: true,
   showDayDetail: false,
-  theme: loadPreference().theme,
-  colorMode: loadPreference().colorMode,
   showSettings: false,
   mobileTab: 'calendar',
 
@@ -182,23 +150,6 @@ export const calendarUiStore = createStore<CalendarUiState>((set) => ({
 
   toggleSettings: () => set((state) => ({ showSettings: !state.showSettings })),
   setMobileTab: (tab) => set({ mobileTab: tab }),
-  setTheme: (theme) => {
-    set((state) => {
-      savePreference(theme, state.colorMode);
-      applyTheme(theme, state.colorMode);
-      syncThemeToServer(theme, state.colorMode);
-      return { theme };
-    });
-  },
-  setColorMode: (mode) => {
-    set((state) => {
-      savePreference(state.theme, mode);
-      applyTheme(state.theme, mode);
-      applyColorMode(mode);
-      syncThemeToServer(state.theme, mode);
-      return { colorMode: mode };
-    });
-  },
 }));
 
 /** React hook with selector. Always pass a selector to avoid over-rendering. */

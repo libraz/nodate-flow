@@ -1,3 +1,8 @@
+# Reserved: handlers not yet implemented
+# TODO: NOTIFICATION.NOTIFICATION.NOT_FOUND overlaps semantically with
+# WS.NOTIFICATION.NOT_FOUND (ws.yaml). When notification handlers are
+# implemented, disambiguate: WS.NOTIFICATION covers workspace-scoped
+# in-app notifications; this domain covers cross-channel delivery.
 domain: notification
 breadcrumb: "Notification"
 

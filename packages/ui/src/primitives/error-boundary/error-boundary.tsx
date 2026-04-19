@@ -22,6 +22,10 @@ export interface ErrorBoundaryProps {
   fallback?: (props: ErrorFallbackProps) => ReactElement;
   /** Called when an error is caught (for logging / reporting). */
   onError?: (error: Error, info: ErrorInfo) => void;
+  /** Title shown in the default fallback UI. Defaults to "Something went wrong". */
+  fallbackTitle?: string;
+  /** Action button label in the default fallback UI. Defaults to "Try again". */
+  fallbackAction?: string;
 }
 
 interface State {
@@ -29,13 +33,18 @@ interface State {
 }
 
 /** Default fallback UI shown when no custom fallback is provided. */
-function DefaultFallback({ error, resetErrorBoundary }: ErrorFallbackProps): ReactElement {
+function DefaultFallback({
+  error,
+  resetErrorBoundary,
+  title = 'Something went wrong',
+  action = 'Try again',
+}: ErrorFallbackProps & { title?: string; action?: string }): ReactElement {
   return (
     <div className={styles.root} role="alert">
-      <p className={styles.title}>Something went wrong</p>
+      <p className={styles.title}>{title}</p>
       <p className={styles.message}>{error.message}</p>
       <button type="button" className={styles.retry} onClick={resetErrorBoundary}>
-        Try again
+        {action}
       </button>
     </div>
   );
@@ -60,8 +69,18 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, State> 
   override render(): ReactNode {
     const { error } = this.state;
     if (error) {
-      const Fallback = this.props.fallback ?? DefaultFallback;
-      return <Fallback error={error} resetErrorBoundary={this.reset} />;
+      if (this.props.fallback) {
+        const Fallback = this.props.fallback;
+        return <Fallback error={error} resetErrorBoundary={this.reset} />;
+      }
+      return (
+        <DefaultFallback
+          error={error}
+          resetErrorBoundary={this.reset}
+          title={this.props.fallbackTitle}
+          action={this.props.fallbackAction}
+        />
+      );
     }
     return this.props.children;
   }

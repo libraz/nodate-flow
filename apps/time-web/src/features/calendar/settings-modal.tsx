@@ -10,24 +10,25 @@ import ThemePicker, {
 import type { ColorMode, ThemeFamily } from '@nodate-flow/ui/providers/theme-provider';
 
 import { type SupportedLanguage, i18n, setLanguage } from '../../i18n';
-import type { Theme } from '../../lib/theme';
+import { useTheme } from '../../providers/theme-provider';
 import { useCalendarUi } from '../../stores/calendar-ui-store';
 
-const LANGUAGES: { value: SupportedLanguage; label: string }[] = [
-  { value: 'en', label: 'English' },
-  { value: 'ja', label: '\u65E5\u672C\u8A9E' },
-];
+function useLanguageOptions(): { value: SupportedLanguage; label: string }[] {
+  const { t } = useTranslation();
+  return [
+    { value: 'en', label: t('settings.language_en') },
+    { value: 'ja', label: t('settings.language_ja') },
+  ];
+}
 
 export default function SettingsModal(): ReactElement | null {
   const { t } = useTranslation();
   const showSettings = useCalendarUi((s) => s.showSettings);
   const toggleSettings = useCalendarUi((s) => s.toggleSettings);
-  const theme = useCalendarUi((s) => s.theme);
-  const colorMode = useCalendarUi((s) => s.colorMode);
-  const setTheme = useCalendarUi((s) => s.setTheme);
-  const setColorMode = useCalendarUi((s) => s.setColorMode);
+  const { family, colorMode, setFamily, setColorMode } = useTheme();
 
   const currentLang = (i18n.language?.substring(0, 2) ?? 'en') as SupportedLanguage;
+  const LANGUAGES = useLanguageOptions();
 
   const themes: ThemeFamilyEntry[] = [
     {
@@ -66,10 +67,10 @@ export default function SettingsModal(): ReactElement | null {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}>
         <ThemePicker
           themes={themes}
-          selectedTheme={theme as ThemeFamily}
+          selectedTheme={family}
           colorModes={colorModes}
-          selectedColorMode={colorMode as ColorMode}
-          onThemeChange={(t) => setTheme(t as Theme)}
+          selectedColorMode={colorMode}
+          onThemeChange={(f) => setFamily(f as ThemeFamily)}
           onColorModeChange={(m) => setColorMode(m as ColorMode)}
           themeLabel={t('settings.theme')}
           colorModeLabel={t('settings.color_mode')}

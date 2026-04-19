@@ -227,8 +227,9 @@ func RevokeInvite(deps Deps) func(context.Context, *RevokeInviteInput) (*RevokeI
 		}
 
 		err = deps.Queries.DisableCalendarInvite(ctx, generated.DisableCalendarInviteParams{
-			PublicID:   types.FromUUID(invUID),
-			CalendarID: cal.ID,
+			PublicID:    types.FromUUID(invUID),
+			CalendarID:  cal.ID,
+			WorkspaceID: wsID,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarInviteStoreRevokeInterrupted)

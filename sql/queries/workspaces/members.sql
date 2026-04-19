@@ -71,6 +71,20 @@ SET enabled = FALSE
 WHERE workspace_id = ?
   AND user_id = ?;
 
+-- name: CheckWorkspaceMemberExists :one
+-- Verify that a user is an enabled member of a workspace. Returns 1 if
+-- the membership exists, sql.ErrNoRows otherwise.
+SELECT 1 AS ok FROM workspace_members
+WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE
+LIMIT 1;
+
+-- name: GetWorkspaceMemberRole :one
+-- Return the role string for an enabled workspace member. Returns
+-- sql.ErrNoRows when the user is not a member.
+SELECT role FROM workspace_members
+WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE
+LIMIT 1;
+
 -- name: UpdateMemberRole :exec
 -- Change a member's role.
 UPDATE workspace_members

@@ -103,16 +103,18 @@ UPDATE calendar_events
 SET enabled = FALSE
 WHERE public_id = ?
   AND calendar_id = ?
+  AND workspace_id = ?
 `
 
 type DisableCalendarEventParams struct {
-	PublicID   types.PublicID `json:"publicId"`
-	CalendarID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+	CalendarID  uint32         `json:"-"`
+	WorkspaceID uint32         `json:"-"`
 }
 
 // Soft-delete a calendar event.
 func (q *Queries) DisableCalendarEvent(ctx context.Context, arg DisableCalendarEventParams) error {
-	_, err := q.db.ExecContext(ctx, disableCalendarEvent, arg.PublicID, arg.CalendarID)
+	_, err := q.db.ExecContext(ctx, disableCalendarEvent, arg.PublicID, arg.CalendarID, arg.WorkspaceID)
 	return err
 }
 
@@ -147,13 +149,15 @@ SELECT
 FROM calendar_events
 WHERE public_id = ?
   AND calendar_id = ?
+  AND workspace_id = ?
   AND enabled = TRUE
 LIMIT 1
 `
 
 type FindCalendarEventByPublicIdParams struct {
-	PublicID   types.PublicID `json:"publicId"`
-	CalendarID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+	CalendarID  uint32         `json:"-"`
+	WorkspaceID uint32         `json:"-"`
 }
 
 type FindCalendarEventByPublicIdRow struct {
@@ -187,7 +191,7 @@ type FindCalendarEventByPublicIdRow struct {
 
 // Resolve a calendar event by UUID v7 within a calendar.
 func (q *Queries) FindCalendarEventByPublicId(ctx context.Context, arg FindCalendarEventByPublicIdParams) (FindCalendarEventByPublicIdRow, error) {
-	row := q.db.QueryRowContext(ctx, findCalendarEventByPublicId, arg.PublicID, arg.CalendarID)
+	row := q.db.QueryRowContext(ctx, findCalendarEventByPublicId, arg.PublicID, arg.CalendarID, arg.WorkspaceID)
 	var i FindCalendarEventByPublicIdRow
 	err := row.Scan(
 		&i.ID,
@@ -224,9 +228,15 @@ const findCalendarEventOwner = `-- name: FindCalendarEventOwner :one
 SELECT owner_user_id, calendar_id, workspace_id
 FROM calendar_events
 WHERE public_id = ?
+  AND workspace_id = ?
   AND enabled = TRUE
 LIMIT 1
 `
+
+type FindCalendarEventOwnerParams struct {
+	PublicID    types.PublicID `json:"publicId"`
+	WorkspaceID uint32         `json:"-"`
+}
 
 type FindCalendarEventOwnerRow struct {
 	OwnerUserID uint32 `json:"-"`
@@ -235,8 +245,8 @@ type FindCalendarEventOwnerRow struct {
 }
 
 // Quick lookup for permission checks: who owns this event?
-func (q *Queries) FindCalendarEventOwner(ctx context.Context, publicID types.PublicID) (FindCalendarEventOwnerRow, error) {
-	row := q.db.QueryRowContext(ctx, findCalendarEventOwner, publicID)
+func (q *Queries) FindCalendarEventOwner(ctx context.Context, arg FindCalendarEventOwnerParams) (FindCalendarEventOwnerRow, error) {
+	row := q.db.QueryRowContext(ctx, findCalendarEventOwner, arg.PublicID, arg.WorkspaceID)
 	var i FindCalendarEventOwnerRow
 	err := row.Scan(&i.OwnerUserID, &i.CalendarID, &i.WorkspaceID)
 	return i, err
@@ -267,6 +277,7 @@ FROM calendar_events ce
 WHERE ce.calendar_id = ?
   AND ce.enabled = TRUE
 ORDER BY ce.start_at ASC, ce.public_id ASC
+LIMIT 10000
 `
 
 type ListAllCalendarEventsRow struct {
@@ -368,6 +379,7 @@ WHERE ce.workspace_id = ?
   AND ce.end_at > ?
   AND ce.enabled = TRUE
 ORDER BY ce.start_at ASC, ce.public_id ASC
+LIMIT 1000
 `
 
 type ListCalendarEventsAcrossCalendarsParams struct {
@@ -473,6 +485,7 @@ WHERE ce.calendar_id = ?
   AND ce.end_at > ?
   AND ce.enabled = TRUE
 ORDER BY ce.start_at ASC, ce.public_id ASC
+LIMIT 1000
 `
 
 type ListCalendarEventsByRangeParams struct {
@@ -583,6 +596,7 @@ WHERE ce.workspace_id = ?
   AND (ce.recurrence_end IS NULL OR ce.recurrence_end > ?)
   AND ce.enabled = TRUE
 ORDER BY ce.start_at ASC
+LIMIT 1000
 `
 
 type ListRecurringCalendarEventsAcrossCalendarsParams struct {
@@ -697,6 +711,7 @@ WHERE ce.calendar_id = ?
   AND (ce.recurrence_end IS NULL OR ce.recurrence_end > ?)
   AND ce.enabled = TRUE
 ORDER BY ce.start_at ASC
+LIMIT 1000
 `
 
 type ListRecurringCalendarEventsByRangeParams struct {
@@ -799,6 +814,7 @@ SET kind                = COALESCE(?, kind),
     task_id             = COALESCE(?, task_id)
 WHERE public_id = ?
   AND calendar_id = ?
+  AND workspace_id = ?
   AND enabled = TRUE
 `
 
@@ -823,6 +839,7 @@ type PatchCalendarEventParams struct {
 	TaskID               sql.NullInt32                `json:"-"`
 	PublicID             types.PublicID               `json:"publicId"`
 	CalendarID           uint32                       `json:"-"`
+	WorkspaceID          uint32                       `json:"-"`
 }
 
 // Patch mutable event fields. NULL params leave columns untouched.
@@ -848,6 +865,7 @@ func (q *Queries) PatchCalendarEvent(ctx context.Context, arg PatchCalendarEvent
 		arg.TaskID,
 		arg.PublicID,
 		arg.CalendarID,
+		arg.WorkspaceID,
 	)
 	return err
 }

@@ -3,6 +3,7 @@ import { Link, createFileRoute } from '@tanstack/react-router';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { DateTime } from 'luxon';
 import type { ReactElement } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
@@ -64,6 +65,7 @@ export const Route = createFileRoute('/share/$token')({
 
 function SharePage(): ReactElement {
   const { token } = Route.useParams();
+  const { t } = useTranslation();
   const isAuthenticated = useAuth(selectIsAuthenticated);
   const { data: calendar, isLoading: calLoading, error: calError } = useShareCalendarQuery(token);
   const { data: events, isLoading: eventsLoading } = useShareEventsQuery(token);
@@ -79,7 +81,7 @@ function SharePage(): ReactElement {
           justifyContent: 'center',
         }}
       >
-        <p style={{ color: 'var(--nf-color-fg-muted)' }}>Loading shared calendar...</p>
+        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('share.loading')}</p>
       </div>
     );
   }
@@ -97,14 +99,12 @@ function SharePage(): ReactElement {
         }}
       >
         <CalendarIcon size={48} style={{ color: 'var(--nf-color-fg-subtle)' }} />
-        <p style={{ color: 'var(--nf-color-fg-muted)' }}>
-          This shared calendar link is invalid or has expired.
-        </p>
+        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('share.invalid_or_expired')}</p>
         <Link
           to="/login"
           style={{ fontSize: 'var(--nf-text-sm)', color: 'var(--nf-color-accent)' }}
         >
-          Sign in
+          {t('share.sign_in')}
         </Link>
       </div>
     );
@@ -157,7 +157,7 @@ function SharePage(): ReactElement {
                 onClick={handleJoin}
                 disabled={acceptMutation.isPending}
               >
-                {acceptMutation.isPending ? 'Joining...' : 'Join Calendar'}
+                {acceptMutation.isPending ? t('share.joining') : t('share.join_calendar')}
               </Button>
             ) : (
               <Link
@@ -174,7 +174,7 @@ function SharePage(): ReactElement {
                   textDecoration: 'none',
                 }}
               >
-                Sign in to join
+                {t('share.sign_in_to_join')}
               </Link>
             )}
           </div>
@@ -199,7 +199,7 @@ function SharePage(): ReactElement {
               fontSize: 'var(--nf-text-sm)',
             }}
           >
-            Successfully joined the calendar! Redirecting...
+            {t('share.join_success')}
           </div>
         ) : null}
 
@@ -232,7 +232,7 @@ function SharePage(): ReactElement {
               color: 'var(--nf-color-fg-subtle)',
             }}
           >
-            No upcoming events
+            {t('share.no_upcoming_events')}
           </p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>

@@ -243,7 +243,23 @@ func BuildResult(deps Deps) Result {
 		if deps.EmbedBaseURL != "" {
 			opts = append(opts, embed.WithOpenAIBaseURL(deps.EmbedBaseURL))
 		}
-		embedClient = embed.New(embed.NewOpenAIProvider(deps.EmbedOpenAIKey, opts...), deps.Queries)
+		// Encrypt the plaintext key at boot so the provider stores only
+		// ciphertext and decrypts per-call (decrypt-use-zero pattern).
+		// When no cipher is available, pass the raw bytes with a nil
+		// decryptor which triggers the identity fallback.
+		var keyCipher []byte
+		var dec embed.Decryptor
+		if deps.Cipher != nil {
+			ct, encErr := deps.Cipher.Encrypt([]byte(deps.EmbedOpenAIKey))
+			if encErr == nil {
+				keyCipher = ct
+				dec = deps.Cipher
+			}
+		}
+		if keyCipher == nil {
+			keyCipher = []byte(deps.EmbedOpenAIKey)
+		}
+		embedClient = embed.New(embed.NewOpenAIProvider(keyCipher, dec, opts...), deps.Queries)
 	}
 	// When a real cipher is available but the NL compilers were not
 	// set up by the embed-key path above, wire them to the workspace's

@@ -101,6 +101,7 @@ func resolveEvent(
 	ctx context.Context,
 	q *generated.Queries,
 	calID uint32,
+	wsID uint32,
 	evtIDStr string,
 ) (generated.FindCalendarEventByPublicIdRow, error) {
 	evtUID, err := uuid.Parse(evtIDStr)
@@ -108,8 +109,9 @@ func resolveEvent(
 		return generated.FindCalendarEventByPublicIdRow{}, errEventNotFound
 	}
 	evt, err := q.FindCalendarEventByPublicId(ctx, generated.FindCalendarEventByPublicIdParams{
-		PublicID:   types.FromUUID(evtUID),
-		CalendarID: calID,
+		PublicID:    types.FromUUID(evtUID),
+		CalendarID:  calID,
+		WorkspaceID: wsID,
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -134,7 +136,7 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
@@ -212,7 +214,7 @@ func RemoveAttendee(deps Deps) func(context.Context, *RemoveAttendeeInput) (*Rem
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
@@ -262,7 +264,7 @@ func UpdateRsvp(deps Deps) func(context.Context, *UpdateRsvpInput) (*UpdateRsvpO
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
@@ -302,7 +304,7 @@ func ToggleCanEdit(deps Deps) func(context.Context, *ToggleCanEditInput) (*Toggl
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}

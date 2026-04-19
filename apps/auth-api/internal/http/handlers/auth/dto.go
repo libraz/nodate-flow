@@ -136,11 +136,12 @@ type LogoutOutput struct {
 }
 
 // OIDCStartOutput is the response for GET /auth/oidc/google/start.
+// The nonce is embedded inside the signed state JWT and is not returned
+// separately to avoid leaking it to the client.
 type OIDCStartOutput struct {
 	Body struct {
 		AuthorizationURL string `json:"authorizationUrl"`
 		State            string `json:"state"`
-		Nonce            string `json:"nonce"`
 	}
 }
 

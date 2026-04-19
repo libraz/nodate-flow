@@ -16,6 +16,23 @@ import { type FormEvent, type ReactElement, useCallback, useEffect, useState } f
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
+/**
+ * isSafeRedirect returns true when the URL is a relative path (starting
+ * with a single slash) or points to the same origin as the current page.
+ * Protocol-relative URLs ("//evil.com") and foreign origins are rejected
+ * to prevent open-redirect attacks via the ?redirect= query parameter.
+ */
+function isSafeRedirect(url: string): boolean {
+  // Relative path (but not protocol-relative "//...")
+  if (url.startsWith('/') && !url.startsWith('//')) return true;
+  try {
+    const parsed = new URL(url);
+    return parsed.origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
 import AuthCard from '../components/auth-card';
 import { type LoginFormValues, loginSchema } from '../features/auth/auth-schemas';
 import {
@@ -74,7 +91,7 @@ function LoginPage(): ReactElement {
   const [totpSubmitting, setTotpSubmitting] = useState(false);
 
   const redirectAfterLogin = useCallback((): void => {
-    if (redirectTarget) {
+    if (redirectTarget && isSafeRedirect(redirectTarget)) {
       window.location.href = redirectTarget;
     } else {
       void navigate({ to: '/profile', replace: true });

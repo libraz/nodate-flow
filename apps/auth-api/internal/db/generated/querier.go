@@ -21,6 +21,7 @@ type Querier interface {
 	// Re-enable a previously suspended workspace.
 	AdminEnableWorkspace(ctx context.Context, publicID types.PublicID) error
 	// Find instance admin grant for a specific user.
+	// Used as an existence check by grant/revoke handlers (result is discarded).
 	AdminFindInstanceAdminByUserId(ctx context.Context, userID uint32) (AdminFindInstanceAdminByUserIdRow, error)
 	// Resolve internal user_id from public_id for admin session lookup.
 	AdminFindUserIdByPublicId(ctx context.Context, publicID types.PublicID) (uint32, error)
@@ -66,6 +67,9 @@ type Querier interface {
 	AppendAuditLog(ctx context.Context, arg AppendAuditLogParams) (int64, error)
 	// Append an instance-wide audit row. payload_json MUST be redacted.
 	AppendInstanceAuditLog(ctx context.Context, arg AppendInstanceAuditLogParams) (int64, error)
+	// Verify that a user is an enabled member of a workspace. Returns 1 if
+	// the membership exists, sql.ErrNoRows otherwise.
+	CheckWorkspaceMemberExists(ctx context.Context, arg CheckWorkspaceMemberExistsParams) (int32, error)
 	// Disable TOTP on a local identity.
 	ClearIdentityMfa(ctx context.Context, id uint32) error
 	// Mark a pending TOTP enrollment as confirmed by stamping
@@ -116,8 +120,10 @@ type Querier interface {
 	// Resolve a PAT row from its SHA-256 hash for bearer auth.
 	FindPatByHash(ctx context.Context, tokenHash string) (FindPatByHashRow, error)
 	// Resolve a session by its external public_id (UUID v7).
+	// id is required: used internally for session operations.
 	FindSessionByPublicId(ctx context.Context, publicID types.PublicID) (FindSessionByPublicIdRow, error)
 	// Resolve a session from its SHA-256 refresh hash. Caller validates expiry.
+	// id is required: used by RotateSessionRefreshHash (WHERE id = ?).
 	FindSessionByRefreshHash(ctx context.Context, refreshHash string) (FindSessionByRefreshHashRow, error)
 	// Resolve an unused recovery code by (user_id, hash).
 	FindUnusedRecoveryCode(ctx context.Context, arg FindUnusedRecoveryCodeParams) (uint32, error)
@@ -153,6 +159,9 @@ type Querier interface {
 	FindWorkspaceInviteWorkspaceName(ctx context.Context, tokenHash string) (FindWorkspaceInviteWorkspaceNameRow, error)
 	// Resolve a workspace membership by (workspace_id, user_id).
 	FindWorkspaceMemberByUserId(ctx context.Context, arg FindWorkspaceMemberByUserIdParams) (FindWorkspaceMemberByUserIdRow, error)
+	// Return the role string for an enabled workspace member. Returns
+	// sql.ErrNoRows when the user is not a member.
+	GetWorkspaceMemberRole(ctx context.Context, arg GetWorkspaceMemberRoleParams) (WorkspaceMembersRole, error)
 	// Bump the use counter after a successful accept.
 	IncrementInviteUseCount(ctx context.Context, id uint32) error
 	// Insert a hashed recovery code for a user.

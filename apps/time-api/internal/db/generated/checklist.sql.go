@@ -54,16 +54,18 @@ UPDATE calendar_event_checklist_items
 SET enabled = FALSE
 WHERE public_id = ?
   AND event_id = ?
+  AND workspace_id = ?
 `
 
 type DisableCalendarChecklistItemParams struct {
-	PublicID types.PublicID `json:"publicId"`
-	EventID  uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+	EventID     uint32         `json:"-"`
+	WorkspaceID uint32         `json:"-"`
 }
 
 // Soft-delete a checklist item.
 func (q *Queries) DisableCalendarChecklistItem(ctx context.Context, arg DisableCalendarChecklistItemParams) error {
-	_, err := q.db.ExecContext(ctx, disableCalendarChecklistItem, arg.PublicID, arg.EventID)
+	_, err := q.db.ExecContext(ctx, disableCalendarChecklistItem, arg.PublicID, arg.EventID, arg.WorkspaceID)
 	return err
 }
 
@@ -81,13 +83,15 @@ SELECT
 FROM calendar_event_checklist_items
 WHERE public_id = ?
   AND event_id = ?
+  AND workspace_id = ?
   AND enabled = TRUE
 LIMIT 1
 `
 
 type FindCalendarChecklistItemByPublicIdParams struct {
-	PublicID types.PublicID `json:"publicId"`
-	EventID  uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+	EventID     uint32         `json:"-"`
+	WorkspaceID uint32         `json:"-"`
 }
 
 type FindCalendarChecklistItemByPublicIdRow struct {
@@ -104,7 +108,7 @@ type FindCalendarChecklistItemByPublicIdRow struct {
 
 // Resolve a checklist item by UUID v7.
 func (q *Queries) FindCalendarChecklistItemByPublicId(ctx context.Context, arg FindCalendarChecklistItemByPublicIdParams) (FindCalendarChecklistItemByPublicIdRow, error) {
-	row := q.db.QueryRowContext(ctx, findCalendarChecklistItemByPublicId, arg.PublicID, arg.EventID)
+	row := q.db.QueryRowContext(ctx, findCalendarChecklistItemByPublicId, arg.PublicID, arg.EventID, arg.WorkspaceID)
 	var i FindCalendarChecklistItemByPublicIdRow
 	err := row.Scan(
 		&i.ID,
@@ -181,15 +185,17 @@ SET title       = COALESCE(?, title),
     sort_weight = COALESCE(?, sort_weight)
 WHERE public_id = ?
   AND event_id = ?
+  AND workspace_id = ?
   AND enabled = TRUE
 `
 
 type UpdateCalendarChecklistItemParams struct {
-	Title      sql.NullString `json:"title"`
-	Done       sql.NullBool   `json:"done"`
-	SortWeight sql.NullInt32  `json:"sortWeight"`
-	PublicID   types.PublicID `json:"publicId"`
-	EventID    uint32         `json:"-"`
+	Title       sql.NullString `json:"title"`
+	Done        sql.NullBool   `json:"done"`
+	SortWeight  sql.NullInt32  `json:"sortWeight"`
+	PublicID    types.PublicID `json:"publicId"`
+	EventID     uint32         `json:"-"`
+	WorkspaceID uint32         `json:"-"`
 }
 
 // Update a checklist item's title, done, or sort_weight.
@@ -200,6 +206,7 @@ func (q *Queries) UpdateCalendarChecklistItem(ctx context.Context, arg UpdateCal
 		arg.SortWeight,
 		arg.PublicID,
 		arg.EventID,
+		arg.WorkspaceID,
 	)
 	return err
 }

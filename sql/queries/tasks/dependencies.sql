@@ -69,7 +69,8 @@ WHERE td.workspace_id = ?
   AND p.public_id = ?
   AND ft.project_id = tt.project_id
   AND td.enabled = TRUE
-ORDER BY td.created_at ASC, td.public_id ASC;
+ORDER BY td.created_at ASC, td.public_id ASC
+LIMIT 5000;
 
 -- name: DeleteDependency :exec
 -- Soft-delete a dependency edge.

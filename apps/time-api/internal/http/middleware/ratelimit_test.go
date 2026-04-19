@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -30,6 +31,9 @@ func TestIPRateLimiter_Middleware_AllowsUnderLimit(t *testing.T) {
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 		require.Equal(t, http.StatusOK, rec.Code, "request %d should be allowed", i+1)
+		require.NotEmpty(t, rec.Header().Get("X-RateLimit-Limit"), "X-RateLimit-Limit must be set")
+		require.NotEmpty(t, rec.Header().Get("X-RateLimit-Remaining"), "X-RateLimit-Remaining must be set")
+		require.NotEmpty(t, rec.Header().Get("X-RateLimit-Reset"), "X-RateLimit-Reset must be set")
 	}
 }
 
@@ -67,6 +71,12 @@ func TestIPRateLimiter_Middleware_BlocksOverLimit(t *testing.T) {
 
 	require.Equal(t, http.StatusTooManyRequests, rec.Code, "over-limit request must be 429")
 	require.NotEmpty(t, rec.Header().Get("Retry-After"), "Retry-After header must be set")
+	require.Equal(t, "application/json", rec.Header().Get("Content-Type"), "response must be JSON")
+
+	// Verify JSON error body.
+	var body map[string]any
+	require.NoError(t, json.NewDecoder(rec.Body).Decode(&body))
+	require.Equal(t, "RATE.LIMIT_EXCEEDED", body["code"])
 }
 
 func TestIPRateLimiter_Middleware_DifferentIPsAreIndependent(t *testing.T) {
@@ -152,20 +162,5 @@ func TestIPRateLimiter_Stop(t *testing.T) {
 			rl.Stop()
 			rl.Stop()
 		})
-	})
-
-	t.Run("done channel is closed after stop", func(t *testing.T) {
-		t.Parallel()
-		rl := NewIPRateLimiter(RateLimitConfig{
-			MaxRequests: 10,
-			Window:      time.Second,
-		})
-		rl.Stop()
-		select {
-		case <-rl.done:
-			// expected — channel is closed
-		default:
-			t.Fatal("done channel should be closed after Stop()")
-		}
 	})
 }

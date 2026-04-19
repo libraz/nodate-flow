@@ -117,6 +117,8 @@ type FindMcpTokenByHashRow struct {
 }
 
 // Resolve an MCP token by its SHA-256 hash for bearer auth.
+// id, workspace_id, user_id are required: used internally by auth middleware
+// to establish session context (not exposed to API).
 func (q *Queries) FindMcpTokenByHash(ctx context.Context, tokenHash string) (FindMcpTokenByHashRow, error) {
 	row := q.db.QueryRowContext(ctx, findMcpTokenByHash, tokenHash)
 	var i FindMcpTokenByHashRow

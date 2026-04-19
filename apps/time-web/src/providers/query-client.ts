@@ -1,36 +1,5 @@
-import { QueryClient } from '@tanstack/react-query';
-
-interface MaybeCodedError {
-  code?: string;
-}
-
-function hasCode(err: unknown): err is MaybeCodedError {
-  return typeof err === 'object' && err !== null && 'code' in err;
-}
-
 /**
- * Create the singleton QueryClient with project defaults aligned with
- * flow-web configuration.
+ * Re-export the shared query client from @nodate-flow/sdk.
+ * Kept as a bridge so existing imports continue to resolve.
  */
-export function createQueryClient(): QueryClient {
-  return new QueryClient({
-    defaultOptions: {
-      queries: {
-        staleTime: 30_000,
-        gcTime: 5 * 60_000,
-        refetchOnWindowFocus: false,
-        throwOnError: true,
-        retry: (failureCount, error) => {
-          if (hasCode(error) && error.code === 'AUTH.TOKEN.EXPIRED') return false;
-          return failureCount < 1;
-        },
-      },
-      mutations: {
-        throwOnError: false,
-      },
-    },
-  });
-}
-
-/** Module-level singleton QueryClient instance. */
-export const queryClient = createQueryClient();
+export { createQueryClient, queryClient } from '@nodate-flow/sdk';

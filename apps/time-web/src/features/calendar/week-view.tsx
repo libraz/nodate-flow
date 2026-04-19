@@ -239,7 +239,10 @@ export default function WeekView(): ReactElement {
                 className={styles.headerDayNum}
                 style={
                   isToday
-                    ? { backgroundColor: 'var(--nf-color-accent)', color: '#fff' }
+                    ? {
+                        backgroundColor: 'var(--nf-color-accent)',
+                        color: 'var(--nf-color-fg-on-accent)',
+                      }
                     : { color: dayColor }
                 }
               >
@@ -292,7 +295,7 @@ export default function WeekView(): ReactElement {
                     }}
                     onClick={() => openEventDetail(event.id)}
                     className={styles.allDayEvent}
-                    style={getEventStyle(event.kind, event.showAs, '#3b82f6')}
+                    style={getEventStyle(event.kind, event.showAs, 'var(--nf-color-accent)')}
                   >
                     {event.title}
                   </button>
@@ -379,7 +382,7 @@ export default function WeekView(): ReactElement {
                 {/* Events */}
                 {dayEvents.map((event) => {
                   const { top, height } = getEventTopAndHeight(event);
-                  const style = getEventStyle(event.kind, event.showAs, '#3b82f6');
+                  const style = getEventStyle(event.kind, event.showAs, 'var(--nf-color-accent)');
                   return (
                     <button
                       key={event.id}

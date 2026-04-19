@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
@@ -30,8 +30,8 @@
   "devDependencies": {
     "@nodate-flow/ui": "workspace:*",
     "@nodate-flow/holidays": "workspace:*",
-    "@tanstack/router-devtools": "1.166.11",
-    "@tanstack/router-plugin": "1.167.12",
+    "@tanstack/router-devtools": "1.168.10",
+    "@tanstack/router-plugin": "1.168.10",
     "@types/luxon": "^3.4.2",
     "@types/react": "19.0.0",
     "@types/react-dom": "19.0.0",

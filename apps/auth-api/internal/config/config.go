@@ -14,7 +14,7 @@ type Config struct {
 	LogLevel string `env:"NF_AUTH_LOG_LEVEL" envDefault:"info"`
 
 	// DbDsn is the MySQL DSN shared with flow-api and time-api.
-	DbDsn string `env:"NF_DB_DSN"`
+	DbDsn string `env:"NF_DB_DSN,required"`
 
 	// CookieSecure toggles the Secure flag on the nd_rt refresh cookie.
 	CookieSecure bool `env:"NF_COOKIE_SECURE" envDefault:"false"`

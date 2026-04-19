@@ -151,7 +151,9 @@
     "theme_dotline": "ドットライン",
     "mode_light": "ライト",
     "mode_dark": "ダーク",
-    "mode_system": "システム"
+    "mode_system": "システム",
+    "language_en": "English",
+    "language_ja": "日本語"
   },
   "search": {
     "placeholder": "予定を検索...",
@@ -181,6 +183,16 @@
     "memo": "メモ",
     "search": "検索",
     "settings": "設定"
+  },
+  "share": {
+    "loading": "\u5171\u6709\u30ab\u30ec\u30f3\u30c0\u30fc\u3092\u8aad\u307f\u8fbc\u307f\u4e2d...",
+    "invalid_or_expired": "\u3053\u306e\u5171\u6709\u30ab\u30ec\u30f3\u30c0\u30fc\u30ea\u30f3\u30af\u306f\u7121\u52b9\u304b\u6709\u52b9\u671f\u9650\u5207\u308c\u3067\u3059\u3002",
+    "sign_in": "\u30b5\u30a4\u30f3\u30a4\u30f3",
+    "joining": "\u53c2\u52a0\u4e2d...",
+    "join_calendar": "\u30ab\u30ec\u30f3\u30c0\u30fc\u306b\u53c2\u52a0",
+    "sign_in_to_join": "\u30b5\u30a4\u30f3\u30a4\u30f3\u3057\u3066\u53c2\u52a0",
+    "join_success": "\u30ab\u30ec\u30f3\u30c0\u30fc\u306b\u53c2\u52a0\u3057\u307e\u3057\u305f\uff01\u30ea\u30c0\u30a4\u30ec\u30af\u30c8\u4e2d...",
+    "no_upcoming_events": "\u4eca\u5f8c\u306e\u4e88\u5b9a\u306f\u3042\u308a\u307e\u305b\u3093"
   },
   "rsvp": {
     "accept": "参加",

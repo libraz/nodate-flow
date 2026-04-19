@@ -121,6 +121,7 @@ type FindPendingDeliveriesRow struct {
 }
 
 // Find deliveries ready for (re)delivery. Used by the background worker.
+// d.id is required: used by MarkDeliveryDelivered/Failed/Dead (WHERE id = ?).
 func (q *Queries) FindPendingDeliveries(ctx context.Context, limit int32) ([]FindPendingDeliveriesRow, error) {
 	rows, err := q.db.QueryContext(ctx, findPendingDeliveries, limit)
 	if err != nil {
@@ -213,6 +214,7 @@ type ListActiveSubscriptionsForEventRow struct {
 
 // Find all active subscriptions in a workspace. Event type filtering
 // is done in Go since JSON_CONTAINS is not sqlc-friendly.
+// id is required: used as subscription_id FK in CreateWebhookDelivery.
 func (q *Queries) ListActiveSubscriptionsForEvent(ctx context.Context, workspaceID uint32) ([]ListActiveSubscriptionsForEventRow, error) {
 	rows, err := q.db.QueryContext(ctx, listActiveSubscriptionsForEvent, workspaceID)
 	if err != nil {

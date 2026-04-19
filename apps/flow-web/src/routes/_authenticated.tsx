@@ -8,6 +8,22 @@
 import { Outlet, createFileRoute, useRouterState } from '@tanstack/react-router';
 import { type ReactElement, useCallback, useEffect, useState } from 'react';
 
+/**
+ * isSafeRedirect returns true when the URL is a relative path (starting
+ * with a single slash) or points to the same origin as the current page.
+ * Protocol-relative URLs ("//evil.com") and foreign origins are rejected
+ * to prevent open-redirect attacks.
+ */
+function isSafeRedirect(url: string): boolean {
+  if (url.startsWith('/') && !url.startsWith('//')) return true;
+  try {
+    const parsed = new URL(url);
+    return parsed.origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
 import AppShell from '../components/layout/app-shell';
 import NotFound from '../components/not-found';
 import ShortcutsHelpDialog from '../components/shortcuts-help-dialog';
@@ -48,7 +64,10 @@ function AuthenticatedLayout(): ReactElement | null {
     if (status === 'unauthenticated' && !isAuthenticated) {
       const accountsUrl =
         (import.meta.env.VITE_ACCOUNTS_WEB_URL as string | undefined) ?? 'http://localhost:5175';
-      window.location.href = `${accountsUrl}/login?redirect=${encodeURIComponent(window.location.href)}`;
+      const target = `${accountsUrl}/login?redirect=${encodeURIComponent(window.location.href)}`;
+      if (isSafeRedirect(target)) {
+        window.location.href = target;
+      }
     }
   }, [status, isAuthenticated]);
 

@@ -151,7 +151,9 @@
     "theme_dotline": "Dotline",
     "mode_light": "Light",
     "mode_dark": "Dark",
-    "mode_system": "System"
+    "mode_system": "System",
+    "language_en": "English",
+    "language_ja": "\u65e5\u672c\u8a9e"
   },
   "search": {
     "placeholder": "Search events...",
@@ -181,6 +183,16 @@
     "memo": "Memo",
     "search": "Search",
     "settings": "Settings"
+  },
+  "share": {
+    "loading": "Loading shared calendar...",
+    "invalid_or_expired": "This shared calendar link is invalid or has expired.",
+    "sign_in": "Sign in",
+    "joining": "Joining...",
+    "join_calendar": "Join Calendar",
+    "sign_in_to_join": "Sign in to join",
+    "join_success": "Successfully joined the calendar! Redirecting...",
+    "no_upcoming_events": "No upcoming events"
   },
   "rsvp": {
     "accept": "Accept",

@@ -201,7 +201,7 @@ export default function EventDetail(): ReactElement | null {
     );
   }
 
-  const eventColor = '#3b82f6';
+  const eventColor = 'var(--nf-color-accent)';
 
   const content = (
     <div className={detailStyles.scrollContainer}>

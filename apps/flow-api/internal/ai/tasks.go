@@ -124,6 +124,39 @@ type InvocationRecord struct {
 	ErrorCode        string
 }
 
+// maxTitleLen is the maximum number of characters accepted for a
+// user-supplied task title before it is truncated. This limits the
+// surface area for prompt injection and prevents excessively large
+// prompts from being sent to the LLM provider.
+const maxTitleLen = 500
+
+// maxDescLen is the maximum number of characters accepted for a
+// user-supplied task description before it is truncated.
+const maxDescLen = 5000
+
+// sanitizeTitle truncates a user-supplied title to maxTitleLen runes.
+// SECURITY: User-supplied content is included verbatim in LLM prompts.
+// While full prompt-injection mitigation requires output validation
+// (not input sanitization alone), truncating input reduces the attack
+// surface and prevents prompt-size abuse.
+func sanitizeTitle(s string) string {
+	r := []rune(s)
+	if len(r) > maxTitleLen {
+		return string(r[:maxTitleLen])
+	}
+	return s
+}
+
+// sanitizeDesc truncates a user-supplied description to maxDescLen
+// runes. See sanitizeTitle for the security rationale.
+func sanitizeDesc(s string) string {
+	r := []rune(s)
+	if len(r) > maxDescLen {
+		return string(r[:maxDescLen])
+	}
+	return s
+}
+
 const proposeTasksSystem = `You are a task-planning assistant for the nodate-flow workspace. ` +
 	`Reply ONLY with a JSON array of objects with keys "title", "description", "priority". ` +
 	`priority is one of "low", "medium", "high".`
@@ -149,9 +182,11 @@ func (o *Orchestrator) ProposeTasksFrom(ctx context.Context, workspaceID uint32,
 		return nil, ErrNoProvider
 	}
 
+	// Truncate user input to limit prompt-injection surface and prevent
+	// prompt-size abuse. See maxDescLen for the rationale.
 	req := providers.Request{
 		System: proposeTasksSystem,
-		Prompt: signal,
+		Prompt: sanitizeDesc(signal),
 	}
 	wsIDStr := strconv.FormatUint(uint64(workspaceID), 10)
 	resp, err := prov.Complete(ctx, req)
@@ -188,7 +223,7 @@ func (o *Orchestrator) ProposePriority(ctx context.Context, workspaceID uint32, 
 	}
 	req := providers.Request{
 		System: proposePrioritySystem,
-		Prompt: taskSummary,
+		Prompt: sanitizeDesc(taskSummary),
 	}
 	wsIDStr := strconv.FormatUint(uint64(workspaceID), 10)
 	resp, err := prov.Complete(ctx, req)
@@ -335,7 +370,8 @@ func (o *Orchestrator) ProposeSteps(
 	}
 
 	// ---- build user prompt ----
-	userPrompt := buildStepsPrompt(title, description, existingChildren, ranked)
+	// Truncate user input before building the LLM prompt.
+	userPrompt := buildStepsPrompt(sanitizeTitle(title), sanitizeDesc(description), existingChildren, ranked)
 
 	// ---- call LLM ----
 	req := providers.Request{

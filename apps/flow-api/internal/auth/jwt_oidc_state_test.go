@@ -54,7 +54,7 @@ func TestOIDCStateRejectsTotpChallenge(t *testing.T) {
 	t.Parallel()
 	iss, _ := NewJWTIssuer(nil, "nodate-flow", "api", time.Minute)
 	// A TOTP challenge token should not be accepted as an OIDC state token.
-	totpTok, _, _ := iss.SignTotpChallenge(42)
+	totpTok, _, _ := iss.SignTotpChallenge("01961234-5678-7aaa-bbbb-ccccddddeeee")
 	if _, err := iss.VerifyOIDCState(totpTok); err == nil {
 		t.Fatal("totp challenge should not be accepted as oidc state")
 	}

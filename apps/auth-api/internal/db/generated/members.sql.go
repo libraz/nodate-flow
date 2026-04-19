@@ -13,6 +13,26 @@ import (
 	types "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 )
 
+const checkWorkspaceMemberExists = `-- name: CheckWorkspaceMemberExists :one
+SELECT 1 AS ok FROM workspace_members
+WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE
+LIMIT 1
+`
+
+type CheckWorkspaceMemberExistsParams struct {
+	WorkspaceID uint32 `json:"-"`
+	UserID      uint32 `json:"-"`
+}
+
+// Verify that a user is an enabled member of a workspace. Returns 1 if
+// the membership exists, sql.ErrNoRows otherwise.
+func (q *Queries) CheckWorkspaceMemberExists(ctx context.Context, arg CheckWorkspaceMemberExistsParams) (int32, error) {
+	row := q.db.QueryRowContext(ctx, checkWorkspaceMemberExists, arg.WorkspaceID, arg.UserID)
+	var ok int32
+	err := row.Scan(&ok)
+	return ok, err
+}
+
 const createWorkspaceMember = `-- name: CreateWorkspaceMember :execlastid
 INSERT INTO workspace_members (
   public_id,
@@ -109,6 +129,26 @@ func (q *Queries) FindWorkspaceMemberByUserId(ctx context.Context, arg FindWorks
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const getWorkspaceMemberRole = `-- name: GetWorkspaceMemberRole :one
+SELECT role FROM workspace_members
+WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE
+LIMIT 1
+`
+
+type GetWorkspaceMemberRoleParams struct {
+	WorkspaceID uint32 `json:"-"`
+	UserID      uint32 `json:"-"`
+}
+
+// Return the role string for an enabled workspace member. Returns
+// sql.ErrNoRows when the user is not a member.
+func (q *Queries) GetWorkspaceMemberRole(ctx context.Context, arg GetWorkspaceMemberRoleParams) (WorkspaceMembersRole, error) {
+	row := q.db.QueryRowContext(ctx, getWorkspaceMemberRole, arg.WorkspaceID, arg.UserID)
+	var role WorkspaceMembersRole
+	err := row.Scan(&role)
+	return role, err
 }
 
 const listWorkspaceMembers = `-- name: ListWorkspaceMembers :many

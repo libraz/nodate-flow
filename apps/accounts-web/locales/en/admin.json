@@ -27,6 +27,7 @@
     "suspended_only": "Suspended",
     "no_results": "No users found.",
     "detail": "User Details",
+    "user_agent": "User Agent",
     "sessions": "Sessions",
     "grant_admin": "Grant Admin",
     "revoke_admin": "Revoke Admin"

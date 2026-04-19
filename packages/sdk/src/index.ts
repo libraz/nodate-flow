@@ -13,3 +13,24 @@ export {
   createRefreshMiddleware,
   type RefreshMiddlewareOptions,
 } from './refresh.js';
+
+// Shared auth store (Zustand)
+export {
+  authStore,
+  useAuth,
+  selectAccessToken,
+  selectUser,
+  selectIsAuthenticated,
+  type AuthUser,
+  type AuthState,
+} from './auth-store.js';
+
+// Shared API error utilities
+export { ApiError, toApiError, type ProblemJson } from './api-error.js';
+
+// Shared TanStack Query client + provider
+export { createQueryClient, queryClient } from './query-client.js';
+export { QueryProvider } from './query-provider.js';
+
+// Shared i18n provider
+export { I18nProvider, type I18nProviderProps } from './i18n-provider.js';

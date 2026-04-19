@@ -87,8 +87,8 @@ logs: ## Tail compose logs
 
 # ---------- build ----------
 
-.PHONY: build build-api build-web
-build: build-api build-auth-api build-time-api build-web ## Build all apps
+.PHONY: build build-api build-web build-accounts-web build-time-web
+build: build-api build-auth-api build-time-api build-web build-accounts-web build-time-web ## Build all apps
 
 build-api:
 	cd apps/flow-api && go build -o ../../bin/flow-api ./cmd/api
@@ -102,10 +102,16 @@ build-time-api:
 build-web:
 	cd apps/flow-web && $(PKG_RUN) build
 
+build-accounts-web:
+	cd apps/accounts-web && $(PKG_RUN) build
+
+build-time-web:
+	cd apps/time-web && $(PKG_RUN) build
+
 # ---------- test ----------
 
-.PHONY: test test-api test-web test-e2e test-contract lighthouse
-test: test-api test-auth-api test-time-api test-web ## Run unit/integration tests (Go + TS)
+.PHONY: test test-api test-web test-accounts-web test-time-web test-ui test-sdk test-e2e test-contract lighthouse
+test: test-api test-auth-api test-time-api test-web test-accounts-web test-time-web test-ui test-sdk ## Run unit/integration tests (Go + TS)
 
 test-api: ## Go tests (flow)
 	cd apps/flow-api && go test ./...
@@ -116,8 +122,20 @@ test-auth-api: ## Go tests (auth)
 test-time-api: ## Go tests (time)
 	cd apps/time-api && go test ./...
 
-test-web: ## Vitest
+test-web: ## Vitest (flow-web)
 	cd apps/flow-web && $(PKG_RUN) test
+
+test-accounts-web: ## Vitest (accounts-web)
+	cd apps/accounts-web && $(PKG_RUN) test
+
+test-time-web: ## Vitest (time-web)
+	cd apps/time-web && $(PKG_RUN) test
+
+test-ui: ## Vitest (packages/ui)
+	cd packages/ui && $(PKG_RUN) test
+
+test-sdk: ## Vitest (packages/sdk)
+	cd packages/sdk && $(PKG_RUN) test
 
 test-e2e: ## Playwright E2E
 	cd apps/flow-web && $(PKG_RUN) e2e
@@ -135,11 +153,15 @@ check: lint typecheck vet ## Lint + typecheck + go vet
 
 lint: ## biome check + golangci-lint
 	$(PKG_RUN) check
-	cd apps/flow-api && golangci-lint run ./... || true
+	cd apps/flow-api && golangci-lint run ./...
+	cd apps/auth-api && golangci-lint run ./...
+	cd apps/time-api && golangci-lint run ./...
 
 format: ## biome format + gofmt
 	$(PKG_RUN) format
 	cd apps/flow-api && gofmt -w .
+	cd apps/auth-api && gofmt -w .
+	cd apps/time-api && gofmt -w .
 
 typecheck: ## tsc -b
 	$(PKG_RUN) typecheck

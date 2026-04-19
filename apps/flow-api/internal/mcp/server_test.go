@@ -160,6 +160,29 @@ func TestBuildEventNotification(t *testing.T) {
 	}
 }
 
+// TestHashTokenDeterministic verifies that hashToken produces consistent
+// SHA-256 hex output and never returns the raw token.
+func TestHashTokenDeterministic(t *testing.T) {
+	tok := "mcp_test-token-abc123"
+	h1 := hashToken(tok)
+	h2 := hashToken(tok)
+	if h1 != h2 {
+		t.Fatalf("hashToken is not deterministic: %q != %q", h1, h2)
+	}
+	if h1 == tok {
+		t.Fatal("hashToken must not return the raw token")
+	}
+	// SHA-256 hex is always 64 characters.
+	if len(h1) != 64 {
+		t.Fatalf("expected 64 hex chars, got %d: %q", len(h1), h1)
+	}
+	// Different tokens produce different hashes.
+	h3 := hashToken("mcp_different-token")
+	if h1 == h3 {
+		t.Fatal("different tokens should produce different hashes")
+	}
+}
+
 // TestMalformedFrameReturnsFrameMalformed documents the happy path for
 // JSON-RPC frame validation failure.
 func TestMalformedFrameReturnsFrameMalformed(t *testing.T) {

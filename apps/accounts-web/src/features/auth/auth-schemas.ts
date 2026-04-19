@@ -37,6 +37,8 @@ export const profileSchema = z.object({
     'aurora-dark',
     'dotline-light',
     'dotline-dark',
+    'glass-light',
+    'glass-dark',
     'system',
   ]),
 });

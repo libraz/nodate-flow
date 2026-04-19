@@ -43,14 +43,13 @@ func (q *Queries) AdminCountActiveInstanceAdmins(ctx context.Context) (int64, er
 }
 
 const adminFindInstanceAdminByUserId = `-- name: AdminFindInstanceAdminByUserId :one
-SELECT id, public_id, user_id, granted_at, revoked_at
+SELECT public_id, user_id, granted_at, revoked_at
 FROM instance_admins
 WHERE user_id = ? AND enabled = TRUE AND revoked_at IS NULL
 LIMIT 1
 `
 
 type AdminFindInstanceAdminByUserIdRow struct {
-	ID        uint32         `json:"-"`
 	PublicID  types.PublicID `json:"publicId"`
 	UserID    uint32         `json:"-"`
 	GrantedAt time.Time      `json:"grantedAt"`
@@ -58,11 +57,11 @@ type AdminFindInstanceAdminByUserIdRow struct {
 }
 
 // Find instance admin grant for a specific user.
+// Used as an existence check by grant/revoke handlers (result is discarded).
 func (q *Queries) AdminFindInstanceAdminByUserId(ctx context.Context, userID uint32) (AdminFindInstanceAdminByUserIdRow, error) {
 	row := q.db.QueryRowContext(ctx, adminFindInstanceAdminByUserId, userID)
 	var i AdminFindInstanceAdminByUserIdRow
 	err := row.Scan(
-		&i.ID,
 		&i.PublicID,
 		&i.UserID,
 		&i.GrantedAt,

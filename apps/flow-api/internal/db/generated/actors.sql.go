@@ -96,6 +96,7 @@ type FindAgentIDByPublicIDForWorkspaceParams struct {
 
 // Resolve an ai_agents public id to its internal id, scoped to the
 // workspace. Used by task actor handlers to bind by public id.
+// id is required: returned as FK value for task_actors.agent_id.
 func (q *Queries) FindAgentIDByPublicIDForWorkspace(ctx context.Context, arg FindAgentIDByPublicIDForWorkspaceParams) (uint32, error) {
 	row := q.db.QueryRowContext(ctx, findAgentIDByPublicIDForWorkspace, arg.WorkspaceID, arg.PublicID)
 	var id uint32

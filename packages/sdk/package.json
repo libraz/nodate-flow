@@ -12,9 +12,29 @@
   "dependencies": {
     "openapi-fetch": "0.13.0"
   },
+  "peerDependencies": {
+    "@tanstack/react-query": ">=5.0.0",
+    "i18next": ">=23.0.0",
+    "react": ">=18.0.0",
+    "react-i18next": ">=15.0.0",
+    "zustand": ">=5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@tanstack/react-query": { "optional": true },
+    "i18next": { "optional": true },
+    "react": { "optional": true },
+    "react-i18next": { "optional": true },
+    "zustand": { "optional": true }
+  },
   "devDependencies": {
+    "@tanstack/react-query": "5.59.16",
+    "@types/react": "19.0.0",
+    "i18next": "23.16.4",
     "openapi-typescript": "7.4.2",
+    "react": "19.0.0",
+    "react-i18next": "15.1.0",
     "typescript": "5.6.3",
-    "vitest": "^4.1.4"
+    "vitest": "^4.1.4",
+    "zustand": "5.0.1"
   }
 }

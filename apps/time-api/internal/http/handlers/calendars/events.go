@@ -369,8 +369,9 @@ func GetEvent(deps Deps) func(context.Context, *GetEventInput) (*GetEventOutput,
 			return nil, errEventNotFound
 		}
 		evt, err := deps.Queries.FindCalendarEventByPublicId(ctx, generated.FindCalendarEventByPublicIdParams{
-			PublicID:   types.FromUUID(evtUID),
-			CalendarID: cal.ID,
+			PublicID:    types.FromUUID(evtUID),
+			CalendarID:  cal.ID,
+			WorkspaceID: wsID,
 		})
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -412,8 +413,9 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 			return nil, errEventNotFound
 		}
 		evt, err := deps.Queries.FindCalendarEventByPublicId(ctx, generated.FindCalendarEventByPublicIdParams{
-			PublicID:   types.FromUUID(evtUID),
-			CalendarID: cal.ID,
+			PublicID:    types.FromUUID(evtUID),
+			CalendarID:  cal.ID,
+			WorkspaceID: wsID,
 		})
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -436,8 +438,9 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		}
 
 		params := generated.PatchCalendarEventParams{
-			PublicID:   types.FromUUID(evtUID),
-			CalendarID: cal.ID,
+			PublicID:    types.FromUUID(evtUID),
+			CalendarID:  cal.ID,
+			WorkspaceID: wsID,
 		}
 		if input.Body.Kind != nil {
 			params.Kind = generated.NullCalendarEventsKind{
@@ -504,8 +507,9 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 
 		// Re-read.
 		evt, err = deps.Queries.FindCalendarEventByPublicId(ctx, generated.FindCalendarEventByPublicIdParams{
-			PublicID:   types.FromUUID(evtUID),
-			CalendarID: cal.ID,
+			PublicID:    types.FromUUID(evtUID),
+			CalendarID:  cal.ID,
+			WorkspaceID: wsID,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarEventStoreReadInterrupted)
@@ -540,8 +544,9 @@ func DeleteEvent(deps Deps) func(context.Context, *DeleteEventInput) (*DeleteEve
 			return nil, errEventNotFound
 		}
 		evt, err := deps.Queries.FindCalendarEventByPublicId(ctx, generated.FindCalendarEventByPublicIdParams{
-			PublicID:   types.FromUUID(evtUID),
-			CalendarID: cal.ID,
+			PublicID:    types.FromUUID(evtUID),
+			CalendarID:  cal.ID,
+			WorkspaceID: wsID,
 		})
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -563,8 +568,9 @@ func DeleteEvent(deps Deps) func(context.Context, *DeleteEventInput) (*DeleteEve
 		}
 
 		err = deps.Queries.DisableCalendarEvent(ctx, generated.DisableCalendarEventParams{
-			PublicID:   types.FromUUID(evtUID),
-			CalendarID: cal.ID,
+			PublicID:    types.FromUUID(evtUID),
+			CalendarID:  cal.ID,
+			WorkspaceID: wsID,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarEventStoreDeleteInterrupted)

@@ -14,6 +14,7 @@
   },
   "empty": "ウィジェットがありません",
   "empty_description": "ウィジェットを追加してダッシュボードをカスタマイズしましょう。",
+  "resize_label": "リサイズ",
   "confirm_remove": "このウィジェットを削除しますか？",
   "widget_title_label": "ウィジェットタイトル",
   "select_type": "ウィジェットタイプを選択",

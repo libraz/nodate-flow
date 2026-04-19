@@ -169,6 +169,7 @@ type FindSessionByPublicIdRow struct {
 }
 
 // Resolve a session by its external public_id (UUID v7).
+// id is required: used internally for session operations.
 func (q *Queries) FindSessionByPublicId(ctx context.Context, publicID types.PublicID) (FindSessionByPublicIdRow, error) {
 	row := q.db.QueryRowContext(ctx, findSessionByPublicId, publicID)
 	var i FindSessionByPublicIdRow
@@ -220,6 +221,7 @@ type FindSessionByRefreshHashRow struct {
 }
 
 // Resolve a session from its SHA-256 refresh hash. Caller validates expiry.
+// id is required: used by RotateSessionRefreshHash (WHERE id = ?).
 func (q *Queries) FindSessionByRefreshHash(ctx context.Context, refreshHash string) (FindSessionByRefreshHashRow, error) {
 	row := q.db.QueryRowContext(ctx, findSessionByRefreshHash, refreshHash)
 	var i FindSessionByRefreshHashRow

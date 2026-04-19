@@ -38,6 +38,7 @@ SELECT
 FROM calendar_event_checklist_items
 WHERE public_id = ?
   AND event_id = ?
+  AND workspace_id = ?
   AND enabled = TRUE
 LIMIT 1;
 
@@ -49,6 +50,7 @@ SET title       = COALESCE(sqlc.narg('title'), title),
     sort_weight = COALESCE(sqlc.narg('sort_weight'), sort_weight)
 WHERE public_id = ?
   AND event_id = ?
+  AND workspace_id = ?
   AND enabled = TRUE;
 
 -- name: DisableCalendarChecklistItem :exec
@@ -56,4 +58,5 @@ WHERE public_id = ?
 UPDATE calendar_event_checklist_items
 SET enabled = FALSE
 WHERE public_id = ?
-  AND event_id = ?;
+  AND event_id = ?
+  AND workspace_id = ?;

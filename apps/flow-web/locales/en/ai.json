@@ -3,6 +3,7 @@
     "title": "AI providers",
     "empty": "No providers configured",
     "add": "Add provider",
+    "masked_key_label": "API key (masked)",
     "write_only_notice": "API keys are write-only. Once saved, they cannot be read back — only rotated or deleted.",
     "field": {
       "kind": "Kind",

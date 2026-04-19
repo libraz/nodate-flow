@@ -90,7 +90,7 @@ func ListAttachments(deps Deps) func(context.Context, *ListAttachmentsInput) (*L
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
@@ -130,7 +130,7 @@ func CreateAttachment(deps Deps) func(context.Context, *CreateAttachmentInput) (
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
@@ -196,7 +196,7 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteAttachmentInput) (
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
@@ -207,8 +207,9 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteAttachmentInput) (
 		}
 
 		att, err := deps.Queries.FindCalendarEventAttachmentByPublicId(ctx, generated.FindCalendarEventAttachmentByPublicIdParams{
-			PublicID: types.FromUUID(attUID),
-			EventID:  evt.ID,
+			PublicID:    types.FromUUID(attUID),
+			EventID:     evt.ID,
+			WorkspaceID: wsID,
 		})
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -224,8 +225,9 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteAttachmentInput) (
 		}
 
 		err = deps.Queries.DisableCalendarEventAttachment(ctx, generated.DisableCalendarEventAttachmentParams{
-			PublicID: types.FromUUID(attUID),
-			EventID:  evt.ID,
+			PublicID:    types.FromUUID(attUID),
+			EventID:     evt.ID,
+			WorkspaceID: wsID,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarAttachmentStoreDeleteInterrupted)

@@ -149,18 +149,15 @@ func run() error {
 	sort.Slice(all, func(i, j int) bool { return all[i].Code < all[j].Code })
 
 	// Generate Go per-domain files for all app directories that have
-	// an internal/errors/ directory. The canonical output is apps/api/;
-	// flow-api, auth-api, and time-api receive the same per-domain files
-	// but only for domains they already track (existing files are updated,
-	// new domain files are added only to apps/api/ and apps/flow-api/).
-	// The errors.go runtime helper is only written for apps/api/ (the
-	// others use go-shared/apierr type aliases).
+	// an internal/errors/ directory. flow-api receives all domains;
+	// auth-api and time-api receive only updates for domains they already
+	// track. The runtime helper (Spec/APIError/New/Newf/Wrap) lives in
+	// packages/go-shared/apierr and is not generated here.
 	goTargets := []struct {
 		dir     string
 		allDoms bool // true = write all domains; false = update existing only
 		runtime bool // true = write errors.go runtime helper
 	}{
-		{filepath.Join(root, "apps", "api", "internal", "errors"), true, true},
 		{filepath.Join(root, "apps", "flow-api", "internal", "errors"), true, false},
 		{filepath.Join(root, "apps", "auth-api", "internal", "errors"), false, false},
 		{filepath.Join(root, "apps", "time-api", "internal", "errors"), false, false},
@@ -206,7 +203,7 @@ func run() error {
 	}
 
 	// Locale files — write to all web app directories that have locales/.
-	localeApps := []string{"apps/web", "apps/flow-web"}
+	localeApps := []string{"apps/flow-web", "apps/accounts-web"}
 	for _, app := range localeApps {
 		enDir := filepath.Join(root, app, "locales", "en")
 		jaDir := filepath.Join(root, app, "locales", "ja")

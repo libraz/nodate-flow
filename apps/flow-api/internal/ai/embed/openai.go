@@ -11,6 +11,24 @@ import (
 	"time"
 )
 
+// Decryptor is the narrow contract used by OpenAIProvider to unseal the
+// stored API key ciphertext. In production this is satisfied by
+// *crypto.Cipher; tests may inject a fake.
+type Decryptor interface {
+	Decrypt(blob []byte) ([]byte, error)
+}
+
+// identityDecryptor is a fallback Decryptor that returns a copy of the
+// input bytes. Used when no real cipher is available at startup so the
+// provider still follows the decrypt-use-zero lifecycle.
+type identityDecryptor struct{}
+
+func (identityDecryptor) Decrypt(blob []byte) ([]byte, error) {
+	out := make([]byte, len(blob))
+	copy(out, blob)
+	return out, nil
+}
+
 const (
 	defaultOpenAIEmbedURL   = "https://api.openai.com/v1/embeddings"
 	defaultOpenAIEmbedModel = "text-embedding-3-small"
@@ -20,12 +38,17 @@ const (
 // OpenAIProvider produces embeddings using the OpenAI Embeddings API.
 // It supports text-embedding-3-small (768 dims) and any endpoint that
 // speaks the same schema (Azure OpenAI, LiteLLM, vLLM, etc.).
+//
+// The API key is stored as ciphertext and decrypted per-call via a
+// Decryptor. The plaintext is zeroed immediately after use, matching
+// the pattern used by the LLM providers in internal/ai/providers.
 type OpenAIProvider struct {
-	apiKey string
-	model  string
-	dim    int
-	url    string
-	client *http.Client
+	keyCiphertext []byte
+	dec           Decryptor
+	model         string
+	dim           int
+	url           string
+	client        *http.Client
 }
 
 // OpenAIOption configures an OpenAIProvider.
@@ -49,15 +72,22 @@ func WithOpenAIBaseURL(u string) OpenAIOption {
 }
 
 // NewOpenAIProvider creates an embedding provider backed by the OpenAI
-// Embeddings API. apiKey is the plaintext API key. The caller is
-// responsible for decrypting the key before passing it here.
-func NewOpenAIProvider(apiKey string, opts ...OpenAIOption) *OpenAIProvider {
+// Embeddings API. keyCiphertext is the encrypted API key blob; dec is
+// used to decrypt it on every call. The plaintext is zeroed immediately
+// after each use. When dec is nil an identity decryptor is used (the
+// blob is treated as plaintext — useful when no cipher is available at
+// startup, but the decrypt-use-zero lifecycle still applies).
+func NewOpenAIProvider(keyCiphertext []byte, dec Decryptor, opts ...OpenAIOption) *OpenAIProvider {
+	if dec == nil {
+		dec = identityDecryptor{}
+	}
 	p := &OpenAIProvider{
-		apiKey: apiKey,
-		model:  defaultOpenAIEmbedModel,
-		dim:    Dim,
-		url:    defaultOpenAIEmbedURL,
-		client: &http.Client{Timeout: openAIEmbedTimeout},
+		keyCiphertext: keyCiphertext,
+		dec:           dec,
+		model:         defaultOpenAIEmbedModel,
+		dim:           Dim,
+		url:           defaultOpenAIEmbedURL,
+		client:        &http.Client{Timeout: openAIEmbedTimeout},
 	}
 	for _, o := range opts {
 		o(p)
@@ -106,7 +136,13 @@ func (p *OpenAIProvider) Embed(ctx context.Context, text string) ([]float32, err
 		return nil, fmt.Errorf("openai embed: build request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+p.apiKey)
+
+	plain, err := p.dec.Decrypt(p.keyCiphertext)
+	if err != nil {
+		return nil, fmt.Errorf("openai embed: decrypt key: %w", err)
+	}
+	httpReq.Header.Set("Authorization", "Bearer "+string(plain))
+	zero(plain)
 
 	resp, err := p.client.Do(httpReq)
 	if err != nil {
@@ -114,7 +150,7 @@ func (p *OpenAIProvider) Embed(ctx context.Context, text string) ([]float32, err
 	}
 	defer resp.Body.Close()
 
-	raw, _ := io.ReadAll(resp.Body)
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 	if resp.StatusCode/100 != 2 {
 		return nil, fmt.Errorf("openai embed: upstream status %d: %s", resp.StatusCode, truncate(raw, 200))
 	}
@@ -137,4 +173,12 @@ func truncate(b []byte, n int) string {
 		return string(b)
 	}
 	return string(b[:n]) + "..."
+}
+
+// zero overwrites b with zero bytes. Used to scrub plaintext API keys
+// after they have been written to an outbound Authorization header.
+func zero(b []byte) {
+	for i := range b {
+		b[i] = 0
+	}
 }

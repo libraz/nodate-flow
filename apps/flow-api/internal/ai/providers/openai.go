@@ -90,7 +90,7 @@ func (p *openAIProvider) Complete(ctx context.Context, req Request) (*Response, 
 		return nil, fmt.Errorf("openai: do: %w", err)
 	}
 	defer resp.Body.Close()
-	raw, err := io.ReadAll(resp.Body)
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 	if err != nil {
 		return nil, fmt.Errorf("openai: read body: %w", err)
 	}

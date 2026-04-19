@@ -56,6 +56,11 @@ func OIDCGoogleCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*O
 			}
 			userPub = pub
 		case errors.Is(err, sql.ErrNoRows):
+			// Block auto-provisioning when self-service registration is
+			// disabled at the instance level.
+			if !deps.RegistrationOpen {
+				return nil, httpErr(apierrors.AuthRegisterInstanceRegistrationDisabled)
+			}
 			// Auto-provision a new user.
 			userPub = types.New()
 			locale := claims.Locale

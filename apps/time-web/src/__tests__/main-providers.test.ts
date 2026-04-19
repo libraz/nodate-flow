@@ -1,3 +1,4 @@
+/// <reference types="node" />
 /**
  * Smoke test verifying that time-web's main.tsx wraps the app with the
  * required provider hierarchy: I18nProvider, ThemeProvider, ConfirmProvider (C3).
@@ -11,7 +12,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('time-web main.tsx provider hierarchy', () => {
-  const source = readFileSync(resolve(__dirname, '../main.tsx'), 'utf-8');
+  const source = readFileSync(resolve(import.meta.dirname, '../main.tsx'), 'utf-8');
 
   it('imports I18nProvider', () => {
     expect(source).toContain("import { I18nProvider } from './providers/i18n-provider'");

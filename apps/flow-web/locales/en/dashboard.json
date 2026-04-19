@@ -14,6 +14,7 @@
   },
   "empty": "No widgets yet",
   "empty_description": "Add widgets to customize your dashboard.",
+  "resize_label": "Resize",
   "confirm_remove": "Remove this widget?",
   "widget_title_label": "Widget title",
   "select_type": "Select widget type",

@@ -24,10 +24,10 @@ export const PRIORITY_KEY: Record<TaskPriority, string> = {
 /** CSS color string for each priority level. */
 export const PRIORITY_COLOR: Record<TaskPriority, string> = {
   0: 'var(--nf-color-fg-muted)',
-  1: '#3498db',
-  2: '#e67e22',
-  3: '#e74c3c',
-  4: '#c0392b',
+  1: 'var(--nf-color-info)',
+  2: 'var(--nf-color-warning)',
+  3: 'var(--nf-color-danger)',
+  4: 'var(--nf-color-danger)',
 };
 
 /** Badge tone for each priority level. */

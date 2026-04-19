@@ -84,10 +84,12 @@ func (p *googleProvider) Complete(ctx context.Context, req Request) (*Response, 
 
 	resp, err := doLimited(ctx, DestGoogle, httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("google: do: %w", err)
+		// Redact the URL from the error to avoid leaking the API key
+		// that Google's API design requires in the query string.
+		return nil, fmt.Errorf("google: do: request failed (url redacted)")
 	}
 	defer resp.Body.Close()
-	raw, err := io.ReadAll(resp.Body)
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 	if err != nil {
 		return nil, fmt.Errorf("google: read body: %w", err)
 	}

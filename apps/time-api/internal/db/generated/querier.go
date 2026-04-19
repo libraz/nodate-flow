@@ -11,6 +11,9 @@ import (
 )
 
 type Querier interface {
+	// Verify that a user is an enabled member of a workspace. Returns 1 if
+	// the membership exists, sql.ErrNoRows otherwise.
+	CheckWorkspaceMemberExists(ctx context.Context, arg CheckWorkspaceMemberExistsParams) (int32, error)
 	// Disable TOTP on a local identity.
 	ClearIdentityMfa(ctx context.Context, id uint32) error
 	// Mark a pending TOTP enrollment as confirmed by stamping
@@ -93,7 +96,7 @@ type Querier interface {
 	// Resolve a comment by UUID v7.
 	FindCalendarEventCommentByPublicId(ctx context.Context, arg FindCalendarEventCommentByPublicIdParams) (FindCalendarEventCommentByPublicIdRow, error)
 	// Quick lookup for permission checks: who owns this event?
-	FindCalendarEventOwner(ctx context.Context, publicID types.PublicID) (FindCalendarEventOwnerRow, error)
+	FindCalendarEventOwner(ctx context.Context, arg FindCalendarEventOwnerParams) (FindCalendarEventOwnerRow, error)
 	// Resolve an invite by its token hash for the acceptance flow.
 	FindCalendarInviteByTokenHash(ctx context.Context, tokenHash string) (FindCalendarInviteByTokenHashRow, error)
 	// Public-facing invite lookup (for share page preview, no auth required).
@@ -118,8 +121,10 @@ type Querier interface {
 	// Find the personal calendar for a user in a workspace.
 	FindPersonalCalendar(ctx context.Context, arg FindPersonalCalendarParams) (FindPersonalCalendarRow, error)
 	// Resolve a session by its external public_id (UUID v7).
+	// id is required: used internally for session operations.
 	FindSessionByPublicId(ctx context.Context, publicID types.PublicID) (FindSessionByPublicIdRow, error)
 	// Resolve a session from its SHA-256 refresh hash. Caller validates expiry.
+	// id is required: used by RotateSessionRefreshHash (WHERE id = ?).
 	FindSessionByRefreshHash(ctx context.Context, refreshHash string) (FindSessionByRefreshHashRow, error)
 	// Find a system calendar by its slug within a workspace.
 	FindSystemCalendarBySlug(ctx context.Context, arg FindSystemCalendarBySlugParams) (FindSystemCalendarBySlugRow, error)
@@ -151,6 +156,9 @@ type Querier interface {
 	FindWorkspaceInviteWorkspaceName(ctx context.Context, tokenHash string) (FindWorkspaceInviteWorkspaceNameRow, error)
 	// Resolve a workspace membership by (workspace_id, user_id).
 	FindWorkspaceMemberByUserId(ctx context.Context, arg FindWorkspaceMemberByUserIdParams) (FindWorkspaceMemberByUserIdRow, error)
+	// Return the role string for an enabled workspace member. Returns
+	// sql.ErrNoRows when the user is not a member.
+	GetWorkspaceMemberRole(ctx context.Context, arg GetWorkspaceMemberRoleParams) (WorkspaceMembersRole, error)
 	// Bump the use counter after a successful acceptance.
 	IncrementCalendarInviteUseCount(ctx context.Context, id uint32) error
 	// Bump the use counter after a successful accept.

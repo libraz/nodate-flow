@@ -123,7 +123,8 @@ export default function DayCell(props: DayCellProps): ReactElement {
       <div className={styles.events}>
         {visibleEvents.map((event) => {
           const color =
-            (event as CalendarEvent & { displayColor?: string }).displayColor || '#47B2F7';
+            (event as CalendarEvent & { displayColor?: string }).displayColor ||
+            'var(--nf-color-accent)';
           return (
             <button
               key={event.id}

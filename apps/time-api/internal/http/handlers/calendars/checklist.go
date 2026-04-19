@@ -103,7 +103,7 @@ func ListChecklist(deps Deps) func(context.Context, *ListChecklistInput) (*ListC
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
@@ -140,7 +140,7 @@ func CreateChecklistItem(deps Deps) func(context.Context, *CreateChecklistItemIn
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
@@ -189,7 +189,7 @@ func UpdateChecklistItem(deps Deps) func(context.Context, *UpdateChecklistItemIn
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
@@ -200,8 +200,9 @@ func UpdateChecklistItem(deps Deps) func(context.Context, *UpdateChecklistItemIn
 		}
 
 		params := generated.UpdateCalendarChecklistItemParams{
-			PublicID: types.FromUUID(itemUID),
-			EventID:  evt.ID,
+			PublicID:    types.FromUUID(itemUID),
+			EventID:     evt.ID,
+			WorkspaceID: wsID,
 		}
 		if input.Body.Title != nil {
 			params.Title = sql.NullString{String: *input.Body.Title, Valid: true}
@@ -242,7 +243,7 @@ func DeleteChecklistItem(deps Deps) func(context.Context, *DeleteChecklistItemIn
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
@@ -253,8 +254,9 @@ func DeleteChecklistItem(deps Deps) func(context.Context, *DeleteChecklistItemIn
 		}
 
 		err = deps.Queries.DisableCalendarChecklistItem(ctx, generated.DisableCalendarChecklistItemParams{
-			PublicID: types.FromUUID(itemUID),
-			EventID:  evt.ID,
+			PublicID:    types.FromUUID(itemUID),
+			EventID:     evt.ID,
+			WorkspaceID: wsID,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarChecklistStoreDeleteInterrupted)

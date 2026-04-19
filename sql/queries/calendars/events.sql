@@ -57,6 +57,7 @@ SELECT
 FROM calendar_events
 WHERE public_id = ?
   AND calendar_id = ?
+  AND workspace_id = ?
   AND enabled = TRUE
 LIMIT 1;
 
@@ -88,7 +89,8 @@ WHERE ce.calendar_id = ?
   AND ce.start_at < ?
   AND ce.end_at > ?
   AND ce.enabled = TRUE
-ORDER BY ce.start_at ASC, ce.public_id ASC;
+ORDER BY ce.start_at ASC, ce.public_id ASC
+LIMIT 1000;
 
 -- name: ListRecurringCalendarEventsByRange :many
 -- List recurring events whose recurrence window overlaps the query range.
@@ -121,7 +123,8 @@ WHERE ce.calendar_id = ?
   AND ce.start_at < ?
   AND (ce.recurrence_end IS NULL OR ce.recurrence_end > ?)
   AND ce.enabled = TRUE
-ORDER BY ce.start_at ASC;
+ORDER BY ce.start_at ASC
+LIMIT 1000;
 
 -- name: ListCalendarEventsAcrossCalendars :many
 -- Cross-calendar query: list events across multiple calendars for a user
@@ -157,7 +160,8 @@ WHERE ce.workspace_id = ?
   AND ce.start_at < ?
   AND ce.end_at > ?
   AND ce.enabled = TRUE
-ORDER BY ce.start_at ASC, ce.public_id ASC;
+ORDER BY ce.start_at ASC, ce.public_id ASC
+LIMIT 1000;
 
 -- name: ListRecurringCalendarEventsAcrossCalendars :many
 -- Cross-calendar query: list recurring events across multiple calendars
@@ -196,7 +200,8 @@ WHERE ce.workspace_id = ?
   AND ce.start_at < ?
   AND (ce.recurrence_end IS NULL OR ce.recurrence_end > ?)
   AND ce.enabled = TRUE
-ORDER BY ce.start_at ASC;
+ORDER BY ce.start_at ASC
+LIMIT 1000;
 
 -- name: PatchCalendarEvent :exec
 -- Patch mutable event fields. NULL params leave columns untouched.
@@ -221,6 +226,7 @@ SET kind                = COALESCE(sqlc.narg('kind'), kind),
     task_id             = COALESCE(sqlc.narg('task_id'), task_id)
 WHERE public_id = ?
   AND calendar_id = ?
+  AND workspace_id = ?
   AND enabled = TRUE;
 
 -- name: DisableCalendarEvent :exec
@@ -228,7 +234,8 @@ WHERE public_id = ?
 UPDATE calendar_events
 SET enabled = FALSE
 WHERE public_id = ?
-  AND calendar_id = ?;
+  AND calendar_id = ?
+  AND workspace_id = ?;
 
 -- name: ListAllCalendarEvents :many
 -- List all enabled events in a calendar (no date filter, for export).
@@ -255,12 +262,14 @@ SELECT
 FROM calendar_events ce
 WHERE ce.calendar_id = ?
   AND ce.enabled = TRUE
-ORDER BY ce.start_at ASC, ce.public_id ASC;
+ORDER BY ce.start_at ASC, ce.public_id ASC
+LIMIT 10000;
 
 -- name: FindCalendarEventOwner :one
 -- Quick lookup for permission checks: who owns this event?
 SELECT owner_user_id, calendar_id, workspace_id
 FROM calendar_events
 WHERE public_id = ?
+  AND workspace_id = ?
   AND enabled = TRUE
 LIMIT 1;

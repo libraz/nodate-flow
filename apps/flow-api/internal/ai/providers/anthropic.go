@@ -91,7 +91,7 @@ func (p *anthropicProvider) Complete(ctx context.Context, req Request) (*Respons
 	}
 	defer resp.Body.Close()
 
-	raw, err := io.ReadAll(resp.Body)
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 	if err != nil {
 		return nil, fmt.Errorf("anthropic: read body: %w", err)
 	}

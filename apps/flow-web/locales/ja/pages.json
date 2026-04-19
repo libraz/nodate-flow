@@ -15,6 +15,7 @@
   "ai_generate": "AIで生成",
   "ai_generating": "生成中...",
   "children": "サブページ",
+  "breadcrumb_label": "パンくずリスト",
   "search_placeholder": "ページを検索...",
   "created_by": "{name}が作成",
   "updated_at": "更新: {date}",

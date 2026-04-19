@@ -12,7 +12,7 @@ concurrency:
 
 env:
   GO_VERSION: "1.25.0"
-  BUN_VERSION: "latest"
+  BUN_VERSION: "1.3.11"
 
 jobs:
   # ---------- Job 1: Lint and typecheck (Go + TS in parallel steps) ----------
@@ -114,13 +114,47 @@ jobs:
         run: go test -short -race -count=1 -coverprofile=coverage.out -covermode=atomic ./...
         working-directory: apps/auth-api
 
+      - name: Check Go coverage threshold (80%) — auth-api
+        working-directory: apps/auth-api
+        run: |
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          echo "Total coverage: ${COVERAGE}%"
+          if [ "$(echo "${COVERAGE} < 80" | bc -l)" -eq 1 ]; then
+            echo "::error::Go coverage ${COVERAGE}% is below 80% threshold"
+            exit 1
+          fi
+
       - name: Go test (short) — time-api
         run: go test -short -race -count=1 -coverprofile=coverage.out -covermode=atomic ./...
         working-directory: apps/time-api
 
+      - name: Check Go coverage threshold (80%) — time-api
+        working-directory: apps/time-api
+        run: |
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          echo "Total coverage: ${COVERAGE}%"
+          if [ "$(echo "${COVERAGE} < 80" | bc -l)" -eq 1 ]; then
+            echo "::error::Go coverage ${COVERAGE}% is below 80% threshold"
+            exit 1
+          fi
+
       - name: Vitest with coverage
         run: bun run test -- --coverage
         working-directory: apps/flow-web
+
+      - name: Check Vitest coverage threshold (80%)
+        working-directory: apps/flow-web
+        run: |
+          if [ -f coverage/coverage-summary.json ]; then
+            COVERAGE=$(node -e "const c = require('./coverage/coverage-summary.json'); console.log(c.total.lines.pct)")
+            echo "Total line coverage: ${COVERAGE}%"
+            if [ "$(echo "${COVERAGE} < 80" | bc -l)" -eq 1 ]; then
+              echo "::error::Vitest line coverage ${COVERAGE}% is below 80% threshold"
+              exit 1
+            fi
+          else
+            echo "::warning::No coverage summary found, skipping threshold check"
+          fi
 
   # ---------- Job 3: Integration tests (Go E2E + Playwright) ----------
   test-integration:

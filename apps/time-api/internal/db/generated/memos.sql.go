@@ -54,16 +54,18 @@ UPDATE calendar_memos
 SET enabled = FALSE
 WHERE public_id = ?
   AND calendar_id = ?
+  AND workspace_id = ?
 `
 
 type DisableCalendarMemoParams struct {
-	PublicID   types.PublicID `json:"publicId"`
-	CalendarID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+	CalendarID  uint32         `json:"-"`
+	WorkspaceID uint32         `json:"-"`
 }
 
 // Soft-delete a memo.
 func (q *Queries) DisableCalendarMemo(ctx context.Context, arg DisableCalendarMemoParams) error {
-	_, err := q.db.ExecContext(ctx, disableCalendarMemo, arg.PublicID, arg.CalendarID)
+	_, err := q.db.ExecContext(ctx, disableCalendarMemo, arg.PublicID, arg.CalendarID, arg.WorkspaceID)
 	return err
 }
 
@@ -82,13 +84,15 @@ SELECT
 FROM calendar_memos
 WHERE public_id = ?
   AND calendar_id = ?
+  AND workspace_id = ?
   AND enabled = TRUE
 LIMIT 1
 `
 
 type FindCalendarMemoByPublicIdParams struct {
-	PublicID   types.PublicID `json:"publicId"`
-	CalendarID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+	CalendarID  uint32         `json:"-"`
+	WorkspaceID uint32         `json:"-"`
 }
 
 type FindCalendarMemoByPublicIdRow struct {
@@ -106,7 +110,7 @@ type FindCalendarMemoByPublicIdRow struct {
 
 // Resolve a memo by UUID v7.
 func (q *Queries) FindCalendarMemoByPublicId(ctx context.Context, arg FindCalendarMemoByPublicIdParams) (FindCalendarMemoByPublicIdRow, error) {
-	row := q.db.QueryRowContext(ctx, findCalendarMemoByPublicId, arg.PublicID, arg.CalendarID)
+	row := q.db.QueryRowContext(ctx, findCalendarMemoByPublicId, arg.PublicID, arg.CalendarID, arg.WorkspaceID)
 	var i FindCalendarMemoByPublicIdRow
 	err := row.Scan(
 		&i.ID,
@@ -194,15 +198,17 @@ SET title       = COALESCE(?, title),
     sort_weight = COALESCE(?, sort_weight)
 WHERE public_id = ?
   AND calendar_id = ?
+  AND workspace_id = ?
   AND enabled = TRUE
 `
 
 type UpdateCalendarMemoParams struct {
-	Title      sql.NullString `json:"title"`
-	Done       sql.NullBool   `json:"done"`
-	SortWeight sql.NullInt32  `json:"sortWeight"`
-	PublicID   types.PublicID `json:"publicId"`
-	CalendarID uint32         `json:"-"`
+	Title       sql.NullString `json:"title"`
+	Done        sql.NullBool   `json:"done"`
+	SortWeight  sql.NullInt32  `json:"sortWeight"`
+	PublicID    types.PublicID `json:"publicId"`
+	CalendarID  uint32         `json:"-"`
+	WorkspaceID uint32         `json:"-"`
 }
 
 // Update a memo's title, done, or sort_weight.
@@ -213,6 +219,7 @@ func (q *Queries) UpdateCalendarMemo(ctx context.Context, arg UpdateCalendarMemo
 		arg.SortWeight,
 		arg.PublicID,
 		arg.CalendarID,
+		arg.WorkspaceID,
 	)
 	return err
 }

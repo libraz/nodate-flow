@@ -55,10 +55,11 @@ function ChildPagesSection({
 // ---------------------------------------------------------------------------
 
 function Breadcrumb({ page }: { page: PageItem }): ReactElement | null {
+  const { t } = useTranslation('pages');
   if (!page.parentPageId || !page.parentPageTitle) return null;
 
   return (
-    <nav className={styles.breadcrumb} aria-label="Breadcrumb">
+    <nav className={styles.breadcrumb} aria-label={t('breadcrumb_label')}>
       <Link
         to="/pages/$pageId"
         params={{ pageId: page.parentPageId }}

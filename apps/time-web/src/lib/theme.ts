@@ -1,4 +1,9 @@
 /**
+ * @deprecated This module is no longer used. Theme management has been
+ * consolidated into the shared ThemeProvider from @nodate-flow/ui
+ * (see providers/theme-provider.tsx). This file is kept temporarily
+ * to avoid breaking any stale references and can be deleted.
+ *
  * Theme utilities for time-web.
  *
  * Uses the shared `nf.theme` localStorage key so that theme preference

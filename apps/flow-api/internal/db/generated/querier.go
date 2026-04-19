@@ -40,6 +40,7 @@ type Querier interface {
 	// Re-enable a previously suspended workspace.
 	AdminEnableWorkspace(ctx context.Context, publicID types.PublicID) error
 	// Find instance admin grant for a specific user.
+	// Used as an existence check by grant/revoke handlers (result is discarded).
 	AdminFindInstanceAdminByUserId(ctx context.Context, userID uint32) (AdminFindInstanceAdminByUserIdRow, error)
 	// Resolve internal user_id from public_id for admin session lookup.
 	AdminFindUserIdByPublicId(ctx context.Context, publicID types.PublicID) (uint32, error)
@@ -94,6 +95,9 @@ type Querier interface {
 	ArchiveNotification(ctx context.Context, arg ArchiveNotificationParams) error
 	// Link an existing signal to a task by public_id.
 	AttachSignalToTask(ctx context.Context, arg AttachSignalToTaskParams) error
+	// Verify that a user is an enabled member of a workspace. Returns 1 if
+	// the membership exists, sql.ErrNoRows otherwise.
+	CheckWorkspaceMemberExists(ctx context.Context, arg CheckWorkspaceMemberExistsParams) (int32, error)
 	// Pick the oldest pending run and mark it claimed in the same tx.
 	// Callers wrap this in BEGIN / COMMIT; SELECT ... FOR UPDATE SKIP LOCKED
 	// lets multiple workers race for rows without contention.
@@ -272,6 +276,7 @@ type Querier interface {
 	FailConstraint(ctx context.Context, arg FailConstraintParams) error
 	// Resolve an ai_agents public id to its internal id, scoped to the
 	// workspace. Used by task actor handlers to bind by public id.
+	// id is required: returned as FK value for task_actors.agent_id.
 	FindAgentIDByPublicIDForWorkspace(ctx context.Context, arg FindAgentIDByPublicIDForWorkspaceParams) (uint32, error)
 	// Resolve an ai_agents row's internal id by public_id, workspace-scoped.
 	FindAgentInternalIDByPublicID(ctx context.Context, arg FindAgentInternalIDByPublicIDParams) (uint32, error)
@@ -288,7 +293,7 @@ type Querier interface {
 	// Resolve a comment by UUID v7.
 	FindCalendarEventCommentByPublicId(ctx context.Context, arg FindCalendarEventCommentByPublicIdParams) (FindCalendarEventCommentByPublicIdRow, error)
 	// Quick lookup for permission checks: who owns this event?
-	FindCalendarEventOwner(ctx context.Context, publicID types.PublicID) (FindCalendarEventOwnerRow, error)
+	FindCalendarEventOwner(ctx context.Context, arg FindCalendarEventOwnerParams) (FindCalendarEventOwnerRow, error)
 	// Resolve an invite by its token hash for the acceptance flow.
 	FindCalendarInviteByTokenHash(ctx context.Context, tokenHash string) (FindCalendarInviteByTokenHashRow, error)
 	// Public-facing invite lookup (for share page preview, no auth required).
@@ -300,6 +305,7 @@ type Querier interface {
 	// Return the internal id of the most recently created enabled provider
 	// for a workspace. Used by the ai_invocations logger when the
 	// orchestrator does not track which provider handled the call.
+	// id is required: returned as FK value for ai_invocations.provider_id.
 	FindDefaultProviderIDForWorkspace(ctx context.Context, workspaceID uint32) (uint32, error)
 	// Resolve an identity by (provider, subject) pair for OIDC login flows.
 	FindIdentityByProviderSubject(ctx context.Context, arg FindIdentityByProviderSubjectParams) (FindIdentityByProviderSubjectRow, error)
@@ -316,10 +322,13 @@ type Querier interface {
 	// TOTP handlers to read / write mfa_secret_ciphertext.
 	FindLocalIdentityByUserId(ctx context.Context, userID uint32) (FindLocalIdentityByUserIdRow, error)
 	// Resolve an MCP token by its SHA-256 hash for bearer auth.
+	// id, workspace_id, user_id are required: used internally by auth middleware
+	// to establish session context (not exposed to API).
 	FindMcpTokenByHash(ctx context.Context, tokenHash string) (FindMcpTokenByHashRow, error)
 	// Resolve a PAT row from its SHA-256 hash for bearer auth.
 	FindPatByHash(ctx context.Context, tokenHash string) (FindPatByHashRow, error)
 	// Find deliveries ready for (re)delivery. Used by the background worker.
+	// d.id is required: used by MarkDeliveryDelivered/Failed/Dead (WHERE id = ?).
 	FindPendingDeliveries(ctx context.Context, limit int32) ([]FindPendingDeliveriesRow, error)
 	// Find the personal calendar for a user in a workspace.
 	FindPersonalCalendar(ctx context.Context, arg FindPersonalCalendarParams) (FindPersonalCalendarRow, error)
@@ -333,10 +342,13 @@ type Querier interface {
 	// INTERNAL USE ONLY. Returns api_key_ciphertext for the providers package
 	// to decrypt before calling the upstream LLM. Must NOT be called from
 	// handlers, MCP tools, or any code outside apps/flow-api/internal/ai/providers/.
+	// id is required: used internally by the providers package for logging/tracking.
 	FindProviderForDecrypt(ctx context.Context, arg FindProviderForDecryptParams) (FindProviderForDecryptRow, error)
 	// Resolve a session by its external public_id (UUID v7).
+	// id is required: used internally for session operations.
 	FindSessionByPublicId(ctx context.Context, publicID types.PublicID) (FindSessionByPublicIdRow, error)
 	// Resolve a session from its SHA-256 refresh hash. Caller validates expiry.
+	// id is required: used by RotateSessionRefreshHash (WHERE id = ?).
 	FindSessionByRefreshHash(ctx context.Context, refreshHash string) (FindSessionByRefreshHashRow, error)
 	// Find a system calendar by its slug within a workspace.
 	FindSystemCalendarBySlug(ctx context.Context, arg FindSystemCalendarBySlugParams) (FindSystemCalendarBySlugRow, error)
@@ -378,6 +390,10 @@ type Querier interface {
 	FindWorkspaceMemberByUserId(ctx context.Context, arg FindWorkspaceMemberByUserIdParams) (FindWorkspaceMemberByUserIdRow, error)
 	// Fetch the minimal fields an agent runner needs to invoke an LLM.
 	GetAgentForExec(ctx context.Context, arg GetAgentForExecParams) (GetAgentForExecRow, error)
+	// Fetch the minimal fields the agent guard needs to make an allow/deny
+	// decision. Returns enabled, paused, allowed_scopes_json, and the
+	// monthly cost cap. Used by the MCP dispatch guard.
+	GetAgentGuardSnapshot(ctx context.Context, id uint32) (GetAgentGuardSnapshotRow, error)
 	// ============================================================================
 	// ai_settings queries (ADR 0003)
 	// Per-workspace AI knobs: embed model, daily embed budget, and the
@@ -396,6 +412,8 @@ type Querier interface {
 	// Fetch a single lens by its public_id.
 	GetLensByPublicID(ctx context.Context, arg GetLensByPublicIDParams) (GetLensByPublicIDRow, error)
 	// Fetch a single page by workspace_id + public_id, including parent page info.
+	// pg.id is required: used by MCP resolvePage and page handlers for
+	// parent_page_id resolution and circular-reference checks.
 	GetPageByPublicId(ctx context.Context, arg GetPageByPublicIdParams) (GetPageByPublicIdRow, error)
 	// Compute nesting depth of a page by walking up to the root via recursive CTE.
 	// Returns 0 for root pages, 1 for direct children of root, etc.
@@ -419,6 +437,9 @@ type Querier interface {
 	GetWebhookSubscription(ctx context.Context, arg GetWebhookSubscriptionParams) (GetWebhookSubscriptionRow, error)
 	// Fetch a single widget by workspace_id + public_id.
 	GetWidgetByPublicID(ctx context.Context, arg GetWidgetByPublicIDParams) (GetWidgetByPublicIDRow, error)
+	// Return the role string for an enabled workspace member. Returns
+	// sql.ErrNoRows when the user is not a member.
+	GetWorkspaceMemberRole(ctx context.Context, arg GetWorkspaceMemberRoleParams) (WorkspaceMembersRole, error)
 	// Check if any events have occurred in the workspace since the given timestamp.
 	// Used by the agent runtime pre-flight check to skip LLM calls when idle.
 	HasRecentEventsForWorkspace(ctx context.Context, arg HasRecentEventsForWorkspaceParams) (bool, error)
@@ -432,6 +453,7 @@ type Querier interface {
 	InsertSignal(ctx context.Context, arg InsertSignalParams) (int64, error)
 	// Find all active subscriptions in a workspace. Event type filtering
 	// is done in Go since JSON_CONTAINS is not sqlc-friendly.
+	// id is required: used as subscription_id FK in CreateWebhookDelivery.
 	ListActiveSubscriptionsForEvent(ctx context.Context, workspaceID uint32) ([]ListActiveSubscriptionsForEventRow, error)
 	// List actors on a task joined with user display fields.
 	ListActorsForTask(ctx context.Context, arg ListActorsForTaskParams) ([]ListActorsForTaskRow, error)

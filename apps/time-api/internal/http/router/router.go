@@ -47,7 +47,7 @@ func Build(deps Deps) http.Handler {
 func BuildResult(deps Deps) Result {
 	r := chi.NewRouter()
 	r.Use(middleware.ClientIP())
-	r.Use(middleware.SecurityHeaders)
+	r.Use(middleware.SecurityHeaders())
 
 	newConfig := func() huma.Config {
 		return huma.DefaultConfig("nodate-time", "0.0.0")

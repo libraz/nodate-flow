@@ -46,6 +46,7 @@ SELECT
 FROM calendar_event_attachments
 WHERE public_id = ?
   AND event_id = ?
+  AND workspace_id = ?
   AND enabled = TRUE
 LIMIT 1;
 
@@ -54,4 +55,5 @@ LIMIT 1;
 UPDATE calendar_event_attachments
 SET enabled = FALSE
 WHERE public_id = ?
-  AND event_id = ?;
+  AND event_id = ?
+  AND workspace_id = ?;

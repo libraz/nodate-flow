@@ -67,7 +67,7 @@ func (p *ollamaProvider) Complete(ctx context.Context, req Request) (*Response, 
 		return nil, fmt.Errorf("ollama: do: %w", err)
 	}
 	defer resp.Body.Close()
-	raw, err := io.ReadAll(resp.Body)
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 	if err != nil {
 		return nil, fmt.Errorf("ollama: read body: %w", err)
 	}

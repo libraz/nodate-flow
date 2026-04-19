@@ -128,7 +128,7 @@ function ProfilePage(): ReactElement {
                   fontSize: 'var(--nf-text-sm, 0.875rem)',
                 }}
               >
-                <option value="en">English</option>
+                <option value="en">{t('profile.locale_en')}</option>
                 <option value="ja">{t('profile.locale_ja')}</option>
               </select>
             );
@@ -157,6 +157,8 @@ function ProfilePage(): ReactElement {
                 <option value="aurora-dark">{t('profile.theme_aurora_dark')}</option>
                 <option value="dotline-light">{t('profile.theme_dotline_light')}</option>
                 <option value="dotline-dark">{t('profile.theme_dotline_dark')}</option>
+                <option value="glass-light">{t('profile.theme_glass_light')}</option>
+                <option value="glass-dark">{t('profile.theme_glass_dark')}</option>
               </select>
             );
           }}

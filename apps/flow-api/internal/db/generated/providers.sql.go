@@ -96,6 +96,7 @@ LIMIT 1
 // Return the internal id of the most recently created enabled provider
 // for a workspace. Used by the ai_invocations logger when the
 // orchestrator does not track which provider handled the call.
+// id is required: returned as FK value for ai_invocations.provider_id.
 func (q *Queries) FindDefaultProviderIDForWorkspace(ctx context.Context, workspaceID uint32) (uint32, error) {
 	row := q.db.QueryRowContext(ctx, findDefaultProviderIDForWorkspace, workspaceID)
 	var id uint32
@@ -149,6 +150,7 @@ type FindProviderForDecryptRow struct {
 // INTERNAL USE ONLY. Returns api_key_ciphertext for the providers package
 // to decrypt before calling the upstream LLM. Must NOT be called from
 // handlers, MCP tools, or any code outside apps/flow-api/internal/ai/providers/.
+// id is required: used internally by the providers package for logging/tracking.
 func (q *Queries) FindProviderForDecrypt(ctx context.Context, arg FindProviderForDecryptParams) (FindProviderForDecryptRow, error) {
 	row := q.db.QueryRowContext(ctx, findProviderForDecrypt, arg.WorkspaceID, arg.PublicID)
 	var i FindProviderForDecryptRow

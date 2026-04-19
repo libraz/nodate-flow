@@ -1,3 +1,4 @@
+/// <reference types="node" />
 /**
  * Verify that time-web calendar components use i18n `t()` calls for
  * aria-label attributes instead of hardcoded English strings (H8).
@@ -10,7 +11,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const calendarDir = resolve(__dirname, '..');
+const calendarDir = resolve(import.meta.dirname, '..');
 
 /** Read all .tsx files in the calendar feature directory. */
 function getCalendarSources(): Array<{ name: string; content: string }> {
@@ -67,7 +68,10 @@ describe('calendar aria-label i18n', () => {
   });
 
   it('all t() keys used in aria-labels exist in en/common.json', () => {
-    const enJson = readFileSync(resolve(__dirname, '../../../locales/en/common.json'), 'utf-8');
+    const enJson = readFileSync(
+      resolve(import.meta.dirname, '../../../locales/en/common.json'),
+      'utf-8',
+    );
     const translations = JSON.parse(enJson);
 
     // Collect all t('...') calls from aria-label attributes across all sources

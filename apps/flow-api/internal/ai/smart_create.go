@@ -163,6 +163,11 @@ func (o *Orchestrator) ProposeSmartCreate(
 		}
 	}
 
+	// Truncate user input before embedding and LLM prompt building to
+	// limit prompt-injection surface and prevent prompt-size abuse.
+	title = sanitizeTitle(title)
+	description = sanitizeDesc(description)
+
 	// ---- embed the new task text ----
 	taskText := composeText(title, description)
 	queryVec, err := embedClient.Embed(ctx, taskText)

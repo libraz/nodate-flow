@@ -15,6 +15,7 @@
   "ai_generate": "Generate with AI",
   "ai_generating": "Generating...",
   "children": "Sub-pages",
+  "breadcrumb_label": "Breadcrumb",
   "search_placeholder": "Search pages...",
   "created_by": "Created by {name}",
   "updated_at": "Updated {date}",

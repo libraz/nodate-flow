@@ -207,3 +207,70 @@ func TestRedact_EmptyString(t *testing.T) {
 		t.Fatalf("Redact of empty string should be empty, got %q", got)
 	}
 }
+
+func TestRedact_NewSecretPrefixes(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		value  string
+		prefix string
+	}{
+		{"AKIA AWS key", "AKIAIOSFODNN7EXAMPLE", "AKIA"},
+		{"glpat GitLab PAT", "glpat-abc123def456ghi789", "glpat-"},
+		{"SG. SendGrid", "SG.abc123def456.ghi789jkl012mno345pqr678stu901vwx", "SG."},
+		{"rk_live_ Stripe restricted", "rk_live_" + "abc123def456ghi789jkl012", "rk_live_"},
+		{"sk_live_ Stripe secret", "sk_live_" + "abc123def456ghi789jkl012", "sk_live_"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := Redact(tc.value)
+			expected := "[REDACTED:" + tc.prefix + "]"
+			if !strings.Contains(got, expected) {
+				t.Fatalf("expected prefix redaction %q in output, got: %s", expected, got)
+			}
+			// The raw secret body after the prefix must not appear.
+			afterPrefix := tc.value[len(tc.prefix):]
+			if strings.Contains(got, afterPrefix) {
+				t.Fatalf("raw secret body leaked in output: %s", got)
+			}
+		})
+	}
+}
+
+func TestRedactHandler_NewPrefixesInLogValues(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		value  string
+		prefix string
+	}{
+		{"AKIA in log", "AKIAIOSFODNN7EXAMPLE", "AKIA"},
+		{"glpat in log", "glpat-xxxxxxxxxxxxxxxxxxxx", "glpat-"},
+		{"SG. in log", "SG.sendgrid-api-key-value", "SG."},
+		{"rk_live_ in log", "rk_live_" + "striperestricted", "rk_live_"},
+		{"sk_live_ in log", "sk_live_" + "stripesecretkey", "sk_live_"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var buf bytes.Buffer
+			l := newTestLogger(&buf)
+			l.Info("secret found", "some_field", tc.value)
+
+			out := buf.String()
+			expected := "[REDACTED:" + tc.prefix + "]"
+			if !strings.Contains(out, expected) {
+				t.Fatalf("expected prefix redaction %q in output, got: %s", expected, out)
+			}
+			afterPrefix := tc.value[len(tc.prefix):]
+			if strings.Contains(out, afterPrefix) {
+				t.Fatalf("raw secret body leaked in output: %s", out)
+			}
+		})
+	}
+}

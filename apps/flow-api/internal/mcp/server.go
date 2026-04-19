@@ -21,7 +21,9 @@ package mcp
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -197,8 +199,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Per-token rate limiting.
-	if allowed, retryAfter := h.rl.allow(tok); !allowed {
+	// Per-token rate limiting. Hash the token so the plaintext is never
+	// stored as a map key in the rate limiter.
+	tokHash := hashToken(tok)
+	if allowed, retryAfter := h.rl.allow(tokHash); !allowed {
 		w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())))
 		writeRPCError(w, req.ID, apierrors.RateLimitExceeded, "rate limit exceeded")
 		return
@@ -374,37 +378,30 @@ func writeRPCError(w http.ResponseWriter, id json.RawMessage, spec *apierrors.Sp
 }
 
 // loadAgentGuardSnapshot fetches the minimal ai_agents row that
-// agentguard.Decide needs, via raw SQL to avoid a sqlc regen on this
-// slice. Returns a zero Agent (not enabled) if the row is missing so
-// Decide will pause the caller.
+// agentguard.Decide needs. Returns a zero Agent (not enabled) if the
+// row is missing so Decide will pause the caller.
 func (h *Handler) loadAgentGuardSnapshot(ctx context.Context, agentID uint32) (agentguard.Agent, error) {
-	const q = `SELECT enabled, paused, allowed_scopes_json, monthly_cost_cap_cents FROM ai_agents WHERE id = ? LIMIT 1`
-	var (
-		enabled       bool
-		paused        bool
-		scopesJSON    sql.NullString
-		monthlyCapRaw sql.NullInt64
-	)
-	if err := h.deps.DB.QueryRowContext(ctx, q, agentID).Scan(&enabled, &paused, &scopesJSON, &monthlyCapRaw); err != nil {
+	row, err := h.deps.Queries.GetAgentGuardSnapshot(ctx, agentID)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return agentguard.Agent{Enabled: false}, nil
 		}
 		return agentguard.Agent{}, err
 	}
 	var scopes []string
-	if scopesJSON.Valid && scopesJSON.String != "" {
-		if err := json.Unmarshal([]byte(scopesJSON.String), &scopes); err != nil {
-			slog.WarnContext(ctx, "mcp: malformed allowed_scopes_json", slog.Int("agent_id", int(agentID)), slog.String("err", err.Error()))
+	if len(row.AllowedScopesJson) > 0 {
+		if uerr := json.Unmarshal(row.AllowedScopesJson, &scopes); uerr != nil {
+			slog.WarnContext(ctx, "mcp: malformed allowed_scopes_json", slog.Int("agent_id", int(agentID)), slog.String("err", uerr.Error()))
 		}
 	}
 	var cap *int64
-	if monthlyCapRaw.Valid {
-		v := monthlyCapRaw.Int64
+	if row.MonthlyCostCapCents.Valid {
+		v := int64(row.MonthlyCostCapCents.Int32)
 		cap = &v
 	}
 	return agentguard.Agent{
-		Enabled:             enabled,
-		Paused:              paused,
+		Enabled:             row.Enabled,
+		Paused:              row.Paused,
 		AllowedScopes:       scopes,
 		MonthlyCostCapCents: cap,
 	}, nil
@@ -414,12 +411,13 @@ func (h *Handler) loadAgentGuardSnapshot(ctx context.Context, agentID uint32) (a
 // for ai_invocations attributed to agentID since the first day of the
 // current UTC month. Used by the dispatch guard.
 func (h *Handler) loadAgentMonthSpendCents(ctx context.Context, agentID uint32) (int64, error) {
-	const q = `SELECT CAST(COALESCE(ROUND(SUM(cost_estimate) * 100), 0) AS SIGNED)
-	             FROM ai_invocations WHERE agent_id = ? AND invoked_at >= ?`
 	now := time.Now().UTC()
 	since := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
-	var cents int64
-	if err := h.deps.DB.QueryRowContext(ctx, q, agentID, since).Scan(&cents); err != nil {
+	cents, err := h.deps.Queries.SumAiCostForAgentSince(ctx, generated.SumAiCostForAgentSinceParams{
+		AgentID:   sql.NullInt32{Int32: int32(agentID), Valid: true},
+		InvokedAt: since,
+	})
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, nil
 		}
@@ -435,6 +433,14 @@ func bearerFromHeader(h string) (string, bool) {
 	}
 	tok := strings.TrimSpace(h[len(prefix):])
 	return tok, tok != ""
+}
+
+// hashToken returns a hex-encoded SHA-256 of the token. Used as the
+// rate limiter map key so the plaintext token is never stored in memory
+// beyond the request lifetime.
+func hashToken(tok string) string {
+	sum := sha256.Sum256([]byte(tok))
+	return hex.EncodeToString(sum[:])
 }
 
 // audit writes a single mcp_invocations row. It never returns an error

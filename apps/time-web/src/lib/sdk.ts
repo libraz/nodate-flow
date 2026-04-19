@@ -13,6 +13,22 @@
 
 import { createClient, createRefreshMiddleware, createTokenRefresher } from '@nodate-flow/sdk';
 
+/**
+ * isSafeRedirect returns true when the URL is a relative path (starting
+ * with a single slash) or points to the same origin as the current page.
+ * Protocol-relative URLs ("//evil.com") and foreign origins are rejected
+ * to prevent open-redirect attacks.
+ */
+function isSafeRedirect(url: string): boolean {
+  if (url.startsWith('/') && !url.startsWith('//')) return true;
+  try {
+    const parsed = new URL(url);
+    return parsed.origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
 import { authStore } from '../features/auth/auth-store';
 
 /**
@@ -65,7 +81,10 @@ export const refreshAccessToken = createTokenRefresher({
   setAccessToken: (token) => authStore.getState().setAccessToken(token),
   clearSession: () => authStore.getState().clearSession(),
   onSessionExpired: () => {
-    window.location.href = `${accountsWebUrl}/login?redirect=${encodeURIComponent(window.location.href)}`;
+    const target = `${accountsWebUrl}/login?redirect=${encodeURIComponent(window.location.href)}`;
+    if (isSafeRedirect(target)) {
+      window.location.href = target;
+    }
   },
 });
 
