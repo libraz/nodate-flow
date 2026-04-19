@@ -3,7 +3,7 @@
  * otherwise falls back to `initials` text. Always requires an `alt` for a11y.
  */
 
-import { type HTMLAttributes, type ReactElement, type Ref, forwardRef } from 'react';
+import { type HTMLAttributes, type ReactElement, forwardRef } from 'react';
 import { cx } from '../../lib/cx';
 import styles from './avatar.module.css';
 
@@ -20,11 +20,9 @@ export interface AvatarProps extends HTMLAttributes<HTMLSpanElement> {
   size?: AvatarSize;
 }
 
-function AvatarImpl(
-  { className, src, alt, initials, size = 'md', ...rest }: AvatarProps,
-  ref: Ref<HTMLSpanElement>,
-): ReactElement {
-  return (
+/** Avatar displays a user image or initials fallback. */
+const Avatar = forwardRef<HTMLSpanElement, AvatarProps>(
+  ({ className, src, alt, initials, size = 'md', ...rest }, ref): ReactElement => (
     <span
       ref={ref}
       role="img"
@@ -34,10 +32,8 @@ function AvatarImpl(
     >
       {src ? <img className={styles.image} src={src} alt="" /> : initials}
     </span>
-  );
-}
-
-const Avatar = forwardRef<HTMLSpanElement, AvatarProps>(AvatarImpl);
+  ),
+);
 Avatar.displayName = 'Avatar';
 
 export default Avatar;

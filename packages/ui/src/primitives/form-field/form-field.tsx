@@ -5,14 +5,7 @@
  * input element.
  */
 
-import {
-  type HTMLAttributes,
-  type ReactElement,
-  type ReactNode,
-  type Ref,
-  forwardRef,
-  useId,
-} from 'react';
+import { type HTMLAttributes, type ReactElement, type ReactNode, forwardRef, useId } from 'react';
 import { cx } from '../../lib/cx';
 import styles from './form-field.module.css';
 
@@ -35,50 +28,48 @@ export interface FormFieldProps extends Omit<HTMLAttributes<HTMLDivElement>, 'ch
   children: (control: FormFieldControlProps) => ReactNode;
 }
 
-function FormFieldImpl(
-  { className, label, description, error, required, children, ...rest }: FormFieldProps,
-  ref: Ref<HTMLDivElement>,
-): ReactElement {
-  const inputId = useId();
-  const descId = useId();
-  const errorId = useId();
+/** FormField wires label, description, and error state onto a child control. */
+const FormField = forwardRef<HTMLDivElement, FormFieldProps>(
+  ({ className, label, description, error, required, children, ...rest }, ref): ReactElement => {
+    const inputId = useId();
+    const descId = useId();
+    const errorId = useId();
 
-  const describedBy: string[] = [];
-  if (description) describedBy.push(descId);
-  if (error) describedBy.push(errorId);
+    const describedBy: string[] = [];
+    if (description) describedBy.push(descId);
+    if (error) describedBy.push(errorId);
 
-  const control: FormFieldControlProps = {
-    id: inputId,
-    ...(describedBy.length > 0 ? { 'aria-describedby': describedBy.join(' ') } : {}),
-    ...(error ? { 'aria-invalid': true } : {}),
-  };
+    const control: FormFieldControlProps = {
+      id: inputId,
+      ...(describedBy.length > 0 ? { 'aria-describedby': describedBy.join(' ') } : {}),
+      ...(error ? { 'aria-invalid': true } : {}),
+    };
 
-  return (
-    <div ref={ref} className={cx(styles.root, className)} {...rest}>
-      <label className={styles.label} htmlFor={inputId}>
-        {label}
-        {required ? (
-          <span className={styles.required} aria-hidden="true">
-            *
+    return (
+      <div ref={ref} className={cx(styles.root, className)} {...rest}>
+        <label className={styles.label} htmlFor={inputId}>
+          {label}
+          {required ? (
+            <span className={styles.required} aria-hidden="true">
+              *
+            </span>
+          ) : null}
+        </label>
+        {description ? (
+          <span id={descId} className={styles.description}>
+            {description}
           </span>
         ) : null}
-      </label>
-      {description ? (
-        <span id={descId} className={styles.description}>
-          {description}
-        </span>
-      ) : null}
-      {children(control)}
-      {error ? (
-        <span id={errorId} className={styles.error}>
-          {error}
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
-const FormField = forwardRef<HTMLDivElement, FormFieldProps>(FormFieldImpl);
+        {children(control)}
+        {error ? (
+          <span id={errorId} className={styles.error}>
+            {error}
+          </span>
+        ) : null}
+      </div>
+    );
+  },
+);
 FormField.displayName = 'FormField';
 
 export default FormField;

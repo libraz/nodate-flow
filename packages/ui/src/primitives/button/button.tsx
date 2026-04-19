@@ -5,7 +5,7 @@
  * Focus is rendered via the design system focus ring token.
  */
 
-import { type ButtonHTMLAttributes, type ReactElement, type Ref, forwardRef } from 'react';
+import { type ButtonHTMLAttributes, type ReactElement, forwardRef } from 'react';
 import { cx } from '../../lib/cx';
 import styles from './button.module.css';
 
@@ -19,11 +19,9 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: ButtonSize;
 }
 
-function ButtonImpl(
-  { variant = 'default', size = 'md', className, type, ...rest }: ButtonProps,
-  ref: Ref<HTMLButtonElement>,
-): ReactElement {
-  return (
+/** Button renders a styled native `<button>` with variant and size support. */
+const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ variant = 'default', size = 'md', className, type, ...rest }, ref): ReactElement => (
     <button
       ref={ref}
       type={type ?? 'button'}
@@ -38,10 +36,8 @@ function ButtonImpl(
       )}
       {...rest}
     />
-  );
-}
-
-const Button = forwardRef<HTMLButtonElement, ButtonProps>(ButtonImpl);
+  ),
+);
 Button.displayName = 'Button';
 
 export default Button;

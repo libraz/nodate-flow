@@ -3,7 +3,7 @@
  * Decorative separators are marked `aria-hidden` and given `role="none"`.
  */
 
-import { type HTMLAttributes, type ReactElement, type Ref, forwardRef } from 'react';
+import { type HTMLAttributes, type ReactElement, forwardRef } from 'react';
 import { cx } from '../../lib/cx';
 import styles from './separator.module.css';
 
@@ -16,18 +16,19 @@ export interface SeparatorProps extends HTMLAttributes<HTMLDivElement> {
   decorative?: boolean;
 }
 
-function SeparatorImpl(
-  {
-    className,
-    orientation = 'horizontal',
-    decorative = true,
-    role,
-    'aria-orientation': ariaOrientation,
-    ...rest
-  }: SeparatorProps,
-  ref: Ref<HTMLDivElement>,
-): ReactElement {
-  return (
+/** Separator renders a thin hairline divider. */
+const Separator = forwardRef<HTMLDivElement, SeparatorProps>(
+  (
+    {
+      className,
+      orientation = 'horizontal',
+      decorative = true,
+      role,
+      'aria-orientation': ariaOrientation,
+      ...rest
+    },
+    ref,
+  ): ReactElement => (
     <div
       ref={ref}
       role={role ?? (decorative ? 'none' : 'separator')}
@@ -39,10 +40,8 @@ function SeparatorImpl(
       )}
       {...rest}
     />
-  );
-}
-
-const Separator = forwardRef<HTMLDivElement, SeparatorProps>(SeparatorImpl);
+  ),
+);
 Separator.displayName = 'Separator';
 
 export default Separator;

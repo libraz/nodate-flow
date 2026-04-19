@@ -3,7 +3,7 @@
  * design-system styling plus an `invalid` style hook driven by `aria-invalid`.
  */
 
-import { type InputHTMLAttributes, type ReactElement, type Ref, forwardRef } from 'react';
+import { type InputHTMLAttributes, type ReactElement, forwardRef } from 'react';
 import { cx } from '../../lib/cx';
 import styles from './input.module.css';
 
@@ -12,11 +12,9 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   invalid?: boolean;
 }
 
-function InputImpl(
-  { className, invalid, type, 'aria-invalid': ariaInvalid, ...rest }: InputProps,
-  ref: Ref<HTMLInputElement>,
-): ReactElement {
-  return (
+/** Input renders a styled native `<input>` element. */
+const Input = forwardRef<HTMLInputElement, InputProps>(
+  ({ className, invalid, type, 'aria-invalid': ariaInvalid, ...rest }, ref): ReactElement => (
     <input
       ref={ref}
       type={type ?? 'text'}
@@ -24,10 +22,8 @@ function InputImpl(
       className={cx(styles.root, invalid && styles.invalid, className)}
       {...rest}
     />
-  );
-}
-
-const Input = forwardRef<HTMLInputElement, InputProps>(InputImpl);
+  ),
+);
 Input.displayName = 'Input';
 
 export default Input;

@@ -3,7 +3,7 @@
  * `label` for assistive technology.
  */
 
-import { type HTMLAttributes, type ReactElement, type Ref, forwardRef } from 'react';
+import { type HTMLAttributes, type ReactElement, forwardRef } from 'react';
 import { cx } from '../../lib/cx';
 import styles from './spinner.module.css';
 
@@ -16,11 +16,9 @@ export interface SpinnerProps extends Omit<HTMLAttributes<HTMLSpanElement>, 'rol
   label: string;
 }
 
-function SpinnerImpl(
-  { className, size = 'md', label, ...rest }: SpinnerProps,
-  ref: Ref<HTMLSpanElement>,
-): ReactElement {
-  return (
+/** Spinner renders an indeterminate progress indicator. */
+const Spinner = forwardRef<HTMLSpanElement, SpinnerProps>(
+  ({ className, size = 'md', label, ...rest }, ref): ReactElement => (
     <span
       ref={ref}
       role="status"
@@ -29,10 +27,8 @@ function SpinnerImpl(
       className={cx(styles.root, size === 'sm' && styles.sm, size === 'lg' && styles.lg, className)}
       {...rest}
     />
-  );
-}
-
-const Spinner = forwardRef<HTMLSpanElement, SpinnerProps>(SpinnerImpl);
+  ),
+);
 Spinner.displayName = 'Spinner';
 
 export default Spinner;

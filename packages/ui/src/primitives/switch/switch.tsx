@@ -4,7 +4,7 @@
  * (`defaultChecked`) usage. Space / Enter toggle via native button behavior.
  */
 
-import { type ButtonHTMLAttributes, type ReactElement, type Ref, forwardRef } from 'react';
+import { type ButtonHTMLAttributes, type ReactElement, forwardRef } from 'react';
 import { useControllableState } from '../../hooks/use-controllable-state';
 import { cx } from '../../lib/cx';
 import styles from './switch.module.css';
@@ -19,36 +19,37 @@ export interface SwitchProps
   onCheckedChange?: (next: boolean) => void;
 }
 
-function SwitchImpl(
-  { checked, defaultChecked, onCheckedChange, disabled, className, onClick, ...rest }: SwitchProps,
-  ref: Ref<HTMLButtonElement>,
-): ReactElement {
-  const [value = false, setValue] = useControllableState<boolean>({
-    value: checked,
-    defaultValue: defaultChecked ?? false,
-    onChange: onCheckedChange,
-  });
+/** Switch renders a toggle button with `role="switch"`. */
+const Switch = forwardRef<HTMLButtonElement, SwitchProps>(
+  (
+    { checked, defaultChecked, onCheckedChange, disabled, className, onClick, ...rest },
+    ref,
+  ): ReactElement => {
+    const [value = false, setValue] = useControllableState<boolean>({
+      value: checked,
+      defaultValue: defaultChecked ?? false,
+      onChange: onCheckedChange,
+    });
 
-  return (
-    <button
-      ref={ref}
-      type="button"
-      role="switch"
-      aria-checked={value}
-      disabled={disabled}
-      className={cx(styles.root, className)}
-      onClick={(e) => {
-        onClick?.(e);
-        if (!e.defaultPrevented) setValue(!value);
-      }}
-      {...rest}
-    >
-      <span className={styles.thumb} aria-hidden="true" />
-    </button>
-  );
-}
-
-const Switch = forwardRef<HTMLButtonElement, SwitchProps>(SwitchImpl);
+    return (
+      <button
+        ref={ref}
+        type="button"
+        role="switch"
+        aria-checked={value}
+        disabled={disabled}
+        className={cx(styles.root, className)}
+        onClick={(e) => {
+          onClick?.(e);
+          if (!e.defaultPrevented) setValue(!value);
+        }}
+        {...rest}
+      >
+        <span className={styles.thumb} aria-hidden="true" />
+      </button>
+    );
+  },
+);
 Switch.displayName = 'Switch';
 
 export default Switch;

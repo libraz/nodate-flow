@@ -2,7 +2,7 @@
  * Badge — small inline tag with semantic tone variants.
  */
 
-import { type HTMLAttributes, type ReactElement, type Ref, forwardRef } from 'react';
+import { type HTMLAttributes, type ReactElement, forwardRef } from 'react';
 import { cx } from '../../lib/cx';
 import styles from './badge.module.css';
 
@@ -13,11 +13,9 @@ export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   tone?: BadgeTone;
 }
 
-function BadgeImpl(
-  { className, tone = 'neutral', ...rest }: BadgeProps,
-  ref: Ref<HTMLSpanElement>,
-): ReactElement {
-  return (
+/** Badge renders a small inline tag with semantic tone variants. */
+const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
+  ({ className, tone = 'neutral', ...rest }, ref): ReactElement => (
     <span
       ref={ref}
       className={cx(
@@ -31,10 +29,8 @@ function BadgeImpl(
       )}
       {...rest}
     />
-  );
-}
-
-const Badge = forwardRef<HTMLSpanElement, BadgeProps>(BadgeImpl);
+  ),
+);
 Badge.displayName = 'Badge';
 
 export default Badge;

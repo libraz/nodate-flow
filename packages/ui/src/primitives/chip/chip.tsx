@@ -2,7 +2,7 @@
  * Chip — small dismissible tag for active filters and selections.
  */
 
-import { type HTMLAttributes, type ReactElement, type Ref, forwardRef } from 'react';
+import { type HTMLAttributes, type ReactElement, forwardRef } from 'react';
 import { cx } from '../../lib/cx';
 import styles from './chip.module.css';
 
@@ -19,11 +19,12 @@ export interface ChipProps extends HTMLAttributes<HTMLSpanElement> {
   dismissLabel?: string;
 }
 
-function ChipImpl(
-  { className, tone = 'neutral', onDismiss, dismissLabel = 'Remove', children, ...rest }: ChipProps,
-  ref: Ref<HTMLSpanElement>,
-): ReactElement {
-  return (
+/** Chip renders a small dismissible tag for active filters and selections. */
+const Chip = forwardRef<HTMLSpanElement, ChipProps>(
+  (
+    { className, tone = 'neutral', onDismiss, dismissLabel = 'Remove', children, ...rest },
+    ref,
+  ): ReactElement => (
     <span
       ref={ref}
       className={cx(
@@ -49,10 +50,8 @@ function ChipImpl(
         </button>
       )}
     </span>
-  );
-}
-
-const Chip = forwardRef<HTMLSpanElement, ChipProps>(ChipImpl);
+  ),
+);
 Chip.displayName = 'Chip';
 
 export default Chip;
