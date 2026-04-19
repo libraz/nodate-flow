@@ -52,8 +52,8 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
         style={{
           padding: '3rem 1rem',
           textAlign: 'center',
-          color: 'var(--nf-color-fg-muted, var(--color-muted))',
-          border: '1px dashed var(--nf-color-border, var(--color-border))',
+          color: 'var(--nf-color-fg-muted, var(--nf-color-fg-muted))',
+          border: '1px dashed var(--nf-color-border, var(--nf-color-border))',
           borderRadius: '0.75rem',
           background: 'var(--nf-color-bg-sunken, transparent)',
         }}
@@ -132,7 +132,7 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
                 <code
                   style={{
                     fontSize: '0.75rem',
-                    color: 'var(--color-muted)',
+                    color: 'var(--nf-color-fg-muted)',
                     fontFamily: 'var(--font-mono)',
                   }}
                 >
@@ -140,7 +140,7 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
                 </code>
               </header>
               {agent.description ? (
-                <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+                <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
                   {agent.description}
                 </p>
               ) : null}
@@ -162,7 +162,7 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
                 >
                   <label
                     htmlFor={`agent-schedule-${agent.id}`}
-                    style={{ color: 'var(--color-muted)' }}
+                    style={{ color: 'var(--nf-color-fg-muted)' }}
                   >
                     {t('agents.scheduleKind.label')}
                   </label>
@@ -266,7 +266,7 @@ function EventTriggersEditor({
         fontSize: '0.875rem',
       }}
     >
-      <label htmlFor={`agent-events-${agentId}`} style={{ color: 'var(--color-muted)' }}>
+      <label htmlFor={`agent-events-${agentId}`} style={{ color: 'var(--nf-color-fg-muted)' }}>
         {t('agents.eventTriggers.label')}
       </label>
       <Input
@@ -323,7 +323,9 @@ function CreateAgentForm({
   if (models.models.length === 0) {
     return (
       <Card style={{ padding: '1rem' }}>
-        <p style={{ margin: 0, color: 'var(--color-muted)' }}>{t('agents.create.noModels')}</p>
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
+          {t('agents.create.noModels')}
+        </p>
       </Card>
     );
   }
@@ -471,7 +473,7 @@ function AiAgentsRoute(): ReactElement {
       >
         <div>
           <h1 style={{ margin: 0, fontSize: '1.25rem' }}>{t('agents.title')}</h1>
-          <p style={{ margin: 0, color: 'var(--color-muted)' }}>{t('agents.subtitle')}</p>
+          <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{t('agents.subtitle')}</p>
         </div>
         {creating ? null : (
           <Button

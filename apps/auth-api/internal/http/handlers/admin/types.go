@@ -48,7 +48,7 @@ type AdminUser struct {
 // ListUsersInput binds query parameters for GET /admin/users.
 type ListUsersInput struct {
 	Search  string `query:"search" default:""`
-	Enabled *bool  `query:"enabled"`
+	Enabled string `query:"enabled" default:"" enum:"true,false," doc:"Filter by enabled status (empty=all)"`
 	PaginatedInput
 }
 
@@ -101,44 +101,53 @@ type AdminWorkspace struct {
 	UpdatedAt    *int64  `json:"updatedAt,omitempty"`
 }
 
-// ListWorkspacesInput binds query parameters for GET /admin/workspaces.
-type ListWorkspacesInput struct {
+// AdminListWorkspacesInput binds query parameters for GET /admin/workspaces.
+type AdminListWorkspacesInput struct {
 	Search  string `query:"search" default:""`
-	Enabled *bool  `query:"enabled"`
+	Enabled string `query:"enabled" default:"" enum:"true,false," doc:"Filter by enabled status (empty=all)"`
 	PaginatedInput
 }
 
-// ListWorkspacesOutput is the response for GET /admin/workspaces.
-type ListWorkspacesOutput struct {
-	Body struct {
-		Total int64            `json:"total"`
-		Items []AdminWorkspace `json:"items"`
-	}
+// AdminListWorkspacesOutput is the response for GET /admin/workspaces.
+type AdminListWorkspacesOutput struct {
+	Body AdminListWorkspacesOutputBody
 }
 
-// GetWorkspaceInput binds the path parameter for GET /admin/workspaces/{wsId}.
-type GetWorkspaceInput struct {
+// AdminListWorkspacesOutputBody is the response body for GET /admin/workspaces.
+type AdminListWorkspacesOutputBody struct {
+	Total int64            `json:"total"`
+	Items []AdminWorkspace `json:"items"`
+}
+
+// AdminGetWorkspaceInput binds the path parameter for GET /admin/workspaces/{wsId}.
+type AdminGetWorkspaceInput struct {
 	WsID string `path:"wsId"`
 }
 
-// GetWorkspaceOutput is the response for GET /admin/workspaces/{wsId}.
-type GetWorkspaceOutput struct {
+// AdminGetWorkspaceOutput is the response for GET /admin/workspaces/{wsId}.
+type AdminGetWorkspaceOutput struct {
 	Body AdminWorkspace
 }
 
-// PatchWorkspaceInput binds the path and body for PATCH /admin/workspaces/{wsId}.
-type PatchWorkspaceInput struct {
+// AdminPatchWorkspaceInput binds the path and body for PATCH /admin/workspaces/{wsId}.
+type AdminPatchWorkspaceInput struct {
 	WsID string `path:"wsId"`
-	Body struct {
-		Enabled *bool `json:"enabled"`
-	}
+	Body AdminPatchWorkspaceInputBody
 }
 
-// PatchWorkspaceOutput is the response for PATCH /admin/workspaces/{wsId}.
-type PatchWorkspaceOutput struct {
-	Body struct {
-		Ok bool `json:"ok"`
-	}
+// AdminPatchWorkspaceInputBody is the JSON body for PATCH /admin/workspaces/{wsId}.
+type AdminPatchWorkspaceInputBody struct {
+	Enabled *bool `json:"enabled"`
+}
+
+// AdminPatchWorkspaceOutput is the response for PATCH /admin/workspaces/{wsId}.
+type AdminPatchWorkspaceOutput struct {
+	Body AdminPatchWorkspaceOutputBody
+}
+
+// AdminPatchWorkspaceOutputBody is the response body for PATCH /admin/workspaces/{wsId}.
+type AdminPatchWorkspaceOutputBody struct {
+	Ok bool `json:"ok"`
 }
 
 // --- Sessions ---
@@ -255,8 +264,8 @@ type AuditEntry struct {
 // ListAuditLogsInput binds query parameters for GET /admin/audit-logs.
 type ListAuditLogsInput struct {
 	Action string `query:"action" default:""`
-	From   *int64 `query:"from" doc:"Unix seconds, inclusive"`
-	To     *int64 `query:"to" doc:"Unix seconds, inclusive"`
+	From   int64  `query:"from" default:"0" doc:"Unix seconds, inclusive (0=no lower bound)"`
+	To     int64  `query:"to" default:"0" doc:"Unix seconds, inclusive (0=no upper bound)"`
 	PaginatedInput
 }
 

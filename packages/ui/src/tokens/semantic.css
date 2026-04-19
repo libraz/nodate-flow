@@ -36,9 +36,13 @@
 
   /* status */
   --nf-color-success: oklch(70% 0.16 150);
+  --nf-color-success-subtle: oklch(95% 0.04 150);
   --nf-color-warning: oklch(78% 0.15 75);
+  --nf-color-warning-subtle: oklch(95% 0.04 75);
   --nf-color-danger: oklch(62% 0.21 25);
+  --nf-color-danger-subtle: oklch(95% 0.04 25);
   --nf-color-info: oklch(70% 0.13 240);
+  --nf-color-info-subtle: oklch(95% 0.04 240);
 
   /* focus ring */
   --nf-color-focus-ring: oklch(66% 0.18 240);

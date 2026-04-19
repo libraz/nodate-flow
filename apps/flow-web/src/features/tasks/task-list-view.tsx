@@ -16,7 +16,7 @@ import type { ColumnDef, RowSelectionState } from '@tanstack/react-table';
 import { type DragEvent, type ReactElement, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { formatDate, isOverdue } from '../../lib/format';
+import { formatDate, formatEpoch, isOverdue } from '../../lib/format';
 import { computeBlockedByOpen, useProjectDependenciesQuery } from '../projects/api';
 
 import {
@@ -84,9 +84,9 @@ function BulkActionBar({
   const btnStyle: React.CSSProperties = {
     padding: '0.375rem 0.75rem',
     borderRadius: '0.375rem',
-    border: '1px solid var(--nf-color-border, var(--color-hairline))',
-    background: 'var(--color-surface, rgba(127,127,127,0.05))',
-    color: 'var(--color-fg)',
+    border: '1px solid var(--nf-color-border, var(--nf-color-hairline))',
+    background: 'var(--nf-color-surface))',
+    color: 'var(--nf-color-fg)',
     fontSize: '0.8125rem',
     cursor: busy ? 'wait' : 'pointer',
     opacity: busy ? 0.5 : 1,
@@ -100,8 +100,8 @@ function BulkActionBar({
         gap: '0.5rem',
         padding: '0.5rem 0.75rem',
         borderRadius: '0.5rem',
-        background: 'var(--nf-color-accent, var(--color-accent, #9b59b6))',
-        color: 'var(--nf-color-accent-fg, white)',
+        background: 'var(--nf-color-accent, var(--nf-color-accent))',
+        color: 'var(--nf-color-accent, white)',
         fontSize: '0.8125rem',
         marginBottom: '0.5rem',
       }}
@@ -260,7 +260,7 @@ function InlineTitleCell({
         onStartEdit();
       }}
       style={{
-        color: 'var(--color-fg)',
+        color: 'var(--nf-color-fg)',
         textDecoration: 'none',
         fontWeight: 500,
       }}
@@ -417,10 +417,10 @@ function InlineDueCell({
           fontSize: '0.8125rem',
           padding: '0.125rem 0.25rem',
           margin: '-0.125rem -0.25rem',
-          border: '1px solid var(--nf-color-border, var(--color-hairline))',
+          border: '1px solid var(--nf-color-border, var(--nf-color-hairline))',
           borderRadius: '0.25rem',
-          background: 'var(--color-surface, transparent)',
-          color: 'var(--color-fg)',
+          background: 'var(--nf-color-surface)',
+          color: 'var(--nf-color-fg)',
         }}
       />
     );
@@ -568,7 +568,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
             width: '100%',
             userSelect: 'none',
             opacity: dragIdx === row.index ? 0.4 : 1,
-            color: 'var(--color-muted)',
+            color: 'var(--nf-color-fg-muted)',
             fontSize: '0.75rem',
             lineHeight: 1,
           }}
@@ -640,7 +640,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
       header: () => t('tasks.columns.deps'),
       cell: ({ row }) => {
         const count = blockedByOpen.get(row.original.id) ?? 0;
-        if (count === 0) return <span style={{ color: 'var(--color-muted)' }}>—</span>;
+        if (count === 0) return <span style={{ color: 'var(--nf-color-fg-muted)' }}>—</span>;
         return (
           <span
             style={{
@@ -664,14 +664,14 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
       header: () => t('tasks.columns.assignee'),
       cell: ({ row }) => {
         const count = row.original.assigneeCount;
-        if (count === 0) return <span style={{ color: 'var(--color-muted)' }}>—</span>;
+        if (count === 0) return <span style={{ color: 'var(--nf-color-fg-muted)' }}>—</span>;
         return (
           <span
             style={{
               display: 'inline-flex',
               gap: '0.375rem',
               alignItems: 'center',
-              color: 'var(--color-muted)',
+              color: 'var(--nf-color-fg-muted)',
             }}
           >
             <span
@@ -725,8 +725,8 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
       size: 110,
       header: () => t('tasks.columns.updated'),
       cell: ({ row }) => (
-        <span style={{ color: 'var(--color-muted)' }}>
-          {row.original.updatedAt ? formatDate(row.original.updatedAt, locale) : '—'}
+        <span style={{ color: 'var(--nf-color-fg-muted)' }}>
+          {formatEpoch(row.original.updatedAt, locale) ?? '—'}
         </span>
       ),
     },

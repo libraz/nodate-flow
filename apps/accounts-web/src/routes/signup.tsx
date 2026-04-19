@@ -158,7 +158,7 @@ function SignupPage(): ReactElement {
             role="alert"
             style={{
               margin: 0,
-              color: 'var(--nf-color-fg-danger, var(--color-danger))',
+              color: 'var(--nf-color-danger)',
               fontSize: 'var(--nf-text-sm, 0.875rem)',
             }}
           >
@@ -174,7 +174,7 @@ function SignupPage(): ReactElement {
           style={{
             margin: 0,
             fontSize: 'var(--nf-text-sm, 0.875rem)',
-            color: 'var(--nf-color-fg-muted, var(--color-muted))',
+            color: 'var(--nf-color-fg-muted)',
           }}
         >
           {t('signup.haveAccount')} <Link to="/login">{t('signup.loginLink')}</Link>

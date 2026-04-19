@@ -130,7 +130,7 @@ export default function WorkspaceInviteDialog({
     return (
       <Dialog open={open} onClose={handleClose} title={t('workspaces.invites.link_ready_title')}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <p style={{ margin: 0, color: 'var(--nf-color-fg-muted, var(--color-muted))' }}>
+          <p style={{ margin: 0, color: 'var(--nf-color-fg-muted, var(--nf-color-fg-muted))' }}>
             {t('workspaces.invites.link_ready_description')}
           </p>
           <div

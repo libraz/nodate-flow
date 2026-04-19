@@ -216,7 +216,7 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
     >
       <label
         htmlFor="nl-query-input"
-        style={{ fontSize: '0.75rem', color: 'var(--nf-color-muted)' }}
+        style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}
       >
         {t('nl_query.label')}
       </label>
@@ -318,7 +318,7 @@ function GlassDockSuggestionRow({
           <span
             style={{
               fontSize: '0.75rem',
-              color: 'var(--nf-color-muted)',
+              color: 'var(--nf-color-fg-muted)',
             }}
           >
             {suggestion.recommendedAction}
@@ -370,7 +370,7 @@ function StateSuggestionsPanel({
         borderBlockEnd: '1px solid var(--nf-color-border)',
       }}
     >
-      <strong style={{ fontSize: '0.75rem', color: 'var(--nf-color-muted)' }}>
+      <strong style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}>
         {t('state_suggestions.title')}
       </strong>
       <ul
@@ -432,7 +432,7 @@ function RemindersPanel({
         borderBlockEnd: '1px solid var(--nf-color-border)',
       }}
     >
-      <strong style={{ fontSize: '0.75rem', color: 'var(--nf-color-muted)' }}>
+      <strong style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}>
         {t('reminders.title')}
       </strong>
       <ul
@@ -468,7 +468,7 @@ function RemindersPanel({
                 <span
                   style={{
                     fontSize: '0.6875rem',
-                    color: 'var(--nf-color-muted)',
+                    color: 'var(--nf-color-fg-muted)',
                   }}
                 >
                   {r.dueOn ? formatRelativeDate(r.dueOn, t) : ''}
@@ -501,7 +501,7 @@ function AutoActionsPanel({
         borderBlockEnd: '1px solid var(--nf-color-border)',
       }}
     >
-      <strong style={{ fontSize: '0.75rem', color: 'var(--nf-color-muted)' }}>
+      <strong style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}>
         {t('auto_actions.title')}
       </strong>
       <ul
@@ -685,7 +685,7 @@ export default function GlassDock(): ReactElement {
           <p
             style={{
               margin: 0,
-              color: 'var(--nf-color-muted)',
+              color: 'var(--nf-color-fg-muted)',
               fontSize: '0.8125rem',
               textAlign: 'center',
               padding: '1rem',

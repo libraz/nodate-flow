@@ -19,7 +19,7 @@ export default function MaskedKey({ value }: MaskedKeyProps): ReactElement {
         gap: '0.375rem',
         fontFamily: 'var(--font-mono, ui-monospace, monospace)',
         fontSize: '0.875rem',
-        color: 'var(--color-muted)',
+        color: 'var(--nf-color-fg-muted)',
       }}
     >
       <span aria-hidden="true">🔒</span>

@@ -18,7 +18,7 @@ function WorkspaceTimelineRoute(): ReactElement {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <header>
-        <h1 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--color-fg)' }}>
+        <h1 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--nf-color-fg)' }}>
           {tTimeline('view.title')}
         </h1>
       </header>

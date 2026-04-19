@@ -8,148 +8,148 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './routes/__root'
-import { Route as SignupRouteImport } from './routes/signup'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
-import { Route as AuthenticatedSecurityRouteImport } from './routes/_authenticated/security'
-import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
-import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
-import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
-import { Route as AuthenticatedAdminWorkspacesRouteImport } from './routes/_authenticated/admin/workspaces'
-import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
-import { Route as AuthenticatedAdminSettingsRouteImport } from './routes/_authenticated/admin/settings'
-import { Route as AuthenticatedAdminAuditLogsRouteImport } from './routes/_authenticated/admin/audit-logs'
-import { Route as AuthenticatedAdminAdminsRouteImport } from './routes/_authenticated/admin/admins'
-import { Route as AuthenticatedAdminWorkspacesWsIdRouteImport } from './routes/_authenticated/admin/workspaces_.$wsId'
-import { Route as AuthenticatedAdminUsersUserIdRouteImport } from './routes/_authenticated/admin/users_.$userId'
+import { Route as rootRouteImport } from './routes/__root';
+import { Route as SignupRouteImport } from './routes/signup';
+import { Route as LoginRouteImport } from './routes/login';
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated';
+import { Route as AuthenticatedSecurityRouteImport } from './routes/_authenticated/security';
+import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile';
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin';
+import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index';
+import { Route as AuthenticatedAdminWorkspacesRouteImport } from './routes/_authenticated/admin/workspaces';
+import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users';
+import { Route as AuthenticatedAdminSettingsRouteImport } from './routes/_authenticated/admin/settings';
+import { Route as AuthenticatedAdminAuditLogsRouteImport } from './routes/_authenticated/admin/audit-logs';
+import { Route as AuthenticatedAdminAdminsRouteImport } from './routes/_authenticated/admin/admins';
+import { Route as AuthenticatedAdminWorkspacesWsIdRouteImport } from './routes/_authenticated/admin/workspaces_.$wsId';
+import { Route as AuthenticatedAdminUsersUserIdRouteImport } from './routes/_authenticated/admin/users_.$userId';
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const AuthenticatedSecurityRoute = AuthenticatedSecurityRouteImport.update({
   id: '/security',
   path: '/security',
   getParentRoute: () => AuthenticatedRoute,
-} as any)
+} as any);
 const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
   getParentRoute: () => AuthenticatedRoute,
-} as any)
+} as any);
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
   getParentRoute: () => AuthenticatedRoute,
-} as any)
+} as any);
 const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
-} as any)
+} as any);
 const AuthenticatedAdminWorkspacesRoute =
   AuthenticatedAdminWorkspacesRouteImport.update({
     id: '/workspaces',
     path: '/workspaces',
     getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
+  } as any);
 const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
   getParentRoute: () => AuthenticatedAdminRoute,
-} as any)
+} as any);
 const AuthenticatedAdminSettingsRoute =
   AuthenticatedAdminSettingsRouteImport.update({
     id: '/settings',
     path: '/settings',
     getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
+  } as any);
 const AuthenticatedAdminAuditLogsRoute =
   AuthenticatedAdminAuditLogsRouteImport.update({
     id: '/audit-logs',
     path: '/audit-logs',
     getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
+  } as any);
 const AuthenticatedAdminAdminsRoute =
   AuthenticatedAdminAdminsRouteImport.update({
     id: '/admins',
     path: '/admins',
     getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
+  } as any);
 const AuthenticatedAdminWorkspacesWsIdRoute =
   AuthenticatedAdminWorkspacesWsIdRouteImport.update({
     id: '/workspaces_/$wsId',
     path: '/workspaces/$wsId',
     getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
+  } as any);
 const AuthenticatedAdminUsersUserIdRoute =
   AuthenticatedAdminUsersUserIdRouteImport.update({
     id: '/users_/$userId',
     path: '/users/$userId',
     getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
+  } as any);
 
 export interface FileRoutesByFullPath {
-  '/': typeof AuthenticatedRouteWithChildren
-  '/login': typeof LoginRoute
-  '/signup': typeof SignupRoute
-  '/admin': typeof AuthenticatedAdminRouteWithChildren
-  '/profile': typeof AuthenticatedProfileRoute
-  '/security': typeof AuthenticatedSecurityRoute
-  '/admin/admins': typeof AuthenticatedAdminAdminsRoute
-  '/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute
-  '/admin/settings': typeof AuthenticatedAdminSettingsRoute
-  '/admin/users': typeof AuthenticatedAdminUsersRoute
-  '/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute
-  '/admin/': typeof AuthenticatedAdminIndexRoute
-  '/admin/users/$userId': typeof AuthenticatedAdminUsersUserIdRoute
-  '/admin/workspaces/$wsId': typeof AuthenticatedAdminWorkspacesWsIdRoute
+  '/': typeof AuthenticatedRouteWithChildren;
+  '/login': typeof LoginRoute;
+  '/signup': typeof SignupRoute;
+  '/admin': typeof AuthenticatedAdminRouteWithChildren;
+  '/profile': typeof AuthenticatedProfileRoute;
+  '/security': typeof AuthenticatedSecurityRoute;
+  '/admin/admins': typeof AuthenticatedAdminAdminsRoute;
+  '/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute;
+  '/admin/settings': typeof AuthenticatedAdminSettingsRoute;
+  '/admin/users': typeof AuthenticatedAdminUsersRoute;
+  '/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute;
+  '/admin/': typeof AuthenticatedAdminIndexRoute;
+  '/admin/users/$userId': typeof AuthenticatedAdminUsersUserIdRoute;
+  '/admin/workspaces/$wsId': typeof AuthenticatedAdminWorkspacesWsIdRoute;
 }
 export interface FileRoutesByTo {
-  '/': typeof AuthenticatedRouteWithChildren
-  '/login': typeof LoginRoute
-  '/signup': typeof SignupRoute
-  '/profile': typeof AuthenticatedProfileRoute
-  '/security': typeof AuthenticatedSecurityRoute
-  '/admin/admins': typeof AuthenticatedAdminAdminsRoute
-  '/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute
-  '/admin/settings': typeof AuthenticatedAdminSettingsRoute
-  '/admin/users': typeof AuthenticatedAdminUsersRoute
-  '/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute
-  '/admin': typeof AuthenticatedAdminIndexRoute
-  '/admin/users/$userId': typeof AuthenticatedAdminUsersUserIdRoute
-  '/admin/workspaces/$wsId': typeof AuthenticatedAdminWorkspacesWsIdRoute
+  '/': typeof AuthenticatedRouteWithChildren;
+  '/login': typeof LoginRoute;
+  '/signup': typeof SignupRoute;
+  '/profile': typeof AuthenticatedProfileRoute;
+  '/security': typeof AuthenticatedSecurityRoute;
+  '/admin/admins': typeof AuthenticatedAdminAdminsRoute;
+  '/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute;
+  '/admin/settings': typeof AuthenticatedAdminSettingsRoute;
+  '/admin/users': typeof AuthenticatedAdminUsersRoute;
+  '/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute;
+  '/admin': typeof AuthenticatedAdminIndexRoute;
+  '/admin/users/$userId': typeof AuthenticatedAdminUsersUserIdRoute;
+  '/admin/workspaces/$wsId': typeof AuthenticatedAdminWorkspacesWsIdRoute;
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport
-  '/_authenticated': typeof AuthenticatedRouteWithChildren
-  '/login': typeof LoginRoute
-  '/signup': typeof SignupRoute
-  '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
-  '/_authenticated/profile': typeof AuthenticatedProfileRoute
-  '/_authenticated/security': typeof AuthenticatedSecurityRoute
-  '/_authenticated/admin/admins': typeof AuthenticatedAdminAdminsRoute
-  '/_authenticated/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute
-  '/_authenticated/admin/settings': typeof AuthenticatedAdminSettingsRoute
-  '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
-  '/_authenticated/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute
-  '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
-  '/_authenticated/admin/users_/$userId': typeof AuthenticatedAdminUsersUserIdRoute
-  '/_authenticated/admin/workspaces_/$wsId': typeof AuthenticatedAdminWorkspacesWsIdRoute
+  __root__: typeof rootRouteImport;
+  '/_authenticated': typeof AuthenticatedRouteWithChildren;
+  '/login': typeof LoginRoute;
+  '/signup': typeof SignupRoute;
+  '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren;
+  '/_authenticated/profile': typeof AuthenticatedProfileRoute;
+  '/_authenticated/security': typeof AuthenticatedSecurityRoute;
+  '/_authenticated/admin/admins': typeof AuthenticatedAdminAdminsRoute;
+  '/_authenticated/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute;
+  '/_authenticated/admin/settings': typeof AuthenticatedAdminSettingsRoute;
+  '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute;
+  '/_authenticated/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute;
+  '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute;
+  '/_authenticated/admin/users_/$userId': typeof AuthenticatedAdminUsersUserIdRoute;
+  '/_authenticated/admin/workspaces_/$wsId': typeof AuthenticatedAdminWorkspacesWsIdRoute;
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath
+  fileRoutesByFullPath: FileRoutesByFullPath;
   fullPaths:
     | '/'
     | '/login'
@@ -164,8 +164,8 @@ export interface FileRouteTypes {
     | '/admin/workspaces'
     | '/admin/'
     | '/admin/users/$userId'
-    | '/admin/workspaces/$wsId'
-  fileRoutesByTo: FileRoutesByTo
+    | '/admin/workspaces/$wsId';
+  fileRoutesByTo: FileRoutesByTo;
   to:
     | '/'
     | '/login'
@@ -179,7 +179,7 @@ export interface FileRouteTypes {
     | '/admin/workspaces'
     | '/admin'
     | '/admin/users/$userId'
-    | '/admin/workspaces/$wsId'
+    | '/admin/workspaces/$wsId';
   id:
     | '__root__'
     | '/_authenticated'
@@ -195,127 +195,127 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/workspaces'
     | '/_authenticated/admin/'
     | '/_authenticated/admin/users_/$userId'
-    | '/_authenticated/admin/workspaces_/$wsId'
-  fileRoutesById: FileRoutesById
+    | '/_authenticated/admin/workspaces_/$wsId';
+  fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
-  AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
-  LoginRoute: typeof LoginRoute
-  SignupRoute: typeof SignupRoute
+  AuthenticatedRoute: typeof AuthenticatedRouteWithChildren;
+  LoginRoute: typeof LoginRoute;
+  SignupRoute: typeof SignupRoute;
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
     '/signup': {
-      id: '/signup'
-      path: '/signup'
-      fullPath: '/signup'
-      preLoaderRoute: typeof SignupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/signup';
+      path: '/signup';
+      fullPath: '/signup';
+      preLoaderRoute: typeof SignupRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/login';
+      path: '/login';
+      fullPath: '/login';
+      preLoaderRoute: typeof LoginRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/_authenticated': {
-      id: '/_authenticated'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof AuthenticatedRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/_authenticated';
+      path: '';
+      fullPath: '/';
+      preLoaderRoute: typeof AuthenticatedRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/_authenticated/security': {
-      id: '/_authenticated/security'
-      path: '/security'
-      fullPath: '/security'
-      preLoaderRoute: typeof AuthenticatedSecurityRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
+      id: '/_authenticated/security';
+      path: '/security';
+      fullPath: '/security';
+      preLoaderRoute: typeof AuthenticatedSecurityRouteImport;
+      parentRoute: typeof AuthenticatedRoute;
+    };
     '/_authenticated/profile': {
-      id: '/_authenticated/profile'
-      path: '/profile'
-      fullPath: '/profile'
-      preLoaderRoute: typeof AuthenticatedProfileRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
+      id: '/_authenticated/profile';
+      path: '/profile';
+      fullPath: '/profile';
+      preLoaderRoute: typeof AuthenticatedProfileRouteImport;
+      parentRoute: typeof AuthenticatedRoute;
+    };
     '/_authenticated/admin': {
-      id: '/_authenticated/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AuthenticatedAdminRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
+      id: '/_authenticated/admin';
+      path: '/admin';
+      fullPath: '/admin';
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport;
+      parentRoute: typeof AuthenticatedRoute;
+    };
     '/_authenticated/admin/': {
-      id: '/_authenticated/admin/'
-      path: '/'
-      fullPath: '/admin/'
-      preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
+      id: '/_authenticated/admin/';
+      path: '/';
+      fullPath: '/admin/';
+      preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport;
+      parentRoute: typeof AuthenticatedAdminRoute;
+    };
     '/_authenticated/admin/workspaces': {
-      id: '/_authenticated/admin/workspaces'
-      path: '/workspaces'
-      fullPath: '/admin/workspaces'
-      preLoaderRoute: typeof AuthenticatedAdminWorkspacesRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
+      id: '/_authenticated/admin/workspaces';
+      path: '/workspaces';
+      fullPath: '/admin/workspaces';
+      preLoaderRoute: typeof AuthenticatedAdminWorkspacesRouteImport;
+      parentRoute: typeof AuthenticatedAdminRoute;
+    };
     '/_authenticated/admin/users': {
-      id: '/_authenticated/admin/users'
-      path: '/users'
-      fullPath: '/admin/users'
-      preLoaderRoute: typeof AuthenticatedAdminUsersRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
+      id: '/_authenticated/admin/users';
+      path: '/users';
+      fullPath: '/admin/users';
+      preLoaderRoute: typeof AuthenticatedAdminUsersRouteImport;
+      parentRoute: typeof AuthenticatedAdminRoute;
+    };
     '/_authenticated/admin/settings': {
-      id: '/_authenticated/admin/settings'
-      path: '/settings'
-      fullPath: '/admin/settings'
-      preLoaderRoute: typeof AuthenticatedAdminSettingsRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
+      id: '/_authenticated/admin/settings';
+      path: '/settings';
+      fullPath: '/admin/settings';
+      preLoaderRoute: typeof AuthenticatedAdminSettingsRouteImport;
+      parentRoute: typeof AuthenticatedAdminRoute;
+    };
     '/_authenticated/admin/audit-logs': {
-      id: '/_authenticated/admin/audit-logs'
-      path: '/audit-logs'
-      fullPath: '/admin/audit-logs'
-      preLoaderRoute: typeof AuthenticatedAdminAuditLogsRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
+      id: '/_authenticated/admin/audit-logs';
+      path: '/audit-logs';
+      fullPath: '/admin/audit-logs';
+      preLoaderRoute: typeof AuthenticatedAdminAuditLogsRouteImport;
+      parentRoute: typeof AuthenticatedAdminRoute;
+    };
     '/_authenticated/admin/admins': {
-      id: '/_authenticated/admin/admins'
-      path: '/admins'
-      fullPath: '/admin/admins'
-      preLoaderRoute: typeof AuthenticatedAdminAdminsRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
+      id: '/_authenticated/admin/admins';
+      path: '/admins';
+      fullPath: '/admin/admins';
+      preLoaderRoute: typeof AuthenticatedAdminAdminsRouteImport;
+      parentRoute: typeof AuthenticatedAdminRoute;
+    };
     '/_authenticated/admin/workspaces_/$wsId': {
-      id: '/_authenticated/admin/workspaces_/$wsId'
-      path: '/workspaces/$wsId'
-      fullPath: '/admin/workspaces/$wsId'
-      preLoaderRoute: typeof AuthenticatedAdminWorkspacesWsIdRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
+      id: '/_authenticated/admin/workspaces_/$wsId';
+      path: '/workspaces/$wsId';
+      fullPath: '/admin/workspaces/$wsId';
+      preLoaderRoute: typeof AuthenticatedAdminWorkspacesWsIdRouteImport;
+      parentRoute: typeof AuthenticatedAdminRoute;
+    };
     '/_authenticated/admin/users_/$userId': {
-      id: '/_authenticated/admin/users_/$userId'
-      path: '/users/$userId'
-      fullPath: '/admin/users/$userId'
-      preLoaderRoute: typeof AuthenticatedAdminUsersUserIdRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
+      id: '/_authenticated/admin/users_/$userId';
+      path: '/users/$userId';
+      fullPath: '/admin/users/$userId';
+      preLoaderRoute: typeof AuthenticatedAdminUsersUserIdRouteImport;
+      parentRoute: typeof AuthenticatedAdminRoute;
+    };
   }
 }
 
 interface AuthenticatedAdminRouteChildren {
-  AuthenticatedAdminAdminsRoute: typeof AuthenticatedAdminAdminsRoute
-  AuthenticatedAdminAuditLogsRoute: typeof AuthenticatedAdminAuditLogsRoute
-  AuthenticatedAdminSettingsRoute: typeof AuthenticatedAdminSettingsRoute
-  AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
-  AuthenticatedAdminWorkspacesRoute: typeof AuthenticatedAdminWorkspacesRoute
-  AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
-  AuthenticatedAdminUsersUserIdRoute: typeof AuthenticatedAdminUsersUserIdRoute
-  AuthenticatedAdminWorkspacesWsIdRoute: typeof AuthenticatedAdminWorkspacesWsIdRoute
+  AuthenticatedAdminAdminsRoute: typeof AuthenticatedAdminAdminsRoute;
+  AuthenticatedAdminAuditLogsRoute: typeof AuthenticatedAdminAuditLogsRoute;
+  AuthenticatedAdminSettingsRoute: typeof AuthenticatedAdminSettingsRoute;
+  AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute;
+  AuthenticatedAdminWorkspacesRoute: typeof AuthenticatedAdminWorkspacesRoute;
+  AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute;
+  AuthenticatedAdminUsersUserIdRoute: typeof AuthenticatedAdminUsersUserIdRoute;
+  AuthenticatedAdminWorkspacesWsIdRoute: typeof AuthenticatedAdminWorkspacesWsIdRoute;
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
@@ -327,32 +327,32 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
   AuthenticatedAdminUsersUserIdRoute: AuthenticatedAdminUsersUserIdRoute,
   AuthenticatedAdminWorkspacesWsIdRoute: AuthenticatedAdminWorkspacesWsIdRoute,
-}
+};
 
 const AuthenticatedAdminRouteWithChildren =
-  AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
+  AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren);
 
 interface AuthenticatedRouteChildren {
-  AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
-  AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
-  AuthenticatedSecurityRoute: typeof AuthenticatedSecurityRoute
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren;
+  AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute;
+  AuthenticatedSecurityRoute: typeof AuthenticatedSecurityRoute;
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedSecurityRoute: AuthenticatedSecurityRoute,
-}
+};
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
   AuthenticatedRouteChildren,
-)
+);
 
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
-}
+};
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>()
+  ._addFileTypes<FileRouteTypes>();

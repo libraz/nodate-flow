@@ -58,7 +58,7 @@ function RecoveryCodesView({
           listStyle: 'none',
           padding: '0.75rem 1rem',
           margin: 0,
-          border: '1px solid var(--color-border)',
+          border: '1px solid var(--nf-color-border)',
           borderRadius: '0.5rem',
           fontFamily: 'var(--font-mono)',
           fontSize: '0.875rem',
@@ -163,7 +163,7 @@ function EnrollmentForm({
           gap: '0.5rem',
           alignItems: 'center',
           padding: '0.75rem 1rem',
-          border: '1px solid var(--color-border)',
+          border: '1px solid var(--nf-color-border)',
           borderRadius: '0.5rem',
         }}
       >
@@ -181,7 +181,7 @@ function EnrollmentForm({
           {t('security.totp.copy')}
         </Button>
       </div>
-      <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--color-fg-muted)' }}>
+      <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--nf-color-fg-muted)' }}>
         <a href={enrollment.otpauthUrl.startsWith('otpauth:') ? enrollment.otpauthUrl : undefined}>
           {t('security.totp.open_in_app')}
         </a>
@@ -257,7 +257,7 @@ function EnabledPanel(): ReactElement {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <DisableForm />
-      <hr style={{ border: 0, borderTop: '1px solid var(--color-border)', width: '100%' }} />
+      <hr style={{ border: 0, borderTop: '1px solid var(--nf-color-border)', width: '100%' }} />
       <div>
         <h3 style={{ margin: '0 0 0.5rem' }}>{t('security.totp.recovery.title')}</h3>
         <p style={{ margin: '0 0 0.75rem' }}>

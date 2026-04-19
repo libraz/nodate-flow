@@ -17,20 +17,20 @@ func ListAuditLogs(deps Deps) func(context.Context, *ListAuditLogsInput) (*ListA
 			limit = 50
 		}
 
-		// Convert optional unix-second boundaries to time.Time for the query.
-		// When nil, pass nil as the interface{} so the WHERE clause skips the
+		// Convert unix-second boundaries to time.Time for the query.
+		// When 0, pass nil as the interface{} so the WHERE clause skips the
 		// bound (see "? IS NULL OR ..." in the SQL).
 		var fromFilter interface{}
 		var fromTime time.Time
-		if in.From != nil {
-			fromTime = time.Unix(*in.From, 0)
+		if in.From != 0 {
+			fromTime = time.Unix(in.From, 0)
 			fromFilter = fromTime
 		}
 
 		var toFilter interface{}
 		var toTime time.Time
-		if in.To != nil {
-			toTime = time.Unix(*in.To, 0)
+		if in.To != 0 {
+			toTime = time.Unix(in.To, 0)
 			toFilter = toTime
 		}
 

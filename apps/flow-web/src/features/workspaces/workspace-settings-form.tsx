@@ -100,7 +100,7 @@ export default function WorkspaceSettingsForm({
     >
       <header style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
         <h1 style={{ margin: 0, fontSize: '1.5rem' }}>{t('workspace.general.title')}</h1>
-        <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
           {t('workspace.general.description')}
         </p>
       </header>

@@ -60,8 +60,8 @@ export default function DayDetail(): ReactElement | null {
       />
 
       <div
-        className="glass-surface-heavy rounded-t-[var(--radius-2xl)]"
-        style={{ boxShadow: 'var(--shadow-elevated)' }}
+        className="glass-surface-heavy rounded-t-[var(--nf-radius-lg)]"
+        style={{ boxShadow: 'var(--nf-shadow-lg)' }}
       >
         <div className="flex items-center justify-center py-2">
           <button
@@ -70,12 +70,12 @@ export default function DayDetail(): ReactElement | null {
             className="flex items-center justify-center"
             aria-label={t('common.close')}
           >
-            <ChevronDown className="h-5 w-5" style={{ color: 'var(--color-text-tertiary)' }} />
+            <ChevronDown className="h-5 w-5" style={{ color: 'var(--nf-color-fg-subtle)' }} />
           </button>
         </div>
 
         <div className="px-4 pb-2">
-          <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+          <h3 className="text-sm font-semibold" style={{ color: 'var(--nf-color-fg)' }}>
             {selectedDate
               .setLocale(i18n.language)
               .toLocaleString({ weekday: 'long', month: 'long', day: 'numeric' })}
@@ -84,7 +84,7 @@ export default function DayDetail(): ReactElement | null {
 
         <div className="max-h-[50vh] overflow-y-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
           {events.length === 0 ? (
-            <p className="py-8 text-center text-sm" style={{ color: 'var(--color-text-tertiary)' }}>
+            <p className="py-8 text-center text-sm" style={{ color: 'var(--nf-color-fg-subtle)' }}>
               {t('calendar.noEventsForDay')}
             </p>
           ) : (
@@ -99,17 +99,17 @@ export default function DayDetail(): ReactElement | null {
                       closeDayDetail();
                       openEventDetail(event.id);
                     }}
-                    className="flex w-full items-center gap-3 rounded-[var(--radius-sm)] px-3 py-2.5 text-left hover:bg-[var(--color-hover)]"
+                    className="flex w-full items-center gap-3 rounded-[var(--nf-radius-sm)] px-3 py-2.5 text-left hover:bg-[var(--nf-color-surface-hover)]"
                   >
-                    <div className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--color-accent)]" />
+                    <div className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--nf-color-accent)]" />
                     <div className="min-w-0 flex-1">
                       <p
                         className="truncate text-sm font-medium"
-                        style={{ color: 'var(--color-text-primary)' }}
+                        style={{ color: 'var(--nf-color-fg)' }}
                       >
                         {event.title}
                       </p>
-                      <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                      <p className="text-xs" style={{ color: 'var(--nf-color-fg-muted)' }}>
                         {event.allDay
                           ? t('event.allDay')
                           : start.setLocale(i18n.language).toLocaleString(DateTime.TIME_SIMPLE)}

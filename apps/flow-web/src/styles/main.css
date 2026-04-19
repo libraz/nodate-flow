@@ -6,6 +6,8 @@
 @import "@nodate-flow/ui/themes/aurora-dark.css";
 @import "@nodate-flow/ui/themes/dotline-light.css";
 @import "@nodate-flow/ui/themes/dotline-dark.css";
+@import "@nodate-flow/ui/themes/glass-light.css";
+@import "@nodate-flow/ui/themes/glass-dark.css";
 
 :root {
   color-scheme: light dark;

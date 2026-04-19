@@ -16,10 +16,10 @@ export default function FabButton(): ReactElement {
       style={{
         bottom: 'calc(60px + env(safe-area-inset-bottom))',
         right: '16px',
-        borderRadius: 'var(--radius-lg, 20px)',
-        background: 'var(--color-accent)',
+        borderRadius: 'var(--nf-radius-lg, 20px)',
+        background: 'var(--nf-color-accent)',
         color: '#ffffff',
-        boxShadow: 'var(--shadow-elevated)',
+        boxShadow: 'var(--nf-shadow-lg)',
       }}
       aria-label={t('calendar.createNewEvent')}
     >

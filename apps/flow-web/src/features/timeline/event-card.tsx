@@ -45,7 +45,7 @@ export function eventSourceTag(
   if (type.startsWith('task.')) {
     return { label: 'task', color: '#f59e0b' };
   }
-  return { label: 'system', color: 'var(--color-muted)' };
+  return { label: 'system', color: 'var(--nf-color-fg-muted)' };
 }
 
 function formatRelative(occurredAt: number, locale: string): string {
@@ -125,7 +125,7 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
             inlineSize: '1.75rem',
             blockSize: '1.75rem',
             borderRadius: '999px',
-            background: 'var(--color-bg)',
+            background: 'var(--nf-color-bg)',
             border: `2px solid ${tag.color}`,
             display: 'flex',
             alignItems: 'center',
@@ -154,7 +154,7 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
             flexWrap: 'wrap',
           }}
         >
-          <span style={{ color: 'var(--color-fg)', lineHeight: 1.4, wordBreak: 'break-word' }}>
+          <span style={{ color: 'var(--nf-color-fg)', lineHeight: 1.4, wordBreak: 'break-word' }}>
             {translated}
           </span>
           <span
@@ -173,7 +173,7 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
           <span
             style={{
               marginInlineStart: 'auto',
-              color: 'var(--color-muted)',
+              color: 'var(--nf-color-fg-muted)',
               fontSize: '0.75rem',
               fontVariantNumeric: 'tabular-nums',
             }}
@@ -184,7 +184,7 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
         {payloadVisible ? (
           <details>
             <summary
-              style={{ cursor: 'pointer', color: 'var(--color-muted)', fontSize: '0.75rem' }}
+              style={{ cursor: 'pointer', color: 'var(--nf-color-fg-muted)', fontSize: '0.75rem' }}
             >
               {event.type}
             </summary>
@@ -192,7 +192,7 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
               style={{
                 marginBlockStart: '0.25rem',
                 padding: '0.5rem',
-                background: 'var(--color-surface-2, var(--color-surface))',
+                background: 'var(--nf-color-surface))',
                 borderRadius: '0.25rem',
                 fontSize: '0.7rem',
                 overflowX: 'auto',

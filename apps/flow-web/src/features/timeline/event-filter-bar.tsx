@@ -76,9 +76,9 @@ function ActorPicker({ workspaceId, selected, onSelect, label }: ActorPickerProp
         minBlockSize: '6rem',
         padding: '0.25rem',
         borderRadius: '0.25rem',
-        border: '1px solid var(--color-border)',
-        background: 'var(--color-bg)',
-        color: 'var(--color-fg)',
+        border: '1px solid var(--nf-color-border)',
+        background: 'var(--nf-color-bg)',
+        color: 'var(--nf-color-fg)',
       }}
     >
       {users.map((u) => (
@@ -136,11 +136,9 @@ export default function EventFilterBar({
         style={{
           padding: '0.25rem 0.625rem',
           borderRadius: '999px',
-          border: `1px solid ${active ? 'var(--color-accent, #9b59b6)' : 'var(--color-border)'}`,
-          background: active
-            ? 'var(--color-accent-subtle, rgba(155,89,182,0.12))'
-            : 'var(--color-surface, transparent)',
-          color: active ? 'var(--color-accent, #9b59b6)' : 'var(--color-fg)',
+          border: `1px solid ${active ? 'var(--nf-color-accent)' : 'var(--nf-color-border)'}`,
+          background: active ? 'var(--nf-color-accent-subtle))' : 'var(--nf-color-surface)',
+          color: active ? 'var(--nf-color-accent)' : 'var(--nf-color-fg)',
           fontSize: '0.8125rem',
           cursor: 'pointer',
         }}
@@ -153,17 +151,17 @@ export default function EventFilterBar({
   return (
     <details
       style={{
-        border: '1px solid var(--color-border)',
+        border: '1px solid var(--nf-color-border)',
         borderRadius: '0.5rem',
         padding: '0.5rem 0.75rem',
-        background: 'var(--color-surface, transparent)',
+        background: 'var(--nf-color-surface)',
       }}
     >
       <summary
         style={{
           cursor: 'pointer',
           fontSize: '0.8125rem',
-          color: 'var(--color-muted)',
+          color: 'var(--nf-color-fg-muted)',
           display: 'flex',
           alignItems: 'center',
           gap: '0.5rem',
@@ -175,8 +173,8 @@ export default function EventFilterBar({
             style={{
               padding: '0 0.5rem',
               borderRadius: '999px',
-              background: 'var(--color-accent-subtle, rgba(155,89,182,0.15))',
-              color: 'var(--color-accent, #9b59b6)',
+              background: 'var(--nf-color-accent-subtle))',
+              color: 'var(--nf-color-accent)',
               fontSize: '0.6875rem',
             }}
           >
@@ -211,7 +209,7 @@ export default function EventFilterBar({
                 fontSize: '0.6875rem',
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
-                color: 'var(--color-muted)',
+                color: 'var(--nf-color-fg-muted)',
               }}
             >
               {t(`filter.kind_group.${group.key}`, { defaultValue: group.key })}
@@ -232,7 +230,7 @@ export default function EventFilterBar({
             columnGap: '0.75rem',
             marginBlockStart: '0.25rem',
             paddingBlockStart: '0.625rem',
-            borderBlockStart: '1px solid var(--color-border)',
+            borderBlockStart: '1px solid var(--nf-color-border)',
           }}
         >
           <span
@@ -240,7 +238,7 @@ export default function EventFilterBar({
               fontSize: '0.6875rem',
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
-              color: 'var(--color-muted)',
+              color: 'var(--nf-color-fg-muted)',
             }}
           >
             {actorLabel}

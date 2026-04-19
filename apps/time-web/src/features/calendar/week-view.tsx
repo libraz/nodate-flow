@@ -93,9 +93,9 @@ function CurrentTimeIndicator(): ReactElement | null {
       <div className="flex items-center">
         <div
           className="h-2.5 w-2.5 shrink-0 rounded-full"
-          style={{ backgroundColor: 'var(--color-danger)' }}
+          style={{ backgroundColor: 'var(--nf-color-danger)' }}
         />
-        <div className="h-0.5 flex-1" style={{ backgroundColor: 'var(--color-danger)' }} />
+        <div className="h-0.5 flex-1" style={{ backgroundColor: 'var(--nf-color-danger)' }} />
       </div>
     </div>
   );
@@ -188,10 +188,10 @@ export default function WeekView(): ReactElement {
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Day header */}
       <div
-        className="grid shrink-0 border-b border-[var(--color-separator)]"
+        className="grid shrink-0 border-b border-[var(--nf-color-hairline)]"
         style={{ gridTemplateColumns: '56px repeat(7, 1fr)' }}
       >
-        <div className="border-r border-[var(--color-separator)]" />
+        <div className="border-r border-[var(--nf-color-hairline)]" />
         {weekDays.map((day) => {
           const iso = day.toISODate() ?? '';
           const isToday = iso === todayIso;
@@ -201,14 +201,14 @@ export default function WeekView(): ReactElement {
           const isSaturday = dow === 6;
 
           let dayColor: string;
-          if (holiday || isSunday) dayColor = 'var(--color-sunday)';
-          else if (isSaturday) dayColor = 'var(--color-saturday)';
-          else dayColor = 'var(--color-text-primary)';
+          if (holiday || isSunday) dayColor = 'var(--nf-cal-sunday)';
+          else if (isSaturday) dayColor = 'var(--nf-cal-saturday)';
+          else dayColor = 'var(--nf-color-fg)';
 
           return (
             <div
               key={iso}
-              className="border-r border-[var(--color-separator)] px-1 py-2 text-center"
+              className="border-r border-[var(--nf-color-hairline)] px-1 py-2 text-center"
             >
               <div className="text-xs" style={{ color: dayColor }}>
                 {day.setLocale(i18n.language).toLocaleString({ weekday: 'short' })}
@@ -217,7 +217,7 @@ export default function WeekView(): ReactElement {
                 className="mx-auto mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold"
                 style={
                   isToday
-                    ? { backgroundColor: 'var(--color-accent)', color: '#fff' }
+                    ? { backgroundColor: 'var(--nf-color-accent)', color: '#fff' }
                     : { color: dayColor }
                 }
               >
@@ -226,7 +226,7 @@ export default function WeekView(): ReactElement {
               {holiday ? (
                 <div
                   className="mt-0.5 truncate text-[9px]"
-                  style={{ color: 'var(--color-sunday)' }}
+                  style={{ color: 'var(--nf-cal-sunday)' }}
                 >
                   {holiday.name}
                 </div>
@@ -239,12 +239,12 @@ export default function WeekView(): ReactElement {
       {/* All-day events bar */}
       {hasAnyAllDay(allDay) ? (
         <div
-          className="grid shrink-0 border-b border-[var(--color-separator)]"
+          className="grid shrink-0 border-b border-[var(--nf-color-hairline)]"
           style={{ gridTemplateColumns: '56px repeat(7, 1fr)' }}
         >
           <div
-            className="border-r border-[var(--color-separator)] px-1 py-1 text-right text-[10px]"
-            style={{ color: 'var(--color-text-tertiary)' }}
+            className="border-r border-[var(--nf-color-hairline)] px-1 py-1 text-right text-[10px]"
+            style={{ color: 'var(--nf-color-fg-subtle)' }}
           >
             {t('calendar.allDay')}
           </div>
@@ -254,7 +254,7 @@ export default function WeekView(): ReactElement {
             return (
               <div
                 key={iso}
-                className="border-r border-[var(--color-separator)] px-0.5 py-0.5 space-y-0.5"
+                className="border-r border-[var(--nf-color-hairline)] px-0.5 py-0.5 space-y-0.5"
                 onDragOver={(e) => {
                   e.preventDefault();
                   e.dataTransfer.dropEffect = 'move';
@@ -306,14 +306,14 @@ export default function WeekView(): ReactElement {
           }}
         >
           {/* Hour labels */}
-          <div className="relative border-r border-[var(--color-separator)]">
+          <div className="relative border-r border-[var(--nf-color-hairline)]">
             {HOURS.map((hour) => (
               <div
                 key={hour}
                 className="absolute right-1 -translate-y-1/2 text-[11px]"
                 style={{
                   top: (hour - START_HOUR) * HOUR_HEIGHT,
-                  color: 'var(--color-text-tertiary)',
+                  color: 'var(--nf-color-fg-subtle)',
                 }}
               >
                 {DateTime.fromObject({ hour })
@@ -335,8 +335,8 @@ export default function WeekView(): ReactElement {
             return (
               <div
                 key={iso}
-                className="relative border-r border-[var(--color-separator)]"
-                style={isNonWorking ? { backgroundColor: 'var(--color-surface-inset)' } : undefined}
+                className="relative border-r border-[var(--nf-color-hairline)]"
+                style={isNonWorking ? { backgroundColor: 'var(--nf-color-bg-sunken)' } : undefined}
                 onDragOver={(e) => {
                   e.preventDefault();
                   e.dataTransfer.dropEffect = 'move';
@@ -367,7 +367,7 @@ export default function WeekView(): ReactElement {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleSlotClick(day, hour);
                     }}
-                    className="absolute left-0 right-0 border-t border-[var(--color-separator)] cursor-pointer hover:bg-[var(--color-hover)]"
+                    className="absolute left-0 right-0 border-t border-[var(--nf-color-hairline)] cursor-pointer hover:bg-[var(--nf-color-surface-hover)]"
                     style={{
                       top: (hour - START_HOUR) * HOUR_HEIGHT,
                       height: HOUR_HEIGHT,

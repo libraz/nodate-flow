@@ -16,7 +16,7 @@ import { type ReactElement, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { OPEN_COMMAND_PALETTE_EVENT } from '../components/layout/glass-dock';
-import type { TaskPriority } from '../features/tasks/api';
+import type { TaskDerivedState, TaskPriority } from '../features/tasks/api';
 import { PRIORITY_COLOR, PRIORITY_KEY, STATE_COLOR } from '../features/tasks/constants';
 import { sdk } from '../lib/sdk';
 
@@ -125,7 +125,7 @@ function TodayRoute(): ReactElement {
         >
           {t('today.title')}
         </h1>
-        <p style={{ margin: 0, color: 'var(--color-muted)' }}>{t('today.subtitle')}</p>
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{t('today.subtitle')}</p>
       </header>
 
       {totalCount === 0 ? (
@@ -159,8 +159,8 @@ function TodayRoute(): ReactElement {
               alignItems: 'center',
               padding: '0.5rem 1rem',
               borderRadius: '0.5rem',
-              background: 'var(--nf-color-accent, var(--color-accent, #9b59b6))',
-              color: 'var(--nf-color-accent-fg, white)',
+              background: 'var(--nf-color-accent, var(--nf-color-accent))',
+              color: 'var(--nf-color-accent, white)',
               border: 'none',
               cursor: 'pointer',
               fontSize: '0.875rem',
@@ -188,7 +188,7 @@ function TodayRoute(): ReactElement {
                 fontSize: '0.85rem',
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
-                color: isOverdue ? 'var(--nf-color-danger, #c0392b)' : 'var(--color-muted)',
+                color: isOverdue ? 'var(--nf-color-danger, #c0392b)' : 'var(--nf-color-fg-muted)',
               }}
             >
               {t(`today.sections.${key}`)} ({items.length})
@@ -216,7 +216,7 @@ function TodayRoute(): ReactElement {
                       borderRadius: '0.5rem',
                       background: isOverdue
                         ? 'var(--nf-color-danger-subtle, rgba(192,57,43,0.08))'
-                        : 'var(--color-surface, rgba(127,127,127,0.05))',
+                        : 'var(--nf-color-surface))',
                       borderInlineStart: isOverdue
                         ? '3px solid var(--nf-color-danger, #c0392b)'
                         : '3px solid transparent',
@@ -228,7 +228,9 @@ function TodayRoute(): ReactElement {
                         inlineSize: '0.5rem',
                         blockSize: '0.5rem',
                         borderRadius: '999px',
-                        background: STATE_COLOR[task.derivedState] ?? 'var(--color-muted)',
+                        background:
+                          STATE_COLOR[task.derivedState as TaskDerivedState] ??
+                          'var(--nf-color-fg-muted)',
                         flexShrink: 0,
                       }}
                     />
@@ -266,7 +268,7 @@ function TodayRoute(): ReactElement {
                     <span
                       style={{
                         fontSize: '0.75rem',
-                        color: 'var(--color-muted)',
+                        color: 'var(--nf-color-fg-muted)',
                         whiteSpace: 'nowrap',
                       }}
                     >
@@ -277,7 +279,7 @@ function TodayRoute(): ReactElement {
                     <span
                       style={{
                         fontSize: '0.75rem',
-                        color: 'var(--color-muted)',
+                        color: 'var(--nf-color-fg-muted)',
                         whiteSpace: 'nowrap',
                         minWidth: '5.5rem',
                         textAlign: 'right',

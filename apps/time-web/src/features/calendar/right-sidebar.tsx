@@ -38,23 +38,23 @@ function MemoTab(): ReactElement {
             if (e.key === 'Enter') handleAdd();
           }}
           placeholder={t('rightPanel.addMemo')}
-          className="flex-1 rounded-md border border-[var(--color-border)] px-2 py-1.5 text-sm focus:border-[var(--color-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+          className="flex-1 rounded-md border border-[var(--nf-color-border)] px-2 py-1.5 text-sm focus:border-[var(--nf-color-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--nf-color-accent)]"
           style={{
-            backgroundColor: 'var(--color-surface-inset)',
-            color: 'var(--color-text-primary)',
+            backgroundColor: 'var(--nf-color-bg-sunken)',
+            color: 'var(--nf-color-fg)',
           }}
         />
         <button
           type="button"
           onClick={handleAdd}
           disabled={!newMemo.trim()}
-          className="rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-sm font-medium text-[var(--color-text-on-accent)] hover:opacity-90 disabled:opacity-50"
+          className="rounded-md bg-[var(--nf-color-accent)] px-3 py-1.5 text-sm font-medium text-[var(--nf-color-fg-on-accent)] hover:opacity-90 disabled:opacity-50"
         >
           {t('common.add')}
         </button>
       </div>
       {memos.length === 0 ? (
-        <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>
+        <p className="text-sm" style={{ color: 'var(--nf-color-fg-subtle)' }}>
           {t('rightPanel.noMemos')}
         </p>
       ) : (
@@ -62,16 +62,16 @@ function MemoTab(): ReactElement {
           {memos.map((memo) => (
             <label
               key={memo.id}
-              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[var(--color-hover)]"
+              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[var(--nf-color-surface-hover)]"
             >
               <input
                 type="checkbox"
                 checked={memo.done}
                 onChange={() => toggleDone(memo.id)}
-                className="rounded border-[var(--color-border)]"
+                className="rounded border-[var(--nf-color-border)]"
               />
               <span
-                style={memo.done ? { color: 'var(--color-text-tertiary)' } : undefined}
+                style={memo.done ? { color: 'var(--nf-color-fg-subtle)' } : undefined}
                 className={memo.done ? 'line-through' : ''}
               >
                 {memo.text}
@@ -94,7 +94,7 @@ function MembersTab(): ReactElement {
 
   if (!calendarId) {
     return (
-      <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>
+      <p className="text-sm" style={{ color: 'var(--nf-color-fg-subtle)' }}>
         {t('rightPanel.noSharedCalendar')}
       </p>
     );
@@ -102,7 +102,7 @@ function MembersTab(): ReactElement {
 
   if (isLoading) {
     return (
-      <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+      <p className="text-sm" style={{ color: 'var(--nf-color-fg-muted)' }}>
         {t('rightPanel.loadingMembers')}
       </p>
     );
@@ -111,7 +111,7 @@ function MembersTab(): ReactElement {
   return (
     <div className="space-y-1">
       {members?.length === 0 ? (
-        <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>
+        <p className="text-sm" style={{ color: 'var(--nf-color-fg-subtle)' }}>
           {t('rightPanel.noMembers')}
         </p>
       ) : (
@@ -123,8 +123,8 @@ function MembersTab(): ReactElement {
             />
             <span className="flex-1 truncate text-sm">{member.displayName}</span>
             <span
-              className="rounded bg-[var(--color-surface-inset)] px-1.5 py-0.5 text-[10px] font-medium capitalize"
-              style={{ color: 'var(--color-text-secondary)' }}
+              className="rounded bg-[var(--nf-color-bg-sunken)] px-1.5 py-0.5 text-[10px] font-medium capitalize"
+              style={{ color: 'var(--nf-color-fg-muted)' }}
             >
               {member.role}
             </span>
@@ -142,7 +142,7 @@ function ShareTab(): ReactElement {
 
   if (!firstShared) {
     return (
-      <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>
+      <p className="text-sm" style={{ color: 'var(--nf-color-fg-subtle)' }}>
         {t('rightPanel.noSharedCalendarAvailable')}
       </p>
     );
@@ -152,7 +152,7 @@ function ShareTab(): ReactElement {
 
   return (
     <div className="space-y-3">
-      <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+      <p className="text-sm" style={{ color: 'var(--nf-color-fg-muted)' }}>
         {t('rightPanel.shareDescription')}
       </p>
       <div className="flex items-center gap-2">
@@ -160,20 +160,20 @@ function ShareTab(): ReactElement {
           type="text"
           readOnly
           value={shareUrl}
-          className="flex-1 truncate rounded-md border border-[var(--color-border)] bg-[var(--color-surface-inset)] px-2 py-1.5 text-sm"
-          style={{ color: 'var(--color-text-secondary)' }}
+          className="flex-1 truncate rounded-md border border-[var(--nf-color-border)] bg-[var(--nf-color-bg-sunken)] px-2 py-1.5 text-sm"
+          style={{ color: 'var(--nf-color-fg-muted)' }}
         />
         <button
           type="button"
           onClick={() => {
             void navigator.clipboard.writeText(shareUrl);
           }}
-          className="rounded-md bg-[var(--color-accent)] px-3 py-1.5 text-sm font-medium text-[var(--color-text-on-accent)] hover:opacity-90"
+          className="rounded-md bg-[var(--nf-color-accent)] px-3 py-1.5 text-sm font-medium text-[var(--nf-color-fg-on-accent)] hover:opacity-90"
         >
           {t('rightPanel.copy')}
         </button>
       </div>
-      <p className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+      <p className="text-xs" style={{ color: 'var(--nf-color-fg-subtle)' }}>
         {t('rightPanel.shareLinkHint')}
       </p>
     </div>
@@ -183,7 +183,7 @@ function ShareTab(): ReactElement {
 function NotificationsTab(): ReactElement {
   const { t } = useTranslation();
   return (
-    <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>
+    <p className="text-sm" style={{ color: 'var(--nf-color-fg-subtle)' }}>
       {t('rightPanel.noNotifications')}
     </p>
   );
@@ -211,10 +211,10 @@ export default function RightSidebar(): ReactElement | null {
 
   return (
     <aside
-      className="flex w-72 shrink-0 flex-col border-l border-[var(--color-border)]"
-      style={{ backgroundColor: 'var(--color-surface-elevated)' }}
+      className="flex w-72 shrink-0 flex-col border-l border-[var(--nf-color-border)]"
+      style={{ backgroundColor: 'var(--nf-color-bg-elevated)' }}
     >
-      <div className="flex items-center justify-between border-b border-[var(--color-border)] px-3 py-2">
+      <div className="flex items-center justify-between border-b border-[var(--nf-color-border)] px-3 py-2">
         <div className="flex gap-1">
           {tabs.map(({ panel, icon: Icon, label }) => (
             <button
@@ -223,12 +223,11 @@ export default function RightSidebar(): ReactElement | null {
               onClick={() => setRightPanel(panel)}
               className={`rounded-md p-1.5 ${
                 rightPanel === panel
-                  ? 'bg-[var(--color-surface-inset)]'
-                  : 'hover:bg-[var(--color-hover)]'
+                  ? 'bg-[var(--nf-color-bg-sunken)]'
+                  : 'hover:bg-[var(--nf-color-surface-hover)]'
               }`}
               style={{
-                color:
-                  rightPanel === panel ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+                color: rightPanel === panel ? 'var(--nf-color-fg)' : 'var(--nf-color-fg-subtle)',
               }}
               title={label}
             >
@@ -239,8 +238,8 @@ export default function RightSidebar(): ReactElement | null {
         <button
           type="button"
           onClick={() => setRightPanel(null)}
-          className="rounded-md p-1 hover:bg-[var(--color-hover)]"
-          style={{ color: 'var(--color-text-tertiary)' }}
+          className="rounded-md p-1 hover:bg-[var(--nf-color-surface-hover)]"
+          style={{ color: 'var(--nf-color-fg-subtle)' }}
           aria-label={t('rightPanel.close')}
         >
           <X className="h-4 w-4" />
@@ -248,7 +247,7 @@ export default function RightSidebar(): ReactElement | null {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
-        <h3 className="mb-3 text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+        <h3 className="mb-3 text-sm font-semibold" style={{ color: 'var(--nf-color-fg)' }}>
           {panelLabels[rightPanel]}
         </h3>
         {rightPanel === 'memo' ? <MemoTab /> : null}

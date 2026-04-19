@@ -41,7 +41,7 @@ function AuthenticatedLayout(): ReactElement | null {
             to="/admin/users"
             style={{
               fontSize: 'var(--nf-text-xs, 0.75rem)',
-              color: 'var(--nf-color-fg-muted, var(--color-muted))',
+              color: 'var(--nf-color-fg-muted)',
               textDecoration: 'none',
             }}
           >

@@ -12,7 +12,7 @@ import { ChevronRight, FileText, Pencil, Sparkles, Trash2 } from 'lucide-react';
 import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import Markdown from '../../components/markdown/markdown';
+import Markdown from '@nodate-flow/ui/primitives/markdown';
 import { confirmAction } from '../../lib/confirm-action';
 import { type PageItem, useChildPagesQuery, useDeletePage, usePageQuery } from './api';
 import styles from './pages.module.css';

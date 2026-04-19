@@ -94,7 +94,7 @@ export default function AutoActionSettingsPage({
     >
       <header style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
         <h1 style={{ margin: 0, fontSize: '1.5rem' }}>{t('workspace.auto_actions.title')}</h1>
-        <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
           {t('workspace.auto_actions.description')}
         </p>
       </header>
@@ -145,7 +145,7 @@ export default function AutoActionSettingsPage({
             <span
               style={{
                 fontSize: '0.875rem',
-                color: 'var(--color-muted)',
+                color: 'var(--nf-color-fg-muted)',
               }}
             >
               {intervalMinutes === 0
@@ -191,7 +191,7 @@ export default function AutoActionSettingsPage({
             <span
               style={{
                 fontSize: '0.8125rem',
-                color: 'var(--color-muted)',
+                color: 'var(--nf-color-fg-muted)',
                 fontWeight: 500,
               }}
             >
@@ -207,7 +207,7 @@ export default function AutoActionSettingsPage({
         </Button>
       </div>
 
-      <hr style={{ border: 'none', borderBlockStart: '1px solid var(--color-border)' }} />
+      <hr style={{ border: 'none', borderBlockStart: '1px solid var(--nf-color-border)' }} />
 
       <AutoActionRulesSection workspaceId={workspaceId} masterEnabled={enabled} />
     </form>
@@ -348,7 +348,7 @@ function AutoActionRulesSection({
     padding: '0.5rem 0.75rem',
     fontSize: '0.8125rem',
     fontWeight: 600,
-    color: 'var(--color-muted)',
+    color: 'var(--nf-color-fg-muted)',
     whiteSpace: 'nowrap',
   };
 
@@ -368,7 +368,7 @@ function AutoActionRulesSection({
         <h2 style={{ margin: 0, fontSize: '1.125rem' }}>
           {t('workspace.auto_actions.rules.title')}
         </h2>
-        <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
           {t('workspace.auto_actions.rules.description')}
         </p>
       </header>
@@ -384,7 +384,7 @@ function AutoActionRulesSection({
           <thead>
             <tr
               style={{
-                borderBlockEnd: '1px solid var(--color-border)',
+                borderBlockEnd: '1px solid var(--nf-color-border)',
               }}
             >
               <th style={thStyle}>{t('workspace.auto_actions.rules.column.rule')}</th>
@@ -404,7 +404,7 @@ function AutoActionRulesSection({
                 <tr
                   key={kind}
                   style={{
-                    borderBlockEnd: '1px solid var(--color-border)',
+                    borderBlockEnd: '1px solid var(--nf-color-border)',
                   }}
                 >
                   {/* Rule name + description */}
@@ -416,7 +416,7 @@ function AutoActionRulesSection({
                       <span
                         style={{
                           fontSize: '0.75rem',
-                          color: 'var(--color-muted)',
+                          color: 'var(--nf-color-fg-muted)',
                         }}
                       >
                         {t(`workspace.auto_actions.rules.${kind}.description`)}
@@ -469,7 +469,7 @@ function AutoActionRulesSection({
                       <span
                         style={{
                           fontSize: '0.8125rem',
-                          color: 'var(--color-muted)',
+                          color: 'var(--nf-color-fg-muted)',
                           fontStyle: 'italic',
                         }}
                       >

@@ -56,17 +56,17 @@ export default function MembersDialog({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-overlay)]">
-      <div className="glass-surface-heavy w-full max-w-md rounded-[var(--radius-lg)] p-6 ring-1 ring-[var(--color-border)]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--nf-color-overlay)]">
+      <div className="glass-surface-heavy w-full max-w-md rounded-[var(--nf-radius-lg)] p-6 ring-1 ring-[var(--nf-color-border)]">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+          <h2 className="text-lg font-semibold" style={{ color: 'var(--nf-color-fg)' }}>
             {t('members.title')}
           </h2>
           <button
             type="button"
             onClick={onClose}
             className="transition-colors"
-            style={{ color: 'var(--color-text-tertiary)' }}
+            style={{ color: 'var(--nf-color-fg-subtle)' }}
           >
             <X className="h-5 w-5" />
           </button>
@@ -78,19 +78,19 @@ export default function MembersDialog({
             placeholder={t('members.emailPlaceholder')}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="flex-1 rounded-[var(--radius-sm)] border border-[var(--color-border)] px-3 py-2 text-sm outline-none focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]"
+            className="flex-1 rounded-[var(--nf-radius-sm)] border border-[var(--nf-color-border)] px-3 py-2 text-sm outline-none focus:border-[var(--nf-color-accent)] focus:ring-1 focus:ring-[var(--nf-color-accent)]"
             style={{
-              backgroundColor: 'var(--color-surface-inset)',
-              color: 'var(--color-text-primary)',
+              backgroundColor: 'var(--nf-color-bg-sunken)',
+              color: 'var(--nf-color-fg)',
             }}
           />
           <select
             value={role}
             onChange={(e) => setRole(e.target.value as SubscriptionRole)}
-            className="rounded-[var(--radius-sm)] border border-[var(--color-border)] px-2 py-2 text-sm"
+            className="rounded-[var(--nf-radius-sm)] border border-[var(--nf-color-border)] px-2 py-2 text-sm"
             style={{
-              backgroundColor: 'var(--color-surface-inset)',
-              color: 'var(--color-text-primary)',
+              backgroundColor: 'var(--nf-color-bg-sunken)',
+              color: 'var(--nf-color-fg)',
             }}
           >
             {roles
@@ -104,28 +104,28 @@ export default function MembersDialog({
           <button
             type="submit"
             disabled={addMutation.isPending}
-            className="rounded-[var(--radius-sm)] bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-[var(--color-text-on-accent)] hover:opacity-90 disabled:opacity-50"
+            className="rounded-[var(--nf-radius-sm)] bg-[var(--nf-color-accent)] px-3 py-2 text-sm font-medium text-[var(--nf-color-fg-on-accent)] hover:opacity-90 disabled:opacity-50"
           >
             {t('common.add')}
           </button>
         </form>
 
         {addMutation.isError ? (
-          <p className="mb-2 text-xs" style={{ color: 'var(--color-danger)' }}>
+          <p className="mb-2 text-xs" style={{ color: 'var(--nf-color-danger)' }}>
             {addMutation.error.message}
           </p>
         ) : null}
 
         <div className="max-h-64 space-y-2 overflow-y-auto">
           {isLoading ? (
-            <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+            <p className="text-sm" style={{ color: 'var(--nf-color-fg-muted)' }}>
               {t('common.loading')}
             </p>
           ) : (
             members?.map((member) => (
               <div
                 key={member.userId}
-                className="flex items-center gap-3 rounded-[var(--radius-sm)] px-2 py-1.5 hover:bg-[var(--color-hover)]"
+                className="flex items-center gap-3 rounded-[var(--nf-radius-sm)] px-2 py-1.5 hover:bg-[var(--nf-color-surface-hover)]"
               >
                 <span
                   className="h-3 w-3 shrink-0 rounded-full"
@@ -134,7 +134,7 @@ export default function MembersDialog({
                 <div className="flex-1 min-w-0">
                   <p
                     className="truncate text-sm font-medium"
-                    style={{ color: 'var(--color-text-primary)' }}
+                    style={{ color: 'var(--nf-color-fg)' }}
                   >
                     {member.displayName}
                   </p>
@@ -147,10 +147,10 @@ export default function MembersDialog({
                       role: e.target.value as SubscriptionRole,
                     })
                   }
-                  className="rounded-[var(--radius-sm)] border border-[var(--color-border)] px-1.5 py-0.5 text-xs"
+                  className="rounded-[var(--nf-radius-sm)] border border-[var(--nf-color-border)] px-1.5 py-0.5 text-xs"
                   style={{
-                    backgroundColor: 'var(--color-surface-inset)',
-                    color: 'var(--color-text-secondary)',
+                    backgroundColor: 'var(--nf-color-bg-sunken)',
+                    color: 'var(--nf-color-fg-muted)',
                   }}
                 >
                   {roles.map((r) => (
@@ -162,8 +162,8 @@ export default function MembersDialog({
                 <button
                   type="button"
                   onClick={() => removeMutation.mutate(member.userId)}
-                  className="hover:text-[var(--color-danger)] transition-colors"
-                  style={{ color: 'var(--color-text-tertiary)' }}
+                  className="hover:text-[var(--nf-color-danger)] transition-colors"
+                  style={{ color: 'var(--nf-color-fg-subtle)' }}
                 >
                   <X className="h-4 w-4" />
                 </button>

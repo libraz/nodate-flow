@@ -60,8 +60,8 @@ function StatCard({
         gap: '0.75rem',
         padding: '1rem 1.25rem',
         borderRadius: '0.75rem',
-        background: 'var(--color-surface, rgba(127,127,127,0.05))',
-        border: '1px solid var(--nf-color-border, var(--color-hairline))',
+        background: 'var(--nf-color-surface))',
+        border: '1px solid var(--nf-color-border, var(--nf-color-hairline))',
         flex: '1 1 0',
         minWidth: '10rem',
       }}
@@ -74,7 +74,7 @@ function StatCard({
           width: '2.5rem',
           height: '2.5rem',
           borderRadius: '0.5rem',
-          background: accent ?? 'var(--nf-color-accent, var(--color-accent, #9b59b6))',
+          background: accent ?? 'var(--nf-color-accent, var(--nf-color-accent))',
           color: 'white',
           flexShrink: 0,
         }}
@@ -83,7 +83,9 @@ function StatCard({
       </div>
       <div>
         <div style={{ fontSize: '1.5rem', fontWeight: 700, lineHeight: 1.1 }}>{value}</div>
-        <div style={{ fontSize: '0.75rem', color: 'var(--color-muted)', marginTop: '0.125rem' }}>
+        <div
+          style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)', marginTop: '0.125rem' }}
+        >
           {label}
         </div>
       </div>
@@ -170,7 +172,7 @@ function TaskSummary(): ReactElement {
               fontSize: '0.85rem',
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
-              color: 'var(--color-muted)',
+              color: 'var(--nf-color-fg-muted)',
             }}
           >
             {t('home.recent_tasks')}
@@ -194,7 +196,7 @@ function TaskSummary(): ReactElement {
                   gap: '0.75rem',
                   padding: '0.6rem 0.75rem',
                   borderRadius: '0.5rem',
-                  background: 'var(--color-surface, rgba(127,127,127,0.05))',
+                  background: 'var(--nf-color-surface))',
                 }}
               >
                 <Link
@@ -215,7 +217,7 @@ function TaskSummary(): ReactElement {
                 <span
                   style={{
                     fontSize: '0.75rem',
-                    color: 'var(--color-muted)',
+                    color: 'var(--nf-color-fg-muted)',
                     whiteSpace: 'nowrap',
                   }}
                 >
@@ -229,7 +231,7 @@ function TaskSummary(): ReactElement {
               to="/today"
               style={{
                 fontSize: '0.8125rem',
-                color: 'var(--nf-color-accent, var(--color-accent))',
+                color: 'var(--nf-color-accent, var(--nf-color-accent))',
                 textDecoration: 'none',
               }}
             >
@@ -250,7 +252,7 @@ function WorkspaceLinks(): ReactElement {
 
   if (workspaces.length === 0) {
     return (
-      <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
         {t('workspaces.empty')}
       </p>
     );
@@ -269,8 +271,8 @@ function WorkspaceLinks(): ReactElement {
             gap: '0.5rem',
             padding: '0.5rem 1rem',
             borderRadius: '0.5rem',
-            background: 'var(--color-surface, rgba(127,127,127,0.05))',
-            border: '1px solid var(--nf-color-border, var(--color-hairline))',
+            background: 'var(--nf-color-surface))',
+            border: '1px solid var(--nf-color-border, var(--nf-color-hairline))',
             color: 'inherit',
             textDecoration: 'none',
             fontSize: '0.875rem',
@@ -292,7 +294,7 @@ function LanguageSwitcher(): ReactElement {
   return (
     <fieldset
       style={{
-        border: '1px solid var(--color-hairline)',
+        border: '1px solid var(--nf-color-hairline)',
         borderRadius: '999px',
         padding: '0.125rem',
         display: 'inline-flex',
@@ -304,7 +306,7 @@ function LanguageSwitcher(): ReactElement {
           fontFamily: 'var(--font-mono)',
           fontSize: '0.625rem',
           letterSpacing: '0.08em',
-          color: 'var(--color-muted)',
+          color: 'var(--nf-color-fg-muted)',
           paddingInline: '0.5rem',
         }}
       >
@@ -321,8 +323,8 @@ function LanguageSwitcher(): ReactElement {
               setLanguage(lng);
             }}
             style={{
-              background: active ? 'var(--color-fg)' : 'transparent',
-              color: active ? 'var(--color-bg)' : 'var(--color-fg)',
+              background: active ? 'var(--nf-color-fg)' : 'transparent',
+              color: active ? 'var(--nf-color-bg)' : 'var(--nf-color-fg)',
               border: 'none',
               borderRadius: '999px',
               paddingBlock: '0.375rem',
@@ -346,7 +348,7 @@ function ThemeSwitcher(): ReactElement {
   return (
     <fieldset
       style={{
-        border: '1px solid var(--color-hairline)',
+        border: '1px solid var(--nf-color-hairline)',
         borderRadius: '999px',
         padding: '0.125rem',
         display: 'inline-flex',
@@ -359,7 +361,7 @@ function ThemeSwitcher(): ReactElement {
           fontFamily: 'var(--font-mono)',
           fontSize: '0.625rem',
           letterSpacing: '0.08em',
-          color: 'var(--color-muted)',
+          color: 'var(--nf-color-fg-muted)',
           paddingInline: '0.5rem',
         }}
       >
@@ -375,8 +377,8 @@ function ThemeSwitcher(): ReactElement {
               setPreference(pref);
             }}
             style={{
-              background: active ? 'var(--color-fg)' : 'transparent',
-              color: active ? 'var(--color-bg)' : 'var(--color-fg)',
+              background: active ? 'var(--nf-color-fg)' : 'transparent',
+              color: active ? 'var(--nf-color-bg)' : 'var(--nf-color-fg)',
               border: 'none',
               borderRadius: '999px',
               paddingBlock: '0.375rem',
@@ -394,19 +396,8 @@ function ThemeSwitcher(): ReactElement {
   );
 }
 
-function themeLabelKey(
-  name: (typeof concreteThemes)[number],
-): 'theme.aurora-light' | 'theme.aurora-dark' | 'theme.dotline-light' | 'theme.dotline-dark' {
-  switch (name) {
-    case 'aurora-light':
-      return 'theme.aurora-light';
-    case 'aurora-dark':
-      return 'theme.aurora-dark';
-    case 'dotline-light':
-      return 'theme.dotline-light';
-    case 'dotline-dark':
-      return 'theme.dotline-dark';
-  }
+function themeLabelKey(name: (typeof concreteThemes)[number]): string {
+  return `theme.${name}` as const;
 }
 
 /* ── Dashboard widgets (workspace-scoped) ─────────────────── */
@@ -468,7 +459,7 @@ function HomePage(): ReactElement {
             fontFamily: 'var(--font-mono)',
             fontSize: '0.6875rem',
             letterSpacing: '0.18em',
-            color: 'var(--color-muted)',
+            color: 'var(--nf-color-fg-muted)',
             margin: 0,
           }}
         >
@@ -487,8 +478,8 @@ function HomePage(): ReactElement {
             gap: '0.5rem',
             padding: '0.5rem 1rem',
             borderRadius: '0.5rem',
-            background: 'var(--nf-color-accent, var(--color-accent, #9b59b6))',
-            color: 'var(--nf-color-accent-fg, white)',
+            background: 'var(--nf-color-accent, var(--nf-color-accent))',
+            color: 'var(--nf-color-accent, white)',
             border: 'none',
             cursor: 'pointer',
             fontSize: '0.875rem',
@@ -511,8 +502,8 @@ function HomePage(): ReactElement {
             padding: '0.5rem 1rem',
             borderRadius: '0.5rem',
             background: 'transparent',
-            color: 'var(--color-fg)',
-            border: '1px solid var(--nf-color-border, var(--color-hairline))',
+            color: 'var(--nf-color-fg)',
+            border: '1px solid var(--nf-color-border, var(--nf-color-hairline))',
             cursor: 'pointer',
             fontSize: '0.875rem',
           }}
@@ -529,8 +520,8 @@ function HomePage(): ReactElement {
             padding: '0.5rem 1rem',
             borderRadius: '0.5rem',
             background: 'transparent',
-            color: 'var(--color-fg)',
-            border: '1px solid var(--nf-color-border, var(--color-hairline))',
+            color: 'var(--nf-color-fg)',
+            border: '1px solid var(--nf-color-border, var(--nf-color-hairline))',
             textDecoration: 'none',
             fontSize: '0.875rem',
           }}
@@ -543,7 +534,7 @@ function HomePage(): ReactElement {
       {/* Task summary */}
       <Suspense
         fallback={
-          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-muted)' }}>
+          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--nf-color-fg-muted)' }}>
             {t('common.loading')}
           </div>
         }
@@ -559,7 +550,7 @@ function HomePage(): ReactElement {
             fontSize: '0.85rem',
             textTransform: 'uppercase',
             letterSpacing: '0.05em',
-            color: 'var(--color-muted)',
+            color: 'var(--nf-color-fg-muted)',
           }}
         >
           {t('nav.workspaces')}

@@ -26,8 +26,8 @@ export interface LensDto {
   groupBy: string | null;
   isDefault: boolean;
   sortWeight: number;
-  updatedAt?: string;
-  createdAt: string;
+  updatedAt?: number;
+  createdAt: number;
 }
 
 import { ApiError, toApiError } from '../../lib/api-error';

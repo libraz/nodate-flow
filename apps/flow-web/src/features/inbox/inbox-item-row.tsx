@@ -90,8 +90,8 @@ export default function InboxItemRow({
             inlineSize: '2rem',
             blockSize: '2rem',
             borderRadius: '0.5rem',
-            background: 'var(--color-surface-2)',
-            color: 'var(--color-fg)',
+            background: 'var(--nf-color-surface)',
+            color: 'var(--nf-color-fg)',
             flexShrink: 0,
           }}
         >
@@ -112,7 +112,7 @@ export default function InboxItemRow({
               style={{
                 fontFamily: 'var(--font-mono)',
                 fontSize: '0.8125rem',
-                color: 'var(--color-muted)',
+                color: 'var(--nf-color-fg-muted)',
               }}
             >
               {item.kind}
@@ -123,7 +123,7 @@ export default function InboxItemRow({
               to="/tasks/$taskId"
               params={{ taskId: item.taskId }}
               style={{
-                color: 'var(--color-fg)',
+                color: 'var(--nf-color-fg)',
                 textDecoration: 'none',
                 fontWeight: 500,
                 overflow: 'hidden',
@@ -136,7 +136,7 @@ export default function InboxItemRow({
           ) : null}
           <span
             style={{
-              color: 'var(--color-muted)',
+              color: 'var(--nf-color-fg-muted)',
               fontSize: '0.8125rem',
               fontVariantNumeric: 'tabular-nums',
             }}

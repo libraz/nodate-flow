@@ -75,7 +75,7 @@ export default function PasswordPanel(): ReactElement {
       }}
       style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxInlineSize: '28rem' }}
     >
-      <p style={{ margin: 0, color: 'var(--color-fg-muted)' }}>
+      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
         {t('security.password.description')}
       </p>
       <FormField label={t('security.password.current')} required>
@@ -123,7 +123,7 @@ export default function PasswordPanel(): ReactElement {
         )}
       </FormField>
       {fieldError != null && (
-        <p style={{ margin: 0, color: 'var(--color-danger-fg)' }} role="alert">
+        <p style={{ margin: 0, color: 'var(--nf-color-danger)' }} role="alert">
           {fieldError}
         </p>
       )}

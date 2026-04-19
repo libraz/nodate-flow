@@ -8,7 +8,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { formatDate } from '../../lib/format';
+import { formatEpoch } from '../../lib/format';
 import { type ProjectMember, useProjectMembersQuery } from './api';
 import ProjectAddMemberDialog from './project-add-member-dialog';
 
@@ -39,7 +39,7 @@ export default function ProjectMembersTable({ projectId }: ProjectMembersTablePr
       id: 'added_at',
       header: () => t('projects.members.added_at'),
       cell: ({ row }) => (
-        <span>{formatDate(row.original.addedAt ?? row.original.createdAt, locale)}</span>
+        <span>{formatEpoch(row.original.addedAt ?? row.original.createdAt, locale) ?? '—'}</span>
       ),
     },
   ];

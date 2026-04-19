@@ -1,0 +1,114 @@
+.trigger {
+  all: unset;
+  cursor: pointer;
+  padding: var(--nf-space-1) var(--nf-space-3);
+  border-radius: var(--nf-radius-md);
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-accent);
+  background: var(--nf-color-accent-subtle);
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.trigger:hover {
+  background: var(--nf-color-accent-hover);
+  color: var(--nf-color-fg-on-accent);
+}
+
+.trigger:focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: var(--nf-focus-ring-offset);
+}
+
+.panel {
+  margin: calc(-1 * var(--nf-space-4));
+  padding: var(--nf-space-3);
+  inline-size: 17.5rem;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-block-end: var(--nf-space-2);
+}
+
+.navBtn {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 2rem;
+  block-size: 2rem;
+  border-radius: var(--nf-radius-sm);
+  color: var(--nf-color-fg);
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.navBtn:hover {
+  background: var(--nf-color-surface-hover);
+}
+
+.monthYear {
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+}
+
+.weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-block-end: var(--nf-space-1);
+}
+
+.weekday {
+  padding-block: var(--nf-space-1);
+  text-align: center;
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg-subtle);
+}
+
+.dayGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.day {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  block-size: 2.25rem;
+  border-radius: var(--nf-radius-pill);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg);
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.day:hover:not(:disabled) {
+  background: var(--nf-color-surface-hover);
+}
+
+.day:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.daySelected {
+  background: var(--nf-color-accent);
+  color: var(--nf-color-fg-on-accent);
+  font-weight: var(--nf-weight-semibold);
+}
+
+.daySelected:hover {
+  background: var(--nf-color-accent-hover);
+}
+
+.dayToday {
+  outline: 2px solid var(--nf-color-accent);
+  outline-offset: -2px;
+  font-weight: var(--nf-weight-bold);
+}

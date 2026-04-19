@@ -12,7 +12,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { formatDate } from '../../lib/format';
+import { formatEpoch } from '../../lib/format';
 import { type Project, useProjectsQuery } from './api';
 import ProjectCreateDialog from './project-create-dialog';
 
@@ -37,7 +37,7 @@ export default function ProjectList({ workspaceId }: ProjectListProps): ReactEle
           to="/projects/$projectId"
           params={{ projectId: row.original.id }}
           style={{
-            color: 'var(--color-fg)',
+            color: 'var(--nf-color-fg)',
             textDecoration: 'none',
             fontWeight: 500,
           }}
@@ -66,7 +66,7 @@ export default function ProjectList({ workspaceId }: ProjectListProps): ReactEle
       id: 'created',
       accessorKey: 'createdAt',
       header: () => t('projects.columns.created'),
-      cell: ({ row }) => <span>{formatDate(row.original.createdAt, locale)}</span>,
+      cell: ({ row }) => <span>{formatEpoch(row.original.createdAt, locale) ?? '—'}</span>,
     },
   ];
 

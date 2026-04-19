@@ -32,14 +32,14 @@ const tableStyle: React.CSSProperties = {
 const thStyle: React.CSSProperties = {
   textAlign: 'start',
   padding: 'var(--nf-space-2, 0.5rem) var(--nf-space-3, 0.75rem)',
-  borderBlockEnd: '2px solid var(--nf-color-border, var(--color-hairline))',
+  borderBlockEnd: '2px solid var(--nf-color-border)',
   fontWeight: 600,
-  color: 'var(--nf-color-fg-muted, var(--color-muted))',
+  color: 'var(--nf-color-fg-muted)',
 };
 
 const tdStyle: React.CSSProperties = {
   padding: 'var(--nf-space-2, 0.5rem) var(--nf-space-3, 0.75rem)',
-  borderBlockEnd: '1px solid var(--nf-color-border, var(--color-hairline))',
+  borderBlockEnd: '1px solid var(--nf-color-border)',
 };
 
 function formatTimestamp(ts: number): string {
@@ -121,7 +121,7 @@ function AdminsPage(): ReactElement {
           role="alert"
           style={{
             margin: 0,
-            color: 'var(--nf-color-fg-danger, var(--color-danger))',
+            color: 'var(--nf-color-danger)',
             fontSize: 'var(--nf-text-sm, 0.875rem)',
           }}
         >
@@ -130,13 +130,9 @@ function AdminsPage(): ReactElement {
       ) : null}
 
       {loading ? (
-        <p style={{ color: 'var(--nf-color-fg-muted, var(--color-muted))' }}>
-          {t('common.loading')}
-        </p>
+        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('common.loading')}</p>
       ) : admins.length === 0 ? (
-        <p style={{ color: 'var(--nf-color-fg-muted, var(--color-muted))' }}>
-          {t('admins.noAdmins')}
-        </p>
+        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('admins.noAdmins')}</p>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
@@ -175,7 +171,7 @@ function AdminsPage(): ReactElement {
       <div
         style={{
           padding: 'var(--nf-space-4, 1rem)',
-          border: '1px solid var(--nf-color-border, var(--color-hairline))',
+          border: '1px solid var(--nf-color-border)',
           borderRadius: 'var(--nf-radius-md, 0.375rem)',
         }}
       >
@@ -198,7 +194,7 @@ function AdminsPage(): ReactElement {
               style={{
                 display: 'block',
                 fontSize: 'var(--nf-text-xs, 0.75rem)',
-                color: 'var(--nf-color-fg-muted, var(--color-muted))',
+                color: 'var(--nf-color-fg-muted)',
                 marginBlockEnd: 'var(--nf-space-1, 0.25rem)',
               }}
             >
@@ -221,7 +217,7 @@ function AdminsPage(): ReactElement {
             role="alert"
             style={{
               margin: 'var(--nf-space-2, 0.5rem) 0 0 0',
-              color: 'var(--nf-color-fg-danger, var(--color-danger))',
+              color: 'var(--nf-color-danger)',
               fontSize: 'var(--nf-text-sm, 0.875rem)',
             }}
           >

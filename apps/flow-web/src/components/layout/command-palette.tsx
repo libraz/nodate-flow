@@ -215,8 +215,8 @@ function CommandModeBody({ prompt, wsId, onSelect }: CommandModeBodyProps): Reac
                     : 'var(--nf-color-warning-subtle, oklch(0.85 0.15 85))',
                 color:
                   result.confidence >= 0.8
-                    ? 'var(--nf-color-success-fg, oklch(0.35 0.15 145))'
-                    : 'var(--nf-color-warning-fg, oklch(0.35 0.15 85))',
+                    ? 'var(--nf-color-success, oklch(0.35 0.15 145))'
+                    : 'var(--nf-color-warning, oklch(0.35 0.15 85))',
               }}
             >
               {t('dock.command_palette.confidence', {
@@ -596,7 +596,7 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
           paddingBlockStart: '0.5rem',
           borderBlockStart: '1px solid var(--nf-color-border)',
           fontSize: '0.6875rem',
-          color: 'var(--nf-color-fg-subtle, var(--color-muted))',
+          color: 'var(--nf-color-fg-subtle, var(--nf-color-fg-muted))',
         }}
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}>
@@ -637,7 +637,7 @@ const kbdStyle = {
   borderRadius: '0.25rem',
   border: '1px solid var(--nf-color-border)',
   background: 'var(--nf-color-surface, transparent)',
-  color: 'var(--nf-color-fg, var(--color-fg))',
+  color: 'var(--nf-color-fg, var(--nf-color-fg))',
   lineHeight: 1.4,
 } as const;
 

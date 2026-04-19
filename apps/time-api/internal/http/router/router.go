@@ -68,7 +68,6 @@ func BuildResult(deps Deps) Result {
 	// Build workspace handler dependencies.
 	wsDeps := workspaces.Deps{
 		Queries: queries,
-		DB:      deps.DB,
 	}
 
 	// Health endpoint (public).
@@ -123,13 +122,6 @@ func BuildResult(deps Deps) Result {
 			Path:        "/workspaces",
 			Summary:     "List workspaces for the authenticated user",
 		}, workspaces.List(wsDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "workspaces-create",
-			Method:      http.MethodPost,
-			Path:        "/workspaces",
-			Summary:     "Create a workspace",
-		}, workspaces.Create(wsDeps))
-
 		// Workspace-scoped calendar routes (no calId).
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "calendars-list",

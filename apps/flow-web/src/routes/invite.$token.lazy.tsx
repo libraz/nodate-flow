@@ -44,7 +44,7 @@ function InviteAcceptPage(): ReactElement {
           >
             {t('workspaces.invites.join_title', { workspace: info.workspaceName })}
           </h1>
-          <p style={{ margin: 0, color: 'var(--nf-color-fg-muted, var(--color-muted))' }}>
+          <p style={{ margin: 0, color: 'var(--nf-color-fg-muted, var(--nf-color-fg-muted))' }}>
             {t('workspaces.invites.login_required')}
           </p>
           <Link
@@ -53,8 +53,8 @@ function InviteAcceptPage(): ReactElement {
               display: 'inline-block',
               padding: '0.625rem 1.25rem',
               borderRadius: '0.5rem',
-              background: 'var(--color-accent, #9b59b6)',
-              color: 'var(--color-on-accent, #fff)',
+              background: 'var(--nf-color-accent)',
+              color: 'var(--nf-color-fg-on-accent)',
               textDecoration: 'none',
               textAlign: 'center',
               fontWeight: 500,
@@ -107,7 +107,7 @@ function InviteAcceptPage(): ReactElement {
         >
           {t('workspaces.invites.join_title', { workspace: info.workspaceName })}
         </h1>
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted, var(--color-muted))' }}>
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted, var(--nf-color-fg-muted))' }}>
           {t('workspaces.invites.join_description', {
             workspace: info.workspaceName,
             role: roleLabel(info.role),
@@ -118,7 +118,7 @@ function InviteAcceptPage(): ReactElement {
             style={{
               margin: 0,
               fontSize: 'var(--nf-text-sm, 0.875rem)',
-              color: 'var(--nf-color-fg-muted, var(--color-muted))',
+              color: 'var(--nf-color-fg-muted, var(--nf-color-fg-muted))',
             }}
           >
             {t('workspaces.invites.expires_at', {
@@ -134,7 +134,7 @@ function InviteAcceptPage(): ReactElement {
             role="alert"
             style={{
               margin: 0,
-              color: 'var(--nf-color-fg-danger, var(--color-danger))',
+              color: 'var(--nf-color-danger, var(--nf-color-danger))',
               fontSize: 'var(--nf-text-sm, 0.875rem)',
             }}
           >
@@ -149,9 +149,9 @@ function InviteAcceptPage(): ReactElement {
               alignItems: 'center',
               padding: '0.625rem 1.25rem',
               borderRadius: '0.5rem',
-              border: '1px solid var(--color-border)',
+              border: '1px solid var(--nf-color-border)',
               background: 'transparent',
-              color: 'var(--color-fg)',
+              color: 'var(--nf-color-fg)',
               textDecoration: 'none',
             }}
           >

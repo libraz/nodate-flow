@@ -12,7 +12,7 @@ import {
   useSuspenseQuery,
 } from '@tanstack/react-query';
 
-import { sdk } from '../../lib/sdk';
+import { authSdk as sdk } from '../../lib/sdk';
 
 export type Me = components['schemas']['MeBody'];
 export type PatchMeInput = components['schemas']['PatchMeInputBody'];

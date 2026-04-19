@@ -193,7 +193,7 @@ export default function EventModal(): ReactElement | null {
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-50 bg-[var(--color-overlay)]"
+        className="fixed inset-0 z-50 bg-[var(--nf-color-overlay)]"
         onClick={closeEventModal}
         onKeyDown={(e) => {
           if (e.key === 'Escape') closeEventModal();
@@ -205,7 +205,7 @@ export default function EventModal(): ReactElement | null {
 
       {/* Mobile: bottom sheet */}
       <div className="glass-surface-heavy fixed inset-x-0 bottom-0 z-50 flex max-h-[92vh] flex-col overflow-hidden rounded-t-3xl sm:hidden">
-        <div className="mx-auto mt-2 mb-1 h-1 w-10 rounded-full bg-[var(--color-text-tertiary)] opacity-30" />
+        <div className="mx-auto mt-2 mb-1 h-1 w-10 rounded-full bg-[var(--nf-color-fg-subtle)] opacity-30" />
         <ModalContent
           t={t}
           title={title}
@@ -243,7 +243,7 @@ export default function EventModal(): ReactElement | null {
 
       {/* Desktop: centered modal */}
       <div className="fixed inset-0 z-50 hidden items-center justify-center sm:flex">
-        <div className="glass-surface-heavy flex max-h-[90vh] w-full max-w-[480px] flex-col overflow-hidden rounded-2xl ring-1 ring-[var(--color-border)]">
+        <div className="glass-surface-heavy flex max-h-[90vh] w-full max-w-[480px] flex-col overflow-hidden rounded-2xl ring-1 ring-[var(--nf-color-border)]">
           <ModalContent
             t={t}
             title={title}
@@ -361,11 +361,11 @@ function ModalContent({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder={t('event.title')}
-          className="w-full resize-none border-b-2 border-transparent bg-transparent text-[24px] font-light outline-none transition-colors placeholder:text-[var(--color-text-tertiary)] focus:border-[var(--color-accent)]"
-          style={{ color: 'var(--color-text-primary)' }}
+          className="w-full resize-none border-b-2 border-transparent bg-transparent text-[24px] font-light outline-none transition-colors placeholder:text-[var(--nf-color-fg-subtle)] focus:border-[var(--nf-color-accent)]"
+          style={{ color: 'var(--nf-color-fg)' }}
         />
         {errors.title ? (
-          <p className="mt-1 text-[12px]" style={{ color: 'var(--color-danger)' }}>
+          <p className="mt-1 text-[12px]" style={{ color: 'var(--nf-color-danger)' }}>
             {errors.title}
           </p>
         ) : null}
@@ -374,10 +374,10 @@ function ModalContent({
       {/* Scrollable body */}
       <div className="flex-1 space-y-4 overflow-y-auto px-6 py-4">
         {/* Date/time card */}
-        <div className="rounded-xl bg-[var(--color-surface-secondary)] p-4">
+        <div className="rounded-xl bg-[var(--nf-color-bg-sunken)] p-4">
           {/* All-day toggle */}
           <div className="flex items-center justify-between">
-            <span className="text-[14px]" style={{ color: 'var(--color-text-secondary)' }}>
+            <span className="text-[14px]" style={{ color: 'var(--nf-color-fg-muted)' }}>
               {t('event.allDay')}
             </span>
             <button
@@ -385,25 +385,25 @@ function ModalContent({
               onClick={() => setAllDay(!allDay)}
               className="relative h-[28px] w-[48px] shrink-0 rounded-full transition-colors"
               style={{
-                backgroundColor: allDay ? 'var(--color-accent)' : 'var(--color-surface-inset)',
-                border: allDay ? 'none' : '1px solid var(--color-border)',
+                backgroundColor: allDay ? 'var(--nf-color-accent)' : 'var(--nf-color-bg-sunken)',
+                border: allDay ? 'none' : '1px solid var(--nf-color-border)',
               }}
             >
               <span
                 className="absolute left-0 top-[2px] h-[24px] w-[24px] rounded-full shadow-sm transition-transform"
                 style={{
                   transform: allDay ? 'translateX(22px)' : 'translateX(2px)',
-                  backgroundColor: 'var(--color-surface-elevated, #fff)',
+                  backgroundColor: 'var(--nf-color-bg-elevated, #fff)',
                 }}
               />
             </button>
           </div>
 
-          <div className="my-1 border-t border-[var(--color-border)] opacity-50" />
+          <div className="my-1 border-t border-[var(--nf-color-border)] opacity-50" />
 
           {/* Start */}
           <div className="flex items-center justify-between py-1">
-            <span className="text-[14px]" style={{ color: 'var(--color-text-secondary)' }}>
+            <span className="text-[14px]" style={{ color: 'var(--nf-color-fg-muted)' }}>
               {t('event.start')}
             </span>
             <div className="flex items-center gap-2">
@@ -412,11 +412,11 @@ function ModalContent({
             </div>
           </div>
 
-          <div className="my-1 border-t border-[var(--color-border)] opacity-50" />
+          <div className="my-1 border-t border-[var(--nf-color-border)] opacity-50" />
 
           {/* End */}
           <div className="flex items-center justify-between py-1">
-            <span className="text-[14px]" style={{ color: 'var(--color-text-secondary)' }}>
+            <span className="text-[14px]" style={{ color: 'var(--nf-color-fg-muted)' }}>
               {t('event.end')}
             </span>
             <div className="flex items-center gap-2">
@@ -427,9 +427,9 @@ function ModalContent({
         </div>
 
         {/* Calendar selector card */}
-        <div className="rounded-xl bg-[var(--color-surface-secondary)] p-4">
+        <div className="rounded-xl bg-[var(--nf-color-bg-sunken)] p-4">
           <div className="flex items-center justify-between">
-            <span className="text-[14px]" style={{ color: 'var(--color-text-secondary)' }}>
+            <span className="text-[14px]" style={{ color: 'var(--nf-color-fg-muted)' }}>
               {t('event.calendar')}
             </span>
             <CustomSelect
@@ -449,16 +449,16 @@ function ModalContent({
             />
           </div>
           {errors.calendarId ? (
-            <p className="mt-1 text-[12px]" style={{ color: 'var(--color-danger)' }}>
+            <p className="mt-1 text-[12px]" style={{ color: 'var(--nf-color-danger)' }}>
               {errors.calendarId}
             </p>
           ) : null}
         </div>
 
         {/* Kind & Show As card */}
-        <div className="rounded-xl bg-[var(--color-surface-secondary)] p-4">
+        <div className="rounded-xl bg-[var(--nf-color-bg-sunken)] p-4">
           <div className="flex items-center justify-between">
-            <span className="text-[14px]" style={{ color: 'var(--color-text-secondary)' }}>
+            <span className="text-[14px]" style={{ color: 'var(--nf-color-fg-muted)' }}>
               {t('event.kind')}
             </span>
             <CustomSelect
@@ -469,10 +469,10 @@ function ModalContent({
             />
           </div>
 
-          <div className="my-1 border-t border-[var(--color-border)] opacity-50" />
+          <div className="my-1 border-t border-[var(--nf-color-border)] opacity-50" />
 
           <div className="flex items-center justify-between">
-            <span className="text-[14px]" style={{ color: 'var(--color-text-secondary)' }}>
+            <span className="text-[14px]" style={{ color: 'var(--nf-color-fg-muted)' }}>
               {t('event.showAs')}
             </span>
             <CustomSelect
@@ -485,12 +485,12 @@ function ModalContent({
         </div>
 
         {/* Location & Memo card */}
-        <div className="rounded-xl bg-[var(--color-surface-secondary)] p-4">
+        <div className="rounded-xl bg-[var(--nf-color-bg-sunken)] p-4">
           <div>
             <label
               htmlFor="event-location"
               className="text-[14px]"
-              style={{ color: 'var(--color-text-secondary)' }}
+              style={{ color: 'var(--nf-color-fg-muted)' }}
             >
               {t('event.location')}
             </label>
@@ -503,13 +503,13 @@ function ModalContent({
             />
           </div>
 
-          <div className="my-1 border-t border-[var(--color-border)] opacity-50" />
+          <div className="my-1 border-t border-[var(--nf-color-border)] opacity-50" />
 
           <div>
             <label
               htmlFor="event-memo"
               className="text-[14px]"
-              style={{ color: 'var(--color-text-secondary)' }}
+              style={{ color: 'var(--nf-color-fg-muted)' }}
             >
               {t('event.memo')}
             </label>
@@ -525,7 +525,7 @@ function ModalContent({
       </div>
 
       {/* Action buttons */}
-      <div className="flex gap-3 border-t border-[var(--color-border)] px-6 py-4">
+      <div className="flex gap-3 border-t border-[var(--nf-color-border)] px-6 py-4">
         <button type="button" onClick={closeEventModal} className="btn-secondary flex-1 rounded-xl">
           {t('common.cancel')}
         </button>

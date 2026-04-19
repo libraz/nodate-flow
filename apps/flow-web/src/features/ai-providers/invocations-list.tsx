@@ -36,7 +36,7 @@ function InvocationRow({ row }: { row: AiInvocation }): ReactElement {
               style={{
                 fontFamily: 'var(--font-mono)',
                 fontSize: '0.75rem',
-                color: 'var(--color-muted)',
+                color: 'var(--nf-color-fg-muted)',
               }}
             >
               {row.model}
@@ -45,7 +45,7 @@ function InvocationRow({ row }: { row: AiInvocation }): ReactElement {
               style={{
                 marginInlineStart: 'auto',
                 fontSize: '0.75rem',
-                color: 'var(--color-muted)',
+                color: 'var(--nf-color-fg-muted)',
               }}
             >
               {formatWhen(row.invokedAt)}
@@ -55,7 +55,7 @@ function InvocationRow({ row }: { row: AiInvocation }): ReactElement {
             style={{
               margin: 0,
               fontSize: '0.75rem',
-              color: 'var(--color-muted)',
+              color: 'var(--nf-color-fg-muted)',
               whiteSpace: 'pre-wrap',
               overflow: 'hidden',
               display: '-webkit-box',
@@ -68,7 +68,7 @@ function InvocationRow({ row }: { row: AiInvocation }): ReactElement {
             {row.promptRedacted}
           </p>
           {row.errorCode ? (
-            <span style={{ fontSize: '0.75rem', color: 'var(--color-danger)' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--nf-color-danger)' }}>
               {t('ai_activity.error_code', { code: row.errorCode })}
             </span>
           ) : null}
@@ -89,7 +89,7 @@ export default function InvocationsList({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <header style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
         <h1 style={{ margin: 0, fontSize: '1.5rem' }}>{t('ai_activity.title')}</h1>
-        <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
           {t('ai_activity.description')}
         </p>
       </header>
@@ -98,8 +98,8 @@ export default function InvocationsList({
           style={{
             padding: '3rem 1rem',
             textAlign: 'center',
-            color: 'var(--nf-color-fg-muted, var(--color-muted))',
-            border: '1px dashed var(--nf-color-border, var(--color-border))',
+            color: 'var(--nf-color-fg-muted, var(--nf-color-fg-muted))',
+            border: '1px dashed var(--nf-color-border, var(--nf-color-border))',
             borderRadius: '0.75rem',
             background: 'var(--nf-color-bg-sunken, transparent)',
             fontSize: '0.875rem',

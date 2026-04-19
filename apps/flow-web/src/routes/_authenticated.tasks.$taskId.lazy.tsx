@@ -7,7 +7,7 @@
  * title / priority / due edits go through `useUpdateTask`.
  */
 
-import Badge from '@nodate-flow/ui/primitives/badge';
+import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
 import Button, { type ButtonVariant } from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
 import Combobox from '@nodate-flow/ui/primitives/combobox';
@@ -23,7 +23,7 @@ import { Link, createLazyFileRoute, getRouteApi } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import Markdown from '../components/markdown/markdown';
+import Markdown from '@nodate-flow/ui/primitives/markdown';
 import ConstraintEditor from '../features/constraints/constraint-editor';
 import StateGraph from '../features/constraints/state-graph';
 import { useProjectQuery } from '../features/projects/api';
@@ -54,7 +54,7 @@ import { useTaskTimelineQuery } from '../features/timeline/api';
 import ReplayPanel from '../features/timeline/replay-panel';
 import TaskMiniTimeline from '../features/timeline/task-mini-timeline';
 import { useWorkspaceMembersQuery, useWorkspaceQuery } from '../features/workspaces/api';
-import { formatDateTime } from '../lib/format';
+import { formatEpochDateTime } from '../lib/format';
 
 const routeApi = getRouteApi('/_authenticated/tasks/$taskId');
 
@@ -104,7 +104,7 @@ function TitleEditor({ id, initial }: { id: string; initial: string }): ReactEle
             border: 'none',
             padding: 0,
             cursor: 'pointer',
-            color: 'var(--color-fg)',
+            color: 'var(--nf-color-fg)',
             font: 'inherit',
             textAlign: 'start',
           }}
@@ -196,12 +196,12 @@ function DescriptionEditor({
               : undefined
           }
           style={{
-            color: isEmpty ? 'var(--color-muted)' : 'var(--color-fg)',
+            color: isEmpty ? 'var(--nf-color-fg-muted)' : 'var(--nf-color-fg)',
             minBlockSize: '3rem',
             inlineSize: '100%',
             ...(isEmpty
               ? {
-                  border: '1px dashed var(--nf-color-border, var(--color-hairline))',
+                  border: '1px dashed var(--nf-color-border, var(--nf-color-hairline))',
                   borderRadius: '0.5rem',
                   padding: '1rem',
                   cursor: 'pointer',
@@ -287,7 +287,7 @@ function CommentsFeed({ taskId }: { taskId: string }): ReactElement {
     <section style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <h2 style={{ margin: 0, fontSize: '1.125rem' }}>{t('tasks.comments.title')}</h2>
       {comments.length === 0 ? (
-        <p style={{ color: 'var(--color-muted)', margin: 0 }}>{t('tasks.comments.empty')}</p>
+        <p style={{ color: 'var(--nf-color-fg-muted)', margin: 0 }}>{t('tasks.comments.empty')}</p>
       ) : (
         <ul
           style={{
@@ -313,12 +313,12 @@ function CommentsFeed({ taskId }: { taskId: string }): ReactElement {
                   <strong>{c.authorDisplayName}</strong>
                   <span
                     style={{
-                      color: 'var(--color-muted)',
+                      color: 'var(--nf-color-fg-muted)',
                       fontVariantNumeric: 'tabular-nums',
                       fontSize: '0.875rem',
                     }}
                   >
-                    {formatDateTime(c.createdAt, locale)}
+                    {formatEpochDateTime(c.createdAt, locale)}
                   </span>
                 </header>
                 <Markdown>{c.body}</Markdown>
@@ -395,7 +395,7 @@ function AssigneesSection({
   return (
     <>
       {assignees.length === 0 ? (
-        <p style={{ margin: 0, color: 'var(--color-muted)' }}>
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
           {t('tasks.detail.assignees.empty')}
         </p>
       ) : (
@@ -432,7 +432,7 @@ function AssigneesSection({
       )}
       {picking ? (
         available.length === 0 ? (
-          <p style={{ margin: 0, color: 'var(--color-muted)' }}>
+          <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
             {t('tasks.detail.assignees.none')}
           </p>
         ) : (
@@ -547,7 +547,7 @@ function Sidebar({
     >
       <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ color: 'var(--color-muted)' }}>{t('tasks.detail.state_label')}</span>
+          <span style={{ color: 'var(--nf-color-fg-muted)' }}>{t('tasks.detail.state_label')}</span>
           <Badge tone={STATE_TONE[state]}>{t(STATE_KEY[state])}</Badge>
         </div>
         <Separator />
@@ -763,7 +763,7 @@ function RelatedTasksSection({ taskId }: { taskId: string }): ReactElement {
   const { data } = useTaskDuplicatesQuery(taskId);
   if (data.candidates.length === 0) {
     return (
-      <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
         {t('tasks.detail.duplicates.empty')}
       </p>
     );
@@ -789,7 +789,7 @@ function RelatedTasksSection({ taskId }: { taskId: string }): ReactElement {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.5rem',
-                color: 'var(--color-fg)',
+                color: 'var(--nf-color-fg)',
                 textDecoration: 'none',
               }}
             >
@@ -803,7 +803,7 @@ function RelatedTasksSection({ taskId }: { taskId: string }): ReactElement {
                 style={{
                   fontFamily: 'var(--font-mono)',
                   fontSize: '0.75rem',
-                  color: 'var(--color-muted)',
+                  color: 'var(--nf-color-fg-muted)',
                 }}
               >
                 {c.score.toFixed(2)}
@@ -822,7 +822,7 @@ function AiActivitySection({ taskId }: { taskId: string }): ReactElement {
   const locale = i18n.resolvedLanguage ?? 'en';
   if (invocations.length === 0) {
     return (
-      <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
         {t('tasks.detail.ai_activity.empty')}
       </p>
     );
@@ -849,7 +849,7 @@ function AiActivitySection({ taskId }: { taskId: string }): ReactElement {
                 style={{
                   fontFamily: 'var(--font-mono)',
                   fontSize: '0.75rem',
-                  color: 'var(--color-muted)',
+                  color: 'var(--nf-color-fg-muted)',
                 }}
               >
                 {inv.model}
@@ -858,11 +858,11 @@ function AiActivitySection({ taskId }: { taskId: string }): ReactElement {
                 style={{
                   marginInlineStart: 'auto',
                   fontSize: '0.75rem',
-                  color: 'var(--color-muted)',
+                  color: 'var(--nf-color-fg-muted)',
                   fontVariantNumeric: 'tabular-nums',
                 }}
               >
-                {formatDateTime(new Date(inv.invokedAt * 1000).toISOString(), locale)}
+                {formatEpochDateTime(inv.invokedAt, locale)}
               </span>
             </div>
             {inv.promptRedacted ? (
@@ -870,7 +870,7 @@ function AiActivitySection({ taskId }: { taskId: string }): ReactElement {
                 style={{
                   margin: 0,
                   fontSize: '0.8125rem',
-                  color: 'var(--color-fg)',
+                  color: 'var(--nf-color-fg)',
                   whiteSpace: 'pre-wrap',
                   overflow: 'hidden',
                   display: '-webkit-box',
@@ -921,7 +921,7 @@ function InferStateSection({ taskId }: { taskId: string }): ReactElement {
   const { data } = useTaskInferStateQuery(taskId);
   if (!data.proposal) {
     return (
-      <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
         {t('tasks.detail.infer_state.empty')}
       </p>
     );
@@ -935,13 +935,13 @@ function InferStateSection({ taskId }: { taskId: string }): ReactElement {
           style={{
             fontFamily: 'var(--font-mono)',
             fontSize: '0.75rem',
-            color: 'var(--color-muted)',
+            color: 'var(--nf-color-fg-muted)',
           }}
         >
           {confidence.toFixed(2)}
         </span>
       </div>
-      <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--color-fg)' }}>{reason}</p>
+      <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--nf-color-fg)' }}>{reason}</p>
     </div>
   );
 }
@@ -963,7 +963,7 @@ function TaskBreadcrumbInner({
         alignItems: 'center',
         gap: '0.375rem',
         fontSize: '0.8125rem',
-        color: 'var(--color-muted)',
+        color: 'var(--nf-color-fg-muted)',
         flexWrap: 'wrap',
       }}
     >

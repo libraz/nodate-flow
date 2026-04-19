@@ -4,6 +4,197 @@
  */
 
 export interface paths {
+    "/admin/audit-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List instance audit logs */
+        get: operations["admin-list-audit-logs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/instance-admins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List instance administrators */
+        get: operations["admin-list-admins"];
+        put?: never;
+        /** Grant instance admin privileges */
+        post: operations["admin-grant-admin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/instance-admins/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke instance admin privileges */
+        delete: operations["admin-revoke-admin"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke a session */
+        delete: operations["admin-revoke-session"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List instance settings */
+        get: operations["admin-list-settings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update instance settings */
+        patch: operations["admin-patch-settings"];
+        trace?: never;
+    };
+    "/admin/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bootstrap the first instance admin */
+        post: operations["admin-setup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List all users */
+        get: operations["admin-list-users"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get user details */
+        get: operations["admin-get-user"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update user (suspend/enable) */
+        patch: operations["admin-patch-user"];
+        trace?: never;
+    };
+    "/admin/users/{userId}/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List sessions for a user */
+        get: operations["admin-list-user-sessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/workspaces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List all workspaces */
+        get: operations["admin-list-workspaces"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/workspaces/{wsId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get workspace details */
+        get: operations["admin-get-workspace"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update workspace (suspend/enable) */
+        patch: operations["admin-patch-workspace"];
+        trace?: never;
+    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -30,7 +221,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Complete a TOTP step-up login after /auth/login returned totp_required */
+        /** Complete a TOTP step-up login */
         post: operations["auth-login-totp"];
         delete?: never;
         options?: never;
@@ -200,8 +391,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Accept a workspace invite link */
-        post: operations["workspaces-invites-accept"];
+        /** Accept a workspace invite */
+        post: operations["invites-accept"];
         delete?: never;
         options?: never;
         head?: never;
@@ -215,8 +406,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Fetch public info about a workspace invite (no auth required) */
-        get: operations["workspaces-invites-info"];
+        /** Preview invite details (public) */
+        get: operations["invites-info"];
         put?: never;
         post?: never;
         delete?: never;
@@ -356,7 +547,7 @@ export interface paths {
         get: operations["me-sessions-list"];
         put?: never;
         post?: never;
-        /** Revoke every session except the one on the current request */
+        /** Revoke every session except the current one */
         delete: operations["me-sessions-revoke-others"];
         options?: never;
         head?: never;
@@ -373,7 +564,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Revoke a single session by public id */
+        /** Revoke a single session */
         delete: operations["me-sessions-revoke"];
         options?: never;
         head?: never;
@@ -404,11 +595,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Return the authenticated user's TOTP 2FA status */
+        /** Return TOTP 2FA status */
         get: operations["me-totp-status"];
         put?: never;
         post?: never;
-        /** Disable TOTP 2FA after password reverification */
+        /** Disable TOTP 2FA */
         delete: operations["me-totp-disable"];
         options?: never;
         head?: never;
@@ -424,7 +615,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Confirm TOTP 2FA enrollment with a generated code */
+        /** Confirm TOTP 2FA enrollment */
         post: operations["me-totp-confirm"];
         delete?: never;
         options?: never;
@@ -441,7 +632,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Begin TOTP 2FA enrollment (returns otpauth URL) */
+        /** Begin TOTP 2FA enrollment */
         post: operations["me-totp-enroll"];
         delete?: never;
         options?: never;
@@ -456,10 +647,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Return remaining TOTP recovery code count */
+        /** Return remaining recovery code count */
         get: operations["me-totp-recovery-status"];
         put?: never;
-        /** Regenerate TOTP recovery codes after password reverification */
+        /** Regenerate TOTP recovery codes */
         post: operations["me-totp-recovery-regenerate"];
         delete?: never;
         options?: never;
@@ -946,7 +1137,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Run the Phase 3 constraint engine for a task and persist satisfied/failed markers */
+        /** Run the constraint engine for a task and persist satisfied/failed markers */
         post: operations["tasks-constraints-evaluate"];
         delete?: never;
         options?: never;
@@ -1098,7 +1289,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Replay transition events and report drift vs stored derived_state (3.ENG-1) */
+        /** Replay transition events and report drift vs stored derived_state */
         get: operations["tasks-replay"];
         put?: never;
         post?: never;
@@ -1149,7 +1340,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List workspaces visible to the caller */
+        /** List workspaces for the authenticated user */
         get: operations["workspaces-list"];
         put?: never;
         /** Create a workspace */
@@ -1167,15 +1358,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Fetch a workspace */
+        /** Get workspace details */
         get: operations["workspaces-get"];
         put?: never;
         post?: never;
-        /** Soft-disable a workspace */
+        /** Disable a workspace */
         delete: operations["workspaces-disable"];
         options?: never;
         head?: never;
-        /** Patch a workspace */
+        /** Update workspace details */
         patch: operations["workspaces-patch"];
         trace?: never;
     };
@@ -1223,7 +1414,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Toggle the kill switch on an AI agent (4.AGENT-3) */
+        /** Toggle the kill switch on an AI agent */
         post: operations["ai-agent-pause"];
         delete?: never;
         options?: never;
@@ -1308,7 +1499,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Workspace-wide deterministic auto-action proposals (2.AI-3) */
+        /** Workspace-wide deterministic auto-action proposals */
         get: operations["ai-auto-actions"];
         put?: never;
         post?: never;
@@ -1463,7 +1654,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Workspace-wide deterministic reminder engine proposals (2.AI-4) */
+        /** Workspace-wide deterministic reminder engine proposals */
         get: operations["ai-reminders"];
         put?: never;
         post?: never;
@@ -1497,7 +1688,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Workspace-wide deterministic state inference proposals (2.AI-1) */
+        /** Workspace-wide deterministic state inference proposals */
         get: operations["ai-state-suggestions"];
         put?: never;
         post?: never;
@@ -1565,7 +1756,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Deterministic weekly digest markdown for a workspace (2.AI-9) */
+        /** Deterministic weekly digest markdown for a workspace */
         get: operations["ai-weekly-digest"];
         put?: never;
         post?: never;
@@ -1573,6 +1764,75 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendar-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List events across all subscribed calendars */
+        get: operations["calendar-events-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List calendars visible to the caller */
+        get: operations["calendars-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a calendar event */
+        post: operations["calendar-events-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/events/{eventId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a calendar event */
+        delete: operations["calendar-events-delete"];
+        options?: never;
+        head?: never;
+        /** Update a calendar event */
+        patch: operations["calendar-events-patch"];
         trace?: never;
     };
     "/workspaces/{wsId}/dashboard/widgets": {
@@ -1673,10 +1933,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List active invite links for a workspace */
+        /** List invite links */
         get: operations["workspaces-invites-list"];
         put?: never;
-        /** Create a shareable invite link for a workspace */
+        /** Create an invite link */
         post: operations["workspaces-invites-create"];
         delete?: never;
         options?: never;
@@ -1814,11 +2074,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List members of a workspace */
+        /** List workspace members */
         get: operations["workspaces-members-list"];
         put?: never;
-        /** Invite a user to a workspace */
-        post: operations["workspaces-members-invite"];
+        /** Add a member to a workspace */
+        post: operations["workspaces-members-add"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1839,7 +2099,7 @@ export interface paths {
         delete: operations["workspaces-members-remove"];
         options?: never;
         head?: never;
-        /** Change a member's role */
+        /** Update a member's role */
         patch: operations["workspaces-members-update-role"];
         trace?: never;
     };
@@ -2130,7 +2390,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List workspace users (minimal summary for actor pickers) */
+        /** List workspace users (actor picker) */
         get: operations["workspaces-users-list"];
         put?: never;
         post?: never;
@@ -2344,6 +2604,89 @@ export interface components {
             /** @enum {string} */
             role: "owner" | "admin" | "member" | "guest";
         };
+        AdminListWorkspacesOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["AdminWorkspace"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
+        AdminPatchWorkspaceInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            enabled: boolean | null;
+        };
+        AdminPatchWorkspaceOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        AdminSession: {
+            active: boolean;
+            /** Format: int64 */
+            createdAt: number;
+            /** Format: int64 */
+            expiresAt: number;
+            id: string;
+            ipAddress: string;
+            /** Format: int64 */
+            lastUsedAt?: number;
+            userAgent: string;
+        };
+        AdminUser: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            avatarUrl?: string;
+            /** Format: int64 */
+            createdAt: number;
+            displayName: string;
+            email: string;
+            /** Format: int64 */
+            emailVerifiedAt?: number;
+            enabled: boolean;
+            id: string;
+            isInstanceAdmin: boolean;
+            /** Format: int64 */
+            lastLoginAt?: number;
+            locale: string;
+            /** Format: int64 */
+            updatedAt?: number;
+            /** Format: int64 */
+            workspaceCount: number;
+        };
+        AdminWorkspace: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            createdAt: number;
+            description?: string;
+            enabled: boolean;
+            iconUrl?: string;
+            id: string;
+            /** Format: int64 */
+            memberCount: number;
+            name: string;
+            /** Format: int64 */
+            projectCount?: number;
+            slug: string;
+            /** Format: int64 */
+            updatedAt?: number;
+        };
         AgentSummary: {
             /**
              * Format: uri
@@ -2354,6 +2697,7 @@ export interface components {
             createdAt: number;
             description?: string;
             eventTriggerTypes?: string[] | null;
+            /** @description Agent public id (UUID v7) */
             id: string;
             modelId: string;
             modelName: string;
@@ -2380,6 +2724,7 @@ export interface components {
         AiInvocation: {
             costEstimate?: string;
             errorCode?: string;
+            /** @description Invocation public id (UUID v7) */
             id: string;
             /** Format: int64 */
             invokedAt: number;
@@ -2408,7 +2753,7 @@ export interface components {
             applied: number;
             /** Format: int64 */
             dismissed: number;
-            /** @description Per-provider egress rate limiter counters (4.AGENT-2) */
+            /** @description Per-provider egress rate limiter counters */
             outboundLimits: components["schemas"]["OutboundLimitStat"][] | null;
             /** Format: int64 */
             proposed: number;
@@ -2508,6 +2853,21 @@ export interface components {
             reason: string;
             userPublicId: string;
         };
+        AuditEntry: {
+            action: string;
+            actorDisplayName?: string;
+            actorUserId?: string;
+            id: string;
+            ipAddress?: string;
+            /** Format: int64 */
+            occurredAt: number;
+            payload?: unknown;
+            targetResourcePublicId?: string;
+            targetResourceType?: string;
+            targetWorkspaceId?: string;
+            targetWorkspaceName?: string;
+            userAgent?: string;
+        };
         AuthTokens: {
             /**
              * Format: uri
@@ -2542,6 +2902,23 @@ export interface components {
             intervalMinutes: number;
             /** Format: double */
             threshold: number;
+        };
+        CalendarDTO: {
+            color: string;
+            coverUrl?: string;
+            /** Format: int64 */
+            createdAt: number;
+            description?: string;
+            displayColor?: string;
+            /** @description Calendar public id (UUID v7) */
+            id: string;
+            kind: string;
+            memberColor?: string;
+            name: string;
+            role?: string;
+            /** Format: int64 */
+            updatedAt?: number;
+            visible: boolean;
         };
         ChangePasswordInputBody: {
             /**
@@ -2631,6 +3008,25 @@ export interface components {
             provider: "github" | "slack" | "google_calendar";
             scopes: string;
         };
+        Cookie: {
+            Domain: string;
+            /** Format: date-time */
+            Expires: string;
+            HttpOnly: boolean;
+            /** Format: int64 */
+            MaxAge: number;
+            Name: string;
+            Partitioned: boolean;
+            Path: string;
+            Quoted: boolean;
+            Raw: string;
+            RawExpires: string;
+            /** Format: int64 */
+            SameSite: number;
+            Secure: boolean;
+            Unparsed: string[] | null;
+            Value: string;
+        };
         CountUnreadOutputBody: {
             /**
              * Format: uri
@@ -2663,6 +3059,22 @@ export interface components {
              * @description Sampling temperature x100 (default 100)
              */
             temperature?: number;
+        };
+        CreateEventInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            allDay: boolean;
+            endAt: string;
+            kind?: string;
+            location?: string;
+            memo?: string;
+            showAs?: string;
+            startAt: string;
+            timezone: string;
+            title: string;
         };
         CreateInputBody: {
             /**
@@ -2711,6 +3123,7 @@ export interface components {
             agentId?: string;
             /** Format: int64 */
             createdAt: number;
+            /** @description McpToken public id (UUID v7) */
             id: string;
             name: string;
             scopes: string[] | null;
@@ -2862,6 +3275,14 @@ export interface components {
             invite: components["schemas"]["WorkspaceInvite"];
             /** @description Plaintext token (only returned once) */
             token: string;
+        };
+        DeleteEventOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
         };
         DeleteLensBody: {
             /**
@@ -3041,6 +3462,28 @@ export interface components {
             readonly $schema?: string;
             outcomes: components["schemas"]["EvaluateConstraintsOutcome"][] | null;
         };
+        EventDTO: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            allDay: boolean;
+            blockLabel?: string;
+            calendarId: string;
+            endAt: string;
+            /** @description Event public id (UUID v7) */
+            id: string;
+            kind: string;
+            location?: string;
+            memo?: string;
+            ownerUserId?: string;
+            showAs: string;
+            startAt: string;
+            timezone: string;
+            title: string;
+            visibility: string;
+        };
         ExplainConstraintBody: {
             /**
              * Format: uri
@@ -3138,6 +3581,23 @@ export interface components {
             readonly $schema?: string;
             webhook: components["schemas"]["WebhookSubscriptionDetailDTO"];
         };
+        GrantAdminInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description User public id (UUID v7) */
+            userId: string;
+        };
+        GrantAdminOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
         HealthOutputBody: {
             /**
              * Format: uri
@@ -3150,6 +3610,7 @@ export interface components {
             /** Format: int64 */
             createdAt: number;
             externalId?: string;
+            /** @description InboxItem public id (UUID v7) */
             id: string;
             kind: string;
             payload?: unknown;
@@ -3203,14 +3664,31 @@ export interface components {
             reason: string;
             transition: string;
         };
+        InstanceAdmin: {
+            avatarUrl?: string;
+            displayName: string;
+            email: string;
+            /** Format: int64 */
+            grantedAt: number;
+            grantedByDisplayName?: string;
+            grantedById?: string;
+            id: string;
+            userId: string;
+        };
+        InstanceSetting: {
+            key: string;
+            /** Format: int64 */
+            updatedAt?: number;
+            value: string;
+        };
         InviteInfoOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            /** Format: date-time */
-            expiresAt?: string;
+            /** Format: int64 */
+            expiresAt?: number;
             role: string;
             workspaceName: string;
         };
@@ -3223,6 +3701,16 @@ export interface components {
             groupBy: string | null;
             sort: components["schemas"]["SortSpec"][] | null;
         };
+        ListAdminsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["InstanceAdmin"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
         ListAgentsOutputBody: {
             /**
              * Format: uri
@@ -3230,6 +3718,16 @@ export interface components {
              */
             readonly $schema?: string;
             agents: components["schemas"]["AgentSummary"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
+        ListAuditLogsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["AuditEntry"][] | null;
             /** Format: int64 */
             total: number;
         };
@@ -3242,6 +3740,14 @@ export interface components {
             actions: components["schemas"]["TaskAutoAction"][] | null;
             /** Format: int64 */
             total: number;
+        };
+        ListCalendarsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            calendars: components["schemas"]["CalendarDTO"][] | null;
         };
         ListChildPagesBody: {
             /**
@@ -3273,6 +3779,14 @@ export interface components {
             candidates: components["schemas"]["DuplicateCandidate"][] | null;
             model: string;
             source: string;
+        };
+        ListEventsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            events: components["schemas"]["EventDTO"][] | null;
         };
         ListForTaskBody: {
             /**
@@ -3449,6 +3963,14 @@ export interface components {
             readonly $schema?: string;
             items: components["schemas"]["SessionSummary"][] | null;
         };
+        ListSettingsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["InstanceSetting"][] | null;
+        };
         ListStateSuggestionsOutputBody: {
             /**
              * Format: uri
@@ -3562,6 +4084,26 @@ export interface components {
             readonly $schema?: string;
             events: components["schemas"]["TimelineEvent"][] | null;
             nextCursor: string | null;
+            /** Format: int64 */
+            total: number;
+        };
+        ListUserSessionsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["AdminSession"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
+        ListUsersOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["AdminUser"][] | null;
             /** Format: int64 */
             total: number;
         };
@@ -3685,6 +4227,7 @@ export interface components {
             createdAt: number;
             /** Format: int64 */
             expiresAt?: number;
+            /** @description McpToken public id (UUID v7) */
             id: string;
             /** Format: int64 */
             lastUsedAt?: number;
@@ -3704,6 +4247,7 @@ export interface components {
             displayName: string;
             email: string;
             id: string;
+            isInstanceAdmin: boolean;
             locale: string;
             notifEmailAssignment: boolean;
             notifEmailDigest: boolean;
@@ -3711,10 +4255,11 @@ export interface components {
             notifEmailMention: boolean;
             notifWebPush: boolean;
             /** @enum {string} */
-            themePreference: "aurora-light" | "aurora-dark" | "dotline-light" | "dotline-dark" | "system";
+            themePreference: "aurora-light" | "aurora-dark" | "dotline-light" | "dotline-dark" | "glass-light" | "glass-dark" | "system";
         };
         ModelSummary: {
             displayName: string;
+            /** @description Model public id (UUID v7) */
             id: string;
             name: string;
             providerId: string;
@@ -3722,8 +4267,8 @@ export interface components {
         };
         MyTaskListItem: {
             actorRole: string;
-            /** Format: date-time */
-            createdAt: string;
+            /** Format: int64 */
+            createdAt: number;
             derivedState: string;
             dueOn?: string;
             eventOn?: string;
@@ -3733,8 +4278,8 @@ export interface components {
             projectId: string;
             projectName?: string;
             title: string;
-            /** Format: date-time */
-            updatedAt?: string;
+            /** Format: int64 */
+            updatedAt?: number;
             workspaceId: string;
             workspaceName: string;
         };
@@ -3748,6 +4293,7 @@ export interface components {
             /** Format: int64 */
             deliveredAt: number | null;
             eventType: string;
+            /** @description Notification public id (UUID v7) */
             id: string;
             /** Format: int64 */
             readAt: number | null;
@@ -3873,6 +4419,22 @@ export interface components {
             /** Format: double */
             threshold?: number;
         };
+        PatchEventInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            allDay?: boolean;
+            endAt?: string;
+            kind?: string;
+            location?: string;
+            memo?: string;
+            showAs?: string;
+            startAt?: string;
+            timezone?: string;
+            title?: string;
+        };
         PatchMeInputBody: {
             /**
              * Format: uri
@@ -3888,7 +4450,7 @@ export interface components {
             notifEmailMention?: boolean;
             notifWebPush?: boolean;
             /** @enum {string} */
-            themePreference?: "aurora-light" | "aurora-dark" | "dotline-light" | "dotline-dark" | "system";
+            themePreference?: "aurora-light" | "aurora-dark" | "dotline-light" | "dotline-dark" | "glass-light" | "glass-dark" | "system";
         };
         PatchProjectBody: {
             /**
@@ -3910,6 +4472,25 @@ export interface components {
             apiKey: string;
         };
         PatchProviderOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        PatchSettingsInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Key-value pairs to upsert */
+            settings: {
+                [key: string]: string;
+            };
+        };
+        PatchSettingsOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
@@ -3943,6 +4524,22 @@ export interface components {
              * @enum {string}
              */
             visibility?: "public" | "project" | "private";
+        };
+        PatchUserInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            enabled: boolean | null;
+        };
+        PatchUserOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
         };
         PatchWorkspaceInputBody: {
             /**
@@ -4002,24 +4599,26 @@ export interface components {
         };
         Project: {
             color?: string;
-            /** Format: date-time */
-            createdAt: string;
+            /** Format: int64 */
+            createdAt: number;
             description?: string;
-            /** Format: date-time */
+            /** @description YYYY-MM-DD */
             endedOn?: string;
+            /** @description Project public id (UUID v7) */
             id: string;
             isArchived: boolean;
             name: string;
             slug: string;
-            /** Format: date-time */
+            /** @description YYYY-MM-DD */
             startedOn?: string;
-            /** Format: date-time */
-            updatedAt?: string;
+            /** Format: int64 */
+            updatedAt?: number;
             workspaceId: string;
         };
         ProjectDependencyEdge: {
             fromTaskDerivedState: string;
             fromTaskId: string;
+            /** @description Dependency public id (UUID v7) */
             id: string;
             kind: string;
             toTaskDerivedState: string;
@@ -4031,13 +4630,14 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            /** Format: date-time */
-            addedAt?: string;
+            /** Format: int64 */
+            addedAt?: number;
             avatarUrl?: string;
-            /** Format: date-time */
-            createdAt: string;
+            /** Format: int64 */
+            createdAt: number;
             displayName: string;
             email: string;
+            /** @description ProjectMember public id (UUID v7) */
             id: string;
             role: string;
             userId: string;
@@ -4087,14 +4687,15 @@ export interface components {
             readonly $schema?: string;
             apiKeyMasked: string;
             baseUrl?: string;
-            /** Format: date-time */
-            createdAt: string;
+            /** Format: int64 */
+            createdAt: number;
             defaultModel?: string;
+            /** @description Provider public id (UUID v7) */
             id: string;
             kind: string;
             name: string;
-            /** Format: date-time */
-            updatedAt?: string;
+            /** Format: int64 */
+            updatedAt?: number;
         };
         ProviderStatus: {
             /** @description True when the server has credentials for this provider */
@@ -4270,6 +4871,14 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        RevokeAdminOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
         RevokeAllOtherSessionsOutputBody: {
             /**
              * Format: uri
@@ -4305,8 +4914,8 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            /** Format: date-time */
-            createdAt: string;
+            /** Format: int64 */
+            createdAt: number;
             creatorDisplayName: string;
             creatorId: string;
             filter: unknown;
@@ -4331,8 +4940,8 @@ export interface components {
             sort: unknown;
             /** Format: int32 */
             sortWeight: number;
-            /** Format: date-time */
-            updatedAt?: string;
+            /** Format: int64 */
+            updatedAt?: number;
         };
         SearchPagesBody: {
             /**
@@ -4367,20 +4976,29 @@ export interface components {
             lastUsedAt?: number;
             userAgent: string;
         };
+        SetupOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
         Signal: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            /** Format: date-time */
-            createdAt: string;
+            /** Format: int64 */
+            createdAt: number;
             externalId?: string;
+            /** @description Signal public id (UUID v7) */
             id: string;
             kind: string;
             payload?: unknown;
-            /** Format: date-time */
-            receivedAt: string;
+            /** Format: int64 */
+            receivedAt: number;
             source: string;
             taskId?: string;
         };
@@ -4466,14 +5084,14 @@ export interface components {
             readonly $schema?: string;
             /** Format: int64 */
             actorCount: number;
-            /** Format: date-time */
-            completedAt?: string;
+            /** Format: int64 */
+            completedAt?: number;
             /** Format: int64 */
             constraintCount: number;
             /** Format: int64 */
             constraintSatisfiedCount: number;
-            /** Format: date-time */
-            createdAt: string;
+            /** Format: int64 */
+            createdAt: number;
             createdByUserId?: string;
             /** Format: int64 */
             dependencyCount: number;
@@ -4491,8 +5109,8 @@ export interface components {
             sortWeight: number;
             startedOn?: string;
             title: string;
-            /** Format: date-time */
-            updatedAt?: string;
+            /** Format: int64 */
+            updatedAt?: number;
             visibility: string;
             /** Format: uuid */
             workspaceId: string;
@@ -4504,14 +5122,14 @@ export interface components {
              */
             readonly $schema?: string;
             avatarUrl?: string;
-            /** Format: date-time */
-            createdAt: string;
+            /** Format: int64 */
+            createdAt: number;
             displayName: string;
             email: string;
             id: string;
             role: string;
-            /** Format: date-time */
-            updatedAt?: string;
+            /** Format: int64 */
+            updatedAt?: number;
             userId: string;
         };
         TaskAgentActor: {
@@ -4522,12 +5140,12 @@ export interface components {
             readonly $schema?: string;
             agentId: string;
             agentName: string;
-            /** Format: date-time */
-            createdAt: string;
+            /** Format: int64 */
+            createdAt: number;
             id: string;
             role: string;
-            /** Format: date-time */
-            updatedAt?: string;
+            /** Format: int64 */
+            updatedAt?: number;
         };
         TaskAiInvocation: {
             costEstimate?: string;
@@ -4555,13 +5173,13 @@ export interface components {
             byteSize: number;
             checksumSha256?: string;
             contentType: string;
-            /** Format: date-time */
-            createdAt: string;
+            /** Format: int64 */
+            createdAt: number;
             filename: string;
             id: string;
             storageKey: string;
-            /** Format: date-time */
-            updatedAt?: string;
+            /** Format: int64 */
+            updatedAt?: number;
             uploaderDisplayName: string;
             uploaderId: string;
         };
@@ -4584,13 +5202,13 @@ export interface components {
             authorDisplayName: string;
             authorId: string;
             body: string;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            editedAt?: string;
+            /** Format: int64 */
+            createdAt: number;
+            /** Format: int64 */
+            editedAt?: number;
             id: string;
-            /** Format: date-time */
-            updatedAt?: string;
+            /** Format: int64 */
+            updatedAt?: number;
         };
         TaskConstraint: {
             /**
@@ -4598,19 +5216,19 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            /** Format: date-time */
-            createdAt: string;
+            /** Format: int64 */
+            createdAt: number;
             expression: string;
-            /** Format: date-time */
-            failedAt?: string;
+            /** Format: int64 */
+            failedAt?: number;
             id: string;
             kind: string;
-            /** Format: date-time */
-            satisfiedAt?: string;
+            /** Format: int64 */
+            satisfiedAt?: number;
             /** Format: int32 */
             sortWeight: number;
-            /** Format: date-time */
-            updatedAt?: string;
+            /** Format: int64 */
+            updatedAt?: number;
         };
         TaskDependency: {
             /**
@@ -4618,20 +5236,20 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            /** Format: date-time */
-            createdAt: string;
+            /** Format: int64 */
+            createdAt: number;
             fromTaskId: string;
             id: string;
             kind: string;
             toTaskDerivedState: string;
             toTaskId: string;
             toTaskTitle: string;
-            /** Format: date-time */
-            updatedAt?: string;
+            /** Format: int64 */
+            updatedAt?: number;
         };
         TaskDependencyEdge: {
-            /** Format: date-time */
-            createdAt: string;
+            /** Format: int64 */
+            createdAt: number;
             id: string;
             kind: string;
             otherTaskDerivedState: string;
@@ -4641,10 +5259,10 @@ export interface components {
         TaskListItem: {
             /** Format: int64 */
             assigneeCount: number;
-            /** Format: date-time */
-            completedAt?: string;
-            /** Format: date-time */
-            createdAt: string;
+            /** Format: int64 */
+            completedAt?: number;
+            /** Format: int64 */
+            createdAt: number;
             derivedState: string;
             dueOn?: string;
             eventOn?: string;
@@ -4659,8 +5277,8 @@ export interface components {
             sortWeight: number;
             startedOn?: string;
             title: string;
-            /** Format: date-time */
-            updatedAt?: string;
+            /** Format: int64 */
+            updatedAt?: number;
             visibility: string;
         };
         TaskPrioritySuggestion: {
@@ -4737,6 +5355,7 @@ export interface components {
         TimelineEvent: {
             actorDisplayName?: string;
             actorUserId?: string;
+            /** @description TimelineEvent public id (UUID v7) */
             id: string;
             /** Format: int64 */
             occurredAt: number;
@@ -5014,6 +5633,7 @@ export interface components {
             failedAt: number | null;
             /** Format: int32 */
             httpStatus: number | null;
+            /** @description WebhookDelivery public id (UUID v7) */
             id: string;
             /** Format: int32 */
             maxAttempts: number;
@@ -5026,6 +5646,7 @@ export interface components {
             creatorId?: string;
             description: string;
             eventTypes: unknown;
+            /** @description WebhookSubscription public id (UUID v7) */
             id: string;
             isActive: boolean;
             /** Format: int64 */
@@ -5039,6 +5660,7 @@ export interface components {
             creatorId?: string;
             description: string;
             eventTypes: unknown;
+            /** @description WebhookSubscription public id (UUID v7) */
             id: string;
             isActive: boolean;
             secret: string;
@@ -5108,8 +5730,8 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            /** Format: date-time */
-            createdAt: string;
+            /** Format: int64 */
+            createdAt: number;
             description?: string;
             iconUrl?: string;
             /** @description Workspace public id (UUID v7) */
@@ -5123,15 +5745,15 @@ export interface components {
             /** @description Caller's role in this workspace */
             role?: string;
             slug: string;
-            /** Format: date-time */
-            updatedAt?: string;
+            /** Format: int64 */
+            updatedAt?: number;
         };
         WorkspaceInvite: {
-            /** Format: date-time */
-            createdAt: string;
+            /** Format: int64 */
+            createdAt: number;
             createdByName: string;
-            /** Format: date-time */
-            expiresAt?: string;
+            /** Format: int64 */
+            expiresAt?: number;
             /** @description Invite public id (UUID v7) */
             id: string;
             label?: string;
@@ -5143,18 +5765,19 @@ export interface components {
         };
         WorkspaceMember: {
             avatarUrl?: string;
-            /** Format: date-time */
-            createdAt: string;
+            /** Format: int64 */
+            createdAt: number;
             displayName: string;
             email: string;
+            /** @description WorkspaceMember public id (UUID v7) */
             id: string;
-            /** Format: date-time */
-            invitedAt?: string;
-            /** Format: date-time */
-            joinedAt?: string;
+            /** Format: int64 */
+            invitedAt?: number;
+            /** Format: int64 */
+            joinedAt?: number;
             role: string;
-            /** Format: date-time */
-            updatedAt?: string;
+            /** Format: int64 */
+            updatedAt?: number;
             userId: string;
         };
         WorkspaceUserSummary: {
@@ -5172,6 +5795,498 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    "admin-list-audit-logs": {
+        parameters: {
+            query?: {
+                action?: string;
+                /** @description Unix seconds, inclusive (0=no lower bound) */
+                from?: number;
+                /** @description Unix seconds, inclusive (0=no upper bound) */
+                to?: number;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListAuditLogsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "admin-list-admins": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListAdminsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "admin-grant-admin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GrantAdminInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrantAdminOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "admin-revoke-admin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description User public id (UUID v7) */
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevokeAdminOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "admin-revoke-session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevokeSessionOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "admin-list-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListSettingsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "admin-patch-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchSettingsInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatchSettingsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "admin-setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "admin-list-users": {
+        parameters: {
+            query?: {
+                search?: string;
+                /** @description Filter by enabled status (empty=all) */
+                enabled?: "true" | "false" | "";
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListUsersOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "admin-get-user": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUser"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "admin-patch-user": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchUserInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatchUserOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "admin-list-user-sessions": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListUserSessionsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "admin-list-workspaces": {
+        parameters: {
+            query?: {
+                search?: string;
+                /** @description Filter by enabled status (empty=all) */
+                enabled?: "true" | "false" | "";
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminListWorkspacesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "admin-get-workspace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminWorkspace"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "admin-patch-workspace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminPatchWorkspaceInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPatchWorkspaceOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "auth-login": {
         parameters: {
             query?: never;
@@ -5250,7 +6365,7 @@ export interface operations {
             header?: never;
             path?: never;
             cookie?: {
-                nf_rt?: string;
+                nd_rt?: components["schemas"]["Cookie"];
             };
         };
         requestBody?: never;
@@ -5281,6 +6396,7 @@ export interface operations {
             query?: {
                 code?: string;
                 state?: string;
+                nonce?: string;
             };
             header?: {
                 "User-Agent"?: string;
@@ -5348,7 +6464,7 @@ export interface operations {
             };
             path?: never;
             cookie?: {
-                nf_rt?: string;
+                nd_rt?: components["schemas"]["Cookie"];
             };
         };
         requestBody?: never;
@@ -5545,7 +6661,7 @@ export interface operations {
             };
         };
     };
-    "workspaces-invites-accept": {
+    "invites-accept": {
         parameters: {
             query?: never;
             header?: never;
@@ -5576,7 +6692,7 @@ export interface operations {
             };
         };
     };
-    "workspaces-invites-info": {
+    "invites-info": {
         parameters: {
             query?: never;
             header?: never;
@@ -5837,7 +6953,7 @@ export interface operations {
             header?: never;
             path?: never;
             cookie?: {
-                nf_rt?: string;
+                nd_rt?: components["schemas"]["Cookie"];
             };
         };
         requestBody: {
@@ -5872,7 +6988,7 @@ export interface operations {
             header?: never;
             path?: never;
             cookie?: {
-                nf_rt?: string;
+                nd_rt?: components["schemas"]["Cookie"];
             };
         };
         requestBody?: never;
@@ -5903,7 +7019,7 @@ export interface operations {
             header?: never;
             path?: never;
             cookie?: {
-                nf_rt?: string;
+                nd_rt?: components["schemas"]["Cookie"];
             };
         };
         requestBody?: never;
@@ -8983,6 +10099,179 @@ export interface operations {
             };
         };
     };
+    "calendar-events-list": {
+        parameters: {
+            query?: {
+                /** @description ISO date (YYYY-MM-DD) */
+                start?: string;
+                /** @description ISO date (YYYY-MM-DD) */
+                end?: string;
+            };
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListEventsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "calendars-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListCalendarsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "calendar-events-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                calId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateEventInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventDTO"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "calendar-events-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                calId: string;
+                eventId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteEventOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "calendar-events-patch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                calId: string;
+                eventId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchEventInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventDTO"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "dashboard-widgets-list": {
         parameters: {
             query?: {
@@ -9732,7 +11021,7 @@ export interface operations {
             };
         };
     };
-    "workspaces-members-invite": {
+    "workspaces-members-add": {
         parameters: {
             query?: never;
             header?: never;

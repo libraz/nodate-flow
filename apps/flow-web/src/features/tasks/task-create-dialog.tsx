@@ -373,7 +373,7 @@ function SmartCreateSection({
     <section
       aria-label={t('tasks.smart_create.assist_button')}
       style={{
-        border: '1px solid var(--color-border)',
+        border: '1px solid var(--nf-color-border)',
         borderRadius: '0.5rem',
         padding: '1rem',
         display: 'flex',
@@ -404,7 +404,10 @@ function SmartCreateSection({
 
       {/* Error state */}
       {proposalError && !proposing && (
-        <p role="alert" style={{ color: 'var(--color-danger)', margin: 0, fontSize: '0.875rem' }}>
+        <p
+          role="alert"
+          style={{ color: 'var(--nf-color-danger)', margin: 0, fontSize: '0.875rem' }}
+        >
           {t('tasks.smart_create.error')}
         </p>
       )}
@@ -468,7 +471,7 @@ function SmartCreateSection({
 
           {/* No suggestions */}
           {proposal.suggestedAssignees.length === 0 && proposal.subtasks.length === 0 && (
-            <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--color-muted)' }}>
+            <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--nf-color-fg-muted)' }}>
               {t('tasks.smart_create.no_suggestions')}
             </p>
           )}
@@ -517,14 +520,17 @@ function AssigneeSuggestionRow({
         <span
           style={{
             marginInlineStart: '0.5rem',
-            color: 'var(--color-muted)',
+            color: 'var(--nf-color-fg-muted)',
             fontSize: '0.75rem',
           }}
         >
           {t('tasks.smart_create.confidence', { value: String(confidence) })}
         </span>
       </label>
-      <span style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }} title={assignee.reason}>
+      <span
+        style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}
+        title={assignee.reason}
+      >
         {t('tasks.smart_create.reason', { reason: assignee.reason })}
       </span>
     </li>
@@ -565,7 +571,7 @@ function SubtaskProposalRow({ subtask, checked, onToggle }: SubtaskProposalRowPr
             style={{
               margin: '0.25rem 0 0',
               fontSize: '0.75rem',
-              color: 'var(--color-muted)',
+              color: 'var(--nf-color-fg-muted)',
             }}
           >
             {subtask.description}
@@ -575,7 +581,7 @@ function SubtaskProposalRow({ subtask, checked, onToggle }: SubtaskProposalRowPr
           <span
             style={{
               fontSize: '0.75rem',
-              color: 'var(--color-muted)',
+              color: 'var(--nf-color-fg-muted)',
               marginBlockStart: '0.125rem',
               display: 'block',
             }}

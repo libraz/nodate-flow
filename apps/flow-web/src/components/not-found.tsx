@@ -51,7 +51,7 @@ export default function NotFound(): ReactElement {
           fontFamily: 'var(--font-display)',
           margin: 0,
           fontSize: '1.5rem',
-          color: 'var(--color-fg)',
+          color: 'var(--nf-color-fg)',
         }}
       >
         {t('not_found.title')}
@@ -60,7 +60,7 @@ export default function NotFound(): ReactElement {
         style={{
           margin: 0,
           maxInlineSize: '28rem',
-          color: 'var(--color-muted)',
+          color: 'var(--nf-color-fg-muted)',
         }}
       >
         {t('not_found.description')}
@@ -72,8 +72,8 @@ export default function NotFound(): ReactElement {
           alignItems: 'center',
           padding: '0.5rem 1.25rem',
           borderRadius: '0.5rem',
-          background: 'var(--nf-color-accent, var(--color-accent, #9b59b6))',
-          color: 'var(--nf-color-accent-fg, white)',
+          background: 'var(--nf-color-accent, var(--nf-color-accent))',
+          color: 'var(--nf-color-accent, white)',
           textDecoration: 'none',
           fontWeight: 500,
         }}

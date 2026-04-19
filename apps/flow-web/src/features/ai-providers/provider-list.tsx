@@ -82,12 +82,12 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
         </Button>
       </header>
 
-      <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
         {t('providers.write_only_notice')}
       </p>
 
       {providers.length === 0 ? (
-        <Card style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-muted)' }}>
+        <Card style={{ padding: '2rem', textAlign: 'center', color: 'var(--nf-color-fg-muted)' }}>
           {t('providers.empty')}
         </Card>
       ) : (
@@ -115,7 +115,7 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
                 >
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                     <strong>{p.name}</strong>
-                    <span style={{ color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+                    <span style={{ color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
                       {kindLabel(p.kind)}
                       {p.defaultModel ? ` · ${p.defaultModel}` : ''}
                     </span>

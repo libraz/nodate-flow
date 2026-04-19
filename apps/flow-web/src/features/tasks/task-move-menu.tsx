@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 
 import { TRANSITIONS_BY_STATE, type TaskDerivedState, type TransitionName } from './api';
 import { STATE_KEY } from './constants';
+import styles from './task-move-menu.module.css';
 
 /** Maps a transition verb to the state the task lands in. */
 const LANDING_STATE: Record<TransitionName, TaskDerivedState> = {
@@ -84,17 +85,7 @@ export default function TaskMoveMenu({ state, onTransition }: TaskMoveMenuProps)
       onOpenChange={setOpen}
       placement="bottom-end"
       content={
-        <div
-          role="menu"
-          aria-label={t('tasks.board.move_menu')}
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.125rem',
-            margin: 'calc(-1 * var(--nf-space-4, 1rem))',
-            padding: 'var(--nf-space-2, 0.5rem)',
-          }}
-        >
+        <div role="menu" aria-label={t('tasks.board.move_menu')} className={styles.menuList}>
           {legal.map((name, idx) => {
             const landing = LANDING_STATE[name];
             return (
@@ -105,44 +96,12 @@ export default function TaskMoveMenu({ state, onTransition }: TaskMoveMenuProps)
                 }}
                 role="menuitem"
                 type="button"
+                className={styles.menuItem}
                 onClick={() => handleSelect(name)}
                 onKeyDown={(e) => handleKeyDown(e, idx)}
-                style={{
-                  all: 'unset',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '0.75rem',
-                  padding: '0.375rem 0.5rem',
-                  borderRadius: 'var(--nf-radius-sm, 0.25rem)',
-                  cursor: 'pointer',
-                  fontSize: 'var(--nf-text-sm, 0.875rem)',
-                  lineHeight: 1.4,
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.background =
-                    'var(--nf-color-bg-hover, var(--color-surface-raised))';
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = 'transparent';
-                }}
-                onFocus={(e) => {
-                  (e.currentTarget as HTMLElement).style.background =
-                    'var(--nf-color-bg-hover, var(--color-surface-raised))';
-                }}
-                onBlur={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = 'transparent';
-                }}
               >
                 <span>{t(`tasks.transitions.${name}`)}</span>
-                <span
-                  style={{
-                    color: 'var(--nf-color-fg-muted, var(--color-muted))',
-                    fontSize: 'var(--nf-text-xs, 0.75rem)',
-                  }}
-                >
-                  → {t(STATE_KEY[landing])}
-                </span>
+                <span className={styles.menuItemLanding}>→ {t(STATE_KEY[landing])}</span>
               </button>
             );
           })}
@@ -154,35 +113,10 @@ export default function TaskMoveMenu({ state, onTransition }: TaskMoveMenuProps)
         aria-label={t('tasks.board.move_menu')}
         aria-haspopup="menu"
         aria-expanded={open}
+        className={styles.trigger}
         onClick={(e) => {
           // Prevent the card's onClick from navigating to task detail.
           e.stopPropagation();
-        }}
-        style={{
-          all: 'unset',
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: '1.5rem',
-          height: '1.5rem',
-          borderRadius: 'var(--nf-radius-sm, 0.25rem)',
-          color: 'var(--nf-color-fg-muted, var(--color-muted))',
-          cursor: 'pointer',
-          flexShrink: 0,
-        }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLElement).style.background =
-            'var(--nf-color-bg-hover, var(--color-surface-raised))';
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLElement).style.background = 'transparent';
-        }}
-        onFocus={(e) => {
-          (e.currentTarget as HTMLElement).style.background =
-            'var(--nf-color-bg-hover, var(--color-surface-raised))';
-        }}
-        onBlur={(e) => {
-          (e.currentTarget as HTMLElement).style.background = 'transparent';
         }}
       >
         <MoreVertical size={14} aria-hidden />

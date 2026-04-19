@@ -103,7 +103,7 @@ export default function TaskCard({
           style={{
             flex: 1,
             fontWeight: 600,
-            color: 'var(--color-fg)',
+            color: 'var(--nf-color-fg)',
             lineHeight: 1.3,
             wordBreak: 'break-word',
             textDecoration: 'none',

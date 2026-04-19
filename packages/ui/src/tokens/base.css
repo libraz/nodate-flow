@@ -56,6 +56,10 @@
   --nf-z-toast: 1500;
   --nf-z-tooltip: 1600;
 
+  /* breakpoints (reference only — CSS custom properties cannot be used in @media)
+   * Use the JS constants from @nodate-flow/ui/tokens/breakpoints instead.
+   * sm: 640px, md: 768px, lg: 1024px, xl: 1280px */
+
   /* motion durations */
   --nf-duration-instant: 80ms;
   --nf-duration-fast: 120ms;

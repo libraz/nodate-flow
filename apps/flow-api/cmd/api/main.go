@@ -28,8 +28,6 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/router"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/integrations"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/integrations/email"
 	nflog "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/log"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/notification"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/obs"
@@ -37,6 +35,8 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/storage"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/stream"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/webhook"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
 )
 
 func main() {
@@ -162,7 +162,12 @@ func main() {
 		}
 	}
 
-	jwtIssuer, err := auth.NewJWTIssuer(nil, "nodate-flow", "api", 15*time.Minute)
+	jwtPriv, err := authn.DeriveEd25519Key(os.Getenv("NF_SECRET_KEY"), "nodate-flow:jwt:v1")
+	if err != nil {
+		logger.Error("jwt key derivation failed", "err", err)
+		os.Exit(1)
+	}
+	jwtIssuer, err := auth.NewJWTIssuer(jwtPriv, "nodate-flow", "api", 15*time.Minute)
 	if err != nil {
 		logger.Error("jwt issuer init failed", "err", err)
 		os.Exit(1)
@@ -285,33 +290,6 @@ func main() {
 	webhookWorker := webhook.NewWorker(db, queries)
 	eventbus.AddNotifyHook(webhookWorker.Hook())
 
-	integrationsRegistry := integrations.NewRegistry(
-		func() (integrations.Provider, error) {
-			return integrations.NewGithub(cfg.GithubClientID, cfg.GithubClientSecret)
-		},
-		func() (integrations.Provider, error) {
-			return integrations.NewSlack(cfg.SlackClientID, cfg.SlackClientSecret)
-		},
-		func() (integrations.Provider, error) {
-			return integrations.NewGoogleCalendar(cfg.GoogleClientID, cfg.GoogleClientSecret)
-		},
-	)
-
-	// Background OAuth token refresher: keeps Google Calendar
-	// access tokens fresh so foreground MCP / ingest handlers
-	// never race a 401. Other providers (GitHub, Slack) return
-	// ErrRefreshNotSupported and are silently skipped.
-	integrationsRefresher := &integrations.Refresher{
-		Queries:  queries,
-		Cipher:   cipher,
-		Registry: integrationsRegistry,
-		Logger:   logger,
-	}
-	refresherCtx, refresherCancel := context.WithCancel(context.Background())
-	defer refresherCancel()
-	go integrationsRefresher.Run(refresherCtx)
-	logger.Info("integrations refresher goroutine launched")
-
 	inner := router.Build(router.Deps{
 		DB:                    db,
 		Queries:               queries,
@@ -332,9 +310,6 @@ func main() {
 		EmbedOpenAIKey:        cfg.EmbedOpenAIKey,
 		EmbedModel:            cfg.EmbedModel,
 		EmbedBaseURL:          cfg.EmbedBaseURL,
-		Integrations:          integrationsRegistry,
-		PublicBaseURL:         cfg.PublicBaseURL,
-		WebBaseURL:            cfg.WebBaseURL,
 	})
 
 	// Wrap the router with the request logger so the prod binary keeps
@@ -407,7 +382,7 @@ func main() {
 	// reviews) without human intervention. Controlled by
 	// NF_FLOW_AUTO_ACTION_INTERVAL (0 disables).
 	autoActionExec := &autoactions.Executor{
-		DB:     db,
+		DB: db,
 		Config: autoactions.ExecutorConfig{
 			Interval:            cfg.AutoActionInterval,
 			ConfidenceThreshold: float32(cfg.AutoActionThreshold),
@@ -455,7 +430,6 @@ func main() {
 	autoActionExec.Stop()
 	webhookWorker.Stop()
 	schedulerCancel()
-	refresherCancel()
 	if workerCancel != nil {
 		workerCancel()
 	}

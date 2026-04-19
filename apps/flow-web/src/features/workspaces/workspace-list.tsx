@@ -12,7 +12,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { formatDate } from '../../lib/format';
+import { formatEpoch } from '../../lib/format';
 import { type Workspace, useWorkspacesQuery } from './api';
 import WorkspaceCreateDialog from './workspace-create-dialog';
 
@@ -33,7 +33,7 @@ export default function WorkspaceList(): ReactElement {
           to="/workspaces/$id"
           params={{ id: row.original.id }}
           style={{
-            color: 'var(--color-fg)',
+            color: 'var(--nf-color-fg)',
             textDecoration: 'none',
             fontWeight: 500,
           }}
@@ -60,7 +60,7 @@ export default function WorkspaceList(): ReactElement {
       id: 'created',
       accessorKey: 'createdAt',
       header: () => t('workspaces.columns.created'),
-      cell: ({ row }) => <span>{formatDate(row.original.createdAt, locale)}</span>,
+      cell: ({ row }) => <span>{formatEpoch(row.original.createdAt, locale) ?? '—'}</span>,
     },
   ];
 

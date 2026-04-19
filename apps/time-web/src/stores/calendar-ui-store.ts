@@ -6,11 +6,29 @@ import {
   type Theme,
   applyColorMode,
   applyTheme,
-  loadColorMode,
-  loadTheme,
-  saveColorMode,
-  saveTheme,
+  combinePreference,
+  loadPreference,
+  savePreference,
 } from '../lib/theme';
+import { useAuthStore } from './auth-store';
+
+const AUTH_API_URL = import.meta.env.VITE_AUTH_API_BASE_URL ?? 'http://localhost:8082';
+
+/** Fire-and-forget server sync of theme preference. */
+function syncThemeToServer(theme: Theme, colorMode: ColorMode): void {
+  const token = useAuthStore.getState().accessToken;
+  if (!token) return;
+  const pref = combinePreference(theme, colorMode);
+  void fetch(`${AUTH_API_URL}/me`, {
+    method: 'PATCH',
+    // biome-ignore lint/style/useNamingConvention: HTTP header
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    credentials: 'include',
+    body: JSON.stringify({ themePreference: pref }),
+  }).catch(() => {
+    /* ignore — local state is the fast path */
+  });
+}
 
 export type CalendarView = 'month' | 'week';
 export type RightPanel = 'memo' | 'members' | 'share' | 'notifications';
@@ -79,8 +97,8 @@ export const useCalendarUiStore = create<CalendarUiState>((set) => ({
   searchQuery: '',
   leftSidebarExpanded: true,
   showDayDetail: false,
-  theme: loadTheme(),
-  colorMode: loadColorMode(),
+  theme: loadPreference().theme,
+  colorMode: loadPreference().colorMode,
   showSettings: false,
   mobileTab: 'calendar',
 
@@ -155,17 +173,19 @@ export const useCalendarUiStore = create<CalendarUiState>((set) => ({
   toggleSettings: () => set((state) => ({ showSettings: !state.showSettings })),
   setMobileTab: (tab) => set({ mobileTab: tab }),
   setTheme: (theme) => {
-    saveTheme(theme);
     set((state) => {
+      savePreference(theme, state.colorMode);
       applyTheme(theme, state.colorMode);
+      syncThemeToServer(theme, state.colorMode);
       return { theme };
     });
   },
   setColorMode: (mode) => {
-    saveColorMode(mode);
     set((state) => {
+      savePreference(state.theme, mode);
       applyTheme(state.theme, mode);
       applyColorMode(mode);
+      syncThemeToServer(state.theme, mode);
       return { colorMode: mode };
     });
   },

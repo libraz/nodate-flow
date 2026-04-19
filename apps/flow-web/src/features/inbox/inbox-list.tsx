@@ -183,7 +183,7 @@ export default function InboxList(): ReactElement {
             flexDirection: 'column',
             gap: '0.375rem',
             fontSize: '0.875rem',
-            color: 'var(--color-muted)',
+            color: 'var(--nf-color-fg-muted)',
           }}
         >
           {t('filter.workspace_label')}
@@ -193,9 +193,9 @@ export default function InboxList(): ReactElement {
             style={{
               padding: '0.5rem 0.75rem',
               borderRadius: '0.5rem',
-              border: '1px solid var(--color-border)',
-              background: 'var(--color-surface)',
-              color: 'var(--color-fg)',
+              border: '1px solid var(--nf-color-border)',
+              background: 'var(--nf-color-surface)',
+              color: 'var(--nf-color-fg)',
               fontSize: '0.9375rem',
               maxInlineSize: '20rem',
             }}
@@ -229,7 +229,7 @@ export default function InboxList(): ReactElement {
               margin: 0,
               fontSize: '0.875rem',
               fontWeight: 600,
-              color: 'var(--color-muted)',
+              color: 'var(--nf-color-fg-muted)',
               textTransform: 'uppercase',
               letterSpacing: '0.04em',
             }}

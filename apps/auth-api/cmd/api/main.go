@@ -23,6 +23,9 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/router"
+	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/integrations"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
 )
 
 func main() {
@@ -62,11 +65,56 @@ func main() {
 		logger.Warn("cipher disabled (TOTP unavailable)", "err", cerr)
 	}
 
-	jwtIssuer, err := auth.NewJWTIssuer(nil, "nodate-flow", "api", 15*time.Minute)
+	jwtPriv, err := authn.DeriveEd25519Key(os.Getenv("NF_SECRET_KEY"), "nodate-flow:jwt:v1")
+	if err != nil {
+		logger.Error("jwt key derivation failed", "err", err)
+		os.Exit(1)
+	}
+	jwtIssuer, err := auth.NewJWTIssuer(jwtPriv, "nodate-flow", "api", 15*time.Minute)
 	if err != nil {
 		logger.Error("jwt issuer init failed", "err", err)
 		os.Exit(1)
 	}
+
+	var emailSender email.Sender
+	if cfg.SmtpHost != "" {
+		s, smtpErr := email.NewSMTPSender(email.SMTPConfig{
+			Host:     cfg.SmtpHost,
+			Port:     cfg.SmtpPort,
+			Username: cfg.SmtpUsername,
+			Password: cfg.SmtpPassword,
+			From:     cfg.SmtpFrom,
+		})
+		if smtpErr != nil {
+			logger.Error("smtp init failed", "err", smtpErr)
+			os.Exit(1)
+		}
+		emailSender = s
+		logger.Info("email sender configured", "host", cfg.SmtpHost)
+	}
+
+	integrationsRegistry := integrations.NewRegistry(
+		func() (integrations.Provider, error) {
+			return integrations.NewGithub(cfg.IntGithubClientID, cfg.IntGithubClientSecret)
+		},
+		func() (integrations.Provider, error) {
+			return integrations.NewSlack(cfg.IntSlackClientID, cfg.IntSlackClientSecret)
+		},
+		func() (integrations.Provider, error) {
+			return integrations.NewGoogleCalendar(cfg.IntGoogleClientID, cfg.IntGoogleClientSecret)
+		},
+	)
+
+	refresherCtx, refresherCancel := context.WithCancel(context.Background())
+	defer refresherCancel()
+	integrationsRefresher := &integrations.Refresher{
+		Queries:  queries,
+		Cipher:   cipher,
+		Registry: integrationsRegistry,
+		Logger:   logger,
+	}
+	go integrationsRefresher.Run(refresherCtx)
+	logger.Info("integrations refresher goroutine launched")
 
 	inner := router.Build(router.Deps{
 		DB:               db,
@@ -75,6 +123,11 @@ func main() {
 		Cipher:           cipher,
 		CookieSecure:     cfg.CookieSecure,
 		RegistrationOpen: cfg.RegistrationOpen,
+		EmailSender:      emailSender,
+		FlowWebURL:       cfg.FlowWebURL,
+		Integrations:     integrationsRegistry,
+		PublicBaseURL:     cfg.PublicBaseURL,
+		WebBaseURL:        cfg.FlowWebURL,
 	})
 
 	outer := chi.NewRouter()

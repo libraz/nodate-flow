@@ -35,14 +35,14 @@ const tableStyle: React.CSSProperties = {
 const thStyle: React.CSSProperties = {
   textAlign: 'start',
   padding: 'var(--nf-space-2, 0.5rem) var(--nf-space-3, 0.75rem)',
-  borderBlockEnd: '2px solid var(--nf-color-border, var(--color-hairline))',
+  borderBlockEnd: '2px solid var(--nf-color-border)',
   fontWeight: 600,
-  color: 'var(--nf-color-fg-muted, var(--color-muted))',
+  color: 'var(--nf-color-fg-muted)',
 };
 
 const tdStyle: React.CSSProperties = {
   padding: 'var(--nf-space-2, 0.5rem) var(--nf-space-3, 0.75rem)',
-  borderBlockEnd: '1px solid var(--nf-color-border, var(--color-hairline))',
+  borderBlockEnd: '1px solid var(--nf-color-border)',
 };
 
 function formatTimestamp(ts: number): string {
@@ -139,7 +139,7 @@ function AuditLogsPage(): ReactElement {
           <label
             style={{
               fontSize: 'var(--nf-text-xs, 0.75rem)',
-              color: 'var(--nf-color-fg-muted, var(--color-muted))',
+              color: 'var(--nf-color-fg-muted)',
             }}
           >
             {t('auditLogs.filterFrom')}
@@ -151,10 +151,9 @@ function AuditLogsPage(): ReactElement {
                 display: 'block',
                 padding: '0.375rem 0.5rem',
                 borderRadius: 'var(--nf-radius-md, 0.375rem)',
-                border:
-                  'var(--nf-space-px, 1px) solid var(--nf-color-border, var(--color-hairline))',
-                background: 'var(--nf-color-bg, var(--color-bg))',
-                color: 'var(--nf-color-fg, var(--color-fg))',
+                border: 'var(--nf-space-px, 1px) solid var(--nf-color-border)',
+                background: 'var(--nf-color-bg)',
+                color: 'var(--nf-color-fg)',
                 fontSize: 'var(--nf-text-sm, 0.875rem)',
               }}
             />
@@ -164,7 +163,7 @@ function AuditLogsPage(): ReactElement {
           <label
             style={{
               fontSize: 'var(--nf-text-xs, 0.75rem)',
-              color: 'var(--nf-color-fg-muted, var(--color-muted))',
+              color: 'var(--nf-color-fg-muted)',
             }}
           >
             {t('auditLogs.filterTo')}
@@ -176,10 +175,9 @@ function AuditLogsPage(): ReactElement {
                 display: 'block',
                 padding: '0.375rem 0.5rem',
                 borderRadius: 'var(--nf-radius-md, 0.375rem)',
-                border:
-                  'var(--nf-space-px, 1px) solid var(--nf-color-border, var(--color-hairline))',
-                background: 'var(--nf-color-bg, var(--color-bg))',
-                color: 'var(--nf-color-fg, var(--color-fg))',
+                border: 'var(--nf-space-px, 1px) solid var(--nf-color-border)',
+                background: 'var(--nf-color-bg)',
+                color: 'var(--nf-color-fg)',
                 fontSize: 'var(--nf-text-sm, 0.875rem)',
               }}
             />
@@ -192,7 +190,7 @@ function AuditLogsPage(): ReactElement {
           role="alert"
           style={{
             margin: 0,
-            color: 'var(--nf-color-fg-danger, var(--color-danger))',
+            color: 'var(--nf-color-danger)',
             fontSize: 'var(--nf-text-sm, 0.875rem)',
           }}
         >
@@ -201,13 +199,9 @@ function AuditLogsPage(): ReactElement {
       ) : null}
 
       {loading ? (
-        <p style={{ color: 'var(--nf-color-fg-muted, var(--color-muted))' }}>
-          {t('common.loading')}
-        </p>
+        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('common.loading')}</p>
       ) : entries.length === 0 ? (
-        <p style={{ color: 'var(--nf-color-fg-muted, var(--color-muted))' }}>
-          {t('auditLogs.noResults')}
-        </p>
+        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('auditLogs.noResults')}</p>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
@@ -249,7 +243,7 @@ function AuditLogsPage(): ReactElement {
         <Button variant="default" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
           {t('common.previous')}
         </Button>
-        <span style={{ color: 'var(--nf-color-fg-muted, var(--color-muted))' }}>
+        <span style={{ color: 'var(--nf-color-fg-muted)' }}>
           {t('common.page', { page, total: totalPages })}
         </span>
         <Button

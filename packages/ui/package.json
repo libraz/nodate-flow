@@ -9,12 +9,14 @@
     ".": "./src/index.ts",
     "./tokens/base.css": "./src/tokens/base.css",
     "./tokens/semantic.css": "./src/tokens/semantic.css",
+    "./tokens/breakpoints": "./src/tokens/breakpoints.ts",
     "./themes/aurora-light.css": "./src/themes/aurora-light.css",
     "./themes/aurora-dark.css": "./src/themes/aurora-dark.css",
     "./themes/dotline-light.css": "./src/themes/dotline-light.css",
     "./themes/dotline-dark.css": "./src/themes/dotline-dark.css",
     "./themes/glass-light.css": "./src/themes/glass-light.css",
     "./themes/glass-dark.css": "./src/themes/glass-dark.css",
+    "./providers/theme-provider": "./src/providers/theme-provider.tsx",
     "./hooks/use-theme": "./src/hooks/use-theme.ts",
     "./hooks/use-controllable-state": "./src/hooks/use-controllable-state.ts",
     "./hooks/use-focus-trap": "./src/hooks/use-focus-trap.ts",
@@ -48,8 +50,15 @@
     "./primitives/confirm": "./src/primitives/confirm/confirm.tsx",
     "./primitives/tabs": "./src/primitives/tabs/tabs.tsx",
     "./primitives/scroll-area": "./src/primitives/scroll-area/scroll-area.tsx",
+    "./primitives/date-picker": "./src/primitives/date-picker/date-picker.tsx",
     "./primitives/data-grid": "./src/primitives/data-grid/data-grid.tsx",
-    "./primitives/auth-card": "./src/primitives/auth-card/auth-card.tsx"
+    "./primitives/markdown": "./src/primitives/markdown/markdown.tsx",
+    "./primitives/empty-state": "./src/primitives/empty-state/empty-state.tsx",
+    "./primitives/error-boundary": "./src/primitives/error-boundary/error-boundary.tsx",
+    "./primitives/page-skeleton": "./src/primitives/page-skeleton/page-skeleton.tsx",
+    "./primitives/auth-card": "./src/primitives/auth-card/auth-card.tsx",
+    "./primitives/theme-picker": "./src/primitives/theme-picker/theme-picker.tsx",
+    "./primitives/time-picker": "./src/primitives/time-picker/time-picker.tsx"
   },
   "scripts": {
     "typecheck": "tsc -b",
@@ -65,7 +74,13 @@
   },
   "peerDependencies": {
     "react": "19.0.0",
-    "react-dom": "19.0.0"
+    "react-dom": "19.0.0",
+    "react-markdown": ">=10.0.0",
+    "remark-gfm": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react-markdown": { "optional": true },
+    "remark-gfm": { "optional": true }
   },
   "devDependencies": {
     "@testing-library/react": "16.0.1",

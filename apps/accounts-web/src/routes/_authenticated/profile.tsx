@@ -122,10 +122,9 @@ function ProfilePage(): ReactElement {
                 style={{
                   padding: '0.5rem 0.75rem',
                   borderRadius: 'var(--nf-radius-md, 0.375rem)',
-                  border:
-                    'var(--nf-space-px, 1px) solid var(--nf-color-border, var(--color-hairline))',
-                  background: 'var(--nf-color-bg, var(--color-bg))',
-                  color: 'var(--nf-color-fg, var(--color-fg))',
+                  border: 'var(--nf-space-px, 1px) solid var(--nf-color-border)',
+                  background: 'var(--nf-color-bg)',
+                  color: 'var(--nf-color-fg)',
                   fontSize: 'var(--nf-text-sm, 0.875rem)',
                 }}
               >
@@ -147,10 +146,9 @@ function ProfilePage(): ReactElement {
                 style={{
                   padding: '0.5rem 0.75rem',
                   borderRadius: 'var(--nf-radius-md, 0.375rem)',
-                  border:
-                    'var(--nf-space-px, 1px) solid var(--nf-color-border, var(--color-hairline))',
-                  background: 'var(--nf-color-bg, var(--color-bg))',
-                  color: 'var(--nf-color-fg, var(--color-fg))',
+                  border: 'var(--nf-space-px, 1px) solid var(--nf-color-border)',
+                  background: 'var(--nf-color-bg)',
+                  color: 'var(--nf-color-fg)',
                   fontSize: 'var(--nf-text-sm, 0.875rem)',
                 }}
               >
@@ -169,7 +167,7 @@ function ProfilePage(): ReactElement {
             role="alert"
             style={{
               margin: 0,
-              color: 'var(--nf-color-fg-danger, var(--color-danger))',
+              color: 'var(--nf-color-danger)',
               fontSize: 'var(--nf-text-sm, 0.875rem)',
             }}
           >
@@ -181,7 +179,7 @@ function ProfilePage(): ReactElement {
           <output
             style={{
               margin: 0,
-              color: 'var(--nf-color-fg-success, var(--color-success, green))',
+              color: 'var(--nf-color-success, var(--nf-color-success))',
               fontSize: 'var(--nf-text-sm, 0.875rem)',
             }}
           >
@@ -197,7 +195,7 @@ function ProfilePage(): ReactElement {
           style={{
             margin: 0,
             fontSize: 'var(--nf-text-sm, 0.875rem)',
-            color: 'var(--nf-color-fg-muted, var(--color-muted))',
+            color: 'var(--nf-color-fg-muted)',
           }}
         >
           <Link to="/security">{t('profile.securityLink')}</Link>

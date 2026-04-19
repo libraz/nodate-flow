@@ -11,21 +11,20 @@ import type { ColumnDef } from '@tanstack/react-table';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatEpochDateTime } from '../../lib/format';
 import { type WorkspaceInvite, useListInvitesQuery, useRevokeInvite } from './invite-api';
 
 export interface WorkspaceInvitesListProps {
   workspaceId: string;
 }
 
-function formatExpiry(iso: string | undefined, locale: string, t: (key: string) => string): string {
-  if (!iso) return t('workspaces.invites.never');
-  try {
-    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(
-      new Date(iso),
-    );
-  } catch {
-    return iso;
-  }
+function formatExpiry(
+  epoch: number | undefined,
+  locale: string,
+  t: (key: string) => string,
+): string {
+  if (!epoch) return t('workspaces.invites.never');
+  return formatEpochDateTime(epoch, locale) ?? t('workspaces.invites.never');
 }
 
 function formatUses(useCount: number, maxUses: number | null, t: (key: string) => string): string {

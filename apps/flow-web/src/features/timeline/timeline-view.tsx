@@ -128,8 +128,8 @@ function TimelineInner({
           style={{
             padding: '3rem 1rem',
             textAlign: 'center',
-            color: 'var(--nf-color-fg-muted, var(--color-muted))',
-            border: '1px dashed var(--nf-color-border, var(--color-border))',
+            color: 'var(--nf-color-fg-muted, var(--nf-color-fg-muted))',
+            border: '1px dashed var(--nf-color-border, var(--nf-color-border))',
             borderRadius: '0.75rem',
             background: 'var(--nf-color-bg-sunken, transparent)',
           }}
@@ -159,9 +159,9 @@ function TimelineInner({
                   fontSize: '0.75rem',
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
-                  color: 'var(--color-muted)',
-                  background: 'var(--nf-color-bg, var(--color-bg))',
-                  borderBlockEnd: '1px solid var(--color-border)',
+                  color: 'var(--nf-color-fg-muted)',
+                  background: 'var(--nf-color-bg, var(--nf-color-bg))',
+                  borderBlockEnd: '1px solid var(--nf-color-border)',
                 }}
               >
                 {g.label} · {g.items.length}
@@ -182,7 +182,7 @@ function TimelineInner({
                     insetBlockStart: 0,
                     insetBlockEnd: 0,
                     inlineSize: '2px',
-                    background: 'var(--color-border)',
+                    background: 'var(--nf-color-border)',
                   }}
                 />
                 {g.items.map((ev) => (

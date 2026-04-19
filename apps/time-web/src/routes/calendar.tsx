@@ -37,7 +37,7 @@ function TabButton({
       type="button"
       onClick={onClick}
       className="flex flex-1 flex-col items-center gap-0.5 py-2"
-      style={{ color: active ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}
+      style={{ color: active ? 'var(--nf-color-accent)' : 'var(--nf-color-fg-subtle)' }}
     >
       {icon}
       <span className="text-[10px] font-medium">{label}</span>
@@ -67,7 +67,7 @@ function CalendarPage(): ReactElement {
         {sidebarOpen ? (
           <>
             <div
-              className="fixed inset-0 z-30 bg-[var(--color-overlay)] sm:hidden"
+              className="fixed inset-0 z-30 bg-[var(--nf-color-overlay)] sm:hidden"
               onClick={() => setSidebarOpen(false)}
               onKeyDown={(e) => {
                 if (e.key === 'Escape') setSidebarOpen(false);
@@ -78,7 +78,7 @@ function CalendarPage(): ReactElement {
             />
             <div
               className="fixed inset-y-0 left-0 z-30 flex w-64 shadow-xl sm:hidden"
-              style={{ backgroundColor: 'var(--color-surface-primary)' }}
+              style={{ backgroundColor: 'var(--nf-color-surface-primary)' }}
             >
               <CalendarSidebar />
             </div>
@@ -110,7 +110,7 @@ function CalendarPage(): ReactElement {
 
       {/* Mobile bottom tab bar */}
       <nav
-        className="glass-surface-heavy fixed bottom-0 left-0 right-0 z-40 flex border-t border-[var(--color-border)] sm:hidden"
+        className="glass-surface-heavy fixed bottom-0 left-0 right-0 z-40 flex border-t border-[var(--nf-color-border)] sm:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <TabButton

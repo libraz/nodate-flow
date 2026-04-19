@@ -34,7 +34,7 @@ function InboxRoute(): ReactElement {
         >
           {t('view.title')}
         </h1>
-        <p style={{ margin: 0, color: 'var(--color-muted)' }}>{t('view.subtitle')}</p>
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{t('view.subtitle')}</p>
       </header>
       <Suspense
         fallback={

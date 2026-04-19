@@ -110,15 +110,15 @@ export default function NotificationsForm(): ReactElement {
                 gap: '0.75rem',
                 alignItems: 'start',
                 padding: '0.75rem 1rem',
-                border: '1px solid var(--color-border)',
+                border: '1px solid var(--nf-color-border)',
                 borderRadius: '0.5rem',
               }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                <label htmlFor={id} style={{ fontWeight: 500, color: 'var(--color-fg)' }}>
+                <label htmlFor={id} style={{ fontWeight: 500, color: 'var(--nf-color-fg)' }}>
                   {t(item.labelKey)}
                 </label>
-                <span style={{ fontSize: '0.875rem', color: 'var(--color-fg-muted)' }}>
+                <span style={{ fontSize: '0.875rem', color: 'var(--nf-color-fg-muted)' }}>
                   {t(item.descriptionKey)}
                 </span>
               </div>

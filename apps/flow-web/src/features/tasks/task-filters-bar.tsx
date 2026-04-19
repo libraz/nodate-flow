@@ -182,7 +182,7 @@ export default function TaskFiltersBar({
             display: 'block',
             inlineSize: '1px',
             blockSize: '1.25rem',
-            background: 'var(--nf-color-border, var(--color-hairline))',
+            background: 'var(--nf-color-border, var(--nf-color-hairline))',
             flexShrink: 0,
           }}
         />

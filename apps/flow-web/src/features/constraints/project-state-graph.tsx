@@ -169,7 +169,7 @@ export default function ProjectStateGraph({ projectId }: ProjectStateGraphProps)
           alignItems: 'center',
           justifyContent: 'center',
           minBlockSize: '300px',
-          color: 'var(--color-muted)',
+          color: 'var(--nf-color-fg-muted)',
         }}
       >
         <p>{t('constraints:stateGraph.noTasks')}</p>
@@ -210,7 +210,7 @@ export default function ProjectStateGraph({ projectId }: ProjectStateGraphProps)
             style={{
               fontWeight: 400,
               fontSize: '0.8125rem',
-              color: 'var(--color-muted)',
+              color: 'var(--nf-color-fg-muted)',
               marginInlineStart: '0.75rem',
             }}
           >
@@ -228,7 +228,7 @@ export default function ProjectStateGraph({ projectId }: ProjectStateGraphProps)
       >
         <defs>
           <marker id="dep-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-            <path d="M0,0 L8,4 L0,8 Z" fill="var(--color-border, #94a3b8)" />
+            <path d="M0,0 L8,4 L0,8 Z" fill="var(--nf-color-border)" />
           </marker>
         </defs>
 
@@ -257,7 +257,7 @@ export default function ProjectStateGraph({ projectId }: ProjectStateGraphProps)
               key={edge.id}
               d={edgePath(from.x, from.y, to.x, to.y)}
               fill="none"
-              stroke="var(--color-border, #94a3b8)"
+              stroke="var(--nf-color-border)"
               strokeWidth={1.5}
               markerEnd="url(#dep-arrow)"
               opacity={0.7}

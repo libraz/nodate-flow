@@ -1292,6 +1292,8 @@ const (
 	UsersThemePreferenceAuroraDark   UsersThemePreference = "aurora-dark"
 	UsersThemePreferenceDotlineLight UsersThemePreference = "dotline-light"
 	UsersThemePreferenceDotlineDark  UsersThemePreference = "dotline-dark"
+	UsersThemePreferenceGlassLight   UsersThemePreference = "glass-light"
+	UsersThemePreferenceGlassDark    UsersThemePreference = "glass-dark"
 	UsersThemePreferenceSystem       UsersThemePreference = "system"
 )
 

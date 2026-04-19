@@ -6,7 +6,7 @@
  * colors, and badge tones consistently.
  */
 
-import type { BadgeTone } from '@nodate-flow/ui';
+import type { BadgeTone } from '@nodate-flow/ui/primitives/badge';
 
 import type { TaskDerivedState, TaskPriority } from './api';
 
@@ -23,7 +23,7 @@ export const PRIORITY_KEY: Record<TaskPriority, string> = {
 
 /** CSS color string for each priority level. */
 export const PRIORITY_COLOR: Record<TaskPriority, string> = {
-  0: 'var(--color-muted, #95a5a6)',
+  0: 'var(--nf-color-fg-muted)',
   1: '#3498db',
   2: '#e67e22',
   3: '#e74c3c',
@@ -52,11 +52,11 @@ export const STATE_KEY: Record<TaskDerivedState, string> = {
 
 /** CSS color string for each derived state (with CSS variable fallbacks). */
 export const STATE_COLOR: Record<TaskDerivedState, string> = {
-  open: 'var(--color-info, #3498db)',
-  waiting: 'var(--color-warning, #f39c12)',
-  review: 'var(--color-accent, #9b59b6)',
-  done: 'var(--color-success, #27ae60)',
-  cancelled: 'var(--color-muted, #95a5a6)',
+  open: 'var(--nf-color-info)',
+  waiting: 'var(--nf-color-warning)',
+  review: 'var(--nf-color-accent)',
+  done: 'var(--nf-color-success)',
+  cancelled: 'var(--nf-color-fg-muted)',
 };
 
 /** Badge tone for each derived state. */

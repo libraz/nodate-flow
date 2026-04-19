@@ -98,6 +98,50 @@ export function isZeroTime(iso: string): boolean {
  * @param dueOn - Date string in YYYY-MM-DD format, or `null`/`undefined`.
  * @returns `true` when the due date is in the past.
  */
+/**
+ * Format a unix-second timestamp as a medium-length localised date.
+ *
+ * @param epochSec - Unix timestamp in seconds.
+ * @param locale - BCP 47 language tag.
+ * @returns Formatted date string, or `null` for zero/falsy values.
+ */
+export function formatEpoch(
+  epochSec: number | string | null | undefined,
+  locale: string,
+): string | null {
+  if (!epochSec) return null;
+  const n = typeof epochSec === 'string' ? Number(epochSec) : epochSec;
+  if (Number.isNaN(n)) return null;
+  try {
+    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(n * 1000));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Format a unix-second timestamp as a medium-length localised date+time.
+ *
+ * @param epochSec - Unix timestamp in seconds.
+ * @param locale - BCP 47 language tag.
+ * @returns Formatted date+time string, or `null` for zero/falsy values.
+ */
+export function formatEpochDateTime(
+  epochSec: number | string | null | undefined,
+  locale: string,
+): string | null {
+  if (!epochSec) return null;
+  const n = typeof epochSec === 'string' ? Number(epochSec) : epochSec;
+  if (Number.isNaN(n)) return null;
+  try {
+    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(
+      new Date(n * 1000),
+    );
+  } catch {
+    return null;
+  }
+}
+
 export function isOverdue(dueOn: string | null | undefined): boolean {
   if (!dueOn) return false;
   const now = new Date();

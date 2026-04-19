@@ -11,7 +11,7 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/integrations/email"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
 )
 
 // Fanout creates per-user notification rows in response to eventbus

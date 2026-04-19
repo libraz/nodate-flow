@@ -14,7 +14,7 @@ import {
 } from '@tanstack/react-query';
 
 import { ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { authSdk as sdk } from '../../lib/sdk';
 
 export { ApiError as SettingsApiError };
 

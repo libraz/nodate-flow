@@ -42,10 +42,10 @@ function ThemeCard({
     <button
       type="button"
       onClick={onSelect}
-      className="group relative flex flex-col items-center gap-2 rounded-[var(--radius-md)] p-3 transition-all"
+      className="group relative flex flex-col items-center gap-2 rounded-[var(--nf-radius-md)] p-3 transition-all"
       style={{
-        border: selected ? '2px solid var(--color-accent)' : '2px solid var(--color-border)',
-        backgroundColor: selected ? 'var(--color-accent-bg)' : 'transparent',
+        border: selected ? '2px solid var(--nf-color-accent)' : '2px solid var(--nf-color-border)',
+        backgroundColor: selected ? 'var(--nf-color-accent-subtle)' : 'transparent',
       }}
     >
       {/* Mini preview */}
@@ -69,7 +69,7 @@ function ThemeCard({
       </div>
       <span
         className="text-[12px] font-medium"
-        style={{ color: selected ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}
+        style={{ color: selected ? 'var(--nf-color-accent)' : 'var(--nf-color-fg-muted)' }}
       >
         {label}
       </span>
@@ -94,19 +94,19 @@ function ColorModeButton({
     <button
       type="button"
       onClick={onSelect}
-      className="flex flex-1 flex-col items-center gap-1.5 rounded-[var(--radius-md)] py-2.5 transition-all"
+      className="flex flex-1 flex-col items-center gap-1.5 rounded-[var(--nf-radius-md)] py-2.5 transition-all"
       style={{
-        border: selected ? '2px solid var(--color-accent)' : '2px solid var(--color-border)',
-        backgroundColor: selected ? 'var(--color-accent-bg)' : 'transparent',
+        border: selected ? '2px solid var(--nf-color-accent)' : '2px solid var(--nf-color-border)',
+        backgroundColor: selected ? 'var(--nf-color-accent-subtle)' : 'transparent',
       }}
     >
       <Icon
         className="h-5 w-5"
-        style={{ color: selected ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}
+        style={{ color: selected ? 'var(--nf-color-accent)' : 'var(--nf-color-fg-subtle)' }}
       />
       <span
         className="text-[12px] font-medium"
-        style={{ color: selected ? 'var(--color-accent)' : 'var(--color-text-secondary)' }}
+        style={{ color: selected ? 'var(--nf-color-accent)' : 'var(--nf-color-fg-muted)' }}
       >
         {label}
       </span>
@@ -148,22 +148,22 @@ export default function SettingsModal(): ReactElement | null {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-overlay)]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--nf-color-overlay)]"
       onClick={handleBackdropClick}
       onKeyDown={undefined}
       role="presentation"
     >
-      <div className="glass-surface-heavy w-full max-w-[420px] rounded-[var(--radius-xl)] ring-1 ring-[var(--color-border)]">
+      <div className="glass-surface-heavy w-full max-w-[420px] rounded-[var(--nf-radius-lg)] ring-1 ring-[var(--nf-color-border)]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-1">
-          <h2 className="text-[18px] font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+          <h2 className="text-[18px] font-semibold" style={{ color: 'var(--nf-color-fg)' }}>
             {t('settings.title')}
           </h2>
           <button
             type="button"
             onClick={toggleSettings}
-            className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] transition-colors hover:bg-[var(--color-hover)]"
-            style={{ color: 'var(--color-text-tertiary)' }}
+            className="flex h-8 w-8 items-center justify-center rounded-[var(--nf-radius-sm)] transition-colors hover:bg-[var(--nf-color-surface-hover)]"
+            style={{ color: 'var(--nf-color-fg-subtle)' }}
           >
             <X className="h-4.5 w-4.5" />
           </button>
@@ -174,7 +174,7 @@ export default function SettingsModal(): ReactElement | null {
           <div>
             <span
               className="mb-2.5 block text-[13px] font-medium uppercase tracking-wider"
-              style={{ color: 'var(--color-text-tertiary)' }}
+              style={{ color: 'var(--nf-color-fg-subtle)' }}
             >
               {t('settings.theme')}
             </span>
@@ -195,7 +195,7 @@ export default function SettingsModal(): ReactElement | null {
           <div>
             <span
               className="mb-2.5 block text-[13px] font-medium uppercase tracking-wider"
-              style={{ color: 'var(--color-text-tertiary)' }}
+              style={{ color: 'var(--nf-color-fg-subtle)' }}
             >
               {t('settings.colorMode')}
             </span>
@@ -216,7 +216,7 @@ export default function SettingsModal(): ReactElement | null {
           <div>
             <span
               className="mb-2.5 block text-[13px] font-medium uppercase tracking-wider"
-              style={{ color: 'var(--color-text-tertiary)' }}
+              style={{ color: 'var(--nf-color-fg-subtle)' }}
             >
               {t('settings.language')}
             </span>
@@ -226,14 +226,14 @@ export default function SettingsModal(): ReactElement | null {
                   key={lang.value}
                   type="button"
                   onClick={() => setLanguage(lang.value)}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-[var(--radius-md)] py-2.5 transition-all"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-[var(--nf-radius-md)] py-2.5 transition-all"
                   style={{
                     border:
                       currentLang === lang.value
-                        ? '2px solid var(--color-accent)'
-                        : '2px solid var(--color-border)',
+                        ? '2px solid var(--nf-color-accent)'
+                        : '2px solid var(--nf-color-border)',
                     backgroundColor:
-                      currentLang === lang.value ? 'var(--color-accent-bg)' : 'transparent',
+                      currentLang === lang.value ? 'var(--nf-color-accent-subtle)' : 'transparent',
                   }}
                 >
                   <Globe
@@ -241,8 +241,8 @@ export default function SettingsModal(): ReactElement | null {
                     style={{
                       color:
                         currentLang === lang.value
-                          ? 'var(--color-accent)'
-                          : 'var(--color-text-tertiary)',
+                          ? 'var(--nf-color-accent)'
+                          : 'var(--nf-color-fg-subtle)',
                     }}
                   />
                   <span
@@ -250,8 +250,8 @@ export default function SettingsModal(): ReactElement | null {
                     style={{
                       color:
                         currentLang === lang.value
-                          ? 'var(--color-accent)'
-                          : 'var(--color-text-secondary)',
+                          ? 'var(--nf-color-accent)'
+                          : 'var(--nf-color-fg-muted)',
                     }}
                   >
                     {lang.label}

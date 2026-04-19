@@ -83,7 +83,7 @@ function SetupPage(): ReactElement {
   if (checking) {
     return (
       <div className="app-bg flex min-h-screen items-center justify-center">
-        <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>
+        <p className="text-sm" style={{ color: 'var(--nf-color-fg-subtle)' }}>
           {t('common.loading')}
         </p>
       </div>
@@ -92,21 +92,21 @@ function SetupPage(): ReactElement {
 
   return (
     <div className="app-bg flex min-h-screen items-center justify-center px-4">
-      <div className="glass-surface w-full max-w-sm rounded-[var(--radius-xl)] p-8">
-        <h1
-          className="mb-2 text-center text-2xl font-bold"
-          style={{ color: 'var(--color-text-primary)' }}
-        >
+      <div className="glass-surface w-full max-w-sm rounded-[var(--nf-radius-lg)] p-8">
+        <h1 className="mb-2 text-center text-2xl font-bold" style={{ color: 'var(--nf-color-fg)' }}>
           {t('workspace.create')}
         </h1>
-        <p className="mb-8 text-center text-sm" style={{ color: 'var(--color-text-tertiary)' }}>
+        <p className="mb-8 text-center text-sm" style={{ color: 'var(--nf-color-fg-subtle)' }}>
           {t('workspace.description')}
         </p>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <div
-              className="rounded-[var(--radius-sm)] px-4 py-3 text-sm"
-              style={{ backgroundColor: 'var(--color-danger-bg)', color: 'var(--color-danger)' }}
+              className="rounded-[var(--nf-radius-sm)] px-4 py-3 text-sm"
+              style={{
+                backgroundColor: 'var(--nf-color-danger-subtle)',
+                color: 'var(--nf-color-danger)',
+              }}
             >
               {error}
             </div>
@@ -115,7 +115,7 @@ function SetupPage(): ReactElement {
             <label
               htmlFor="ws-name"
               className="mb-1 block text-sm font-medium"
-              style={{ color: 'var(--color-text-secondary)' }}
+              style={{ color: 'var(--nf-color-fg-muted)' }}
             >
               {t('workspace.name')}
             </label>
@@ -133,7 +133,7 @@ function SetupPage(): ReactElement {
             <label
               htmlFor="ws-slug"
               className="mb-1 block text-sm font-medium"
-              style={{ color: 'var(--color-text-secondary)' }}
+              style={{ color: 'var(--nf-color-fg-muted)' }}
             >
               {t('workspace.slug')}
             </label>
@@ -149,7 +149,7 @@ function SetupPage(): ReactElement {
               className="input-modern w-full"
               placeholder={t('workspace.slugPlaceholder')}
             />
-            <p className="mt-1 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+            <p className="mt-1 text-xs" style={{ color: 'var(--nf-color-fg-subtle)' }}>
               {t('workspace.slugHint')}
             </p>
           </div>

@@ -108,6 +108,7 @@ interface MeResponse {
   id: string;
   email: string;
   displayName: string;
+  themePreference?: string;
 }
 
 async function authFetch<T>(path: string, options?: RequestInit): Promise<T> {

@@ -68,7 +68,9 @@ export default function IntegrationsPanel(): ReactElement {
     <section
       style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxInlineSize: '48rem' }}
     >
-      <p style={{ margin: 0, color: 'var(--color-fg-muted)' }}>{t('integrations.description')}</p>
+      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
+        {t('integrations.description')}
+      </p>
       <ul
         style={{
           listStyle: 'none',
@@ -92,26 +94,26 @@ export default function IntegrationsPanel(): ReactElement {
                 gap: '0.75rem',
                 alignItems: 'center',
                 padding: '1rem 1.25rem',
-                border: '1px solid var(--color-border)',
+                border: '1px solid var(--nf-color-border)',
                 borderRadius: '0.5rem',
               }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                <span style={{ fontWeight: 500, color: 'var(--color-fg)' }}>
+                <span style={{ fontWeight: 500, color: 'var(--nf-color-fg)' }}>
                   {t(`integrations.provider.${name}.name`)}
                 </span>
-                <span style={{ fontSize: '0.875rem', color: 'var(--color-fg-muted)' }}>
+                <span style={{ fontSize: '0.875rem', color: 'var(--nf-color-fg-muted)' }}>
                   {t(`integrations.provider.${name}.description`)}
                 </span>
                 {connection != null ? (
-                  <span style={{ fontSize: '0.75rem', color: 'var(--color-fg-muted)' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}>
                     {t('integrations.connected_as', {
                       account: connection.externalAccountLabel,
                       time: new Date(connection.connectedAt * 1000).toLocaleString(i18n.language),
                     })}
                   </span>
                 ) : !configured ? (
-                  <span style={{ fontSize: '0.75rem', color: 'var(--color-fg-muted)' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}>
                     {t('integrations.not_configured')}
                   </span>
                 ) : null}

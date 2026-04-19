@@ -14,7 +14,7 @@ import {
   useSuspenseQuery,
 } from '@tanstack/react-query';
 
-import { sdk } from '../../lib/sdk';
+import { authSdk as sdk } from '../../lib/sdk';
 
 export type Workspace = components['schemas']['Workspace'];
 export type WorkspaceMember = components['schemas']['WorkspaceMember'];

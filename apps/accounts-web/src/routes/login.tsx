@@ -181,7 +181,7 @@ function LoginPage(): ReactElement {
           <p
             style={{
               margin: 0,
-              color: 'var(--nf-color-fg-muted, var(--color-muted))',
+              color: 'var(--nf-color-fg-muted)',
               fontSize: 'var(--nf-text-sm, 0.875rem)',
             }}
           >
@@ -235,7 +235,7 @@ function LoginPage(): ReactElement {
               role="alert"
               style={{
                 margin: 0,
-                color: 'var(--nf-color-fg-danger, var(--color-danger))',
+                color: 'var(--nf-color-danger)',
                 fontSize: 'var(--nf-text-sm, 0.875rem)',
               }}
             >
@@ -328,7 +328,7 @@ function LoginPage(): ReactElement {
             role="alert"
             style={{
               margin: 0,
-              color: 'var(--nf-color-fg-danger, var(--color-danger))',
+              color: 'var(--nf-color-danger)',
               fontSize: 'var(--nf-text-sm, 0.875rem)',
             }}
           >
@@ -344,7 +344,7 @@ function LoginPage(): ReactElement {
           style={{
             margin: 0,
             fontSize: 'var(--nf-text-sm, 0.875rem)',
-            color: 'var(--nf-color-fg-muted, var(--color-muted))',
+            color: 'var(--nf-color-fg-muted)',
           }}
         >
           {t('login.noAccount')} <Link to="/signup">{t('login.signupLink')}</Link>

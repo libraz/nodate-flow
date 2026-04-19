@@ -61,10 +61,10 @@ export default function SearchPanel(): ReactElement | null {
       {/* Mobile: full-screen overlay */}
       <div
         className="fixed inset-0 z-50 flex flex-col sm:hidden"
-        style={{ backgroundColor: 'var(--color-surface-elevated)' }}
+        style={{ backgroundColor: 'var(--nf-color-bg-elevated)' }}
       >
-        <div className="flex items-center gap-2 border-b border-[var(--color-border)] px-4 py-3">
-          <Search className="h-5 w-5 shrink-0" style={{ color: 'var(--color-text-tertiary)' }} />
+        <div className="flex items-center gap-2 border-b border-[var(--nf-color-border)] px-4 py-3">
+          <Search className="h-5 w-5 shrink-0" style={{ color: 'var(--nf-color-fg-subtle)' }} />
           <input
             ref={inputRef}
             type="text"
@@ -72,7 +72,7 @@ export default function SearchPanel(): ReactElement | null {
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('search.placeholder')}
             className="flex-1 text-sm bg-transparent focus:outline-none"
-            style={{ color: 'var(--color-text-primary)' }}
+            style={{ color: 'var(--nf-color-fg)' }}
             // biome-ignore lint/a11y/noAutofocus: search panel auto-focus is expected
             autoFocus
           />
@@ -80,7 +80,7 @@ export default function SearchPanel(): ReactElement | null {
             type="button"
             onClick={toggleSearch}
             className="rounded-md p-1 hover:opacity-80"
-            style={{ color: 'var(--color-text-tertiary)' }}
+            style={{ color: 'var(--nf-color-fg-subtle)' }}
             aria-label={t('search.close')}
           >
             <X className="h-5 w-5" />
@@ -93,18 +93,18 @@ export default function SearchPanel(): ReactElement | null {
 
       {/* Desktop: inline below header */}
       <div
-        className="relative hidden border-b border-[var(--color-border)] sm:block"
-        style={{ backgroundColor: 'var(--color-surface-elevated)' }}
+        className="relative hidden border-b border-[var(--nf-color-border)] sm:block"
+        style={{ backgroundColor: 'var(--nf-color-bg-elevated)' }}
       >
         <div className="mx-auto flex max-w-2xl items-center gap-2 px-4 py-2">
-          <Search className="h-4 w-4 shrink-0" style={{ color: 'var(--color-text-tertiary)' }} />
+          <Search className="h-4 w-4 shrink-0" style={{ color: 'var(--nf-color-fg-subtle)' }} />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('search.placeholder')}
             className="flex-1 text-sm bg-transparent focus:outline-none"
-            style={{ color: 'var(--color-text-primary)' }}
+            style={{ color: 'var(--nf-color-fg)' }}
             // biome-ignore lint/a11y/noAutofocus: search panel auto-focus is expected
             autoFocus
           />
@@ -112,7 +112,7 @@ export default function SearchPanel(): ReactElement | null {
             type="button"
             onClick={toggleSearch}
             className="rounded-md p-1 hover:opacity-80"
-            style={{ color: 'var(--color-text-tertiary)' }}
+            style={{ color: 'var(--nf-color-fg-subtle)' }}
             aria-label={t('search.close')}
           >
             <X className="h-4 w-4" />
@@ -120,10 +120,10 @@ export default function SearchPanel(): ReactElement | null {
         </div>
         {searchQuery.trim() ? (
           <div
-            className="absolute left-0 right-0 z-30 max-h-80 overflow-y-auto border-b border-[var(--color-border)]"
+            className="absolute left-0 right-0 z-30 max-h-80 overflow-y-auto border-b border-[var(--nf-color-border)]"
             style={{
-              backgroundColor: 'var(--color-surface-elevated)',
-              boxShadow: 'var(--shadow-lg)',
+              backgroundColor: 'var(--nf-color-bg-elevated)',
+              boxShadow: 'var(--nf-shadow-md)',
             }}
           >
             <div className="mx-auto max-w-2xl">
@@ -147,14 +147,14 @@ function SearchResults({
 
   if (results.length === 0) {
     return (
-      <p className="px-4 py-6 text-center text-sm" style={{ color: 'var(--color-text-tertiary)' }}>
+      <p className="px-4 py-6 text-center text-sm" style={{ color: 'var(--nf-color-fg-subtle)' }}>
         {t('search.noResults')}
       </p>
     );
   }
 
   return (
-    <div className="divide-y divide-[var(--color-separator)]">
+    <div className="divide-y divide-[var(--nf-color-hairline)]">
       {results.map((event) => {
         const start = DateTime.fromISO(event.startAt);
         return (
@@ -162,23 +162,20 @@ function SearchResults({
             key={event.id}
             type="button"
             onClick={() => onSelect(event)}
-            className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-[var(--color-hover)]"
+            className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-[var(--nf-color-surface-hover)]"
           >
-            <div className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--color-accent)]" />
+            <div className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--nf-color-accent)]" />
             <div className="min-w-0 flex-1">
-              <p
-                className="truncate text-sm font-medium"
-                style={{ color: 'var(--color-text-primary)' }}
-              >
+              <p className="truncate text-sm font-medium" style={{ color: 'var(--nf-color-fg)' }}>
                 {event.title}
               </p>
-              <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+              <p className="text-xs" style={{ color: 'var(--nf-color-fg-muted)' }}>
                 {event.allDay
                   ? start.setLocale(i18n.language).toLocaleString(DateTime.DATE_MED)
                   : start.setLocale(i18n.language).toLocaleString(DateTime.DATETIME_MED)}
               </p>
               {event.location ? (
-                <p className="truncate text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+                <p className="truncate text-xs" style={{ color: 'var(--nf-color-fg-subtle)' }}>
                   {event.location}
                 </p>
               ) : null}

@@ -1,0 +1,52 @@
+.trigger {
+  all: unset;
+  cursor: pointer;
+  padding: var(--nf-space-1) var(--nf-space-3);
+  border-radius: var(--nf-radius-md);
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-accent);
+  background: var(--nf-color-accent-subtle);
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.trigger:hover {
+  background: var(--nf-color-accent-hover);
+  color: var(--nf-color-fg-on-accent);
+}
+
+.trigger:focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: var(--nf-focus-ring-offset);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  max-block-size: 15rem;
+  overflow-y: auto;
+  margin: calc(-1 * var(--nf-space-4));
+  padding: var(--nf-space-1) 0;
+}
+
+.slot {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--nf-space-2) var(--nf-space-4);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg);
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.slot:hover {
+  background: var(--nf-color-surface-hover);
+}
+
+.slot[data-selected] {
+  background: var(--nf-color-accent-subtle);
+  color: var(--nf-color-accent);
+  font-weight: var(--nf-weight-semibold);
+}

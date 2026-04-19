@@ -84,7 +84,7 @@ function ProjectLayout(): ReactElement {
         style={{
           display: 'flex',
           gap: '0.25rem',
-          borderBlockEnd: '1px solid var(--color-border)',
+          borderBlockEnd: '1px solid var(--nf-color-border)',
           paddingBlockEnd: '0.5rem',
         }}
       >
@@ -99,7 +99,7 @@ function ProjectLayout(): ReactElement {
               'data-active': 'true',
               style: {
                 background: 'var(--nf-color-accent-subtle, rgba(155,89,182,0.12))',
-                color: 'var(--nf-color-accent, var(--color-accent, #9b59b6))',
+                color: 'var(--nf-color-accent, var(--nf-color-accent))',
                 fontWeight: 500,
               },
             }}
@@ -107,7 +107,7 @@ function ProjectLayout(): ReactElement {
               display: 'inline-block',
               padding: '0.5rem 0.875rem',
               borderRadius: '0.5rem',
-              color: 'var(--color-fg)',
+              color: 'var(--nf-color-fg)',
               textDecoration: 'none',
             }}
           >

@@ -40,7 +40,6 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/dashboard"
 	exporthandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/export"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/inbox"
-	integrationshandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/integrations"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/lenses"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/notifications"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/pages"
@@ -51,14 +50,12 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/timeboxes"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/timeline"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/webhooks"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/workspaces"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
-	integrationspkg "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/integrations"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/integrations/email"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/mcp"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/obs"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/storage"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/stream"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
 )
 
 // Deps is the dependency bundle Build needs in order to wire every
@@ -145,17 +142,6 @@ type Deps struct {
 	EmbedModel string
 	// EmbedBaseURL overrides the embeddings API base URL.
 	EmbedBaseURL string
-
-	// Integrations is the personal-OAuth provider registry (GitHub /
-	// Slack / Google Calendar). Nil in tests; the handlers degrade
-	// gracefully by returning INTEGRATION.OAUTH.PROVIDER_NOT_CONFIGURED.
-	Integrations *integrationspkg.Registry
-	// PublicBaseURL is the origin used to build OAuth callback URLs
-	// (e.g. https://api.example.com + /oauth/callback/github).
-	PublicBaseURL string
-	// WebBaseURL is where the OAuth callback handler bounces the user
-	// back to after writing the user_integrations row.
-	WebBaseURL string
 }
 
 // Result is what BuildResult returns: the composed chi router plus the
@@ -215,20 +201,6 @@ func BuildResult(deps Deps) Result {
 	})
 
 	auditRec := audit.New(deps.Queries)
-	integrationsDeps := integrationshandlers.Deps{
-		DB:            deps.DB,
-		Queries:       deps.Queries,
-		Cipher:        deps.Cipher,
-		Registry:      deps.Integrations,
-		PublicBaseURL: deps.PublicBaseURL,
-		WebBaseURL:    deps.WebBaseURL,
-	}
-	huma.Register(api, huma.Operation{
-		OperationID: "oauth-integration-callback",
-		Method:      http.MethodGet,
-		Path:        "/oauth/callback/{provider}",
-		Summary:     "Complete a personal OAuth integration flow",
-	}, integrationshandlers.Callback(integrationsDeps))
 
 	authMW := middleware.RequireAuth(middleware.AuthDeps{
 		JWT:     deps.JWT,
@@ -236,7 +208,6 @@ func BuildResult(deps Deps) Result {
 		DB:      passthroughDB{deps.DB},
 	})
 	aclDB := passthroughDB{deps.DB}
-	wsDeps := workspaces.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
 	prjDeps := projects.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
 	// Write-time embedding client (ADR 0003). Uses the OpenAI provider
 	// when NF_EMBED_OPENAI_KEY is set, otherwise the deterministic mock.
@@ -336,65 +307,11 @@ func BuildResult(deps Deps) Result {
 		}
 	}
 
-	// /workspaces, /me/integrations (auth-protected).
-	r.Group(func(sub chi.Router) {
-		sub.Use(authMW)
-		subAPI := newSubAPI(sub)
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "me-integrations-list",
-			Method:      http.MethodGet,
-			Path:        "/me/integrations",
-			Summary:     "List the authenticated user's personal OAuth integrations",
-		}, integrationshandlers.List(integrationsDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "me-integrations-connect",
-			Method:      http.MethodPost,
-			Path:        "/me/integrations/{provider}/connect",
-			Summary:     "Start a personal OAuth connect flow",
-		}, integrationshandlers.Connect(integrationsDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "me-integrations-disconnect",
-			Method:      http.MethodDelete,
-			Path:        "/me/integrations/{id}",
-			Summary:     "Disconnect a personal OAuth integration",
-		}, integrationshandlers.Disconnect(integrationsDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "workspaces-create",
-			Method:      http.MethodPost,
-			Path:        "/workspaces",
-			Summary:     "Create a workspace",
-		}, workspaces.Create(wsDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "workspaces-list",
-			Method:      http.MethodGet,
-			Path:        "/workspaces",
-			Summary:     "List workspaces visible to the caller",
-		}, workspaces.List(wsDeps))
-	})
-
-	// /workspaces/{wsId} member-level reads, plus project list.
+	// /workspaces/{wsId} member-level reads: project list, lenses, AI, etc.
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
 		sub.Use(middleware.RequireWorkspaceMember(aclDB))
 		subAPI := newSubAPI(sub)
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "workspaces-get",
-			Method:      http.MethodGet,
-			Path:        "/workspaces/{wsId}",
-			Summary:     "Fetch a workspace",
-		}, workspaces.Get(wsDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "workspaces-members-list",
-			Method:      http.MethodGet,
-			Path:        "/workspaces/{wsId}/members",
-			Summary:     "List members of a workspace",
-		}, workspaces.ListMembers(wsDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "workspaces-users-list",
-			Method:      http.MethodGet,
-			Path:        "/workspaces/{wsId}/users",
-			Summary:     "List workspace users (minimal summary for actor pickers)",
-		}, workspaces.ListUsers(wsDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "projects-list",
 			Method:      http.MethodGet,
@@ -542,38 +459,12 @@ func BuildResult(deps Deps) Result {
 		aihandlers.RegisterMcpTokens(subAPI, aiDeps)
 	})
 
-	// Workspace admin routes + AI providers + project create.
+	// Workspace admin routes: AI providers, project create, webhooks.
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
 		sub.Use(middleware.RequireWorkspaceMember(aclDB))
 		sub.Use(middleware.RequireWorkspaceRole(middleware.WorkspaceRoleAdmin))
 		subAPI := newSubAPI(sub)
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "workspaces-patch",
-			Method:      http.MethodPatch,
-			Path:        "/workspaces/{wsId}",
-			Summary:     "Patch a workspace",
-		}, workspaces.Patch(wsDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "workspaces-members-invite",
-			Method:      http.MethodPost,
-			Path:        "/workspaces/{wsId}/members",
-			Summary:     "Invite a user to a workspace",
-		}, workspaces.InviteMember(wsDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "workspaces-members-update-role",
-			Method:      http.MethodPatch,
-			Path:        "/workspaces/{wsId}/members/{userId}",
-			Summary:     "Change a member's role",
-		}, workspaces.UpdateMemberRole(wsDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "workspaces-members-remove",
-			Method:      http.MethodDelete,
-			Path:        "/workspaces/{wsId}/members/{userId}",
-			Summary:     "Remove a member from a workspace",
-		}, workspaces.RemoveMember(wsDeps))
-		inviteDeps := workspaces.InviteDeps{Deps: wsDeps, EmailSender: deps.EmailSender, WebURL: deps.WebBaseURL}
-		workspaces.RegisterInvites(subAPI, inviteDeps)
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "projects-create",
 			Method:      http.MethodPost,
@@ -585,20 +476,6 @@ func BuildResult(deps Deps) Result {
 		aihandlers.RegisterAutoActionRules(subAPI, aiDeps)
 		webhookDeps := webhooks.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
 		webhooks.Register(subAPI, webhookDeps)
-	})
-
-	// Workspace owner-only.
-	r.Group(func(sub chi.Router) {
-		sub.Use(authMW)
-		sub.Use(middleware.RequireWorkspaceMember(aclDB))
-		sub.Use(middleware.RequireWorkspaceRole(middleware.WorkspaceRoleOwner))
-		subAPI := newSubAPI(sub)
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "workspaces-disable",
-			Method:      http.MethodDelete,
-			Path:        "/workspaces/{wsId}",
-			Summary:     "Soft-disable a workspace",
-		}, workspaces.Disable(wsDeps))
 	})
 
 	// /projects/{prjId}.
@@ -638,14 +515,6 @@ func BuildResult(deps Deps) Result {
 		sub.Use(middleware.RequireWorkspaceMember(aclDB))
 		subAPI := newSubAPI(sub)
 		timeline.RegisterWorkspaceScoped(subAPI, tlDeps)
-	})
-
-	// Invite accept (auth only, no workspace scope).
-	r.Group(func(sub chi.Router) {
-		sub.Use(authMW)
-		subAPI := newSubAPI(sub)
-		inviteAcceptDeps := workspaces.InviteDeps{Deps: wsDeps, EmailSender: deps.EmailSender, WebURL: deps.WebBaseURL}
-		workspaces.RegisterInviteAccept(subAPI, inviteAcceptDeps)
 	})
 
 	// Signals + inbox (auth only; handlers resolve ws membership themselves).
@@ -707,20 +576,6 @@ func BuildResult(deps Deps) Result {
 		publicLensAPI := newSubAPI(sub)
 		publicLensDeps := lenses.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
 		lenses.RegisterPublic(publicLensAPI, publicLensDeps)
-	})
-
-	// Public invite info (no auth, per-IP rate limited).
-	r.Group(func(sub chi.Router) {
-		if !deps.DisableRateLimit {
-			publicInviteRateLimiter := middleware.NewIPRateLimiter(middleware.RateLimitConfig{
-				MaxRequests: 30,
-				Window:      15 * time.Minute,
-			})
-			sub.Use(publicInviteRateLimiter.Middleware())
-		}
-		publicInviteAPI := newSubAPI(sub)
-		publicInviteDeps := workspaces.InviteDeps{Deps: wsDeps, EmailSender: deps.EmailSender, WebURL: deps.WebBaseURL}
-		workspaces.RegisterPublicInvites(publicInviteAPI, publicInviteDeps)
 	})
 
 	// Public webhooks (verify their own signatures).

@@ -5,10 +5,7 @@
 // consumers can rotate the access token (e.g. after refresh) without
 // rebuilding the client.
 
-import createOpenapiFetch, {
-  type Client,
-  type ClientOptions,
-} from 'openapi-fetch';
+import createOpenapiFetch, { type Client, type ClientOptions } from 'openapi-fetch';
 
 import type { paths } from './openapi';
 
@@ -36,9 +33,7 @@ export interface CreateClientOptions {
  * createClient returns a typed openapi-fetch client bound to the
  * generated nodate-flow OpenAPI schema.
  */
-export function createClient(
-  options: CreateClientOptions
-): Client<paths> {
+export function createClient(options: CreateClientOptions): Client<paths> {
   const client = createOpenapiFetch<paths>({
     baseUrl: options.baseUrl,
     credentials: 'include',

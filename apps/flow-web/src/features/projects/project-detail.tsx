@@ -113,8 +113,8 @@ function OverviewPanel({ id }: { id: string }): ReactElement {
             margin: 0,
             padding: '2rem 1rem',
             textAlign: 'center',
-            color: 'var(--nf-color-fg-muted, var(--color-muted))',
-            border: '1px dashed var(--nf-color-border, var(--color-border))',
+            color: 'var(--nf-color-fg-muted, var(--nf-color-fg-muted))',
+            border: '1px dashed var(--nf-color-border, var(--nf-color-border))',
             borderRadius: '0.5rem',
             background: 'var(--nf-color-bg-sunken, transparent)',
           }}
@@ -145,7 +145,7 @@ function OverviewPanel({ id }: { id: string }): ReactElement {
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: '2rem', fontWeight: 600, lineHeight: 1 }}>{active}</div>
-          <div style={{ fontSize: '0.8125rem', color: 'var(--color-muted)' }}>
+          <div style={{ fontSize: '0.8125rem', color: 'var(--nf-color-fg-muted)' }}>
             {t('projects.detail.active_tasks')}
           </div>
         </div>
@@ -153,7 +153,7 @@ function OverviewPanel({ id }: { id: string }): ReactElement {
           style={{
             marginInlineStart: 'auto',
             fontSize: '0.875rem',
-            color: 'var(--color-muted)',
+            color: 'var(--nf-color-fg-muted)',
           }}
         >
           {t('projects.detail.progress', { pct })}
@@ -165,7 +165,7 @@ function OverviewPanel({ id }: { id: string }): ReactElement {
           blockSize: '0.5rem',
           borderRadius: '999px',
           overflow: 'hidden',
-          background: 'var(--color-surface, rgba(127,127,127,0.08))',
+          background: 'var(--nf-color-surface))',
         }}
       >
         {STATE_ORDER.map((s) =>
@@ -197,13 +197,13 @@ function OverviewPanel({ id }: { id: string }): ReactElement {
             style={{
               padding: '0.5rem 0.75rem',
               borderRadius: '0.5rem',
-              background: 'var(--color-surface, rgba(127,127,127,0.05))',
+              background: 'var(--nf-color-surface))',
               display: 'flex',
               flexDirection: 'column',
               gap: '0.125rem',
             }}
           >
-            <span style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}>
               {t(`tasks.status.${s}`)}
             </span>
             <span
@@ -220,7 +220,7 @@ function OverviewPanel({ id }: { id: string }): ReactElement {
         style={{
           alignSelf: 'flex-start',
           fontSize: '0.875rem',
-          color: 'var(--color-accent, #9b59b6)',
+          color: 'var(--nf-color-accent)',
           textDecoration: 'none',
         }}
       >
@@ -284,7 +284,7 @@ export default function ProjectDetail({ id }: ProjectDetailProps): ReactElement 
           {project.name}
         </h1>
         {project.description ? (
-          <p style={{ margin: 0, color: 'var(--color-muted)' }}>{project.description}</p>
+          <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{project.description}</p>
         ) : null}
       </header>
 

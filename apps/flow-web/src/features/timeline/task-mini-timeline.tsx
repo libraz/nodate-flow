@@ -19,7 +19,7 @@ export default function TaskMiniTimeline({ taskId }: TaskMiniTimelineProps): Rea
 
   if (data.events.length === 0) {
     return (
-      <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--color-muted)' }}>
+      <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--nf-color-fg-muted)' }}>
         {t('view.empty')}
       </div>
     );

@@ -29,6 +29,7 @@ DROP TABLE IF EXISTS `events`;
 DROP TABLE IF EXISTS `identities`;
 DROP TABLE IF EXISTS `instance_admins`;
 DROP TABLE IF EXISTS `instance_audit_logs`;
+DROP TABLE IF EXISTS `instance_settings`;
 DROP TABLE IF EXISTS `lenses`;
 DROP TABLE IF EXISTS `mcp_invocations`;
 DROP TABLE IF EXISTS `mcp_tokens`;
@@ -931,6 +932,31 @@ CREATE TABLE instance_audit_logs (
   CONSTRAINT fk_instance_audit_logs_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT fk_instance_audit_logs_workspace FOREIGN KEY (target_workspace_id) REFERENCES workspaces(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Instance-wide audit log';
+
+-- >>> instance_settings.sql
+-- ====================================
+-- instance_settings
+-- Instance-level dynamic settings. NOT workspace-scoped: these settings
+-- apply globally to the entire deployment.
+-- ====================================
+CREATE TABLE instance_settings (
+  id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id       BINARY(16)     NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  setting_key     VARCHAR(128) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Setting identifier',
+  setting_value   TEXT           NOT NULL COMMENT 'Current value as text',
+  updated_by_user_id INT UNSIGNED NULL COMMENT 'Last modifier user.id',
+  sort_weight     INT            NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes           TEXT           NULL COMMENT 'Admin notes',
+  enabled         BOOLEAN        NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at      TIMESTAMP      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  UNIQUE KEY uniq_instance_settings_public_id (public_id),
+  UNIQUE KEY uniq_instance_settings_key (setting_key),
+
+  CONSTRAINT fk_instance_settings_user
+    FOREIGN KEY (updated_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Instance-level dynamic settings';
 
 -- >>> lenses.sql
 -- ====================================
@@ -1865,8 +1891,10 @@ CREATE TABLE workspaces (
   KEY idx_workspaces_enabled (enabled)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Tenant boundary';
 
+DROP VIEW IF EXISTS `v_admin_users`;
 DROP VIEW IF EXISTS `v_audit_recent`;
 DROP VIEW IF EXISTS `v_inbox`;
+DROP VIEW IF EXISTS `v_instance_audit_logs`;
 DROP VIEW IF EXISTS `v_my_tasks`;
 DROP VIEW IF EXISTS `v_project_stats`;
 DROP VIEW IF EXISTS `v_projects`;
@@ -1875,6 +1903,30 @@ DROP VIEW IF EXISTS `v_task_list`;
 DROP VIEW IF EXISTS `v_task_timeline`;
 DROP VIEW IF EXISTS `v_users`;
 DROP VIEW IF EXISTS `v_workspace_members`;
+
+-- >>> v_admin_users.sql
+-- v_admin_users
+-- Instance-scoped user view for admin panel. Unlike v_users, this is NOT
+-- workspace-scoped and includes all users regardless of membership.
+CREATE OR REPLACE VIEW v_admin_users AS
+SELECT
+  u.id,
+  u.public_id,
+  u.email,
+  u.display_name,
+  u.avatar_url,
+  u.locale,
+  u.last_login_at,
+  u.email_verified_at,
+  u.enabled,
+  u.created_at,
+  u.updated_at,
+  (SELECT COUNT(*) FROM workspace_members wm
+     WHERE wm.user_id = u.id AND wm.enabled = TRUE) AS workspace_count,
+  EXISTS(SELECT 1 FROM instance_admins ia
+     WHERE ia.user_id = u.id AND ia.enabled = TRUE
+       AND ia.revoked_at IS NULL) AS is_instance_admin
+FROM users u;
 
 -- >>> v_audit_recent.sql
 -- v_audit_recent
@@ -1924,6 +1976,28 @@ INNER JOIN workspaces w
 LEFT JOIN tasks t
   ON t.id = s.task_id AND t.enabled = TRUE
 WHERE s.enabled = TRUE;
+
+-- >>> v_instance_audit_logs.sql
+-- v_instance_audit_logs
+-- Instance-wide audit log joined with actor user and optional workspace.
+CREATE OR REPLACE VIEW v_instance_audit_logs AS
+SELECT
+  ial.public_id,
+  actor.public_id   AS actor_user_public_id,
+  actor.display_name AS actor_display_name,
+  ial.action,
+  ws.public_id      AS target_workspace_public_id,
+  ws.name           AS target_workspace_name,
+  ial.target_resource_type,
+  ial.target_resource_public_id,
+  ial.ip_address,
+  ial.user_agent,
+  ial.payload_json,
+  ial.occurred_at
+FROM instance_audit_logs ial
+LEFT JOIN users actor ON actor.id = ial.actor_user_id
+LEFT JOIN workspaces ws ON ws.id = ial.target_workspace_id
+WHERE ial.enabled = TRUE;
 
 -- >>> v_my_tasks.sql
 -- v_my_tasks

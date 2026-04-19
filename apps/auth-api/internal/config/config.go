@@ -42,6 +42,33 @@ type Config struct {
 
 	// AccountsWebURL is the origin of the accounts-web frontend.
 	AccountsWebURL string `env:"NF_AUTH_WEB_URL" envDefault:"http://localhost:5175"`
+
+	// FlowWebURL is the origin of the flow-web frontend, used in
+	// workspace invite links.
+	FlowWebURL string `env:"NF_AUTH_FLOW_WEB_URL" envDefault:"http://localhost:5173"`
+
+	// OAuth integration provider credentials (personal connections).
+	// These are separate from the OIDC login providers above; they
+	// power /me/integrations. When missing, the provider card is
+	// rendered as "not configured".
+	IntGithubClientID     string `env:"NF_AUTH_GITHUB_CLIENT_ID" envDefault:""`
+	IntGithubClientSecret string `env:"NF_AUTH_GITHUB_CLIENT_SECRET" envDefault:""`
+	IntSlackClientID      string `env:"NF_AUTH_SLACK_CLIENT_ID" envDefault:""`
+	IntSlackClientSecret  string `env:"NF_AUTH_SLACK_CLIENT_SECRET" envDefault:""`
+	IntGoogleClientID     string `env:"NF_AUTH_GOOGLE_INTEGRATION_CLIENT_ID" envDefault:""`
+	IntGoogleClientSecret string `env:"NF_AUTH_GOOGLE_INTEGRATION_CLIENT_SECRET" envDefault:""`
+
+	// SmtpHost is the SMTP server hostname. When empty, email
+	// sending is disabled (invite links are returned without delivery).
+	SmtpHost string `env:"NF_AUTH_SMTP_HOST" envDefault:""`
+	// SmtpPort is the SMTP server port (typically 587 for STARTTLS).
+	SmtpPort int `env:"NF_AUTH_SMTP_PORT" envDefault:"587"`
+	// SmtpUsername is the SASL login. Empty to skip authentication.
+	SmtpUsername string `env:"NF_AUTH_SMTP_USERNAME" envDefault:""`
+	// SmtpPassword is the SASL secret.
+	SmtpPassword string `env:"NF_AUTH_SMTP_PASSWORD" envDefault:""`
+	// SmtpFrom is the envelope sender address.
+	SmtpFrom string `env:"NF_AUTH_SMTP_FROM" envDefault:"noreply@nodate-flow.local"`
 }
 
 // Load parses NF_* environment variables into a Config and validates

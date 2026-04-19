@@ -15,7 +15,7 @@ import {
 } from '@tanstack/react-query';
 
 import { ApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { authSdk as sdk } from '../../lib/sdk';
 import { workspacesKeys } from './api';
 
 export { ApiError as WorkspaceApiError };

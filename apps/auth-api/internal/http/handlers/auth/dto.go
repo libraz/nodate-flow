@@ -165,7 +165,7 @@ type MeBody struct {
 	Email           string  `json:"email"`
 	DisplayName     string  `json:"displayName"`
 	Locale          string  `json:"locale"`
-	ThemePreference string  `json:"themePreference" enum:"aurora-light,aurora-dark,dotline-light,dotline-dark,system"`
+	ThemePreference string  `json:"themePreference" enum:"aurora-light,aurora-dark,dotline-light,dotline-dark,glass-light,glass-dark,system"`
 	AvatarURL       *string `json:"avatarUrl,omitempty"`
 
 	// Notification channel toggles. Exposed on /me so the settings UI
@@ -195,7 +195,7 @@ type PatchMeInput struct {
 type PatchMeInputBody struct {
 	DisplayName     *string `json:"displayName,omitempty" minLength:"1" maxLength:"100"`
 	Locale          *string `json:"locale,omitempty" maxLength:"10"`
-	ThemePreference *string `json:"themePreference,omitempty" enum:"aurora-light,aurora-dark,dotline-light,dotline-dark,system"`
+	ThemePreference *string `json:"themePreference,omitempty" enum:"aurora-light,aurora-dark,dotline-light,dotline-dark,glass-light,glass-dark,system"`
 	AvatarURL       *string `json:"avatarUrl,omitempty" maxLength:"1024"`
 
 	// Notification channel toggles. nil leaves the column untouched.

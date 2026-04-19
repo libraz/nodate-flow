@@ -57,7 +57,7 @@ export default function SessionsPanel(): ReactElement {
     <section
       style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxInlineSize: '48rem' }}
     >
-      <p style={{ margin: 0, color: 'var(--color-fg-muted)' }}>
+      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
         {t('security.sessions.description')}
       </p>
 
@@ -83,13 +83,13 @@ export default function SessionsPanel(): ReactElement {
                 gap: '0.75rem',
                 alignItems: 'center',
                 padding: '0.75rem 1rem',
-                border: '1px solid var(--color-border)',
+                border: '1px solid var(--nf-color-border)',
                 borderRadius: '0.5rem',
-                background: s.current ? 'var(--color-surface-hover)' : 'transparent',
+                background: s.current ? 'var(--nf-color-surface-hover)' : 'transparent',
               }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                <span style={{ fontWeight: 500, color: 'var(--color-fg)' }}>
+                <span style={{ fontWeight: 500, color: 'var(--nf-color-fg)' }}>
                   {s.userAgent || t('security.sessions.unknown_device')}
                   {s.current && (
                     <span
@@ -98,18 +98,18 @@ export default function SessionsPanel(): ReactElement {
                         fontSize: '0.75rem',
                         padding: '0.125rem 0.5rem',
                         borderRadius: '0.25rem',
-                        background: 'var(--color-accent-muted)',
-                        color: 'var(--color-accent-fg)',
+                        background: 'var(--nf-color-accent-hover)',
+                        color: 'var(--nf-color-accent)',
                       }}
                     >
                       {t('security.sessions.current_badge')}
                     </span>
                   )}
                 </span>
-                <span style={{ fontSize: '0.875rem', color: 'var(--color-fg-muted)' }}>
+                <span style={{ fontSize: '0.875rem', color: 'var(--nf-color-fg-muted)' }}>
                   {s.ipAddress || t('security.sessions.unknown_ip')}
                 </span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-fg-muted)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}>
                   {t('security.sessions.created_at', {
                     time: formatUnix(s.createdAt, i18n.language),
                   })}

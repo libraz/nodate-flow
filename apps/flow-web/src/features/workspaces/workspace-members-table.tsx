@@ -13,7 +13,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { formatDateNullable } from '../../lib/format';
+import { formatEpoch } from '../../lib/format';
 import { selectUser, useAuth } from '../auth/auth-store';
 import {
   type WorkspaceMember,
@@ -121,8 +121,7 @@ export default function WorkspaceMembersTable({
       header: () => t('workspaces.members.added_at'),
       cell: ({ row }) => {
         const formatted =
-          formatDateNullable(row.original.joinedAt, locale) ??
-          formatDateNullable(row.original.createdAt, locale);
+          formatEpoch(row.original.joinedAt, locale) ?? formatEpoch(row.original.createdAt, locale);
         return <span>{formatted ?? t('workspaces.members.pending')}</span>;
       },
     },
@@ -173,7 +172,7 @@ export default function WorkspaceMembersTable({
               setInviteOpen(true);
             }}
           >
-            {t('workspaces.invites.create_link')}
+            {t('workspaces.invites.create')}
           </Button>
           <Button
             variant="primary"

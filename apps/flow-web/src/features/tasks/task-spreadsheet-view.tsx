@@ -14,7 +14,7 @@ import type { ReactElement } from 'react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { formatDate, isOverdue } from '../../lib/format';
+import { formatDate, formatEpoch, isOverdue } from '../../lib/format';
 
 import {
   type TaskDerivedState,
@@ -474,11 +474,7 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
   };
 
   const renderUpdatedCell = (task: TaskListItem): ReactElement => {
-    return (
-      <span className={css.mutedText}>
-        {task.updatedAt ? formatDate(task.updatedAt, locale) : '—'}
-      </span>
-    );
+    return <span className={css.mutedText}>{formatEpoch(task.updatedAt, locale) ?? '—'}</span>;
   };
 
   /* ── Row renderer ──────────────────────────────────────────── */

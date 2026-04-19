@@ -246,6 +246,207 @@
         "required": ["email", "role"],
         "type": "object"
       },
+      "AdminListWorkspacesOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AdminListWorkspacesOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminWorkspace"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "items"],
+        "type": "object"
+      },
+      "AdminPatchWorkspaceInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AdminPatchWorkspaceInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "enabled": {
+            "type": ["boolean", "null"]
+          }
+        },
+        "required": ["enabled"],
+        "type": "object"
+      },
+      "AdminPatchWorkspaceOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AdminPatchWorkspaceOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
+      "AdminSession": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "expiresAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "ipAddress": {
+            "type": "string"
+          },
+          "lastUsedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "userAgent": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "userAgent", "ipAddress", "expiresAt", "active", "createdAt"],
+        "type": "object"
+      },
+      "AdminUser": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AdminUser.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "emailVerifiedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "isInstanceAdmin": {
+            "type": "boolean"
+          },
+          "lastLoginAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "workspaceCount": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "displayName",
+          "locale",
+          "enabled",
+          "workspaceCount",
+          "isInstanceAdmin",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "AdminWorkspace": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AdminWorkspace.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "iconUrl": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "memberCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "projectCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["id", "slug", "name", "enabled", "memberCount", "createdAt"],
+        "type": "object"
+      },
       "AgentSummary": {
         "additionalProperties": false,
         "properties": {
@@ -270,6 +471,7 @@
             "type": ["array", "null"]
           },
           "id": {
+            "description": "Agent public id (UUID v7)",
             "type": "string"
           },
           "modelId": {
@@ -343,6 +545,7 @@
             "type": "string"
           },
           "id": {
+            "description": "Invocation public id (UUID v7)",
             "type": "string"
           },
           "invokedAt": {
@@ -400,7 +603,7 @@
             "type": "integer"
           },
           "outboundLimits": {
-            "description": "Per-provider egress rate limiter counters (4.AGENT-2)",
+            "description": "Per-provider egress rate limiter counters",
             "items": {
               "$ref": "#/components/schemas/OutboundLimitStat"
             },
@@ -689,6 +892,48 @@
         "required": ["userPublicId", "displayName", "confidence", "reason"],
         "type": "object"
       },
+      "AuditEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "actorDisplayName": {
+            "type": "string"
+          },
+          "actorUserId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "ipAddress": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "payload": {},
+          "targetResourcePublicId": {
+            "type": "string"
+          },
+          "targetResourceType": {
+            "type": "string"
+          },
+          "targetWorkspaceId": {
+            "type": "string"
+          },
+          "targetWorkspaceName": {
+            "type": "string"
+          },
+          "userAgent": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "action", "occurredAt"],
+        "type": "object"
+      },
       "AuthTokens": {
         "additionalProperties": false,
         "properties": {
@@ -759,6 +1004,52 @@
           }
         },
         "required": ["enabled", "intervalMinutes", "threshold"],
+        "type": "object"
+      },
+      "CalendarDTO": {
+        "additionalProperties": false,
+        "properties": {
+          "color": {
+            "type": "string"
+          },
+          "coverUrl": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "displayColor": {
+            "type": "string"
+          },
+          "id": {
+            "description": "Calendar public id (UUID v7)",
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "memberColor": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "visible": {
+            "type": "boolean"
+          }
+        },
+        "required": ["id", "kind", "name", "color", "visible", "createdAt"],
         "type": "object"
       },
       "ChangePasswordInputBody": {
@@ -964,6 +1255,76 @@
         ],
         "type": "object"
       },
+      "Cookie": {
+        "additionalProperties": false,
+        "properties": {
+          "Domain": {
+            "type": "string"
+          },
+          "Expires": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "HttpOnly": {
+            "type": "boolean"
+          },
+          "MaxAge": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "Name": {
+            "type": "string"
+          },
+          "Partitioned": {
+            "type": "boolean"
+          },
+          "Path": {
+            "type": "string"
+          },
+          "Quoted": {
+            "type": "boolean"
+          },
+          "Raw": {
+            "type": "string"
+          },
+          "RawExpires": {
+            "type": "string"
+          },
+          "SameSite": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "Secure": {
+            "type": "boolean"
+          },
+          "Unparsed": {
+            "items": {
+              "type": "string"
+            },
+            "type": ["array", "null"]
+          },
+          "Value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "Name",
+          "Value",
+          "Quoted",
+          "Path",
+          "Domain",
+          "Expires",
+          "RawExpires",
+          "MaxAge",
+          "Secure",
+          "HttpOnly",
+          "SameSite",
+          "Partitioned",
+          "Raw",
+          "Unparsed"
+        ],
+        "type": "object"
+      },
       "CountUnreadOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -1031,6 +1392,51 @@
           }
         },
         "required": ["modelId", "name", "systemPrompt"],
+        "type": "object"
+      },
+      "CreateEventInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateEventInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "allDay": {
+            "type": "boolean"
+          },
+          "endAt": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "location": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "memo": {
+            "maxLength": 5000,
+            "type": "string"
+          },
+          "showAs": {
+            "type": "string"
+          },
+          "startAt": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["title", "allDay", "startAt", "endAt", "timezone"],
         "type": "object"
       },
       "CreateInputBody": {
@@ -1136,6 +1542,7 @@
             "type": "integer"
           },
           "id": {
+            "description": "McpToken public id (UUID v7)",
             "type": "string"
           },
           "name": {
@@ -1458,7 +1865,7 @@
           "expiresIn": {
             "description": "Seconds until invite expires",
             "format": "int64",
-            "minimum": 60,
+            "minimum": 1,
             "type": "integer"
           },
           "label": {
@@ -1497,6 +1904,23 @@
           }
         },
         "required": ["invite", "token"],
+        "type": "object"
+      },
+      "DeleteEventOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/DeleteEventOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
         "type": "object"
       },
       "DeleteLensBody": {
@@ -1879,6 +2303,74 @@
         "required": ["outcomes"],
         "type": "object"
       },
+      "EventDTO": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/EventDTO.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "allDay": {
+            "type": "boolean"
+          },
+          "blockLabel": {
+            "type": "string"
+          },
+          "calendarId": {
+            "type": "string"
+          },
+          "endAt": {
+            "type": "string"
+          },
+          "id": {
+            "description": "Event public id (UUID v7)",
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "memo": {
+            "type": "string"
+          },
+          "ownerUserId": {
+            "type": "string"
+          },
+          "showAs": {
+            "type": "string"
+          },
+          "startAt": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "calendarId",
+          "kind",
+          "visibility",
+          "showAs",
+          "title",
+          "allDay",
+          "startAt",
+          "endAt",
+          "timezone"
+        ],
+        "type": "object"
+      },
       "ExplainConstraintBody": {
         "additionalProperties": false,
         "properties": {
@@ -2074,6 +2566,41 @@
         "required": ["webhook"],
         "type": "object"
       },
+      "GrantAdminInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/GrantAdminInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "userId": {
+            "description": "User public id (UUID v7)",
+            "type": "string"
+          }
+        },
+        "required": ["userId"],
+        "type": "object"
+      },
+      "GrantAdminOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/GrantAdminOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
       "HealthOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -2102,6 +2629,7 @@
             "type": "string"
           },
           "id": {
+            "description": "InboxItem public id (UUID v7)",
             "type": "string"
           },
           "kind": {
@@ -2228,6 +2756,55 @@
         "required": ["transition", "confidence", "reason"],
         "type": "object"
       },
+      "InstanceAdmin": {
+        "additionalProperties": false,
+        "properties": {
+          "avatarUrl": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "grantedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "grantedByDisplayName": {
+            "type": "string"
+          },
+          "grantedById": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "userId", "email", "displayName", "grantedAt"],
+        "type": "object"
+      },
+      "InstanceSetting": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": ["key", "value"],
+        "type": "object"
+      },
       "InviteInfoOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -2239,8 +2816,8 @@
             "type": "string"
           },
           "expiresAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "role": {
             "type": "string"
@@ -2275,6 +2852,30 @@
         "required": ["filter", "sort", "groupBy"],
         "type": "object"
       },
+      "ListAdminsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListAdminsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InstanceAdmin"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "items"],
+        "type": "object"
+      },
       "ListAgentsOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -2299,6 +2900,30 @@
         "required": ["total", "agents"],
         "type": "object"
       },
+      "ListAuditLogsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListAuditLogsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AuditEntry"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "items"],
+        "type": "object"
+      },
       "ListAutoActionsOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -2321,6 +2946,26 @@
           }
         },
         "required": ["total", "actions"],
+        "type": "object"
+      },
+      "ListCalendarsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListCalendarsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "calendars": {
+            "items": {
+              "$ref": "#/components/schemas/CalendarDTO"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["calendars"],
         "type": "object"
       },
       "ListChildPagesBody": {
@@ -2398,6 +3043,26 @@
           }
         },
         "required": ["source", "model", "candidates"],
+        "type": "object"
+      },
+      "ListEventsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListEventsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/EventDTO"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["events"],
         "type": "object"
       },
       "ListForTaskBody": {
@@ -2827,6 +3492,26 @@
         "required": ["items"],
         "type": "object"
       },
+      "ListSettingsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListSettingsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InstanceSetting"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["items"],
+        "type": "object"
+      },
       "ListStateSuggestionsOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -3112,6 +3797,54 @@
         "required": ["total", "events", "nextCursor"],
         "type": "object"
       },
+      "ListUserSessionsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListUserSessionsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminSession"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "items"],
+        "type": "object"
+      },
+      "ListUsersOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListUsersOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminUser"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "items"],
+        "type": "object"
+      },
       "ListWidgetsBody": {
         "additionalProperties": false,
         "properties": {
@@ -3384,6 +4117,7 @@
             "type": "integer"
           },
           "id": {
+            "description": "McpToken public id (UUID v7)",
             "type": "string"
           },
           "lastUsedAt": {
@@ -3432,6 +4166,9 @@
           "id": {
             "type": "string"
           },
+          "isInstanceAdmin": {
+            "type": "boolean"
+          },
           "locale": {
             "type": "string"
           },
@@ -3451,7 +4188,15 @@
             "type": "boolean"
           },
           "themePreference": {
-            "enum": ["aurora-light", "aurora-dark", "dotline-light", "dotline-dark", "system"],
+            "enum": [
+              "aurora-light",
+              "aurora-dark",
+              "dotline-light",
+              "dotline-dark",
+              "glass-light",
+              "glass-dark",
+              "system"
+            ],
             "type": "string"
           }
         },
@@ -3465,7 +4210,8 @@
           "notifEmailMention",
           "notifEmailAssignment",
           "notifEmailDueSoon",
-          "notifWebPush"
+          "notifWebPush",
+          "isInstanceAdmin"
         ],
         "type": "object"
       },
@@ -3476,6 +4222,7 @@
             "type": "string"
           },
           "id": {
+            "description": "Model public id (UUID v7)",
             "type": "string"
           },
           "name": {
@@ -3498,8 +4245,8 @@
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "derivedState": {
             "type": "string"
@@ -3527,8 +4274,8 @@
             "type": "string"
           },
           "updatedAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "workspaceId": {
             "type": "string"
@@ -3577,6 +4324,7 @@
             "type": "string"
           },
           "id": {
+            "description": "Notification public id (UUID v7)",
             "type": "string"
           },
           "readAt": {
@@ -3888,6 +4636,49 @@
         },
         "type": "object"
       },
+      "PatchEventInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PatchEventInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "allDay": {
+            "type": "boolean"
+          },
+          "endAt": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "location": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "memo": {
+            "maxLength": 5000,
+            "type": "string"
+          },
+          "showAs": {
+            "type": "string"
+          },
+          "startAt": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 500,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "PatchMeInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -3927,7 +4718,15 @@
             "type": "boolean"
           },
           "themePreference": {
-            "enum": ["aurora-light", "aurora-dark", "dotline-light", "dotline-dark", "system"],
+            "enum": [
+              "aurora-light",
+              "aurora-dark",
+              "dotline-light",
+              "dotline-dark",
+              "glass-light",
+              "glass-dark",
+              "system"
+            ],
             "type": "string"
           }
         },
@@ -3997,6 +4796,44 @@
         "required": ["ok"],
         "type": "object"
       },
+      "PatchSettingsInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PatchSettingsInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "settings": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Key-value pairs to upsert",
+            "type": "object"
+          }
+        },
+        "required": ["settings"],
+        "type": "object"
+      },
+      "PatchSettingsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PatchSettingsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
       "PatchTaskBody": {
         "additionalProperties": false,
         "properties": {
@@ -4045,6 +4882,40 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "PatchUserInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PatchUserInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "enabled": {
+            "type": ["boolean", "null"]
+          }
+        },
+        "required": ["enabled"],
+        "type": "object"
+      },
+      "PatchUserOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PatchUserOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
         "type": "object"
       },
       "PatchWorkspaceInputBody": {
@@ -4177,17 +5048,18 @@
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "description": {
             "type": "string"
           },
           "endedOn": {
-            "format": "date-time",
+            "description": "YYYY-MM-DD",
             "type": "string"
           },
           "id": {
+            "description": "Project public id (UUID v7)",
             "type": "string"
           },
           "isArchived": {
@@ -4200,12 +5072,12 @@
             "type": "string"
           },
           "startedOn": {
-            "format": "date-time",
+            "description": "YYYY-MM-DD",
             "type": "string"
           },
           "updatedAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "workspaceId": {
             "type": "string"
@@ -4224,6 +5096,7 @@
             "type": "string"
           },
           "id": {
+            "description": "Dependency public id (UUID v7)",
             "type": "string"
           },
           "kind": {
@@ -4257,15 +5130,15 @@
             "type": "string"
           },
           "addedAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "avatarUrl": {
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "displayName": {
             "type": "string"
@@ -4274,6 +5147,7 @@
             "type": "string"
           },
           "id": {
+            "description": "ProjectMember public id (UUID v7)",
             "type": "string"
           },
           "role": {
@@ -4388,13 +5262,14 @@
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "defaultModel": {
             "type": "string"
           },
           "id": {
+            "description": "Provider public id (UUID v7)",
             "type": "string"
           },
           "kind": {
@@ -4404,8 +5279,8 @@
             "type": "string"
           },
           "updatedAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           }
         },
         "required": ["id", "kind", "name", "apiKeyMasked", "createdAt"],
@@ -4774,6 +5649,23 @@
         "required": ["ok"],
         "type": "object"
       },
+      "RevokeAdminOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/RevokeAdminOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
       "RevokeAllOtherSessionsOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -4841,8 +5733,8 @@
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "creatorDisplayName": {
             "type": "string"
@@ -4887,8 +5779,8 @@
             "type": "integer"
           },
           "updatedAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           }
         },
         "required": [
@@ -4966,6 +5858,23 @@
         "required": ["id", "userAgent", "ipAddress", "current", "createdAt", "expiresAt"],
         "type": "object"
       },
+      "SetupOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/SetupOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
       "Signal": {
         "additionalProperties": false,
         "properties": {
@@ -4977,13 +5886,14 @@
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "externalId": {
             "type": "string"
           },
           "id": {
+            "description": "Signal public id (UUID v7)",
             "type": "string"
           },
           "kind": {
@@ -4991,8 +5901,8 @@
           },
           "payload": {},
           "receivedAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "source": {
             "type": "string"
@@ -5194,8 +6104,8 @@
             "type": "integer"
           },
           "completedAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "constraintCount": {
             "format": "int64",
@@ -5206,8 +6116,8 @@
             "type": "integer"
           },
           "createdAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "createdByUserId": {
             "type": "string"
@@ -5255,8 +6165,8 @@
             "type": "string"
           },
           "updatedAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "visibility": {
             "type": "string"
@@ -5297,8 +6207,8 @@
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "displayName": {
             "type": "string"
@@ -5313,8 +6223,8 @@
             "type": "string"
           },
           "updatedAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "userId": {
             "type": "string"
@@ -5340,8 +6250,8 @@
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "id": {
             "type": "string"
@@ -5350,8 +6260,8 @@
             "type": "string"
           },
           "updatedAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           }
         },
         "required": ["id", "agentId", "agentName", "role", "createdAt"],
@@ -5422,8 +6332,8 @@
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "filename": {
             "type": "string"
@@ -5435,8 +6345,8 @@
             "type": "string"
           },
           "updatedAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "uploaderDisplayName": {
             "type": "string"
@@ -5506,19 +6416,19 @@
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "editedAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "id": {
             "type": "string"
           },
           "updatedAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           }
         },
         "required": ["id", "authorId", "authorDisplayName", "body", "createdAt"],
@@ -5535,15 +6445,15 @@
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "expression": {
             "type": "string"
           },
           "failedAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "id": {
             "type": "string"
@@ -5552,16 +6462,16 @@
             "type": "string"
           },
           "satisfiedAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "sortWeight": {
             "format": "int32",
             "type": "integer"
           },
           "updatedAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           }
         },
         "required": ["id", "kind", "expression", "sortWeight", "createdAt"],
@@ -5578,8 +6488,8 @@
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "fromTaskId": {
             "type": "string"
@@ -5600,8 +6510,8 @@
             "type": "string"
           },
           "updatedAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           }
         },
         "required": [
@@ -5619,8 +6529,8 @@
         "additionalProperties": false,
         "properties": {
           "createdAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "id": {
             "type": "string"
@@ -5656,12 +6566,12 @@
             "type": "integer"
           },
           "completedAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "createdAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "derivedState": {
             "type": "string"
@@ -5702,8 +6612,8 @@
             "type": "string"
           },
           "updatedAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "visibility": {
             "type": "string"
@@ -5930,6 +6840,7 @@
             "type": "string"
           },
           "id": {
+            "description": "TimelineEvent public id (UUID v7)",
             "type": "string"
           },
           "occurredAt": {
@@ -6526,6 +7437,7 @@
             "type": ["integer", "null"]
           },
           "id": {
+            "description": "WebhookDelivery public id (UUID v7)",
             "type": "string"
           },
           "maxAttempts": {
@@ -6568,6 +7480,7 @@
           },
           "eventTypes": {},
           "id": {
+            "description": "WebhookSubscription public id (UUID v7)",
             "type": "string"
           },
           "isActive": {
@@ -6610,6 +7523,7 @@
           },
           "eventTypes": {},
           "id": {
+            "description": "WebhookSubscription public id (UUID v7)",
             "type": "string"
           },
           "isActive": {
@@ -6796,8 +7710,8 @@
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "description": {
             "type": "string"
@@ -6825,8 +7739,8 @@
             "type": "string"
           },
           "updatedAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           }
         },
         "required": ["id", "slug", "name", "memberCount", "createdAt"],
@@ -6836,15 +7750,15 @@
         "additionalProperties": false,
         "properties": {
           "createdAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "createdByName": {
             "type": "string"
           },
           "expiresAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "id": {
             "description": "Invite public id (UUID v7)",
@@ -6876,8 +7790,8 @@
             "type": "string"
           },
           "createdAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "displayName": {
             "type": "string"
@@ -6886,22 +7800,23 @@
             "type": "string"
           },
           "id": {
+            "description": "WorkspaceMember public id (UUID v7)",
             "type": "string"
           },
           "invitedAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "joinedAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "role": {
             "type": "string"
           },
           "updatedAt": {
-            "format": "date-time",
-            "type": "string"
+            "format": "int64",
+            "type": "integer"
           },
           "userId": {
             "type": "string"
@@ -6935,6 +7850,738 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/admin/audit-logs": {
+      "get": {
+        "operationId": "admin-list-audit-logs",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "query",
+            "name": "action",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Unix seconds, inclusive (0=no lower bound)",
+            "explode": false,
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "default": 0,
+              "description": "Unix seconds, inclusive (0=no lower bound)",
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Unix seconds, inclusive (0=no upper bound)",
+            "explode": false,
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "default": 0,
+              "description": "Unix seconds, inclusive (0=no upper bound)",
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListAuditLogsOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List instance audit logs",
+        "tags": ["Admin"]
+      }
+    },
+    "/admin/instance-admins": {
+      "get": {
+        "operationId": "admin-list-admins",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListAdminsOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List instance administrators",
+        "tags": ["Admin"]
+      },
+      "post": {
+        "operationId": "admin-grant-admin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantAdminInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrantAdminOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Grant instance admin privileges",
+        "tags": ["Admin"]
+      }
+    },
+    "/admin/instance-admins/{userId}": {
+      "delete": {
+        "operationId": "admin-revoke-admin",
+        "parameters": [
+          {
+            "description": "User public id (UUID v7)",
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "description": "User public id (UUID v7)",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeAdminOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Revoke instance admin privileges",
+        "tags": ["Admin"]
+      }
+    },
+    "/admin/sessions/{sessionId}": {
+      "delete": {
+        "operationId": "admin-revoke-session",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sessionId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeSessionOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Revoke a session",
+        "tags": ["Admin"]
+      }
+    },
+    "/admin/settings": {
+      "get": {
+        "operationId": "admin-list-settings",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListSettingsOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List instance settings",
+        "tags": ["Admin"]
+      },
+      "patch": {
+        "operationId": "admin-patch-settings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchSettingsInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatchSettingsOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update instance settings",
+        "tags": ["Admin"]
+      }
+    },
+    "/admin/setup": {
+      "post": {
+        "operationId": "admin-setup",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Bootstrap the first instance admin",
+        "tags": ["Admin"]
+      }
+    },
+    "/admin/users": {
+      "get": {
+        "operationId": "admin-list-users",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by enabled status (empty=all)",
+            "explode": false,
+            "in": "query",
+            "name": "enabled",
+            "schema": {
+              "description": "Filter by enabled status (empty=all)",
+              "enum": ["true", "false", ""],
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListUsersOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List all users",
+        "tags": ["Admin"]
+      }
+    },
+    "/admin/users/{userId}": {
+      "get": {
+        "operationId": "admin-get-user",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUser"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get user details",
+        "tags": ["Admin"]
+      },
+      "patch": {
+        "operationId": "admin-patch-user",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchUserInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatchUserOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update user (suspend/enable)",
+        "tags": ["Admin"]
+      }
+    },
+    "/admin/users/{userId}/sessions": {
+      "get": {
+        "operationId": "admin-list-user-sessions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListUserSessionsOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List sessions for a user",
+        "tags": ["Admin"]
+      }
+    },
+    "/admin/workspaces": {
+      "get": {
+        "operationId": "admin-list-workspaces",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by enabled status (empty=all)",
+            "explode": false,
+            "in": "query",
+            "name": "enabled",
+            "schema": {
+              "description": "Filter by enabled status (empty=all)",
+              "enum": ["true", "false", ""],
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminListWorkspacesOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List all workspaces",
+        "tags": ["Admin"]
+      }
+    },
+    "/admin/workspaces/{wsId}": {
+      "get": {
+        "operationId": "admin-get-workspace",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminWorkspace"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get workspace details",
+        "tags": ["Admin"]
+      },
+      "patch": {
+        "operationId": "admin-patch-workspace",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminPatchWorkspaceInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPatchWorkspaceOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update workspace (suspend/enable)",
+        "tags": ["Admin"]
+      }
+    },
     "/auth/login": {
       "post": {
         "operationId": "auth-login",
@@ -7040,7 +8687,7 @@
             "description": "Error"
           }
         },
-        "summary": "Complete a TOTP step-up login after /auth/login returned totp_required"
+        "summary": "Complete a TOTP step-up login"
       }
     },
     "/auth/logout": {
@@ -7049,9 +8696,9 @@
         "parameters": [
           {
             "in": "cookie",
-            "name": "nf_rt",
+            "name": "nd_rt",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Cookie"
             }
           }
         ],
@@ -7110,6 +8757,14 @@
             "explode": false,
             "in": "query",
             "name": "state",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "nonce",
             "schema": {
               "type": "string"
             }
@@ -7188,9 +8843,9 @@
           },
           {
             "in": "cookie",
-            "name": "nf_rt",
+            "name": "nd_rt",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Cookie"
             }
           }
         ],
@@ -7479,7 +9134,7 @@
     },
     "/invites/{token}/accept": {
       "post": {
-        "operationId": "workspaces-invites-accept",
+        "operationId": "invites-accept",
         "parameters": [
           {
             "in": "path",
@@ -7512,12 +9167,12 @@
             "description": "Error"
           }
         },
-        "summary": "Accept a workspace invite link"
+        "summary": "Accept a workspace invite"
       }
     },
     "/invites/{token}/info": {
       "get": {
-        "operationId": "workspaces-invites-info",
+        "operationId": "invites-info",
         "parameters": [
           {
             "in": "path",
@@ -7550,7 +9205,7 @@
             "description": "Error"
           }
         },
-        "summary": "Fetch public info about a workspace invite (no auth required)"
+        "summary": "Preview invite details (public)"
       }
     },
     "/me": {
@@ -7843,9 +9498,9 @@
         "parameters": [
           {
             "in": "cookie",
-            "name": "nf_rt",
+            "name": "nd_rt",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Cookie"
             }
           }
         ],
@@ -7890,9 +9545,9 @@
         "parameters": [
           {
             "in": "cookie",
-            "name": "nf_rt",
+            "name": "nd_rt",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Cookie"
             }
           }
         ],
@@ -7918,16 +9573,16 @@
             "description": "Error"
           }
         },
-        "summary": "Revoke every session except the one on the current request"
+        "summary": "Revoke every session except the current one"
       },
       "get": {
         "operationId": "me-sessions-list",
         "parameters": [
           {
             "in": "cookie",
-            "name": "nf_rt",
+            "name": "nd_rt",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Cookie"
             }
           }
         ],
@@ -7993,7 +9648,7 @@
             "description": "Error"
           }
         },
-        "summary": "Revoke a single session by public id"
+        "summary": "Revoke a single session"
       }
     },
     "/me/tasks": {
@@ -8084,7 +9739,7 @@
             "description": "Error"
           }
         },
-        "summary": "Disable TOTP 2FA after password reverification"
+        "summary": "Disable TOTP 2FA"
       },
       "get": {
         "operationId": "me-totp-status",
@@ -8110,7 +9765,7 @@
             "description": "Error"
           }
         },
-        "summary": "Return the authenticated user's TOTP 2FA status"
+        "summary": "Return TOTP 2FA status"
       }
     },
     "/me/totp/confirm": {
@@ -8148,7 +9803,7 @@
             "description": "Error"
           }
         },
-        "summary": "Confirm TOTP 2FA enrollment with a generated code"
+        "summary": "Confirm TOTP 2FA enrollment"
       }
     },
     "/me/totp/enroll": {
@@ -8176,7 +9831,7 @@
             "description": "Error"
           }
         },
-        "summary": "Begin TOTP 2FA enrollment (returns otpauth URL)"
+        "summary": "Begin TOTP 2FA enrollment"
       }
     },
     "/me/totp/recovery-codes": {
@@ -8204,7 +9859,7 @@
             "description": "Error"
           }
         },
-        "summary": "Return remaining TOTP recovery code count"
+        "summary": "Return remaining recovery code count"
       },
       "post": {
         "operationId": "me-totp-recovery-regenerate",
@@ -8240,7 +9895,7 @@
             "description": "Error"
           }
         },
-        "summary": "Regenerate TOTP recovery codes after password reverification"
+        "summary": "Regenerate TOTP recovery codes"
       }
     },
     "/notifications/{notifId}/archive": {
@@ -10165,7 +11820,7 @@
             "description": "Error"
           }
         },
-        "summary": "Run the Phase 3 constraint engine for a task and persist satisfied/failed markers"
+        "summary": "Run the constraint engine for a task and persist satisfied/failed markers"
       }
     },
     "/tasks/{id}/constraints/explain": {
@@ -10603,7 +12258,7 @@
             "description": "Error"
           }
         },
-        "summary": "Replay transition events and report drift vs stored derived_state (3.ENG-1)"
+        "summary": "Replay transition events and report drift vs stored derived_state"
       }
     },
     "/tasks/{id}/timeline": {
@@ -10788,7 +12443,7 @@
             "description": "Error"
           }
         },
-        "summary": "List workspaces visible to the caller"
+        "summary": "List workspaces for the authenticated user"
       },
       "post": {
         "operationId": "workspaces-create",
@@ -10862,7 +12517,7 @@
             "description": "Error"
           }
         },
-        "summary": "Soft-disable a workspace"
+        "summary": "Disable a workspace"
       },
       "get": {
         "operationId": "workspaces-get",
@@ -10898,7 +12553,7 @@
             "description": "Error"
           }
         },
-        "summary": "Fetch a workspace"
+        "summary": "Get workspace details"
       },
       "patch": {
         "operationId": "workspaces-patch",
@@ -10944,7 +12599,7 @@
             "description": "Error"
           }
         },
-        "summary": "Patch a workspace"
+        "summary": "Update workspace details"
       }
     },
     "/workspaces/{wsId}/ai/agents": {
@@ -11163,7 +12818,7 @@
             "description": "Error"
           }
         },
-        "summary": "Toggle the kill switch on an AI agent (4.AGENT-3)"
+        "summary": "Toggle the kill switch on an AI agent"
       }
     },
     "/workspaces/{wsId}/ai/agents/{agentId}/schedule": {
@@ -11471,7 +13126,7 @@
             "description": "Error"
           }
         },
-        "summary": "Workspace-wide deterministic auto-action proposals (2.AI-3)"
+        "summary": "Workspace-wide deterministic auto-action proposals"
       }
     },
     "/workspaces/{wsId}/ai/compile-lens": {
@@ -12014,7 +13669,7 @@
             "description": "Error"
           }
         },
-        "summary": "Workspace-wide deterministic reminder engine proposals (2.AI-4)"
+        "summary": "Workspace-wide deterministic reminder engine proposals"
       }
     },
     "/workspaces/{wsId}/ai/resolve-command": {
@@ -12100,7 +13755,7 @@
             "description": "Error"
           }
         },
-        "summary": "Workspace-wide deterministic state inference proposals (2.AI-1)"
+        "summary": "Workspace-wide deterministic state inference proposals"
       }
     },
     "/workspaces/{wsId}/ai/suggestions": {
@@ -12254,7 +13909,275 @@
             "description": "Error"
           }
         },
-        "summary": "Deterministic weekly digest markdown for a workspace (2.AI-9)"
+        "summary": "Deterministic weekly digest markdown for a workspace"
+      }
+    },
+    "/workspaces/{wsId}/calendar-events": {
+      "get": {
+        "operationId": "calendar-events-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "ISO date (YYYY-MM-DD)",
+            "explode": false,
+            "in": "query",
+            "name": "start",
+            "schema": {
+              "description": "ISO date (YYYY-MM-DD)",
+              "type": "string"
+            }
+          },
+          {
+            "description": "ISO date (YYYY-MM-DD)",
+            "explode": false,
+            "in": "query",
+            "name": "end",
+            "schema": {
+              "description": "ISO date (YYYY-MM-DD)",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListEventsOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List events across all subscribed calendars"
+      }
+    },
+    "/workspaces/{wsId}/calendars": {
+      "get": {
+        "operationId": "calendars-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListCalendarsOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List calendars visible to the caller"
+      }
+    },
+    "/workspaces/{wsId}/calendars/{calId}/events": {
+      "post": {
+        "operationId": "calendar-events-create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "calId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEventInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventDTO"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create a calendar event"
+      }
+    },
+    "/workspaces/{wsId}/calendars/{calId}/events/{eventId}": {
+      "delete": {
+        "operationId": "calendar-events-delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "calId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteEventOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete a calendar event"
+      },
+      "patch": {
+        "operationId": "calendar-events-patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "calId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchEventInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventDTO"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update a calendar event"
       }
     },
     "/workspaces/{wsId}/dashboard/widgets": {
@@ -12745,7 +14668,7 @@
             "description": "Error"
           }
         },
-        "summary": "List active invite links for a workspace"
+        "summary": "List invite links"
       },
       "post": {
         "operationId": "workspaces-invites-create",
@@ -12791,7 +14714,7 @@
             "description": "Error"
           }
         },
-        "summary": "Create a shareable invite link for a workspace"
+        "summary": "Create an invite link"
       }
     },
     "/workspaces/{wsId}/invites/{inviteId}": {
@@ -13404,10 +15327,10 @@
             "description": "Error"
           }
         },
-        "summary": "List members of a workspace"
+        "summary": "List workspace members"
       },
       "post": {
-        "operationId": "workspaces-members-invite",
+        "operationId": "workspaces-members-add",
         "parameters": [
           {
             "in": "path",
@@ -13450,7 +15373,7 @@
             "description": "Error"
           }
         },
-        "summary": "Invite a user to a workspace"
+        "summary": "Add a member to a workspace"
       }
     },
     "/workspaces/{wsId}/members/{userId}": {
@@ -13550,7 +15473,7 @@
             "description": "Error"
           }
         },
-        "summary": "Change a member's role"
+        "summary": "Update a member's role"
       }
     },
     "/workspaces/{wsId}/notifications/read-all": {
@@ -14903,7 +16826,7 @@
             "description": "Error"
           }
         },
-        "summary": "List workspace users (minimal summary for actor pickers)"
+        "summary": "List workspace users (actor picker)"
       }
     },
     "/workspaces/{wsId}/webhooks": {

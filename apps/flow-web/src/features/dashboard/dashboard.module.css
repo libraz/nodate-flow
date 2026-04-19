@@ -53,7 +53,8 @@
   box-shadow: var(--nf-shadow-sm);
   overflow: hidden;
   min-block-size: 10rem;
-  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  transition: box-shadow var(--nf-duration-fast) var(--nf-ease-standard), border-color
+    var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .widget:hover {
@@ -126,7 +127,7 @@
   color: var(--nf-color-danger);
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.1s ease;
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .removeButton:hover {
@@ -210,7 +211,8 @@
   border-radius: var(--nf-radius-md);
   background: var(--nf-color-bg-elevated);
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color var(--nf-duration-fast) var(--nf-ease-standard), box-shadow
+    var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .typeCard:hover {

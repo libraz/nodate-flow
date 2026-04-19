@@ -1,6 +1,7 @@
 import Icon from '@nodate-flow/ui/icon';
 import { cx } from '@nodate-flow/ui/lib/cx';
 import Tooltip from '@nodate-flow/ui/primitives/tooltip';
+import { BP } from '@nodate-flow/ui/tokens/breakpoints';
 import { Link, useRouterState } from '@tanstack/react-router';
 import {
   Briefcase,
@@ -12,9 +13,11 @@ import {
   FolderKanban,
   Inbox,
   type LucideIcon,
+  Menu,
   Settings,
+  X,
 } from 'lucide-react';
-import { type ReactElement, Suspense, useEffect, useState } from 'react';
+import { type ReactElement, Suspense, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useProjectsQuery } from '../../features/projects/api';
@@ -88,9 +91,24 @@ function WorkspaceProjectsSection({ workspaceId }: { workspaceId: string }): Rea
   );
 }
 
+function useIsMobile(): boolean {
+  const [mobile, setMobile] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < BP.md,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${BP.md - 1}px)`);
+    const onChange = (e: MediaQueryListEvent): void => setMobile(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return mobile;
+}
+
 export default function Sidebar(): ReactElement {
   const { t } = useTranslation('common');
   const [collapsed, setCollapsed] = useState<boolean>(() => readInitialCollapsed());
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const isMobile = useIsMobile();
   const currentWorkspaceId = useCurrentWorkspaceId();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
@@ -102,9 +120,19 @@ export default function Sidebar(): ReactElement {
     }
   }, [collapsed]);
 
-  const handleToggle = (): void => {
-    setCollapsed((prev) => !prev);
-  };
+  // Close mobile drawer on route change
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally re-run on pathname change
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  const handleToggle = useCallback((): void => {
+    if (isMobile) {
+      setMobileOpen((prev) => !prev);
+    } else {
+      setCollapsed((prev) => !prev);
+    }
+  }, [isMobile]);
 
   const labelKeyFor = (
     key: NavItem['key'],
@@ -132,68 +160,96 @@ export default function Sidebar(): ReactElement {
   };
 
   return (
-    <aside
-      className={cx(styles.sidebar, collapsed && styles.collapsed)}
-      data-collapsed={collapsed || undefined}
-    >
-      <div className={styles.brand}>
-        <span className={styles.brandLabel}>nodate-flow</span>
-      </div>
-      <nav className={styles.nav} aria-label={t('nav.primary')}>
-        {NAV_ITEMS.map((item) => {
-          const label = t(labelKeyFor(item.key));
-          // Settings and Workspaces should stay highlighted on any
-          // nested child route (e.g. /settings/security,
-          // /workspaces/$id/projects), but the Settings link targets
-          // /settings/profile specifically so the default exact match
-          // fails on siblings. Fall back to a pathname-prefix check.
-          const sectionActive =
-            (item.key === 'settings' && pathname.startsWith('/settings')) ||
-            (item.key === 'workspaces' && pathname.startsWith('/workspaces'));
-          const linkEl = (
-            <Link
-              key={item.key}
-              to={item.to}
-              className={cx(styles.item, sectionActive && styles.itemActive)}
-              activeProps={{ className: cx(styles.item, styles.itemActive) }}
-            >
-              <Icon icon={item.icon} decorative />
-              <span className={styles.label}>{label}</span>
-            </Link>
-          );
-          // Render the project tree directly beneath the Workspaces
-          // nav entry when we are inside a workspace-scoped route.
-          if (item.key === 'workspaces' && currentWorkspaceId && !collapsed) {
-            return (
-              <div key={item.key}>
-                {linkEl}
-                <Suspense fallback={null}>
-                  <WorkspaceProjectsSection workspaceId={currentWorkspaceId} />
-                </Suspense>
-              </div>
-            );
-          }
-          if (collapsed) {
-            return (
-              <Tooltip key={item.key} content={label} placement="right">
-                {linkEl}
-              </Tooltip>
-            );
-          }
-          return linkEl;
-        })}
-      </nav>
-      <div className={styles.footer}>
+    <>
+      {/* Mobile backdrop */}
+      {isMobile && mobileOpen ? (
+        <div
+          className={styles.backdrop}
+          onClick={() => setMobileOpen(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setMobileOpen(false);
+          }}
+          role="presentation"
+        />
+      ) : null}
+      {/* Mobile hamburger button */}
+      {isMobile && !mobileOpen ? (
         <button
           type="button"
-          className={styles.toggle}
-          onClick={handleToggle}
-          aria-label={collapsed ? t('nav.expand') : t('nav.collapse')}
-          aria-expanded={!collapsed}
+          className={styles.mobileMenuBtn}
+          onClick={() => setMobileOpen(true)}
+          aria-label={t('nav.expand')}
         >
-          <Icon icon={collapsed ? ChevronsRight : ChevronsLeft} decorative />
+          <Menu size={20} />
         </button>
-      </div>
-    </aside>
+      ) : null}
+      <aside
+        className={cx(
+          styles.sidebar,
+          collapsed && styles.collapsed,
+          isMobile && mobileOpen && styles.mobileOpen,
+        )}
+        data-collapsed={collapsed || undefined}
+      >
+        <div className={styles.brand}>
+          <span className={styles.brandLabel}>nodate-flow</span>
+        </div>
+        <nav className={styles.nav} aria-label={t('nav.primary')}>
+          {NAV_ITEMS.map((item) => {
+            const label = t(labelKeyFor(item.key));
+            // Settings and Workspaces should stay highlighted on any
+            // nested child route (e.g. /settings/security,
+            // /workspaces/$id/projects), but the Settings link targets
+            // /settings/profile specifically so the default exact match
+            // fails on siblings. Fall back to a pathname-prefix check.
+            const sectionActive =
+              (item.key === 'settings' && pathname.startsWith('/settings')) ||
+              (item.key === 'workspaces' && pathname.startsWith('/workspaces'));
+            const linkEl = (
+              <Link
+                key={item.key}
+                to={item.to}
+                className={cx(styles.item, sectionActive && styles.itemActive)}
+                activeProps={{ className: cx(styles.item, styles.itemActive) }}
+              >
+                <Icon icon={item.icon} decorative />
+                <span className={styles.label}>{label}</span>
+              </Link>
+            );
+            // Render the project tree directly beneath the Workspaces
+            // nav entry when we are inside a workspace-scoped route.
+            if (item.key === 'workspaces' && currentWorkspaceId && !collapsed) {
+              return (
+                <div key={item.key}>
+                  {linkEl}
+                  <Suspense fallback={null}>
+                    <WorkspaceProjectsSection workspaceId={currentWorkspaceId} />
+                  </Suspense>
+                </div>
+              );
+            }
+            if (collapsed) {
+              return (
+                <Tooltip key={item.key} content={label} placement="right">
+                  {linkEl}
+                </Tooltip>
+              );
+            }
+            return linkEl;
+          })}
+        </nav>
+        <div className={styles.footer}>
+          <button
+            type="button"
+            className={styles.toggle}
+            onClick={handleToggle}
+            aria-label={collapsed ? t('nav.expand') : t('nav.collapse')}
+            aria-expanded={!collapsed}
+          >
+            <Icon icon={isMobile ? X : collapsed ? ChevronsRight : ChevronsLeft} decorative />
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }

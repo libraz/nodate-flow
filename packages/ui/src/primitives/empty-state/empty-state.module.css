@@ -1,0 +1,33 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-8) var(--nf-space-4);
+  text-align: center;
+}
+
+.icon {
+  color: var(--nf-color-fg-subtle);
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--nf-text-base);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg-muted);
+}
+
+.description {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-subtle);
+  max-inline-size: 28rem;
+}
+
+.action {
+  margin-block-start: var(--nf-space-2);
+}

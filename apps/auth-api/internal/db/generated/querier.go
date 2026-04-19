@@ -6,6 +6,7 @@ package generated
 
 import (
 	"context"
+	"database/sql"
 
 	types "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 )
@@ -71,10 +72,16 @@ type Querier interface {
 	// mfa_confirmed_at. The caller must have already validated a code
 	// against the stored secret.
 	ConfirmIdentityMfa(ctx context.Context, id uint32) error
+	// Atomically look up and delete an OAuth state row. The caller MUST
+	// still check expires_at against CURRENT_TIMESTAMP before trusting
+	// the returned row.
+	ConsumeOauthState(ctx context.Context, state string) (ConsumeOauthStateRow, error)
 	// Count unused recovery codes for a user.
 	CountActiveRecoveryCodes(ctx context.Context, userID uint32) (int64, error)
 	// Insert a new identity row (local password or OIDC binding) for a user.
 	CreateIdentity(ctx context.Context, arg CreateIdentityParams) (int64, error)
+	// Insert a short-lived CSRF state row for the personal OAuth flow.
+	CreateOauthState(ctx context.Context, arg CreateOauthStateParams) error
 	// Insert a new personal access token. Plain token is shown to the user once.
 	CreatePat(ctx context.Context, arg CreatePatParams) (int64, error)
 	// Insert a new refresh-token session for a user.
@@ -89,6 +96,10 @@ type Querier interface {
 	CreateWorkspaceMember(ctx context.Context, arg CreateWorkspaceMemberParams) (int64, error)
 	// Delete every recovery code (used or not) for a user.
 	DeleteAllRecoveryCodesForUser(ctx context.Context, userID uint32) error
+	// Explicit delete for the state row that :one above just returned.
+	DeleteOauthState(ctx context.Context, state string) error
+	// Hard-delete a single integration row (user-scoped).
+	DeleteUserIntegration(ctx context.Context, arg DeleteUserIntegrationParams) error
 	// Soft-disable a workspace. Cascade is handled by FK ON DELETE for hard purges.
 	DisableWorkspace(ctx context.Context, publicID types.PublicID) error
 	// Resolve an identity by (provider, subject) pair for OIDC login flows.
@@ -119,6 +130,12 @@ type Querier interface {
 	// Resolve the owning user + workspace for an MCP bearer token by hash.
 	// Returns internal ids for the auth middleware.
 	FindUserForMcpToken(ctx context.Context, tokenHash string) (FindUserForMcpTokenRow, error)
+	// Resolve a single integration by its public id, user-scoped. Used
+	// by DELETE /me/integrations/{publicId}.
+	FindUserIntegrationByPublicId(ctx context.Context, arg FindUserIntegrationByPublicIdParams) (FindUserIntegrationByPublicIdRow, error)
+	// Resolve a user's integration for a specific provider. Returns the
+	// encrypted tokens so the caller can refresh or use them.
+	FindUserIntegrationByUserProvider(ctx context.Context, arg FindUserIntegrationByUserProviderParams) (FindUserIntegrationByUserProviderRow, error)
 	// Resolve the internal users.id for a public UUID, excluding disabled rows.
 	FindUserInternalIdByPublicId(ctx context.Context, publicID types.PublicID) (uint32, error)
 	// Fetch the minimal profile for the /me endpoint by internal id.
@@ -140,12 +157,19 @@ type Querier interface {
 	IncrementInviteUseCount(ctx context.Context, id uint32) error
 	// Insert a hashed recovery code for a user.
 	InsertRecoveryCode(ctx context.Context, arg InsertRecoveryCodeParams) error
+	// List enabled integrations whose access token will expire before
+	// the given cutoff AND still have a stored refresh token. Used by
+	// the background token refresher.
+	ListConnectionsExpiringBefore(ctx context.Context, accessTokenExpiresAt sql.NullTime) ([]ListConnectionsExpiringBeforeRow, error)
 	// List a user's PATs in a workspace, masked (no token_hash).
 	ListPatsForUser(ctx context.Context, arg ListPatsForUserParams) ([]ListPatsForUserRow, error)
 	// List recent audit log entries for a workspace via v_audit_recent.
 	ListRecentAudit(ctx context.Context, arg ListRecentAuditParams) ([]ListRecentAuditRow, error)
 	// List a user's active sessions ordered by most recent first.
 	ListSessionsForUser(ctx context.Context, arg ListSessionsForUserParams) ([]ListSessionsForUserRow, error)
+	// List every active integration owned by a user. Tokens are NOT
+	// selected; only metadata used by the /me/integrations list view.
+	ListUserIntegrations(ctx context.Context, userID uint32) ([]ListUserIntegrationsRow, error)
 	// List active invites for a workspace, most recent first.
 	ListWorkspaceInvites(ctx context.Context, arg ListWorkspaceInvitesParams) ([]ListWorkspaceInvitesRow, error)
 	// List members of a workspace via v_workspace_members.
@@ -158,6 +182,9 @@ type Querier interface {
 	PatchMe(ctx context.Context, arg PatchMeParams) error
 	// Patch a workspace via COALESCE; NULL params leave existing columns untouched.
 	PatchWorkspace(ctx context.Context, arg PatchWorkspaceParams) error
+	// Garbage-collect oauth_states rows past their expires_at. Called
+	// opportunistically from the callback handler.
+	PurgeExpiredOauthStates(ctx context.Context) error
 	// Insert a new global user account. The caller supplies a UUID v7 public_id.
 	RegisterUser(ctx context.Context, arg RegisterUserParams) (int64, error)
 	// Soft-remove a member from a workspace.
@@ -180,6 +207,8 @@ type Querier interface {
 	// Begin (or restart) TOTP enrollment by writing a fresh encrypted
 	// secret and clearing any previous confirmation timestamp.
 	SetIdentityMfaSecret(ctx context.Context, arg SetIdentityMfaSecretParams) error
+	// Replace stored tokens after a successful refresh.
+	UpdateConnectionTokens(ctx context.Context, arg UpdateConnectionTokensParams) error
 	// Bump failed login counter and optionally apply a lockout deadline.
 	UpdateIdentityFailedAttempts(ctx context.Context, arg UpdateIdentityFailedAttemptsParams) error
 	// Replace the Argon2id password hash on a local identity.
@@ -194,6 +223,10 @@ type Querier interface {
 	UpdateWorkspace(ctx context.Context, arg UpdateWorkspaceParams) error
 	// Update workspace name and slug by public_id.
 	UpdateWorkspaceFull(ctx context.Context, arg UpdateWorkspaceFullParams) error
+	// Insert or replace a user+provider integration. The uniq
+	// (user_id, provider) key guarantees only one active row per
+	// provider per user; on conflict we refresh every token column.
+	UpsertUserIntegration(ctx context.Context, arg UpsertUserIntegrationParams) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)

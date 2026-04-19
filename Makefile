@@ -31,16 +31,27 @@ help: ## Show this help
 
 # ---------- dev (yarn dev equivalent) ----------
 
-.PHONY: dev dev-api dev-auth-api dev-web dev-time-api dev-time up down logs
-dev: db-schema .env ## Start MySQL (compose) + auth API + flow API + flow web in parallel
-	@echo "starting mysql, auth-api, flow-api, flow-web..."
+.PHONY: dev dev-api dev-auth-api dev-web dev-accounts-web dev-time-api dev-time dev-reset up down logs
+dev: db-schema .env ## Start MySQL (compose) + auth API + flow API + accounts web + flow web
+	@echo "starting mysql, auth-api, flow-api, accounts-web, flow-web..."
 	@docker compose up -d mysql
-	@$(MAKE) -j3 dev-auth-api dev-api dev-web
+	@$(MAKE) -j4 dev-auth-api dev-api dev-accounts-web dev-web
 
 dev-time: db-schema .env ## Start MySQL (compose) + auth API + time API + time web in parallel
 	@echo "starting mysql, auth-api, time-api..."
 	@docker compose up -d mysql
 	@$(MAKE) -j2 dev-auth-api dev-time-api
+
+dev-reset: ## Full reset: nuke volumes, rebuild schema, start fresh, seed
+	@echo "resetting everything from scratch..."
+	docker compose down -v || true
+	@$(MAKE) db-schema
+	docker compose up -d mysql
+	@echo "waiting for mysql to be healthy (schema init may take a moment)..."
+	@until docker compose exec mysql mysql -u root -prootpw -e "SELECT 1 FROM workspaces LIMIT 0" nodate_flow 2>/dev/null; do sleep 2; done
+	@echo "mysql ready, seeding..."
+	@$(MAKE) seed-flow
+	@$(MAKE) dev
 
 # Copy .env.example on first run so `make dev` works out of the box.
 .env:
@@ -60,8 +71,11 @@ dev-auth-api: ## Run Go auth API against the local MySQL (reads .env)
 	  NF_DB_DSN="$${NF_DB_DSN:-$(NF_DB_USER):$(NF_DB_PASSWORD)@tcp($(NF_DB_HOST):$(NF_DB_PORT))/$(NF_DB_NAME)?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci}" \
 	  go run ./cmd/api
 
-dev-web: ## Run Vite dev server
+dev-web: ## Run Vite dev server (flow-web, port 5173)
 	cd apps/flow-web && $(PKG_RUN) dev
+
+dev-accounts-web: ## Run Vite dev server (accounts-web, port 5175)
+	cd apps/accounts-web && $(PKG_RUN) dev
 
 dev-time-api: ## Run nodate-time API against the local MySQL (reads .env)
 	cd apps/time-api && go run ./cmd/api
@@ -150,8 +164,12 @@ gen-sqlc: ## sqlc generate (requires sqlc installed)
 gen-errors: ## Regenerate Go/TS error modules + locale stubs + docs from errors/*.yaml
 	go -C scripts run gen-errors.go
 
-gen-openapi: ## Dump merged OpenAPI 3.1 to packages/sdk/openapi.json
-	cd apps/flow-api && go run ./cmd/dump-openapi -o ../../packages/sdk/openapi.json
+gen-openapi: ## Dump merged OpenAPI 3.1 (flow-api + auth-api) to packages/sdk/openapi.json
+	cd apps/flow-api && go run ./cmd/dump-openapi -o ../../packages/sdk/openapi-flow.json
+	cd apps/auth-api && go run ./cmd/dump-openapi -o ../../packages/sdk/openapi-auth.json
+	cd scripts && go run merge-openapi.go -o ../packages/sdk/openapi.json ../packages/sdk/openapi-flow.json ../packages/sdk/openapi-auth.json
+	$(PKG_X) biome format --write packages/sdk/openapi.json
+	@rm -f packages/sdk/openapi-flow.json packages/sdk/openapi-auth.json
 
 gen-sdk: gen-openapi ## Generate TS SDK from OpenAPI
 	cd packages/sdk && $(PKG_X) openapi-typescript openapi.json -o src/openapi.ts
@@ -182,7 +200,7 @@ db-apply: db-schema ## Apply schema.sql to a self-hosted MySQL (uses NF_DB_* var
 	@echo "applying sql/schema.sql to $(NF_DB_USER)@$(NF_DB_HOST):$(NF_DB_PORT)/$(NF_DB_NAME)"
 	mysql -h $(NF_DB_HOST) -P $(NF_DB_PORT) -u $(NF_DB_USER) -p$(NF_DB_PASSWORD) $(NF_DB_NAME) < sql/schema.sql
 
-db-reset: ## Drop the compose mysql volume and re-init from schema.sql
+db-reset: db-schema ## Drop the compose mysql volume and re-init from schema.sql
 	docker compose down
 	docker volume rm nodate-flow_mysql_data || true
 	docker compose up -d mysql

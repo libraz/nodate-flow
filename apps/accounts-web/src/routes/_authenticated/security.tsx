@@ -153,7 +153,7 @@ function SecurityPage(): ReactElement {
 
   const dividerStyle = {
     border: 'none',
-    borderBlockStart: 'var(--nf-space-px, 1px) solid var(--nf-color-border, var(--color-hairline))',
+    borderBlockStart: 'var(--nf-space-px, 1px) solid var(--nf-color-border)',
     margin: 0,
   };
 
@@ -224,7 +224,7 @@ function SecurityPage(): ReactElement {
               role="alert"
               style={{
                 margin: 0,
-                color: 'var(--nf-color-fg-danger, var(--color-danger))',
+                color: 'var(--nf-color-danger)',
                 fontSize: 'var(--nf-text-sm, 0.875rem)',
               }}
             >
@@ -236,7 +236,7 @@ function SecurityPage(): ReactElement {
             <output
               style={{
                 margin: 0,
-                color: 'var(--nf-color-fg-success, var(--color-success, green))',
+                color: 'var(--nf-color-success, var(--nf-color-success))',
                 fontSize: 'var(--nf-text-sm, 0.875rem)',
               }}
             >
@@ -259,7 +259,7 @@ function SecurityPage(): ReactElement {
           style={{
             margin: 0,
             fontSize: 'var(--nf-text-sm, 0.875rem)',
-            color: 'var(--nf-color-fg-muted, var(--color-muted))',
+            color: 'var(--nf-color-fg-muted)',
           }}
         >
           {totpEnrolled === null
@@ -292,7 +292,7 @@ function SecurityPage(): ReactElement {
             style={{
               margin: 0,
               fontSize: 'var(--nf-text-sm, 0.875rem)',
-              color: 'var(--nf-color-fg-muted, var(--color-muted))',
+              color: 'var(--nf-color-fg-muted)',
             }}
           >
             {t('security.sessionsLoading')}
@@ -302,7 +302,7 @@ function SecurityPage(): ReactElement {
             style={{
               margin: 0,
               fontSize: 'var(--nf-text-sm, 0.875rem)',
-              color: 'var(--nf-color-fg-muted, var(--color-muted))',
+              color: 'var(--nf-color-fg-muted)',
             }}
           >
             {t('security.sessionsEmpty')}
@@ -327,11 +327,8 @@ function SecurityPage(): ReactElement {
                   justifyContent: 'space-between',
                   padding: 'var(--nf-space-3, 0.75rem)',
                   borderRadius: 'var(--nf-radius-md, 0.375rem)',
-                  border:
-                    'var(--nf-space-px, 1px) solid var(--nf-color-border, var(--color-hairline))',
-                  background: session.current
-                    ? 'var(--nf-color-bg-elevated, var(--color-surface))'
-                    : 'transparent',
+                  border: 'var(--nf-space-px, 1px) solid var(--nf-color-border)',
+                  background: session.current ? 'var(--nf-color-bg-elevated)' : 'transparent',
                 }}
               >
                 <div>
@@ -349,7 +346,7 @@ function SecurityPage(): ReactElement {
                     style={{
                       margin: 0,
                       fontSize: 'var(--nf-text-xs, 0.75rem)',
-                      color: 'var(--nf-color-fg-muted, var(--color-muted))',
+                      color: 'var(--nf-color-fg-muted)',
                     }}
                   >
                     {session.ipAddress}
@@ -379,7 +376,7 @@ function SecurityPage(): ReactElement {
         style={{
           margin: 0,
           fontSize: 'var(--nf-text-sm, 0.875rem)',
-          color: 'var(--nf-color-fg-muted, var(--color-muted))',
+          color: 'var(--nf-color-fg-muted)',
         }}
       >
         <Link to="/profile">{t('security.profileLink')}</Link>

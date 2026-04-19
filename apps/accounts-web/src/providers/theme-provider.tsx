@@ -15,6 +15,8 @@ export const concreteThemes = [
   'aurora-dark',
   'dotline-light',
   'dotline-dark',
+  'glass-light',
+  'glass-dark',
 ] as const;
 
 /** Concrete theme name. */

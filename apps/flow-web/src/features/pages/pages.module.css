@@ -75,7 +75,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: background 0.1s ease;
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .treeItem:hover {
@@ -229,7 +229,7 @@
   color: var(--nf-color-fg);
   text-decoration: none;
   font-size: var(--nf-text-sm);
-  transition: box-shadow 0.15s ease;
+  transition: box-shadow var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .childLink:hover {
@@ -398,7 +398,7 @@
   color: var(--nf-color-fg);
   text-decoration: none;
   font-size: var(--nf-text-sm);
-  transition: background 0.1s ease;
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .searchResultItem:hover {

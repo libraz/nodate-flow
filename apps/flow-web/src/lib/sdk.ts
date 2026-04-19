@@ -35,6 +35,16 @@ export const sdk: NodateFlowClient = createClient({
 });
 
 /**
+ * SDK client targeting the auth-api service (port 8082). Used for
+ * workspace CRUD, member management, and invite endpoints which have
+ * been consolidated into the Identity + Tenant Plane.
+ */
+export const authSdk: NodateFlowClient = createClient({
+  baseUrl: authApiBaseUrl,
+  tokenProvider: () => authStore.getState().accessToken ?? undefined,
+});
+
+/**
  * Calls POST /auth/refresh directly (bypassing the typed client to avoid
  * recursive middleware on 401). On success, updates the auth store and
  * returns the new access token. On failure, clears the session and
@@ -92,8 +102,8 @@ export function refreshAccessToken(): Promise<string | null> {
 
 // Response middleware: on 401, try a single refresh + replay. We avoid
 // retrying refresh / login / logout themselves to prevent loops.
-sdk.use({
-  async onResponse({ request, response }) {
+const refreshMiddleware = {
+  async onResponse({ request, response }: { request: Request; response: Response }) {
     if (response.status !== 401) return response;
     const url = new URL(request.url);
     const path = url.pathname;
@@ -115,4 +125,7 @@ sdk.use({
     replay.headers.set('Authorization', `Bearer ${newToken}`);
     return fetch(replay);
   },
-});
+};
+
+sdk.use(refreshMiddleware);
+authSdk.use(refreshMiddleware);

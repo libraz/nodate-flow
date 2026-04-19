@@ -210,8 +210,8 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
             <Card
               style={{
                 padding: '0.75rem 1rem',
-                background: isHover ? 'var(--color-surface-raised)' : 'var(--color-surface)',
-                borderColor: isHover ? 'var(--color-accent)' : undefined,
+                background: isHover ? 'var(--nf-color-bg-elevated)' : 'var(--nf-color-surface)',
+                borderColor: isHover ? 'var(--nf-color-accent)' : undefined,
               }}
             >
               <header
@@ -223,7 +223,9 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
                 }}
               >
                 <span style={{ fontWeight: 600 }}>{t(STATE_KEY[state])}</span>
-                <span style={{ color: 'var(--color-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                <span
+                  style={{ color: 'var(--nf-color-fg-muted)', fontVariantNumeric: 'tabular-nums' }}
+                >
                   {items.length}
                 </span>
               </header>
@@ -236,7 +238,7 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
                 flexDirection: 'column',
                 gap: '0.75rem',
                 padding: '0.25rem',
-                border: isHover ? '2px dashed var(--color-accent)' : '2px dashed transparent',
+                border: isHover ? '2px dashed var(--nf-color-accent)' : '2px dashed transparent',
                 borderRadius: '0.75rem',
                 minBlockSize: '6rem',
                 transition: 'border-color 120ms ease',
@@ -248,9 +250,9 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
                     margin: 0,
                     padding: '1.25rem 0.75rem',
                     textAlign: 'center',
-                    color: 'var(--nf-color-fg-muted, var(--color-muted))',
+                    color: 'var(--nf-color-fg-muted, var(--nf-color-fg-muted))',
                     fontSize: '0.8125rem',
-                    border: '1px dashed var(--nf-color-border, var(--color-border))',
+                    border: '1px dashed var(--nf-color-border, var(--nf-color-border))',
                     borderRadius: '0.5rem',
                     background: 'var(--nf-color-bg-sunken, transparent)',
                   }}

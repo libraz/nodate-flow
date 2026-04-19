@@ -47,11 +47,11 @@ export default function DayCell(props: DayCellProps): ReactElement {
   if (isToday) {
     dayNumberColor = '';
   } else if (holiday || isSunday) {
-    dayNumberColor = 'var(--color-sunday)';
+    dayNumberColor = 'var(--nf-cal-sunday)';
   } else if (isSaturday) {
-    dayNumberColor = 'var(--color-saturday)';
+    dayNumberColor = 'var(--nf-cal-saturday)';
   } else {
-    dayNumberColor = 'var(--color-text-primary)';
+    dayNumberColor = 'var(--nf-color-fg)';
   }
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -93,15 +93,15 @@ export default function DayCell(props: DayCellProps): ReactElement {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`day-cell relative flex min-h-[56px] flex-col items-start overflow-hidden border-b border-r border-[var(--color-separator)] cursor-pointer px-1.5 pt-1.5 pb-1 transition-colors hover:bg-[var(--color-hover)] sm:min-h-[88px] ${
-        isSelected ? 'bg-[var(--color-accent-bg)]' : ''
-      } ${!isCurrentMonth ? 'opacity-40' : ''} ${dragOver ? 'ring-2 ring-inset ring-[var(--color-accent)]' : ''}`}
+      className={`day-cell relative flex min-h-[56px] flex-col items-start overflow-hidden border-b border-r border-[var(--nf-color-hairline)] cursor-pointer px-1.5 pt-1.5 pb-1 transition-colors hover:bg-[var(--nf-color-surface-hover)] sm:min-h-[88px] ${
+        isSelected ? 'bg-[var(--nf-color-accent-subtle)]' : ''
+      } ${!isCurrentMonth ? 'opacity-40' : ''} ${dragOver ? 'ring-2 ring-inset ring-[var(--nf-color-accent)]' : ''}`}
     >
       <div className="flex items-center gap-1">
         {isToday ? (
           <span
             className="flex h-7 w-7 items-center justify-center rounded-full text-[15px] font-medium"
-            style={{ backgroundColor: 'var(--color-accent)', color: '#ffffff' }}
+            style={{ backgroundColor: 'var(--nf-color-accent)', color: '#ffffff' }}
           >
             {date.day}
           </span>
@@ -116,7 +116,7 @@ export default function DayCell(props: DayCellProps): ReactElement {
         {holiday ? (
           <span
             className="hidden truncate text-[10px] sm:inline"
-            style={{ color: 'var(--color-sunday)' }}
+            style={{ color: 'var(--nf-cal-sunday)' }}
           >
             {holiday.name}
           </span>
@@ -165,7 +165,7 @@ export default function DayCell(props: DayCellProps): ReactElement {
           );
         })}
         {overflowCount > 0 ? (
-          <span className="block pl-1 text-[10px]" style={{ color: 'var(--color-text-secondary)' }}>
+          <span className="block pl-1 text-[10px]" style={{ color: 'var(--nf-color-fg-muted)' }}>
             {t('event.more', { count: overflowCount })}
           </span>
         ) : null}

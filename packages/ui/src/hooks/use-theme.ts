@@ -8,13 +8,21 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-export type ThemeId = 'aurora-light' | 'aurora-dark' | 'dotline-light' | 'dotline-dark';
+export type ThemeId =
+  | 'aurora-light'
+  | 'aurora-dark'
+  | 'dotline-light'
+  | 'dotline-dark'
+  | 'glass-light'
+  | 'glass-dark';
 
 export const THEME_IDS: readonly ThemeId[] = [
   'aurora-light',
   'aurora-dark',
   'dotline-light',
   'dotline-dark',
+  'glass-light',
+  'glass-dark',
 ] as const;
 
 export interface UseThemeOptions {

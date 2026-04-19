@@ -30,7 +30,7 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import type { Project } from '../features/projects/api';
-import { TASK_PRIORITIES } from '../features/tasks/api';
+import { TASK_PRIORITIES, type TaskDerivedState, type TaskPriority } from '../features/tasks/api';
 import { PRIORITY_KEY, STATE_COLOR } from '../features/tasks/constants';
 import { useWorkspacesQuery } from '../features/workspaces/api';
 import { sdk } from '../lib/sdk';
@@ -263,7 +263,7 @@ function QuickCreateDialog({
                 value={String(priority)}
                 onChange={(e) => setPriority(Number(e.currentTarget.value) as TaskPriority)}
               >
-                {PRIORITIES.map((p) => (
+                {TASK_PRIORITIES.map((p) => (
                   <option key={p} value={String(p)}>
                     {t(PRIORITY_KEY[p])}
                   </option>
@@ -518,7 +518,7 @@ function CalendarRoute(): ReactElement {
         >
           {t('calendar.title')}
         </h1>
-        <p style={{ margin: 0, color: 'var(--color-muted)' }}>{t('calendar.subtitle')}</p>
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{t('calendar.subtitle')}</p>
       </header>
 
       <div
@@ -571,7 +571,7 @@ function CalendarRoute(): ReactElement {
                 fontSize: '0.75rem',
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
-                color: 'var(--color-muted)',
+                color: 'var(--nf-color-fg-muted)',
                 paddingInline: '0.5rem',
               }}
             >
@@ -622,14 +622,14 @@ function CalendarRoute(): ReactElement {
                   padding: '0.5rem',
                   borderRadius: '0.5rem',
                   background: isDragOver
-                    ? 'var(--color-primary-subtle, rgba(52, 152, 219, 0.12))'
+                    ? 'var(--nf-color-accent-subtle))'
                     : cell.inMonth
-                      ? 'var(--color-surface, rgba(127,127,127,0.05))'
+                      ? 'var(--nf-color-surface))'
                       : 'transparent',
                   border: isDragOver
-                    ? '2px dashed var(--color-primary, #3498db)'
+                    ? '2px dashed var(--nf-color-accent)'
                     : isToday
-                      ? '1px solid var(--color-accent, #9b59b6)'
+                      ? '1px solid var(--nf-color-accent)'
                       : '1px solid transparent',
                   opacity: cell.inMonth ? 1 : 0.4,
                   display: 'flex',
@@ -648,7 +648,7 @@ function CalendarRoute(): ReactElement {
                     alignItems: 'center',
                     fontSize: '0.75rem',
                     fontVariantNumeric: 'tabular-nums',
-                    color: isToday ? 'var(--color-accent, #9b59b6)' : 'var(--color-muted)',
+                    color: isToday ? 'var(--nf-color-accent)' : 'var(--nf-color-fg-muted)',
                     fontWeight: isToday ? 600 : 400,
                   }}
                 >
@@ -686,7 +686,7 @@ function CalendarRoute(): ReactElement {
                           textDecoration: 'none',
                           padding: '0.125rem 0.25rem',
                           borderRadius: '0.25rem',
-                          background: 'var(--color-bg, rgba(255,255,255,0.04))',
+                          background: 'var(--nf-color-bg))',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
@@ -702,7 +702,9 @@ function CalendarRoute(): ReactElement {
                             inlineSize: '0.5rem',
                             blockSize: '0.5rem',
                             borderRadius: '999px',
-                            background: STATE_COLOR[task.derivedState] ?? 'var(--color-muted)',
+                            background:
+                              STATE_COLOR[task.derivedState as TaskDerivedState] ??
+                              'var(--nf-color-fg-muted)',
                             flexShrink: 0,
                           }}
                         />
@@ -722,7 +724,7 @@ function CalendarRoute(): ReactElement {
                     <li
                       style={{
                         fontSize: '0.6875rem',
-                        color: 'var(--color-muted)',
+                        color: 'var(--nf-color-fg-muted)',
                         paddingInline: '0.25rem',
                       }}
                     >
@@ -759,7 +761,7 @@ function CalendarRoute(): ReactElement {
                             inlineSize: '0.5rem',
                             blockSize: '0.5rem',
                             transform: 'rotate(45deg)',
-                            background: 'var(--color-accent, #9b59b6)',
+                            background: 'var(--nf-color-accent)',
                             flexShrink: 0,
                           }}
                         />

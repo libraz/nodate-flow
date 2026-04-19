@@ -10,7 +10,7 @@ import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { confirmAction } from '../../lib/confirm-action';
-import { formatDateTime } from '../../lib/format';
+import { formatEpochDateTime } from '../../lib/format';
 import { type McpTokenSummary, useMcpTokensQuery, useRevokeMcpToken } from './api';
 import TokenCreateDialog from './token-create-dialog';
 
@@ -24,8 +24,7 @@ function formatUnixDateTime(
   locale: string,
   fallback: string,
 ): string {
-  if (unixSec === undefined || unixSec === null) return fallback;
-  return formatDateTime(new Date(unixSec * 1000).toISOString(), locale);
+  return formatEpochDateTime(unixSec, locale) ?? fallback;
 }
 
 export default function TokenList({ workspaceId }: TokenListProps): ReactElement {
@@ -60,7 +59,7 @@ export default function TokenList({ workspaceId }: TokenListProps): ReactElement
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
           <h1 style={{ margin: 0, fontSize: '1.5rem' }}>{t('workspace.mcp_tokens.title')}</h1>
-          <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+          <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
             {t('workspace.mcp_tokens.description')}
           </p>
         </div>
@@ -76,7 +75,9 @@ export default function TokenList({ workspaceId }: TokenListProps): ReactElement
       </header>
 
       {tokens.length === 0 ? (
-        <p style={{ margin: 0, color: 'var(--color-muted)' }}>{t('workspace.mcp_tokens.empty')}</p>
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
+          {t('workspace.mcp_tokens.empty')}
+        </p>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table
@@ -87,7 +88,7 @@ export default function TokenList({ workspaceId }: TokenListProps): ReactElement
             }}
           >
             <thead>
-              <tr style={{ textAlign: 'start', color: 'var(--color-muted)' }}>
+              <tr style={{ textAlign: 'start', color: 'var(--nf-color-fg-muted)' }}>
                 <th style={{ padding: '0.5rem 0.75rem', textAlign: 'start' }}>
                   {t('workspace.mcp_tokens.table.name')}
                 </th>
@@ -110,7 +111,7 @@ export default function TokenList({ workspaceId }: TokenListProps): ReactElement
             </thead>
             <tbody>
               {tokens.map((token) => (
-                <tr key={token.id} style={{ borderBlockStart: '1px solid var(--color-border)' }}>
+                <tr key={token.id} style={{ borderBlockStart: '1px solid var(--nf-color-border)' }}>
                   <td style={{ padding: '0.75rem' }}>{token.name}</td>
                   <td style={{ padding: '0.75rem', fontFamily: 'var(--font-mono, monospace)' }}>
                     {token.tokenPrefix}

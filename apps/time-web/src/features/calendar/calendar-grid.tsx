@@ -298,12 +298,12 @@ export default function CalendarGrid(): ReactElement {
   return (
     <div className="relative flex-1 overflow-hidden">
       {/* Sticky weekday header */}
-      <div className="weekday-strip absolute inset-x-0 top-0 z-10 grid grid-cols-7 border-b border-[var(--color-separator)]">
+      <div className="weekday-strip absolute inset-x-0 top-0 z-10 grid grid-cols-7 border-b border-[var(--nf-color-hairline)]">
         {SUNDAY_FIRST.map((name, i) => {
           let colorStyle: string;
-          if (i === 0) colorStyle = 'var(--color-sunday)';
-          else if (i === 6) colorStyle = 'var(--color-saturday)';
-          else colorStyle = 'var(--color-text-secondary)';
+          if (i === 0) colorStyle = 'var(--nf-cal-sunday)';
+          else if (i === 6) colorStyle = 'var(--nf-cal-saturday)';
+          else colorStyle = 'var(--nf-color-fg-muted)';
           return (
             <div
               key={name}

@@ -92,7 +92,7 @@ function AttachmentRow({
         <span
           style={{
             fontSize: '0.8125rem',
-            color: 'var(--color-muted)',
+            color: 'var(--nf-color-fg-muted)',
             display: 'flex',
             gap: '0.5rem',
             flexWrap: 'wrap',
@@ -183,7 +183,9 @@ export default function TaskAttachments({ taskId }: TaskAttachmentsProps): React
         </div>
       </div>
       {attachments.length === 0 ? (
-        <p style={{ color: 'var(--color-muted)', margin: 0 }}>{t('tasks.attachments.empty')}</p>
+        <p style={{ color: 'var(--nf-color-fg-muted)', margin: 0 }}>
+          {t('tasks.attachments.empty')}
+        </p>
       ) : (
         <ul
           style={{

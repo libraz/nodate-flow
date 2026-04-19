@@ -19,8 +19,12 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	adminhandlers "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/admin"
 	authhandlers "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/auth"
+	inthandlers "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/integrations"
+	wshandlers "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/workspace"
+	integrationspkg "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/integrations"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/middleware"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
 )
 
 // Deps is the dependency bundle Build needs.
@@ -33,11 +37,40 @@ type Deps struct {
 	CookieSecure     bool
 	RegistrationOpen bool
 	DisableRateLimit bool
+	EmailSender      email.Sender
+	FlowWebURL       string
+
+	// Integrations is the personal-OAuth provider registry (GitHub /
+	// Slack / Google Calendar). Nil in tests; the handlers degrade
+	// gracefully by returning INTEGRATION.OAUTH.PROVIDER_NOT_CONFIGURED.
+	Integrations *integrationspkg.Registry
+	// PublicBaseURL is the origin used to build OAuth callback URLs
+	// (e.g. https://auth.example.com + /oauth/callback/github).
+	PublicBaseURL string
+	// WebBaseURL is where the OAuth callback handler bounces the user
+	// back to after writing the user_integrations row.
+	WebBaseURL string
+}
+
+// Result is what BuildResult returns: the composed chi router plus the
+// list of huma.API instances that were registered against it. The
+// dump-openapi command merges each API's OpenAPI document into a single
+// spec for TypeScript SDK generation.
+type Result struct {
+	Handler http.Handler
+	APIs    []huma.API
 }
 
 // Build mounts every auth-api route onto a fresh chi router and returns
-// it as an http.Handler.
+// it as an http.Handler. It is a thin wrapper around BuildResult for
+// callers that only need the handler.
 func Build(deps Deps) http.Handler {
+	return BuildResult(deps).Handler
+}
+
+// BuildResult mounts every auth-api route onto a fresh chi router and
+// returns the handler together with the list of huma.API instances used.
+func BuildResult(deps Deps) Result {
 	r := chi.NewRouter()
 	r.Use(middleware.ClientIP())
 	r.Use(middleware.SecurityHeaders())
@@ -45,9 +78,13 @@ func Build(deps Deps) http.Handler {
 	newConfig := func() huma.Config {
 		return huma.DefaultConfig("nodate-auth", "0.0.0")
 	}
+	var apis []huma.API
 	api := humachi.New(r, newConfig())
+	apis = append(apis, api)
 	newSubAPI := func(sub chi.Router) huma.API {
-		return humachi.New(sub, newConfig())
+		a := humachi.New(sub, newConfig())
+		apis = append(apis, a)
+		return a
 	}
 
 	// Health endpoint.
@@ -254,7 +291,193 @@ func Build(deps Deps) http.Handler {
 		adminhandlers.Register(subAPI, adminDeps)
 	})
 
-	return r
+	// Workspace handler dependencies.
+	wsDeps := wshandlers.Deps{
+		DB:      deps.DB,
+		Queries: deps.Queries,
+		Audit:   auditRec,
+	}
+	inviteDeps := wshandlers.InviteDeps{
+		Deps:        wsDeps,
+		EmailSender: deps.EmailSender,
+		WebURL:      deps.FlowWebURL,
+	}
+	wsACL := middleware.RequireWorkspaceMember(passthroughDB{deps.DB})
+
+	// Workspace auth-only endpoints (create, list, accept invite).
+	r.Group(func(sub chi.Router) {
+		sub.Use(authMW)
+		subAPI := newSubAPI(sub)
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "workspaces-create",
+			Method:      http.MethodPost,
+			Path:        "/workspaces",
+			Summary:     "Create a workspace",
+		}, wshandlers.Create(wsDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "workspaces-list",
+			Method:      http.MethodGet,
+			Path:        "/workspaces",
+			Summary:     "List workspaces for the authenticated user",
+		}, wshandlers.List(wsDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "invites-accept",
+			Method:      http.MethodPost,
+			Path:        "/invites/{token}/accept",
+			Summary:     "Accept a workspace invite",
+		}, wshandlers.AcceptInvite(inviteDeps))
+	})
+
+	// Workspace member read endpoints.
+	r.Group(func(sub chi.Router) {
+		sub.Use(authMW)
+		sub.Use(wsACL)
+		subAPI := newSubAPI(sub)
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "workspaces-get",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}",
+			Summary:     "Get workspace details",
+		}, wshandlers.Get(wsDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "workspaces-members-list",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/members",
+			Summary:     "List workspace members",
+		}, wshandlers.ListMembers(wsDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "workspaces-users-list",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/users",
+			Summary:     "List workspace users (actor picker)",
+		}, wshandlers.ListUsers(wsDeps))
+	})
+
+	// Workspace admin write endpoints.
+	r.Group(func(sub chi.Router) {
+		sub.Use(authMW)
+		sub.Use(wsACL)
+		sub.Use(middleware.RequireWorkspaceRole(middleware.WorkspaceRoleAdmin))
+		subAPI := newSubAPI(sub)
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "workspaces-patch",
+			Method:      http.MethodPatch,
+			Path:        "/workspaces/{wsId}",
+			Summary:     "Update workspace details",
+		}, wshandlers.Patch(wsDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "workspaces-members-add",
+			Method:      http.MethodPost,
+			Path:        "/workspaces/{wsId}/members",
+			Summary:     "Add a member to a workspace",
+		}, wshandlers.InviteMember(wsDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "workspaces-members-update-role",
+			Method:      http.MethodPatch,
+			Path:        "/workspaces/{wsId}/members/{userId}",
+			Summary:     "Update a member's role",
+		}, wshandlers.UpdateMemberRole(wsDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "workspaces-members-remove",
+			Method:      http.MethodDelete,
+			Path:        "/workspaces/{wsId}/members/{userId}",
+			Summary:     "Remove a member from a workspace",
+		}, wshandlers.RemoveMember(wsDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "workspaces-invites-create",
+			Method:      http.MethodPost,
+			Path:        "/workspaces/{wsId}/invites",
+			Summary:     "Create an invite link",
+		}, wshandlers.CreateInvite(inviteDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "workspaces-invites-list",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/invites",
+			Summary:     "List invite links",
+		}, wshandlers.ListInvites(inviteDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "workspaces-invites-revoke",
+			Method:      http.MethodDelete,
+			Path:        "/workspaces/{wsId}/invites/{inviteId}",
+			Summary:     "Revoke an invite link",
+		}, wshandlers.RevokeInvite(inviteDeps))
+	})
+
+	// Workspace owner-only endpoints.
+	r.Group(func(sub chi.Router) {
+		sub.Use(authMW)
+		sub.Use(wsACL)
+		sub.Use(middleware.RequireWorkspaceRole(middleware.WorkspaceRoleOwner))
+		subAPI := newSubAPI(sub)
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "workspaces-disable",
+			Method:      http.MethodDelete,
+			Path:        "/workspaces/{wsId}",
+			Summary:     "Disable a workspace",
+		}, wshandlers.Disable(wsDeps))
+	})
+
+	// Public invite info (rate-limited, no auth).
+	r.Group(func(sub chi.Router) {
+		if !deps.DisableRateLimit {
+			inviteRateLimiter := middleware.NewIPRateLimiter(middleware.RateLimitConfig{
+				MaxRequests: 30,
+				Window:      15 * time.Minute,
+			})
+			sub.Use(inviteRateLimiter.Middleware())
+		}
+		subAPI := newSubAPI(sub)
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "invites-info",
+			Method:      http.MethodGet,
+			Path:        "/invites/{token}/info",
+			Summary:     "Preview invite details (public)",
+		}, wshandlers.InviteInfo(inviteDeps))
+	})
+
+	// /me/integrations (personal OAuth connections).
+	integrationsDeps := inthandlers.Deps{
+		DB:            deps.DB,
+		Queries:       deps.Queries,
+		Cipher:        deps.Cipher,
+		Registry:      deps.Integrations,
+		PublicBaseURL: deps.PublicBaseURL,
+		WebBaseURL:    deps.WebBaseURL,
+	}
+
+	// OAuth callback — unauthenticated (user arrives from provider).
+	huma.Register(api, huma.Operation{
+		OperationID: "oauth-integration-callback",
+		Method:      http.MethodGet,
+		Path:        "/oauth/callback/{provider}",
+		Summary:     "Complete a personal OAuth integration flow",
+	}, inthandlers.Callback(integrationsDeps))
+
+	// /me/integrations (auth-protected).
+	r.Group(func(sub chi.Router) {
+		sub.Use(authMW)
+		subAPI := newSubAPI(sub)
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "me-integrations-list",
+			Method:      http.MethodGet,
+			Path:        "/me/integrations",
+			Summary:     "List the authenticated user's personal OAuth integrations",
+		}, inthandlers.List(integrationsDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "me-integrations-connect",
+			Method:      http.MethodPost,
+			Path:        "/me/integrations/{provider}/connect",
+			Summary:     "Start a personal OAuth connect flow",
+		}, inthandlers.Connect(integrationsDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "me-integrations-disconnect",
+			Method:      http.MethodDelete,
+			Path:        "/me/integrations/{id}",
+			Summary:     "Disconnect a personal OAuth integration",
+		}, inthandlers.Disconnect(integrationsDeps))
+	})
+
+	return Result{Handler: r, APIs: apis}
 }
 
 type healthOutput struct {

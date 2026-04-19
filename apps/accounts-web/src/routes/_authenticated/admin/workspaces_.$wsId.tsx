@@ -20,7 +20,7 @@ interface WorkspaceDetail {
 }
 
 const labelStyle: React.CSSProperties = {
-  color: 'var(--nf-color-fg-muted, var(--color-muted))',
+  color: 'var(--nf-color-fg-muted)',
   fontSize: 'var(--nf-text-xs, 0.75rem)',
   marginBlockEnd: 'var(--nf-space-1, 0.25rem)',
 };
@@ -92,24 +92,19 @@ function WorkspaceDetailPage(): ReactElement {
   };
 
   if (loading) {
-    return (
-      <p style={{ color: 'var(--nf-color-fg-muted, var(--color-muted))' }}>{t('common.loading')}</p>
-    );
+    return <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('common.loading')}</p>;
   }
 
   if (error || !workspace) {
     return (
       <div>
-        <Link
-          to="/admin/workspaces"
-          style={{ color: 'var(--nf-color-fg-accent, var(--color-accent))' }}
-        >
+        <Link to="/admin/workspaces" style={{ color: 'var(--nf-color-accent)' }}>
           {t('common.back')}
         </Link>
         <p
           role="alert"
           style={{
-            color: 'var(--nf-color-fg-danger, var(--color-danger))',
+            color: 'var(--nf-color-danger)',
             fontSize: 'var(--nf-text-sm, 0.875rem)',
           }}
         >
@@ -125,7 +120,7 @@ function WorkspaceDetailPage(): ReactElement {
         <Link
           to="/admin/workspaces"
           style={{
-            color: 'var(--nf-color-fg-accent, var(--color-accent))',
+            color: 'var(--nf-color-accent)',
             fontSize: 'var(--nf-text-sm, 0.875rem)',
           }}
         >
@@ -146,7 +141,7 @@ function WorkspaceDetailPage(): ReactElement {
       <div
         style={{
           padding: 'var(--nf-space-4, 1rem)',
-          border: '1px solid var(--nf-color-border, var(--color-hairline))',
+          border: '1px solid var(--nf-color-border)',
           borderRadius: 'var(--nf-radius-md, 0.375rem)',
         }}
       >
@@ -168,11 +163,11 @@ function WorkspaceDetailPage(): ReactElement {
             style={{
               ...badgeBase,
               background: workspace.enabled
-                ? 'var(--nf-color-bg-success, rgba(0,128,0,0.1))'
-                : 'var(--nf-color-bg-danger, rgba(255,0,0,0.1))',
+                ? 'var(--nf-color-success, rgba(0,128,0,0.1))'
+                : 'var(--nf-color-danger, rgba(255,0,0,0.1))',
               color: workspace.enabled
-                ? 'var(--nf-color-fg-success, green)'
-                : 'var(--nf-color-fg-danger, red)',
+                ? 'var(--nf-color-success, green)'
+                : 'var(--nf-color-danger, red)',
             }}
           >
             {workspace.enabled ? t('workspaces.enabled') : t('workspaces.disabled')}

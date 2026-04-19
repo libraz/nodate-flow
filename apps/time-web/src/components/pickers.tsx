@@ -126,14 +126,14 @@ function DatePickerPanel({
   return createPortal(
     <div
       ref={floatingRef}
-      className="fixed z-[9999] w-[280px] rounded-2xl bg-[var(--color-surface-elevated)] p-3 ring-1 ring-[var(--color-border)]"
-      style={{ ...style, boxShadow: 'var(--shadow-elevated)', backdropFilter: 'blur(20px)' }}
+      className="fixed z-[9999] w-[280px] rounded-2xl bg-[var(--nf-color-bg-elevated)] p-3 ring-1 ring-[var(--nf-color-border)]"
+      style={{ ...style, boxShadow: 'var(--nf-shadow-lg)', backdropFilter: 'blur(20px)' }}
     >
       <div className="mb-2 flex items-center justify-between">
         <button
           type="button"
           onClick={() => setViewMonth((m) => m.minus({ months: 1 }))}
-          className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-[var(--color-hover)]"
+          className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-[var(--nf-color-surface-hover)]"
           aria-label="Previous month"
         >
           <svg
@@ -141,7 +141,7 @@ function DatePickerPanel({
             height="16"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="var(--color-text-primary)"
+            stroke="var(--nf-color-fg)"
             strokeWidth="2"
             role="img"
             aria-label="Previous month"
@@ -149,13 +149,11 @@ function DatePickerPanel({
             <path d="M15 18l-6-6 6-6" />
           </svg>
         </button>
-        <span className="text-[14px] font-semibold text-[var(--color-text-primary)]">
-          {monthLabel}
-        </span>
+        <span className="text-[14px] font-semibold text-[var(--nf-color-fg)]">{monthLabel}</span>
         <button
           type="button"
           onClick={() => setViewMonth((m) => m.plus({ months: 1 }))}
-          className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-[var(--color-hover)]"
+          className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-[var(--nf-color-surface-hover)]"
           aria-label="Next month"
         >
           <svg
@@ -163,7 +161,7 @@ function DatePickerPanel({
             height="16"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="var(--color-text-primary)"
+            stroke="var(--nf-color-fg)"
             role="img"
             aria-label="Next month"
             strokeWidth="2"
@@ -181,10 +179,10 @@ function DatePickerPanel({
             style={{
               color:
                 i === 0
-                  ? 'var(--color-sunday)'
+                  ? 'var(--nf-cal-sunday)'
                   : i === 6
-                    ? 'var(--color-saturday)'
-                    : 'var(--color-text-tertiary)',
+                    ? 'var(--nf-cal-saturday)'
+                    : 'var(--nf-color-fg-subtle)',
             }}
           >
             {wd}
@@ -207,19 +205,19 @@ function DatePickerPanel({
               disabled={isDisabled}
               className="flex h-9 w-full items-center justify-center rounded-full text-[13px] transition-colors"
               style={{
-                backgroundColor: isSelected ? 'var(--color-accent)' : 'transparent',
+                backgroundColor: isSelected ? 'var(--nf-color-accent)' : 'transparent',
                 color: isSelected
                   ? '#ffffff'
                   : isDisabled
-                    ? 'var(--color-text-tertiary)'
+                    ? 'var(--nf-color-fg-subtle)'
                     : dayOfWeek === 0
-                      ? 'var(--color-sunday)'
+                      ? 'var(--nf-cal-sunday)'
                       : dayOfWeek === 6
-                        ? 'var(--color-saturday)'
-                        : 'var(--color-text-primary)',
+                        ? 'var(--nf-cal-saturday)'
+                        : 'var(--nf-color-fg)',
                 fontWeight: isToday ? 700 : isSelected ? 600 : 400,
                 opacity: isDisabled ? 0.3 : 1,
-                outline: isToday && !isSelected ? '2px solid var(--color-accent)' : 'none',
+                outline: isToday && !isSelected ? '2px solid var(--nf-color-accent)' : 'none',
                 outlineOffset: '-2px',
               }}
             >
@@ -282,8 +280,8 @@ function TimePickerPanel({
   return createPortal(
     <div
       ref={floatingRef}
-      className="fixed z-[9999] max-h-[240px] w-[100px] overflow-y-auto rounded-2xl bg-[var(--color-surface-elevated)] py-1 ring-1 ring-[var(--color-border)]"
-      style={{ ...style, boxShadow: 'var(--shadow-elevated)', backdropFilter: 'blur(20px)' }}
+      className="fixed z-[9999] max-h-[240px] w-[100px] overflow-y-auto rounded-2xl bg-[var(--nf-color-bg-elevated)] py-1 ring-1 ring-[var(--nf-color-border)]"
+      style={{ ...style, boxShadow: 'var(--nf-shadow-lg)', backdropFilter: 'blur(20px)' }}
     >
       {TIME_SLOTS.map((slot) => {
         const isSelected = slot === nearestSlot;
@@ -298,8 +296,8 @@ function TimePickerPanel({
             }}
             className="flex w-full items-center justify-center py-2 text-[14px] transition-colors"
             style={{
-              backgroundColor: isSelected ? 'var(--color-accent-bg)' : 'transparent',
-              color: isSelected ? 'var(--color-accent)' : 'var(--color-text-primary)',
+              backgroundColor: isSelected ? 'var(--nf-color-accent-subtle)' : 'transparent',
+              color: isSelected ? 'var(--nf-color-accent)' : 'var(--nf-color-fg)',
               fontWeight: isSelected ? 600 : 400,
             }}
           >
@@ -356,7 +354,7 @@ export function CustomSelect({
         ref={anchorRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-2 rounded-lg bg-[var(--color-surface-inset)] py-1.5 pr-3 pl-3 text-[14px] text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-hover)]"
+        className="flex w-full items-center justify-between gap-2 rounded-lg bg-[var(--nf-color-bg-sunken)] py-1.5 pr-3 pl-3 text-[14px] text-[var(--nf-color-fg)] transition-colors hover:bg-[var(--nf-color-surface-hover)]"
       >
         <span className="flex items-center gap-2 truncate">
           {selected?.icon}
@@ -367,7 +365,7 @@ export function CustomSelect({
           height="12"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="var(--color-text-tertiary)"
+          stroke="var(--nf-color-fg-subtle)"
           strokeWidth="2"
           role="img"
           aria-label="Toggle"
@@ -384,11 +382,11 @@ export function CustomSelect({
         createPortal(
           <div
             ref={floatingRef}
-            className="fixed z-[9999] max-h-[240px] min-w-[160px] overflow-y-auto rounded-2xl bg-[var(--color-surface-elevated)] py-1 ring-1 ring-[var(--color-border)]"
+            className="fixed z-[9999] max-h-[240px] min-w-[160px] overflow-y-auto rounded-2xl bg-[var(--nf-color-bg-elevated)] py-1 ring-1 ring-[var(--nf-color-border)]"
             style={{
               top: pos.top,
               left: pos.left,
-              boxShadow: 'var(--shadow-elevated)',
+              boxShadow: 'var(--nf-shadow-lg)',
               backdropFilter: 'blur(20px)',
             }}
           >
@@ -405,8 +403,8 @@ export function CustomSelect({
                   }}
                   className="flex w-full items-center gap-2 whitespace-nowrap px-3 py-2.5 text-left text-[14px] transition-colors"
                   style={{
-                    backgroundColor: isSelected ? 'var(--color-accent-bg)' : 'transparent',
-                    color: isSelected ? 'var(--color-accent)' : 'var(--color-text-primary)',
+                    backgroundColor: isSelected ? 'var(--nf-color-accent-subtle)' : 'transparent',
+                    color: isSelected ? 'var(--nf-color-accent)' : 'var(--nf-color-fg)',
                     fontWeight: isSelected ? 600 : 400,
                   }}
                 >
@@ -416,7 +414,7 @@ export function CustomSelect({
                       height="14"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke="var(--color-accent)"
+                      stroke="var(--nf-color-accent)"
                       strokeWidth="2.5"
                       role="img"
                       aria-label="Selected"
@@ -481,7 +479,7 @@ export function DateTimeField({
 
   return (
     <div className="flex items-center justify-between py-2.5">
-      {label && <span className="text-[14px] text-[var(--color-text-secondary)]">{label}</span>}
+      {label && <span className="text-[14px] text-[var(--nf-color-fg-muted)]">{label}</span>}
       <div className="flex items-center gap-2">
         <button
           ref={dateFloating.anchorRef}
@@ -490,7 +488,7 @@ export function DateTimeField({
             setShowDatePicker((v) => !v);
             setShowTimePicker(false);
           }}
-          className="rounded-lg bg-[var(--color-accent-bg)] px-3 py-1.5 text-[14px] font-medium text-[var(--color-accent)] transition-colors hover:bg-[var(--color-accent-subtle)]"
+          className="rounded-lg bg-[var(--nf-color-accent-subtle)] px-3 py-1.5 text-[14px] font-medium text-[var(--nf-color-accent)] transition-colors hover:bg-[var(--nf-color-accent-subtle)]"
         >
           {dateLabel}
         </button>
@@ -513,7 +511,7 @@ export function DateTimeField({
                 setShowTimePicker((v) => !v);
                 setShowDatePicker(false);
               }}
-              className="rounded-lg bg-[var(--color-accent-bg)] px-3 py-1.5 text-[14px] font-medium text-[var(--color-accent)] transition-colors hover:bg-[var(--color-accent-subtle)]"
+              className="rounded-lg bg-[var(--nf-color-accent-subtle)] px-3 py-1.5 text-[14px] font-medium text-[var(--nf-color-accent)] transition-colors hover:bg-[var(--nf-color-accent-subtle)]"
             >
               {timeValue}
             </button>
@@ -567,7 +565,7 @@ export function DatePickerDropdown({
         ref={floating.anchorRef}
         type="button"
         onClick={() => setShowPicker((v) => !v)}
-        className="rounded-lg bg-[var(--color-accent-bg)] px-3 py-1.5 text-[14px] font-medium text-[var(--color-accent)] transition-colors hover:bg-[var(--color-accent-subtle)]"
+        className="rounded-lg bg-[var(--nf-color-accent-subtle)] px-3 py-1.5 text-[14px] font-medium text-[var(--nf-color-accent)] transition-colors hover:bg-[var(--nf-color-accent-subtle)]"
       >
         {dateLabel}
       </button>
@@ -608,7 +606,7 @@ export function TimePickerDropdown({
         ref={floating.anchorRef}
         type="button"
         onClick={() => setShowPicker((v) => !v)}
-        className="rounded-lg bg-[var(--color-accent-bg)] px-3 py-1.5 text-[14px] font-medium text-[var(--color-accent)] transition-colors hover:bg-[var(--color-accent-subtle)]"
+        className="rounded-lg bg-[var(--nf-color-accent-subtle)] px-3 py-1.5 text-[14px] font-medium text-[var(--nf-color-accent)] transition-colors hover:bg-[var(--nf-color-accent-subtle)]"
       >
         {value || '00:00'}
       </button>

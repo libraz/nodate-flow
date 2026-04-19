@@ -37,7 +37,7 @@ interface SessionsResponse {
 }
 
 const labelStyle: React.CSSProperties = {
-  color: 'var(--nf-color-fg-muted, var(--color-muted))',
+  color: 'var(--nf-color-fg-muted)',
   fontSize: 'var(--nf-text-xs, 0.75rem)',
   marginBlockEnd: 'var(--nf-space-1, 0.25rem)',
 };
@@ -58,15 +58,15 @@ const badgeBase: React.CSSProperties = {
 const thStyle: React.CSSProperties = {
   textAlign: 'start',
   padding: 'var(--nf-space-2, 0.5rem) var(--nf-space-3, 0.75rem)',
-  borderBlockEnd: '2px solid var(--nf-color-border, var(--color-hairline))',
+  borderBlockEnd: '2px solid var(--nf-color-border)',
   fontWeight: 600,
-  color: 'var(--nf-color-fg-muted, var(--color-muted))',
+  color: 'var(--nf-color-fg-muted)',
   fontSize: 'var(--nf-text-sm, 0.875rem)',
 };
 
 const tdStyle: React.CSSProperties = {
   padding: 'var(--nf-space-2, 0.5rem) var(--nf-space-3, 0.75rem)',
-  borderBlockEnd: '1px solid var(--nf-color-border, var(--color-hairline))',
+  borderBlockEnd: '1px solid var(--nf-color-border)',
   fontSize: 'var(--nf-text-sm, 0.875rem)',
 };
 
@@ -160,21 +160,19 @@ function UserDetailPage(): ReactElement {
   };
 
   if (loading) {
-    return (
-      <p style={{ color: 'var(--nf-color-fg-muted, var(--color-muted))' }}>{t('common.loading')}</p>
-    );
+    return <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('common.loading')}</p>;
   }
 
   if (error || !user) {
     return (
       <div>
-        <Link to="/admin/users" style={{ color: 'var(--nf-color-fg-accent, var(--color-accent))' }}>
+        <Link to="/admin/users" style={{ color: 'var(--nf-color-accent)' }}>
           {t('common.back')}
         </Link>
         <p
           role="alert"
           style={{
-            color: 'var(--nf-color-fg-danger, var(--color-danger))',
+            color: 'var(--nf-color-danger)',
             fontSize: 'var(--nf-text-sm, 0.875rem)',
           }}
         >
@@ -190,7 +188,7 @@ function UserDetailPage(): ReactElement {
         <Link
           to="/admin/users"
           style={{
-            color: 'var(--nf-color-fg-accent, var(--color-accent))',
+            color: 'var(--nf-color-accent)',
             fontSize: 'var(--nf-text-sm, 0.875rem)',
           }}
         >
@@ -211,7 +209,7 @@ function UserDetailPage(): ReactElement {
       <div
         style={{
           padding: 'var(--nf-space-4, 1rem)',
-          border: '1px solid var(--nf-color-border, var(--color-hairline))',
+          border: '1px solid var(--nf-color-border)',
           borderRadius: 'var(--nf-radius-md, 0.375rem)',
         }}
       >
@@ -227,11 +225,11 @@ function UserDetailPage(): ReactElement {
             style={{
               ...badgeBase,
               background: user.enabled
-                ? 'var(--nf-color-bg-success, rgba(0,128,0,0.1))'
-                : 'var(--nf-color-bg-danger, rgba(255,0,0,0.1))',
+                ? 'var(--nf-color-success, rgba(0,128,0,0.1))'
+                : 'var(--nf-color-danger, rgba(255,0,0,0.1))',
               color: user.enabled
-                ? 'var(--nf-color-fg-success, green)'
-                : 'var(--nf-color-fg-danger, red)',
+                ? 'var(--nf-color-success, green)'
+                : 'var(--nf-color-danger, red)',
             }}
           >
             {user.enabled ? t('users.enabled') : t('users.disabled')}
@@ -277,7 +275,7 @@ function UserDetailPage(): ReactElement {
       {sessions.length === 0 ? (
         <p
           style={{
-            color: 'var(--nf-color-fg-muted, var(--color-muted))',
+            color: 'var(--nf-color-fg-muted)',
             fontSize: 'var(--nf-text-sm, 0.875rem)',
           }}
         >

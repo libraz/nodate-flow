@@ -27,9 +27,13 @@
   --nf-color-accent-subtle: oklch(32% 0.06 175);
 
   --nf-color-success: oklch(74% 0.16 150);
+  --nf-color-success-subtle: oklch(25% 0.04 150);
   --nf-color-warning: oklch(80% 0.15 75);
+  --nf-color-warning-subtle: oklch(25% 0.04 75);
   --nf-color-danger: oklch(70% 0.2 25);
+  --nf-color-danger-subtle: oklch(25% 0.04 25);
   --nf-color-info: oklch(76% 0.13 240);
+  --nf-color-info-subtle: oklch(25% 0.04 240);
 
   --nf-color-focus-ring: oklch(78% 0.16 240);
   --nf-focus-ring-width: 2px;

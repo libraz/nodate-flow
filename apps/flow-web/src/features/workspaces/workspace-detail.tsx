@@ -29,8 +29,8 @@ function OverviewPanel({ workspaceId }: { workspaceId: string }): ReactElement {
             margin: 0,
             padding: '2rem 1rem',
             textAlign: 'center',
-            color: 'var(--nf-color-fg-muted, var(--color-muted))',
-            border: '1px dashed var(--nf-color-border, var(--color-border))',
+            color: 'var(--nf-color-fg-muted, var(--nf-color-fg-muted))',
+            border: '1px dashed var(--nf-color-border, var(--nf-color-border))',
             borderRadius: '0.5rem',
             background: 'var(--nf-color-bg-sunken, transparent)',
           }}
@@ -49,7 +49,7 @@ function OverviewPanel({ workspaceId }: { workspaceId: string }): ReactElement {
           fontSize: '0.8125rem',
           textTransform: 'uppercase',
           letterSpacing: '0.05em',
-          color: 'var(--color-muted)',
+          color: 'var(--nf-color-fg-muted)',
         }}
       >
         {t('workspaces.nav.projects')} ({active.length})
@@ -75,7 +75,7 @@ function OverviewPanel({ workspaceId }: { workspaceId: string }): ReactElement {
                 gap: '0.75rem',
                 padding: '0.6rem 0.75rem',
                 borderRadius: '0.5rem',
-                background: 'var(--color-surface, rgba(127,127,127,0.05))',
+                background: 'var(--nf-color-surface))',
                 color: 'inherit',
                 textDecoration: 'none',
               }}
@@ -86,7 +86,7 @@ function OverviewPanel({ workspaceId }: { workspaceId: string }): ReactElement {
                   inlineSize: '0.6rem',
                   blockSize: '0.6rem',
                   borderRadius: '999px',
-                  background: p.color ?? 'var(--color-muted)',
+                  background: p.color ?? 'var(--nf-color-fg-muted)',
                   flexShrink: 0,
                 }}
               />
@@ -94,7 +94,7 @@ function OverviewPanel({ workspaceId }: { workspaceId: string }): ReactElement {
               {p.description ? (
                 <span
                   style={{
-                    color: 'var(--color-muted)',
+                    color: 'var(--nf-color-fg-muted)',
                     fontSize: '0.8125rem',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -167,7 +167,7 @@ export default function WorkspaceDetail({ id }: WorkspaceDetailProps): ReactElem
           {workspace.name}
         </h1>
         {workspace.description ? (
-          <p style={{ margin: 0, color: 'var(--color-muted)' }}>{workspace.description}</p>
+          <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{workspace.description}</p>
         ) : null}
       </header>
 

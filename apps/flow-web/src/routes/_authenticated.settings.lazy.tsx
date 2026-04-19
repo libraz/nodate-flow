@@ -67,7 +67,7 @@ function SettingsLayout(): ReactElement {
               'aria-current': 'page',
               style: {
                 background: 'var(--nf-color-accent-subtle, rgba(155,89,182,0.12))',
-                color: 'var(--nf-color-accent, var(--color-accent, #9b59b6))',
+                color: 'var(--nf-color-accent, var(--nf-color-accent))',
                 fontWeight: 500,
               },
             }}
@@ -75,7 +75,7 @@ function SettingsLayout(): ReactElement {
               display: 'block',
               padding: '0.5rem 0.75rem',
               borderRadius: '0.5rem',
-              color: 'var(--color-fg)',
+              color: 'var(--nf-color-fg)',
               textDecoration: 'none',
             }}
           >

@@ -51,7 +51,7 @@
   border: var(--nf-space-px) solid var(--nf-color-border);
   border-radius: var(--nf-radius-md);
   cursor: pointer;
-  transition: box-shadow 0.15s ease;
+  transition: box-shadow var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .card:hover {
@@ -144,7 +144,7 @@
   block-size: 100%;
   background: var(--nf-color-accent);
   border-radius: var(--nf-radius-pill);
-  transition: inline-size 0.3s ease;
+  transition: inline-size var(--nf-duration-slow) var(--nf-ease-standard);
 }
 
 /* Empty state */

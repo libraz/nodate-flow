@@ -36,7 +36,9 @@ function CountsRow({ counts }: { counts: WeeklyDigestCounts }): ReactElement {
       {items.map((item) => (
         <li key={item.key}>
           <Card style={{ padding: '0.625rem 0.75rem' }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}>{item.label}</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}>
+              {item.label}
+            </div>
             <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>{counts[item.key]}</div>
           </Card>
         </li>
@@ -54,7 +56,9 @@ function TaskList({
 }): ReactElement {
   if (tasks.length === 0) {
     return (
-      <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.8125rem' }}>{emptyLabel}</p>
+      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.8125rem' }}>
+        {emptyLabel}
+      </p>
     );
   }
   return (
@@ -72,7 +76,7 @@ function TaskList({
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {task.title}
           </span>
-          <span style={{ color: 'var(--color-muted)', fontFamily: 'var(--font-mono)' }}>
+          <span style={{ color: 'var(--nf-color-fg-muted)', fontFamily: 'var(--font-mono)' }}>
             {task.date}
           </span>
         </li>
@@ -90,7 +94,7 @@ export default function DigestView({ workspaceId }: { workspaceId: string }): Re
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <header style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
         <h1 style={{ margin: 0, fontSize: '1.5rem' }}>{t('weekly_digest.title')}</h1>
-        <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.8125rem' }}>
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.8125rem' }}>
           {t('weekly_digest.description')}
         </p>
       </header>

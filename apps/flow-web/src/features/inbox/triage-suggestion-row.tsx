@@ -54,13 +54,13 @@ export default function TriageSuggestionRow({
               style={{
                 fontFamily: 'var(--font-mono)',
                 fontSize: '0.8125rem',
-                color: 'var(--color-muted)',
+                color: 'var(--nf-color-fg-muted)',
               }}
             >
               {suggestion.recommendedAction}
             </span>
           </div>
-          <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--color-fg)' }}>
+          <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--nf-color-fg)' }}>
             {suggestion.reasoning}
           </p>
         </div>

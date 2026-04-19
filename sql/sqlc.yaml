@@ -161,6 +161,7 @@ sql:
       - "queries/audit"
       - "queries/workspaces"
       - "queries/admin"
+      - "queries/integrations"
     schema:
       - "tables"
       - "views"

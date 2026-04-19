@@ -17,8 +17,8 @@ function NotFound(): ReactElement {
         justifyContent: 'center',
         gap: '1rem',
         fontFamily: 'var(--font-body)',
-        background: 'var(--color-bg)',
-        color: 'var(--color-fg)',
+        background: 'var(--nf-color-bg)',
+        color: 'var(--nf-color-fg)',
       }}
     >
       <h1
@@ -30,14 +30,14 @@ function NotFound(): ReactElement {
       >
         404
       </h1>
-      <p style={{ margin: 0, color: 'var(--color-muted)' }}>{t('notFound.description')}</p>
+      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{t('notFound.description')}</p>
       <Link
         to="/login"
         style={{
           padding: '0.5rem 1rem',
           borderRadius: '0.5rem',
-          background: 'var(--color-accent, #9b59b6)',
-          color: 'var(--color-on-accent, #fff)',
+          background: 'var(--nf-color-accent)',
+          color: 'var(--nf-color-fg-on-accent)',
           textDecoration: 'none',
         }}
       >
@@ -75,13 +75,13 @@ function FatalFallback({
         gap: '1rem',
         padding: '2rem',
         fontFamily: 'var(--font-body)',
-        background: 'var(--color-bg)',
-        color: 'var(--color-fg)',
+        background: 'var(--nf-color-bg)',
+        color: 'var(--nf-color-fg)',
         textAlign: 'center',
       }}
     >
       <h1 style={{ fontFamily: 'var(--font-display)', margin: 0 }}>{t('fatal.title')}</h1>
-      <p style={{ margin: 0, color: 'var(--color-muted)', maxInlineSize: '36rem' }}>
+      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', maxInlineSize: '36rem' }}>
         {t('fatal.description')}
       </p>
       {message ? (
@@ -90,8 +90,8 @@ function FatalFallback({
             margin: 0,
             padding: '0.75rem 1rem',
             borderRadius: '0.5rem',
-            background: 'var(--color-surface, rgba(127,127,127,0.08))',
-            color: 'var(--color-muted)',
+            background: 'var(--nf-color-surface))',
+            color: 'var(--nf-color-fg-muted)',
             fontSize: '0.8125rem',
             maxInlineSize: '48rem',
             whiteSpace: 'pre-wrap',
@@ -108,9 +108,9 @@ function FatalFallback({
           style={{
             padding: '0.5rem 1rem',
             borderRadius: '0.5rem',
-            border: '1px solid var(--color-border)',
-            background: 'var(--color-surface)',
-            color: 'var(--color-fg)',
+            border: '1px solid var(--nf-color-border)',
+            background: 'var(--nf-color-surface)',
+            color: 'var(--nf-color-fg)',
             cursor: 'pointer',
           }}
         >
@@ -121,8 +121,8 @@ function FatalFallback({
           style={{
             padding: '0.5rem 1rem',
             borderRadius: '0.5rem',
-            background: 'var(--color-accent, #9b59b6)',
-            color: 'var(--color-on-accent, #fff)',
+            background: 'var(--nf-color-accent)',
+            color: 'var(--nf-color-fg-on-accent)',
             textDecoration: 'none',
           }}
         >

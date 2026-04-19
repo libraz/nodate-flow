@@ -35,7 +35,7 @@ export default function CalendarHeader(): ReactElement {
         <button
           type="button"
           onClick={toggleSidebar}
-          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-[var(--color-hover)] sm:hidden"
+          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-[var(--nf-color-surface-hover)] sm:hidden"
           aria-label={t('calendar.toggleSidebar')}
         >
           <Menu className="h-5 w-5" />
@@ -43,7 +43,7 @@ export default function CalendarHeader(): ReactElement {
         <button
           type="button"
           onClick={goToPrevious}
-          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-[var(--color-hover)]"
+          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-[var(--nf-color-surface-hover)]"
           aria-label={prevLabel}
         >
           <ChevronLeft className="h-5 w-5" />
@@ -51,7 +51,7 @@ export default function CalendarHeader(): ReactElement {
         <button
           type="button"
           onClick={goToNext}
-          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-[var(--color-hover)]"
+          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-[var(--nf-color-surface-hover)]"
           aria-label={nextLabel}
         >
           <ChevronRight className="h-5 w-5" />
@@ -59,13 +59,13 @@ export default function CalendarHeader(): ReactElement {
         <button
           type="button"
           onClick={goToToday}
-          className="ml-1 rounded-full bg-[var(--color-accent-bg)] px-3 text-sm font-medium text-[var(--color-accent)]"
+          className="ml-1 rounded-full bg-[var(--nf-color-accent-subtle)] px-3 text-sm font-medium text-[var(--nf-color-accent)]"
         >
           {t('calendar.today')}
         </button>
       </div>
 
-      <h1 className="text-[16px] font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+      <h1 className="text-[16px] font-semibold" style={{ color: 'var(--nf-color-fg)' }}>
         {title}
       </h1>
 
@@ -74,7 +74,7 @@ export default function CalendarHeader(): ReactElement {
           type="button"
           onClick={() => openEventModal()}
           className="hidden items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90 sm:flex"
-          style={{ background: 'var(--color-accent)' }}
+          style={{ background: 'var(--nf-color-accent)' }}
         >
           <Plus className="h-4 w-4" />
           {t('calendar.createNewEvent')}
@@ -82,7 +82,7 @@ export default function CalendarHeader(): ReactElement {
         <button
           type="button"
           onClick={toggleSearch}
-          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-[var(--color-hover)]"
+          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-[var(--nf-color-surface-hover)]"
           aria-label={t('search.searchEvents')}
         >
           <Search className="h-5 w-5" />

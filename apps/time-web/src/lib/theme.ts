@@ -1,8 +1,19 @@
+/**
+ * Theme utilities for time-web.
+ *
+ * Uses the shared `nf.theme` localStorage key so that theme preference
+ * is synchronized with flow-web and other apps when the user is logged in.
+ */
+
 export type Theme = 'glass' | 'aurora' | 'dotline';
 export type ColorMode = 'light' | 'dark' | 'system';
 
-const THEME_STORAGE_KEY = 'nt_theme';
-const COLOR_MODE_STORAGE_KEY = 'nt_color_mode';
+/** Combined preference stored in localStorage (e.g. 'aurora-dark' or 'system'). */
+export type ThemePreference = `${Theme}-${'light' | 'dark'}` | 'system';
+
+const STORAGE_KEY = 'nf.theme';
+const LEGACY_THEME_KEY = 'nt_theme';
+const LEGACY_COLOR_MODE_KEY = 'nt_color_mode';
 
 function resolveSystemColorScheme(): 'light' | 'dark' {
   if (typeof window === 'undefined') return 'light';
@@ -37,41 +48,60 @@ export function watchSystemColorScheme(callback: (isDark: boolean) => void): () 
   return () => mql.removeEventListener('change', handler);
 }
 
-/** Read persisted theme from localStorage. */
-export function loadTheme(): Theme {
+/**
+ * Migrate legacy localStorage keys (nt_theme + nt_color_mode) to the
+ * shared nf.theme key. Called once on boot.
+ */
+function migrateLegacyKeys(): void {
   try {
-    const stored = localStorage.getItem(THEME_STORAGE_KEY);
-    if (stored === 'glass' || stored === 'aurora' || stored === 'dotline') return stored;
-  } catch {
-    // ignore
-  }
-  return 'glass';
-}
-
-/** Read persisted color mode from localStorage. */
-export function loadColorMode(): ColorMode {
-  try {
-    const stored = localStorage.getItem(COLOR_MODE_STORAGE_KEY);
-    if (stored === 'light' || stored === 'dark' || stored === 'system') return stored;
-  } catch {
-    // ignore
-  }
-  return 'system';
-}
-
-/** Persist theme to localStorage. */
-export function saveTheme(theme: Theme): void {
-  try {
-    localStorage.setItem(THEME_STORAGE_KEY, theme);
+    const legacyTheme = localStorage.getItem(LEGACY_THEME_KEY);
+    const legacyMode = localStorage.getItem(LEGACY_COLOR_MODE_KEY);
+    if (legacyTheme || legacyMode) {
+      const theme = legacyTheme ?? 'glass';
+      const mode = legacyMode ?? 'system';
+      if (mode === 'system') {
+        localStorage.setItem(STORAGE_KEY, 'system');
+      } else {
+        localStorage.setItem(STORAGE_KEY, `${theme}-${mode}`);
+      }
+      localStorage.removeItem(LEGACY_THEME_KEY);
+      localStorage.removeItem(LEGACY_COLOR_MODE_KEY);
+    }
   } catch {
     // ignore
   }
 }
 
-/** Persist color mode to localStorage. */
-export function saveColorMode(mode: ColorMode): void {
+/** Split a stored preference into theme + colorMode. */
+export function splitPreference(pref: string): { theme: Theme; colorMode: ColorMode } {
+  if (pref === 'system') return { theme: 'glass', colorMode: 'system' };
+  const match = pref.match(/^(glass|aurora|dotline)-(light|dark)$/);
+  if (match) return { theme: match[1] as Theme, colorMode: match[2] as ColorMode };
+  return { theme: 'glass', colorMode: 'system' };
+}
+
+/** Combine theme + colorMode into a preference string. */
+export function combinePreference(theme: Theme, colorMode: ColorMode): ThemePreference {
+  if (colorMode === 'system') return 'system';
+  return `${theme}-${colorMode}`;
+}
+
+/** Read persisted theme + colorMode from the shared localStorage key. */
+export function loadPreference(): { theme: Theme; colorMode: ColorMode } {
+  migrateLegacyKeys();
   try {
-    localStorage.setItem(COLOR_MODE_STORAGE_KEY, mode);
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) return splitPreference(stored);
+  } catch {
+    // ignore
+  }
+  return { theme: 'glass', colorMode: 'system' };
+}
+
+/** Persist theme preference to the shared localStorage key. */
+export function savePreference(theme: Theme, colorMode: ColorMode): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, combinePreference(theme, colorMode));
   } catch {
     // ignore
   }

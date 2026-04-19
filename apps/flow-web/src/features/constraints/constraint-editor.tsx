@@ -142,7 +142,7 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
           <summary
             style={{
               cursor: 'pointer',
-              color: 'var(--color-muted)',
+              color: 'var(--nf-color-fg-muted)',
               fontSize: '0.8125rem',
               marginBlockEnd: '0.375rem',
             }}

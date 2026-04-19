@@ -65,7 +65,7 @@ export default function ProviderRotateDialog({
         }}
         style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
       >
-        <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
           {t('providers.rotate_dialog.description')}
         </p>
         <FormField label={t('providers.field.api_key')} required>

@@ -62,7 +62,7 @@ function StepItem({
         gap: '0.375rem',
         padding: '0.625rem 0.75rem',
         borderRadius: '0.375rem',
-        background: checked ? 'var(--color-surface-alt)' : 'transparent',
+        background: checked ? 'var(--nf-color-bg-sunken)' : 'transparent',
         opacity: checked ? 1 : 0.6,
       }}
     >
@@ -100,7 +100,7 @@ function StepItem({
               border: 'none',
               padding: 0,
               cursor: 'pointer',
-              color: 'var(--color-muted)',
+              color: 'var(--nf-color-fg-muted)',
               fontSize: '0.8125rem',
               textDecoration: 'underline',
             }}
@@ -112,7 +112,7 @@ function StepItem({
               style={{
                 margin: '0.25rem 0 0',
                 fontSize: '0.8125rem',
-                color: 'var(--color-fg)',
+                color: 'var(--nf-color-fg)',
                 whiteSpace: 'pre-wrap',
               }}
             >
@@ -201,7 +201,7 @@ export default function TaskStepsPanel({ taskId }: TaskStepsPanelProps): ReactEl
               style={{
                 display: 'block',
                 fontSize: '0.8125rem',
-                color: 'var(--color-muted)',
+                color: 'var(--nf-color-fg-muted)',
                 marginBlockEnd: '0.25rem',
               }}
             >
@@ -216,9 +216,10 @@ export default function TaskStepsPanel({ taskId }: TaskStepsPanelProps): ReactEl
                     setGranularity(g);
                   }}
                   style={{
-                    background: granularity === g ? 'var(--color-primary)' : 'transparent',
-                    color: granularity === g ? 'var(--color-on-primary)' : 'var(--color-fg)',
-                    border: '1px solid var(--color-border)',
+                    background: granularity === g ? 'var(--nf-color-accent)' : 'transparent',
+                    color:
+                      granularity === g ? 'var(--nf-color-fg-on-accent)' : 'var(--nf-color-fg)',
+                    border: '1px solid var(--nf-color-border)',
                     padding: '0.375rem 0.75rem',
                     cursor: 'pointer',
                     fontSize: '0.8125rem',
@@ -255,7 +256,7 @@ export default function TaskStepsPanel({ taskId }: TaskStepsPanelProps): ReactEl
       ) : (
         <>
           {steps.length === 0 ? (
-            <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+            <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
               {t('tasks.steps.empty')}
             </p>
           ) : (

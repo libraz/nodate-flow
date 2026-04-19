@@ -101,7 +101,7 @@ function AuditRow({ entry }: { entry: AuditLogEntry }): ReactElement {
           padding: '0.5rem 0.75rem',
           fontSize: '0.8125rem',
           whiteSpace: 'nowrap',
-          color: 'var(--color-muted)',
+          color: 'var(--nf-color-fg-muted)',
         }}
       >
         {formatTimestamp(entry.occurredAt)}
@@ -130,7 +130,7 @@ function AuditRow({ entry }: { entry: AuditLogEntry }): ReactElement {
           padding: '0.5rem 0.75rem',
           fontSize: '0.75rem',
           fontFamily: 'var(--font-mono)',
-          color: 'var(--color-muted)',
+          color: 'var(--nf-color-fg-muted)',
         }}
       >
         {entry.resourcePublicId ?? '\u2014'}
@@ -139,7 +139,7 @@ function AuditRow({ entry }: { entry: AuditLogEntry }): ReactElement {
         style={{
           padding: '0.5rem 0.75rem',
           fontSize: '0.75rem',
-          color: 'var(--color-muted)',
+          color: 'var(--nf-color-fg-muted)',
           maxInlineSize: '16rem',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
@@ -255,7 +255,7 @@ export default function AuditLogView({
             {t('audit_log.export_csv')}
           </Button>
         </div>
-        <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
           {t('audit_log.description')}
         </p>
       </header>
@@ -273,7 +273,7 @@ export default function AuditLogView({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             <label
               htmlFor="audit-action-filter"
-              style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}
+              style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}
             >
               {t('audit_log.filter.action')}
             </label>
@@ -295,7 +295,7 @@ export default function AuditLogView({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             <label
               htmlFor="audit-resource-type-filter"
-              style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}
+              style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}
             >
               {t('audit_log.filter.resource_type')}
             </label>
@@ -317,7 +317,7 @@ export default function AuditLogView({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             <label
               htmlFor="audit-actor-search"
-              style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}
+              style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}
             >
               {t('audit_log.filter.actor_search')}
             </label>
@@ -334,7 +334,7 @@ export default function AuditLogView({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             <label
               htmlFor="audit-date-from"
-              style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}
+              style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}
             >
               {t('audit_log.filter.date_from')}
             </label>
@@ -349,7 +349,7 @@ export default function AuditLogView({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             <label
               htmlFor="audit-date-to"
-              style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}
+              style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}
             >
               {t('audit_log.filter.date_to')}
             </label>
@@ -373,8 +373,8 @@ export default function AuditLogView({
           style={{
             padding: '3rem 1rem',
             textAlign: 'center',
-            color: 'var(--nf-color-fg-muted, var(--color-muted))',
-            border: '1px dashed var(--nf-color-border, var(--color-border))',
+            color: 'var(--nf-color-fg-muted, var(--nf-color-fg-muted))',
+            border: '1px dashed var(--nf-color-border, var(--nf-color-border))',
             borderRadius: '0.75rem',
             background: 'var(--nf-color-bg-sunken, transparent)',
             fontSize: '0.875rem',
@@ -394,7 +394,7 @@ export default function AuditLogView({
             <thead>
               <tr
                 style={{
-                  borderBlockEnd: '1px solid var(--color-border)',
+                  borderBlockEnd: '1px solid var(--nf-color-border)',
                 }}
               >
                 <th
@@ -403,7 +403,7 @@ export default function AuditLogView({
                     textAlign: 'start',
                     fontSize: '0.75rem',
                     fontWeight: 500,
-                    color: 'var(--color-muted)',
+                    color: 'var(--nf-color-fg-muted)',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
                   }}
@@ -416,7 +416,7 @@ export default function AuditLogView({
                     textAlign: 'start',
                     fontSize: '0.75rem',
                     fontWeight: 500,
-                    color: 'var(--color-muted)',
+                    color: 'var(--nf-color-fg-muted)',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
                   }}
@@ -429,7 +429,7 @@ export default function AuditLogView({
                     textAlign: 'start',
                     fontSize: '0.75rem',
                     fontWeight: 500,
-                    color: 'var(--color-muted)',
+                    color: 'var(--nf-color-fg-muted)',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
                   }}
@@ -442,7 +442,7 @@ export default function AuditLogView({
                     textAlign: 'start',
                     fontSize: '0.75rem',
                     fontWeight: 500,
-                    color: 'var(--color-muted)',
+                    color: 'var(--nf-color-fg-muted)',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
                   }}
@@ -455,7 +455,7 @@ export default function AuditLogView({
                     textAlign: 'start',
                     fontSize: '0.75rem',
                     fontWeight: 500,
-                    color: 'var(--color-muted)',
+                    color: 'var(--nf-color-fg-muted)',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
                   }}
@@ -468,7 +468,7 @@ export default function AuditLogView({
                     textAlign: 'start',
                     fontSize: '0.75rem',
                     fontWeight: 500,
-                    color: 'var(--color-muted)',
+                    color: 'var(--nf-color-fg-muted)',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
                   }}
@@ -500,7 +500,7 @@ export default function AuditLogView({
           <Button variant="ghost" size="sm" disabled={currentPage === 0} onClick={handlePrevPage}>
             {t('audit_log.pagination.prev')}
           </Button>
-          <span style={{ fontSize: '0.8125rem', color: 'var(--color-muted)' }}>
+          <span style={{ fontSize: '0.8125rem', color: 'var(--nf-color-fg-muted)' }}>
             {t('audit_log.pagination.page_of', {
               current: currentPage + 1,
               total: totalPages,

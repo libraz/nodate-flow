@@ -2,7 +2,7 @@
  * check-theme-parity
  *
  * Asserts that every CSS custom property declared in src/tokens/semantic.css
- * is also declared in each of the 4 theme files. Exits non-zero on any miss.
+ * is also declared in each of the 6 theme files. Exits non-zero on any miss.
  *
  * Intentionally avoids regular expressions: we walk the file character by character
  * looking for `--nf-` identifiers preceded by start-of-line / whitespace and
@@ -22,6 +22,8 @@ const themePaths = [
   resolve(root, 'src/themes/aurora-dark.css'),
   resolve(root, 'src/themes/dotline-light.css'),
   resolve(root, 'src/themes/dotline-dark.css'),
+  resolve(root, 'src/themes/glass-light.css'),
+  resolve(root, 'src/themes/glass-dark.css'),
 ];
 
 /**

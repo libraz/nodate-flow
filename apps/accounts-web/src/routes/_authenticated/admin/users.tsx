@@ -37,14 +37,14 @@ const tableStyle: React.CSSProperties = {
 const thStyle: React.CSSProperties = {
   textAlign: 'start',
   padding: 'var(--nf-space-2, 0.5rem) var(--nf-space-3, 0.75rem)',
-  borderBlockEnd: '2px solid var(--nf-color-border, var(--color-hairline))',
+  borderBlockEnd: '2px solid var(--nf-color-border)',
   fontWeight: 600,
-  color: 'var(--nf-color-fg-muted, var(--color-muted))',
+  color: 'var(--nf-color-fg-muted)',
 };
 
 const tdStyle: React.CSSProperties = {
   padding: 'var(--nf-space-2, 0.5rem) var(--nf-space-3, 0.75rem)',
-  borderBlockEnd: '1px solid var(--nf-color-border, var(--color-hairline))',
+  borderBlockEnd: '1px solid var(--nf-color-border)',
 };
 
 const badgeBase: React.CSSProperties = {
@@ -139,9 +139,9 @@ function UsersPage(): ReactElement {
           style={{
             padding: '0.5rem 0.75rem',
             borderRadius: 'var(--nf-radius-md, 0.375rem)',
-            border: 'var(--nf-space-px, 1px) solid var(--nf-color-border, var(--color-hairline))',
-            background: 'var(--nf-color-bg, var(--color-bg))',
-            color: 'var(--nf-color-fg, var(--color-fg))',
+            border: 'var(--nf-space-px, 1px) solid var(--nf-color-border)',
+            background: 'var(--nf-color-bg)',
+            color: 'var(--nf-color-fg)',
             fontSize: 'var(--nf-text-sm, 0.875rem)',
           }}
         >
@@ -156,7 +156,7 @@ function UsersPage(): ReactElement {
           role="alert"
           style={{
             margin: 0,
-            color: 'var(--nf-color-fg-danger, var(--color-danger))',
+            color: 'var(--nf-color-danger)',
             fontSize: 'var(--nf-text-sm, 0.875rem)',
           }}
         >
@@ -165,13 +165,9 @@ function UsersPage(): ReactElement {
       ) : null}
 
       {loading ? (
-        <p style={{ color: 'var(--nf-color-fg-muted, var(--color-muted))' }}>
-          {t('common.loading')}
-        </p>
+        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('common.loading')}</p>
       ) : users.length === 0 ? (
-        <p style={{ color: 'var(--nf-color-fg-muted, var(--color-muted))' }}>
-          {t('users.noResults')}
-        </p>
+        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('users.noResults')}</p>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
@@ -193,7 +189,7 @@ function UsersPage(): ReactElement {
                     <Link
                       to="/admin/users/$userId"
                       params={{ userId: u.id }}
-                      style={{ color: 'var(--nf-color-fg-accent, var(--color-accent))' }}
+                      style={{ color: 'var(--nf-color-accent)' }}
                     >
                       {u.email}
                     </Link>
@@ -204,11 +200,11 @@ function UsersPage(): ReactElement {
                       style={{
                         ...badgeBase,
                         background: u.enabled
-                          ? 'var(--nf-color-bg-success, rgba(0,128,0,0.1))'
-                          : 'var(--nf-color-bg-danger, rgba(255,0,0,0.1))',
+                          ? 'var(--nf-color-success, rgba(0,128,0,0.1))'
+                          : 'var(--nf-color-danger, rgba(255,0,0,0.1))',
                         color: u.enabled
-                          ? 'var(--nf-color-fg-success, green)'
-                          : 'var(--nf-color-fg-danger, red)',
+                          ? 'var(--nf-color-success, green)'
+                          : 'var(--nf-color-danger, red)',
                       }}
                     >
                       {u.enabled ? t('users.enabled') : t('users.disabled')}
@@ -236,7 +232,7 @@ function UsersPage(): ReactElement {
         <Button variant="default" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
           {t('common.previous')}
         </Button>
-        <span style={{ color: 'var(--nf-color-fg-muted, var(--color-muted))' }}>
+        <span style={{ color: 'var(--nf-color-fg-muted)' }}>
           {t('common.page', { page, total: totalPages })}
         </span>
         <Button

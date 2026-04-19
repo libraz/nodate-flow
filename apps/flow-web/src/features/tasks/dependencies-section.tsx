@@ -6,7 +6,7 @@
  * scoped to the current workspace; results are debounced client-side.
  */
 
-import Badge from '@nodate-flow/ui/primitives/badge';
+import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import Input from '@nodate-flow/ui/primitives/input';
 import Select from '@nodate-flow/ui/primitives/select';
@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import {
   type TaskDependencyEdge,
   type TaskDependencyKind,
+  type TaskDerivedState,
   useAddTaskDependency,
   useRemoveTaskDependency,
   useTaskDependenciesQuery,
@@ -108,7 +109,7 @@ export default function DependenciesSection({
       ) : null}
 
       {isEmpty && !picking ? (
-        <p style={{ margin: 0, color: 'var(--color-muted)' }}>
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
           {t('tasks.detail.dependencies.empty')}
         </p>
       ) : null}
@@ -158,7 +159,7 @@ function DependencyGroup({
           fontSize: '0.75rem',
           textTransform: 'uppercase',
           letterSpacing: '0.05em',
-          color: 'var(--color-muted)',
+          color: 'var(--nf-color-fg-muted)',
         }}
       >
         <Badge tone={tone}>{label}</Badge>
@@ -175,7 +176,7 @@ function DependencyGroup({
         }}
       >
         {items.map((edge) => {
-          const stateTone = STATE_TONE[edge.otherTaskDerivedState] ?? 'neutral';
+          const stateTone = STATE_TONE[edge.otherTaskDerivedState as TaskDerivedState] ?? 'neutral';
           return (
             <li
               key={edge.id}
@@ -185,7 +186,7 @@ function DependencyGroup({
                 gap: '0.5rem',
                 padding: '0.5rem 0.625rem',
                 borderRadius: '0.5rem',
-                background: 'var(--color-surface, rgba(127,127,127,0.05))',
+                background: 'var(--nf-color-surface))',
               }}
             >
               <Badge tone={stateTone}>{edge.otherTaskDerivedState}</Badge>
@@ -271,7 +272,7 @@ function DependencyPicker({
         gap: '0.5rem',
         padding: '0.75rem',
         borderRadius: '0.5rem',
-        border: '1px solid var(--color-border, rgba(127,127,127,0.2))',
+        border: '1px solid var(--nf-color-border))',
       }}
     >
       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -301,7 +302,7 @@ function DependencyPicker({
         </Button>
       </div>
       {debounced.length === 0 ? (
-        <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.8125rem' }}>
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.8125rem' }}>
           {t('tasks.detail.dependencies.searchHint')}
         </p>
       ) : search.isFetching ? (
@@ -309,7 +310,7 @@ function DependencyPicker({
           <Spinner label={t('common.loading')} />
         </div>
       ) : results.length === 0 ? (
-        <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.8125rem' }}>
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.8125rem' }}>
           {t('tasks.detail.dependencies.searchEmpty')}
         </p>
       ) : (
@@ -347,7 +348,9 @@ function DependencyPicker({
                   font: 'inherit',
                 }}
               >
-                <Badge tone={STATE_TONE[task.derivedState] ?? 'neutral'}>{task.derivedState}</Badge>
+                <Badge tone={STATE_TONE[task.derivedState as TaskDerivedState] ?? 'neutral'}>
+                  {task.derivedState}
+                </Badge>
                 <span
                   style={{
                     flex: 1,

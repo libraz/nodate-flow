@@ -25,7 +25,7 @@ function AdminLayout(): ReactElement | null {
   const navLinkStyle = {
     display: 'block',
     padding: 'var(--nf-space-2, 0.5rem) var(--nf-space-3, 0.75rem)',
-    color: 'var(--nf-color-fg, var(--color-fg))',
+    color: 'var(--nf-color-fg)',
     textDecoration: 'none',
     fontSize: 'var(--nf-text-sm, 0.875rem)',
     borderRadius: 'var(--nf-radius-md, 0.375rem)',
@@ -36,13 +36,13 @@ function AdminLayout(): ReactElement | null {
       style={{
         display: 'flex',
         minHeight: '100vh',
-        background: 'var(--nf-color-bg, var(--color-bg))',
+        background: 'var(--nf-color-bg)',
       }}
     >
       <aside
         style={{
           width: '220px',
-          borderInlineEnd: '1px solid var(--nf-color-border, var(--color-hairline))',
+          borderInlineEnd: '1px solid var(--nf-color-border)',
           padding: 'var(--nf-space-4, 1rem)',
           display: 'flex',
           flexDirection: 'column',
@@ -79,7 +79,7 @@ function AdminLayout(): ReactElement | null {
           to="/profile"
           style={{
             ...navLinkStyle,
-            color: 'var(--nf-color-fg-muted, var(--color-muted))',
+            color: 'var(--nf-color-fg-muted)',
             fontSize: 'var(--nf-text-xs, 0.75rem)',
           }}
         >

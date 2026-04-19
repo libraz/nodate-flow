@@ -13,7 +13,7 @@ import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { type ChangeEvent, type ReactElement, type RefObject, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import Markdown from '../../components/markdown/markdown';
+import Markdown from '@nodate-flow/ui/primitives/markdown';
 
 interface MarkdownEditorProps {
   /** Current Markdown source text. */
@@ -236,17 +236,17 @@ export default function MarkdownEditor({
       {previewing ? (
         <div
           style={{
-            border: '1px solid var(--color-border)',
+            border: '1px solid var(--nf-color-border)',
             borderRadius: '0.375rem',
             padding: '0.75rem',
             minBlockSize: `${rows * 1.5}rem`,
-            background: 'var(--color-surface)',
+            background: 'var(--nf-color-surface)',
           }}
         >
           {value.trim().length > 0 ? (
             <Markdown>{value}</Markdown>
           ) : (
-            <p style={{ margin: 0, color: 'var(--color-muted)' }}>
+            <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
               {t('tasks.markdown_editor.preview_empty')}
             </p>
           )}

@@ -41,17 +41,17 @@ export default function InviteDialog({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-overlay)]">
-      <div className="glass-surface-heavy w-full max-w-md rounded-[var(--radius-lg)] p-6 ring-1 ring-[var(--color-border)]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--nf-color-overlay)]">
+      <div className="glass-surface-heavy w-full max-w-md rounded-[var(--nf-radius-lg)] p-6 ring-1 ring-[var(--nf-color-border)]">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+          <h2 className="text-lg font-semibold" style={{ color: 'var(--nf-color-fg)' }}>
             {t('invite.title')}
           </h2>
           <button
             type="button"
             onClick={onClose}
             className="hover:opacity-80"
-            style={{ color: 'var(--color-text-tertiary)' }}
+            style={{ color: 'var(--nf-color-fg-subtle)' }}
           >
             <X className="h-5 w-5" />
           </button>
@@ -61,10 +61,10 @@ export default function InviteDialog({
           <select
             value={role}
             onChange={(e) => setRole(e.target.value)}
-            className="flex-1 rounded-md border border-[var(--color-border)] px-3 py-2 text-sm"
+            className="flex-1 rounded-md border border-[var(--nf-color-border)] px-3 py-2 text-sm"
             style={{
-              backgroundColor: 'var(--color-surface-inset)',
-              color: 'var(--color-text-primary)',
+              backgroundColor: 'var(--nf-color-bg-sunken)',
+              color: 'var(--nf-color-fg)',
             }}
           >
             <option value="manager">{t('members.roleManager')}</option>
@@ -75,7 +75,7 @@ export default function InviteDialog({
             type="button"
             onClick={handleCreate}
             disabled={createMutation.isPending}
-            className="rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-[var(--color-text-on-accent)] hover:opacity-90 disabled:opacity-50"
+            className="rounded-md bg-[var(--nf-color-accent)] px-4 py-2 text-sm font-medium text-[var(--nf-color-fg-on-accent)] hover:opacity-90 disabled:opacity-50"
           >
             {t('invite.createLink')}
           </button>
@@ -83,28 +83,28 @@ export default function InviteDialog({
 
         <div className="max-h-64 space-y-3 overflow-y-auto">
           {isLoading ? (
-            <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+            <p className="text-sm" style={{ color: 'var(--nf-color-fg-muted)' }}>
               {t('common.loading')}
             </p>
           ) : invites?.length === 0 ? (
-            <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>
+            <p className="text-sm" style={{ color: 'var(--nf-color-fg-subtle)' }}>
               {t('invite.noLinks')}
             </p>
           ) : (
             invites?.map((invite) => (
               <div
                 key={invite.id}
-                className="flex items-center justify-between rounded-md border border-[var(--color-border)] px-3 py-2"
+                className="flex items-center justify-between rounded-md border border-[var(--nf-color-border)] px-3 py-2"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span
-                      className="rounded bg-[var(--color-surface-inset)] px-1.5 py-0.5 text-xs font-medium capitalize"
-                      style={{ color: 'var(--color-text-primary)' }}
+                      className="rounded bg-[var(--nf-color-bg-sunken)] px-1.5 py-0.5 text-xs font-medium capitalize"
+                      style={{ color: 'var(--nf-color-fg)' }}
                     >
                       {invite.role}
                     </span>
-                    <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                    <span className="text-xs" style={{ color: 'var(--nf-color-fg-muted)' }}>
                       {invite.useCount === 1
                         ? t('invite.use', { count: invite.useCount })
                         : t('invite.uses', { count: invite.useCount })}
@@ -112,7 +112,7 @@ export default function InviteDialog({
                     </span>
                   </div>
                   {invite.expiresAt ? (
-                    <p className="mt-0.5 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+                    <p className="mt-0.5 text-xs" style={{ color: 'var(--nf-color-fg-subtle)' }}>
                       {t('invite.expires', {
                         date: DateTime.fromISO(invite.expiresAt)
                           .setLocale(i18n.language)
@@ -125,12 +125,12 @@ export default function InviteDialog({
                   <button
                     type="button"
                     onClick={() => handleCopy(invite.token)}
-                    className="rounded p-1 hover:bg-[var(--color-hover)]"
-                    style={{ color: 'var(--color-text-tertiary)' }}
+                    className="rounded p-1 hover:bg-[var(--nf-color-surface-hover)]"
+                    style={{ color: 'var(--nf-color-fg-subtle)' }}
                     title={t('invite.copyLink')}
                   >
                     {copiedToken === invite.token ? (
-                      <Check className="h-4 w-4" style={{ color: 'var(--color-accent)' }} />
+                      <Check className="h-4 w-4" style={{ color: 'var(--nf-color-accent)' }} />
                     ) : (
                       <Copy className="h-4 w-4" />
                     )}
@@ -138,11 +138,11 @@ export default function InviteDialog({
                   <button
                     type="button"
                     onClick={() => revokeMutation.mutate(invite.id)}
-                    className="group rounded p-1 hover:bg-[var(--color-hover)]"
-                    style={{ color: 'var(--color-text-tertiary)' }}
+                    className="group rounded p-1 hover:bg-[var(--nf-color-surface-hover)]"
+                    style={{ color: 'var(--nf-color-fg-subtle)' }}
                     title={t('invite.revoke')}
                   >
-                    <X className="h-4 w-4 group-hover:text-[var(--color-danger)]" />
+                    <X className="h-4 w-4 group-hover:text-[var(--nf-color-danger)]" />
                   </button>
                 </div>
               </div>

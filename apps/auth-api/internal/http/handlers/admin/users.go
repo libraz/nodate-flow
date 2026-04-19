@@ -23,9 +23,9 @@ func ListUsers(deps Deps) func(context.Context, *ListUsersInput) (*ListUsersOutp
 
 		var filterEnabled interface{}
 		var enabledBool bool
-		if in.Enabled != nil {
-			filterEnabled = *in.Enabled
-			enabledBool = *in.Enabled
+		if in.Enabled != "" {
+			enabledBool = in.Enabled == "true"
+			filterEnabled = enabledBool
 		}
 
 		rows, err := deps.Queries.AdminListUsers(ctx, generated.AdminListUsersParams{

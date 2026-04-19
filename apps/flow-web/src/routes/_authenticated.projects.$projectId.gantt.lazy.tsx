@@ -22,6 +22,7 @@ import { type ReactElement, Suspense, useCallback, useMemo, useState } from 'rea
 import { useTranslation } from 'react-i18next';
 
 import { useProjectDependenciesQuery } from '../features/projects/api';
+import type { TaskDerivedState } from '../features/tasks/api';
 import { STATE_COLOR } from '../features/tasks/constants';
 import { sdk } from '../lib/sdk';
 
@@ -410,7 +411,7 @@ function GanttView(): ReactElement {
               display: 'flex',
               gap: '0.125rem',
               alignItems: 'center',
-              borderInlineStart: '1px solid var(--color-border)',
+              borderInlineStart: '1px solid var(--nf-color-border)',
               paddingInlineStart: '0.5rem',
             }}
           >
@@ -467,9 +468,9 @@ function GanttView(): ReactElement {
               gap: '0.375rem',
               alignItems: 'center',
               fontSize: '0.8125rem',
-              color: 'var(--color-muted)',
+              color: 'var(--nf-color-fg-muted)',
               cursor: 'pointer',
-              borderInlineStart: '1px solid var(--color-border)',
+              borderInlineStart: '1px solid var(--nf-color-border)',
               paddingInlineStart: '0.5rem',
               userSelect: 'none',
             }}
@@ -503,22 +504,22 @@ function GanttView(): ReactElement {
           style={{
             display: 'grid',
             gridTemplateColumns: `${LABEL_WIDTH}px minmax(0, 1fr)`,
-            border: '1px solid var(--color-border, rgba(127,127,127,0.2))',
+            border: '1px solid var(--nf-color-border))',
             borderRadius: '0.5rem',
             overflow: 'hidden',
-            background: 'var(--color-surface, rgba(127,127,127,0.04))',
+            background: 'var(--nf-color-surface))',
           }}
         >
           {/* Label column */}
           <div
             style={{
-              borderInlineEnd: '1px solid var(--color-border, rgba(127,127,127,0.2))',
+              borderInlineEnd: '1px solid var(--nf-color-border))',
             }}
           >
             <div
               style={{
                 blockSize: HEADER_HEIGHT,
-                borderBlockEnd: '1px solid var(--color-border, rgba(127,127,127,0.2))',
+                borderBlockEnd: '1px solid var(--nf-color-border))',
               }}
             />
             {scheduled.map(({ task }) => (
@@ -547,7 +548,9 @@ function GanttView(): ReactElement {
                     inlineSize: '0.5rem',
                     blockSize: '0.5rem',
                     borderRadius: '999px',
-                    background: STATE_COLOR[task.derivedState] ?? 'var(--color-muted)',
+                    background:
+                      STATE_COLOR[task.derivedState as TaskDerivedState] ??
+                      'var(--nf-color-fg-muted)',
                     flexShrink: 0,
                   }}
                 />
@@ -598,7 +601,7 @@ function GanttView(): ReactElement {
                 >
                   <path
                     d="M 0 0 L 10 5 L 0 10 z"
-                    fill="var(--nf-color-fg-muted, var(--color-muted, #95a5a6))"
+                    fill="var(--nf-color-fg-muted, var(--nf-color-fg-muted))"
                   />
                 </marker>
               </defs>
@@ -628,7 +631,7 @@ function GanttView(): ReactElement {
                       y={HEADER_HEIGHT - 6}
                       textAnchor="middle"
                       fontSize="10"
-                      fill="var(--nf-color-fg-muted, var(--color-muted))"
+                      fill="var(--nf-color-fg-muted, var(--nf-color-fg-muted))"
                     >
                       {c.date.getDate()}
                     </text>
@@ -639,7 +642,7 @@ function GanttView(): ReactElement {
                       y={14}
                       fontSize="10"
                       fontWeight="600"
-                      fill="var(--nf-color-fg, var(--color-fg))"
+                      fill="var(--nf-color-fg, var(--nf-color-fg))"
                     >
                       {`${c.date.getFullYear()}/${c.date.getMonth() + 1}`}
                     </text>
@@ -654,7 +657,7 @@ function GanttView(): ReactElement {
                   y={14}
                   fontSize="10"
                   fontWeight="600"
-                  fill="var(--nf-color-fg, var(--color-fg))"
+                  fill="var(--nf-color-fg, var(--nf-color-fg))"
                 >
                   {`${firstDayDate.getFullYear()}/${firstDayDate.getMonth() + 1}`}
                 </text>
@@ -667,7 +670,7 @@ function GanttView(): ReactElement {
                   y1={HEADER_HEIGHT}
                   x2={todayOffset * dayWidth + dayWidth / 2}
                   y2={chartHeight}
-                  stroke="var(--color-accent, #9b59b6)"
+                  stroke="var(--nf-color-accent)"
                   strokeWidth={1.5}
                   strokeDasharray="3 3"
                 />
@@ -684,7 +687,7 @@ function GanttView(): ReactElement {
                       ? 'var(--nf-color-danger, #c0392b)'
                       : arrow.danger
                         ? 'var(--nf-color-danger, #c0392b)'
-                        : 'var(--nf-color-fg-muted, var(--color-muted, #95a5a6))'
+                        : 'var(--nf-color-fg-muted, var(--nf-color-fg-muted))'
                   }
                   strokeWidth={arrow.critical ? 1.5 : 0.75}
                   strokeDasharray={arrow.danger || arrow.critical ? undefined : '3 3'}
@@ -709,7 +712,8 @@ function GanttView(): ReactElement {
                   HEADER_HEIGHT +
                   idx * (ROW_HEIGHT + ROW_GAP) +
                   (ROW_HEIGHT + ROW_GAP - BAR_HEIGHT) / 2;
-                const fill = STATE_COLOR[task.derivedState] ?? 'var(--color-muted)';
+                const fill =
+                  STATE_COLOR[task.derivedState as TaskDerivedState] ?? 'var(--nf-color-fg-muted)';
                 const isCritical = criticalPathIds.has(task.id);
                 return (
                   <g
@@ -815,7 +819,7 @@ function GanttView(): ReactElement {
                     gap: '0.5rem',
                     padding: '0.375rem 0.5rem',
                     borderRadius: '0.375rem',
-                    color: 'var(--color-fg)',
+                    color: 'var(--nf-color-fg)',
                     fontSize: '0.8125rem',
                     textDecoration: 'none',
                   }}
@@ -826,7 +830,9 @@ function GanttView(): ReactElement {
                       inlineSize: '0.5rem',
                       blockSize: '0.5rem',
                       borderRadius: '999px',
-                      background: STATE_COLOR[task.derivedState] ?? 'var(--color-muted, #95a5a6)',
+                      background:
+                        STATE_COLOR[task.derivedState as TaskDerivedState] ??
+                        'var(--nf-color-fg-muted)',
                       flexShrink: 0,
                     }}
                   />
