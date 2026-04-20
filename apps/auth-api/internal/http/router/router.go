@@ -38,9 +38,10 @@ type Deps struct {
 	OIDCMicrosoft    *auth.MicrosoftOIDCClient
 	Sessions         sessionstore.Store
 	Cipher           *crypto.Cipher
-	CookieSecure     bool
-	RegistrationOpen bool
-	DisableRateLimit bool
+	CookieSecure      bool
+	RegistrationOpen  bool
+	MinPasswordLength int
+	DisableRateLimit  bool
 	EmailSender      email.Sender
 	FlowWebURL       string
 	AccountsWebURL   string
@@ -131,7 +132,8 @@ func BuildResult(deps Deps) Result {
 		OIDCMicrosoft:    deps.OIDCMicrosoft,
 		Cipher:           deps.Cipher,
 		CookieSecure:     deps.CookieSecure,
-		RegistrationOpen: deps.RegistrationOpen,
+		RegistrationOpen:  deps.RegistrationOpen,
+		MinPasswordLength: deps.MinPasswordLength,
 		Audit:            auditRec,
 		EmailSender:      deps.EmailSender,
 		AccountsWebURL:   deps.AccountsWebURL,

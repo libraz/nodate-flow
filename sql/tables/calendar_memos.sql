@@ -23,6 +23,7 @@ CREATE TABLE calendar_memos (
   UNIQUE KEY uniq_calendar_memos_public_id (public_id),
   KEY idx_calendar_memos_calendar (calendar_id, sort_weight),
   KEY idx_calendar_memos_workspace (workspace_id, calendar_id),
+  KEY idx_calendar_memos_creator (workspace_id, created_by_user_id),
 
   CONSTRAINT fk_calendar_memos_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_memos_calendar FOREIGN KEY (calendar_id) REFERENCES calendars(id) ON DELETE CASCADE,

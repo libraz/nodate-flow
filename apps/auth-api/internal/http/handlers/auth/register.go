@@ -23,7 +23,7 @@ func Register(deps Deps) func(context.Context, *RegisterInput) (*RegisterOutput,
 			return nil, httpErr(apierrors.AuthRegisterInstanceRegistrationDisabled)
 		}
 		email := strings.ToLower(strings.TrimSpace(in.Body.Email))
-		if len(in.Body.Password) < 8 {
+		if len(in.Body.Password) < deps.minPwLen() {
 			return nil, httpErr(apierrors.AuthRegisterPasswordTooWeak)
 		}
 		// Conflict check.

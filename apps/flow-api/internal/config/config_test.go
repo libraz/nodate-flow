@@ -12,6 +12,7 @@ func TestValidateEnumsAcceptsValid(t *testing.T) {
 		SessionStore:      "mysql",
 		AgentRunner:       "log",
 		AgentQueueBackend: "memory",
+		WebhooksInsecure:  true,
 	}
 	if err := validateEnums(cfg); err != nil {
 		t.Fatalf("valid config rejected: %v", err)
@@ -25,6 +26,7 @@ func TestValidateEnumsAcceptsRedis(t *testing.T) {
 		SessionStore:      "redis",
 		AgentRunner:       "orchestrator",
 		AgentQueueBackend: "mysql",
+		WebhooksInsecure:  true,
 	}
 	if err := validateEnums(cfg); err != nil {
 		t.Fatalf("valid config rejected: %v", err)
@@ -40,6 +42,7 @@ func TestValidateEnumsRejectsInvalidPort(t *testing.T) {
 			SessionStore:      "mysql",
 			AgentRunner:       "log",
 			AgentQueueBackend: "memory",
+			WebhooksInsecure:  true,
 		}
 		err := validateEnums(cfg)
 		if err == nil {
@@ -59,6 +62,7 @@ func TestValidateEnumsRejectsInvalidSessionStore(t *testing.T) {
 		SessionStore:      "postgres",
 		AgentRunner:       "log",
 		AgentQueueBackend: "memory",
+		WebhooksInsecure:  true,
 	}
 	if err := validateEnums(cfg); err == nil {
 		t.Fatal("invalid SessionStore should be rejected")
@@ -72,6 +76,7 @@ func TestValidateEnumsRejectsInvalidAgentRunner(t *testing.T) {
 		SessionStore:      "mysql",
 		AgentRunner:       "invalid",
 		AgentQueueBackend: "memory",
+		WebhooksInsecure:  true,
 	}
 	if err := validateEnums(cfg); err == nil {
 		t.Fatal("invalid AgentRunner should be rejected")
@@ -85,8 +90,74 @@ func TestValidateEnumsRejectsInvalidQueueBackend(t *testing.T) {
 		SessionStore:      "mysql",
 		AgentRunner:       "log",
 		AgentQueueBackend: "redis",
+		WebhooksInsecure:  true,
 	}
 	if err := validateEnums(cfg); err == nil {
 		t.Fatal("invalid AgentQueueBackend should be rejected")
 	}
+}
+
+func TestValidateEnumsRequiresWebhookSecrets(t *testing.T) {
+	t.Parallel()
+	base := Config{
+		Port:              "8080",
+		SessionStore:      "mysql",
+		AgentRunner:       "log",
+		AgentQueueBackend: "memory",
+		WebhooksInsecure:  false,
+	}
+
+	t.Run("rejects empty GhWebhookSecret", func(t *testing.T) {
+		cfg := base
+		cfg.GhWebhookSecret = ""
+		cfg.SlackSigningSecret = "s"
+		cfg.GoogleChannelToken = "g"
+		err := validateEnums(&cfg)
+		if err == nil {
+			t.Fatal("empty GhWebhookSecret should be rejected when WebhooksInsecure=false")
+		}
+		if !strings.Contains(err.Error(), "NF_FLOW_GH_WEBHOOK_SECRET") {
+			t.Errorf("error should mention env var: %v", err)
+		}
+	})
+
+	t.Run("rejects empty SlackSigningSecret", func(t *testing.T) {
+		cfg := base
+		cfg.GhWebhookSecret = "h"
+		cfg.SlackSigningSecret = ""
+		cfg.GoogleChannelToken = "g"
+		err := validateEnums(&cfg)
+		if err == nil {
+			t.Fatal("empty SlackSigningSecret should be rejected when WebhooksInsecure=false")
+		}
+	})
+
+	t.Run("rejects empty GoogleChannelToken", func(t *testing.T) {
+		cfg := base
+		cfg.GhWebhookSecret = "h"
+		cfg.SlackSigningSecret = "s"
+		cfg.GoogleChannelToken = ""
+		err := validateEnums(&cfg)
+		if err == nil {
+			t.Fatal("empty GoogleChannelToken should be rejected when WebhooksInsecure=false")
+		}
+	})
+
+	t.Run("accepts empty secrets when insecure", func(t *testing.T) {
+		cfg := base
+		cfg.WebhooksInsecure = true
+		if err := validateEnums(&cfg); err != nil {
+			t.Fatalf("should accept empty secrets when WebhooksInsecure=true: %v", err)
+		}
+	})
+
+	t.Run("accepts all secrets set", func(t *testing.T) {
+		cfg := base
+		cfg.GhWebhookSecret = "h"
+		cfg.SlackSigningSecret = "s"
+		cfg.GoogleChannelToken = "g"
+		if err := validateEnums(&cfg); err != nil {
+			t.Fatalf("should accept all secrets set: %v", err)
+		}
+	})
 }

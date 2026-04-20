@@ -22,7 +22,7 @@ func ChangePassword(deps Deps) func(context.Context, *ChangePasswordInput) (*Cha
 		if !ok {
 			return nil, httpErr(apierrors.AuthSessionRevoked)
 		}
-		if len(in.Body.NewPassword) < 8 {
+		if len(in.Body.NewPassword) < deps.minPwLen() {
 			return nil, httpErr(apierrors.AuthPasswordTooWeak)
 		}
 		row, err := deps.Queries.FindLocalIdentityByUserId(ctx, uid)

@@ -84,6 +84,7 @@ func runAddFavorite(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	}
 	// Check for existing favorite to avoid duplicates.
 	_, err = deps.Queries.FindFavoriteByTarget(ctx, generated.FindFavoriteByTargetParams{
+		WorkspaceID:    s.workspaceID,
 		UserID:         s.userID,
 		TargetType:     tt,
 		TargetPublicID: targetPub,

@@ -127,7 +127,7 @@ function CommandModeBody({ prompt, wsId, onSelect }: CommandModeBodyProps): Reac
 
   return (
     // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard trap for command result
-    <div onKeyDown={handleKeyDown} tabIndex={0} style={{ outline: 'none' }}>
+    <div onKeyDown={handleKeyDown} tabIndex={0} className={css.commandModeBody}>
       <div className={css.groupLabel}>{t('dock.command_palette.group_command')}</div>
 
       {resolveCommand.isPending && (

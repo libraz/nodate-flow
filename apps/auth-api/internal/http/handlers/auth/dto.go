@@ -47,6 +47,17 @@ type Deps struct {
 	// AccountsWebURL is the origin of the accounts-web frontend, used
 	// to build magic link verification URLs.
 	AccountsWebURL string
+	// MinPasswordLength is the minimum password length for registration
+	// and password changes. Defaults to 8 when zero.
+	MinPasswordLength int
+}
+
+// minPwLen returns the effective minimum password length.
+func (d Deps) minPwLen() int {
+	if d.MinPasswordLength > 0 {
+		return d.MinPasswordLength
+	}
+	return 8
 }
 
 // RegisterInput is the body for POST /auth/register.

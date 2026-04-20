@@ -27,10 +27,7 @@ func HandleGoogleWebhook(deps Deps) http.HandlerFunc {
 		}
 		token := r.Header.Get(goog.HeaderChannelToken)
 		if !goog.VerifyChannelToken(token, deps.GoogleChannelToken) {
-			writeJSON(w, http.StatusUnauthorized, map[string]any{
-				"code":    "INTEGRATION.GOOGLE.WEBHOOK_INVALID_TOKEN",
-				"message": "Google push channel token verification failed",
-			})
+			writeError(w, apierrors.IntegrationGoogleWebhookInvalidToken)
 			return
 		}
 		kind := goog.NormalizeEventKind(r.Header.Get(goog.HeaderResourceState))

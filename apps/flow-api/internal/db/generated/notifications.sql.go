@@ -42,6 +42,7 @@ WHERE recipient_user_id = ?
 `
 
 // Count unread notifications for a user across all workspaces.
+// Used by the global notification badge when no workspace is selected.
 func (q *Queries) CountUnreadNotifications(ctx context.Context, recipientUserID uint32) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countUnreadNotifications, recipientUserID)
 	var unread_count int64

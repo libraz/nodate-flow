@@ -39,7 +39,8 @@ SELECT
   uf.sort_weight,
   uf.created_at
 FROM user_favorites uf
-WHERE uf.public_id = ?
+WHERE uf.workspace_id = ?
+  AND uf.public_id = ?
   AND uf.user_id = ?
   AND uf.enabled = TRUE;
 
@@ -47,14 +48,16 @@ WHERE uf.public_id = ?
 -- Soft-delete a favorite.
 UPDATE user_favorites
 SET enabled = FALSE
-WHERE public_id = ?
+WHERE workspace_id = ?
+  AND public_id = ?
   AND user_id = ?;
 
 -- name: FindFavoriteByTarget :one
 -- Check if a user has already favorited this entity.
 SELECT id, public_id
 FROM user_favorites
-WHERE user_id = ?
+WHERE workspace_id = ?
+  AND user_id = ?
   AND target_type = ?
   AND target_public_id = ?
   AND enabled = TRUE;

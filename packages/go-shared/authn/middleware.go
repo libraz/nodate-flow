@@ -27,12 +27,12 @@ func RequireAuth(resolvers ...TokenResolver) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			tok, ok := bearerFromHeader(r.Header.Get("Authorization"))
 			if !ok {
-				writeJSON401(w)
+				writeJSON401Missing(w)
 				return
 			}
 			userID, sid, err := resolveChain(r.Context(), tok, resolvers)
 			if err != nil {
-				writeJSON401(w)
+				writeJSON401SignatureInvalid(w)
 				return
 			}
 			ctx := WithActor(r.Context(), userID)
@@ -88,11 +88,20 @@ type errorBody struct {
 	Message string `json:"message"`
 }
 
-func writeJSON401(w http.ResponseWriter) {
+func writeJSON401Missing(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(http.StatusUnauthorized)
+	_ = json.NewEncoder(w).Encode(errorBody{
+		Code:    "AUTH.TOKEN.MISSING_OR_MALFORMED",
+		Message: "Missing or invalid authentication token",
+	})
+}
+
+func writeJSON401SignatureInvalid(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusUnauthorized)
 	_ = json.NewEncoder(w).Encode(errorBody{
 		Code:    "AUTH.TOKEN.SIGNATURE_INVALID",
-		Message: "Missing or invalid authentication token",
+		Message: "Token signature is invalid",
 	})
 }

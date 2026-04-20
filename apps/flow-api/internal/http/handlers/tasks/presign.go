@@ -20,6 +20,8 @@ const presignExpiry = 15 * time.Minute
 const maxFileSize = 100 * 1024 * 1024
 
 // allowedMIMEPrefixes lists safe MIME type prefixes for uploads.
+// Intentionally excludes application/octet-stream (catch-all) and
+// limits application/vnd.ms-* to safe Office types.
 var allowedMIMEPrefixes = []string{
 	"image/",
 	"text/",
@@ -30,17 +32,35 @@ var allowedMIMEPrefixes = []string{
 	"application/gzip",
 	"application/x-tar",
 	"application/vnd.openxmlformats-officedocument",
-	"application/vnd.ms-",
+	"application/vnd.ms-excel",
+	"application/vnd.ms-powerpoint",
 	"application/vnd.oasis.opendocument",
-	"application/octet-stream",
 	"video/",
 	"audio/",
+}
+
+// blockedExtensions rejects dangerous file extensions regardless of
+// the declared MIME type.
+var blockedExtensions = []string{
+	".exe", ".dll", ".bat", ".cmd", ".com", ".scr", ".pif",
+	".msi", ".msp", ".mst", ".vbs", ".vbe", ".js", ".jse",
+	".wsf", ".wsh", ".ps1", ".psm1",
 }
 
 func isAllowedContentType(ct string) bool {
 	ct = strings.ToLower(strings.TrimSpace(ct))
 	for _, prefix := range allowedMIMEPrefixes {
 		if strings.HasPrefix(ct, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasBlockedExtension(filename string) bool {
+	lower := strings.ToLower(filename)
+	for _, ext := range blockedExtensions {
+		if strings.HasSuffix(lower, ext) {
 			return true
 		}
 	}
@@ -56,6 +76,9 @@ func PresignUpload(deps Deps) func(context.Context, *PresignUploadInput) (*Presi
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		if !isAllowedContentType(in.Body.ContentType) {
+			return nil, httpErr(apierrors.ValidationFileTypeNotAllowed)
+		}
+		if hasBlockedExtension(in.Body.Filename) {
 			return nil, httpErr(apierrors.ValidationFileTypeNotAllowed)
 		}
 		if in.Body.ByteSize > maxFileSize {

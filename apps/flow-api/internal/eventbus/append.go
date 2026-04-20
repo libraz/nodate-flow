@@ -12,6 +12,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -161,10 +162,16 @@ func Append(ctx context.Context, db DBTX, evt Event) error {
 		PayloadJson: raw,
 		OccurredAt:  time.Now().UTC(),
 	})
-	if err == nil {
-		seq := globalSeq.Add(1)
-		seqCtx := WithSeq(ctx, seq)
-		fireNotifyHooks(seqCtx, evt.WorkspaceID, evt.Type)
+	if err != nil {
+		slog.ErrorContext(ctx, "eventbus: append failed",
+			"type", evt.Type,
+			"workspace_id", evt.WorkspaceID,
+			"error", err,
+		)
+		return err
 	}
-	return err
+	seq := globalSeq.Add(1)
+	seqCtx := WithSeq(ctx, seq)
+	fireNotifyHooks(seqCtx, evt.WorkspaceID, evt.Type)
+	return nil
 }

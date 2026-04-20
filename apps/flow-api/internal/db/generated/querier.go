@@ -138,6 +138,7 @@ type Querier interface {
 	// Count total and completed tasks in a timebox for progress tracking.
 	CountTasksForTimebox(ctx context.Context, timeboxID uint32) (CountTasksForTimeboxRow, error)
 	// Count unread notifications for a user across all workspaces.
+	// Used by the global notification badge when no workspace is selected.
 	CountUnreadNotifications(ctx context.Context, recipientUserID uint32) (int64, error)
 	// Count unread notifications for a user within a specific workspace.
 	CountUnreadNotificationsForWorkspace(ctx context.Context, arg CountUnreadNotificationsForWorkspaceParams) (int64, error)

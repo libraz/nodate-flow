@@ -55,3 +55,13 @@ func GeneratePAT() (plaintext string, hash string, err error) {
 func GenerateMCP() (plaintext string, hash string, err error) {
 	return GenerateOpaque(PrefixMCP)
 }
+
+// RandomHex returns a hex-encoded random string of 2*n characters.
+// Panics if the system CSPRNG fails (unrecoverable).
+func RandomHex(n int) string {
+	b := make([]byte, n)
+	if _, err := rand.Read(b); err != nil {
+		panic("authn: crypto/rand failed: " + err.Error())
+	}
+	return hex.EncodeToString(b)
+}

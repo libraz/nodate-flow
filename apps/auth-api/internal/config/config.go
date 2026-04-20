@@ -32,6 +32,10 @@ type Config struct {
 	// RegistrationOpen controls whether new user sign-up is allowed.
 	RegistrationOpen bool `env:"NF_REGISTRATION_OPEN" envDefault:"true"`
 
+	// MinPasswordLength is the minimum accepted password length for
+	// registration and password changes. Defaults to 8.
+	MinPasswordLength int `env:"NF_AUTH_MIN_PASSWORD_LENGTH" envDefault:"8"`
+
 	// CorsAllowedOrigins is the comma-separated list of origins allowed to
 	// call the auth API with credentials. Must include accounts-web,
 	// flow-web, and time-web origins.

@@ -31,6 +31,11 @@ export const AuthErrors = {
     status: 401,
     message: "Magic link is invalid or has expired",
   },
+  AUTH_OIDC_EMAIL_NOT_VERIFIED: {
+    code: "AUTH.OIDC.EMAIL_NOT_VERIFIED",
+    status: 403,
+    message: "Email address is not verified by the identity provider",
+  },
   AUTH_OIDC_GITHUB_NOT_CONFIGURED: {
     code: "AUTH.OIDC.GITHUB_NOT_CONFIGURED",
     status: 503,
@@ -110,6 +115,11 @@ export const AuthErrors = {
     code: "AUTH.SESSION.REVOKED",
     status: 401,
     message: "Session has been revoked",
+  },
+  AUTH_TOKEN_MISSING_OR_MALFORMED: {
+    code: "AUTH.TOKEN.MISSING_OR_MALFORMED",
+    status: 401,
+    message: "Missing or invalid authentication token",
   },
   AUTH_TOKEN_REFRESH_EXPIRED: {
     code: "AUTH.TOKEN.REFRESH_EXPIRED",

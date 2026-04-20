@@ -2,10 +2,9 @@ package auth
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 )
 
 // OIDCGoogleStart handles GET /auth/oidc/google/start. It returns the
@@ -16,7 +15,7 @@ func OIDCGoogleStart(deps Deps) func(context.Context, *struct{}) (*OIDCStartOutp
 		if deps.OIDC == nil {
 			return nil, httpErr(apierrors.AuthOidcProviderUnreachable)
 		}
-		nonce := randomHex(16)
+		nonce := authn.RandomHex(16)
 		// State is a signed JWT that embeds the nonce. The callback
 		// validates the JWT signature + expiry to provide CSRF
 		// protection without server-side storage.
@@ -33,10 +32,4 @@ func OIDCGoogleStart(deps Deps) func(context.Context, *struct{}) (*OIDCStartOutp
 		out.Body.State = state
 		return out, nil
 	}
-}
-
-func randomHex(n int) string {
-	b := make([]byte, n)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
 }

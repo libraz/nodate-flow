@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/agentruntime"
@@ -79,12 +80,17 @@ func ListAgents(deps Deps) func(context.Context, *ListAgentsInput) (*ListAgentsO
 				for tr.Next() {
 					var pub types.PublicID
 					var raw json.RawMessage
-					if err := tr.Scan(&pub, &raw); err == nil {
-						var arr []string
-						if json.Unmarshal(raw, &arr) == nil && len(arr) > 0 {
-							triggerByPub[pub.String()] = arr
-						}
+					if err := tr.Scan(&pub, &raw); err != nil {
+						slog.ErrorContext(ctx, "agents: scan event_trigger_types", "error", err)
+						continue
 					}
+					var arr []string
+					if json.Unmarshal(raw, &arr) == nil && len(arr) > 0 {
+						triggerByPub[pub.String()] = arr
+					}
+				}
+				if err := tr.Err(); err != nil {
+					slog.ErrorContext(ctx, "agents: iterate event_trigger_types", "error", err)
 				}
 			}
 		}
@@ -159,7 +165,10 @@ func UpdateAgentSchedule(deps Deps) func(context.Context, *UpdateAgentScheduleIn
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		n, _ := res.RowsAffected()
+		n, raErr := res.RowsAffected()
+		if raErr != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
 		if n == 0 {
 			return nil, httpErr(apierrors.AiAgentNotFound)
 		}
@@ -336,7 +345,10 @@ func UpdateAgentEventTriggers(deps Deps) func(context.Context, *UpdateAgentEvent
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		n, _ := res.RowsAffected()
+		n, raErr := res.RowsAffected()
+		if raErr != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
 		if n == 0 {
 			return nil, httpErr(apierrors.AiAgentNotFound)
 		}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -71,7 +72,9 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 			Action string `json:"action"`
 		}
 		if json.Valid(body) {
-			_ = json.Unmarshal(body, &actionEnv)
+			if uerr := json.Unmarshal(body, &actionEnv); uerr != nil {
+				slog.WarnContext(r.Context(), "webhook: github action unmarshal", "error", uerr)
+			}
 		}
 		event = gh.NormalizeEventKind(event, actionEnv.Action)
 

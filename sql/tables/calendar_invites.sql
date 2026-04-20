@@ -25,6 +25,7 @@ CREATE TABLE calendar_invites (
   UNIQUE KEY uniq_calendar_invites_public_id (public_id),
   UNIQUE KEY uniq_calendar_invites_token_hash (token_hash),
   KEY idx_calendar_invites_calendar (workspace_id, calendar_id),
+  KEY idx_calendar_invites_creator (workspace_id, created_by_user_id),
 
   CONSTRAINT fk_calendar_invites_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_invites_calendar FOREIGN KEY (calendar_id) REFERENCES calendars(id) ON DELETE CASCADE,

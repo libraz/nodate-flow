@@ -16,6 +16,8 @@ var (
 	AuthMagicLinkEmailNotFound = &Spec{Code: "AUTH.MAGIC_LINK.EMAIL_NOT_FOUND", Status: 404, Message: "No account found for this email address"}
 	// AUTH.MAGIC_LINK.INVALID_OR_EXPIRED — Magic link is invalid or has expired
 	AuthMagicLinkInvalidOrExpired = &Spec{Code: "AUTH.MAGIC_LINK.INVALID_OR_EXPIRED", Status: 401, Message: "Magic link is invalid or has expired"}
+	// AUTH.OIDC.EMAIL_NOT_VERIFIED — Email address is not verified by the identity provider
+	AuthOidcEmailNotVerified = &Spec{Code: "AUTH.OIDC.EMAIL_NOT_VERIFIED", Status: 403, Message: "Email address is not verified by the identity provider"}
 	// AUTH.OIDC.GITHUB_NOT_CONFIGURED — GitHub login is not configured
 	AuthOidcGithubNotConfigured = &Spec{Code: "AUTH.OIDC.GITHUB_NOT_CONFIGURED", Status: 503, Message: "GitHub login is not configured"}
 	// AUTH.OIDC.ID_TOKEN_INVALID — OIDC ID token is invalid
@@ -48,6 +50,8 @@ var (
 	AuthSessionExpired = &Spec{Code: "AUTH.SESSION.EXPIRED", Status: 401, Message: "Session has expired"}
 	// AUTH.SESSION.REVOKED — Session has been revoked
 	AuthSessionRevoked = &Spec{Code: "AUTH.SESSION.REVOKED", Status: 401, Message: "Session has been revoked"}
+	// AUTH.TOKEN.MISSING_OR_MALFORMED — Missing or invalid authentication token
+	AuthTokenMissingOrMalformed = &Spec{Code: "AUTH.TOKEN.MISSING_OR_MALFORMED", Status: 401, Message: "Missing or invalid authentication token"}
 	// AUTH.TOKEN.REFRESH_EXPIRED — Refresh token has expired
 	AuthTokenRefreshExpired = &Spec{Code: "AUTH.TOKEN.REFRESH_EXPIRED", Status: 401, Message: "Refresh token has expired"}
 	// AUTH.TOKEN.REFRESH_INVALID — Refresh token is invalid

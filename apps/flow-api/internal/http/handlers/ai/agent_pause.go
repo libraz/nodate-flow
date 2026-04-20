@@ -49,7 +49,10 @@ func PauseAgent(deps Deps) func(context.Context, *PauseAgentInput) (*PauseAgentO
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		n, _ := res.RowsAffected()
+		n, err := res.RowsAffected()
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
 		if n == 0 {
 			return nil, httpErr(apierrors.AiAgentNotFound)
 		}

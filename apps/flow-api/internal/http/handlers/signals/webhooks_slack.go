@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -61,7 +62,9 @@ func HandleSlackWebhook(deps Deps) http.HandlerFunc {
 			} `json:"event"`
 		}
 		if json.Valid(body) {
-			_ = json.Unmarshal(body, &envelope)
+			if uerr := json.Unmarshal(body, &envelope); uerr != nil {
+				slog.WarnContext(r.Context(), "webhook: slack envelope unmarshal", "error", uerr)
+			}
 			kind = sl.NormalizeEventKind(envelope.Type, envelope.Event.Type)
 		}
 		payload := body

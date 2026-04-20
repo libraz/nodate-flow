@@ -81,12 +81,19 @@ function SecurityPage(): ReactElement {
 
   useEffect(() => {
     let cancelled = false;
-    void sdk.GET('/auth/totp/status').then((res) => {
-      if (!cancelled && res.data) {
-        const status = res.data as TotpStatusResponse;
-        setTotpEnrolled(status.enrolled);
-      }
-    });
+    void sdk
+      .GET('/auth/totp/status')
+      .then((res) => {
+        if (!cancelled && res.data) {
+          const status = res.data as TotpStatusResponse;
+          setTotpEnrolled(status.enrolled);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          console.error('Failed to fetch TOTP status', err);
+        }
+      });
     return () => {
       cancelled = true;
     };
@@ -99,13 +106,21 @@ function SecurityPage(): ReactElement {
 
   useEffect(() => {
     let cancelled = false;
-    void sdk.GET('/auth/sessions').then((res) => {
-      if (!cancelled) {
-        const body = res.data as SessionsResponse | undefined;
-        setSessions(body?.sessions ?? []);
-        setSessionsLoading(false);
-      }
-    });
+    void sdk
+      .GET('/auth/sessions')
+      .then((res) => {
+        if (!cancelled) {
+          const body = res.data as SessionsResponse | undefined;
+          setSessions(body?.sessions ?? []);
+          setSessionsLoading(false);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          console.error('Failed to fetch sessions', err);
+          setSessionsLoading(false);
+        }
+      });
     return () => {
       cancelled = true;
     };

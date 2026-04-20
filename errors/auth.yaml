@@ -160,6 +160,13 @@ resources:
         description: "Returned when the refresh token is past its lifetime and can no longer be exchanged."
         userAction: "Sign in again."
 
+      missing_or_malformed:
+        code: AUTH.TOKEN.MISSING_OR_MALFORMED
+        status: 401
+        message: "Missing or invalid authentication token"
+        description: "Returned when the Authorization header is absent, does not start with Bearer, or the token is empty. Distinct from signature verification failures."
+        userAction: "Include a valid Bearer token in the Authorization header."
+
       signature_invalid:
         code: AUTH.TOKEN.SIGNATURE_INVALID
         status: 401
@@ -235,6 +242,13 @@ resources:
         message: "Microsoft login is not configured"
         description: "Returned when the user attempts to sign in via Microsoft but the instance has no Microsoft OIDC client configured."
         userAction: "Ask the instance administrator to configure Microsoft login credentials."
+
+      email_not_verified:
+        code: AUTH.OIDC.EMAIL_NOT_VERIFIED
+        status: 403
+        message: "Email address is not verified by the identity provider"
+        description: "Returned when the OIDC identity provider indicates the user's email address has not been verified."
+        userAction: "Verify your email address with your identity provider, then try again."
 
   pat:
     breadcrumb: "Auth > Personal Access Token"

@@ -35,6 +35,7 @@ func Create(deps Deps) func(context.Context, *CreateFavoriteInput) (*CreateFavor
 
 		// Check for duplicate favorite on the same target.
 		_, dupErr := deps.Queries.FindFavoriteByTarget(ctx, generated.FindFavoriteByTargetParams{
+			WorkspaceID:    wsID,
 			UserID:         actorID,
 			TargetType:     generated.UserFavoritesTargetType(in.Body.TargetType),
 			TargetPublicID: targetPub,
@@ -89,8 +90,9 @@ func Create(deps Deps) func(context.Context, *CreateFavoriteInput) (*CreateFavor
 		}
 
 		row, err := deps.Queries.FindFavoriteByPublicId(ctx, generated.FindFavoriteByPublicIdParams{
-			PublicID: pub,
-			UserID:   actorID,
+			WorkspaceID: wsID,
+			PublicID:     pub,
+			UserID:       actorID,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -148,6 +150,11 @@ func Delete(deps Deps) func(context.Context, *DeleteFavoriteInput) (*DeleteFavor
 			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
 		}
 
+		wsID, err := resolve.WorkspaceMember(ctx, deps.DB, in.WorkspaceID, actorID)
+		if err != nil {
+			return nil, err
+		}
+
 		pub, err := types.Parse(in.ID)
 		if err != nil {
 			return nil, httpErr(apierrors.WsFavoriteNotFound)
@@ -155,8 +162,9 @@ func Delete(deps Deps) func(context.Context, *DeleteFavoriteInput) (*DeleteFavor
 
 		// Look up the favorite to get the workspace for the event.
 		row, err := deps.Queries.FindFavoriteByPublicId(ctx, generated.FindFavoriteByPublicIdParams{
-			PublicID: pub,
-			UserID:   actorID,
+			WorkspaceID: wsID,
+			PublicID:    pub,
+			UserID:      actorID,
 		})
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -166,8 +174,9 @@ func Delete(deps Deps) func(context.Context, *DeleteFavoriteInput) (*DeleteFavor
 		}
 
 		if err := deps.Queries.DisableFavorite(ctx, generated.DisableFavoriteParams{
-			PublicID: pub,
-			UserID:   actorID,
+			WorkspaceID: wsID,
+			PublicID:    pub,
+			UserID:      actorID,
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}

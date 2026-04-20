@@ -41,6 +41,13 @@ func OIDCGoogleCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*O
 		if err := idTok.Claims(&claims); err != nil {
 			return nil, httpErr(apierrors.AuthOidcIdTokenInvalid)
 		}
+		// Reject unverified emails. Google OIDC normally returns
+		// email_verified=true, but compromised or misconfigured IdPs
+		// might not; this check prevents account creation with an
+		// unverified email address.
+		if !claims.Verified {
+			return nil, httpErr(apierrors.AuthOidcEmailNotVerified)
+		}
 
 		ident, err := deps.Queries.FindIdentityByProviderSubject(ctx, generated.FindIdentityByProviderSubjectParams{
 			Provider: generated.IdentitiesProvider("google"),

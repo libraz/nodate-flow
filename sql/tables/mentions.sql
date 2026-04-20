@@ -24,6 +24,7 @@ CREATE TABLE mentions (
   UNIQUE KEY uniq_mentions_public_id (public_id),
   KEY idx_mentions_workspace_mentioned_user (workspace_id, mentioned_user_id),
   KEY idx_mentions_task_id (task_id),
+  KEY idx_mentions_comment_id (comment_id),
 
   CONSTRAINT fk_mentions_workspace FOREIGN KEY (workspace_id)      REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_mentions_mentioned FOREIGN KEY (mentioned_user_id) REFERENCES users(id)      ON DELETE CASCADE,

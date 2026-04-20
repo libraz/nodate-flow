@@ -29,6 +29,10 @@ type Config struct {
 	// GoogleChannelToken is the X-Goog-Channel-Token shared secret that
 	// Google Drive push notifications must echo back on every delivery.
 	GoogleChannelToken string `env:"NF_FLOW_GOOGLE_CHANNEL_TOKEN" envDefault:""`
+	// WebhooksInsecure disables webhook signature verification. Set to
+	// true only for local development and CI where webhook secrets are
+	// not available.
+	WebhooksInsecure bool `env:"NF_FLOW_WEBHOOKS_INSECURE" envDefault:"false"`
 	// DefaultWorkspaceID is the workspace public id (UUID v7) that
 	// inbound webhook signals are routed to as a fallback when the
 	// repo_workspace_mappings table has no entry for the repository.
@@ -236,17 +240,21 @@ func validateEnums(cfg *Config) error {
 		return fmt.Errorf("config: NF_FLOW_AGENT_QUEUE_BACKEND must be \"memory\" or \"mysql\", got %q", cfg.AgentQueueBackend)
 	}
 
-	// Warn when webhook signature verification secrets are not configured.
-	// These are not fatal because the server can still boot, but inbound
-	// webhook payloads will not be authenticated.
-	if cfg.GhWebhookSecret == "" {
-		slog.Warn("config: NF_FLOW_GH_WEBHOOK_SECRET is empty; GitHub webhook signature verification is disabled")
-	}
-	if cfg.SlackSigningSecret == "" {
-		slog.Warn("config: NF_FLOW_SLACK_SIGNING_SECRET is empty; Slack signature verification is disabled")
-	}
-	if cfg.GoogleChannelToken == "" {
-		slog.Warn("config: NF_FLOW_GOOGLE_CHANNEL_TOKEN is empty; Google push notification token verification is disabled")
+	// Webhook signature verification secrets must be non-empty when the
+	// corresponding webhook feature is reachable. Accept empty only when
+	// NF_FLOW_WEBHOOKS_INSECURE=true (local dev / CI).
+	if !cfg.WebhooksInsecure {
+		if cfg.GhWebhookSecret == "" {
+			return fmt.Errorf("config: NF_FLOW_GH_WEBHOOK_SECRET is required (set NF_FLOW_WEBHOOKS_INSECURE=true to disable)")
+		}
+		if cfg.SlackSigningSecret == "" {
+			return fmt.Errorf("config: NF_FLOW_SLACK_SIGNING_SECRET is required (set NF_FLOW_WEBHOOKS_INSECURE=true to disable)")
+		}
+		if cfg.GoogleChannelToken == "" {
+			return fmt.Errorf("config: NF_FLOW_GOOGLE_CHANNEL_TOKEN is required (set NF_FLOW_WEBHOOKS_INSECURE=true to disable)")
+		}
+	} else {
+		slog.Warn("config: NF_FLOW_WEBHOOKS_INSECURE=true; webhook signature verification is disabled")
 	}
 
 	return nil

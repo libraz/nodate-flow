@@ -91,6 +91,16 @@
 
 /* ── Command mode ───────────────────────────────── */
 
+.commandModeBody:focus {
+  outline: none;
+}
+
+.commandModeBody:focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: var(--nf-focus-ring-offset);
+  border-radius: var(--nf-radius-md);
+}
+
 .commandResult {
   padding: var(--nf-space-2) var(--nf-space-3);
   display: flex;

@@ -52,18 +52,20 @@ func (q *Queries) CreateFavorite(ctx context.Context, arg CreateFavoriteParams) 
 const disableFavorite = `-- name: DisableFavorite :exec
 UPDATE user_favorites
 SET enabled = FALSE
-WHERE public_id = ?
+WHERE workspace_id = ?
+  AND public_id = ?
   AND user_id = ?
 `
 
 type DisableFavoriteParams struct {
-	PublicID types.PublicID `json:"publicId"`
-	UserID   uint32         `json:"-"`
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+	UserID      uint32         `json:"-"`
 }
 
 // Soft-delete a favorite.
 func (q *Queries) DisableFavorite(ctx context.Context, arg DisableFavoriteParams) error {
-	_, err := q.db.ExecContext(ctx, disableFavorite, arg.PublicID, arg.UserID)
+	_, err := q.db.ExecContext(ctx, disableFavorite, arg.WorkspaceID, arg.PublicID, arg.UserID)
 	return err
 }
 
@@ -79,14 +81,16 @@ SELECT
   uf.sort_weight,
   uf.created_at
 FROM user_favorites uf
-WHERE uf.public_id = ?
+WHERE uf.workspace_id = ?
+  AND uf.public_id = ?
   AND uf.user_id = ?
   AND uf.enabled = TRUE
 `
 
 type FindFavoriteByPublicIdParams struct {
-	PublicID types.PublicID `json:"publicId"`
-	UserID   uint32         `json:"-"`
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+	UserID      uint32         `json:"-"`
 }
 
 type FindFavoriteByPublicIdRow struct {
@@ -103,7 +107,7 @@ type FindFavoriteByPublicIdRow struct {
 
 // Find a single favorite by public id.
 func (q *Queries) FindFavoriteByPublicId(ctx context.Context, arg FindFavoriteByPublicIdParams) (FindFavoriteByPublicIdRow, error) {
-	row := q.db.QueryRowContext(ctx, findFavoriteByPublicId, arg.PublicID, arg.UserID)
+	row := q.db.QueryRowContext(ctx, findFavoriteByPublicId, arg.WorkspaceID, arg.PublicID, arg.UserID)
 	var i FindFavoriteByPublicIdRow
 	err := row.Scan(
 		&i.ID,
@@ -122,13 +126,15 @@ func (q *Queries) FindFavoriteByPublicId(ctx context.Context, arg FindFavoriteBy
 const findFavoriteByTarget = `-- name: FindFavoriteByTarget :one
 SELECT id, public_id
 FROM user_favorites
-WHERE user_id = ?
+WHERE workspace_id = ?
+  AND user_id = ?
   AND target_type = ?
   AND target_public_id = ?
   AND enabled = TRUE
 `
 
 type FindFavoriteByTargetParams struct {
+	WorkspaceID    uint32                  `json:"-"`
 	UserID         uint32                  `json:"-"`
 	TargetType     UserFavoritesTargetType `json:"targetType"`
 	TargetPublicID types.PublicID          `json:"targetPublicId"`
@@ -141,7 +147,12 @@ type FindFavoriteByTargetRow struct {
 
 // Check if a user has already favorited this entity.
 func (q *Queries) FindFavoriteByTarget(ctx context.Context, arg FindFavoriteByTargetParams) (FindFavoriteByTargetRow, error) {
-	row := q.db.QueryRowContext(ctx, findFavoriteByTarget, arg.UserID, arg.TargetType, arg.TargetPublicID)
+	row := q.db.QueryRowContext(ctx, findFavoriteByTarget,
+		arg.WorkspaceID,
+		arg.UserID,
+		arg.TargetType,
+		arg.TargetPublicID,
+	)
 	var i FindFavoriteByTargetRow
 	err := row.Scan(&i.ID, &i.PublicID)
 	return i, err

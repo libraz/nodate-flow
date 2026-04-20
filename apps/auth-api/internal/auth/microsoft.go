@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"crypto/subtle"
 	"fmt"
 	"sync"
 
@@ -85,7 +86,7 @@ func (c *MicrosoftOIDCClient) Exchange(ctx context.Context, code, expectedNonce 
 	if err != nil {
 		return nil, fmt.Errorf("microsoft: oidc verify: %w", err)
 	}
-	if expectedNonce != "" && idTok.Nonce != expectedNonce {
+	if expectedNonce != "" && subtle.ConstantTimeCompare([]byte(idTok.Nonce), []byte(expectedNonce)) != 1 {
 		return nil, fmt.Errorf("microsoft: oidc nonce mismatch")
 	}
 	return idTok, nil

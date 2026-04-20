@@ -84,7 +84,8 @@ type ListFavoritesOutput struct {
 
 // DeleteFavoriteInput is the path for DELETE /me/favorites/{id}.
 type DeleteFavoriteInput struct {
-	ID string `path:"id" doc:"Favorite public id (UUID v7)"`
+	ID          string `path:"id" doc:"Favorite public id (UUID v7)"`
+	WorkspaceID string `query:"workspaceId" doc:"Workspace public id (UUID v7)" required:"true"`
 }
 
 // DeleteFavoriteOutput is the response for DELETE /me/favorites/{id}.

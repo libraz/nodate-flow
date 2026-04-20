@@ -1,0 +1,13 @@
+domain: integration_google
+breadcrumb: "Integration > Google"
+
+resources:
+  webhook:
+    breadcrumb: "Integration > Google > Webhook"
+    errors:
+      invalid_token:
+        code: INTEGRATION.GOOGLE.WEBHOOK_INVALID_TOKEN
+        status: 401
+        message: "Google push channel token verification failed"
+        description: "Returned when the X-Goog-Channel-Token header does not match the expected channel token configured for the integration."
+        userAction: "Verify that the channel token matches the one registered during push notification setup."

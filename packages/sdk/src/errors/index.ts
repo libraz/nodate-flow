@@ -7,6 +7,7 @@ export * from "./constraint.js";
 export * from "./export.js";
 export * from "./instance.js";
 export * from "./integration-gh.js";
+export * from "./integration-google.js";
 export * from "./integration-slack.js";
 export * from "./integrations.js";
 export * from "./internal.js";

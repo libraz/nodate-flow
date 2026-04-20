@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 )
@@ -25,6 +26,8 @@ func (p *PreFlight) ShouldSkip(ctx context.Context, workspaceID, agentID uint32)
 	if err != nil {
 		// No previous run or DB error — don't skip so the agent
 		// executes on its first invocation and on transient failures.
+		slog.WarnContext(ctx, "preflight: GetLastSuccessfulAgentRun failed, agent will run",
+			"workspace_id", workspaceID, "agent_id", agentID, "error", err)
 		return false, nil
 	}
 
@@ -33,6 +36,8 @@ func (p *PreFlight) ShouldSkip(ctx context.Context, workspaceID, agentID uint32)
 		OccurredAt:  lastRun,
 	})
 	if err != nil {
+		slog.WarnContext(ctx, "preflight: HasRecentEventsForWorkspace failed, agent will run",
+			"workspace_id", workspaceID, "agent_id", agentID, "error", err)
 		return false, nil
 	}
 

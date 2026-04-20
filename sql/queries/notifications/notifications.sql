@@ -76,6 +76,7 @@ LIMIT ? OFFSET ?;
 
 -- name: CountUnreadNotifications :one
 -- Count unread notifications for a user across all workspaces.
+-- Used by the global notification badge when no workspace is selected.
 SELECT COUNT(*) AS unread_count
 FROM notifications
 WHERE recipient_user_id = ?
