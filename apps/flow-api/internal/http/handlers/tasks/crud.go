@@ -124,6 +124,8 @@ func listTasksFiltered(
   v.public_id,
   v.project_public_id,
   v.project_name,
+  v.project_identifier,
+  v.task_number,
   v.parent_task_public_id,
   v.title,
   v.visibility,
@@ -131,7 +133,10 @@ func listTasksFiltered(
   v.priority,
   v.due_on,
   v.started_on,
+  v.event_on,
   v.completed_at,
+  v.archived_at,
+  v.label_ids,
   v.sort_weight,
   v.updated_at,
   v.created_at,
@@ -160,6 +165,8 @@ LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
 			&r.PublicID,
 			&r.ProjectPublicID,
 			&r.ProjectName,
+			&r.ProjectIdentifier,
+			&r.TaskNumber,
 			&r.ParentTaskPublicID,
 			&r.Title,
 			&r.Visibility,
@@ -167,7 +174,10 @@ LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
 			&r.Priority,
 			&r.DueOn,
 			&r.StartedOn,
+			&r.EventOn,
 			&r.CompletedAt,
+			&r.ArchivedAt,
+			&r.LabelIds,
 			&r.SortWeight,
 			&r.UpdatedAt,
 			&r.CreatedAt,
@@ -256,10 +266,24 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 		if in.Body.Visibility != "" {
 			vis = generated.TasksVisibility(in.Body.Visibility)
 		}
-		taskID, err := deps.Queries.CreateTask(ctx, generated.CreateTaskParams{
+
+		// Allocate next task number inside a transaction for gap-lock safety.
+		tx, err := deps.DB.BeginTx(ctx, nil)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		defer tx.Rollback() //nolint:errcheck
+		qtx := deps.Queries.WithTx(tx)
+		nextNum, err := qtx.AssignTaskNumber(ctx, prj.ID)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
+		taskID, err := qtx.CreateTask(ctx, generated.CreateTaskParams{
 			PublicID:        pub,
 			WorkspaceID:     prj.WorkspaceID,
 			ProjectID:       prj.ID,
+			TaskNumber:      uint32(nextNum),
 			ParentTaskID:    sql.NullInt32{},
 			CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
 			Title:           in.Body.Title,
@@ -271,6 +295,9 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 			Visibility:      vis,
 		})
 		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if err := tx.Commit(); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{

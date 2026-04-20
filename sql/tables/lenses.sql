@@ -17,6 +17,7 @@ CREATE TABLE lenses (
   public_token CHAR(32) CHARACTER SET latin1 NULL COMMENT 'Random hex token for public share URL',
   shared_at DATETIME NULL COMMENT 'Timestamp when first shared publicly',
   safety_checked_at DATETIME NULL COMMENT 'Timestamp of last AI safety check',
+  archived_at DATETIME NULL COMMENT 'Set when lens is archived (distinct from enabled)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
@@ -27,6 +28,7 @@ CREATE TABLE lenses (
   UNIQUE KEY uniq_lenses_public_id (public_id),
   UNIQUE KEY uniq_lenses_workspace_id_project_id_name_enabled (workspace_id, project_id, name, enabled),
   UNIQUE KEY uniq_lenses_public_token (public_token),
+  KEY idx_lenses_workspace_id_archived_at (workspace_id, archived_at),
   KEY idx_lenses_workspace_id_project_id_enabled (workspace_id, project_id, enabled),
   KEY idx_lenses_workspace_id_creator_id (workspace_id, creator_id),
 

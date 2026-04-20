@@ -80,6 +80,10 @@ type Task struct {
 	StartedOn                string `json:"startedOn,omitempty"`
 	EventOn                  string `json:"eventOn,omitempty"`
 	CompletedAt              *int64 `json:"completedAt,omitempty"`
+	ProjectIdentifier        string `json:"projectIdentifier,omitempty"`
+	TaskNumber               int32  `json:"taskNumber"`
+	ArchivedAt               *int64 `json:"archivedAt,omitempty"`
+	LabelCount               int64  `json:"labelCount"`
 	ConstraintCount          int64  `json:"constraintCount"`
 	ConstraintSatisfiedCount int64  `json:"constraintSatisfiedCount"`
 	DependencyCount          int64  `json:"dependencyCount"`
@@ -103,6 +107,10 @@ type TaskListItem struct {
 	StartedOn         string  `json:"startedOn,omitempty"`
 	EventOn           string  `json:"eventOn,omitempty"`
 	CompletedAt       *int64  `json:"completedAt,omitempty"`
+	ProjectIdentifier string  `json:"projectIdentifier,omitempty"`
+	TaskNumber        int32   `json:"taskNumber"`
+	ArchivedAt        *int64  `json:"archivedAt,omitempty"`
+	LabelIDs          string  `json:"labelIds,omitempty"`
 	SortWeight        int32   `json:"sortWeight"`
 	PrimaryAssigneeID *string `json:"primaryAssigneeId"`
 	AssigneeCount     int64   `json:"assigneeCount"`
@@ -759,4 +767,107 @@ type DownloadAttachmentOutputBody struct {
 // DownloadAttachmentOutput is the response for GET /tasks/{id}/attachments/{aid}/download.
 type DownloadAttachmentOutput struct {
 	Body DownloadAttachmentOutputBody
+}
+
+// ---- Archive I/O ----------------------------------------------------------
+
+// ArchiveTaskInput is the path for POST /tasks/{id}/archive.
+type ArchiveTaskInput struct {
+	ID string `path:"id"`
+}
+
+// ArchiveTaskOutput is the response for POST /tasks/{id}/archive.
+type ArchiveTaskOutput struct {
+	Body struct {
+		Ok bool `json:"ok"`
+	}
+}
+
+// UnarchiveTaskInput is the path for POST /tasks/{id}/unarchive.
+type UnarchiveTaskInput struct {
+	ID string `path:"id"`
+}
+
+// UnarchiveTaskOutput is the response for POST /tasks/{id}/unarchive.
+type UnarchiveTaskOutput struct {
+	Body struct {
+		Ok bool `json:"ok"`
+	}
+}
+
+// ListArchivedTasksInput is the query for GET /workspaces/{wsId}/tasks/archived.
+type ListArchivedTasksInput struct {
+	WsID   string `path:"wsId"`
+	Limit  int32  `query:"limit" minimum:"1" maximum:"200" default:"50"`
+	Offset int32  `query:"offset" minimum:"0" default:"0"`
+}
+
+// ListArchivedTasksBody is the response payload for GET /workspaces/{wsId}/tasks/archived.
+type ListArchivedTasksBody struct {
+	Total int64          `json:"total"`
+	Tasks []TaskListItem `json:"tasks"`
+}
+
+// ListArchivedTasksOutput is the response for GET /workspaces/{wsId}/tasks/archived.
+type ListArchivedTasksOutput struct {
+	Body ListArchivedTasksBody
+}
+
+// ---- Description Version History I/O --------------------------------------
+
+// DescriptionVersion is the public DTO for a description version row
+// without the full body (used in list responses).
+type DescriptionVersion struct {
+	ID                string `json:"id"`
+	VersionNumber     int    `json:"versionNumber"`
+	AuthorID          string `json:"authorId,omitempty"`
+	AuthorDisplayName string `json:"authorDisplayName,omitempty"`
+	BodyLength        int    `json:"bodyLength"`
+	CreatedAt         int64  `json:"createdAt"`
+}
+
+// DescriptionVersionFull is the public DTO for a description version
+// including the full body content.
+type DescriptionVersionFull struct {
+	DescriptionVersion
+	Body string `json:"body"`
+}
+
+// ListDescriptionVersionsInput is the path for GET /tasks/{id}/description-history.
+type ListDescriptionVersionsInput struct {
+	ID string `path:"id"`
+}
+
+// ListDescriptionVersionsBody is the response payload for GET /tasks/{id}/description-history.
+type ListDescriptionVersionsBody struct {
+	Versions []DescriptionVersion `json:"versions"`
+}
+
+// ListDescriptionVersionsOutput is the response for GET /tasks/{id}/description-history.
+type ListDescriptionVersionsOutput struct {
+	Body ListDescriptionVersionsBody
+}
+
+// GetDescriptionVersionInput is the path for GET /tasks/{id}/description-history/{versionId}.
+type GetDescriptionVersionInput struct {
+	ID        string `path:"id"`
+	VersionID string `path:"versionId"`
+}
+
+// GetDescriptionVersionOutput is the response for GET /tasks/{id}/description-history/{versionId}.
+type GetDescriptionVersionOutput struct {
+	Body DescriptionVersionFull
+}
+
+// RestoreDescriptionVersionInput is the path for POST /tasks/{id}/description-history/{versionId}/restore.
+type RestoreDescriptionVersionInput struct {
+	ID        string `path:"id"`
+	VersionID string `path:"versionId"`
+}
+
+// RestoreDescriptionVersionOutput is the response for POST /tasks/{id}/description-history/{versionId}/restore.
+type RestoreDescriptionVersionOutput struct {
+	Body struct {
+		Ok bool `json:"ok"`
+	}
 }

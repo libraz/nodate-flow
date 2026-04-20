@@ -56,6 +56,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/instance-stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get instance-level statistics */
+        get: operations["admin-instance-stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/sessions/{sessionId}": {
         parameters: {
             query?: never;
@@ -246,6 +263,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/magic-link/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Request a passwordless magic link */
+        post: operations["auth-magic-link-request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/magic-link/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Verify a magic link token and issue session */
+        get: operations["auth-magic-link-verify"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/oidc/github/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Complete a GitHub OAuth login flow */
+        get: operations["auth-oidc-github-callback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/oidc/github/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Start a GitHub OAuth login flow */
+        get: operations["auth-oidc-github-start"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/oidc/google/callback": {
         parameters: {
             query?: never;
@@ -272,6 +357,40 @@ export interface paths {
         };
         /** Start a Google OIDC login flow */
         get: operations["auth-oidc-google-start"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/oidc/microsoft/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Complete a Microsoft OIDC login flow */
+        get: operations["auth-oidc-microsoft-callback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/oidc/microsoft/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Start a Microsoft OIDC login flow */
+        get: operations["auth-oidc-microsoft-start"];
         put?: never;
         post?: never;
         delete?: never;
@@ -432,6 +551,41 @@ export interface paths {
         head?: never;
         /** Patch the authenticated user's profile */
         patch: operations["me-patch"];
+        trace?: never;
+    };
+    "/me/favorites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the caller's favorites */
+        get: operations["favorites-list"];
+        put?: never;
+        /** Add an item to favorites */
+        post: operations["favorites-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/favorites/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove an item from favorites */
+        delete: operations["favorites-delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/me/integrations": {
@@ -989,6 +1143,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive a task */
+        post: operations["tasks-archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{id}/attachments": {
         parameters: {
             query?: never;
@@ -1214,6 +1385,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/{id}/description-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List description version history for a task */
+        get: operations["tasks-description-history-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/description-history/{versionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a specific description version with full body */
+        get: operations["tasks-description-history-get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/description-history/{versionId}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore a previous description version */
+        post: operations["tasks-description-history-restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{id}/duplicates": {
         parameters: {
             query?: never;
@@ -1248,6 +1470,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/{id}/labels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List labels on a task */
+        get: operations["tasks-labels-list"];
+        put?: never;
+        /** Attach a label to a task */
+        post: operations["tasks-labels-add"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/labels/{labelId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a label from a task */
+        delete: operations["tasks-labels-remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{id}/propose-steps": {
         parameters: {
             query?: never;
@@ -1260,6 +1517,41 @@ export interface paths {
         /** AI-powered step decomposition for a task */
         post: operations["tasks-propose-steps"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/reactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List reactions on a task */
+        get: operations["tasks-reactions-list"];
+        put?: never;
+        /** Add a reaction to a task */
+        post: operations["tasks-reactions-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/reactions/{reactionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a reaction from a task */
+        delete: operations["tasks-reactions-delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1327,6 +1619,23 @@ export interface paths {
         put?: never;
         /** Apply a state machine transition to a task */
         post: operations["tasks-transitions-apply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unarchive a task */
+        post: operations["tasks-unarchive"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1909,6 +2218,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{wsId}/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List import jobs for the workspace */
+        get: operations["imports-list"];
+        put?: never;
+        /** Create an import job */
+        post: operations["imports-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/imports/{importId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a single import job */
+        get: operations["imports-get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/imports/{importId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel a pending or running import job */
+        post: operations["imports-cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{wsId}/inbox/triage": {
         parameters: {
             query?: never;
@@ -1920,6 +2281,59 @@ export interface paths {
         put?: never;
         /** Ask the AI orchestrator to score and recommend actions for inbox items */
         post: operations["inbox-triage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/intake": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List intake items in the triage queue */
+        get: operations["intake-list"];
+        put?: never;
+        /** Create an intake item */
+        post: operations["intake-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/intake/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a single intake item */
+        get: operations["intake-get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Triage an intake item (accept, reject, snooze, or mark duplicate) */
+        patch: operations["intake-triage"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/intake/{id}/convert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Convert an intake item into a task */
+        post: operations["intake-convert"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1959,6 +2373,43 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/labels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List labels in a workspace */
+        get: operations["labels-list"];
+        put?: never;
+        /** Create a label */
+        post: operations["labels-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/labels/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fetch a label */
+        get: operations["labels-get"];
+        put?: never;
+        post?: never;
+        /** Soft-disable a label */
+        delete: operations["labels-disable"];
+        options?: never;
+        head?: never;
+        /** Update a label */
+        patch: operations["labels-patch"];
         trace?: never;
     };
     "/workspaces/{wsId}/lenses": {
@@ -2254,6 +2705,23 @@ export interface paths {
         put?: never;
         /** Apply AI proposal — create parent task with subtasks and assignees */
         post: operations["tasks-apply-smart"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/tasks/archived": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List archived tasks in a workspace */
+        get: operations["tasks-archived-list"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2585,6 +3053,15 @@ export interface components {
             /** @description Target task public id (UUID v7) */
             toTaskId: string;
         };
+        AddTaskLabelBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Label public id (UUID v7) */
+            labelId: string;
+        };
         AddTaskOutputBody: {
             /**
              * Format: uri
@@ -2846,6 +3323,14 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        ArchiveTaskOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
         AssigneeSuggestion: {
             /** Format: double */
             confidence: number;
@@ -2919,6 +3404,14 @@ export interface components {
             /** Format: int64 */
             updatedAt?: number;
             visible: boolean;
+        };
+        CancelImportOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
         };
         ChangePasswordInputBody: {
             /**
@@ -3008,6 +3501,25 @@ export interface components {
             provider: "github" | "slack" | "google_calendar";
             scopes: string;
         };
+        ConvertIntakeItemBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Project public id (UUID v7) to create the task in */
+            projectId: string;
+        };
+        ConvertIntakeItemOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+            /** @description Public id of the created task */
+            taskId: string;
+        };
         Cookie: {
             Domain: string;
             /** Format: date-time */
@@ -3076,6 +3588,35 @@ export interface components {
             timezone: string;
             title: string;
         };
+        CreateFavoriteBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            folderName?: string;
+            /** @description Public id (UUID v7) of the entity to favorite */
+            targetId: string;
+            /** @enum {string} */
+            targetType: "project" | "task" | "page" | "lens" | "timebox";
+            /** @description Workspace public id (UUID v7) */
+            workspaceId: string;
+        };
+        CreateImportBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Source-specific configuration */
+            configJson?: {
+                [key: string]: unknown;
+            };
+            /** @description Target project public id (UUID v7) */
+            projectId?: string;
+            /** @enum {string} */
+            source: "github" | "jira" | "linear" | "csv";
+        };
         CreateInputBody: {
             /**
              * Format: uri
@@ -3088,6 +3629,30 @@ export interface components {
             eventTypes: unknown;
             /** @description Target URL for webhook delivery */
             url: string;
+        };
+        CreateIntakeItemBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            body?: string;
+            title: string;
+        };
+        CreateLabelBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @default #6b7280 */
+            color: string;
+            description?: string;
+            name: string;
+            /** @description Parent label public id for hierarchy */
+            parentLabelId?: string;
+            /** @description Project public id to scope label (omit for workspace-wide) */
+            projectId?: string;
         };
         CreateLensBody: {
             /**
@@ -3160,6 +3725,8 @@ export interface components {
             readonly $schema?: string;
             color?: string;
             description?: string;
+            /** @description Human-readable project key (e.g. NF) */
+            identifier?: string;
             name: string;
             slug: string;
         };
@@ -3176,6 +3743,14 @@ export interface components {
             /** @enum {string} */
             kind: "anthropic" | "openai" | "google" | "ollama" | "openai_compat";
             name: string;
+        };
+        CreateReactionBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            emoji: string;
         };
         CreateTaskBody: {
             /**
@@ -3284,6 +3859,14 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        DeleteFavoriteOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
         DeleteLensBody: {
             /**
              * Format: uri
@@ -3324,6 +3907,14 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        DeleteReactionOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
         DeleteTaskAttachmentBody: {
             /**
              * Format: uri
@@ -3349,6 +3940,42 @@ export interface components {
             ok: boolean;
         };
         DeleteWidgetBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        DescriptionVersion: {
+            authorDisplayName?: string;
+            authorId?: string;
+            /** Format: int64 */
+            bodyLength: number;
+            /** Format: int64 */
+            createdAt: number;
+            id: string;
+            /** Format: int64 */
+            versionNumber: number;
+        };
+        DescriptionVersionFull: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            authorDisplayName?: string;
+            authorId?: string;
+            body: string;
+            /** Format: int64 */
+            bodyLength: number;
+            /** Format: int64 */
+            createdAt: number;
+            id: string;
+            /** Format: int64 */
+            versionNumber: number;
+        };
+        DisableLabelOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
@@ -3552,6 +4179,22 @@ export interface components {
              */
             updatedAt?: number;
         };
+        Favorite: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            createdAt: number;
+            folderName?: string;
+            /** @description Favorite public id (UUID v7) */
+            id: string;
+            /** Format: int32 */
+            sortWeight: number;
+            targetId: string;
+            targetType: string;
+        };
         GeneratePageBody: {
             /**
              * Format: uri
@@ -3605,6 +4248,30 @@ export interface components {
              */
             readonly $schema?: string;
             status: string;
+        };
+        ImportJobBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            completedAt?: number;
+            /** Format: int64 */
+            createdAt: number;
+            errorLog?: string;
+            /** Format: int64 */
+            failedItems: number;
+            /** @description Import job public id (UUID v7) */
+            id: string;
+            /** Format: int64 */
+            processedItems: number;
+            source: string;
+            /** Format: int64 */
+            startedAt?: number;
+            status: string;
+            /** Format: int64 */
+            totalItems: number;
         };
         InboxItem: {
             /** Format: int64 */
@@ -3681,6 +4348,39 @@ export interface components {
             updatedAt?: number;
             value: string;
         };
+        InstanceStatsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            totalUsers: number;
+            /** Format: int64 */
+            totalWorkspaces: number;
+        };
+        IntakeItem: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            aiReasoning?: string;
+            /** Format: double */
+            aiScore?: number;
+            body?: string;
+            /** Format: int64 */
+            createdAt: number;
+            /** @description Intake item public id (UUID v7) */
+            id: string;
+            /** Format: int64 */
+            snoozeUntil?: number;
+            taskId?: string;
+            title: string;
+            triageStatus: string;
+            triagedByDisplayName?: string;
+            triagedByUserId?: string;
+        };
         InviteInfoOutputBody: {
             /**
              * Format: uri
@@ -3691,6 +4391,26 @@ export interface components {
             expiresAt?: number;
             role: string;
             workspaceName: string;
+        };
+        Label: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            color: string;
+            /** Format: int64 */
+            createdAt: number;
+            description?: string;
+            /** @description Label public id (UUID v7) */
+            id: string;
+            name: string;
+            parentLabelId?: string;
+            projectId?: string;
+            /** Format: int32 */
+            sortWeight: number;
+            /** Format: int64 */
+            updatedAt?: number;
         };
         Lens: {
             filter: {
@@ -3718,6 +4438,16 @@ export interface components {
              */
             readonly $schema?: string;
             agents: components["schemas"]["AgentSummary"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
+        ListArchivedTasksBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            tasks: components["schemas"]["TaskListItem"][] | null;
             /** Format: int64 */
             total: number;
         };
@@ -3770,6 +4500,14 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ListDescriptionVersionsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            versions: components["schemas"]["DescriptionVersion"][] | null;
+        };
         ListDuplicatesOutputBody: {
             /**
              * Format: uri
@@ -3787,6 +4525,16 @@ export interface components {
              */
             readonly $schema?: string;
             events: components["schemas"]["EventDTO"][] | null;
+        };
+        ListFavoritesBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            favorites: components["schemas"]["Favorite"][] | null;
+            /** Format: int64 */
+            total: number;
         };
         ListForTaskBody: {
             /**
@@ -3807,6 +4555,17 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ListImportsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["ImportJobBody"][] | null;
+            nextCursor: string | null;
+            /** Format: int64 */
+            total: number;
+        };
         ListInboxOutputBody: {
             /**
              * Format: uri
@@ -3814,6 +4573,17 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["InboxItem"][] | null;
+            nextCursor: string | null;
+            /** Format: int64 */
+            total: number;
+        };
+        ListIntakeItemsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["IntakeItem"][] | null;
             nextCursor: string | null;
             /** Format: int64 */
             total: number;
@@ -3833,6 +4603,16 @@ export interface components {
              */
             readonly $schema?: string;
             invocations: components["schemas"]["AiInvocation"][] | null;
+        };
+        ListLabelsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            labels: components["schemas"]["Label"][] | null;
+            /** Format: int64 */
+            total: number;
         };
         ListLensesBody: {
             /**
@@ -3945,6 +4725,14 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ListReactionsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            reactions: components["schemas"]["Reaction"][] | null;
+        };
         ListRemindersOutputBody: {
             /**
              * Format: uri
@@ -4040,6 +4828,14 @@ export interface components {
             readonly $schema?: string;
             incoming: components["schemas"]["TaskDependencyEdge"][] | null;
             outgoing: components["schemas"]["TaskDependencyEdge"][] | null;
+        };
+        ListTaskLabelsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            labels: components["schemas"]["TaskLabel"][] | null;
         };
         ListTasksBody: {
             /**
@@ -4205,6 +5001,23 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        MagicLinkRequestInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: email */
+            email: string;
+        };
+        MagicLinkRequestOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
         MarkAllReadOutputBody: {
             /**
              * Format: uri
@@ -4310,7 +5123,6 @@ export interface components {
              */
             readonly $schema?: string;
             authorizationUrl: string;
-            nonce: string;
             state: string;
         };
         OutboundLimitStat: {
@@ -4434,6 +5246,19 @@ export interface components {
             startAt?: string;
             timezone?: string;
             title?: string;
+        };
+        PatchLabelBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            color?: string;
+            description?: string;
+            name?: string;
+            parentLabelId?: string;
+            /** Format: int32 */
+            sortWeight?: number;
         };
         PatchMeInputBody: {
             /**
@@ -4604,8 +5429,13 @@ export interface components {
             description?: string;
             /** @description YYYY-MM-DD */
             endedOn?: string;
+            featureCalendar: boolean;
+            featureLenses: boolean;
+            featurePages: boolean;
+            featureTimeboxes: boolean;
             /** @description Project public id (UUID v7) */
             id: string;
+            identifier: string;
             isArchived: boolean;
             name: string;
             slug: string;
@@ -4726,6 +5556,20 @@ export interface components {
             /** @description 32-char hex token for the public share URL */
             publicToken: string;
         };
+        Reaction: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            createdAt: number;
+            emoji: string;
+            /** @description Reaction public id (UUID v7) */
+            id: string;
+            userDisplayName: string;
+            userId: string;
+        };
         RegisterInputBody: {
             /**
              * Format: uri
@@ -4763,6 +5607,14 @@ export interface components {
             ok: boolean;
         };
         RemoveTaskDependencyBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        RemoveTaskLabelOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
@@ -4864,6 +5716,14 @@ export interface components {
             tool: string;
         };
         ResolveOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        RestoreDescriptionVersionOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
@@ -5085,6 +5945,8 @@ export interface components {
             /** Format: int64 */
             actorCount: number;
             /** Format: int64 */
+            archivedAt?: number;
+            /** Format: int64 */
             completedAt?: number;
             /** Format: int64 */
             constraintCount: number;
@@ -5100,14 +5962,19 @@ export interface components {
             dueOn?: string;
             eventOn?: string;
             id: string;
+            /** Format: int64 */
+            labelCount: number;
             parentTaskId?: string;
             /** Format: int32 */
             priority: number;
             projectId: string;
+            projectIdentifier?: string;
             projectName?: string;
             /** Format: int32 */
             sortWeight: number;
             startedOn?: string;
+            /** Format: int32 */
+            taskNumber: number;
             title: string;
             /** Format: int64 */
             updatedAt?: number;
@@ -5256,7 +6123,25 @@ export interface components {
             otherTaskId: string;
             otherTaskTitle: string;
         };
+        TaskLabel: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            color: string;
+            /** Format: int64 */
+            createdAt: number;
+            description?: string;
+            /** @description Label public id (UUID v7) */
+            id: string;
+            name: string;
+            /** Format: int32 */
+            sortWeight: number;
+        };
         TaskListItem: {
+            /** Format: int64 */
+            archivedAt?: number;
             /** Format: int64 */
             assigneeCount: number;
             /** Format: int64 */
@@ -5267,15 +6152,19 @@ export interface components {
             dueOn?: string;
             eventOn?: string;
             id: string;
+            labelIds?: string;
             parentTaskId?: string;
             primaryAssigneeId: string | null;
             /** Format: int32 */
             priority: number;
             projectId: string;
+            projectIdentifier?: string;
             projectName?: string;
             /** Format: int32 */
             sortWeight: number;
             startedOn?: string;
+            /** Format: int32 */
+            taskNumber: number;
             title: string;
             /** Format: int64 */
             updatedAt?: number;
@@ -5479,6 +6368,20 @@ export interface components {
              */
             transition: "start" | "block" | "unblock" | "submit" | "complete" | "reopen" | "cancel";
         };
+        TriageIntakeItemBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description Unix seconds timestamp for snooze expiry
+             */
+            snoozeUntil?: number;
+            /** @enum {string} */
+            status: "accepted" | "rejected" | "snoozed" | "duplicate";
+        };
         TriggerAgentOutputBody: {
             /**
              * Format: uri
@@ -5486,6 +6389,14 @@ export interface components {
              */
             readonly $schema?: string;
             dedupeKey: string;
+            ok: boolean;
+        };
+        UnarchiveTaskOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
             ok: boolean;
         };
         UnpublishLensBody: {
@@ -5916,6 +6827,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RevokeAdminOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "admin-instance-stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstanceStatsOutputBody"];
                 };
             };
             /** @description Error */
@@ -6391,12 +7331,142 @@ export interface operations {
             };
         };
     };
+    "auth-magic-link-request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MagicLinkRequestInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MagicLinkRequestOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "auth-magic-link-verify": {
+        parameters: {
+            query?: {
+                token?: string;
+            };
+            header?: {
+                "User-Agent"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthTokens"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "auth-oidc-github-callback": {
+        parameters: {
+            query?: {
+                code?: string;
+                state?: string;
+            };
+            header?: {
+                "User-Agent"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthTokens"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "auth-oidc-github-start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OIDCStartOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "auth-oidc-google-callback": {
         parameters: {
             query?: {
                 code?: string;
                 state?: string;
-                nonce?: string;
             };
             header?: {
                 "User-Agent"?: string;
@@ -6428,6 +7498,70 @@ export interface operations {
         };
     };
     "auth-oidc-google-start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OIDCStartOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "auth-oidc-microsoft-callback": {
+        parameters: {
+            query?: {
+                code?: string;
+                state?: string;
+            };
+            header?: {
+                "User-Agent"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthTokens"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "auth-oidc-microsoft-start": {
         parameters: {
             query?: never;
             header?: never;
@@ -6772,6 +7906,105 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "favorites-list": {
+        parameters: {
+            query?: {
+                /** @description Workspace public id (UUID v7) to scope favorites */
+                workspaceId?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListFavoritesBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "favorites-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateFavoriteBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Favorite"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "favorites-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Favorite public id (UUID v7) */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteFavoriteOutputBody"];
                 };
             };
             /** @description Error */
@@ -8204,6 +9437,37 @@ export interface operations {
             };
         };
     };
+    "tasks-archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArchiveTaskOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "tasks-attachments-list": {
         parameters: {
             query?: {
@@ -8775,6 +10039,101 @@ export interface operations {
             };
         };
     };
+    "tasks-description-history-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListDescriptionVersionsBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-description-history-get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                versionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DescriptionVersionFull"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-description-history-restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                versionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestoreDescriptionVersionOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "tasks-duplicates-list": {
         parameters: {
             query?: never;
@@ -8837,6 +10196,104 @@ export interface operations {
             };
         };
     };
+    "tasks-labels-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListTaskLabelsBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-labels-add": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddTaskLabelBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskLabel"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-labels-remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                labelId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoveTaskLabelOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "tasks-propose-steps": {
         parameters: {
             query?: never;
@@ -8859,6 +10316,108 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProposeStepsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-reactions-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Task public id (UUID v7) */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListReactionsBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-reactions-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Task public id (UUID v7) */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReactionBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Reaction"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-reactions-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Task public id (UUID v7) */
+                id: string;
+                /** @description Reaction public id (UUID v7) */
+                reactionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteReactionOutputBody"];
                 };
             };
             /** @description Error */
@@ -8997,6 +10556,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Task"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnarchiveTaskOutputBody"];
                 };
             };
             /** @description Error */
@@ -10515,6 +12105,139 @@ export interface operations {
             };
         };
     };
+    "imports-list": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListImportsBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "imports-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateImportBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportJobBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "imports-get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                importId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportJobBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "imports-cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                importId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CancelImportOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "inbox-triage": {
         parameters: {
             query?: never;
@@ -10537,6 +12260,181 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InboxTriageOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "intake-list": {
+        parameters: {
+            query?: {
+                /** @description Filter by triage status: pending, accepted, rejected, snoozed, duplicate */
+                status?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListIntakeItemsBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "intake-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateIntakeItemBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeItem"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "intake-get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeItem"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "intake-triage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TriageIntakeItemBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeItem"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "intake-convert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConvertIntakeItemBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConvertIntakeItemOutputBody"];
                 };
             };
             /** @description Error */
@@ -10638,6 +12536,177 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RevokeWorkspaceInviteOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "labels-list": {
+        parameters: {
+            query?: {
+                /** @description Optional project public id to filter */
+                projectId?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListLabelsBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "labels-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLabelBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Label"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "labels-get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Label"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "labels-disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisableLabelOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "labels-patch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchLabelBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Label"];
                 };
             };
             /** @description Error */
@@ -11557,6 +13626,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApplySmartOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-archived-list": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListArchivedTasksBody"];
                 };
             };
             /** @description Error */

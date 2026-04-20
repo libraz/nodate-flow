@@ -367,6 +367,8 @@ const findLocalIdentityByUserId = `-- name: FindLocalIdentityByUserId :one
 SELECT
   id,
   password_hash,
+  failed_attempts,
+  locked_until_at,
   mfa_secret_ciphertext,
   mfa_confirmed_at
 FROM identities
@@ -379,19 +381,24 @@ LIMIT 1
 type FindLocalIdentityByUserIdRow struct {
 	ID                  uint32         `json:"-"`
 	PasswordHash        sql.NullString `json:"passwordHash"`
+	FailedAttempts      uint32         `json:"failedAttempts"`
+	LockedUntilAt       sql.NullTime   `json:"lockedUntilAt"`
 	MfaSecretCiphertext sql.NullString `json:"mfaSecretCiphertext"`
 	MfaConfirmedAt      sql.NullTime   `json:"mfaConfirmedAt"`
 }
 
 // Resolve a local-password identity by internal user id. Used by
-// /me/password to verify the caller's current password and by the
-// TOTP handlers to read / write mfa_secret_ciphertext.
+// /me/password to verify the caller's current password, by the
+// TOTP handlers to read / write mfa_secret_ciphertext, and by
+// LoginTotp to enforce brute-force lockout on 2FA attempts.
 func (q *Queries) FindLocalIdentityByUserId(ctx context.Context, userID uint32) (FindLocalIdentityByUserIdRow, error) {
 	row := q.db.QueryRowContext(ctx, findLocalIdentityByUserId, userID)
 	var i FindLocalIdentityByUserIdRow
 	err := row.Scan(
 		&i.ID,
 		&i.PasswordHash,
+		&i.FailedAttempts,
+		&i.LockedUntilAt,
 		&i.MfaSecretCiphertext,
 		&i.MfaConfirmedAt,
 	)

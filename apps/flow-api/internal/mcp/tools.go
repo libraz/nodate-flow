@@ -441,6 +441,203 @@ func registerTools(h *Handler) {
 		}, []string{"text", "calendarId"}),
 		run: runSmartCreateEvent,
 	})
+
+	// Label & archive tools.
+	h.register(tool{
+		name:          "list_labels",
+		description:   "List labels in the caller's workspace.",
+		requiredScope: "read:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"limit":  intSchema("Max number of rows (1..200)."),
+			"offset": intSchema("Row offset."),
+		}, nil),
+		run: runListLabels,
+	})
+	h.register(tool{
+		name:          "create_label",
+		description:   "Create a new label in the workspace.",
+		requiredScope: "write:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"name":        stringSchema("Label name."),
+			"color":       stringSchema("Hex color (e.g. #ef4444). Optional."),
+			"description": stringSchema("Optional description."),
+		}, []string{"name"}),
+		run: runCreateLabel,
+	})
+	h.register(tool{
+		name:          "add_task_label",
+		description:   "Attach a label to a task.",
+		requiredScope: "write:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"taskId":  stringSchema("Task public id (UUID v7)."),
+			"labelId": stringSchema("Label public id (UUID v7)."),
+		}, []string{"taskId", "labelId"}),
+		run: runAddTaskLabel,
+	})
+	h.register(tool{
+		name:          "remove_task_label",
+		description:   "Remove a label from a task.",
+		requiredScope: "write:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"taskId":  stringSchema("Task public id (UUID v7)."),
+			"labelId": stringSchema("Label public id (UUID v7)."),
+		}, []string{"taskId", "labelId"}),
+		run: runRemoveTaskLabel,
+	})
+	h.register(tool{
+		name:          "resolve_task_ref",
+		description:   "Resolve a human-readable task reference (e.g. NF-42) to a task public id.",
+		requiredScope: "read:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"ref": stringSchema("Task reference in PROJECT_IDENTIFIER-NUMBER format (e.g. NF-42)."),
+		}, []string{"ref"}),
+		run: runResolveTaskRef,
+	})
+	h.register(tool{
+		name:          "archive_task",
+		description:   "Archive a task.",
+		requiredScope: "write:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"taskId": stringSchema("Task public id (UUID v7)."),
+		}, []string{"taskId"}),
+		run: runArchiveTask,
+	})
+	h.register(tool{
+		name:          "unarchive_task",
+		description:   "Unarchive a task.",
+		requiredScope: "write:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"taskId": stringSchema("Task public id (UUID v7)."),
+		}, []string{"taskId"}),
+		run: runUnarchiveTask,
+	})
+
+	// Favorites, reactions, and recent visits (Wave 2).
+	h.register(tool{
+		name:          "list_favorites",
+		description:   "List the current user's favorite items in the workspace.",
+		requiredScope: "read:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"limit":  intSchema("Max results (1..50, default 50)."),
+			"offset": intSchema("Skip N results."),
+		}, nil),
+		run: runListFavorites,
+	})
+	h.register(tool{
+		name:          "add_favorite",
+		description:   "Add a task, project, page, lens, or timebox to the user's favorites.",
+		requiredScope: "write:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"targetType": stringSchema("Entity type: project, task, page, lens, or timebox."),
+			"targetId":   stringSchema("Public ID of the entity to favorite."),
+		}, []string{"targetType", "targetId"}),
+		run: runAddFavorite,
+	})
+	h.register(tool{
+		name:          "add_reaction",
+		description:   "Add an emoji reaction to a task.",
+		requiredScope: "write:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"taskId": stringSchema("Task public id (UUID v7)."),
+			"emoji":  stringSchema("Unicode emoji character."),
+		}, []string{"taskId", "emoji"}),
+		run: runAddReaction,
+	})
+	h.register(tool{
+		name:          "list_reactions",
+		description:   "List emoji reactions on a task.",
+		requiredScope: "read:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"taskId": stringSchema("Task public id (UUID v7)."),
+		}, []string{"taskId"}),
+		run: runListReactions,
+	})
+	h.register(tool{
+		name:          "list_recent",
+		description:   "List the user's recently visited entities in the workspace.",
+		requiredScope: "read:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"limit": intSchema("Max results (1..20, default 20)."),
+		}, nil),
+		run: runListRecent,
+	})
+
+	// Intake triage and description version history (Wave 3).
+	h.register(tool{
+		name:          "list_intake_items",
+		description:   "List intake items in the workspace triage queue.",
+		requiredScope: "read:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"status": stringSchema("Filter by triage status: pending, accepted, rejected, snoozed, duplicate. Optional."),
+			"limit":  intSchema("Max results (1..200, default 50)."),
+			"offset": intSchema("Skip N results."),
+		}, nil),
+		run: runListIntakeItems,
+	})
+	h.register(tool{
+		name:          "triage_intake_item",
+		description:   "Accept, reject, snooze, or mark as duplicate an intake item.",
+		requiredScope: "write:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"intakeItemId": stringSchema("Intake item public id (UUID v7)."),
+			"status":       stringSchema("Triage decision: accepted, rejected, snoozed, or duplicate."),
+			"snoozeUntil":  intSchema("Unix seconds timestamp for snooze expiry (required when status is snoozed)."),
+		}, []string{"intakeItemId", "status"}),
+		run: runTriageIntakeItem,
+	})
+	h.register(tool{
+		name:          "convert_intake_to_task",
+		description:   "Convert an intake item into a task in a specified project.",
+		requiredScope: "write:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"intakeItemId": stringSchema("Intake item public id (UUID v7)."),
+			"projectId":    stringSchema("Project public id (UUID v7) to create the task in."),
+		}, []string{"intakeItemId", "projectId"}),
+		run: runConvertIntakeToTask,
+	})
+	h.register(tool{
+		name:          "list_description_versions",
+		description:   "List description version history for a task (newest first, without body).",
+		requiredScope: "read:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"taskId": stringSchema("Task public id (UUID v7)."),
+		}, []string{"taskId"}),
+		run: runListDescriptionVersions,
+	})
+	h.register(tool{
+		name:          "restore_description_version",
+		description:   "Restore a previous description version, updating the task description and creating a new version snapshot.",
+		requiredScope: "write:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"taskId":    stringSchema("Task public id (UUID v7)."),
+			"versionId": stringSchema("Description version public id (UUID v7) to restore."),
+		}, []string{"taskId", "versionId"}),
+		run: runRestoreDescriptionVersion,
+	})
+
+	// Import job management (Wave 4).
+	h.register(tool{
+		name:          "list_import_jobs",
+		description:   "List import jobs for the workspace.",
+		requiredScope: "read:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"status": stringSchema("Filter by status: pending, running, completed, failed, cancelled. Optional."),
+			"limit":  intSchema("Max results (1..200, default 50)."),
+			"offset": intSchema("Skip N results."),
+		}, nil),
+		run: runListImportJobs,
+	})
+	h.register(tool{
+		name:          "create_import_job",
+		description:   "Create a new import job.",
+		requiredScope: "write:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"source":     stringSchema("Import source: github, jira, linear, or csv."),
+			"projectId":  stringSchema("Project public id (UUID v7) to import into. Optional."),
+			"configJson": stringSchema("JSON string with source-specific configuration. Optional."),
+		}, []string{"source"}),
+		run: runCreateImportJob,
+	})
 }
 
 // ----------------------------------------------------------------------------

@@ -205,8 +205,15 @@ func (e *Executor) processWorkspaceWithThreshold(ctx context.Context, wsID uint3
 	// tasks need scanning.
 	minIdleHours := uint32(0)
 	hasIdleRule := false
+	archiveEnabled := false
 	for _, r := range rules {
-		if !r.Enabled || r.IdleHours == 0 {
+		if !r.Enabled {
+			continue
+		}
+		if r.Kind == KindAutoArchiveCompleted {
+			archiveEnabled = true
+		}
+		if r.IdleHours == 0 {
 			continue
 		}
 		if !hasIdleRule || r.IdleHours < minIdleHours {
@@ -216,9 +223,15 @@ func (e *Executor) processWorkspaceWithThreshold(ctx context.Context, wsID uint3
 	}
 
 	// Build the task query with the dynamic idle threshold.
+	// When auto-archive is enabled, also include done/cancelled tasks
+	// that have not been archived yet.
 	idleInterval := "1 DAY" // fallback
 	if hasIdleRule && minIdleHours > 0 {
 		idleInterval = fmt.Sprintf("%d HOUR", minIdleHours)
+	}
+	stateFilter := "AND t.derived_state NOT IN ('done', 'cancelled')"
+	if archiveEnabled {
+		stateFilter = "AND (t.derived_state NOT IN ('done', 'cancelled') OR (t.derived_state IN ('done', 'cancelled') AND t.archived_at IS NULL))"
 	}
 	dynamicTaskQuery := fmt.Sprintf(`
 SELECT t.id, t.public_id, t.workspace_id, t.title, t.derived_state,
@@ -226,14 +239,14 @@ SELECT t.id, t.public_id, t.workspace_id, t.title, t.derived_state,
        EXISTS(SELECT 1 FROM task_actors ta WHERE ta.task_id = t.id AND ta.kind = 'assignee') AS has_assignee
 FROM tasks t
 WHERE t.workspace_id = ? AND t.enabled = TRUE
-  AND t.derived_state NOT IN ('done', 'cancelled')
+  %s
   AND (
     (t.due_on IS NOT NULL AND t.due_on < CURDATE())
     OR
     COALESCE(t.updated_at, t.created_at) < NOW() - INTERVAL %s
   )
 LIMIT 200
-`, idleInterval)
+`, stateFilter, idleInterval)
 
 	rows, err := e.DB.QueryContext(ctx, dynamicTaskQuery, wsID)
 	if err != nil {
@@ -291,6 +304,10 @@ func (e *Executor) applyAction(ctx context.Context, r taskRow, act *Action) {
 		e.escalate(ctx, r, act)
 	case KindCloseStaleReview:
 		e.closeStaleReview(ctx, r, act)
+	case KindAutoArchiveCompleted:
+		e.autoArchive(ctx, r, act)
+	case KindAutoCloseStale:
+		e.autoClose(ctx, r, act)
 	case KindAssignOwner, KindNudgeAssignee:
 		// These require human judgment (who to assign, how to nudge).
 		// Record an event so Glass Dock can surface them, but don't
@@ -399,6 +416,80 @@ func (e *Executor) recordProposal(ctx context.Context, r taskRow, act *Action) {
 	); err != nil {
 		e.Logger.Error("auto-action executor: record proposal", "task", r.publicID.String(), "err", err)
 	}
+}
+
+// autoArchive sets archived_at on a completed/cancelled task that has
+// been idle longer than the configured threshold.
+func (e *Executor) autoArchive(ctx context.Context, r taskRow, act *Action) {
+	tx, err := e.DB.BeginTx(ctx, nil)
+	if err != nil {
+		e.Logger.Error("auto-action executor: begin tx", "err", err)
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.ExecContext(ctx,
+		"UPDATE tasks SET archived_at = NOW(), updated_at = NOW() WHERE id = ? AND archived_at IS NULL",
+		r.id,
+	); err != nil {
+		e.Logger.Error("auto-action executor: archive task", "task", r.publicID.String(), "err", err)
+		return
+	}
+
+	payload, _ := json.Marshal(map[string]any{
+		"auto_action": string(act.Kind),
+		"reason":      act.Reason,
+	})
+	if err := e.appendEvent(ctx, tx, r, "task.archived", payload); err != nil {
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		e.Logger.Error("auto-action executor: commit", "task", r.publicID.String(), "err", err)
+		return
+	}
+	e.Logger.Info("auto-action applied: auto-archive",
+		"task", r.publicID.String(),
+		"state", r.derivedState,
+	)
+}
+
+// autoClose cancels a stale open task that has had no activity beyond
+// the configured threshold.
+func (e *Executor) autoClose(ctx context.Context, r taskRow, act *Action) {
+	tx, err := e.DB.BeginTx(ctx, nil)
+	if err != nil {
+		e.Logger.Error("auto-action executor: begin tx", "err", err)
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.ExecContext(ctx,
+		"UPDATE tasks SET derived_state = 'cancelled', updated_at = NOW() WHERE id = ?",
+		r.id,
+	); err != nil {
+		e.Logger.Error("auto-action executor: close stale task", "task", r.publicID.String(), "err", err)
+		return
+	}
+
+	payload, _ := json.Marshal(map[string]any{
+		"auto_action": string(act.Kind),
+		"from":        r.derivedState,
+		"to":          "cancelled",
+		"reason":      act.Reason,
+	})
+	if err := e.appendEvent(ctx, tx, r, "task.transition.cancel", payload); err != nil {
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		e.Logger.Error("auto-action executor: commit", "task", r.publicID.String(), "err", err)
+		return
+	}
+	e.Logger.Info("auto-action applied: auto-close stale",
+		"task", r.publicID.String(),
+		"from", r.derivedState,
+	)
 }
 
 func (e *Executor) appendEvent(ctx context.Context, tx *sql.Tx, r taskRow, eventType string, payload json.RawMessage) error {

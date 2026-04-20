@@ -1,0 +1,200 @@
+{
+  "title": "ラベル",
+  "new": "新規ラベル",
+  "empty": "ラベルがまだありません。最初のラベルを作成してタスクを整理しましょう。",
+  "search_placeholder": "ラベルを検索…",
+  "columns": {
+    "name": "名前",
+    "color": "色",
+    "description": "説明",
+    "actions": "操作"
+  },
+  "form": {
+    "name": "名前",
+    "name_placeholder": "ラベル名",
+    "color": "色",
+    "description": "説明",
+    "description_placeholder": "説明（任意）",
+    "submit": "保存",
+    "submitting": "保存中…",
+    "cancel": "キャンセル"
+  },
+  "badge": {
+    "remove": "ラベル {name} を削除"
+  },
+  "picker": {
+    "title": "ラベル",
+    "search_placeholder": "ラベルを検索…",
+    "empty": "ラベルが見つかりません。",
+    "no_labels": "利用可能なラベルがありません。",
+    "create_new": "「{name}」を作成",
+    "apply": "適用"
+  },
+  "manager": {
+    "title": "ラベル管理",
+    "edit": "ラベルを編集",
+    "create": "ラベルを作成",
+    "delete": "ラベルを削除",
+    "delete_confirm": "このラベルを削除しますか？すべてのタスクから削除されます。"
+  },
+  "task": {
+    "add": "ラベルを追加",
+    "remove": "ラベルを削除",
+    "none": "ラベルなし"
+  },
+  "filters": {
+    "label": "ラベル",
+    "chip_label": "ラベル: {value}"
+  },
+  "validation": {
+    "name_required": "ラベル名は必須です。",
+    "name_max": "ラベル名は64文字以内にしてください。"
+  },
+  "errors": {
+    "create_failed": "ラベルを作成できませんでした。もう一度お試しください。",
+    "update_failed": "ラベルを更新できませんでした。もう一度お試しください。",
+    "delete_failed": "ラベルを削除できませんでした。もう一度お試しください。",
+    "add_failed": "タスクにラベルを追加できませんでした。もう一度お試しください。",
+    "remove_failed": "タスクからラベルを削除できませんでした。もう一度お試しください。",
+    "name_taken": "同じ名前のラベルが既に存在します。"
+  },
+  "archive": {
+    "action": "アーカイブ",
+    "unarchive": "アーカイブ解除",
+    "confirm": "このタスクをアーカイブしますか？",
+    "archived": "タスクをアーカイブしました",
+    "unarchived": "タスクのアーカイブを解除しました",
+    "view_archived": "アーカイブ済みタスクを表示",
+    "archived_title": "アーカイブ済みタスク",
+    "archived_empty": "アーカイブ済みタスクはありません。",
+    "error_archive": "タスクをアーカイブできませんでした。もう一度お試しください。",
+    "error_unarchive": "アーカイブを解除できませんでした。もう一度お試しください。",
+    "already_archived": "このタスクは既にアーカイブされています。",
+    "not_archived": "このタスクはアーカイブされていません。"
+  },
+  "identifier": {
+    "label": "識別子",
+    "placeholder": "例: NF",
+    "hint": "タスク参照用の短いキー（例: NF-42）。最大5文字。",
+    "validation": {
+      "required": "プロジェクト識別子は必須です。",
+      "max": "識別子は5文字以内にしてください。",
+      "format": "識別子には英数字のみ使用できます。",
+      "taken": "この識別子はワークスペース内で既に使用されています。"
+    }
+  },
+  "feature_toggles": {
+    "title": "機能",
+    "description": "このプロジェクトの機能を有効・無効にします。",
+    "pages": "ページ",
+    "pages_description": "プロジェクト内のドキュメントページを有効にします。",
+    "timeboxes": "タイムボックス",
+    "timeboxes_description": "プロジェクトのタイムボックス（スプリント/イテレーション）を有効にします。",
+    "lenses": "保存済みビュー",
+    "lenses_description": "タスクフィルタリング用の保存済みビューを有効にします。",
+    "calendar": "カレンダー",
+    "calendar_description": "プロジェクトのカレンダービューを有効にします。",
+    "updated": "機能設定を更新しました。",
+    "update_failed": "機能設定を更新できませんでした。もう一度お試しください。"
+  },
+  "favorites": {
+    "title": "お気に入り",
+    "add": "お気に入りに追加",
+    "remove": "お気に入りから削除",
+    "added": "お気に入りに追加しました",
+    "removed": "お気に入りから削除しました",
+    "empty": "お気に入りはまだありません。アイテムにスターを付けて素早くアクセスしましょう。",
+    "error_add": "お気に入りに追加できませんでした。もう一度お試しください。",
+    "error_remove": "お気に入りから削除できませんでした。もう一度お試しください。",
+    "sidebar_title": "お気に入り"
+  },
+  "reactions": {
+    "add": "リアクションを追加",
+    "remove": "リアクションを削除",
+    "reacted": "{emoji} でリアクションしました",
+    "count": "{count}件のリアクション",
+    "error_add": "リアクションを追加できませんでした。もう一度お試しください。",
+    "error_remove": "リアクションを削除できませんでした。もう一度お試しください。"
+  },
+  "intake": {
+    "title": "インテーク",
+    "new": "新規アイテム",
+    "empty": "トリアージキューにアイテムはありません。",
+    "status": {
+      "pending": "保留中",
+      "accepted": "承認済み",
+      "rejected": "却下",
+      "snoozed": "スヌーズ",
+      "duplicate": "重複"
+    },
+    "actions": {
+      "accept": "承認",
+      "reject": "却下",
+      "snooze": "スヌーズ",
+      "duplicate": "重複としてマーク",
+      "convert": "タスクに変換"
+    },
+    "form": {
+      "title": "タイトル",
+      "title_placeholder": "トリアージが必要な内容は？",
+      "body": "説明",
+      "body_placeholder": "詳細...",
+      "submit": "キューに追加",
+      "submitting": "追加中..."
+    },
+    "converted": "タスクに変換しました",
+    "triaged": "アイテムをトリアージしました",
+    "errors": {
+      "create_failed": "インテークアイテムを作成できませんでした。もう一度お試しください。",
+      "triage_failed": "トリアージできませんでした。もう一度お試しください。",
+      "convert_failed": "タスクへの変換ができませんでした。もう一度お試しください。"
+    }
+  },
+  "imports": {
+    "title": "インポート",
+    "new": "新規インポート",
+    "empty": "インポートジョブはまだありません。",
+    "source": {
+      "github": "GitHub",
+      "jira": "Jira",
+      "linear": "Linear",
+      "csv": "CSV"
+    },
+    "status": {
+      "pending": "待機中",
+      "running": "実行中",
+      "completed": "完了",
+      "failed": "失敗",
+      "cancelled": "キャンセル済"
+    },
+    "columns": {
+      "source": "ソース",
+      "status": "ステータス",
+      "progress": "進捗",
+      "created": "作成日",
+      "actions": "操作"
+    },
+    "actions": {
+      "cancel": "キャンセル",
+      "cancel_confirm": "このインポートをキャンセルしますか？"
+    },
+    "errors": {
+      "create_failed": "インポートジョブを作成できませんでした。もう一度お試しください。",
+      "cancel_failed": "インポートをキャンセルできませんでした。もう一度お試しください。",
+      "already_running": "このプロジェクトで既にインポートジョブが実行中です。"
+    }
+  },
+  "description_history": {
+    "title": "バージョン履歴",
+    "empty": "以前のバージョンはありません。",
+    "version": "バージョン {number}",
+    "by": "{name} による",
+    "chars": "{count}文字",
+    "restore": "このバージョンを復元",
+    "restoring": "復元中...",
+    "restored": "バージョンを復元しました",
+    "restore_confirm": "このバージョンを復元しますか？現在の説明は新しいバージョンとして保存されます。",
+    "error_restore": "バージョンを復元できませんでした。もう一度お試しください。",
+    "current": "現在"
+  }
+}

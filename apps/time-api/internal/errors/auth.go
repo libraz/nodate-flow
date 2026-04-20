@@ -10,8 +10,18 @@ var (
 	AuthLoginInvalidCredentials = &Spec{Code: "AUTH.LOGIN.INVALID_CREDENTIALS", Status: 401, Message: "Invalid email or password"}
 	// AUTH.LOGIN.RATE_LIMITED_AFTER_RETRIES — Too many failed login attempts
 	AuthLoginRateLimitedAfterRetries = &Spec{Code: "AUTH.LOGIN.RATE_LIMITED_AFTER_RETRIES", Status: 429, Message: "Too many failed login attempts"}
+	// AUTH.MAGIC_LINK.ALREADY_USED — This magic link has already been used
+	AuthMagicLinkAlreadyUsed = &Spec{Code: "AUTH.MAGIC_LINK.ALREADY_USED", Status: 409, Message: "This magic link has already been used"}
+	// AUTH.MAGIC_LINK.EMAIL_NOT_FOUND — No account found for this email address
+	AuthMagicLinkEmailNotFound = &Spec{Code: "AUTH.MAGIC_LINK.EMAIL_NOT_FOUND", Status: 404, Message: "No account found for this email address"}
+	// AUTH.MAGIC_LINK.INVALID_OR_EXPIRED — Magic link is invalid or has expired
+	AuthMagicLinkInvalidOrExpired = &Spec{Code: "AUTH.MAGIC_LINK.INVALID_OR_EXPIRED", Status: 401, Message: "Magic link is invalid or has expired"}
+	// AUTH.OIDC.GITHUB_NOT_CONFIGURED — GitHub login is not configured
+	AuthOidcGithubNotConfigured = &Spec{Code: "AUTH.OIDC.GITHUB_NOT_CONFIGURED", Status: 503, Message: "GitHub login is not configured"}
 	// AUTH.OIDC.ID_TOKEN_INVALID — OIDC ID token is invalid
 	AuthOidcIdTokenInvalid = &Spec{Code: "AUTH.OIDC.ID_TOKEN_INVALID", Status: 401, Message: "OIDC ID token is invalid"}
+	// AUTH.OIDC.MICROSOFT_NOT_CONFIGURED — Microsoft login is not configured
+	AuthOidcMicrosoftNotConfigured = &Spec{Code: "AUTH.OIDC.MICROSOFT_NOT_CONFIGURED", Status: 503, Message: "Microsoft login is not configured"}
 	// AUTH.OIDC.NONCE_MISMATCH — OIDC nonce does not match
 	AuthOidcNonceMismatch = &Spec{Code: "AUTH.OIDC.NONCE_MISMATCH", Status: 400, Message: "OIDC nonce does not match"}
 	// AUTH.OIDC.PROVIDER_UNREACHABLE — OIDC provider is unreachable

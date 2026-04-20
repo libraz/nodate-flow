@@ -167,6 +167,30 @@ resources:
         description: "Returned when the JWT signature verification fails (wrong key, tampered payload)."
         userAction: "Sign in again."
 
+  magic_link:
+    breadcrumb: "Auth > Magic Link"
+    errors:
+      invalid_or_expired:
+        code: AUTH.MAGIC_LINK.INVALID_OR_EXPIRED
+        status: 401
+        message: "Magic link is invalid or has expired"
+        description: "Returned when the magic link token is malformed, unknown, or past its expiration timestamp."
+        userAction: "Request a new magic link from the login page."
+
+      already_used:
+        code: AUTH.MAGIC_LINK.ALREADY_USED
+        status: 409
+        message: "This magic link has already been used"
+        description: "Returned when the magic link token has already been consumed to create a session."
+        userAction: "Request a new magic link from the login page."
+
+      email_not_found:
+        code: AUTH.MAGIC_LINK.EMAIL_NOT_FOUND
+        status: 404
+        message: "No account found for this email address"
+        description: "Returned when a magic link is requested for an email that is not associated with any account."
+        userAction: "Check the email address for typos, or register a new account."
+
   oidc:
     breadcrumb: "Auth > OIDC"
     errors:
@@ -197,6 +221,20 @@ resources:
         message: "OIDC provider is unreachable"
         description: "Returned when the configured OIDC provider cannot be contacted for discovery or token exchange."
         userAction: "Try again in a moment; contact your administrator if the problem persists."
+
+      github_not_configured:
+        code: AUTH.OIDC.GITHUB_NOT_CONFIGURED
+        status: 503
+        message: "GitHub login is not configured"
+        description: "Returned when the user attempts to sign in via GitHub but the instance has no GitHub OIDC client configured."
+        userAction: "Ask the instance administrator to configure GitHub login credentials."
+
+      microsoft_not_configured:
+        code: AUTH.OIDC.MICROSOFT_NOT_CONFIGURED
+        status: 503
+        message: "Microsoft login is not configured"
+        description: "Returned when the user attempts to sign in via Microsoft but the instance has no Microsoft OIDC client configured."
+        userAction: "Ask the instance administrator to configure Microsoft login credentials."
 
   pat:
     breadcrumb: "Auth > Personal Access Token"

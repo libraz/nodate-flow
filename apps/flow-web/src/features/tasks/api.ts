@@ -784,3 +784,39 @@ export function useDeleteAttachment(): UseMutationResult<void, ApiError, DeleteA
     },
   });
 }
+
+/* ── Archive mutations ────────────────────────────────────────── */
+
+/** Archives a task by its public ID. */
+export function useArchiveTask(): UseMutationResult<void, ApiError, string> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string): Promise<void> => {
+      const { error } = await sdk.POST('/tasks/{id}/archive', {
+        params: { path: { id } },
+      });
+      if (error) throw toApiError(error, 'Failed to archive task');
+    },
+    onSuccess: (_data, id) => {
+      void qc.invalidateQueries({ queryKey: tasksKeys.detail(id) });
+      void qc.invalidateQueries({ queryKey: [...tasksKeys.all, 'list'] });
+    },
+  });
+}
+
+/** Unarchives a task by its public ID. */
+export function useUnarchiveTask(): UseMutationResult<void, ApiError, string> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string): Promise<void> => {
+      const { error } = await sdk.POST('/tasks/{id}/unarchive', {
+        params: { path: { id } },
+      });
+      if (error) throw toApiError(error, 'Failed to unarchive task');
+    },
+    onSuccess: (_data, id) => {
+      void qc.invalidateQueries({ queryKey: tasksKeys.detail(id) });
+      void qc.invalidateQueries({ queryKey: [...tasksKeys.all, 'list'] });
+    },
+  });
+}

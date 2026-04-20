@@ -46,6 +46,14 @@ type Config struct {
 	GoogleClientID     string `env:"NF_AUTH_GOOGLE_CLIENT_ID" envDefault:""`
 	GoogleClientSecret string `env:"NF_AUTH_GOOGLE_CLIENT_SECRET" envDefault:""`
 
+	// OIDC GitHub configuration (login via GitHub).
+	GithubOIDCClientID     string `env:"NF_AUTH_GITHUB_OIDC_CLIENT_ID" envDefault:""`
+	GithubOIDCClientSecret string `env:"NF_AUTH_GITHUB_OIDC_CLIENT_SECRET" envDefault:""`
+
+	// OIDC Microsoft configuration (login via Microsoft).
+	MicrosoftOIDCClientID     string `env:"NF_AUTH_MICROSOFT_OIDC_CLIENT_ID" envDefault:""`
+	MicrosoftOIDCClientSecret string `env:"NF_AUTH_MICROSOFT_OIDC_CLIENT_SECRET" envDefault:""`
+
 	// PublicBaseURL is the externally-visible origin of the auth-api,
 	// used to build OIDC callback URLs.
 	PublicBaseURL string `env:"NF_AUTH_PUBLIC_URL" envDefault:"http://localhost:8082"`

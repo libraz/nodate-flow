@@ -4,12 +4,13 @@ INSERT INTO projects (
   public_id,
   workspace_id,
   slug,
+  identifier,
   name,
   description,
   color,
   started_on,
   ended_on
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: FindProjectByPublicId :one
 -- Resolve a project by its UUID v7 within a workspace. Returns internal id.
@@ -18,12 +19,17 @@ SELECT
   public_id,
   workspace_id,
   slug,
+  identifier,
   name,
   description,
   color,
   is_archived,
   started_on,
   ended_on,
+  feature_pages,
+  feature_timeboxes,
+  feature_lenses,
+  feature_calendar,
   enabled,
   updated_at,
   created_at
@@ -38,6 +44,7 @@ LIMIT 1;
 SELECT
   v.public_id,
   v.slug,
+  v.identifier,
   v.name,
   v.description,
   v.color,
@@ -57,11 +64,16 @@ LIMIT ? OFFSET ?;
 -- Update mutable project fields by public_id.
 UPDATE projects
 SET name = ?,
+    identifier = ?,
     description = ?,
     color = ?,
     is_archived = ?,
     started_on = ?,
-    ended_on = ?
+    ended_on = ?,
+    feature_pages = ?,
+    feature_timeboxes = ?,
+    feature_lenses = ?,
+    feature_calendar = ?
 WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
@@ -75,12 +87,17 @@ SELECT
   p.workspace_id,
   w.public_id AS workspace_public_id,
   p.slug,
+  p.identifier,
   p.name,
   p.description,
   p.color,
   p.is_archived,
   p.started_on,
   p.ended_on,
+  p.feature_pages,
+  p.feature_timeboxes,
+  p.feature_lenses,
+  p.feature_calendar,
   p.enabled,
   p.updated_at,
   p.created_at
@@ -95,6 +112,7 @@ LIMIT 1;
 UPDATE projects
 SET name = ?,
     slug = ?,
+    identifier = ?,
     description = ?
 WHERE workspace_id = ?
   AND public_id = ?
@@ -106,3 +124,17 @@ UPDATE projects
 SET enabled = FALSE
 WHERE workspace_id = ?
   AND public_id = ?;
+
+-- name: FindProjectByIdentifier :one
+-- Resolve a project by its human-readable identifier within a workspace.
+SELECT
+  id,
+  public_id,
+  workspace_id,
+  identifier,
+  name
+FROM projects
+WHERE workspace_id = ?
+  AND identifier = ?
+  AND enabled = TRUE
+LIMIT 1;

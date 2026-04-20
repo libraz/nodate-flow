@@ -18,18 +18,20 @@ INSERT INTO projects (
   public_id,
   workspace_id,
   slug,
+  identifier,
   name,
   description,
   color,
   started_on,
   ended_on
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateProjectParams struct {
 	PublicID    types.PublicID `json:"publicId"`
 	WorkspaceID uint32         `json:"-"`
 	Slug        string         `json:"slug"`
+	Identifier  string         `json:"identifier"`
 	Name        string         `json:"name"`
 	Description sql.NullString `json:"description"`
 	Color       sql.NullString `json:"color"`
@@ -43,6 +45,7 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (i
 		arg.PublicID,
 		arg.WorkspaceID,
 		arg.Slug,
+		arg.Identifier,
 		arg.Name,
 		arg.Description,
 		arg.Color,
@@ -73,18 +76,64 @@ func (q *Queries) DisableProject(ctx context.Context, arg DisableProjectParams) 
 	return err
 }
 
+const findProjectByIdentifier = `-- name: FindProjectByIdentifier :one
+SELECT
+  id,
+  public_id,
+  workspace_id,
+  identifier,
+  name
+FROM projects
+WHERE workspace_id = ?
+  AND identifier = ?
+  AND enabled = TRUE
+LIMIT 1
+`
+
+type FindProjectByIdentifierParams struct {
+	WorkspaceID uint32 `json:"-"`
+	Identifier  string `json:"identifier"`
+}
+
+type FindProjectByIdentifierRow struct {
+	ID          uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+	WorkspaceID uint32         `json:"-"`
+	Identifier  string         `json:"identifier"`
+	Name        string         `json:"name"`
+}
+
+// Resolve a project by its human-readable identifier within a workspace.
+func (q *Queries) FindProjectByIdentifier(ctx context.Context, arg FindProjectByIdentifierParams) (FindProjectByIdentifierRow, error) {
+	row := q.db.QueryRowContext(ctx, findProjectByIdentifier, arg.WorkspaceID, arg.Identifier)
+	var i FindProjectByIdentifierRow
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.WorkspaceID,
+		&i.Identifier,
+		&i.Name,
+	)
+	return i, err
+}
+
 const findProjectByPublicId = `-- name: FindProjectByPublicId :one
 SELECT
   id,
   public_id,
   workspace_id,
   slug,
+  identifier,
   name,
   description,
   color,
   is_archived,
   started_on,
   ended_on,
+  feature_pages,
+  feature_timeboxes,
+  feature_lenses,
+  feature_calendar,
   enabled,
   updated_at,
   created_at
@@ -101,19 +150,24 @@ type FindProjectByPublicIdParams struct {
 }
 
 type FindProjectByPublicIdRow struct {
-	ID          uint32         `json:"-"`
-	PublicID    types.PublicID `json:"publicId"`
-	WorkspaceID uint32         `json:"-"`
-	Slug        string         `json:"slug"`
-	Name        string         `json:"name"`
-	Description sql.NullString `json:"description"`
-	Color       sql.NullString `json:"color"`
-	IsArchived  bool           `json:"isArchived"`
-	StartedOn   sql.NullTime   `json:"startedOn"`
-	EndedOn     sql.NullTime   `json:"endedOn"`
-	Enabled     bool           `json:"enabled"`
-	UpdatedAt   sql.NullTime   `json:"updatedAt"`
-	CreatedAt   time.Time      `json:"createdAt"`
+	ID               uint32         `json:"-"`
+	PublicID         types.PublicID `json:"publicId"`
+	WorkspaceID      uint32         `json:"-"`
+	Slug             string         `json:"slug"`
+	Identifier       string         `json:"identifier"`
+	Name             string         `json:"name"`
+	Description      sql.NullString `json:"description"`
+	Color            sql.NullString `json:"color"`
+	IsArchived       bool           `json:"isArchived"`
+	StartedOn        sql.NullTime   `json:"startedOn"`
+	EndedOn          sql.NullTime   `json:"endedOn"`
+	FeaturePages     bool           `json:"featurePages"`
+	FeatureTimeboxes bool           `json:"featureTimeboxes"`
+	FeatureLenses    bool           `json:"featureLenses"`
+	FeatureCalendar  bool           `json:"featureCalendar"`
+	Enabled          bool           `json:"enabled"`
+	UpdatedAt        sql.NullTime   `json:"updatedAt"`
+	CreatedAt        time.Time      `json:"createdAt"`
 }
 
 // Resolve a project by its UUID v7 within a workspace. Returns internal id.
@@ -125,12 +179,17 @@ func (q *Queries) FindProjectByPublicId(ctx context.Context, arg FindProjectByPu
 		&i.PublicID,
 		&i.WorkspaceID,
 		&i.Slug,
+		&i.Identifier,
 		&i.Name,
 		&i.Description,
 		&i.Color,
 		&i.IsArchived,
 		&i.StartedOn,
 		&i.EndedOn,
+		&i.FeaturePages,
+		&i.FeatureTimeboxes,
+		&i.FeatureLenses,
+		&i.FeatureCalendar,
 		&i.Enabled,
 		&i.UpdatedAt,
 		&i.CreatedAt,
@@ -145,12 +204,17 @@ SELECT
   p.workspace_id,
   w.public_id AS workspace_public_id,
   p.slug,
+  p.identifier,
   p.name,
   p.description,
   p.color,
   p.is_archived,
   p.started_on,
   p.ended_on,
+  p.feature_pages,
+  p.feature_timeboxes,
+  p.feature_lenses,
+  p.feature_calendar,
   p.enabled,
   p.updated_at,
   p.created_at
@@ -167,12 +231,17 @@ type FindProjectByPublicIdGlobalRow struct {
 	WorkspaceID       uint32         `json:"-"`
 	WorkspacePublicID types.PublicID `json:"workspacePublicId"`
 	Slug              string         `json:"slug"`
+	Identifier        string         `json:"identifier"`
 	Name              string         `json:"name"`
 	Description       sql.NullString `json:"description"`
 	Color             sql.NullString `json:"color"`
 	IsArchived        bool           `json:"isArchived"`
 	StartedOn         sql.NullTime   `json:"startedOn"`
 	EndedOn           sql.NullTime   `json:"endedOn"`
+	FeaturePages      bool           `json:"featurePages"`
+	FeatureTimeboxes  bool           `json:"featureTimeboxes"`
+	FeatureLenses     bool           `json:"featureLenses"`
+	FeatureCalendar   bool           `json:"featureCalendar"`
 	Enabled           bool           `json:"enabled"`
 	UpdatedAt         sql.NullTime   `json:"updatedAt"`
 	CreatedAt         time.Time      `json:"createdAt"`
@@ -189,12 +258,17 @@ func (q *Queries) FindProjectByPublicIdGlobal(ctx context.Context, publicID type
 		&i.WorkspaceID,
 		&i.WorkspacePublicID,
 		&i.Slug,
+		&i.Identifier,
 		&i.Name,
 		&i.Description,
 		&i.Color,
 		&i.IsArchived,
 		&i.StartedOn,
 		&i.EndedOn,
+		&i.FeaturePages,
+		&i.FeatureTimeboxes,
+		&i.FeatureLenses,
+		&i.FeatureCalendar,
 		&i.Enabled,
 		&i.UpdatedAt,
 		&i.CreatedAt,
@@ -206,6 +280,7 @@ const listProjectsForWorkspace = `-- name: ListProjectsForWorkspace :many
 SELECT
   v.public_id,
   v.slug,
+  v.identifier,
   v.name,
   v.description,
   v.color,
@@ -231,6 +306,7 @@ type ListProjectsForWorkspaceParams struct {
 type ListProjectsForWorkspaceRow struct {
 	PublicID    types.PublicID `json:"publicId"`
 	Slug        string         `json:"slug"`
+	Identifier  string         `json:"identifier"`
 	Name        string         `json:"name"`
 	Description sql.NullString `json:"description"`
 	Color       sql.NullString `json:"color"`
@@ -256,6 +332,7 @@ func (q *Queries) ListProjectsForWorkspace(ctx context.Context, arg ListProjects
 		if err := rows.Scan(
 			&i.PublicID,
 			&i.Slug,
+			&i.Identifier,
 			&i.Name,
 			&i.Description,
 			&i.Color,
@@ -283,36 +360,51 @@ func (q *Queries) ListProjectsForWorkspace(ctx context.Context, arg ListProjects
 const updateProject = `-- name: UpdateProject :exec
 UPDATE projects
 SET name = ?,
+    identifier = ?,
     description = ?,
     color = ?,
     is_archived = ?,
     started_on = ?,
-    ended_on = ?
+    ended_on = ?,
+    feature_pages = ?,
+    feature_timeboxes = ?,
+    feature_lenses = ?,
+    feature_calendar = ?
 WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE
 `
 
 type UpdateProjectParams struct {
-	Name        string         `json:"name"`
-	Description sql.NullString `json:"description"`
-	Color       sql.NullString `json:"color"`
-	IsArchived  bool           `json:"isArchived"`
-	StartedOn   sql.NullTime   `json:"startedOn"`
-	EndedOn     sql.NullTime   `json:"endedOn"`
-	WorkspaceID uint32         `json:"-"`
-	PublicID    types.PublicID `json:"publicId"`
+	Name             string         `json:"name"`
+	Identifier       string         `json:"identifier"`
+	Description      sql.NullString `json:"description"`
+	Color            sql.NullString `json:"color"`
+	IsArchived       bool           `json:"isArchived"`
+	StartedOn        sql.NullTime   `json:"startedOn"`
+	EndedOn          sql.NullTime   `json:"endedOn"`
+	FeaturePages     bool           `json:"featurePages"`
+	FeatureTimeboxes bool           `json:"featureTimeboxes"`
+	FeatureLenses    bool           `json:"featureLenses"`
+	FeatureCalendar  bool           `json:"featureCalendar"`
+	WorkspaceID      uint32         `json:"-"`
+	PublicID         types.PublicID `json:"publicId"`
 }
 
 // Update mutable project fields by public_id.
 func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) error {
 	_, err := q.db.ExecContext(ctx, updateProject,
 		arg.Name,
+		arg.Identifier,
 		arg.Description,
 		arg.Color,
 		arg.IsArchived,
 		arg.StartedOn,
 		arg.EndedOn,
+		arg.FeaturePages,
+		arg.FeatureTimeboxes,
+		arg.FeatureLenses,
+		arg.FeatureCalendar,
 		arg.WorkspaceID,
 		arg.PublicID,
 	)
@@ -323,6 +415,7 @@ const updateProjectFull = `-- name: UpdateProjectFull :exec
 UPDATE projects
 SET name = ?,
     slug = ?,
+    identifier = ?,
     description = ?
 WHERE workspace_id = ?
   AND public_id = ?
@@ -332,6 +425,7 @@ WHERE workspace_id = ?
 type UpdateProjectFullParams struct {
 	Name        string         `json:"name"`
 	Slug        string         `json:"slug"`
+	Identifier  string         `json:"identifier"`
 	Description sql.NullString `json:"description"`
 	WorkspaceID uint32         `json:"-"`
 	PublicID    types.PublicID `json:"publicId"`
@@ -342,6 +436,7 @@ func (q *Queries) UpdateProjectFull(ctx context.Context, arg UpdateProjectFullPa
 	_, err := q.db.ExecContext(ctx, updateProjectFull,
 		arg.Name,
 		arg.Slug,
+		arg.Identifier,
 		arg.Description,
 		arg.WorkspaceID,
 		arg.PublicID,

@@ -8,9 +8,10 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/sessionstore"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/sessionstore"
 )
 
 // Deps is the dependency bundle passed to each handler.
@@ -20,6 +21,12 @@ type Deps struct {
 	Sessions sessionstore.Store
 	JWT      *auth.JWTIssuer
 	OIDC     *auth.OIDCClient
+	// OIDCGithub is the GitHub OAuth2 client for login. Nil when the
+	// NF_AUTH_GITHUB_OIDC_CLIENT_ID env is unset.
+	OIDCGithub *auth.GithubOAuthClient
+	// OIDCMicrosoft is the Microsoft OIDC client for login. Nil when
+	// the NF_AUTH_MICROSOFT_OIDC_CLIENT_ID env is unset.
+	OIDCMicrosoft *auth.MicrosoftOIDCClient
 	// Cipher encrypts/decrypts TOTP secrets. Nil when NF_SECRET_KEY is
 	// unset; the TOTP endpoints return AUTH.TOTP.NOT_CONFIGURED in that
 	// case so the rest of the api still boots.
@@ -34,6 +41,12 @@ type Deps struct {
 	// Audit records audit log entries for sensitive auth operations.
 	// Optional: nil disables audit logging.
 	Audit *audit.Recorder
+	// EmailSender sends transactional emails (magic link). Nil when
+	// SMTP is not configured.
+	EmailSender email.Sender
+	// AccountsWebURL is the origin of the accounts-web frontend, used
+	// to build magic link verification URLs.
+	AccountsWebURL string
 }
 
 // RegisterInput is the body for POST /auth/register.
@@ -355,4 +368,32 @@ type ChangePasswordOutput struct {
 		Ok                    bool `json:"ok"`
 		OtherSessionsRevoked  int  `json:"otherSessionsRevoked"`
 	}
+}
+
+// MagicLinkRequestInput is the body for POST /auth/magic-link/request.
+type MagicLinkRequestInput struct {
+	Body struct {
+		Email string `json:"email" format:"email" maxLength:"254"`
+	}
+}
+
+// MagicLinkRequestOutput is the response for POST /auth/magic-link/request.
+// It always returns ok=true regardless of whether the email exists, to
+// prevent email enumeration.
+type MagicLinkRequestOutput struct {
+	Body struct {
+		Ok bool `json:"ok"`
+	}
+}
+
+// MagicLinkVerifyInput is the query for GET /auth/magic-link/verify.
+type MagicLinkVerifyInput struct {
+	UserAgent string `header:"User-Agent"`
+	Token     string `query:"token"`
+}
+
+// MagicLinkVerifyOutput is the response for GET /auth/magic-link/verify.
+type MagicLinkVerifyOutput struct {
+	SetCookie http.Cookie `header:"Set-Cookie"`
+	Body      AuthTokens
 }

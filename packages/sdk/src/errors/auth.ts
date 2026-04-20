@@ -16,10 +16,35 @@ export const AuthErrors = {
     status: 429,
     message: "Too many failed login attempts",
   },
+  AUTH_MAGIC_LINK_ALREADY_USED: {
+    code: "AUTH.MAGIC_LINK.ALREADY_USED",
+    status: 409,
+    message: "This magic link has already been used",
+  },
+  AUTH_MAGIC_LINK_EMAIL_NOT_FOUND: {
+    code: "AUTH.MAGIC_LINK.EMAIL_NOT_FOUND",
+    status: 404,
+    message: "No account found for this email address",
+  },
+  AUTH_MAGIC_LINK_INVALID_OR_EXPIRED: {
+    code: "AUTH.MAGIC_LINK.INVALID_OR_EXPIRED",
+    status: 401,
+    message: "Magic link is invalid or has expired",
+  },
+  AUTH_OIDC_GITHUB_NOT_CONFIGURED: {
+    code: "AUTH.OIDC.GITHUB_NOT_CONFIGURED",
+    status: 503,
+    message: "GitHub login is not configured",
+  },
   AUTH_OIDC_ID_TOKEN_INVALID: {
     code: "AUTH.OIDC.ID_TOKEN_INVALID",
     status: 401,
     message: "OIDC ID token is invalid",
+  },
+  AUTH_OIDC_MICROSOFT_NOT_CONFIGURED: {
+    code: "AUTH.OIDC.MICROSOFT_NOT_CONFIGURED",
+    status: 503,
+    message: "Microsoft login is not configured",
   },
   AUTH_OIDC_NONCE_MISMATCH: {
     code: "AUTH.OIDC.NONCE_MISMATCH",

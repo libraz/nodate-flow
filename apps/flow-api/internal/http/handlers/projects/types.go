@@ -24,17 +24,22 @@ var httpErr = handlerutil.HTTPErr
 
 // Project is the public DTO for a project row.
 type Project struct {
-	ID          string  `json:"id" doc:"Project public id (UUID v7)"`
-	WorkspaceID string  `json:"workspaceId"`
-	Slug        string  `json:"slug"`
-	Name        string  `json:"name"`
-	Description string  `json:"description,omitempty"`
-	Color       string  `json:"color,omitempty"`
-	IsArchived  bool    `json:"isArchived"`
-	StartedOn   *string `json:"startedOn,omitempty" doc:"YYYY-MM-DD"`
-	EndedOn     *string `json:"endedOn,omitempty" doc:"YYYY-MM-DD"`
-	UpdatedAt   *int64  `json:"updatedAt,omitempty"`
-	CreatedAt   int64   `json:"createdAt"`
+	ID               string  `json:"id" doc:"Project public id (UUID v7)"`
+	WorkspaceID      string  `json:"workspaceId"`
+	Slug             string  `json:"slug"`
+	Identifier       string  `json:"identifier"`
+	Name             string  `json:"name"`
+	Description      string  `json:"description,omitempty"`
+	Color            string  `json:"color,omitempty"`
+	IsArchived       bool    `json:"isArchived"`
+	StartedOn        *string `json:"startedOn,omitempty" doc:"YYYY-MM-DD"`
+	EndedOn          *string `json:"endedOn,omitempty" doc:"YYYY-MM-DD"`
+	FeaturePages     bool    `json:"featurePages"`
+	FeatureTimeboxes bool    `json:"featureTimeboxes"`
+	FeatureLenses    bool    `json:"featureLenses"`
+	FeatureCalendar  bool    `json:"featureCalendar"`
+	UpdatedAt        *int64  `json:"updatedAt,omitempty"`
+	CreatedAt        int64   `json:"createdAt"`
 }
 
 // ProjectMember is the public DTO for a project_members row.
@@ -52,6 +57,7 @@ type ProjectMember struct {
 // CreateProjectBody is the request body for POST /workspaces/{wsId}/projects.
 type CreateProjectBody struct {
 	Slug        string `json:"slug" minLength:"1" maxLength:"64"`
+	Identifier  string `json:"identifier,omitempty" maxLength:"5" doc:"Human-readable project key (e.g. NF)"`
 	Name        string `json:"name" minLength:"1" maxLength:"100"`
 	Description string `json:"description,omitempty" maxLength:"500"`
 	Color       string `json:"color,omitempty" maxLength:"32"`

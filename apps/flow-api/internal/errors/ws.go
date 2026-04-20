@@ -4,6 +4,28 @@ package errors
 
 // Error codes and specs.
 var (
+	// WS.DESCRIPTION_VERSION.NOT_FOUND — Description version not found
+	WsDescriptionVersionNotFound = &Spec{Code: "WS.DESCRIPTION_VERSION.NOT_FOUND", Status: 404, Message: "Description version not found"}
+	// WS.FAVORITE.ALREADY_EXISTS — This item is already in your favorites
+	WsFavoriteAlreadyExists = &Spec{Code: "WS.FAVORITE.ALREADY_EXISTS", Status: 409, Message: "This item is already in your favorites"}
+	// WS.FAVORITE.NOT_FOUND — Favorite not found
+	WsFavoriteNotFound = &Spec{Code: "WS.FAVORITE.NOT_FOUND", Status: 404, Message: "Favorite not found"}
+	// WS.IMPORT.ALREADY_RUNNING — An import job is already running for this project
+	WsImportAlreadyRunning = &Spec{Code: "WS.IMPORT.ALREADY_RUNNING", Status: 409, Message: "An import job is already running for this project"}
+	// WS.IMPORT.CANNOT_CANCEL — Only pending or running import jobs can be cancelled
+	WsImportCannotCancel = &Spec{Code: "WS.IMPORT.CANNOT_CANCEL", Status: 409, Message: "Only pending or running import jobs can be cancelled"}
+	// WS.IMPORT.NOT_FOUND — Import job not found
+	WsImportNotFound = &Spec{Code: "WS.IMPORT.NOT_FOUND", Status: 404, Message: "Import job not found"}
+	// WS.INTAKE.ALREADY_CONVERTED — This intake item has already been converted to a task
+	WsIntakeAlreadyConverted = &Spec{Code: "WS.INTAKE.ALREADY_CONVERTED", Status: 409, Message: "This intake item has already been converted to a task"}
+	// WS.INTAKE.ALREADY_TRIAGED — This intake item has already been triaged
+	WsIntakeAlreadyTriaged = &Spec{Code: "WS.INTAKE.ALREADY_TRIAGED", Status: 409, Message: "This intake item has already been triaged"}
+	// WS.INTAKE.NOT_FOUND — Intake item not found
+	WsIntakeNotFound = &Spec{Code: "WS.INTAKE.NOT_FOUND", Status: 404, Message: "Intake item not found"}
+	// WS.LABEL.NAME_ALREADY_TAKEN — A label with this name already exists
+	WsLabelNameAlreadyTaken = &Spec{Code: "WS.LABEL.NAME_ALREADY_TAKEN", Status: 409, Message: "A label with this name already exists"}
+	// WS.LABEL.NOT_FOUND — Label not found
+	WsLabelNotFound = &Spec{Code: "WS.LABEL.NOT_FOUND", Status: 404, Message: "Label not found"}
 	// WS.LENS.ALREADY_PRIVATE — This saved view is already private
 	WsLensAlreadyPrivate = &Spec{Code: "WS.LENS.ALREADY_PRIVATE", Status: 409, Message: "This saved view is already private"}
 	// WS.LENS.ALREADY_PUBLIC — This saved view is already published
@@ -18,16 +40,32 @@ var (
 	WsMemberNotFound = &Spec{Code: "WS.MEMBER.NOT_FOUND", Status: 404, Message: "Workspace member not found"}
 	// WS.MEMBER.ROLE_DENIED — Your role does not permit this action
 	WsMemberRoleDenied = &Spec{Code: "WS.MEMBER.ROLE_DENIED", Status: 403, Message: "Your role does not permit this action"}
+	// WS.MENTION.NOT_FOUND — Mention not found
+	WsMentionNotFound = &Spec{Code: "WS.MENTION.NOT_FOUND", Status: 404, Message: "Mention not found"}
 	// WS.NOTIFICATION.NOT_FOUND — Notification not found
 	WsNotificationNotFound = &Spec{Code: "WS.NOTIFICATION.NOT_FOUND", Status: 404, Message: "Notification not found"}
+	// WS.NOTIFICATION_PREFERENCE.NOT_FOUND — Notification preference not found
+	WsNotificationPreferenceNotFound = &Spec{Code: "WS.NOTIFICATION_PREFERENCE.NOT_FOUND", Status: 404, Message: "Notification preference not found"}
 	// WS.PROJECT.ACCESS_DENIED — You do not have access to this project
 	WsProjectAccessDenied = &Spec{Code: "WS.PROJECT.ACCESS_DENIED", Status: 403, Message: "You do not have access to this project"}
+	// WS.PROJECT.FEATURE_DISABLED — This feature is disabled for the project
+	WsProjectFeatureDisabled = &Spec{Code: "WS.PROJECT.FEATURE_DISABLED", Status: 403, Message: "This feature is disabled for the project"}
+	// WS.PROJECT.IDENTIFIER_ALREADY_TAKEN — Project identifier is already taken
+	WsProjectIdentifierAlreadyTaken = &Spec{Code: "WS.PROJECT.IDENTIFIER_ALREADY_TAKEN", Status: 409, Message: "Project identifier is already taken"}
 	// WS.PROJECT.NOT_FOUND — Project not found
 	WsProjectNotFound = &Spec{Code: "WS.PROJECT.NOT_FOUND", Status: 404, Message: "Project not found"}
 	// WS.PROJECT.SLUG_ALREADY_TAKEN — Project slug is already taken
 	WsProjectSlugAlreadyTaken = &Spec{Code: "WS.PROJECT.SLUG_ALREADY_TAKEN", Status: 409, Message: "Project slug is already taken"}
+	// WS.REACTION.ALREADY_EXISTS — You already reacted with this emoji
+	WsReactionAlreadyExists = &Spec{Code: "WS.REACTION.ALREADY_EXISTS", Status: 409, Message: "You already reacted with this emoji"}
+	// WS.REACTION.NOT_FOUND — Reaction not found
+	WsReactionNotFound = &Spec{Code: "WS.REACTION.NOT_FOUND", Status: 404, Message: "Reaction not found"}
 	// WS.TASK.ACCESS_DENIED — You do not have access to this task
 	WsTaskAccessDenied = &Spec{Code: "WS.TASK.ACCESS_DENIED", Status: 403, Message: "You do not have access to this task"}
+	// WS.TASK.ALREADY_ARCHIVED — Task is already archived
+	WsTaskAlreadyArchived = &Spec{Code: "WS.TASK.ALREADY_ARCHIVED", Status: 409, Message: "Task is already archived"}
+	// WS.TASK.NOT_ARCHIVED — Task is not archived
+	WsTaskNotArchived = &Spec{Code: "WS.TASK.NOT_ARCHIVED", Status: 409, Message: "Task is not archived"}
 	// WS.TASK.NOT_FOUND — Task not found
 	WsTaskNotFound = &Spec{Code: "WS.TASK.NOT_FOUND", Status: 404, Message: "Task not found"}
 	// WS.TASK.STATE_TRANSITION_BLOCKED_BY_CONSTRAINT — Task cannot transition to the requested state
@@ -40,6 +78,8 @@ var (
 	WsTaskTransitionUnknown = &Spec{Code: "WS.TASK.TRANSITION_UNKNOWN", Status: 400, Message: "Unknown task transition"}
 	// WS.TASK.UPDATE_CONFLICT — Task was modified by someone else
 	WsTaskUpdateConflict = &Spec{Code: "WS.TASK.UPDATE_CONFLICT", Status: 409, Message: "Task was modified by someone else"}
+	// WS.VIEW_PREFERENCE.NOT_FOUND — View preference not found
+	WsViewPreferenceNotFound = &Spec{Code: "WS.VIEW_PREFERENCE.NOT_FOUND", Status: 404, Message: "View preference not found"}
 	// WS.WORKSPACE.ACCESS_DENIED — You do not have access to this workspace
 	WsWorkspaceAccessDenied = &Spec{Code: "WS.WORKSPACE.ACCESS_DENIED", Status: 403, Message: "You do not have access to this workspace"}
 	// WS.WORKSPACE.NOT_FOUND — Workspace not found

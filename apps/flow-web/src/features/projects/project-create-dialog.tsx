@@ -23,6 +23,7 @@ export interface ProjectCreateDialogProps {
 interface FieldErrors {
   name?: string;
   slug?: string;
+  identifier?: string;
   description?: string;
 }
 
@@ -33,6 +34,11 @@ const schema = z.object({
     .min(1, 'projects.validation.slug_required')
     .max(64)
     .regex(/^[a-z0-9-]+$/, 'projects.validation.slug_format'),
+  identifier: z
+    .string()
+    .min(1, 'identifier.validation.required')
+    .max(5, 'identifier.validation.max')
+    .regex(/^[A-Za-z0-9]+$/, 'identifier.validation.format'),
   description: z.string().max(500).optional(),
 });
 
@@ -42,11 +48,14 @@ export default function ProjectCreateDialog({
   onClose,
 }: ProjectCreateDialogProps): ReactElement {
   const { t } = useTranslation('common');
+  const { t: tLabels } = useTranslation('labels');
   const create = useCreateProject();
 
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [slugTouched, setSlugTouched] = useState(false);
+  const [identifier, setIdentifier] = useState('');
+  const [identifierTouched, setIdentifierTouched] = useState(false);
   const [description, setDescription] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
@@ -62,6 +71,8 @@ export default function ProjectCreateDialog({
     setName('');
     setSlug('');
     setSlugTouched(false);
+    setIdentifier('');
+    setIdentifierTouched(false);
     setDescription('');
     setErrors({});
   };
@@ -77,6 +88,7 @@ export default function ProjectCreateDialog({
     const parsed = schema.safeParse({
       name,
       slug,
+      identifier,
       description: description.trim() === '' ? undefined : description,
     });
     if (!parsed.success) {
@@ -85,6 +97,7 @@ export default function ProjectCreateDialog({
         const field = issue.path[0];
         if (field === 'name') next.name = issue.message;
         if (field === 'slug') next.slug = issue.message;
+        if (field === 'identifier') next.identifier = issue.message;
         if (field === 'description') next.description = issue.message;
       }
       setErrors(next);
@@ -98,6 +111,7 @@ export default function ProjectCreateDialog({
         input: {
           name: parsed.data.name,
           slug: parsed.data.slug,
+          identifier: parsed.data.identifier,
           ...(parsed.data.description ? { description: parsed.data.description } : {}),
         },
       });
@@ -110,6 +124,8 @@ export default function ProjectCreateDialog({
           : undefined;
       if (code === 'WS.PROJECT.SLUG_ALREADY_TAKEN') {
         setErrors((prev) => ({ ...prev, slug: 'projects.validation.slug_taken' }));
+      } else if (code === 'WS.PROJECT.IDENTIFIER_ALREADY_TAKEN') {
+        setErrors((prev) => ({ ...prev, identifier: 'identifier.validation.taken' }));
       } else {
         toaster.show({ tone: 'danger', message: t('projects.errors.create_failed') });
       }
@@ -140,6 +156,14 @@ export default function ProjectCreateDialog({
                 const nextName = e.target.value;
                 setName(nextName);
                 if (!slugTouched) setSlug(slugify(nextName));
+                if (!identifierTouched) {
+                  setIdentifier(
+                    nextName
+                      .replace(/[^a-zA-Z]/g, '')
+                      .slice(0, 3)
+                      .toUpperCase(),
+                  );
+                }
               }}
               autoFocus
             />
@@ -159,6 +183,26 @@ export default function ProjectCreateDialog({
                 setSlugTouched(true);
                 setSlug(e.target.value);
               }}
+            />
+          )}
+        </FormField>
+
+        <FormField
+          label={tLabels('identifier.label')}
+          required
+          description={tLabels('identifier.hint')}
+          {...(errors.identifier ? { error: tLabels(errors.identifier) } : {})}
+        >
+          {(control) => (
+            <Input
+              {...control}
+              value={identifier}
+              onChange={(e) => {
+                setIdentifierTouched(true);
+                setIdentifier(e.target.value.toUpperCase().slice(0, 5));
+              }}
+              placeholder={tLabels('identifier.placeholder')}
+              maxLength={5}
             />
           )}
         </FormField>

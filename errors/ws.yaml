@@ -50,6 +50,20 @@ resources:
         description: "Returned when the requested project slug already exists within the workspace."
         userAction: "Choose a different slug."
 
+      identifier_already_taken:
+        code: WS.PROJECT.IDENTIFIER_ALREADY_TAKEN
+        status: 409
+        message: "Project identifier is already taken"
+        description: "Returned when the requested project identifier already exists within the workspace."
+        userAction: "Choose a different identifier."
+
+      feature_disabled:
+        code: WS.PROJECT.FEATURE_DISABLED
+        status: 403
+        message: "This feature is disabled for the project"
+        description: "Returned when a request targets a feature that has been disabled in the project settings."
+        userAction: "Enable the feature in project settings, or contact a project admin."
+
   task:
     breadcrumb: "Workspace > Task"
     errors:
@@ -101,6 +115,20 @@ resources:
         message: "Task transition not allowed in current state"
         description: "Returned by the constraint engine when the requested transition is illegal for the task's current lifecycle state."
         userAction: "Refresh the task to see its current state and choose a valid transition."
+
+      already_archived:
+        code: WS.TASK.ALREADY_ARCHIVED
+        status: 409
+        message: "Task is already archived"
+        description: "Returned when attempting to archive a task that is already in the archived state."
+        userAction: "The task is already archived."
+
+      not_archived:
+        code: WS.TASK.NOT_ARCHIVED
+        status: 409
+        message: "Task is not archived"
+        description: "Returned when attempting to unarchive a task that is not in the archived state."
+        userAction: "The task is not archived."
 
   member:
     breadcrumb: "Workspace > Member"
@@ -166,3 +194,142 @@ resources:
         message: "Public share link not found or expired"
         description: "Returned when a public lens token does not match any published lens."
         userAction: "Verify the share link is correct and the view is still published."
+
+  label:
+    breadcrumb: "Workspace > Label"
+    errors:
+      not_found:
+        code: WS.LABEL.NOT_FOUND
+        status: 404
+        message: "Label not found"
+        description: "Returned when a label with the given public_id does not exist or has been deleted."
+        userAction: "Verify the label ID, or refresh the list to see current labels."
+
+      name_already_taken:
+        code: WS.LABEL.NAME_ALREADY_TAKEN
+        status: 409
+        message: "A label with this name already exists"
+        description: "Returned when the requested label name already exists within the same workspace/project scope."
+        userAction: "Choose a different name."
+
+  favorite:
+    breadcrumb: "Workspace > Favorite"
+    errors:
+      not_found:
+        code: WS.FAVORITE.NOT_FOUND
+        status: 404
+        message: "Favorite not found"
+        description: "Returned when a favorite with the given public_id does not exist or belongs to another user."
+        userAction: "Verify the favorite ID."
+
+      already_exists:
+        code: WS.FAVORITE.ALREADY_EXISTS
+        status: 409
+        message: "This item is already in your favorites"
+        description: "Returned when the actor attempts to add an item that is already in their favorites list."
+        userAction: "The item is already favorited."
+
+  reaction:
+    breadcrumb: "Workspace > Reaction"
+    errors:
+      not_found:
+        code: WS.REACTION.NOT_FOUND
+        status: 404
+        message: "Reaction not found"
+        description: "Returned when a reaction with the given public_id does not exist or has been removed."
+        userAction: "Verify the reaction ID."
+
+      already_exists:
+        code: WS.REACTION.ALREADY_EXISTS
+        status: 409
+        message: "You already reacted with this emoji"
+        description: "Returned when the actor attempts to add a duplicate reaction with the same emoji to the same target."
+        userAction: "Remove the existing reaction first if you want to change it."
+
+  mention:
+    breadcrumb: "Workspace > Mention"
+    errors:
+      not_found:
+        code: WS.MENTION.NOT_FOUND
+        status: 404
+        message: "Mention not found"
+        description: "Returned when a mention with the given public_id does not exist or has been removed."
+        userAction: "Verify the mention ID."
+
+  view_preference:
+    breadcrumb: "Workspace > View Preference"
+    errors:
+      not_found:
+        code: WS.VIEW_PREFERENCE.NOT_FOUND
+        status: 404
+        message: "View preference not found"
+        description: "Returned when a view preference with the given public_id does not exist for the current user."
+        userAction: "Verify the view preference ID, or create a new one."
+
+  notification_preference:
+    breadcrumb: "Workspace > Notification Preference"
+    errors:
+      not_found:
+        code: WS.NOTIFICATION_PREFERENCE.NOT_FOUND
+        status: 404
+        message: "Notification preference not found"
+        description: "Returned when a notification preference with the given public_id does not exist for the current user."
+        userAction: "Verify the notification preference ID, or create a new one."
+
+  intake:
+    breadcrumb: "Workspace > Intake"
+    errors:
+      not_found:
+        code: WS.INTAKE.NOT_FOUND
+        status: 404
+        message: "Intake item not found"
+        description: "Returned when an intake item with the given public_id does not exist or has been removed."
+        userAction: "Verify the intake item ID, or refresh the list to see current items."
+
+      already_triaged:
+        code: WS.INTAKE.ALREADY_TRIAGED
+        status: 409
+        message: "This intake item has already been triaged"
+        description: "Returned when attempting to triage an intake item that has already been triaged."
+        userAction: "The item has already been triaged. No further action is needed."
+
+      already_converted:
+        code: WS.INTAKE.ALREADY_CONVERTED
+        status: 409
+        message: "This intake item has already been converted to a task"
+        description: "Returned when attempting to convert an intake item that has already been converted to a task."
+        userAction: "The item has already been converted. Open the linked task instead."
+
+  description_version:
+    breadcrumb: "Workspace > Description Version"
+    errors:
+      not_found:
+        code: WS.DESCRIPTION_VERSION.NOT_FOUND
+        status: 404
+        message: "Description version not found"
+        description: "Returned when a description version with the given public_id does not exist or has been removed."
+        userAction: "Verify the version ID, or refresh the version history."
+
+  import:
+    breadcrumb: "Workspace > Import"
+    errors:
+      not_found:
+        code: WS.IMPORT.NOT_FOUND
+        status: 404
+        message: "Import job not found"
+        description: "Returned when an import job with the given public_id does not exist or belongs to a different workspace."
+        userAction: "Verify the import job ID, or refresh the list to see current imports."
+
+      already_running:
+        code: WS.IMPORT.ALREADY_RUNNING
+        status: 409
+        message: "An import job is already running for this project"
+        description: "Returned when a new import is requested while another import job is still in progress for the same project."
+        userAction: "Wait for the current import to finish, or cancel it before starting a new one."
+
+      cannot_cancel:
+        code: WS.IMPORT.CANNOT_CANCEL
+        status: 409
+        message: "Only pending or running import jobs can be cancelled"
+        description: "Returned when attempting to cancel an import job that has already completed, failed, or been cancelled."
+        userAction: "The import job is no longer in a cancellable state."

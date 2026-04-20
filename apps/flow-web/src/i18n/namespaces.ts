@@ -20,6 +20,8 @@ export const namespaces = [
   'relations',
   'dashboard',
   'pages',
+  'labels',
+  'reactions',
 ] as const;
 
 /** Union of all known i18n namespace names. */

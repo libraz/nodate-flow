@@ -34,6 +34,8 @@ type Deps struct {
 	Queries          *generated.Queries
 	JWT              *auth.JWTIssuer
 	OIDC             *auth.OIDCClient
+	OIDCGithub       *auth.GithubOAuthClient
+	OIDCMicrosoft    *auth.MicrosoftOIDCClient
 	Sessions         sessionstore.Store
 	Cipher           *crypto.Cipher
 	CookieSecure     bool
@@ -41,6 +43,7 @@ type Deps struct {
 	DisableRateLimit bool
 	EmailSender      email.Sender
 	FlowWebURL       string
+	AccountsWebURL   string
 
 	// Integrations is the personal-OAuth provider registry (GitHub /
 	// Slack / Google Calendar). Nil in tests; the handlers degrade
@@ -124,10 +127,14 @@ func BuildResult(deps Deps) Result {
 		Sessions:         sessionStore,
 		JWT:              deps.JWT,
 		OIDC:             deps.OIDC,
+		OIDCGithub:       deps.OIDCGithub,
+		OIDCMicrosoft:    deps.OIDCMicrosoft,
 		Cipher:           deps.Cipher,
 		CookieSecure:     deps.CookieSecure,
 		RegistrationOpen: deps.RegistrationOpen,
 		Audit:            auditRec,
+		EmailSender:      deps.EmailSender,
+		AccountsWebURL:   deps.AccountsWebURL,
 	}
 
 	// Public auth endpoints (login / register) behind per-IP rate limiter.
@@ -164,6 +171,42 @@ func BuildResult(deps Deps) Result {
 			Path:        "/auth/oidc/google/callback",
 			Summary:     "Complete a Google OIDC login flow",
 		}, authhandlers.OIDCGoogleCallback(authDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "auth-oidc-github-start",
+			Method:      http.MethodGet,
+			Path:        "/auth/oidc/github/start",
+			Summary:     "Start a GitHub OAuth login flow",
+		}, authhandlers.OIDCGithubStart(authDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "auth-oidc-github-callback",
+			Method:      http.MethodGet,
+			Path:        "/auth/oidc/github/callback",
+			Summary:     "Complete a GitHub OAuth login flow",
+		}, authhandlers.OIDCGithubCallback(authDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "auth-oidc-microsoft-start",
+			Method:      http.MethodGet,
+			Path:        "/auth/oidc/microsoft/start",
+			Summary:     "Start a Microsoft OIDC login flow",
+		}, authhandlers.OIDCMicrosoftStart(authDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "auth-oidc-microsoft-callback",
+			Method:      http.MethodGet,
+			Path:        "/auth/oidc/microsoft/callback",
+			Summary:     "Complete a Microsoft OIDC login flow",
+		}, authhandlers.OIDCMicrosoftCallback(authDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "auth-magic-link-request",
+			Method:      http.MethodPost,
+			Path:        "/auth/magic-link/request",
+			Summary:     "Request a passwordless magic link",
+		}, authhandlers.MagicLinkRequest(authDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "auth-magic-link-verify",
+			Method:      http.MethodGet,
+			Path:        "/auth/magic-link/verify",
+			Summary:     "Verify a magic link token and issue session",
+		}, authhandlers.MagicLinkVerify(authDeps))
 	})
 
 	// Cookie-auth endpoints (refresh / logout / totp).

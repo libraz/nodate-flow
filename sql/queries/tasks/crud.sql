@@ -7,6 +7,7 @@ INSERT INTO tasks (
   project_id,
   parent_task_id,
   created_by_user_id,
+  task_number,
   title,
   description,
   priority,
@@ -14,7 +15,7 @@ INSERT INTO tasks (
   started_on,
   event_on,
   visibility
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: FindTaskByPublicId :one
 -- Detail projection via v_task_detail. Workspace-scoped.
@@ -34,6 +35,10 @@ SELECT
   v.started_on,
   v.event_on,
   v.completed_at,
+  v.project_identifier,
+  v.task_number,
+  v.archived_at,
+  v.label_count,
   v.constraint_count,
   v.constraint_satisfied_count,
   v.dependency_count,
@@ -61,6 +66,10 @@ SELECT
   v.started_on,
   v.event_on,
   v.completed_at,
+  v.project_identifier,
+  v.task_number,
+  v.archived_at,
+  v.label_ids,
   v.sort_weight,
   v.updated_at,
   v.created_at,
@@ -88,6 +97,10 @@ SELECT
   v.started_on,
   v.event_on,
   v.completed_at,
+  v.project_identifier,
+  v.task_number,
+  v.archived_at,
+  v.label_ids,
   v.sort_weight,
   v.updated_at,
   v.created_at,
@@ -206,3 +219,79 @@ WHERE t.workspace_id = ?
   AND t.enabled = TRUE
 ORDER BY t.created_at ASC
 LIMIT 100;
+
+-- name: ArchiveTask :exec
+-- Set archived_at on a task.
+UPDATE tasks
+SET archived_at = CURRENT_TIMESTAMP
+WHERE workspace_id = ?
+  AND public_id = ?
+  AND enabled = TRUE
+  AND archived_at IS NULL;
+
+-- name: UnarchiveTask :exec
+-- Clear archived_at on a task.
+UPDATE tasks
+SET archived_at = NULL
+WHERE workspace_id = ?
+  AND public_id = ?
+  AND enabled = TRUE
+  AND archived_at IS NOT NULL;
+
+-- name: ListArchivedTasksForWorkspace :many
+-- List archived tasks via v_task_list_archived.
+SELECT
+  v.public_id,
+  v.project_public_id,
+  v.project_name,
+  v.project_identifier,
+  v.task_number,
+  v.parent_task_public_id,
+  v.title,
+  v.visibility,
+  v.derived_state,
+  v.priority,
+  v.due_on,
+  v.started_on,
+  v.event_on,
+  v.completed_at,
+  v.archived_at,
+  v.sort_weight,
+  v.updated_at,
+  v.created_at,
+  v.primary_assignee_public_id,
+  v.assignee_count,
+  v.label_ids,
+  COUNT(*) OVER() AS total
+FROM v_task_list_archived v
+WHERE v.workspace_id = ?
+ORDER BY v.archived_at DESC, v.public_id DESC
+LIMIT ? OFFSET ?;
+
+-- name: AssignTaskNumber :one
+-- Allocate the next task number for a project. Must be called inside a
+-- transaction with the project row locked (SELECT ... FOR UPDATE).
+SELECT COALESCE(MAX(task_number), 0) + 1 AS next_number
+FROM tasks
+WHERE project_id = ?;
+
+-- name: SetTaskNumber :exec
+-- Set the task_number after allocation.
+UPDATE tasks
+SET task_number = ?
+WHERE id = ?;
+
+-- name: ResolveTaskRef :one
+-- Resolve a human-readable task reference (e.g. NF-42) to a task public_id.
+SELECT
+  t.id,
+  t.public_id,
+  t.workspace_id,
+  t.title
+FROM tasks t
+INNER JOIN projects p ON p.id = t.project_id AND p.enabled = TRUE
+WHERE p.workspace_id = ?
+  AND p.identifier = ?
+  AND t.task_number = ?
+  AND t.enabled = TRUE
+LIMIT 1;

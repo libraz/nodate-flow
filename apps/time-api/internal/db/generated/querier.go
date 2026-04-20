@@ -14,6 +14,8 @@ type Querier interface {
 	// Verify that a user is an enabled member of a workspace. Returns 1 if
 	// the membership exists, sql.ErrNoRows otherwise.
 	CheckWorkspaceMemberExists(ctx context.Context, arg CheckWorkspaceMemberExistsParams) (int32, error)
+	// Delete tokens that are either expired-and-used or expired-and-unused, for periodic cleanup.
+	CleanupExpiredMagicLinks(ctx context.Context) error
 	// Disable TOTP on a local identity.
 	ClearIdentityMfa(ctx context.Context, id uint32) error
 	// Mark a pending TOTP enrollment as confirmed by stamping
@@ -45,6 +47,8 @@ type Querier interface {
 	CreateCalendarSubscription(ctx context.Context, arg CreateCalendarSubscriptionParams) (int64, error)
 	// Insert a new identity row (local password or OIDC binding) for a user.
 	CreateIdentity(ctx context.Context, arg CreateIdentityParams) (int64, error)
+	// Insert a new magic link token for passwordless login.
+	CreateMagicLinkToken(ctx context.Context, arg CreateMagicLinkTokenParams) (int64, error)
 	// Hide a specific member's events within a shared calendar for a subscriber.
 	CreateMemberFilter(ctx context.Context, arg CreateMemberFilterParams) error
 	// Insert a new personal access token. Plain token is shown to the user once.
@@ -113,9 +117,12 @@ type Querier interface {
 	// to issue session tokens directly or return a totp-challenge.
 	FindLocalIdentityByEmail(ctx context.Context, email string) (FindLocalIdentityByEmailRow, error)
 	// Resolve a local-password identity by internal user id. Used by
-	// /me/password to verify the caller's current password and by the
-	// TOTP handlers to read / write mfa_secret_ciphertext.
+	// /me/password to verify the caller's current password, by the
+	// TOTP handlers to read / write mfa_secret_ciphertext, and by
+	// LoginTotp to enforce brute-force lockout on 2FA attempts.
 	FindLocalIdentityByUserId(ctx context.Context, userID uint32) (FindLocalIdentityByUserIdRow, error)
+	// Resolve a magic link token by its SHA-256 hash. Caller validates expiry.
+	FindMagicLinkByTokenHash(ctx context.Context, tokenHash string) (FindMagicLinkByTokenHashRow, error)
 	// Resolve a PAT row from its SHA-256 hash for bearer auth.
 	FindPatByHash(ctx context.Context, tokenHash string) (FindPatByHashRow, error)
 	// Find the personal calendar for a user in a workspace.
@@ -205,6 +212,8 @@ type Querier interface {
 	ListWorkspaceMembers(ctx context.Context, arg ListWorkspaceMembersParams) ([]ListWorkspaceMembersRow, error)
 	// List workspaces a user belongs to.
 	ListWorkspacesForUser(ctx context.Context, arg ListWorkspacesForUserParams) ([]ListWorkspacesForUserRow, error)
+	// Stamp used_at on a magic link token after successful verification.
+	MarkMagicLinkUsed(ctx context.Context, id uint32) error
 	// Stamp used_at on a recovery code by internal id.
 	MarkRecoveryCodeUsed(ctx context.Context, id uint32) error
 	// Patch mutable calendar fields. NULL params leave columns untouched.

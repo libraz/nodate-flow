@@ -110,6 +110,15 @@ func Register(api huma.API, deps Deps) {
 		Tags:        []string{"Admin"},
 	}, ListAuditLogs(deps))
 
+	// --- Instance Stats ---
+	huma.Register(api, huma.Operation{
+		OperationID: "admin-instance-stats",
+		Method:      http.MethodGet,
+		Path:        "/admin/instance-stats",
+		Summary:     "Get instance-level statistics",
+		Tags:        []string{"Admin"},
+	}, InstanceStats(deps))
+
 	// --- Settings ---
 	huma.Register(api, huma.Operation{
 		OperationID: "admin-list-settings",

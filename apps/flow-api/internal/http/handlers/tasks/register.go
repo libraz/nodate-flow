@@ -254,4 +254,51 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Path:        "/tasks/{id}/attachments/{aid}",
 		Summary:     "Soft-delete an attachment from a task",
 	}, DeleteAttachment(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-archive",
+		Method:      http.MethodPost,
+		Path:        "/tasks/{id}/archive",
+		Summary:     "Archive a task",
+	}, Archive(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-unarchive",
+		Method:      http.MethodPost,
+		Path:        "/tasks/{id}/unarchive",
+		Summary:     "Unarchive a task",
+	}, Unarchive(deps))
+
+	// Description version history.
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-description-history-list",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/description-history",
+		Summary:     "List description version history for a task",
+	}, ListDescriptionVersions(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-description-history-get",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/description-history/{versionId}",
+		Summary:     "Get a specific description version with full body",
+	}, GetDescriptionVersion(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-description-history-restore",
+		Method:      http.MethodPost,
+		Path:        "/tasks/{id}/description-history/{versionId}/restore",
+		Summary:     "Restore a previous description version",
+	}, RestoreDescriptionVersion(deps))
+}
+
+// RegisterWorkspaceScoped wires workspace-level task routes that don't
+// require a specific task context.
+func RegisterWorkspaceScoped(api huma.API, deps Deps) {
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-archived-list",
+		Method:      http.MethodGet,
+		Path:        "/workspaces/{wsId}/tasks/archived",
+		Summary:     "List archived tasks in a workspace",
+	}, ListArchived(deps))
 }

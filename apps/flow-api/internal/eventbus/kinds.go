@@ -51,6 +51,40 @@ const (
 	TaskConstraintRemoved Kind = "task.constraint.removed"
 )
 
+// Label events.
+const (
+	// LabelCreated is appended when a new label is created.
+	LabelCreated Kind = "label.created"
+	// LabelUpdated is appended when a label is edited.
+	LabelUpdated Kind = "label.updated"
+	// LabelDisabled is appended when a label is soft-disabled.
+	LabelDisabled Kind = "label.disabled"
+
+	// TaskLabelAdded is appended when a label is attached to a task.
+	TaskLabelAdded Kind = "task.label.added"
+	// TaskLabelRemoved is appended when a label is detached from a task.
+	TaskLabelRemoved Kind = "task.label.removed"
+)
+
+// Archive events.
+const (
+	// TaskArchived is appended when a task is archived.
+	TaskArchived Kind = "task.archived"
+	// TaskUnarchived is appended when a task is unarchived.
+	TaskUnarchived Kind = "task.unarchived"
+
+	// PageArchived is appended when a page is archived.
+	PageArchived Kind = "page.archived"
+	// PageUnarchived is appended when a page is unarchived.
+	PageUnarchived Kind = "page.unarchived"
+
+	// LensArchived is appended when a lens is archived.
+	LensArchived Kind = "lens.archived"
+
+	// TimeboxArchived is appended when a timebox is archived.
+	TimeboxArchived Kind = "timebox.archived"
+)
+
 // Task transition events. The wire format is "task.transition.<name>"
 // where <name> matches the transition keyword the actor invoked. Use
 // [TaskTransition] to build a value from a free-form name when needed.
@@ -214,6 +248,62 @@ const (
 	CalMemoCreated Kind = "calendar.memo.created"
 	// CalMemoCompleted is appended when a memo is marked done.
 	CalMemoCompleted Kind = "calendar.memo.completed"
+)
+
+// Reaction events.
+const (
+	// ReactionAdded is appended when a user adds a reaction to an entity.
+	ReactionAdded Kind = "reaction.added"
+	// ReactionRemoved is appended when a user removes a reaction from an entity.
+	ReactionRemoved Kind = "reaction.removed"
+)
+
+// Mention events.
+const (
+	// MentionCreated is appended when a user is mentioned in a comment or description.
+	MentionCreated Kind = "mention.created"
+)
+
+// Favorite events.
+const (
+	// FavoriteAdded is appended when a user adds an item to their favorites.
+	FavoriteAdded Kind = "favorite.added"
+	// FavoriteRemoved is appended when a user removes an item from their favorites.
+	FavoriteRemoved Kind = "favorite.removed"
+)
+
+// Intake events.
+const (
+	// IntakeItemCreated is appended when a new intake item is created.
+	IntakeItemCreated Kind = "intake.item.created"
+	// IntakeItemAccepted is appended when an intake item is accepted.
+	IntakeItemAccepted Kind = "intake.item.accepted"
+	// IntakeItemRejected is appended when an intake item is rejected.
+	IntakeItemRejected Kind = "intake.item.rejected"
+	// IntakeItemSnoozed is appended when an intake item is snoozed.
+	IntakeItemSnoozed Kind = "intake.item.snoozed"
+	// IntakeItemDuplicate is appended when an intake item is marked as duplicate.
+	IntakeItemDuplicate Kind = "intake.item.duplicate"
+)
+
+// Description version events.
+const (
+	// DescriptionVersionCreated is appended when a new description version is created.
+	DescriptionVersionCreated Kind = "description.version.created"
+	// DescriptionVersionRestored is appended when a previous description version is restored.
+	DescriptionVersionRestored Kind = "description.version.restored"
+)
+
+// Import job events.
+const (
+	// ImportJobCreated is appended when a new import job is created.
+	ImportJobCreated Kind = "import.job.created"
+	// ImportJobCompleted is appended when an import job finishes successfully.
+	ImportJobCompleted Kind = "import.job.completed"
+	// ImportJobFailed is appended when an import job finishes with errors.
+	ImportJobFailed Kind = "import.job.failed"
+	// ImportJobCancelled is appended when an import job is cancelled.
+	ImportJobCancelled Kind = "import.job.cancelled"
 )
 
 // Legacy / compatibility kinds. These are kept so historical events

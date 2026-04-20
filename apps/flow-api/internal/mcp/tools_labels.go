@@ -1,0 +1,290 @@
+package mcp
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	stderrors "errors"
+	"strconv"
+	"strings"
+
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
+)
+
+func runListLabels(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+	var in struct {
+		Limit  int32 `json:"limit"`
+		Offset int32 `json:"offset"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	if in.Limit <= 0 || in.Limit > 200 {
+		in.Limit = 50
+	}
+	rows, err := deps.Queries.ListLabelsForWorkspace(ctx, generated.ListLabelsForWorkspaceParams{
+		WorkspaceID: s.workspaceID,
+		Limit:       in.Limit,
+		Offset:      in.Offset,
+	})
+	if err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	type labelOut struct {
+		ID          string `json:"id"`
+		Name        string `json:"name"`
+		Color       string `json:"color"`
+		Description string `json:"description,omitempty"`
+	}
+	out := make([]labelOut, 0, len(rows))
+	for _, r := range rows {
+		l := labelOut{
+			ID:    r.PublicID.String(),
+			Name:  r.Name,
+			Color: r.Color,
+		}
+		if r.Description.Valid {
+			l.Description = r.Description.String
+		}
+		out = append(out, l)
+	}
+	return map[string]any{"labels": out}, nil
+}
+
+func runCreateLabel(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+	var in struct {
+		Name        string `json:"name"`
+		Color       string `json:"color"`
+		Description string `json:"description"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	if in.Name == "" {
+		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+	}
+	if in.Color == "" {
+		in.Color = "#6b7280"
+	}
+	pub := newPublicID()
+	if _, err := deps.Queries.CreateLabel(ctx, generated.CreateLabelParams{
+		PublicID:     pub,
+		WorkspaceID:  s.workspaceID,
+		Name:         in.Name,
+		Color:        in.Color,
+		Description:  sql.NullString{String: in.Description, Valid: in.Description != ""},
+	}); err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	actor := int64(s.userID)
+	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		Type:        eventbus.LabelCreated,
+		WorkspaceID: s.workspaceID,
+		ActorUserID: &actor,
+		Payload:     map[string]any{"labelId": pub.String(), "via": "mcp"},
+	})
+	return map[string]any{"id": pub.String(), "name": in.Name, "color": in.Color}, nil
+}
+
+func runAddTaskLabel(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+	var in struct {
+		TaskID  string `json:"taskId"`
+		LabelID string `json:"labelId"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	taskInternal, _, err := resolveTask(ctx, deps, s, in.TaskID)
+	if err != nil {
+		return nil, err
+	}
+	labelPub, err := types.Parse(in.LabelID)
+	if err != nil {
+		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+	}
+	label, err := deps.Queries.FindLabelByPublicId(ctx, generated.FindLabelByPublicIdParams{
+		WorkspaceID: s.workspaceID,
+		PublicID:    labelPub,
+	})
+	if err != nil {
+		if stderrors.Is(err, sql.ErrNoRows) {
+			return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+		}
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	junctionPub := newPublicID()
+	if _, err := deps.Queries.CreateTaskLabel(ctx, generated.CreateTaskLabelParams{
+		PublicID:     junctionPub,
+		WorkspaceID:  s.workspaceID,
+		TaskID:       taskInternal,
+		LabelID:      label.ID,
+	}); err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	taskID64 := int64(taskInternal)
+	actor := int64(s.userID)
+	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		Type:        eventbus.TaskLabelAdded,
+		WorkspaceID: s.workspaceID,
+		ActorUserID: &actor,
+		TaskID:      &taskID64,
+		Payload:     map[string]any{"taskId": in.TaskID, "labelId": in.LabelID, "via": "mcp"},
+	})
+	return map[string]any{"ok": true}, nil
+}
+
+func runRemoveTaskLabel(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+	var in struct {
+		TaskID  string `json:"taskId"`
+		LabelID string `json:"labelId"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	taskInternal, _, err := resolveTask(ctx, deps, s, in.TaskID)
+	if err != nil {
+		return nil, err
+	}
+	labelPub, err := types.Parse(in.LabelID)
+	if err != nil {
+		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+	}
+	label, err := deps.Queries.FindLabelByPublicId(ctx, generated.FindLabelByPublicIdParams{
+		WorkspaceID: s.workspaceID,
+		PublicID:    labelPub,
+	})
+	if err != nil {
+		if stderrors.Is(err, sql.ErrNoRows) {
+			return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+		}
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	if err := deps.Queries.DisableTaskLabel(ctx, generated.DisableTaskLabelParams{
+		WorkspaceID: s.workspaceID,
+		TaskID:      taskInternal,
+		LabelID:     label.ID,
+	}); err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	taskID64 := int64(taskInternal)
+	actor := int64(s.userID)
+	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		Type:        eventbus.TaskLabelRemoved,
+		WorkspaceID: s.workspaceID,
+		ActorUserID: &actor,
+		TaskID:      &taskID64,
+		Payload:     map[string]any{"taskId": in.TaskID, "labelId": in.LabelID, "via": "mcp"},
+	})
+	return map[string]any{"ok": true}, nil
+}
+
+func runResolveTaskRef(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+	var in struct {
+		Ref string `json:"ref"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	parts := strings.SplitN(in.Ref, "-", 2)
+	if len(parts) != 2 {
+		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+	}
+	identifier := strings.ToUpper(parts[0])
+	num, err := strconv.ParseUint(parts[1], 10, 32)
+	if err != nil {
+		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+	}
+	row, err := deps.Queries.ResolveTaskRef(ctx, generated.ResolveTaskRefParams{
+		WorkspaceID: s.workspaceID,
+		Identifier:  identifier,
+		TaskNumber:  uint32(num),
+	})
+	if err != nil {
+		if stderrors.Is(err, sql.ErrNoRows) {
+			return nil, apierrors.New(apierrors.WsTaskNotFound)
+		}
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	return map[string]any{
+		"taskId": row.PublicID.String(),
+		"title":  row.Title,
+	}, nil
+}
+
+func runArchiveTask(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+	var in struct {
+		TaskID string `json:"taskId"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	taskPub, err := types.Parse(in.TaskID)
+	if err != nil {
+		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+	}
+	if err := deps.Queries.ArchiveTask(ctx, generated.ArchiveTaskParams{
+		WorkspaceID: s.workspaceID,
+		PublicID:    taskPub,
+	}); err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	actor := int64(s.userID)
+	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		Type:        eventbus.TaskArchived,
+		WorkspaceID: s.workspaceID,
+		ActorUserID: &actor,
+		Payload:     map[string]any{"taskId": in.TaskID, "via": "mcp"},
+	})
+	return map[string]any{"ok": true}, nil
+}
+
+func runUnarchiveTask(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
+	}
+	var in struct {
+		TaskID string `json:"taskId"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	taskPub, err := types.Parse(in.TaskID)
+	if err != nil {
+		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+	}
+	if err := deps.Queries.UnarchiveTask(ctx, generated.UnarchiveTaskParams{
+		WorkspaceID: s.workspaceID,
+		PublicID:    taskPub,
+	}); err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	actor := int64(s.userID)
+	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		Type:        eventbus.TaskUnarchived,
+		WorkspaceID: s.workspaceID,
+		ActorUserID: &actor,
+		Payload:     map[string]any{"taskId": in.TaskID, "via": "mcp"},
+	})
+	return map[string]any{"ok": true}, nil
+}

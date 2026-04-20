@@ -70,6 +70,8 @@ type Querier interface {
 	// Verify that a user is an enabled member of a workspace. Returns 1 if
 	// the membership exists, sql.ErrNoRows otherwise.
 	CheckWorkspaceMemberExists(ctx context.Context, arg CheckWorkspaceMemberExistsParams) (int32, error)
+	// Delete tokens that are either expired-and-used or expired-and-unused, for periodic cleanup.
+	CleanupExpiredMagicLinks(ctx context.Context) error
 	// Disable TOTP on a local identity.
 	ClearIdentityMfa(ctx context.Context, id uint32) error
 	// Mark a pending TOTP enrollment as confirmed by stamping
@@ -82,8 +84,14 @@ type Querier interface {
 	ConsumeOauthState(ctx context.Context, state string) (ConsumeOauthStateRow, error)
 	// Count unused recovery codes for a user.
 	CountActiveRecoveryCodes(ctx context.Context, userID uint32) (int64, error)
+	// Count all active (non-disabled) users.
+	CountActiveUsers(ctx context.Context) (int64, error)
+	// Count all active (non-disabled) workspaces.
+	CountActiveWorkspaces(ctx context.Context) (int64, error)
 	// Insert a new identity row (local password or OIDC binding) for a user.
 	CreateIdentity(ctx context.Context, arg CreateIdentityParams) (int64, error)
+	// Insert a new magic link token for passwordless login.
+	CreateMagicLinkToken(ctx context.Context, arg CreateMagicLinkTokenParams) (int64, error)
 	// Insert a short-lived CSRF state row for the personal OAuth flow.
 	CreateOauthState(ctx context.Context, arg CreateOauthStateParams) error
 	// Insert a new personal access token. Plain token is shown to the user once.
@@ -118,6 +126,8 @@ type Querier interface {
 	// TOTP handlers to read / write mfa_secret_ciphertext, and by
 	// LoginTotp to enforce brute-force lockout on 2FA attempts.
 	FindLocalIdentityByUserId(ctx context.Context, userID uint32) (FindLocalIdentityByUserIdRow, error)
+	// Resolve a magic link token by its SHA-256 hash. Caller validates expiry.
+	FindMagicLinkByTokenHash(ctx context.Context, tokenHash string) (FindMagicLinkByTokenHashRow, error)
 	// Resolve a PAT row from its SHA-256 hash for bearer auth.
 	FindPatByHash(ctx context.Context, tokenHash string) (FindPatByHashRow, error)
 	// Resolve a session by its external public_id (UUID v7).
@@ -186,6 +196,8 @@ type Querier interface {
 	ListWorkspaceMembers(ctx context.Context, arg ListWorkspaceMembersParams) ([]ListWorkspaceMembersRow, error)
 	// List workspaces a user belongs to.
 	ListWorkspacesForUser(ctx context.Context, arg ListWorkspacesForUserParams) ([]ListWorkspacesForUserRow, error)
+	// Stamp used_at on a magic link token after successful verification.
+	MarkMagicLinkUsed(ctx context.Context, id uint32) error
 	// Stamp used_at on a recovery code by internal id.
 	MarkRecoveryCodeUsed(ctx context.Context, id uint32) error
 	// Patch the authenticated user's profile. NULL params leave the column untouched.

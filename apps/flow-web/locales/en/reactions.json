@@ -1,0 +1,8 @@
+{
+  "add": "Add reaction",
+  "remove": "Remove reaction",
+  "errors": {
+    "add_failed": "Could not add the reaction. Please try again.",
+    "remove_failed": "Could not remove the reaction. Please try again."
+  }
+}

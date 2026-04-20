@@ -16,6 +16,7 @@ CREATE TABLE timeboxes (
   starts_on DATE NOT NULL COMMENT 'Timebox start date',
   ends_on DATE NOT NULL COMMENT 'Timebox end date (must be > starts_on)',
   status ENUM('planned','active','completed','cancelled') NOT NULL DEFAULT 'planned' COMMENT 'Lifecycle status',
+  archived_at DATETIME NULL COMMENT 'Set when timebox is archived (distinct from enabled)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
@@ -25,6 +26,7 @@ CREATE TABLE timeboxes (
 
   UNIQUE KEY uniq_timeboxes_public_id (public_id),
   UNIQUE KEY uniq_timeboxes_workspace_id_name_enabled (workspace_id, name, enabled),
+  KEY idx_timeboxes_workspace_id_archived_at (workspace_id, archived_at),
   KEY idx_timeboxes_workspace_id_status_enabled (workspace_id, status, enabled),
   KEY idx_timeboxes_workspace_id_project_id_enabled (workspace_id, project_id, enabled),
 

@@ -22,6 +22,11 @@ export type StreamKind =
   | 'lens.changed'
   | 'page.changed'
   | 'dashboard.changed'
+  | 'label.changed'
+  | 'reaction.changed'
+  | 'favorite.changed'
+  | 'intake.changed'
+  | 'import.changed'
   | 'resync';
 
 export interface StreamEvent {
@@ -74,6 +79,16 @@ export function keysForEvent(evt: StreamEvent): readonly (readonly unknown[])[] 
       return [['pages', 'list', ws]];
     case 'dashboard.changed':
       return [['dashboard', 'list', ws]];
+    case 'label.changed':
+      return [['labels', 'list', ws], ['tasks']];
+    case 'reaction.changed':
+      return [['reactions']];
+    case 'favorite.changed':
+      return [['favorites', 'list', ws]];
+    case 'intake.changed':
+      return [['intake', 'list', ws]];
+    case 'import.changed':
+      return [['imports', 'list', ws]];
     case 'resync':
       return [
         ['auto-actions', 'list', ws],
@@ -91,6 +106,11 @@ export function keysForEvent(evt: StreamEvent): readonly (readonly unknown[])[] 
         ['lenses', 'list', ws],
         ['pages', 'list', ws],
         ['dashboard', 'list', ws],
+        ['labels', 'list', ws],
+        ['reactions'],
+        ['favorites', 'list', ws],
+        ['intake', 'list', ws],
+        ['imports', 'list', ws],
         ['tasks'],
       ];
   }

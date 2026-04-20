@@ -13,6 +13,41 @@ import (
 	types "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 )
 
+const archiveTask = `-- name: ArchiveTask :exec
+UPDATE tasks
+SET archived_at = CURRENT_TIMESTAMP
+WHERE workspace_id = ?
+  AND public_id = ?
+  AND enabled = TRUE
+  AND archived_at IS NULL
+`
+
+type ArchiveTaskParams struct {
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+// Set archived_at on a task.
+func (q *Queries) ArchiveTask(ctx context.Context, arg ArchiveTaskParams) error {
+	_, err := q.db.ExecContext(ctx, archiveTask, arg.WorkspaceID, arg.PublicID)
+	return err
+}
+
+const assignTaskNumber = `-- name: AssignTaskNumber :one
+SELECT COALESCE(MAX(task_number), 0) + 1 AS next_number
+FROM tasks
+WHERE project_id = ?
+`
+
+// Allocate the next task number for a project. Must be called inside a
+// transaction with the project row locked (SELECT ... FOR UPDATE).
+func (q *Queries) AssignTaskNumber(ctx context.Context, projectID uint32) (int32, error) {
+	row := q.db.QueryRowContext(ctx, assignTaskNumber, projectID)
+	var next_number int32
+	err := row.Scan(&next_number)
+	return next_number, err
+}
+
 const createTask = `-- name: CreateTask :execlastid
 INSERT INTO tasks (
   public_id,
@@ -20,6 +55,7 @@ INSERT INTO tasks (
   project_id,
   parent_task_id,
   created_by_user_id,
+  task_number,
   title,
   description,
   priority,
@@ -27,7 +63,7 @@ INSERT INTO tasks (
   started_on,
   event_on,
   visibility
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateTaskParams struct {
@@ -36,6 +72,7 @@ type CreateTaskParams struct {
 	ProjectID       uint32          `json:"-"`
 	ParentTaskID    sql.NullInt32   `json:"-"`
 	CreatedByUserID sql.NullInt32   `json:"-"`
+	TaskNumber      uint32          `json:"taskNumber"`
 	Title           string          `json:"title"`
 	Description     sql.NullString  `json:"description"`
 	Priority        int32           `json:"priority"`
@@ -54,6 +91,7 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (int64, 
 		arg.ProjectID,
 		arg.ParentTaskID,
 		arg.CreatedByUserID,
+		arg.TaskNumber,
 		arg.Title,
 		arg.Description,
 		arg.Priority,
@@ -103,6 +141,10 @@ SELECT
   v.started_on,
   v.event_on,
   v.completed_at,
+  v.project_identifier,
+  v.task_number,
+  v.archived_at,
+  v.label_count,
   v.constraint_count,
   v.constraint_satisfied_count,
   v.dependency_count,
@@ -137,6 +179,10 @@ type FindTaskByPublicIdRow struct {
 	StartedOn                sql.NullTime      `json:"startedOn"`
 	EventOn                  sql.NullTime      `json:"eventOn"`
 	CompletedAt              sql.NullTime      `json:"completedAt"`
+	ProjectIdentifier        string            `json:"projectIdentifier"`
+	TaskNumber               uint32            `json:"taskNumber"`
+	ArchivedAt               sql.NullTime      `json:"archivedAt"`
+	LabelCount               int64             `json:"labelCount"`
 	ConstraintCount          int64             `json:"constraintCount"`
 	ConstraintSatisfiedCount int64             `json:"constraintSatisfiedCount"`
 	DependencyCount          int64             `json:"dependencyCount"`
@@ -166,6 +212,10 @@ func (q *Queries) FindTaskByPublicId(ctx context.Context, arg FindTaskByPublicId
 		&i.StartedOn,
 		&i.EventOn,
 		&i.CompletedAt,
+		&i.ProjectIdentifier,
+		&i.TaskNumber,
+		&i.ArchivedAt,
+		&i.LabelCount,
 		&i.ConstraintCount,
 		&i.ConstraintSatisfiedCount,
 		&i.DependencyCount,
@@ -175,6 +225,114 @@ func (q *Queries) FindTaskByPublicId(ctx context.Context, arg FindTaskByPublicId
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const listArchivedTasksForWorkspace = `-- name: ListArchivedTasksForWorkspace :many
+SELECT
+  v.public_id,
+  v.project_public_id,
+  v.project_name,
+  v.project_identifier,
+  v.task_number,
+  v.parent_task_public_id,
+  v.title,
+  v.visibility,
+  v.derived_state,
+  v.priority,
+  v.due_on,
+  v.started_on,
+  v.event_on,
+  v.completed_at,
+  v.archived_at,
+  v.sort_weight,
+  v.updated_at,
+  v.created_at,
+  v.primary_assignee_public_id,
+  v.assignee_count,
+  v.label_ids,
+  COUNT(*) OVER() AS total
+FROM v_task_list_archived v
+WHERE v.workspace_id = ?
+ORDER BY v.archived_at DESC, v.public_id DESC
+LIMIT ? OFFSET ?
+`
+
+type ListArchivedTasksForWorkspaceParams struct {
+	WorkspaceID uint32 `json:"-"`
+	Limit       int32  `json:"limit"`
+	Offset      int32  `json:"offset"`
+}
+
+type ListArchivedTasksForWorkspaceRow struct {
+	PublicID                types.PublicID    `json:"publicId"`
+	ProjectPublicID         []byte            `json:"projectPublicId"`
+	ProjectName             string            `json:"projectName"`
+	ProjectIdentifier       string            `json:"projectIdentifier"`
+	TaskNumber              uint32            `json:"taskNumber"`
+	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
+	Title                   string            `json:"title"`
+	Visibility              TasksVisibility   `json:"visibility"`
+	DerivedState            TasksDerivedState `json:"derivedState"`
+	Priority                int32             `json:"priority"`
+	DueOn                   sql.NullTime      `json:"dueOn"`
+	StartedOn               sql.NullTime      `json:"startedOn"`
+	EventOn                 sql.NullTime      `json:"eventOn"`
+	CompletedAt             sql.NullTime      `json:"completedAt"`
+	ArchivedAt              sql.NullTime      `json:"archivedAt"`
+	SortWeight              int32             `json:"sortWeight"`
+	UpdatedAt               sql.NullTime      `json:"updatedAt"`
+	CreatedAt               time.Time         `json:"createdAt"`
+	PrimaryAssigneePublicID interface{}       `json:"primaryAssigneePublicId"`
+	AssigneeCount           int64             `json:"assigneeCount"`
+	LabelIds                sql.NullString    `json:"labelIds"`
+	Total                   interface{}       `json:"total"`
+}
+
+// List archived tasks via v_task_list_archived.
+func (q *Queries) ListArchivedTasksForWorkspace(ctx context.Context, arg ListArchivedTasksForWorkspaceParams) ([]ListArchivedTasksForWorkspaceRow, error) {
+	rows, err := q.db.QueryContext(ctx, listArchivedTasksForWorkspace, arg.WorkspaceID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListArchivedTasksForWorkspaceRow{}
+	for rows.Next() {
+		var i ListArchivedTasksForWorkspaceRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.ProjectPublicID,
+			&i.ProjectName,
+			&i.ProjectIdentifier,
+			&i.TaskNumber,
+			&i.ParentTaskPublicID,
+			&i.Title,
+			&i.Visibility,
+			&i.DerivedState,
+			&i.Priority,
+			&i.DueOn,
+			&i.StartedOn,
+			&i.EventOn,
+			&i.CompletedAt,
+			&i.ArchivedAt,
+			&i.SortWeight,
+			&i.UpdatedAt,
+			&i.CreatedAt,
+			&i.PrimaryAssigneePublicID,
+			&i.AssigneeCount,
+			&i.LabelIds,
+			&i.Total,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listChildTasksByParentID = `-- name: ListChildTasksByParentID :many
@@ -428,6 +586,10 @@ SELECT
   v.started_on,
   v.event_on,
   v.completed_at,
+  v.project_identifier,
+  v.task_number,
+  v.archived_at,
+  v.label_ids,
   v.sort_weight,
   v.updated_at,
   v.created_at,
@@ -461,6 +623,10 @@ type ListTasksForProjectRow struct {
 	StartedOn               sql.NullTime      `json:"startedOn"`
 	EventOn                 sql.NullTime      `json:"eventOn"`
 	CompletedAt             sql.NullTime      `json:"completedAt"`
+	ProjectIdentifier       string            `json:"projectIdentifier"`
+	TaskNumber              uint32            `json:"taskNumber"`
+	ArchivedAt              sql.NullTime      `json:"archivedAt"`
+	LabelIds                sql.NullString    `json:"labelIds"`
 	SortWeight              int32             `json:"sortWeight"`
 	UpdatedAt               sql.NullTime      `json:"updatedAt"`
 	CreatedAt               time.Time         `json:"createdAt"`
@@ -497,6 +663,10 @@ func (q *Queries) ListTasksForProject(ctx context.Context, arg ListTasksForProje
 			&i.StartedOn,
 			&i.EventOn,
 			&i.CompletedAt,
+			&i.ProjectIdentifier,
+			&i.TaskNumber,
+			&i.ArchivedAt,
+			&i.LabelIds,
 			&i.SortWeight,
 			&i.UpdatedAt,
 			&i.CreatedAt,
@@ -531,6 +701,10 @@ SELECT
   v.started_on,
   v.event_on,
   v.completed_at,
+  v.project_identifier,
+  v.task_number,
+  v.archived_at,
+  v.label_ids,
   v.sort_weight,
   v.updated_at,
   v.created_at,
@@ -562,6 +736,10 @@ type ListTasksForWorkspaceRow struct {
 	StartedOn               sql.NullTime      `json:"startedOn"`
 	EventOn                 sql.NullTime      `json:"eventOn"`
 	CompletedAt             sql.NullTime      `json:"completedAt"`
+	ProjectIdentifier       string            `json:"projectIdentifier"`
+	TaskNumber              uint32            `json:"taskNumber"`
+	ArchivedAt              sql.NullTime      `json:"archivedAt"`
+	LabelIds                sql.NullString    `json:"labelIds"`
 	SortWeight              int32             `json:"sortWeight"`
 	UpdatedAt               sql.NullTime      `json:"updatedAt"`
 	CreatedAt               time.Time         `json:"createdAt"`
@@ -593,6 +771,10 @@ func (q *Queries) ListTasksForWorkspace(ctx context.Context, arg ListTasksForWor
 			&i.StartedOn,
 			&i.EventOn,
 			&i.CompletedAt,
+			&i.ProjectIdentifier,
+			&i.TaskNumber,
+			&i.ArchivedAt,
+			&i.LabelIds,
 			&i.SortWeight,
 			&i.UpdatedAt,
 			&i.CreatedAt,
@@ -611,6 +793,64 @@ func (q *Queries) ListTasksForWorkspace(ctx context.Context, arg ListTasksForWor
 		return nil, err
 	}
 	return items, nil
+}
+
+const resolveTaskRef = `-- name: ResolveTaskRef :one
+SELECT
+  t.id,
+  t.public_id,
+  t.workspace_id,
+  t.title
+FROM tasks t
+INNER JOIN projects p ON p.id = t.project_id AND p.enabled = TRUE
+WHERE p.workspace_id = ?
+  AND p.identifier = ?
+  AND t.task_number = ?
+  AND t.enabled = TRUE
+LIMIT 1
+`
+
+type ResolveTaskRefParams struct {
+	WorkspaceID uint32 `json:"-"`
+	Identifier  string `json:"identifier"`
+	TaskNumber  uint32 `json:"taskNumber"`
+}
+
+type ResolveTaskRefRow struct {
+	ID          uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+	WorkspaceID uint32         `json:"-"`
+	Title       string         `json:"title"`
+}
+
+// Resolve a human-readable task reference (e.g. NF-42) to a task public_id.
+func (q *Queries) ResolveTaskRef(ctx context.Context, arg ResolveTaskRefParams) (ResolveTaskRefRow, error) {
+	row := q.db.QueryRowContext(ctx, resolveTaskRef, arg.WorkspaceID, arg.Identifier, arg.TaskNumber)
+	var i ResolveTaskRefRow
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.WorkspaceID,
+		&i.Title,
+	)
+	return i, err
+}
+
+const setTaskNumber = `-- name: SetTaskNumber :exec
+UPDATE tasks
+SET task_number = ?
+WHERE id = ?
+`
+
+type SetTaskNumberParams struct {
+	TaskNumber uint32 `json:"taskNumber"`
+	ID         uint32 `json:"-"`
+}
+
+// Set the task_number after allocation.
+func (q *Queries) SetTaskNumber(ctx context.Context, arg SetTaskNumberParams) error {
+	_, err := q.db.ExecContext(ctx, setTaskNumber, arg.TaskNumber, arg.ID)
+	return err
 }
 
 const transitionTaskState = `-- name: TransitionTaskState :exec
@@ -639,6 +879,26 @@ func (q *Queries) TransitionTaskState(ctx context.Context, arg TransitionTaskSta
 		arg.WorkspaceID,
 		arg.PublicID,
 	)
+	return err
+}
+
+const unarchiveTask = `-- name: UnarchiveTask :exec
+UPDATE tasks
+SET archived_at = NULL
+WHERE workspace_id = ?
+  AND public_id = ?
+  AND enabled = TRUE
+  AND archived_at IS NOT NULL
+`
+
+type UnarchiveTaskParams struct {
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+// Clear archived_at on a task.
+func (q *Queries) UnarchiveTask(ctx context.Context, arg UnarchiveTaskParams) error {
+	_, err := q.db.ExecContext(ctx, unarchiveTask, arg.WorkspaceID, arg.PublicID)
 	return err
 }
 

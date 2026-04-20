@@ -9,6 +9,7 @@ CREATE TABLE tasks (
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   project_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to projects.id',
+  task_number INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Per-project monotonic counter (1-based)',
   parent_task_id INT UNSIGNED NULL COMMENT 'Self-reference for subtasks',
   created_by_user_id INT UNSIGNED NULL COMMENT 'Creator user.id',
 
@@ -20,6 +21,7 @@ CREATE TABLE tasks (
   started_on DATE NULL COMMENT 'Date work began on this task',
   event_on DATE NULL COMMENT 'External reference date (meeting, launch, milestone) this task relates to; NOT a constraint — use deadline constraint for enforcement',
   completed_at DATETIME NULL COMMENT 'Time derived_state transitioned to done',
+  archived_at DATETIME NULL COMMENT 'Set when task is archived (distinct from enabled)',
 
   visibility ENUM('public','project','private') NOT NULL DEFAULT 'public' COMMENT 'ACL Layer 4: public=workspace members, project=project members, private=task actors only',
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
@@ -33,6 +35,8 @@ CREATE TABLE tasks (
   KEY idx_tasks_workspace_id_due_on (workspace_id, due_on),
   KEY idx_tasks_workspace_id_event_on (workspace_id, event_on),
   KEY idx_tasks_workspace_id_derived_state (workspace_id, derived_state),
+  UNIQUE KEY uniq_tasks_project_id_task_number (project_id, task_number),
+  KEY idx_tasks_workspace_id_archived_at (workspace_id, archived_at),
   KEY idx_tasks_parent_task_id (parent_task_id),
   FULLTEXT KEY ft_tasks_title_description (title, description),
 

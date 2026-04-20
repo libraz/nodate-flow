@@ -586,6 +586,140 @@ func (ns NullIdentitiesProvider) Value() (driver.Value, error) {
 	return string(ns.IdentitiesProvider), nil
 }
 
+type ImportJobsSource string
+
+const (
+	ImportJobsSourceGithub ImportJobsSource = "github"
+	ImportJobsSourceJira   ImportJobsSource = "jira"
+	ImportJobsSourceLinear ImportJobsSource = "linear"
+	ImportJobsSourceCsv    ImportJobsSource = "csv"
+)
+
+func (e *ImportJobsSource) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ImportJobsSource(s)
+	case string:
+		*e = ImportJobsSource(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ImportJobsSource: %T", src)
+	}
+	return nil
+}
+
+type NullImportJobsSource struct {
+	ImportJobsSource ImportJobsSource `json:"importJobsSource"`
+	Valid            bool             `json:"valid"` // Valid is true if ImportJobsSource is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullImportJobsSource) Scan(value interface{}) error {
+	if value == nil {
+		ns.ImportJobsSource, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ImportJobsSource.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullImportJobsSource) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ImportJobsSource), nil
+}
+
+type ImportJobsStatus string
+
+const (
+	ImportJobsStatusPending   ImportJobsStatus = "pending"
+	ImportJobsStatusRunning   ImportJobsStatus = "running"
+	ImportJobsStatusCompleted ImportJobsStatus = "completed"
+	ImportJobsStatusFailed    ImportJobsStatus = "failed"
+	ImportJobsStatusCancelled ImportJobsStatus = "cancelled"
+)
+
+func (e *ImportJobsStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ImportJobsStatus(s)
+	case string:
+		*e = ImportJobsStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ImportJobsStatus: %T", src)
+	}
+	return nil
+}
+
+type NullImportJobsStatus struct {
+	ImportJobsStatus ImportJobsStatus `json:"importJobsStatus"`
+	Valid            bool             `json:"valid"` // Valid is true if ImportJobsStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullImportJobsStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.ImportJobsStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ImportJobsStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullImportJobsStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ImportJobsStatus), nil
+}
+
+type IntakeItemsTriageStatus string
+
+const (
+	IntakeItemsTriageStatusPending   IntakeItemsTriageStatus = "pending"
+	IntakeItemsTriageStatusAccepted  IntakeItemsTriageStatus = "accepted"
+	IntakeItemsTriageStatusRejected  IntakeItemsTriageStatus = "rejected"
+	IntakeItemsTriageStatusSnoozed   IntakeItemsTriageStatus = "snoozed"
+	IntakeItemsTriageStatusDuplicate IntakeItemsTriageStatus = "duplicate"
+)
+
+func (e *IntakeItemsTriageStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = IntakeItemsTriageStatus(s)
+	case string:
+		*e = IntakeItemsTriageStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for IntakeItemsTriageStatus: %T", src)
+	}
+	return nil
+}
+
+type NullIntakeItemsTriageStatus struct {
+	IntakeItemsTriageStatus IntakeItemsTriageStatus `json:"intakeItemsTriageStatus"`
+	Valid                   bool                    `json:"valid"` // Valid is true if IntakeItemsTriageStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullIntakeItemsTriageStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.IntakeItemsTriageStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.IntakeItemsTriageStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullIntakeItemsTriageStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.IntakeItemsTriageStatus), nil
+}
+
 type McpInvocationsStatus string
 
 const (
@@ -627,6 +761,91 @@ func (ns NullMcpInvocationsStatus) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.McpInvocationsStatus), nil
+}
+
+type MentionsSource string
+
+const (
+	MentionsSourceTaskDescription MentionsSource = "task_description"
+	MentionsSourceComment         MentionsSource = "comment"
+)
+
+func (e *MentionsSource) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = MentionsSource(s)
+	case string:
+		*e = MentionsSource(s)
+	default:
+		return fmt.Errorf("unsupported scan type for MentionsSource: %T", src)
+	}
+	return nil
+}
+
+type NullMentionsSource struct {
+	MentionsSource MentionsSource `json:"mentionsSource"`
+	Valid          bool           `json:"valid"` // Valid is true if MentionsSource is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullMentionsSource) Scan(value interface{}) error {
+	if value == nil {
+		ns.MentionsSource, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.MentionsSource.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullMentionsSource) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.MentionsSource), nil
+}
+
+type NotificationPreferencesChannel string
+
+const (
+	NotificationPreferencesChannelInApp NotificationPreferencesChannel = "in_app"
+	NotificationPreferencesChannelEmail NotificationPreferencesChannel = "email"
+	NotificationPreferencesChannelPush  NotificationPreferencesChannel = "push"
+)
+
+func (e *NotificationPreferencesChannel) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = NotificationPreferencesChannel(s)
+	case string:
+		*e = NotificationPreferencesChannel(s)
+	default:
+		return fmt.Errorf("unsupported scan type for NotificationPreferencesChannel: %T", src)
+	}
+	return nil
+}
+
+type NullNotificationPreferencesChannel struct {
+	NotificationPreferencesChannel NotificationPreferencesChannel `json:"notificationPreferencesChannel"`
+	Valid                          bool                           `json:"valid"` // Valid is true if NotificationPreferencesChannel is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullNotificationPreferencesChannel) Scan(value interface{}) error {
+	if value == nil {
+		ns.NotificationPreferencesChannel, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.NotificationPreferencesChannel.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullNotificationPreferencesChannel) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.NotificationPreferencesChannel), nil
 }
 
 type NotificationsChannel string
@@ -1242,6 +1461,51 @@ func (ns NullTimeboxesStatus) Value() (driver.Value, error) {
 	return string(ns.TimeboxesStatus), nil
 }
 
+type UserFavoritesTargetType string
+
+const (
+	UserFavoritesTargetTypeProject UserFavoritesTargetType = "project"
+	UserFavoritesTargetTypeTask    UserFavoritesTargetType = "task"
+	UserFavoritesTargetTypePage    UserFavoritesTargetType = "page"
+	UserFavoritesTargetTypeLens    UserFavoritesTargetType = "lens"
+	UserFavoritesTargetTypeTimebox UserFavoritesTargetType = "timebox"
+)
+
+func (e *UserFavoritesTargetType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = UserFavoritesTargetType(s)
+	case string:
+		*e = UserFavoritesTargetType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for UserFavoritesTargetType: %T", src)
+	}
+	return nil
+}
+
+type NullUserFavoritesTargetType struct {
+	UserFavoritesTargetType UserFavoritesTargetType `json:"userFavoritesTargetType"`
+	Valid                   bool                    `json:"valid"` // Valid is true if UserFavoritesTargetType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullUserFavoritesTargetType) Scan(value interface{}) error {
+	if value == nil {
+		ns.UserFavoritesTargetType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.UserFavoritesTargetType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullUserFavoritesTargetType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.UserFavoritesTargetType), nil
+}
+
 type UserIntegrationsProvider string
 
 const (
@@ -1283,6 +1547,95 @@ func (ns NullUserIntegrationsProvider) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.UserIntegrationsProvider), nil
+}
+
+type UserRecentVisitsEntityType string
+
+const (
+	UserRecentVisitsEntityTypeProject UserRecentVisitsEntityType = "project"
+	UserRecentVisitsEntityTypeTask    UserRecentVisitsEntityType = "task"
+	UserRecentVisitsEntityTypePage    UserRecentVisitsEntityType = "page"
+	UserRecentVisitsEntityTypeLens    UserRecentVisitsEntityType = "lens"
+	UserRecentVisitsEntityTypeTimebox UserRecentVisitsEntityType = "timebox"
+)
+
+func (e *UserRecentVisitsEntityType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = UserRecentVisitsEntityType(s)
+	case string:
+		*e = UserRecentVisitsEntityType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for UserRecentVisitsEntityType: %T", src)
+	}
+	return nil
+}
+
+type NullUserRecentVisitsEntityType struct {
+	UserRecentVisitsEntityType UserRecentVisitsEntityType `json:"userRecentVisitsEntityType"`
+	Valid                      bool                       `json:"valid"` // Valid is true if UserRecentVisitsEntityType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullUserRecentVisitsEntityType) Scan(value interface{}) error {
+	if value == nil {
+		ns.UserRecentVisitsEntityType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.UserRecentVisitsEntityType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullUserRecentVisitsEntityType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.UserRecentVisitsEntityType), nil
+}
+
+type UserViewPreferencesScopeType string
+
+const (
+	UserViewPreferencesScopeTypeWorkspace UserViewPreferencesScopeType = "workspace"
+	UserViewPreferencesScopeTypeProject   UserViewPreferencesScopeType = "project"
+	UserViewPreferencesScopeTypeLens      UserViewPreferencesScopeType = "lens"
+	UserViewPreferencesScopeTypeTimebox   UserViewPreferencesScopeType = "timebox"
+)
+
+func (e *UserViewPreferencesScopeType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = UserViewPreferencesScopeType(s)
+	case string:
+		*e = UserViewPreferencesScopeType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for UserViewPreferencesScopeType: %T", src)
+	}
+	return nil
+}
+
+type NullUserViewPreferencesScopeType struct {
+	UserViewPreferencesScopeType UserViewPreferencesScopeType `json:"userViewPreferencesScopeType"`
+	Valid                        bool                         `json:"valid"` // Valid is true if UserViewPreferencesScopeType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullUserViewPreferencesScopeType) Scan(value interface{}) error {
+	if value == nil {
+		ns.UserViewPreferencesScopeType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.UserViewPreferencesScopeType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullUserViewPreferencesScopeType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.UserViewPreferencesScopeType), nil
 }
 
 type UsersThemePreference string
@@ -2193,6 +2546,46 @@ type Identity struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
+// Bulk import job tracking
+type ImportJob struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Internal FK to projects.id (target project)
+	ProjectID sql.NullInt32 `json:"-"`
+	// Internal FK to users.id (who started the import)
+	InitiatedByUserID sql.NullInt32 `json:"-"`
+	// Import source type
+	Source ImportJobsSource `json:"source"`
+	// Lifecycle state
+	Status ImportJobsStatus `json:"status"`
+	// Total items to import
+	TotalItems uint32 `json:"totalItems"`
+	// Successfully processed items
+	ProcessedItems uint32 `json:"processedItems"`
+	// Items that failed to import
+	FailedItems uint32 `json:"failedItems"`
+	// Source-specific import configuration
+	ConfigJson json.RawMessage `json:"configJson"`
+	// Aggregated error log
+	ErrorLog sql.NullString `json:"errorLog"`
+	// When the worker began processing
+	StartedAt sql.NullTime `json:"startedAt"`
+	// When the import finished (success or failure)
+	CompletedAt sql.NullTime `json:"completedAt"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
 // Instance-wide admin grants
 type InstanceAdmin struct {
 	// Internal PK, never exposed
@@ -2273,6 +2666,72 @@ type InstanceSetting struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
+// Intake triage queue
+type IntakeItem struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Origin signal (NULL = manual)
+	SignalID sql.NullInt32 `json:"-"`
+	// Converted task (NULL = not yet converted)
+	TaskID sql.NullInt32 `json:"-"`
+	// User who triaged this item
+	TriagedByUserID sql.NullInt32 `json:"-"`
+	// Item title
+	Title string `json:"title"`
+	// Item body / details
+	Body sql.NullString `json:"body"`
+	// Current triage state
+	TriageStatus IntakeItemsTriageStatus `json:"triageStatus"`
+	// Snooze expiry (NULL = not snoozed)
+	SnoozeUntil sql.NullTime `json:"snoozeUntil"`
+	// 0.00-1.00
+	AiScore sql.NullString `json:"aiScore"`
+	// AI reasoning for the score
+	AiReasoning sql.NullString `json:"aiReasoning"`
+	// When AI scoring was performed
+	ScoredAt sql.NullTime `json:"scoredAt"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
+// Hierarchical colored labels
+type Label struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// NULL = workspace-wide label
+	ProjectID sql.NullInt32 `json:"-"`
+	// Self-ref for hierarchy; NULL = root
+	ParentLabelID sql.NullInt32 `json:"-"`
+	// Display name
+	Name string `json:"name"`
+	// Hex color
+	Color string `json:"color"`
+	// Optional description
+	Description sql.NullString `json:"description"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
 // Saved task query views
 type Lense struct {
 	// Internal PK, never exposed
@@ -2299,6 +2758,34 @@ type Lense struct {
 	SharedAt sql.NullTime `json:"sharedAt"`
 	// Timestamp of last AI safety check
 	SafetyCheckedAt sql.NullTime `json:"safetyCheckedAt"`
+	// Set when lens is archived (distinct from enabled)
+	ArchivedAt sql.NullTime `json:"archivedAt"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
+// Passwordless magic-link tokens
+type MagicLinkToken struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to users.id
+	UserID uint32 `json:"-"`
+	// SHA-256 hex of the token
+	TokenHash string `json:"tokenHash"`
+	// Token expiry time
+	ExpiresAt time.Time `json:"expiresAt"`
+	// Time the token was consumed
+	UsedAt sql.NullTime `json:"usedAt"`
+	// Packed IPv4/IPv6 address at creation
+	IpAddress sql.NullString `json:"ipAddress"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
@@ -2381,6 +2868,28 @@ type McpToken struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
+// @mention cache (re-extractable from markdown)
+type Mention struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID        types.PublicID `json:"publicId"`
+	WorkspaceID     uint32         `json:"-"`
+	MentionedUserID uint32         `json:"-"`
+	ActorUserID     sql.NullInt32  `json:"-"`
+	TaskID          sql.NullInt32  `json:"-"`
+	CommentID       sql.NullInt32  `json:"-"`
+	Source          MentionsSource `json:"source"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
 // Per-user notification entries from eventbus fan-out
 type Notification struct {
 	// Internal PK, never exposed
@@ -2413,6 +2922,29 @@ type Notification struct {
 	ArchivedAt sql.NullTime `json:"archivedAt"`
 	// When email/push was actually sent (null for in_app only)
 	DeliveredAt sql.NullTime `json:"deliveredAt"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
+// Granular per-user notification preferences
+type NotificationPreference struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID    types.PublicID `json:"publicId"`
+	WorkspaceID uint32         `json:"-"`
+	UserID      uint32         `json:"-"`
+	// task.lifecycle, task.comment, task.mention, relation, timebox, ai, etc.
+	EventCategory string                         `json:"eventCategory"`
+	Channel       NotificationPreferencesChannel `json:"channel"`
+	// TRUE = suppress this category+channel
+	IsMuted bool `json:"isMuted"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
@@ -2459,6 +2991,8 @@ type Page struct {
 	Body string `json:"body"`
 	// Whether the page was generated by AI
 	IsAiGenerated bool `json:"isAiGenerated"`
+	// Set when page is archived (distinct from enabled)
+	ArchivedAt sql.NullTime `json:"archivedAt"`
 	// Display order among siblings
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
@@ -2513,6 +3047,8 @@ type Project struct {
 	WorkspaceID uint32 `json:"-"`
 	// Workspace-local slug
 	Slug string `json:"slug"`
+	// Human-readable project key (e.g. NF)
+	Identifier string `json:"identifier"`
 	// Display name
 	Name string `json:"name"`
 	// Optional description
@@ -2525,6 +3061,14 @@ type Project struct {
 	StartedOn sql.NullTime `json:"startedOn"`
 	// Project end date
 	EndedOn sql.NullTime `json:"endedOn"`
+	// Toggle pages feature
+	FeaturePages bool `json:"featurePages"`
+	// Toggle timeboxes feature
+	FeatureTimeboxes bool `json:"featureTimeboxes"`
+	// Toggle lenses feature
+	FeatureLenses bool `json:"featureLenses"`
+	// Toggle calendar feature
+	FeatureCalendar bool `json:"featureCalendar"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
@@ -2551,6 +3095,28 @@ type ProjectMember struct {
 	Role ProjectMembersRole `json:"role"`
 	// Time added to project
 	AddedAt sql.NullTime `json:"addedAt"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
+// Emoji reactions on tasks and comments
+type Reaction struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID    types.PublicID `json:"publicId"`
+	WorkspaceID uint32         `json:"-"`
+	UserID      uint32         `json:"-"`
+	TaskID      sql.NullInt32  `json:"-"`
+	CommentID   sql.NullInt32  `json:"-"`
+	// Unicode emoji
+	Emoji string `json:"emoji"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
@@ -2687,6 +3253,8 @@ type Task struct {
 	WorkspaceID uint32 `json:"-"`
 	// Internal FK to projects.id
 	ProjectID uint32 `json:"-"`
+	// Per-project monotonic counter (1-based)
+	TaskNumber uint32 `json:"taskNumber"`
 	// Self-reference for subtasks
 	ParentTaskID sql.NullInt32 `json:"-"`
 	// Creator user.id
@@ -2707,6 +3275,8 @@ type Task struct {
 	EventOn sql.NullTime `json:"eventOn"`
 	// Time derived_state transitioned to done
 	CompletedAt sql.NullTime `json:"completedAt"`
+	// Set when task is archived (distinct from enabled)
+	ArchivedAt sql.NullTime `json:"archivedAt"`
 	// ACL Layer 4: public=workspace members, project=project members, private=task actors only
 	Visibility TasksVisibility `json:"visibility"`
 	// Display order
@@ -2799,6 +3369,34 @@ type TaskDependency struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
+// Task description version history (full snapshots)
+type TaskDescriptionVersion struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Internal FK to tasks.id
+	TaskID uint32 `json:"-"`
+	// User who authored this version
+	AuthorUserID sql.NullInt32 `json:"-"`
+	// Monotonically increasing per task
+	VersionNumber uint32 `json:"versionNumber"`
+	// Full description snapshot
+	Body string `json:"body"`
+	// Char count (cached)
+	BodyLength uint32 `json:"bodyLength"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
 // Task embedding vectors for duplicate detection (ADR 0003)
 type TaskEmbedding struct {
 	// Internal FK to tasks.id
@@ -2814,6 +3412,28 @@ type TaskEmbedding struct {
 	// Last embed time
 	EmbeddedAt time.Time    `json:"embeddedAt"`
 	UpdatedAt  sql.NullTime `json:"updatedAt"`
+}
+
+// Task-label junction
+type TaskLabel struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Internal FK to tasks.id
+	TaskID uint32 `json:"-"`
+	// Internal FK to labels.id
+	LabelID uint32 `json:"-"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
 }
 
 // Time-bounded work containers
@@ -2838,6 +3458,8 @@ type Timebox struct {
 	EndsOn time.Time `json:"endsOn"`
 	// Lifecycle status
 	Status TimeboxesStatus `json:"status"`
+	// Set when timebox is archived (distinct from enabled)
+	ArchivedAt sql.NullTime `json:"archivedAt"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
@@ -2910,6 +3532,29 @@ type User struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
+// Per-user starred entities
+type UserFavorite struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID    types.PublicID          `json:"publicId"`
+	WorkspaceID uint32                  `json:"-"`
+	UserID      uint32                  `json:"-"`
+	TargetType  UserFavoritesTargetType `json:"targetType"`
+	// public_id of the favorited entity
+	TargetPublicID types.PublicID `json:"targetPublicId"`
+	// Optional grouping folder
+	FolderName sql.NullString `json:"folderName"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
 // Personal OAuth integrations owned by an individual user
 type UserIntegration struct {
 	// Internal PK, never exposed
@@ -2946,6 +3591,28 @@ type UserIntegration struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
+// Per-user recently visited entities
+type UserRecentVisit struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID       types.PublicID             `json:"publicId"`
+	WorkspaceID    uint32                     `json:"-"`
+	UserID         uint32                     `json:"-"`
+	EntityType     UserRecentVisitsEntityType `json:"entityType"`
+	EntityPublicID types.PublicID             `json:"entityPublicId"`
+	// Denormalized title snapshot
+	EntityTitle sql.NullString `json:"entityTitle"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
 // TOTP recovery codes
 type UserRecoveryCode struct {
 	// Internal PK, never exposed
@@ -2956,6 +3623,29 @@ type UserRecoveryCode struct {
 	CodeHash []byte `json:"codeHash"`
 	// Set when the code is consumed at login
 	UsedAt    sql.NullTime `json:"usedAt"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
+// Per-user per-scope display preferences
+type UserViewPreference struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID    types.PublicID               `json:"publicId"`
+	WorkspaceID uint32                       `json:"-"`
+	UserID      uint32                       `json:"-"`
+	ScopeType   UserViewPreferencesScopeType `json:"scopeType"`
+	// NULL for workspace scope
+	ScopePublicID types.PublicID `json:"scopePublicId"`
+	// view_mode, group_by, density, column_order, hidden_columns...
+	PrefsJson json.RawMessage `json:"prefsJson"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
 	UpdatedAt sql.NullTime `json:"updatedAt"`
 	CreatedAt time.Time    `json:"createdAt"`
 }
@@ -3038,18 +3728,23 @@ type VMyTask struct {
 }
 
 type VProject struct {
-	WorkspaceID uint32         `json:"-"`
-	PublicID    types.PublicID `json:"publicId"`
-	Slug        string         `json:"slug"`
-	Name        string         `json:"name"`
-	Description sql.NullString `json:"description"`
-	Color       sql.NullString `json:"color"`
-	IsArchived  bool           `json:"isArchived"`
-	StartedOn   sql.NullTime   `json:"startedOn"`
-	EndedOn     sql.NullTime   `json:"endedOn"`
-	SortWeight  int32          `json:"sortWeight"`
-	UpdatedAt   sql.NullTime   `json:"updatedAt"`
-	CreatedAt   time.Time      `json:"createdAt"`
+	WorkspaceID      uint32         `json:"-"`
+	PublicID         types.PublicID `json:"publicId"`
+	Slug             string         `json:"slug"`
+	Identifier       string         `json:"identifier"`
+	Name             string         `json:"name"`
+	Description      sql.NullString `json:"description"`
+	Color            sql.NullString `json:"color"`
+	IsArchived       bool           `json:"isArchived"`
+	StartedOn        sql.NullTime   `json:"startedOn"`
+	EndedOn          sql.NullTime   `json:"endedOn"`
+	FeaturePages     bool           `json:"featurePages"`
+	FeatureTimeboxes bool           `json:"featureTimeboxes"`
+	FeatureLenses    bool           `json:"featureLenses"`
+	FeatureCalendar  bool           `json:"featureCalendar"`
+	SortWeight       int32          `json:"sortWeight"`
+	UpdatedAt        sql.NullTime   `json:"updatedAt"`
+	CreatedAt        time.Time      `json:"createdAt"`
 }
 
 type VProjectStat struct {
@@ -3071,6 +3766,8 @@ type VTaskDetail struct {
 	PublicID                 types.PublicID    `json:"publicId"`
 	ProjectPublicID          []byte            `json:"projectPublicId"`
 	ProjectName              string            `json:"projectName"`
+	ProjectIdentifier        string            `json:"projectIdentifier"`
+	TaskNumber               uint32            `json:"taskNumber"`
 	ParentTaskPublicID       sql.NullString    `json:"parentTaskPublicId"`
 	CreatedByUserPublicID    sql.NullString    `json:"createdByUserPublicId"`
 	Title                    string            `json:"title"`
@@ -3082,10 +3779,12 @@ type VTaskDetail struct {
 	StartedOn                sql.NullTime      `json:"startedOn"`
 	EventOn                  sql.NullTime      `json:"eventOn"`
 	CompletedAt              sql.NullTime      `json:"completedAt"`
+	ArchivedAt               sql.NullTime      `json:"archivedAt"`
 	ConstraintCount          int64             `json:"constraintCount"`
 	ConstraintSatisfiedCount int64             `json:"constraintSatisfiedCount"`
 	DependencyCount          int64             `json:"dependencyCount"`
 	ActorCount               int64             `json:"actorCount"`
+	LabelCount               int64             `json:"labelCount"`
 	SortWeight               int32             `json:"sortWeight"`
 	UpdatedAt                sql.NullTime      `json:"updatedAt"`
 	CreatedAt                time.Time         `json:"createdAt"`
@@ -3093,12 +3792,14 @@ type VTaskDetail struct {
 
 type VTaskList struct {
 	WorkspaceID             uint32            `json:"-"`
-	TaskInternalID          uint32            `json:"taskInternalId"`
+	TaskInternalID          uint32            `json:"-"`
 	ProjectID               uint32            `json:"-"`
 	CreatedByUserID         sql.NullInt32     `json:"-"`
 	PublicID                types.PublicID    `json:"publicId"`
 	ProjectPublicID         []byte            `json:"projectPublicId"`
 	ProjectName             string            `json:"projectName"`
+	ProjectIdentifier       string            `json:"projectIdentifier"`
+	TaskNumber              uint32            `json:"taskNumber"`
 	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
 	Title                   string            `json:"title"`
 	Visibility              TasksVisibility   `json:"visibility"`
@@ -3108,11 +3809,41 @@ type VTaskList struct {
 	StartedOn               sql.NullTime      `json:"startedOn"`
 	EventOn                 sql.NullTime      `json:"eventOn"`
 	CompletedAt             sql.NullTime      `json:"completedAt"`
+	ArchivedAt              sql.NullTime      `json:"archivedAt"`
 	SortWeight              int32             `json:"sortWeight"`
 	UpdatedAt               sql.NullTime      `json:"updatedAt"`
 	CreatedAt               time.Time         `json:"createdAt"`
 	PrimaryAssigneePublicID interface{}       `json:"primaryAssigneePublicId"`
 	AssigneeCount           int64             `json:"assigneeCount"`
+	LabelIds                sql.NullString    `json:"labelIds"`
+}
+
+type VTaskListArchived struct {
+	WorkspaceID             uint32            `json:"-"`
+	TaskInternalID          uint32            `json:"-"`
+	ProjectID               uint32            `json:"-"`
+	CreatedByUserID         sql.NullInt32     `json:"-"`
+	PublicID                types.PublicID    `json:"publicId"`
+	ProjectPublicID         []byte            `json:"projectPublicId"`
+	ProjectName             string            `json:"projectName"`
+	ProjectIdentifier       string            `json:"projectIdentifier"`
+	TaskNumber              uint32            `json:"taskNumber"`
+	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
+	Title                   string            `json:"title"`
+	Visibility              TasksVisibility   `json:"visibility"`
+	DerivedState            TasksDerivedState `json:"derivedState"`
+	Priority                int32             `json:"priority"`
+	DueOn                   sql.NullTime      `json:"dueOn"`
+	StartedOn               sql.NullTime      `json:"startedOn"`
+	EventOn                 sql.NullTime      `json:"eventOn"`
+	CompletedAt             sql.NullTime      `json:"completedAt"`
+	ArchivedAt              sql.NullTime      `json:"archivedAt"`
+	SortWeight              int32             `json:"sortWeight"`
+	UpdatedAt               sql.NullTime      `json:"updatedAt"`
+	CreatedAt               time.Time         `json:"createdAt"`
+	PrimaryAssigneePublicID interface{}       `json:"primaryAssigneePublicId"`
+	AssigneeCount           int64             `json:"assigneeCount"`
+	LabelIds                sql.NullString    `json:"labelIds"`
 }
 
 type VTaskTimeline struct {

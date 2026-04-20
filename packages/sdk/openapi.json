@@ -207,6 +207,24 @@
         "required": ["toTaskId", "kind"],
         "type": "object"
       },
+      "AddTaskLabelBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AddTaskLabelBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "labelId": {
+            "description": "Label public id (UUID v7)",
+            "type": "string"
+          }
+        },
+        "required": ["labelId"],
+        "type": "object"
+      },
       "AddTaskOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -872,6 +890,23 @@
         "required": ["ok"],
         "type": "object"
       },
+      "ArchiveTaskOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ArchiveTaskOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
       "AssigneeSuggestion": {
         "additionalProperties": false,
         "properties": {
@@ -1050,6 +1085,23 @@
           }
         },
         "required": ["id", "kind", "name", "color", "visible", "createdAt"],
+        "type": "object"
+      },
+      "CancelImportOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CancelImportOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
         "type": "object"
       },
       "ChangePasswordInputBody": {
@@ -1255,6 +1307,45 @@
         ],
         "type": "object"
       },
+      "ConvertIntakeItemBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ConvertIntakeItemBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "projectId": {
+            "description": "Project public id (UUID v7) to create the task in",
+            "type": "string"
+          }
+        },
+        "required": ["projectId"],
+        "type": "object"
+      },
+      "ConvertIntakeItemOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ConvertIntakeItemOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "taskId": {
+            "description": "Public id of the created task",
+            "type": "string"
+          }
+        },
+        "required": ["ok", "taskId"],
+        "type": "object"
+      },
       "Cookie": {
         "additionalProperties": false,
         "properties": {
@@ -1439,6 +1530,63 @@
         "required": ["title", "allDay", "startAt", "endAt", "timezone"],
         "type": "object"
       },
+      "CreateFavoriteBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateFavoriteBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "folderName": {
+            "maxLength": 64,
+            "type": "string"
+          },
+          "targetId": {
+            "description": "Public id (UUID v7) of the entity to favorite",
+            "type": "string"
+          },
+          "targetType": {
+            "enum": ["project", "task", "page", "lens", "timebox"],
+            "type": "string"
+          },
+          "workspaceId": {
+            "description": "Workspace public id (UUID v7)",
+            "type": "string"
+          }
+        },
+        "required": ["workspaceId", "targetType", "targetId"],
+        "type": "object"
+      },
+      "CreateImportBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateImportBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "configJson": {
+            "additionalProperties": {},
+            "description": "Source-specific configuration",
+            "type": "object"
+          },
+          "projectId": {
+            "description": "Target project public id (UUID v7)",
+            "type": "string"
+          },
+          "source": {
+            "enum": ["github", "jira", "linear", "csv"],
+            "type": "string"
+          }
+        },
+        "required": ["source"],
+        "type": "object"
+      },
       "CreateInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -1462,6 +1610,65 @@
           }
         },
         "required": ["url", "description", "eventTypes"],
+        "type": "object"
+      },
+      "CreateIntakeItemBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateIntakeItemBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "body": {
+            "maxLength": 50000,
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["title"],
+        "type": "object"
+      },
+      "CreateLabelBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateLabelBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "color": {
+            "default": "#6b7280",
+            "maxLength": 16,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 255,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "parentLabelId": {
+            "description": "Parent label public id for hierarchy",
+            "type": "string"
+          },
+          "projectId": {
+            "description": "Project public id to scope label (omit for workspace-wide)",
+            "type": "string"
+          }
+        },
+        "required": ["name"],
         "type": "object"
       },
       "CreateLensBody": {
@@ -1631,6 +1838,11 @@
             "maxLength": 500,
             "type": "string"
           },
+          "identifier": {
+            "description": "Human-readable project key (e.g. NF)",
+            "maxLength": 5,
+            "type": "string"
+          },
           "name": {
             "maxLength": 100,
             "minLength": 1,
@@ -1680,6 +1892,25 @@
           }
         },
         "required": ["kind", "name", "apiKey"],
+        "type": "object"
+      },
+      "CreateReactionBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateReactionBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "emoji": {
+            "maxLength": 32,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["emoji"],
         "type": "object"
       },
       "CreateTaskBody": {
@@ -1923,6 +2154,23 @@
         "required": ["ok"],
         "type": "object"
       },
+      "DeleteFavoriteOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/DeleteFavoriteOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
       "DeleteLensBody": {
         "additionalProperties": false,
         "properties": {
@@ -2008,6 +2256,23 @@
         "required": ["ok"],
         "type": "object"
       },
+      "DeleteReactionOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/DeleteReactionOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
       "DeleteTaskAttachmentBody": {
         "additionalProperties": false,
         "properties": {
@@ -2065,6 +2330,89 @@
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
             "examples": ["https://example.com/schemas/DeleteWidgetBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
+      "DescriptionVersion": {
+        "additionalProperties": false,
+        "properties": {
+          "authorDisplayName": {
+            "type": "string"
+          },
+          "authorId": {
+            "type": "string"
+          },
+          "bodyLength": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "versionNumber": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["id", "versionNumber", "bodyLength", "createdAt"],
+        "type": "object"
+      },
+      "DescriptionVersionFull": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/DescriptionVersionFull.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "authorDisplayName": {
+            "type": "string"
+          },
+          "authorId": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "bodyLength": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "versionNumber": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["body", "id", "versionNumber", "bodyLength", "createdAt"],
+        "type": "object"
+      },
+      "DisableLabelOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/DisableLabelOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -2499,6 +2847,41 @@
         "required": ["id", "title", "status", "priority", "projectId", "projectName", "createdAt"],
         "type": "object"
       },
+      "Favorite": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/Favorite.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "folderName": {
+            "type": "string"
+          },
+          "id": {
+            "description": "Favorite public id (UUID v7)",
+            "type": "string"
+          },
+          "sortWeight": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "targetType": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "targetType", "targetId", "sortWeight", "createdAt"],
+        "type": "object"
+      },
       "GeneratePageBody": {
         "additionalProperties": false,
         "properties": {
@@ -2616,6 +2999,65 @@
           }
         },
         "required": ["status"],
+        "type": "object"
+      },
+      "ImportJobBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ImportJobBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "completedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "errorLog": {
+            "type": "string"
+          },
+          "failedItems": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "description": "Import job public id (UUID v7)",
+            "type": "string"
+          },
+          "processedItems": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "source": {
+            "type": "string"
+          },
+          "startedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "totalItems": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "status",
+          "totalItems",
+          "processedItems",
+          "failedItems",
+          "createdAt"
+        ],
         "type": "object"
       },
       "InboxItem": {
@@ -2805,6 +3247,79 @@
         "required": ["key", "value"],
         "type": "object"
       },
+      "InstanceStatsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/InstanceStatsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "totalUsers": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalWorkspaces": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["totalUsers", "totalWorkspaces"],
+        "type": "object"
+      },
+      "IntakeItem": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/IntakeItem.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "aiReasoning": {
+            "type": "string"
+          },
+          "aiScore": {
+            "format": "double",
+            "type": "number"
+          },
+          "body": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "description": "Intake item public id (UUID v7)",
+            "type": "string"
+          },
+          "snoozeUntil": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "triageStatus": {
+            "type": "string"
+          },
+          "triagedByDisplayName": {
+            "type": "string"
+          },
+          "triagedByUserId": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "title", "triageStatus", "createdAt"],
+        "type": "object"
+      },
       "InviteInfoOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -2827,6 +3342,51 @@
           }
         },
         "required": ["workspaceName", "role"],
+        "type": "object"
+      },
+      "Label": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/Label.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "description": "Label public id (UUID v7)",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "parentLabelId": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "sortWeight": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["id", "name", "color", "sortWeight", "createdAt"],
         "type": "object"
       },
       "Lens": {
@@ -2898,6 +3458,30 @@
           }
         },
         "required": ["total", "agents"],
+        "type": "object"
+      },
+      "ListArchivedTasksBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListArchivedTasksBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TaskListItem"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "tasks"],
         "type": "object"
       },
       "ListAuditLogsOutputBody": {
@@ -3019,6 +3603,26 @@
         "required": ["total", "deliveries", "nextCursor"],
         "type": "object"
       },
+      "ListDescriptionVersionsBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListDescriptionVersionsBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/DescriptionVersion"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["versions"],
+        "type": "object"
+      },
       "ListDuplicatesOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -3063,6 +3667,30 @@
           }
         },
         "required": ["events"],
+        "type": "object"
+      },
+      "ListFavoritesBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListFavoritesBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "favorites": {
+            "items": {
+              "$ref": "#/components/schemas/Favorite"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "favorites"],
         "type": "object"
       },
       "ListForTaskBody": {
@@ -3112,6 +3740,33 @@
         "required": ["total", "suggestions", "nextCursor"],
         "type": "object"
       },
+      "ListImportsBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListImportsBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ImportJobBody"
+            },
+            "type": ["array", "null"]
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "items", "nextCursor"],
+        "type": "object"
+      },
       "ListInboxOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -3125,6 +3780,33 @@
           "items": {
             "items": {
               "$ref": "#/components/schemas/InboxItem"
+            },
+            "type": ["array", "null"]
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "items", "nextCursor"],
+        "type": "object"
+      },
+      "ListIntakeItemsBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListIntakeItemsBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/IntakeItem"
             },
             "type": ["array", "null"]
           },
@@ -3177,6 +3859,30 @@
           }
         },
         "required": ["invocations"],
+        "type": "object"
+      },
+      "ListLabelsBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListLabelsBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "labels": {
+            "items": {
+              "$ref": "#/components/schemas/Label"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "labels"],
         "type": "object"
       },
       "ListLensesBody": {
@@ -3448,6 +4154,26 @@
         "required": ["total", "providers"],
         "type": "object"
       },
+      "ListReactionsBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListReactionsBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "reactions": {
+            "items": {
+              "$ref": "#/components/schemas/Reaction"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["reactions"],
+        "type": "object"
+      },
       "ListRemindersOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -3685,6 +4411,26 @@
           }
         },
         "required": ["outgoing", "incoming"],
+        "type": "object"
+      },
+      "ListTaskLabelsBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListTaskLabelsBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "labels": {
+            "items": {
+              "$ref": "#/components/schemas/TaskLabel"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["labels"],
         "type": "object"
       },
       "ListTasksBody": {
@@ -4068,6 +4814,42 @@
         "required": ["ok"],
         "type": "object"
       },
+      "MagicLinkRequestInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/MagicLinkRequestInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "email": {
+            "format": "email",
+            "maxLength": 254,
+            "type": "string"
+          }
+        },
+        "required": ["email"],
+        "type": "object"
+      },
+      "MagicLinkRequestOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/MagicLinkRequestOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
       "MarkAllReadOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -4374,14 +5156,11 @@
           "authorizationUrl": {
             "type": "string"
           },
-          "nonce": {
-            "type": "string"
-          },
           "state": {
             "type": "string"
           }
         },
-        "required": ["authorizationUrl", "state", "nonce"],
+        "required": ["authorizationUrl", "state"],
         "type": "object"
       },
       "OutboundLimitStat": {
@@ -4675,6 +5454,39 @@
           "title": {
             "maxLength": 500,
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PatchLabelBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PatchLabelBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "color": {
+            "maxLength": 16,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 255,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "parentLabelId": {
+            "type": "string"
+          },
+          "sortWeight": {
+            "format": "int32",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -5058,8 +5870,23 @@
             "description": "YYYY-MM-DD",
             "type": "string"
           },
+          "featureCalendar": {
+            "type": "boolean"
+          },
+          "featureLenses": {
+            "type": "boolean"
+          },
+          "featurePages": {
+            "type": "boolean"
+          },
+          "featureTimeboxes": {
+            "type": "boolean"
+          },
           "id": {
             "description": "Project public id (UUID v7)",
+            "type": "string"
+          },
+          "identifier": {
             "type": "string"
           },
           "isArchived": {
@@ -5083,7 +5910,19 @@
             "type": "string"
           }
         },
-        "required": ["id", "workspaceId", "slug", "name", "isArchived", "createdAt"],
+        "required": [
+          "id",
+          "workspaceId",
+          "slug",
+          "identifier",
+          "name",
+          "isArchived",
+          "featurePages",
+          "featureTimeboxes",
+          "featureLenses",
+          "featureCalendar",
+          "createdAt"
+        ],
         "type": "object"
       },
       "ProjectDependencyEdge": {
@@ -5348,6 +6187,37 @@
         "required": ["publicToken"],
         "type": "object"
       },
+      "Reaction": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/Reaction.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "emoji": {
+            "type": "string"
+          },
+          "id": {
+            "description": "Reaction public id (UUID v7)",
+            "type": "string"
+          },
+          "userDisplayName": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "emoji", "userId", "userDisplayName", "createdAt"],
+        "type": "object"
+      },
       "RegisterInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -5438,6 +6308,23 @@
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
             "examples": ["https://example.com/schemas/RemoveTaskDependencyBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
+      "RemoveTaskLabelOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/RemoveTaskLabelOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -5638,6 +6525,23 @@
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
             "examples": ["https://example.com/schemas/ResolveOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
+      "RestoreDescriptionVersionOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/RestoreDescriptionVersionOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -6103,6 +7007,10 @@
             "format": "int64",
             "type": "integer"
           },
+          "archivedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
           "completedAt": {
             "format": "int64",
             "type": "integer"
@@ -6141,6 +7049,10 @@
           "id": {
             "type": "string"
           },
+          "labelCount": {
+            "format": "int64",
+            "type": "integer"
+          },
           "parentTaskId": {
             "type": "string"
           },
@@ -6149,6 +7061,9 @@
             "type": "integer"
           },
           "projectId": {
+            "type": "string"
+          },
+          "projectIdentifier": {
             "type": "string"
           },
           "projectName": {
@@ -6160,6 +7075,10 @@
           },
           "startedOn": {
             "type": "string"
+          },
+          "taskNumber": {
+            "format": "int32",
+            "type": "integer"
           },
           "title": {
             "type": "string"
@@ -6184,6 +7103,8 @@
           "visibility",
           "derivedState",
           "priority",
+          "taskNumber",
+          "labelCount",
           "constraintCount",
           "constraintSatisfiedCount",
           "dependencyCount",
@@ -6558,9 +7479,48 @@
         ],
         "type": "object"
       },
+      "TaskLabel": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/TaskLabel.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "description": "Label public id (UUID v7)",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sortWeight": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": ["id", "name", "color", "sortWeight", "createdAt"],
+        "type": "object"
+      },
       "TaskListItem": {
         "additionalProperties": false,
         "properties": {
+          "archivedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
           "assigneeCount": {
             "format": "int64",
             "type": "integer"
@@ -6585,6 +7545,9 @@
           "id": {
             "type": "string"
           },
+          "labelIds": {
+            "type": "string"
+          },
           "parentTaskId": {
             "type": "string"
           },
@@ -6598,6 +7561,9 @@
           "projectId": {
             "type": "string"
           },
+          "projectIdentifier": {
+            "type": "string"
+          },
           "projectName": {
             "type": "string"
           },
@@ -6607,6 +7573,10 @@
           },
           "startedOn": {
             "type": "string"
+          },
+          "taskNumber": {
+            "format": "int32",
+            "type": "integer"
           },
           "title": {
             "type": "string"
@@ -6626,6 +7596,7 @@
           "visibility",
           "derivedState",
           "priority",
+          "taskNumber",
           "sortWeight",
           "primaryAssigneeId",
           "assigneeCount",
@@ -7098,6 +8069,29 @@
         "required": ["transition"],
         "type": "object"
       },
+      "TriageIntakeItemBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/TriageIntakeItemBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "snoozeUntil": {
+            "description": "Unix seconds timestamp for snooze expiry",
+            "format": "int64",
+            "type": "integer"
+          },
+          "status": {
+            "enum": ["accepted", "rejected", "snoozed", "duplicate"],
+            "type": "string"
+          }
+        },
+        "required": ["status"],
+        "type": "object"
+      },
       "TriggerAgentOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -7116,6 +8110,23 @@
           }
         },
         "required": ["ok", "dedupeKey"],
+        "type": "object"
+      },
+      "UnarchiveTaskOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/UnarchiveTaskOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
         "type": "object"
       },
       "UnpublishLensBody": {
@@ -8068,6 +9079,35 @@
         "tags": ["Admin"]
       }
     },
+    "/admin/instance-stats": {
+      "get": {
+        "operationId": "admin-instance-stats",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceStatsOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get instance-level statistics",
+        "tags": ["Admin"]
+      }
+    },
     "/admin/sessions/{sessionId}": {
       "delete": {
         "operationId": "admin-revoke-session",
@@ -8734,9 +9774,99 @@
         "summary": "Revoke a session"
       }
     },
-    "/auth/oidc/google/callback": {
+    "/auth/magic-link/request": {
+      "post": {
+        "operationId": "auth-magic-link-request",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MagicLinkRequestInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MagicLinkRequestOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Request a passwordless magic link"
+      }
+    },
+    "/auth/magic-link/verify": {
       "get": {
-        "operationId": "auth-oidc-google-callback",
+        "operationId": "auth-magic-link-verify",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "User-Agent",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "token",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthTokens"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Verify a magic link token and issue session"
+      }
+    },
+    "/auth/oidc/github/callback": {
+      "get": {
+        "operationId": "auth-oidc-github-callback",
         "parameters": [
           {
             "in": "header",
@@ -8760,11 +9890,91 @@
             "schema": {
               "type": "string"
             }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthTokens"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Complete a GitHub OAuth login flow"
+      }
+    },
+    "/auth/oidc/github/start": {
+      "get": {
+        "operationId": "auth-oidc-github-start",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OIDCStartOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Start a GitHub OAuth login flow"
+      }
+    },
+    "/auth/oidc/google/callback": {
+      "get": {
+        "operationId": "auth-oidc-google-callback",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "User-Agent",
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "explode": false,
             "in": "query",
-            "name": "nonce",
+            "name": "code",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "state",
             "schema": {
               "type": "string"
             }
@@ -8828,6 +10038,94 @@
           }
         },
         "summary": "Start a Google OIDC login flow"
+      }
+    },
+    "/auth/oidc/microsoft/callback": {
+      "get": {
+        "operationId": "auth-oidc-microsoft-callback",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "User-Agent",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "code",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "state",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthTokens"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Complete a Microsoft OIDC login flow"
+      }
+    },
+    "/auth/oidc/microsoft/start": {
+      "get": {
+        "operationId": "auth-oidc-microsoft-start",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OIDCStartOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Start a Microsoft OIDC login flow"
       }
     },
     "/auth/refresh": {
@@ -9270,6 +10568,145 @@
           }
         },
         "summary": "Patch the authenticated user's profile"
+      }
+    },
+    "/me/favorites": {
+      "get": {
+        "operationId": "favorites-list",
+        "parameters": [
+          {
+            "description": "Workspace public id (UUID v7) to scope favorites",
+            "explode": false,
+            "in": "query",
+            "name": "workspaceId",
+            "schema": {
+              "description": "Workspace public id (UUID v7) to scope favorites",
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListFavoritesBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List the caller's favorites"
+      },
+      "post": {
+        "operationId": "favorites-create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFavoriteBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Favorite"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Add an item to favorites"
+      }
+    },
+    "/me/favorites/{id}": {
+      "delete": {
+        "operationId": "favorites-delete",
+        "parameters": [
+          {
+            "description": "Favorite public id (UUID v7)",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Favorite public id (UUID v7)",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteFavoriteOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Remove an item from favorites"
       }
     },
     "/me/integrations": {
@@ -11235,6 +12672,44 @@
         "summary": "Apply proposed steps as child tasks under a parent task"
       }
     },
+    "/tasks/{id}/archive": {
+      "post": {
+        "operationId": "tasks-archive",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArchiveTaskOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Archive a task"
+      }
+    },
     "/tasks/{id}/attachments": {
       "get": {
         "operationId": "tasks-attachments-list",
@@ -12047,6 +13522,136 @@
         "summary": "Remove a dependency edge"
       }
     },
+    "/tasks/{id}/description-history": {
+      "get": {
+        "operationId": "tasks-description-history-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListDescriptionVersionsBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List description version history for a task"
+      }
+    },
+    "/tasks/{id}/description-history/{versionId}": {
+      "get": {
+        "operationId": "tasks-description-history-get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DescriptionVersionFull"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get a specific description version with full body"
+      }
+    },
+    "/tasks/{id}/description-history/{versionId}/restore": {
+      "post": {
+        "operationId": "tasks-description-history-restore",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestoreDescriptionVersionOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Restore a previous description version"
+      }
+    },
     "/tasks/{id}/duplicates": {
       "get": {
         "operationId": "tasks-duplicates-list",
@@ -12123,6 +13728,136 @@
         "summary": "Propose the next likely state transition for a task"
       }
     },
+    "/tasks/{id}/labels": {
+      "get": {
+        "operationId": "tasks-labels-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListTaskLabelsBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List labels on a task"
+      },
+      "post": {
+        "operationId": "tasks-labels-add",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddTaskLabelBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskLabel"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Attach a label to a task"
+      }
+    },
+    "/tasks/{id}/labels/{labelId}": {
+      "delete": {
+        "operationId": "tasks-labels-remove",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "labelId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoveTaskLabelOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Remove a label from a task"
+      }
+    },
     "/tasks/{id}/propose-steps": {
       "post": {
         "operationId": "tasks-propose-steps",
@@ -12169,6 +13904,144 @@
           }
         },
         "summary": "AI-powered step decomposition for a task"
+      }
+    },
+    "/tasks/{id}/reactions": {
+      "get": {
+        "operationId": "tasks-reactions-list",
+        "parameters": [
+          {
+            "description": "Task public id (UUID v7)",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Task public id (UUID v7)",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListReactionsBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List reactions on a task"
+      },
+      "post": {
+        "operationId": "tasks-reactions-create",
+        "parameters": [
+          {
+            "description": "Task public id (UUID v7)",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Task public id (UUID v7)",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReactionBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reaction"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Add a reaction to a task"
+      }
+    },
+    "/tasks/{id}/reactions/{reactionId}": {
+      "delete": {
+        "operationId": "tasks-reactions-delete",
+        "parameters": [
+          {
+            "description": "Task public id (UUID v7)",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Task public id (UUID v7)",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Reaction public id (UUID v7)",
+            "in": "path",
+            "name": "reactionId",
+            "required": true,
+            "schema": {
+              "description": "Reaction public id (UUID v7)",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteReactionOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Remove a reaction from a task"
       }
     },
     "/tasks/{id}/relation-suggestions": {
@@ -12391,6 +14264,44 @@
           }
         },
         "summary": "Apply a state machine transition to a task"
+      }
+    },
+    "/tasks/{id}/unarchive": {
+      "post": {
+        "operationId": "tasks-unarchive",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnarchiveTaskOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Unarchive a task"
       }
     },
     "/workspaces": {
@@ -14562,6 +16473,205 @@
         "summary": "Export tasks as JSON"
       }
     },
+    "/workspaces/{wsId}/imports": {
+      "get": {
+        "operationId": "imports-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListImportsBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List import jobs for the workspace"
+      },
+      "post": {
+        "operationId": "imports-create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateImportBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create an import job"
+      }
+    },
+    "/workspaces/{wsId}/imports/{importId}": {
+      "get": {
+        "operationId": "imports-get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "importId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get a single import job"
+      }
+    },
+    "/workspaces/{wsId}/imports/{importId}/cancel": {
+      "post": {
+        "operationId": "imports-cancel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "importId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelImportOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Cancel a pending or running import job"
+      }
+    },
     "/workspaces/{wsId}/inbox/triage": {
       "post": {
         "operationId": "inbox-triage",
@@ -14608,6 +16718,279 @@
           }
         },
         "summary": "Ask the AI orchestrator to score and recommend actions for inbox items"
+      }
+    },
+    "/workspaces/{wsId}/intake": {
+      "get": {
+        "operationId": "intake-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by triage status: pending, accepted, rejected, snoozed, duplicate",
+            "explode": false,
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "description": "Filter by triage status: pending, accepted, rejected, snoozed, duplicate",
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListIntakeItemsBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List intake items in the triage queue"
+      },
+      "post": {
+        "operationId": "intake-create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateIntakeItemBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntakeItem"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create an intake item"
+      }
+    },
+    "/workspaces/{wsId}/intake/{id}": {
+      "get": {
+        "operationId": "intake-get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntakeItem"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get a single intake item"
+      },
+      "patch": {
+        "operationId": "intake-triage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TriageIntakeItemBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntakeItem"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Triage an intake item (accept, reject, snooze, or mark duplicate)"
+      }
+    },
+    "/workspaces/{wsId}/intake/{id}/convert": {
+      "post": {
+        "operationId": "intake-convert",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConvertIntakeItemBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConvertIntakeItemOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Convert an intake item into a task"
       }
     },
     "/workspaces/{wsId}/invites": {
@@ -14761,6 +17144,267 @@
           }
         },
         "summary": "Revoke an invite link"
+      }
+    },
+    "/workspaces/{wsId}/labels": {
+      "get": {
+        "operationId": "labels-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional project public id to filter",
+            "explode": false,
+            "in": "query",
+            "name": "projectId",
+            "schema": {
+              "description": "Optional project public id to filter",
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListLabelsBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List labels in a workspace"
+      },
+      "post": {
+        "operationId": "labels-create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLabelBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Label"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create a label"
+      }
+    },
+    "/workspaces/{wsId}/labels/{id}": {
+      "delete": {
+        "operationId": "labels-disable",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisableLabelOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Soft-disable a label"
+      },
+      "get": {
+        "operationId": "labels-get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Label"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Fetch a label"
+      },
+      "patch": {
+        "operationId": "labels-patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchLabelBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Label"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update a label"
       }
     },
     "/workspaces/{wsId}/lenses": {
@@ -16173,6 +18817,67 @@
           }
         },
         "summary": "Apply AI proposal — create parent task with subtasks and assignees"
+      }
+    },
+    "/workspaces/{wsId}/tasks/archived": {
+      "get": {
+        "operationId": "tasks-archived-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListArchivedTasksBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List archived tasks in a workspace"
       }
     },
     "/workspaces/{wsId}/tasks/propose-smart": {

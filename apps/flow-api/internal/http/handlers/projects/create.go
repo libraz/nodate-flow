@@ -32,22 +32,26 @@ func Create(deps Deps) func(context.Context, *CreateProjectInput) (*CreateProjec
 		pub := types.New()
 		desc := sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""}
 		color := sql.NullString{String: in.Body.Color, Valid: in.Body.Color != ""}
+		identifier := strings.ToUpper(strings.TrimSpace(in.Body.Identifier))
 		projectID, err := deps.Queries.CreateProject(ctx, generated.CreateProjectParams{
 			PublicID:    pub,
 			WorkspaceID: ws.ID,
 			Slug:        slug,
+			Identifier:  identifier,
 			Name:        in.Body.Name,
 			Description: desc,
 			Color:       color,
 		})
 		if err != nil {
 			if handlerutil.IsDuplicateEntry(err) {
-				// Only the (workspace_id, slug) unique key should map to
-				// SLUG_ALREADY_TAKEN. Other unique violations (e.g. a
-				// public_id collision) must surface as INTERNAL.
 				var mysqlErr *mysql.MySQLError
-				if errors.As(err, &mysqlErr) && strings.Contains(mysqlErr.Message, "uniq_projects_workspace_id_slug") {
-					return nil, httpErr(apierrors.WsProjectSlugAlreadyTaken)
+				if errors.As(err, &mysqlErr) {
+					if strings.Contains(mysqlErr.Message, "uniq_projects_workspace_id_slug") {
+						return nil, httpErr(apierrors.WsProjectSlugAlreadyTaken)
+					}
+					if strings.Contains(mysqlErr.Message, "uniq_projects_workspace_id_identifier") {
+						return nil, httpErr(apierrors.WsProjectIdentifierAlreadyTaken)
+					}
 				}
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -86,13 +90,18 @@ func Create(deps Deps) func(context.Context, *CreateProjectInput) (*CreateProjec
 		}
 
 		return &CreateProjectOutput{Body: Project{
-			ID:          pub.String(),
-			WorkspaceID: ws.PublicID.String(),
-			Slug:        slug,
-			Name:        in.Body.Name,
-			Description: in.Body.Description,
-			Color:       in.Body.Color,
-			CreatedAt:   time.Now().Unix(),
+			ID:               pub.String(),
+			WorkspaceID:      ws.PublicID.String(),
+			Slug:             slug,
+			Identifier:       identifier,
+			Name:             in.Body.Name,
+			Description:      in.Body.Description,
+			Color:            in.Body.Color,
+			FeaturePages:     true,
+			FeatureTimeboxes: true,
+			FeatureLenses:    true,
+			FeatureCalendar:  true,
+			CreatedAt:        time.Now().Unix(),
 		}}, nil
 	}
 }

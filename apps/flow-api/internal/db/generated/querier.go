@@ -93,8 +93,15 @@ type Querier interface {
 	ArchiveInboxItem(ctx context.Context, arg ArchiveInboxItemParams) error
 	// Archive a single notification.
 	ArchiveNotification(ctx context.Context, arg ArchiveNotificationParams) error
+	// Set archived_at on a task.
+	ArchiveTask(ctx context.Context, arg ArchiveTaskParams) error
+	// Allocate the next task number for a project. Must be called inside a
+	// transaction with the project row locked (SELECT ... FOR UPDATE).
+	AssignTaskNumber(ctx context.Context, projectID uint32) (int32, error)
 	// Link an existing signal to a task by public_id.
 	AttachSignalToTask(ctx context.Context, arg AttachSignalToTaskParams) error
+	// Cancel a pending or running import job.
+	CancelImportJob(ctx context.Context, arg CancelImportJobParams) error
 	// Verify that a user is an enabled member of a workspace. Returns 1 if
 	// the membership exists, sql.ErrNoRows otherwise.
 	CheckWorkspaceMemberExists(ctx context.Context, arg CheckWorkspaceMemberExistsParams) (int32, error)
@@ -102,6 +109,8 @@ type Querier interface {
 	// Callers wrap this in BEGIN / COMMIT; SELECT ... FOR UPDATE SKIP LOCKED
 	// lets multiple workers race for rows without contention.
 	ClaimNextAgentRun(ctx context.Context) (ClaimNextAgentRunRow, error)
+	// Delete tokens that are either expired-and-used or expired-and-unused, for periodic cleanup.
+	CleanupExpiredMagicLinks(ctx context.Context) error
 	// Disable TOTP on a local identity.
 	ClearIdentityMfa(ctx context.Context, id uint32) error
 	// Mark a pending TOTP enrollment as confirmed by stamping
@@ -114,6 +123,10 @@ type Querier interface {
 	ConsumeOauthState(ctx context.Context, state string) (ConsumeOauthStateRow, error)
 	// Count unused recovery codes for a user.
 	CountActiveRecoveryCodes(ctx context.Context, userID uint32) (int64, error)
+	// Count all active (non-disabled) users.
+	CountActiveUsers(ctx context.Context) (int64, error)
+	// Count all active (non-disabled) workspaces.
+	CountActiveWorkspaces(ctx context.Context) (int64, error)
 	// Count ai.suggestion.{proposed,applied,dismissed} events for a workspace
 	// within the given time window. Used by the AI metrics endpoint
 	// to compute acceptance rate.
@@ -149,14 +162,28 @@ type Querier interface {
 	CreateCalendarMemo(ctx context.Context, arg CreateCalendarMemoParams) (int64, error)
 	// Subscribe a user to a calendar with a role and display preferences.
 	CreateCalendarSubscription(ctx context.Context, arg CreateCalendarSubscriptionParams) (int64, error)
+	// Insert a new description version snapshot.
+	CreateDescriptionVersion(ctx context.Context, arg CreateDescriptionVersionParams) (int64, error)
+	// Add an entity to the user's favorites.
+	CreateFavorite(ctx context.Context, arg CreateFavoriteParams) (int64, error)
 	// Insert a new identity row (local password or OIDC binding) for a user.
 	CreateIdentity(ctx context.Context, arg CreateIdentityParams) (int64, error)
+	// Insert a new import job into the queue.
+	CreateImportJob(ctx context.Context, arg CreateImportJobParams) (int64, error)
+	// Insert a new intake item into the triage queue.
+	CreateIntakeItem(ctx context.Context, arg CreateIntakeItemParams) (int64, error)
+	// Insert a new label in a workspace.
+	CreateLabel(ctx context.Context, arg CreateLabelParams) (int64, error)
 	// Insert a new saved lens (view).
 	CreateLens(ctx context.Context, arg CreateLensParams) (int64, error)
+	// Insert a new magic link token for passwordless login.
+	CreateMagicLinkToken(ctx context.Context, arg CreateMagicLinkTokenParams) (int64, error)
 	// Insert a new MCP token. Plain token is shown to the user once.
 	CreateMcpToken(ctx context.Context, arg CreateMcpTokenParams) (int64, error)
 	// Hide a specific member's events within a shared calendar for a subscriber.
 	CreateMemberFilter(ctx context.Context, arg CreateMemberFilterParams) error
+	// Insert a mention record after extracting @mentions from markdown.
+	CreateMention(ctx context.Context, arg CreateMentionParams) (int64, error)
 	// Create a single notification entry for a recipient.
 	CreateNotification(ctx context.Context, arg CreateNotificationParams) (int64, error)
 	// Insert a short-lived CSRF state row for the personal OAuth flow.
@@ -176,6 +203,8 @@ type Querier interface {
 	// ============================================================================
 	// Insert a new LLM provider with encrypted API key.
 	CreateProvider(ctx context.Context, arg CreateProviderParams) (int64, error)
+	// Add an emoji reaction. Either task_id or comment_id must be set (not both).
+	CreateReaction(ctx context.Context, arg CreateReactionParams) (int64, error)
 	// Insert an AI-generated relation suggestion between two tasks.
 	CreateRelationSuggestion(ctx context.Context, arg CreateRelationSuggestionParams) (int64, error)
 	// Insert a new repository-to-workspace mapping.
@@ -187,6 +216,8 @@ type Querier interface {
 	// Insert a new task. derived_state defaults to 'open' and must NOT be set
 	// directly here; the constraint engine and event bus mutate it.
 	CreateTask(ctx context.Context, arg CreateTaskParams) (int64, error)
+	// Attach a label to a task.
+	CreateTaskLabel(ctx context.Context, arg CreateTaskLabelParams) (int64, error)
 	// Insert a new timebox (sprint / iteration / cycle).
 	CreateTimebox(ctx context.Context, arg CreateTimeboxParams) (int64, error)
 	CreateWebhookDelivery(ctx context.Context, arg CreateWebhookDeliveryParams) (int64, error)
@@ -213,6 +244,10 @@ type Querier interface {
 	DeleteDependency(ctx context.Context, arg DeleteDependencyParams) error
 	// Soft-delete a lens.
 	DeleteLens(ctx context.Context, arg DeleteLensParams) error
+	// Remove all mentions for a specific comment (before re-extracting).
+	DeleteMentionsForComment(ctx context.Context, commentID sql.NullInt32) error
+	// Remove all task_description mentions for a task (before re-extracting).
+	DeleteMentionsForTaskDescription(ctx context.Context, taskID sql.NullInt32) error
 	// Explicit delete for the state row that :one above just returned.
 	DeleteOauthState(ctx context.Context, state string) error
 	// Soft-delete a provider.
@@ -224,6 +259,8 @@ type Querier interface {
 	// CASCADE already handles task deletion; this query is for the
 	// re-embed-on-edit flow when a workspace switches to a different model.
 	DeleteTaskEmbeddingsForTask(ctx context.Context, taskID uint32) error
+	// Remove a label from a task (hard delete from junction).
+	DeleteTaskLabel(ctx context.Context, arg DeleteTaskLabelParams) error
 	// Hard-delete a single integration row (user-scoped).
 	DeleteUserIntegration(ctx context.Context, arg DeleteUserIntegrationParams) error
 	DeleteWebhookSubscription(ctx context.Context, arg DeleteWebhookSubscriptionParams) error
@@ -245,12 +282,20 @@ type Querier interface {
 	DisableCalendarMemo(ctx context.Context, arg DisableCalendarMemoParams) error
 	// Remove a user from a calendar (soft-delete).
 	DisableCalendarSubscription(ctx context.Context, arg DisableCalendarSubscriptionParams) error
+	// Soft-delete a favorite.
+	DisableFavorite(ctx context.Context, arg DisableFavoriteParams) error
+	// Soft-disable a label.
+	DisableLabel(ctx context.Context, arg DisableLabelParams) error
 	// Soft-delete a page.
 	DisablePage(ctx context.Context, arg DisablePageParams) error
 	// Soft-disable a project.
 	DisableProject(ctx context.Context, arg DisableProjectParams) error
+	// Soft-delete a reaction by public id and user.
+	DisableReaction(ctx context.Context, arg DisableReactionParams) error
 	// Soft-disable a task.
 	DisableTask(ctx context.Context, arg DisableTaskParams) error
+	// Soft-disable a task-label junction.
+	DisableTaskLabel(ctx context.Context, arg DisableTaskLabelParams) error
 	// Soft-delete a timebox.
 	DisableTimebox(ctx context.Context, arg DisableTimeboxParams) error
 	// Soft-delete a widget.
@@ -307,8 +352,24 @@ type Querier interface {
 	// orchestrator does not track which provider handled the call.
 	// id is required: returned as FK value for ai_invocations.provider_id.
 	FindDefaultProviderIDForWorkspace(ctx context.Context, workspaceID uint32) (uint32, error)
+	// Find a specific description version by public id.
+	FindDescriptionVersion(ctx context.Context, arg FindDescriptionVersionParams) (FindDescriptionVersionRow, error)
+	// Check if a user already reacted with a specific emoji on a task or comment.
+	FindExistingReaction(ctx context.Context, arg FindExistingReactionParams) (FindExistingReactionRow, error)
+	// Find a single favorite by public id.
+	FindFavoriteByPublicId(ctx context.Context, arg FindFavoriteByPublicIdParams) (FindFavoriteByPublicIdRow, error)
+	// Check if a user has already favorited this entity.
+	FindFavoriteByTarget(ctx context.Context, arg FindFavoriteByTargetParams) (FindFavoriteByTargetRow, error)
 	// Resolve an identity by (provider, subject) pair for OIDC login flows.
 	FindIdentityByProviderSubject(ctx context.Context, arg FindIdentityByProviderSubjectParams) (FindIdentityByProviderSubjectRow, error)
+	// Find a single import job by public id.
+	FindImportJobByPublicId(ctx context.Context, arg FindImportJobByPublicIdParams) (FindImportJobByPublicIdRow, error)
+	// Find a single intake item by public id.
+	FindIntakeItemByPublicId(ctx context.Context, arg FindIntakeItemByPublicIdParams) (FindIntakeItemByPublicIdRow, error)
+	// Resolve a label by its UUID v7 within a workspace.
+	FindLabelByPublicId(ctx context.Context, arg FindLabelByPublicIdParams) (FindLabelByPublicIdRow, error)
+	// Find a label by name within a workspace (for MCP resolve).
+	FindLabelByWorkspaceAndName(ctx context.Context, arg FindLabelByWorkspaceAndNameParams) (FindLabelByWorkspaceAndNameRow, error)
 	// Look up a publicly shared lens by its token. Used by unauthenticated
 	// public share endpoints. Only returns enabled + public lenses.
 	FindLensByPublicToken(ctx context.Context, publicToken sql.NullString) (FindLensByPublicTokenRow, error)
@@ -318,13 +379,18 @@ type Querier interface {
 	// to issue session tokens directly or return a totp-challenge.
 	FindLocalIdentityByEmail(ctx context.Context, email string) (FindLocalIdentityByEmailRow, error)
 	// Resolve a local-password identity by internal user id. Used by
-	// /me/password to verify the caller's current password and by the
-	// TOTP handlers to read / write mfa_secret_ciphertext.
+	// /me/password to verify the caller's current password, by the
+	// TOTP handlers to read / write mfa_secret_ciphertext, and by
+	// LoginTotp to enforce brute-force lockout on 2FA attempts.
 	FindLocalIdentityByUserId(ctx context.Context, userID uint32) (FindLocalIdentityByUserIdRow, error)
+	// Resolve a magic link token by its SHA-256 hash. Caller validates expiry.
+	FindMagicLinkByTokenHash(ctx context.Context, tokenHash string) (FindMagicLinkByTokenHashRow, error)
 	// Resolve an MCP token by its SHA-256 hash for bearer auth.
 	// id, workspace_id, user_id are required: used internally by auth middleware
 	// to establish session context (not exposed to API).
 	FindMcpTokenByHash(ctx context.Context, tokenHash string) (FindMcpTokenByHashRow, error)
+	// Check if a specific event category + channel is muted for a user.
+	FindNotificationPreference(ctx context.Context, arg FindNotificationPreferenceParams) (FindNotificationPreferenceRow, error)
 	// Resolve a PAT row from its SHA-256 hash for bearer auth.
 	FindPatByHash(ctx context.Context, tokenHash string) (FindPatByHashRow, error)
 	// Find deliveries ready for (re)delivery. Used by the background worker.
@@ -332,6 +398,8 @@ type Querier interface {
 	FindPendingDeliveries(ctx context.Context, limit int32) ([]FindPendingDeliveriesRow, error)
 	// Find the personal calendar for a user in a workspace.
 	FindPersonalCalendar(ctx context.Context, arg FindPersonalCalendarParams) (FindPersonalCalendarRow, error)
+	// Resolve a project by its human-readable identifier within a workspace.
+	FindProjectByIdentifier(ctx context.Context, arg FindProjectByIdentifierParams) (FindProjectByIdentifierRow, error)
 	// Resolve a project by its UUID v7 within a workspace. Returns internal id.
 	FindProjectByPublicId(ctx context.Context, arg FindProjectByPublicIdParams) (FindProjectByPublicIdRow, error)
 	// Resolve a project by its UUID v7 without workspace scope.
@@ -344,6 +412,10 @@ type Querier interface {
 	// handlers, MCP tools, or any code outside apps/flow-api/internal/ai/providers/.
 	// id is required: used internally by the providers package for logging/tracking.
 	FindProviderForDecrypt(ctx context.Context, arg FindProviderForDecryptParams) (FindProviderForDecryptRow, error)
+	// Find a single reaction by public id.
+	FindReactionByPublicId(ctx context.Context, publicID types.PublicID) (FindReactionByPublicIdRow, error)
+	// Check if a pending or running import already exists for a project.
+	FindRunningImportForProject(ctx context.Context, arg FindRunningImportForProjectParams) (FindRunningImportForProjectRow, error)
 	// Resolve a session by its external public_id (UUID v7).
 	// id is required: used internally for session operations.
 	FindSessionByPublicId(ctx context.Context, publicID types.PublicID) (FindSessionByPublicIdRow, error)
@@ -354,6 +426,8 @@ type Querier interface {
 	FindSystemCalendarBySlug(ctx context.Context, arg FindSystemCalendarBySlugParams) (FindSystemCalendarBySlugRow, error)
 	// Detail projection via v_task_detail. Workspace-scoped.
 	FindTaskByPublicId(ctx context.Context, arg FindTaskByPublicIdParams) (FindTaskByPublicIdRow, error)
+	// Check if a specific task-label junction exists.
+	FindTaskLabelByIds(ctx context.Context, arg FindTaskLabelByIdsParams) (FindTaskLabelByIdsRow, error)
 	// Resolve an unused recovery code by (user_id, hash).
 	FindUnusedRecoveryCode(ctx context.Context, arg FindUnusedRecoveryCodeParams) (uint32, error)
 	// Lookup a user by email for login. Returns internal id for the auth pipeline.
@@ -377,6 +451,8 @@ type Querier interface {
 	FindUserProfileById(ctx context.Context, id uint32) (FindUserProfileByIdRow, error)
 	// Resolve the public UUID for an internal users.id, excluding disabled rows.
 	FindUserPublicIdById(ctx context.Context, id uint32) (types.PublicID, error)
+	// Get a user's view preference for a specific scope.
+	FindViewPreference(ctx context.Context, arg FindViewPreferenceParams) (FindViewPreferenceRow, error)
 	// Resolve a workspace by its UUID v7. Returns internal id for ACL.
 	FindWorkspaceByPublicId(ctx context.Context, publicID types.PublicID) (FindWorkspaceByPublicIdRow, error)
 	// Resolve a workspace by slug. Returns internal id for ACL.
@@ -451,6 +527,8 @@ type Querier interface {
 	InsertRecoveryCode(ctx context.Context, arg InsertRecoveryCodeParams) error
 	// Insert an inbound signal (manual or webhook).
 	InsertSignal(ctx context.Context, arg InsertSignalParams) (int64, error)
+	// Quick check: is this event category muted on the in_app channel for a user?
+	IsEventMutedForUser(ctx context.Context, arg IsEventMutedForUserParams) (int64, error)
 	// Find all active subscriptions in a workspace. Event type filtering
 	// is done in Go since JSON_CONTAINS is not sqlc-friendly.
 	// id is required: used as subscription_id FK in CreateWebhookDelivery.
@@ -471,6 +549,8 @@ type Querier interface {
 	ListAiInvocationsForWorkspace(ctx context.Context, arg ListAiInvocationsForWorkspaceParams) ([]ListAiInvocationsForWorkspaceRow, error)
 	// List all enabled events in a calendar (no date filter, for export).
 	ListAllCalendarEvents(ctx context.Context, calendarID uint32) ([]ListAllCalendarEventsRow, error)
+	// List archived tasks via v_task_list_archived.
+	ListArchivedTasksForWorkspace(ctx context.Context, arg ListArchivedTasksForWorkspaceParams) ([]ListArchivedTasksForWorkspaceRow, error)
 	// List attachments on a task with uploader display fields.
 	ListAttachmentsForTask(ctx context.Context, arg ListAttachmentsForTaskParams) ([]ListAttachmentsForTaskRow, error)
 	// ============================================================================
@@ -531,6 +611,8 @@ type Querier interface {
 	// public_id + current derived_state. The engine builds a
 	// map[public_id]state from this rowset.
 	ListDependencyStatesForEngine(ctx context.Context, fromTaskID uint32) ([]ListDependencyStatesForEngineRow, error)
+	// List all description versions for a task, newest first.
+	ListDescriptionVersions(ctx context.Context, arg ListDescriptionVersionsParams) ([]ListDescriptionVersionsRow, error)
 	// List a project's timeline via v_task_timeline. Filters events whose
 	// owning task lives in the given project (events with no task_id are
 	// excluded by virtue of project_public_id being NULL).
@@ -539,18 +621,32 @@ type Querier interface {
 	ListEventsForTask(ctx context.Context, arg ListEventsForTaskParams) ([]ListEventsForTaskRow, error)
 	// List the workspace-wide event timeline via v_task_timeline.
 	ListEventsForWorkspace(ctx context.Context, arg ListEventsForWorkspaceParams) ([]ListEventsForWorkspaceRow, error)
+	// List all favorites for a user within a workspace, ordered by sort weight.
+	ListFavoritesForUser(ctx context.Context, arg ListFavoritesForUserParams) ([]ListFavoritesForUserRow, error)
+	// List import jobs for a workspace with total count.
+	ListImportJobsForWorkspace(ctx context.Context, arg ListImportJobsForWorkspaceParams) ([]ListImportJobsForWorkspaceRow, error)
 	// List a workspace's inbox via v_inbox.
 	ListInbox(ctx context.Context, arg ListInboxParams) ([]ListInboxRow, error)
 	// List inbox items across every workspace the actor is an active member of.
 	ListInboxForUser(ctx context.Context, arg ListInboxForUserParams) ([]ListInboxForUserRow, error)
 	// List incoming dependencies of a task (edges that point AT this task).
 	ListIncomingDependenciesForTask(ctx context.Context, arg ListIncomingDependenciesForTaskParams) ([]ListIncomingDependenciesForTaskRow, error)
+	// List intake items for a workspace, filtered by status.
+	ListIntakeItemsForWorkspace(ctx context.Context, arg ListIntakeItemsForWorkspaceParams) ([]ListIntakeItemsForWorkspaceRow, error)
+	// List labels scoped to a specific project (includes workspace-wide labels).
+	ListLabelsForProject(ctx context.Context, arg ListLabelsForProjectParams) ([]ListLabelsForProjectRow, error)
+	// List all labels in a workspace, optionally filtered by project.
+	ListLabelsForWorkspace(ctx context.Context, arg ListLabelsForWorkspaceParams) ([]ListLabelsForWorkspaceRow, error)
 	// List enabled lenses scoped to a workspace + project (or workspace-wide when project_id IS NULL).
 	ListLensesForProject(ctx context.Context, arg ListLensesForProjectParams) ([]ListLensesForProjectRow, error)
 	// List a user's MCP tokens in a workspace, masked.
 	ListMcpTokensForUser(ctx context.Context, arg ListMcpTokensForUserParams) ([]ListMcpTokensForUserRow, error)
 	// List hidden members for a subscription.
 	ListMemberFilters(ctx context.Context, subscriptionID uint32) ([]uint32, error)
+	// List all mentions within a specific task (description or comments).
+	ListMentionsForTask(ctx context.Context, taskID sql.NullInt32) ([]ListMentionsForTaskRow, error)
+	// List mentions where a user was mentioned, within a workspace.
+	ListMentionsForUser(ctx context.Context, arg ListMentionsForUserParams) ([]ListMentionsForUserRow, error)
 	// List models registered under a provider. Workspace-scoped.
 	ListModelsForProvider(ctx context.Context, arg ListModelsForProviderParams) ([]ListModelsForProviderRow, error)
 	// Tasks where the given user is attached as an actor, via v_my_tasks.
@@ -561,6 +657,8 @@ type Querier interface {
 	// GET /me/tasks to power the cross-workspace "Today" / Calendar views in
 	// the web client without fanning out one request per workspace.
 	ListMyTasksGlobal(ctx context.Context, arg ListMyTasksGlobalParams) ([]ListMyTasksGlobalRow, error)
+	// List all notification preferences for a user in a workspace.
+	ListNotificationPreferencesForUser(ctx context.Context, arg ListNotificationPreferencesForUserParams) ([]ListNotificationPreferencesForUserRow, error)
 	// List notifications for a user across all their workspaces, ordered newest first.
 	// Excludes archived and disabled notifications.
 	ListNotificationsForUser(ctx context.Context, arg ListNotificationsForUserParams) ([]ListNotificationsForUserRow, error)
@@ -598,8 +696,14 @@ type Querier interface {
 	ListProjectsForWorkspace(ctx context.Context, arg ListProjectsForWorkspaceParams) ([]ListProjectsForWorkspaceRow, error)
 	// Workspace provider list. NEVER selects api_key_ciphertext.
 	ListProvidersForWorkspace(ctx context.Context, arg ListProvidersForWorkspaceParams) ([]ListProvidersForWorkspaceRow, error)
+	// List all reactions on a comment.
+	ListReactionsForComment(ctx context.Context, commentID sql.NullInt32) ([]ListReactionsForCommentRow, error)
+	// List all reactions on a task, grouped by emoji with user info.
+	ListReactionsForTask(ctx context.Context, taskID sql.NullInt32) ([]ListReactionsForTaskRow, error)
 	// List recent audit log entries for a workspace via v_audit_recent.
 	ListRecentAudit(ctx context.Context, arg ListRecentAuditParams) ([]ListRecentAuditRow, error)
+	// List the most recent visits for a user in a workspace, newest first.
+	ListRecentVisitsForUser(ctx context.Context, arg ListRecentVisitsForUserParams) ([]ListRecentVisitsForUserRow, error)
 	// Cross-calendar query: list recurring events across multiple calendars
 	// whose recurrence window overlaps the query range.
 	ListRecurringCalendarEventsAcrossCalendars(ctx context.Context, arg ListRecurringCalendarEventsAcrossCalendarsParams) ([]ListRecurringCalendarEventsAcrossCalendarsRow, error)
@@ -621,6 +725,8 @@ type Querier interface {
 	ListTaskActorRolesForEngine(ctx context.Context, taskID uint32) ([]TaskActorsRole, error)
 	// Enabled constraint rows for a task in evaluation order.
 	ListTaskConstraintsForEngine(ctx context.Context, taskID uint32) ([]ListTaskConstraintsForEngineRow, error)
+	// List labels attached to a task.
+	ListTaskLabels(ctx context.Context, arg ListTaskLabelsParams) ([]ListTaskLabelsRow, error)
 	// List tasks in a project via v_task_list with window-function pagination.
 	ListTasksForProject(ctx context.Context, arg ListTasksForProjectParams) ([]ListTasksForProjectRow, error)
 	// List tasks belonging to a timebox with pagination.
@@ -647,6 +753,8 @@ type Querier interface {
 	// List every active integration owned by a user. Tokens are NOT
 	// selected; only metadata used by the /me/integrations list view.
 	ListUserIntegrations(ctx context.Context, userID uint32) ([]ListUserIntegrationsRow, error)
+	// List all view preferences for a user in a workspace.
+	ListViewPreferencesForUser(ctx context.Context, arg ListViewPreferencesForUserParams) ([]ListViewPreferencesForUserRow, error)
 	// List deliveries for a subscription with pagination.
 	ListWebhookDeliveries(ctx context.Context, arg ListWebhookDeliveriesParams) ([]ListWebhookDeliveriesRow, error)
 	// List webhook subscriptions for a workspace with pagination.
@@ -683,6 +791,8 @@ type Querier interface {
 	MarkDeliveryDelivered(ctx context.Context, arg MarkDeliveryDeliveredParams) error
 	// Mark a delivery attempt as failed with retry scheduling.
 	MarkDeliveryFailed(ctx context.Context, arg MarkDeliveryFailedParams) error
+	// Stamp used_at on a magic link token after successful verification.
+	MarkMagicLinkUsed(ctx context.Context, id uint32) error
 	// Mark a notification as delivered (email/push sent).
 	MarkNotificationDelivered(ctx context.Context, publicID types.PublicID) error
 	// Mark a single notification as read.
@@ -693,6 +803,8 @@ type Querier interface {
 	// lives in the application layer so different agents can have
 	// different budgets.
 	NackAgentRun(ctx context.Context, arg NackAgentRunParams) error
+	// Get the next version number for a task's description history.
+	NextDescriptionVersionNumber(ctx context.Context, taskID uint32) (int32, error)
 	// Patch mutable calendar fields. NULL params leave columns untouched.
 	PatchCalendar(ctx context.Context, arg PatchCalendarParams) error
 	// Patch mutable event fields. NULL params leave columns untouched.
@@ -732,6 +844,8 @@ type Querier interface {
 	ResolveLensProjectID(ctx context.Context, arg ResolveLensProjectIDParams) (sql.NullInt32, error)
 	// Accept or dismiss a pending suggestion. Only transitions from 'pending'.
 	ResolveSuggestion(ctx context.Context, arg ResolveSuggestionParams) error
+	// Resolve a human-readable task reference (e.g. NF-42) to a task public_id.
+	ResolveTaskRef(ctx context.Context, arg ResolveTaskRefParams) (ResolveTaskRefRow, error)
 	// Revoke every active session for a user except one identified by public_id.
 	// Used by "sign out of all other devices" in /settings/security.
 	RevokeAllSessionsForUserExcept(ctx context.Context, arg RevokeAllSessionsForUserExceptParams) error
@@ -755,12 +869,18 @@ type Querier interface {
 	// Begin (or restart) TOTP enrollment by writing a fresh encrypted
 	// secret and clearing any previous confirmation timestamp.
 	SetIdentityMfaSecret(ctx context.Context, arg SetIdentityMfaSecretParams) error
+	// Set AI score and reasoning for an intake item.
+	SetIntakeItemAIScore(ctx context.Context, arg SetIntakeItemAIScoreParams) error
+	// Link an intake item to a converted task.
+	SetIntakeItemTask(ctx context.Context, arg SetIntakeItemTaskParams) error
 	// Revoke public sharing on a lens. Clears the token.
 	// No-op if the lens is already private (WHERE is_public = TRUE guard).
 	SetLensPrivate(ctx context.Context, arg SetLensPrivateParams) error
 	// Enable public sharing on a lens. Generates a share URL token.
 	// No-op if the lens is already public (WHERE is_public = FALSE guard).
 	SetLensPublic(ctx context.Context, arg SetLensPublicParams) error
+	// Set the task_number after allocation.
+	SetTaskNumber(ctx context.Context, arg SetTaskNumberParams) error
 	// Snooze a signal by pushing its received_at forward. Minimal impl;
 	// a dedicated snoozed_until_at column may be added later on.
 	SnoozeInboxItem(ctx context.Context, arg SnoozeInboxItemParams) error
@@ -777,6 +897,8 @@ type Querier interface {
 	// the only path allowed to mutate derived_state and must be called inside
 	// the same transaction as the events append.
 	TransitionTaskState(ctx context.Context, arg TransitionTaskStateParams) error
+	// Clear archived_at on a task.
+	UnarchiveTask(ctx context.Context, arg UnarchiveTaskParams) error
 	// Update the schedule_kind on an existing agent.
 	UpdateAgentScheduleKind(ctx context.Context, arg UpdateAgentScheduleKindParams) error
 	// Grant or revoke edit permission on an attendee (by event owner).
@@ -795,6 +917,14 @@ type Querier interface {
 	UpdateIdentityFailedAttempts(ctx context.Context, arg UpdateIdentityFailedAttemptsParams) error
 	// Replace the Argon2id password hash on a local identity.
 	UpdateIdentityPasswordHash(ctx context.Context, arg UpdateIdentityPasswordHashParams) error
+	// Update the progress counters of an import job.
+	UpdateImportJobProgress(ctx context.Context, arg UpdateImportJobProgressParams) error
+	// Update the status and timing fields of an import job.
+	UpdateImportJobStatus(ctx context.Context, arg UpdateImportJobStatusParams) error
+	// Update the triage status of an intake item.
+	UpdateIntakeItemTriage(ctx context.Context, arg UpdateIntakeItemTriageParams) error
+	// Update mutable label fields.
+	UpdateLabel(ctx context.Context, arg UpdateLabelParams) error
 	// Update a lens name and/or JSON body.
 	UpdateLens(ctx context.Context, arg UpdateLensParams) error
 	// Record the timestamp of the latest AI safety check for a public lens.
@@ -836,6 +966,11 @@ type Querier interface {
 	// Insert or update a single auto-action rule for a workspace.
 	// The UNIQUE KEY on (workspace_id, kind) makes this idempotent.
 	UpsertAutoActionRule(ctx context.Context, arg UpsertAutoActionRuleParams) error
+	// Create or update a notification preference for a user.
+	UpsertNotificationPreference(ctx context.Context, arg UpsertNotificationPreferenceParams) error
+	// Record or refresh a recent visit. If the user already visited this entity,
+	// update the timestamp and title snapshot.
+	UpsertRecentVisit(ctx context.Context, arg UpsertRecentVisitParams) error
 	// ============================================================================
 	// task_embeddings queries (ADR 0003)
 	//
@@ -860,6 +995,8 @@ type Querier interface {
 	// (user_id, provider) key guarantees only one active row per
 	// provider per user; on conflict we refresh every token column.
 	UpsertUserIntegration(ctx context.Context, arg UpsertUserIntegrationParams) (int64, error)
+	// Create or update a user's view preference for a specific scope.
+	UpsertViewPreference(ctx context.Context, arg UpsertViewPreferenceParams) error
 }
 
 var _ Querier = (*Queries)(nil)

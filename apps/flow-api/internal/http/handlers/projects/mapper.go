@@ -7,17 +7,22 @@ import (
 
 func rowToProjectFromFind(r generated.FindProjectByPublicIdGlobalRow) Project {
 	return Project{
-		ID:          r.PublicID.String(),
-		WorkspaceID: r.WorkspacePublicID.String(),
-		Slug:        r.Slug,
-		Name:        r.Name,
-		Description: nullStr(r.Description),
-		Color:       nullStr(r.Color),
-		IsArchived:  r.IsArchived,
-		StartedOn:   nullTimeDate(r.StartedOn),
-		EndedOn:     nullTimeDate(r.EndedOn),
-		UpdatedAt:   nullTimeUnix(r.UpdatedAt),
-		CreatedAt:   r.CreatedAt.Unix(),
+		ID:               r.PublicID.String(),
+		WorkspaceID:      r.WorkspacePublicID.String(),
+		Slug:             r.Slug,
+		Identifier:       r.Identifier,
+		Name:             r.Name,
+		Description:      nullStr(r.Description),
+		Color:            nullStr(r.Color),
+		IsArchived:       r.IsArchived,
+		StartedOn:        nullTimeDate(r.StartedOn),
+		EndedOn:          nullTimeDate(r.EndedOn),
+		FeaturePages:     r.FeaturePages,
+		FeatureTimeboxes: r.FeatureTimeboxes,
+		FeatureLenses:    r.FeatureLenses,
+		FeatureCalendar:  r.FeatureCalendar,
+		UpdatedAt:        nullTimeUnix(r.UpdatedAt),
+		CreatedAt:        r.CreatedAt.Unix(),
 	}
 }
 
@@ -29,6 +34,7 @@ func rowToProjectFromList(r generated.ListProjectsForWorkspaceRow, workspacePubl
 		ID:          r.PublicID.String(),
 		WorkspaceID: workspacePublicID,
 		Slug:        r.Slug,
+		Identifier:  r.Identifier,
 		Name:        r.Name,
 		Description: nullStr(r.Description),
 		Color:       nullStr(r.Color),

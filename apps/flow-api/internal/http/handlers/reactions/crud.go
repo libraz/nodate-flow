@@ -1,0 +1,204 @@
+package reactions
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+)
+
+// Create handles POST /tasks/{id}/reactions.
+func Create(deps Deps) func(context.Context, *CreateReactionInput) (*CreateReactionOutput, error) {
+	return func(ctx context.Context, in *CreateReactionInput) (*CreateReactionOutput, error) {
+		ws, ok := middleware.WorkspaceFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsWorkspaceNotFound)
+		}
+		task, ok := middleware.TaskFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsTaskNotFound)
+		}
+		actorID, ok := middleware.ActorFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
+		}
+
+		taskID := sql.NullInt32{Int32: int32(task.ID), Valid: true}
+
+		// Check for duplicate reaction (same user, same task, same emoji).
+		_, dupErr := deps.Queries.FindExistingReaction(ctx, generated.FindExistingReactionParams{
+			UserID: actorID,
+			TaskID: taskID,
+			Emoji:  in.Body.Emoji,
+		})
+		if dupErr == nil {
+			return nil, httpErr(apierrors.WsReactionAlreadyExists)
+		}
+		if !errors.Is(dupErr, sql.ErrNoRows) {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
+		pub := types.New()
+		if _, err := deps.Queries.CreateReaction(ctx, generated.CreateReactionParams{
+			PublicID:    pub,
+			WorkspaceID: ws.ID,
+			UserID:      actorID,
+			TaskID:      taskID,
+			CommentID:   sql.NullInt32{},
+			Emoji:       in.Body.Emoji,
+		}); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
+		taskIDInt64 := int64(task.ID)
+		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+			Type:        eventbus.ReactionAdded,
+			WorkspaceID: ws.ID,
+			ActorUserID: actorPtr(ctx),
+			TaskID:      &taskIDInt64,
+			Payload: map[string]any{
+				"reactionId": pub.String(),
+				"emoji":      in.Body.Emoji,
+			},
+		})
+
+		if deps.Audit != nil {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "reaction.create",
+				ActorID:      actorID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "reaction",
+				ResourceID:   pub.String(),
+				Metadata:     map[string]any{"emoji": in.Body.Emoji, "taskId": in.ID},
+			})
+		}
+
+		// Fetch the actor's display name for the response.
+		row, err := deps.Queries.FindReactionByPublicId(ctx, pub)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
+		// To return the user display name we look up the actor user row.
+		// Since FindReactionByPublicId does not JOIN users, we use the
+		// list query filtered to just this task and find the matching row.
+		reactions, err := deps.Queries.ListReactionsForTask(ctx, taskID)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		for _, r := range reactions {
+			if r.PublicID == row.PublicID {
+				return &CreateReactionOutput{Body: mapTaskReactionRow(r)}, nil
+			}
+		}
+
+		// Fallback: return without display name.
+		return &CreateReactionOutput{Body: Reaction{
+			ID:        pub.String(),
+			Emoji:     in.Body.Emoji,
+			UserID:    "", // cannot resolve without JOIN
+			CreatedAt: row.CreatedAt.Unix(),
+		}}, nil
+	}
+}
+
+// ListForTask handles GET /tasks/{id}/reactions.
+func ListForTask(deps Deps) func(context.Context, *ListReactionsInput) (*ListReactionsOutput, error) {
+	return func(ctx context.Context, in *ListReactionsInput) (*ListReactionsOutput, error) {
+		_, ok := middleware.WorkspaceFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsWorkspaceNotFound)
+		}
+		task, ok := middleware.TaskFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsTaskNotFound)
+		}
+
+		taskID := sql.NullInt32{Int32: int32(task.ID), Valid: true}
+		rows, err := deps.Queries.ListReactionsForTask(ctx, taskID)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
+		out := &ListReactionsOutput{}
+		out.Body.Reactions = make([]Reaction, 0, len(rows))
+		for _, r := range rows {
+			out.Body.Reactions = append(out.Body.Reactions, mapTaskReactionRow(r))
+		}
+		return out, nil
+	}
+}
+
+// Delete handles DELETE /tasks/{id}/reactions/{reactionId}.
+func Delete(deps Deps) func(context.Context, *DeleteReactionInput) (*DeleteReactionOutput, error) {
+	return func(ctx context.Context, in *DeleteReactionInput) (*DeleteReactionOutput, error) {
+		ws, ok := middleware.WorkspaceFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsWorkspaceNotFound)
+		}
+		_, ok = middleware.TaskFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsTaskNotFound)
+		}
+		actorID, ok := middleware.ActorFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
+		}
+
+		pub, err := types.Parse(in.ReactionID)
+		if err != nil {
+			return nil, httpErr(apierrors.WsReactionNotFound)
+		}
+
+		// Verify the reaction exists and belongs to this user.
+		row, err := deps.Queries.FindReactionByPublicId(ctx, pub)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, httpErr(apierrors.WsReactionNotFound)
+			}
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if row.UserID != actorID {
+			return nil, httpErr(apierrors.WsReactionNotFound)
+		}
+
+		if err := deps.Queries.DisableReaction(ctx, generated.DisableReactionParams{
+			PublicID: pub,
+			UserID:   actorID,
+		}); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
+		taskIDInt64 := int64(row.TaskID.Int32)
+		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+			Type:        eventbus.ReactionRemoved,
+			WorkspaceID: ws.ID,
+			ActorUserID: actorPtr(ctx),
+			TaskID:      &taskIDInt64,
+			Payload: map[string]any{
+				"reactionId": pub.String(),
+				"emoji":      row.Emoji,
+			},
+		})
+
+		if deps.Audit != nil {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "reaction.delete",
+				ActorID:      actorID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "reaction",
+				ResourceID:   pub.String(),
+			})
+		}
+
+		out := &DeleteReactionOutput{}
+		out.Body.Ok = true
+		return out, nil
+	}
+}

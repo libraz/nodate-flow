@@ -38,11 +38,16 @@ import (
 	calhandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/calendars"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/dashboard"
 	exporthandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/export"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/favorites"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/inbox"
+	importhandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/imports"
+	intakehandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/intake"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/labels"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/lenses"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/notifications"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/pages"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/projects"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/reactions"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/relations"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/signals"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/tasks"
@@ -346,6 +351,8 @@ func BuildResult(deps Deps) Result {
 			Path:        "/workspaces/{wsId}/projects",
 			Summary:     "List projects in a workspace",
 		}, projects.List(prjDeps))
+		labelDeps := labels.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
+		labels.RegisterWorkspaceScoped(subAPI, labelDeps)
 		lensDeps := lenses.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
 		lenses.RegisterWorkspaceScoped(subAPI, lensDeps)
 		exportDeps := exporthandlers.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
@@ -461,6 +468,9 @@ func BuildResult(deps Deps) Result {
 			Summary:     "Resolve a natural-language command into an MCP tool invocation",
 		}, aihandlers.ResolveCommand(aiDeps))
 
+		// Workspace-scoped archived task listing.
+		tasks.RegisterWorkspaceScoped(subAPI, taskDeps)
+
 		// AI-powered smart task creation (propose + apply).
 		smartCreateDeps := tasks.SmartCreateDeps{DB: deps.DB, Queries: deps.Queries, AI: aiOrch, Embedder: embedClient, Audit: auditRec}
 		tasks.RegisterSmartCreate(subAPI, smartCreateDeps)
@@ -477,6 +487,10 @@ func BuildResult(deps Deps) Result {
 		notifications.RegisterWorkspaceScoped(subAPI, notifDeps)
 		relationDeps := relations.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
 		relations.RegisterWorkspaceScoped(subAPI, relationDeps)
+		intakeDeps := intakehandlers.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
+		intakehandlers.Register(subAPI, intakeDeps)
+		importDeps := importhandlers.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
+		importhandlers.Register(subAPI, importDeps)
 	})
 
 	// Per-user MCP tokens (workspace member, not admin).
@@ -528,9 +542,13 @@ func BuildResult(deps Deps) Result {
 		sub.Use(middleware.RequireTaskAccess(aclDB))
 		subAPI := newSubAPI(sub)
 		tasks.RegisterTaskScoped(subAPI, taskDeps)
+		labelTaskDeps := labels.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
+		labels.RegisterTaskScoped(subAPI, labelTaskDeps)
 		timeline.RegisterTaskScoped(subAPI, tlDeps)
 		relationTaskDeps := relations.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
 		relations.RegisterTaskScoped(subAPI, relationTaskDeps)
+		reactionDeps := reactions.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
+		reactions.RegisterTaskScoped(subAPI, reactionDeps)
 
 		// AI-powered step decomposition (propose + apply).
 		stepsDeps := tasks.StepsDeps{DB: deps.DB, Queries: deps.Queries, AI: aiOrch, Embedder: embedClient, Audit: auditRec}
@@ -561,6 +579,8 @@ func BuildResult(deps Deps) Result {
 		signals.RegisterCollection(subAPI, signalDeps)
 		inbox.Register(subAPI, inboxDeps)
 		notifications.Register(subAPI, notifDeps)
+		favDeps := favorites.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
+		favorites.Register(subAPI, favDeps)
 		relationAuthDeps := relations.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
 		relations.RegisterAuthScoped(subAPI, relationAuthDeps)
 	})

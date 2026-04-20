@@ -52,6 +52,14 @@ const (
 	// longer than a working week with no activity. The operator
 	// should either sign off or kick it back.
 	KindCloseStaleReview Kind = "close_stale_review"
+	// KindAutoArchiveCompleted fires when a done/cancelled task has
+	// been sitting idle for longer than a threshold. The task is
+	// archived automatically to keep the active list clean.
+	KindAutoArchiveCompleted Kind = "auto_archive_completed"
+	// KindAutoCloseStale fires when an open task has had no updates
+	// for longer than a threshold. The task is cancelled
+	// automatically so the backlog stays honest.
+	KindAutoCloseStale Kind = "auto_close_stale"
 )
 
 // Signals is the compact bag of task facts the rules read. It is kept
@@ -93,6 +101,8 @@ func DefaultRuleConfigs() []RuleConfig {
 		{Kind: KindAssignOwner, Enabled: true, Confidence: 0.75, IdleHours: 24},
 		{Kind: KindNudgeAssignee, Enabled: true, Confidence: 0.70, IdleHours: 72},
 		{Kind: KindCloseStaleReview, Enabled: true, Confidence: 0.70, IdleHours: 120},
+		{Kind: KindAutoArchiveCompleted, Enabled: false, Confidence: 0.90, IdleHours: 336}, // 14 days
+		{Kind: KindAutoCloseStale, Enabled: false, Confidence: 0.80, IdleHours: 720},        // 30 days
 	}
 }
 
@@ -111,9 +121,6 @@ func Evaluate(s Signals) *Action {
 // wins so each task yields at most one action. Disabled rules are
 // skipped entirely.
 func EvaluateWithConfig(s Signals, rules []RuleConfig) *Action {
-	if s.State == StateDone || s.State == StateCancelled {
-		return nil
-	}
 	if s.Now.IsZero() {
 		s.Now = time.Now().UTC()
 	}
@@ -127,12 +134,30 @@ func EvaluateWithConfig(s Signals, rules []RuleConfig) *Action {
 		cfgByKind[r.Kind] = r
 	}
 
+	// Terminal tasks only get auto-archive evaluation.
+	if s.State == StateDone || s.State == StateCancelled {
+		rc, ok := cfgByKind[KindAutoArchiveCompleted]
+		if !ok || !rc.Enabled {
+			return nil
+		}
+		threshold := time.Duration(rc.IdleHours) * time.Hour
+		if idle >= threshold {
+			return &Action{
+				Kind:       KindAutoArchiveCompleted,
+				Confidence: rc.Confidence,
+				Reason:     fmt.Sprintf("completed task idle for %d day(s) — archiving", idleDays(idle)),
+			}
+		}
+		return nil
+	}
+
 	// Urgency order: most urgent first.
 	order := []Kind{
 		KindEscalateOverdue,
 		KindAssignOwner,
 		KindNudgeAssignee,
 		KindCloseStaleReview,
+		KindAutoCloseStale,
 	}
 
 	for _, kind := range order {
@@ -173,6 +198,14 @@ func EvaluateWithConfig(s Signals, rules []RuleConfig) *Action {
 					Kind:       KindCloseStaleReview,
 					Confidence: rc.Confidence,
 					Reason:     fmt.Sprintf("review has been open for %d day(s)", idleDays(idle)),
+				}
+			}
+		case KindAutoCloseStale:
+			if s.State == StateOpen && idle >= threshold {
+				return &Action{
+					Kind:       KindAutoCloseStale,
+					Confidence: rc.Confidence,
+					Reason:     fmt.Sprintf("open task idle for %d day(s) — auto-closing", idleDays(idle)),
 				}
 			}
 		}

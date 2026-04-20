@@ -48,3 +48,9 @@
 .trigger:focus-visible {
   background: var(--nf-color-bg-hover);
 }
+
+.menuDivider {
+  border: none;
+  border-block-start: 1px solid var(--nf-color-border);
+  margin-block: 0.25rem;
+}

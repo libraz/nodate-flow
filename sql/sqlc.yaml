@@ -65,6 +65,41 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.parent_page_id"
             go_struct_tag: 'json:"-"'
+          - column: "*.label_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.parent_label_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.task_internal_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.comment_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.mentioned_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.target_public_id"
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+          - column: "*.entity_public_id"
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+          - column: "*.scope_public_id"
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+          - column: "*.mentioned_public_id"
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+          - column: "*.actor_public_id"
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
           - column: "*.calendar_id"
             go_struct_tag: 'json:"-"'
           - column: "*.event_id"
@@ -94,6 +129,24 @@ sql:
               import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
+          - column: "*.signal_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.triaged_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.author_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.triaged_by_public_id"
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+          - column: "*.author_public_id"
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+          - column: "*.initiated_by_user_id"
+            go_struct_tag: 'json:"-"'
   # --- nodate-time API (calendar + auth queries only) ---
   - engine: "mysql"
     queries:
@@ -164,6 +217,8 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.provider_id"
             go_struct_tag: 'json:"-"'
+          - column: "*.initiated_by_user_id"
+            go_struct_tag: 'json:"-"'
   # --- auth-api (auth + audit + workspace queries only) ---
   - engine: "mysql"
     queries:
@@ -223,6 +278,10 @@ sql:
           - column: "*.updated_by_user_id"
             go_struct_tag: 'json:"-"'
           - column: "*.provider_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.project_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.initiated_by_user_id"
             go_struct_tag: 'json:"-"'
           - column: "*.actor_user_public_id"
             go_type:

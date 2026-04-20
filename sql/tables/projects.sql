@@ -8,12 +8,17 @@ CREATE TABLE projects (
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
 
   slug VARCHAR(63) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Workspace-local slug',
+  identifier CHAR(5) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT '' COMMENT 'Human-readable project key (e.g. NF)',
   name VARCHAR(255) NOT NULL COMMENT 'Display name',
   description TEXT NULL COMMENT 'Optional description',
   color VARCHAR(16) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'Hex color (e.g., #1abc9c)',
   is_archived BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Archived flag (distinct from enabled)',
   started_on DATE NULL COMMENT 'Project start date',
   ended_on DATE NULL COMMENT 'Project end date',
+  feature_pages BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Toggle pages feature',
+  feature_timeboxes BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Toggle timeboxes feature',
+  feature_lenses BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Toggle lenses feature',
+  feature_calendar BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Toggle calendar feature',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
@@ -24,6 +29,7 @@ CREATE TABLE projects (
   UNIQUE KEY uniq_projects_public_id (public_id),
   UNIQUE KEY uniq_projects_workspace_id_slug_enabled (workspace_id, slug, enabled),
   KEY idx_projects_workspace_id_enabled (workspace_id, enabled),
+  UNIQUE KEY uniq_projects_workspace_id_identifier (workspace_id, identifier),
 
   CONSTRAINT fk_projects_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Task container';

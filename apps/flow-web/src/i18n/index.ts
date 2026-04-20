@@ -10,8 +10,10 @@ import enConstraints from '../../locales/en/constraints.json';
 import enDashboard from '../../locales/en/dashboard.json';
 import enErrors from '../../locales/en/errors.json';
 import enInbox from '../../locales/en/inbox.json';
+import enLabels from '../../locales/en/labels.json';
 import enNotifications from '../../locales/en/notifications.json';
 import enPages from '../../locales/en/pages.json';
+import enReactions from '../../locales/en/reactions.json';
 import enRelations from '../../locales/en/relations.json';
 import enSettings from '../../locales/en/settings.json';
 import enTimeline from '../../locales/en/timeline.json';
@@ -23,8 +25,10 @@ import jaConstraints from '../../locales/ja/constraints.json';
 import jaDashboard from '../../locales/ja/dashboard.json';
 import jaErrors from '../../locales/ja/errors.json';
 import jaInbox from '../../locales/ja/inbox.json';
+import jaLabels from '../../locales/ja/labels.json';
 import jaNotifications from '../../locales/ja/notifications.json';
 import jaPages from '../../locales/ja/pages.json';
+import jaReactions from '../../locales/ja/reactions.json';
 import jaRelations from '../../locales/ja/relations.json';
 import jaSettings from '../../locales/ja/settings.json';
 import jaTimeline from '../../locales/ja/timeline.json';
@@ -76,6 +80,8 @@ export function initI18n(): typeof i18n {
         'relations',
         'dashboard',
         'pages',
+        'labels',
+        'reactions',
       ],
       resources: {
         en: {
@@ -92,6 +98,8 @@ export function initI18n(): typeof i18n {
           relations: enRelations,
           dashboard: enDashboard,
           pages: enPages,
+          labels: enLabels,
+          reactions: enReactions,
         },
         ja: {
           auth: jaAuth,
@@ -107,6 +115,8 @@ export function initI18n(): typeof i18n {
           relations: jaRelations,
           dashboard: jaDashboard,
           pages: jaPages,
+          labels: jaLabels,
+          reactions: jaReactions,
         },
       },
       interpolation: { escapeValue: false },

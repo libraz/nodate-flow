@@ -6,6 +6,7 @@ import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
+import Switch from '@nodate-flow/ui/primitives/switch';
 import Tabs, { type TabItem } from '@nodate-flow/ui/primitives/tabs';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { Link, useNavigate } from '@tanstack/react-router';
@@ -15,7 +16,12 @@ import { useTranslation } from 'react-i18next';
 import { confirmAction } from '../../lib/confirm-action';
 import { type TaskDerivedState, useTasksQuery } from '../tasks/api';
 import { STATE_COLOR } from '../tasks/constants';
-import { useDisableProject, useProjectQuery, useUpdateProject } from './api';
+import {
+  type PatchProjectInput,
+  useDisableProject,
+  useProjectQuery,
+  useUpdateProject,
+} from './api';
 import ProjectMembersTable from './project-members-table';
 
 const STATE_ORDER: readonly TaskDerivedState[] = ['open', 'waiting', 'review', 'done', 'cancelled'];
@@ -24,8 +30,20 @@ export interface ProjectDetailProps {
   id: string;
 }
 
+/** Feature flag keys exposed on the project resource. */
+type FeatureFlag = 'featurePages' | 'featureTimeboxes' | 'featureLenses' | 'featureCalendar';
+
+/** i18n label key suffix for each feature flag. */
+const FEATURE_TOGGLES: readonly { flag: FeatureFlag; labelKey: string }[] = [
+  { flag: 'featurePages', labelKey: 'pages' },
+  { flag: 'featureTimeboxes', labelKey: 'timeboxes' },
+  { flag: 'featureLenses', labelKey: 'lenses' },
+  { flag: 'featureCalendar', labelKey: 'calendar' },
+];
+
 function SettingsPanel({ id }: { id: string }): ReactElement {
   const { t } = useTranslation('common');
+  const { t: tLabels } = useTranslation('labels');
   const { data: project } = useProjectQuery(id);
   const update = useUpdateProject();
   const disable = useDisableProject();
@@ -57,6 +75,19 @@ function SettingsPanel({ id }: { id: string }): ReactElement {
     }
   };
 
+  const handleToggle = async (flag: FeatureFlag, next: boolean): Promise<void> => {
+    try {
+      await update.mutateAsync({ id, patch: { [flag]: next } as PatchProjectInput });
+      toaster.show({ tone: 'success', message: tLabels('feature_toggles.updated') });
+    } catch {
+      toaster.show({ tone: 'danger', message: tLabels('feature_toggles.update_failed') });
+    }
+  };
+
+  /* The project object may carry feature flags that the SDK types haven't
+     picked up yet — cast to a record for safe access. */
+  const featureFlags = project as unknown as Record<FeatureFlag, boolean | undefined>;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <Card style={{ padding: '1.25rem' }}>
@@ -83,6 +114,38 @@ function SettingsPanel({ id }: { id: string }): ReactElement {
             </Button>
           </div>
         </form>
+      </Card>
+
+      <Card style={{ padding: '1.25rem' }}>
+        <section>
+          <h3 className="text-base font-semibold text-[var(--nf-color-fg)]">
+            {tLabels('feature_toggles.title')}
+          </h3>
+          <p className="text-sm text-[var(--nf-color-fg-muted)] mb-4">
+            {tLabels('feature_toggles.description')}
+          </p>
+          <div className="flex flex-col gap-4">
+            {FEATURE_TOGGLES.map(({ flag, labelKey }) => (
+              <div key={flag} className="flex items-center justify-between gap-4">
+                <div>
+                  <span className="text-sm font-medium text-[var(--nf-color-fg)]">
+                    {tLabels(`feature_toggles.${labelKey}`)}
+                  </span>
+                  <p className="text-xs text-[var(--nf-color-fg-muted)]">
+                    {tLabels(`feature_toggles.${labelKey}_description`)}
+                  </p>
+                </div>
+                <Switch
+                  checked={featureFlags[flag] ?? false}
+                  onCheckedChange={(next) => {
+                    void handleToggle(flag, next);
+                  }}
+                  aria-label={tLabels(`feature_toggles.${labelKey}`)}
+                />
+              </div>
+            ))}
+          </div>
+        </section>
       </Card>
 
       <Card style={{ padding: '1.25rem' }}>

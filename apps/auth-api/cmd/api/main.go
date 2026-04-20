@@ -130,16 +130,43 @@ func main() {
 		logger.Warn("google OIDC disabled (NF_AUTH_GOOGLE_CLIENT_ID / NF_AUTH_GOOGLE_CLIENT_SECRET not set)")
 	}
 
+	var githubOAuth *auth.GithubOAuthClient
+	if cfg.GithubOIDCClientID != "" && cfg.GithubOIDCClientSecret != "" {
+		githubOAuth = auth.NewGithubOAuth(auth.GithubOAuthConfig{
+			ClientID:     cfg.GithubOIDCClientID,
+			ClientSecret: cfg.GithubOIDCClientSecret,
+			RedirectURL:  cfg.PublicBaseURL + "/auth/oidc/github/callback",
+		})
+		logger.Info("github OAuth login client configured")
+	} else {
+		logger.Warn("github OAuth login disabled (NF_AUTH_GITHUB_OIDC_CLIENT_ID / NF_AUTH_GITHUB_OIDC_CLIENT_SECRET not set)")
+	}
+
+	var microsoftOIDC *auth.MicrosoftOIDCClient
+	if cfg.MicrosoftOIDCClientID != "" && cfg.MicrosoftOIDCClientSecret != "" {
+		microsoftOIDC = auth.NewMicrosoftOIDC(auth.MicrosoftOIDCConfig{
+			ClientID:     cfg.MicrosoftOIDCClientID,
+			ClientSecret: cfg.MicrosoftOIDCClientSecret,
+			RedirectURL:  cfg.PublicBaseURL + "/auth/oidc/microsoft/callback",
+		})
+		logger.Info("microsoft OIDC login client configured")
+	} else {
+		logger.Warn("microsoft OIDC login disabled (NF_AUTH_MICROSOFT_OIDC_CLIENT_ID / NF_AUTH_MICROSOFT_OIDC_CLIENT_SECRET not set)")
+	}
+
 	inner := router.Build(router.Deps{
 		DB:               db,
 		Queries:          queries,
 		JWT:              jwtIssuer,
 		OIDC:             oidcClient,
+		OIDCGithub:       githubOAuth,
+		OIDCMicrosoft:    microsoftOIDC,
 		Cipher:           cipher,
 		CookieSecure:     cfg.CookieSecure,
 		RegistrationOpen: cfg.RegistrationOpen,
 		EmailSender:      emailSender,
 		FlowWebURL:       cfg.FlowWebURL,
+		AccountsWebURL:   cfg.AccountsWebURL,
 		Integrations:     integrationsRegistry,
 		PublicBaseURL:     cfg.PublicBaseURL,
 		WebBaseURL:        cfg.FlowWebURL,

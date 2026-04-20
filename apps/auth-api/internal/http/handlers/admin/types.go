@@ -307,6 +307,16 @@ type PatchSettingsOutput struct {
 	}
 }
 
+// --- Instance Stats ---
+
+// InstanceStatsOutput is the response for GET /admin/instance-stats.
+type InstanceStatsOutput struct {
+	Body struct {
+		TotalUsers      int64 `json:"totalUsers"`
+		TotalWorkspaces int64 `json:"totalWorkspaces"`
+	}
+}
+
 // --- Setup ---
 
 // SetupOutput is the response for POST /admin/setup.

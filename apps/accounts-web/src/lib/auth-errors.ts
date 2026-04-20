@@ -36,6 +36,11 @@ export type AuthErrorI18nKey =
   | 'auth:errors.oidc_nonce_mismatch'
   | 'auth:errors.oidc_id_token_invalid'
   | 'auth:errors.oidc_provider_unreachable'
+  | 'auth:errors.oidc_github_not_configured'
+  | 'auth:errors.oidc_microsoft_not_configured'
+  | 'auth:errors.magic_link_invalid'
+  | 'auth:errors.magic_link_already_used'
+  | 'auth:errors.magic_link_email_not_found'
   | 'auth:errors.pat_token_unknown'
   | 'auth:errors.pat_expired'
   | 'auth:errors.token_refresh_invalid'
@@ -96,6 +101,12 @@ const AUTH_ERROR_MAP: Record<string, AuthErrorI18nKey> = {
   [AuthErrors.AUTH_OIDC_NONCE_MISMATCH.code]: 'auth:errors.oidc_nonce_mismatch',
   [AuthErrors.AUTH_OIDC_ID_TOKEN_INVALID.code]: 'auth:errors.oidc_id_token_invalid',
   [AuthErrors.AUTH_OIDC_PROVIDER_UNREACHABLE.code]: 'auth:errors.oidc_provider_unreachable',
+  [AuthErrors.AUTH_OIDC_GITHUB_NOT_CONFIGURED.code]: 'auth:errors.oidc_github_not_configured',
+  [AuthErrors.AUTH_OIDC_MICROSOFT_NOT_CONFIGURED.code]: 'auth:errors.oidc_microsoft_not_configured',
+  // magic link
+  [AuthErrors.AUTH_MAGIC_LINK_INVALID_OR_EXPIRED.code]: 'auth:errors.magic_link_invalid',
+  [AuthErrors.AUTH_MAGIC_LINK_ALREADY_USED.code]: 'auth:errors.magic_link_already_used',
+  [AuthErrors.AUTH_MAGIC_LINK_EMAIL_NOT_FOUND.code]: 'auth:errors.magic_link_email_not_found',
   // pat
   [AuthErrors.AUTH_PAT_TOKEN_UNKNOWN.code]: 'auth:errors.pat_token_unknown',
   [AuthErrors.AUTH_PAT_EXPIRED.code]: 'auth:errors.pat_expired',

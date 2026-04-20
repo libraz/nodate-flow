@@ -13,7 +13,7 @@ import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import { Link, createFileRoute, useNavigate, useSearch } from '@tanstack/react-router';
-import { type FormEvent, type ReactElement, useCallback, useEffect, useState } from 'react';
+import { type FormEvent, type ReactElement, useCallback, useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
@@ -73,6 +73,11 @@ function LoginPage(): ReactElement {
   const [useRecovery, setUseRecovery] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState('');
   const [totpSubmitting, setTotpSubmitting] = useState(false);
+  const [showMagicLink, setShowMagicLink] = useState(false);
+  const [magicLinkEmail, setMagicLinkEmail] = useState('');
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [magicLinkSending, setMagicLinkSending] = useState(false);
+  const magicLinkEmailRef = useRef<HTMLInputElement>(null);
 
   const redirectAfterLogin = useCallback((): void => {
     if (redirectTarget && isSafeRedirect(redirectTarget)) {
@@ -166,6 +171,157 @@ function LoginPage(): ReactElement {
     setUseRecovery(false);
     setServerError(null);
   };
+
+  const handleSSOStart = async (provider: 'google' | 'github' | 'microsoft'): Promise<void> => {
+    setServerError(null);
+    try {
+      const { data, error } = await sdk.GET(`/auth/oidc/${provider}/start` as never);
+      if (error || !data) {
+        setServerError(mapAuthError(error as ProblemJson | undefined));
+        return;
+      }
+      const result = data as { authorizationUrl: string };
+      window.location.href = result.authorizationUrl;
+    } catch (err) {
+      setServerError(mapAuthThrown(err));
+    }
+  };
+
+  const handleMagicLinkSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
+    e.preventDefault();
+    if (!magicLinkEmail.trim()) return;
+    setServerError(null);
+    setMagicLinkSending(true);
+    try {
+      const { error } = await sdk.POST('/auth/magic-link/request' as never, {
+        body: { email: magicLinkEmail.trim() },
+      });
+      if (error) {
+        setServerError(mapAuthError(error as ProblemJson | undefined));
+        return;
+      }
+      setMagicLinkSent(true);
+    } catch (err) {
+      setServerError(mapAuthThrown(err));
+    } finally {
+      setMagicLinkSending(false);
+    }
+  };
+
+  if (showMagicLink) {
+    if (magicLinkSent) {
+      return (
+        <AuthCard>
+          <div
+            style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5, 1.5rem)' }}
+          >
+            <h1
+              style={{
+                fontFamily: 'var(--nf-font-display, var(--font-display))',
+                fontSize: 'var(--nf-text-2xl, 1.5rem)',
+                margin: 0,
+              }}
+            >
+              {t('login.magic_link_title')}
+            </h1>
+            <p
+              style={{
+                margin: 0,
+                color: 'var(--nf-color-fg-muted)',
+                fontSize: 'var(--nf-text-sm, 0.875rem)',
+              }}
+            >
+              {t('login.magic_link_sent', { email: magicLinkEmail })}
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setShowMagicLink(false);
+                setMagicLinkSent(false);
+                setMagicLinkEmail('');
+              }}
+            >
+              {t('login.magic_link_back')}
+            </Button>
+          </div>
+        </AuthCard>
+      );
+    }
+    return (
+      <AuthCard>
+        <form
+          onSubmit={(e) => {
+            void handleMagicLinkSubmit(e);
+          }}
+          noValidate
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5, 1.5rem)' }}
+        >
+          <h1
+            style={{
+              fontFamily: 'var(--nf-font-display, var(--font-display))',
+              fontSize: 'var(--nf-text-2xl, 1.5rem)',
+              margin: 0,
+            }}
+          >
+            {t('login.magic_link_title')}
+          </h1>
+          <p
+            style={{
+              margin: 0,
+              color: 'var(--nf-color-fg-muted)',
+              fontSize: 'var(--nf-text-sm, 0.875rem)',
+            }}
+          >
+            {t('login.magic_link_instructions')}
+          </p>
+          <FormField label={t('login.email')} required>
+            {(control) => (
+              <Input
+                {...control}
+                ref={magicLinkEmailRef}
+                type="email"
+                autoComplete="email"
+                value={magicLinkEmail}
+                onChange={(e) => {
+                  setMagicLinkEmail(e.target.value);
+                }}
+              />
+            )}
+          </FormField>
+          {serverError ? (
+            <p
+              role="alert"
+              style={{
+                margin: 0,
+                color: 'var(--nf-color-danger)',
+                fontSize: 'var(--nf-text-sm, 0.875rem)',
+              }}
+            >
+              {t(serverError)}
+            </p>
+          ) : null}
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={magicLinkSending || !magicLinkEmail.trim()}
+          >
+            {magicLinkSending ? t('login.magic_link_sending') : t('login.magic_link_submit')}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              setShowMagicLink(false);
+              setServerError(null);
+            }}
+          >
+            {t('login.magic_link_back')}
+          </Button>
+        </form>
+      </AuthCard>
+    );
+  }
 
   if (challengeToken != null) {
     return (
@@ -346,6 +502,77 @@ function LoginPage(): ReactElement {
 
         <Button type="submit" variant="primary" disabled={isSubmitting}>
           {isSubmitting ? t('login.submitting') : t('login.submit')}
+        </Button>
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--nf-space-3, 0.75rem)',
+            color: 'var(--nf-color-fg-muted)',
+            fontSize: 'var(--nf-text-sm, 0.875rem)',
+          }}
+        >
+          <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--nf-color-border)' }} />
+          <span>{t('login.sso_divider')}</span>
+          <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--nf-color-border)' }} />
+        </div>
+
+        <div
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3, 0.75rem)' }}
+        >
+          <Button
+            type="button"
+            variant="default"
+            onClick={() => {
+              void handleSSOStart('google');
+            }}
+          >
+            {t('login.sso_google')}
+          </Button>
+          <Button
+            type="button"
+            variant="default"
+            onClick={() => {
+              void handleSSOStart('github');
+            }}
+          >
+            {t('login.sso_github')}
+          </Button>
+          <Button
+            type="button"
+            variant="default"
+            onClick={() => {
+              void handleSSOStart('microsoft');
+            }}
+          >
+            {t('login.sso_microsoft')}
+          </Button>
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--nf-space-3, 0.75rem)',
+            color: 'var(--nf-color-fg-muted)',
+            fontSize: 'var(--nf-text-sm, 0.875rem)',
+          }}
+        >
+          <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--nf-color-border)' }} />
+          <span>{t('login.magic_link_divider')}</span>
+          <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--nf-color-border)' }} />
+        </div>
+
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => {
+            setShowMagicLink(true);
+            setServerError(null);
+          }}
+        >
+          {t('login.magic_link_button')}
         </Button>
 
         <p
