@@ -20,6 +20,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/http/router"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/notifications"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/httputil"
 )
 
@@ -62,9 +63,32 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Wire the outbound email transport. When NF_TIME_SMTP_HOST is
+	// unset we fall through to the noop sender — invite rows are still
+	// created, but the magic-link message is never delivered.
+	var emailSender email.Sender = email.NoopSender{}
+	if cfg.SmtpHost != "" {
+		s, smtpErr := email.NewSMTPSender(email.SMTPConfig{
+			Host:     cfg.SmtpHost,
+			Port:     cfg.SmtpPort,
+			Username: cfg.SmtpUsername,
+			Password: cfg.SmtpPassword,
+			From:     cfg.SmtpFrom,
+		})
+		if smtpErr != nil {
+			logger.Error("smtp init failed", "err", smtpErr)
+			os.Exit(1)
+		}
+		emailSender = s
+		logger.Info("email sender configured", "host", cfg.SmtpHost)
+	}
+
 	inner := router.Build(router.Deps{
-		DB:  db,
-		JWT: jwtIssuer,
+		DB:          db,
+		JWT:         jwtIssuer,
+		EmailSender: emailSender,
+		EmailFrom:   cfg.SmtpFrom,
+		WebBaseURL:  cfg.WebBaseURL,
 	})
 
 	outer := chi.NewRouter()
@@ -110,4 +134,3 @@ func main() {
 	}
 	logger.Info("shutdown complete")
 }
-

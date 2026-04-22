@@ -42,6 +42,27 @@ type Config struct {
 	// S3UseSSL enables TLS for the S3 connection. Defaults to true;
 	// local MinIO development should set NF_S3_USE_SSL=false.
 	S3UseSSL bool `env:"NF_S3_USE_SSL" envDefault:"true"`
+
+	// SmtpHost is the SMTP server hostname used to dispatch
+	// transactional emails (event-invite magic links). When empty,
+	// email sending is disabled and invite rows are still created but
+	// never marked as sent.
+	SmtpHost string `env:"NF_TIME_SMTP_HOST" envDefault:""`
+	// SmtpPort is the SMTP server port (typically 587 for STARTTLS).
+	SmtpPort int `env:"NF_TIME_SMTP_PORT" envDefault:"587"`
+	// SmtpUsername is the SASL login. Empty to skip authentication.
+	SmtpUsername string `env:"NF_TIME_SMTP_USERNAME" envDefault:""`
+	// SmtpPassword is the SASL secret.
+	SmtpPassword string `env:"NF_TIME_SMTP_PASSWORD" envDefault:""`
+	// SmtpFrom is the envelope sender address used on outbound mail.
+	SmtpFrom string `env:"NF_TIME_SMTP_FROM" envDefault:"noreply@nodate-flow.local"`
+
+	// WebBaseURL is the origin of the time-web (calendar) frontend.
+	// Used to build /invites/accept magic-link URLs embedded in
+	// outbound invite emails. NF_WEB_BASE_URL is preferred; the legacy
+	// NF_TIME_WEB_URL also works via envExpand elsewhere. Defaults to
+	// http://localhost:5174 for local development.
+	WebBaseURL string `env:"NF_WEB_BASE_URL" envDefault:"http://localhost:5174"`
 }
 
 // Load parses NF_* environment variables into a Config and validates

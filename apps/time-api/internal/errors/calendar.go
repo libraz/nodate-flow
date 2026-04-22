@@ -86,6 +86,8 @@ var (
 	CalendarEventStoreReadInterrupted = &Spec{Code: "CALENDAR.EVENT.STORE_READ_INTERRUPTED", Status: 500, Message: "Could not read event"}
 	// CALENDAR.EVENT.STORE_WRITE_INTERRUPTED — Could not save event
 	CalendarEventStoreWriteInterrupted = &Spec{Code: "CALENDAR.EVENT.STORE_WRITE_INTERRUPTED", Status: 500, Message: "Could not save event"}
+	// CALENDAR.INVITE.EMAIL_SEND_INTERRUPTED — Could not send invite email
+	CalendarInviteEmailSendInterrupted = &Spec{Code: "CALENDAR.INVITE.EMAIL_SEND_INTERRUPTED", Status: 500, Message: "Could not send invite email"}
 	// CALENDAR.INVITE.LIST_QUERY_INTERRUPTED — Could not retrieve invites
 	CalendarInviteListQueryInterrupted = &Spec{Code: "CALENDAR.INVITE.LIST_QUERY_INTERRUPTED", Status: 500, Message: "Could not retrieve invites"}
 	// CALENDAR.INVITE.NOT_FOUND — Invite not found or expired

@@ -38,6 +38,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List pending event invites addressed to the caller */
+        get: operations["me-invites-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/invites/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept a calendar event invite via magic-link token */
+        post: operations["event-invites-accept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/share/cal/{token}": {
         parameters: {
             query?: never;
@@ -283,6 +317,23 @@ export interface paths {
         patch: operations["attendees-rsvp"];
         trace?: never;
     };
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{attendeeId}/invite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create (or rotate) a magic-link invite for an attendee */
+        post: operations["event-invites-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{userId}": {
         parameters: {
             query?: never;
@@ -387,6 +438,40 @@ export interface paths {
         head?: never;
         /** Edit a comment */
         patch: operations["comments-edit"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List active magic-link invites for an event */
+        get: operations["event-invites-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/invites/{inviteId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke a magic-link invite */
+        delete: operations["event-invites-revoke"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/workspaces/{wsId}/calendars/{calId}/members": {
@@ -553,6 +638,36 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AcceptEventInviteInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * @description RSVP response to record for the attendee
+             * @enum {string}
+             */
+            rsvp: "accepted" | "declined" | "tentative";
+            /** @description Plaintext magic-link token from the invite email */
+            token: string;
+        };
+        AcceptEventInviteResponse: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            calendarName?: string;
+            /** Format: int64 */
+            eventEndAt?: number;
+            eventId?: string;
+            /** Format: int64 */
+            eventStartAt?: number;
+            eventTitle?: string;
+            inviteId: string;
+            rsvp: string;
+        };
         AddAttendeesInputBody: {
             /**
              * Format: uri
@@ -821,6 +936,18 @@ export interface components {
              */
             visibility?: "default" | "public" | "private" | "confidential";
         };
+        CreateEventInviteInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description Token lifetime in hours; default 168, cap 720
+             */
+            expiresInHours?: number;
+        };
         CreateMemoInputBody: {
             /**
              * Format: uri
@@ -1001,6 +1128,17 @@ export interface components {
              */
             type: string;
         };
+        EventInviteCreateResponse: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            expiresAt: number;
+            id: string;
+            token: string;
+        };
         EventProposal: {
             /** Format: int64 */
             endAt: number;
@@ -1059,6 +1197,19 @@ export interface components {
             readonly $schema?: string;
             status: string;
         };
+        InviteSummaryResponse: {
+            /** Format: int64 */
+            acceptedAt?: number;
+            attendeePublicId: string;
+            /** Format: int64 */
+            createdAt: number;
+            email: string;
+            /** Format: int64 */
+            expiresAt: number;
+            id: string;
+            /** Format: int64 */
+            sentAt?: number;
+        };
         ListAttachmentsOutputBody: {
             /**
              * Format: uri
@@ -1099,6 +1250,14 @@ export interface components {
             readonly $schema?: string;
             comments: components["schemas"]["CommentResponse"][] | null;
         };
+        ListEventInvitesOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            invites: components["schemas"]["InviteSummaryResponse"][] | null;
+        };
         ListEventsOutputBody: {
             /**
              * Format: uri
@@ -1130,6 +1289,14 @@ export interface components {
              */
             readonly $schema?: string;
             events: components["schemas"]["MyCalendarEventResponse"][] | null;
+        };
+        ListMyInvitesOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            invites: components["schemas"]["MyInviteResponse"][] | null;
         };
         ListOutputBody: {
             /**
@@ -1205,6 +1372,25 @@ export interface components {
             visibility: string;
             workspaceId: string;
             workspaceName: string;
+        };
+        MyInviteResponse: {
+            calendarName: string;
+            calendarPublicId: string;
+            /** Format: int64 */
+            createdAt: number;
+            eventAllDay: boolean;
+            /** Format: int64 */
+            eventEndAt?: number;
+            eventLocation?: string;
+            eventPublicId: string;
+            /** Format: int64 */
+            eventStartAt?: number;
+            eventTitle: string;
+            /** Format: int64 */
+            expiresAt: number;
+            id: string;
+            workspaceName: string;
+            workspacePublicId: string;
         };
         PatchCalendarInputBody: {
             /**
@@ -1373,6 +1559,14 @@ export interface components {
             readonly $schema?: string;
             events: components["schemas"]["PublicShareRenderEvent"][] | null;
             page: components["schemas"]["PublicShareRenderPage"];
+        };
+        RevokeEventInviteOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            revoked: boolean;
         };
         ShareEventResponse: {
             allDay: boolean;
@@ -1597,6 +1791,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListMyCalendarEventsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "me-invites-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListMyInvitesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "event-invites-accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptEventInviteInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptEventInviteResponse"];
                 };
             };
             /** @description Error */
@@ -2377,6 +2633,48 @@ export interface operations {
             };
         };
     };
+    "event-invites-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+                /** @description Attendee public ID */
+                attendeeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateEventInviteInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventInviteCreateResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "attendees-remove": {
         parameters: {
             query?: never;
@@ -2756,6 +3054,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EditCommentOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "event-invites-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListEventInvitesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "event-invites-revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+                /** @description Invite public ID */
+                inviteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevokeEventInviteOutputBody"];
                 };
             };
             /** @description Error */

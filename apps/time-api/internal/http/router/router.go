@@ -10,17 +10,28 @@ import (
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
 
-	generated "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/auth"
+	generated "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/http/handlers/calendars"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/http/handlers/workspaces"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
 )
 
 // Deps is the dependency bundle Build needs to wire every route.
 type Deps struct {
 	DB  *sql.DB
 	JWT *auth.JWTIssuer
+	// EmailSender is the outbound-email transport wired into calendar
+	// handlers (event invites). Nil is treated as [email.NoopSender].
+	EmailSender email.Sender
+	// EmailFrom is the envelope sender used by the calendar handlers
+	// when dispatching email. Must align with the SMTP transport
+	// configuration.
+	EmailFrom string
+	// WebBaseURL is the time-web origin used to build magic-link
+	// accept-page URLs in outbound invite emails.
+	WebBaseURL string
 }
 
 type healthOutput struct {
@@ -60,9 +71,16 @@ func BuildResult(deps Deps) Result {
 	queries := generated.New(deps.DB)
 
 	// Build calendar handler dependencies.
+	emailSender := deps.EmailSender
+	if emailSender == nil {
+		emailSender = email.NoopSender{}
+	}
 	calDeps := calendars.Deps{
-		Queries: queries,
-		DB:      deps.DB,
+		Queries:     queries,
+		DB:          deps.DB,
+		EmailSender: emailSender,
+		EmailFrom:   deps.EmailFrom,
+		WebBaseURL:  deps.WebBaseURL,
 	}
 
 	// Build workspace handler dependencies.
@@ -89,6 +107,16 @@ func BuildResult(deps Deps) Result {
 		Path:        "/share/cal/{token}",
 		Summary:     "Render a public calendar share by URL token",
 	}, calendars.RenderPublicShare(calDeps))
+
+	// Event-invite accept (unauthenticated; magic-link token is the
+	// capability). Mounted alongside the public-share render so it lives
+	// outside the auth middleware group.
+	huma.Register(api, huma.Operation{
+		OperationID: "event-invites-accept",
+		Method:      http.MethodPost,
+		Path:        "/public/invites/accept",
+		Summary:     "Accept a calendar event invite via magic-link token",
+	}, calendars.AcceptEventInvite(calDeps))
 
 	// Protected routes (RequireAuth).
 	aclDB := passthroughDB{deps.DB}
@@ -147,6 +175,15 @@ func BuildResult(deps Deps) Result {
 			Path:        "/me/calendar-events",
 			Summary:     "List events across every workspace the caller belongs to",
 		}, calendars.ListMyCalendarEvents(calDeps))
+
+		// Cross-workspace invite inbox: pending magic-link invites
+		// addressed to the authenticated user's primary email.
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "me-invites-list",
+			Method:      http.MethodGet,
+			Path:        "/me/invites",
+			Summary:     "List pending event invites addressed to the caller",
+		}, calendars.ListMyInvites(calDeps))
 
 		// Calendar-invite accept is gone; ws joining uses workspace_invites.
 
@@ -339,6 +376,29 @@ func BuildResult(deps Deps) Result {
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{userId}/can-edit",
 			Summary:     "Toggle can_edit for an attendee",
 		}, calendars.ToggleCanEdit(calDeps))
+
+		// Event invites (magic-link). Create mints a new token (or
+		// rotates an existing one) for a specific attendee, revoke
+		// soft-disables an invite, and list returns the invite metadata
+		// for the event owner's audit view.
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "event-invites-create",
+			Method:      http.MethodPost,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{attendeeId}/invite",
+			Summary:     "Create (or rotate) a magic-link invite for an attendee",
+		}, calendars.CreateEventInvite(calDeps))
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "event-invites-list",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/invites",
+			Summary:     "List active magic-link invites for an event",
+		}, calendars.ListEventInvites(calDeps))
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "event-invites-revoke",
+			Method:      http.MethodDelete,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/invites/{inviteId}",
+			Summary:     "Revoke a magic-link invite",
+		}, calendars.RevokeEventInvite(calDeps))
 
 		// Event comments.
 		huma.Register(calAPI, huma.Operation{

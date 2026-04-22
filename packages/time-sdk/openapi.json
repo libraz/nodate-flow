@@ -1,6 +1,67 @@
 {
   "components": {
     "schemas": {
+      "AcceptEventInviteInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AcceptEventInviteInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "rsvp": {
+            "description": "RSVP response to record for the attendee",
+            "enum": ["accepted", "declined", "tentative"],
+            "type": "string"
+          },
+          "token": {
+            "description": "Plaintext magic-link token from the invite email",
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["token", "rsvp"],
+        "type": "object"
+      },
+      "AcceptEventInviteResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AcceptEventInviteResponse.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "calendarName": {
+            "type": "string"
+          },
+          "eventEndAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "eventStartAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "eventTitle": {
+            "type": "string"
+          },
+          "inviteId": {
+            "type": "string"
+          },
+          "rsvp": {
+            "type": "string"
+          }
+        },
+        "required": ["inviteId", "rsvp"],
+        "type": "object"
+      },
       "AddAttendeesInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -568,6 +629,26 @@
         "required": ["kind", "title", "timezone"],
         "type": "object"
       },
+      "CreateEventInviteInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateEventInviteInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "expiresInHours": {
+            "description": "Token lifetime in hours; default 168, cap 720",
+            "format": "int64",
+            "maximum": 720,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "CreateMemoInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -950,6 +1031,30 @@
         },
         "type": "object"
       },
+      "EventInviteCreateResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/EventInviteCreateResponse.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "token", "expiresAt"],
+        "type": "object"
+      },
       "EventProposal": {
         "additionalProperties": false,
         "properties": {
@@ -1096,6 +1201,38 @@
         "required": ["status"],
         "type": "object"
       },
+      "InviteSummaryResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "acceptedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "attendeePublicId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "email": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "sentAt": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["id", "attendeePublicId", "email", "expiresAt", "createdAt"],
+        "type": "object"
+      },
       "ListAttachmentsOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -1196,6 +1333,26 @@
         "required": ["comments"],
         "type": "object"
       },
+      "ListEventInvitesOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListEventInvitesOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "invites": {
+            "items": {
+              "$ref": "#/components/schemas/InviteSummaryResponse"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["invites"],
+        "type": "object"
+      },
       "ListEventsOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -1274,6 +1431,26 @@
           }
         },
         "required": ["events"],
+        "type": "object"
+      },
+      "ListMyInvitesOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListMyInvitesOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "invites": {
+            "items": {
+              "$ref": "#/components/schemas/MyInviteResponse"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["invites"],
         "type": "object"
       },
       "ListOutputBody": {
@@ -1474,6 +1651,67 @@
           "title",
           "allDay",
           "timezone",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "MyInviteResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "calendarName": {
+            "type": "string"
+          },
+          "calendarPublicId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "eventAllDay": {
+            "type": "boolean"
+          },
+          "eventEndAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "eventLocation": {
+            "type": "string"
+          },
+          "eventPublicId": {
+            "type": "string"
+          },
+          "eventStartAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "eventTitle": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "workspaceName": {
+            "type": "string"
+          },
+          "workspacePublicId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "eventPublicId",
+          "eventTitle",
+          "eventAllDay",
+          "calendarPublicId",
+          "calendarName",
+          "workspacePublicId",
+          "workspaceName",
+          "expiresAt",
           "createdAt"
         ],
         "type": "object"
@@ -1843,6 +2081,23 @@
           }
         },
         "required": ["page", "events"],
+        "type": "object"
+      },
+      "RevokeEventInviteOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/RevokeEventInviteOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "revoked": {
+            "type": "boolean"
+          }
+        },
+        "required": ["revoked"],
         "type": "object"
       },
       "ShareEventResponse": {
@@ -2281,6 +2536,72 @@
           }
         },
         "summary": "List events across every workspace the caller belongs to"
+      }
+    },
+    "/me/invites": {
+      "get": {
+        "operationId": "me-invites-list",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListMyInvitesOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List pending event invites addressed to the caller"
+      }
+    },
+    "/public/invites/accept": {
+      "post": {
+        "operationId": "event-invites-accept",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptEventInviteInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptEventInviteResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Accept a calendar event invite via magic-link token"
       }
     },
     "/share/cal/{token}": {
@@ -3483,6 +3804,86 @@
         "summary": "Update own RSVP for an event"
       }
     },
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{attendeeId}/invite": {
+      "post": {
+        "operationId": "event-invites-create",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Calendar public ID",
+            "in": "path",
+            "name": "calId",
+            "required": true,
+            "schema": {
+              "description": "Calendar public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Event public ID",
+            "in": "path",
+            "name": "evtId",
+            "required": true,
+            "schema": {
+              "description": "Event public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Attendee public ID",
+            "in": "path",
+            "name": "attendeeId",
+            "required": true,
+            "schema": {
+              "description": "Attendee public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEventInviteInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventInviteCreateResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create (or rotate) a magic-link invite for an attendee"
+      }
+    },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{userId}": {
       "delete": {
         "operationId": "attendees-remove",
@@ -4183,6 +4584,136 @@
           }
         },
         "summary": "Edit a comment"
+      }
+    },
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/invites": {
+      "get": {
+        "operationId": "event-invites-list",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Calendar public ID",
+            "in": "path",
+            "name": "calId",
+            "required": true,
+            "schema": {
+              "description": "Calendar public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Event public ID",
+            "in": "path",
+            "name": "evtId",
+            "required": true,
+            "schema": {
+              "description": "Event public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListEventInvitesOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List active magic-link invites for an event"
+      }
+    },
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/invites/{inviteId}": {
+      "delete": {
+        "operationId": "event-invites-revoke",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Calendar public ID",
+            "in": "path",
+            "name": "calId",
+            "required": true,
+            "schema": {
+              "description": "Calendar public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Event public ID",
+            "in": "path",
+            "name": "evtId",
+            "required": true,
+            "schema": {
+              "description": "Event public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Invite public ID",
+            "in": "path",
+            "name": "inviteId",
+            "required": true,
+            "schema": {
+              "description": "Invite public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeEventInviteOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Revoke a magic-link invite"
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/members": {

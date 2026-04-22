@@ -206,6 +206,11 @@ export const CalendarErrors = {
     status: 500,
     message: "Could not save event",
   },
+  CALENDAR_INVITE_EMAIL_SEND_INTERRUPTED: {
+    code: "CALENDAR.INVITE.EMAIL_SEND_INTERRUPTED",
+    status: 500,
+    message: "Could not send invite email",
+  },
   CALENDAR_INVITE_LIST_QUERY_INTERRUPTED: {
     code: "CALENDAR.INVITE.LIST_QUERY_INTERRUPTED",
     status: 500,

@@ -10,6 +10,91 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/http/middleware"
 )
 
+// MyInviteResponse is a single row in the /me/invites inbox. It carries
+// enough context — workspace, calendar, event title, event window — for
+// the inbox UI to render "You're invited to <event> in <workspace>"
+// without fanning out per-invite requests. Only active, non-accepted,
+// non-expired invites for the caller's primary email are returned.
+type MyInviteResponse struct {
+	ID                string  `json:"id"`
+	EventPublicID     string  `json:"eventPublicId"`
+	EventTitle        string  `json:"eventTitle"`
+	EventStartAt      *int64  `json:"eventStartAt,omitempty"`
+	EventEndAt        *int64  `json:"eventEndAt,omitempty"`
+	EventAllDay       bool    `json:"eventAllDay"`
+	EventLocation     *string `json:"eventLocation,omitempty"`
+	CalendarPublicID  string  `json:"calendarPublicId"`
+	CalendarName      string  `json:"calendarName"`
+	WorkspacePublicID string  `json:"workspacePublicId"`
+	WorkspaceName     string  `json:"workspaceName"`
+	ExpiresAt         int64   `json:"expiresAt"`
+	CreatedAt         int64   `json:"createdAt"`
+}
+
+// ListMyInvitesOutput wraps the inbox list. The plural "invites" key
+// matches repo conventions; an empty inbox is rendered as `{invites: []}`.
+type ListMyInvitesOutput struct {
+	Body struct {
+		Invites []MyInviteResponse `json:"invites"`
+	}
+}
+
+// ListMyInvites returns every active, non-accepted, non-expired magic
+// link invite addressed to the authenticated user's primary email,
+// across every workspace. The query behind it is ListMyCalendarEventInvites
+// which JOINs event + calendar + workspace metadata in a single trip.
+//
+// The actor's email is resolved from their user profile row; stub users
+// without an email produce an empty inbox. No ACL check beyond auth: the
+// invites were addressed to this email, and the user proved email
+// control by signing in.
+func ListMyInvites(deps Deps) func(context.Context, *struct{}) (*ListMyInvitesOutput, error) {
+	return func(ctx context.Context, _ *struct{}) (*ListMyInvitesOutput, error) {
+		actorID, ok := middleware.ActorFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.AuthSessionRevoked)
+		}
+		profile, err := deps.Queries.FindUserProfileById(ctx, actorID)
+		if err != nil {
+			return nil, httpErr(apierrors.CalendarInviteListQueryInterrupted)
+		}
+
+		out := &ListMyInvitesOutput{}
+		out.Body.Invites = []MyInviteResponse{}
+		if profile.Email == "" {
+			return out, nil
+		}
+
+		rows, err := deps.Queries.ListMyCalendarEventInvites(ctx, profile.Email)
+		if err != nil {
+			return nil, httpErr(apierrors.CalendarInviteListQueryInterrupted)
+		}
+		out.Body.Invites = make([]MyInviteResponse, 0, len(rows))
+		for _, r := range rows {
+			item := MyInviteResponse{
+				ID:                r.PublicID.String(),
+				EventPublicID:     r.EventPublicID.String(),
+				EventTitle:        r.EventTitle,
+				EventStartAt:      nullTimeUnixPtr(r.EventStartAt),
+				EventEndAt:        nullTimeUnixPtr(r.EventEndAt),
+				EventAllDay:       r.EventAllDay,
+				CalendarPublicID:  r.CalendarPublicID.String(),
+				CalendarName:      r.CalendarName,
+				WorkspacePublicID: r.WorkspacePublicID.String(),
+				WorkspaceName:     r.WorkspaceName,
+				ExpiresAt:         r.ExpiresAt.Unix(),
+				CreatedAt:         r.CreatedAt.Unix(),
+			}
+			if r.EventLocation.Valid {
+				loc := r.EventLocation.String
+				item.EventLocation = &loc
+			}
+			out.Body.Invites = append(out.Body.Invites, item)
+		}
+		return out, nil
+	}
+}
+
 // ListMyCalendarEventsInput is the query for GET /me/calendar-events.
 // `start` and `end` accept either a date (YYYY-MM-DD) or an RFC 3339
 // datetime, matching the per-workspace cross-calendar endpoint so the

@@ -400,6 +400,13 @@ resources:
         description: "Returned when looking up an invite by token hash encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
+      email_send_interrupted:
+        code: CALENDAR.INVITE.EMAIL_SEND_INTERRUPTED
+        status: 500
+        message: "Could not send invite email"
+        description: "Returned when sending the magic-link invite email fails. The invite row is persisted; the email dispatch can be retried via resend."
+        userAction: "Retry the resend action. If the problem persists, contact support."
+
   member:
     breadcrumb: "Calendar > Member"
     errors:

@@ -86,6 +86,7 @@
   "CALENDAR.EVENT.STORE_DELETE_INTERRUPTED": "Could not delete event",
   "CALENDAR.EVENT.STORE_READ_INTERRUPTED": "Could not read event",
   "CALENDAR.EVENT.STORE_WRITE_INTERRUPTED": "Could not save event",
+  "CALENDAR.INVITE.EMAIL_SEND_INTERRUPTED": "Could not send invite email",
   "CALENDAR.INVITE.LIST_QUERY_INTERRUPTED": "Could not retrieve invites",
   "CALENDAR.INVITE.NOT_FOUND": "Invite not found or expired",
   "CALENDAR.INVITE.STORE_LOOKUP_INTERRUPTED": "Could not look up invite",
