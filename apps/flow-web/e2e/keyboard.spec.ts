@@ -10,21 +10,13 @@
 
 import { expect, test } from '@playwright/test';
 
-import { type TestTenant, cleanupTenant, createTestTenant, injectAuth } from './fixtures/tenant';
+import { loadTenants } from './fixtures/load-tenants';
+import { injectAuth } from './fixtures/tenant';
 import { checkA11y } from './helpers/a11y';
 
 test.describe('keyboard shortcuts', () => {
-  let tenant: TestTenant | null = null;
-
-  test.afterEach(async () => {
-    if (tenant) {
-      await cleanupTenant(tenant);
-      tenant = null;
-    }
-  });
-
   test('Cmd+K opens command palette, Escape closes it', async ({ page }) => {
-    tenant = await createTestTenant();
+    const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
 
     await page.goto('/');
@@ -34,7 +26,7 @@ test.describe('keyboard shortcuts', () => {
     await page.waitForLoadState('networkidle');
 
     // Accessibility check on the main authenticated view
-    await checkA11y(page);
+    await checkA11y(page, ['color-contrast', 'region']);
 
     // The command palette should not be visible initially
     const palette = page

@@ -320,6 +320,7 @@ func main() {
 		EmbedOpenAIKey:        cfg.EmbedOpenAIKey,
 		EmbedModel:            cfg.EmbedModel,
 		EmbedBaseURL:          cfg.EmbedBaseURL,
+		DisableRateLimit:      cfg.DisableRateLimit,
 	})
 
 	// Wrap the router with the request logger so the prod binary keeps

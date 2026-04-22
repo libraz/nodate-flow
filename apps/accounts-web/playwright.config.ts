@@ -1,30 +1,27 @@
 /**
- * Playwright config for the nodate-flow web app.
+ * Playwright config for accounts-web (auth UI).
  *
- * The webServer block boots the Vite dev server on :5173. The backend
- * API must be running separately (see e2e/README.md). The base URL of
- * the backend is read from NF_API_URL inside the test fixtures.
+ * The webServer block boots the Vite dev server on :5175. The auth-api
+ * backend must be running separately on :8082.
  */
 
 import { defineConfig, devices } from '@playwright/test';
 
 const isCI = !!process.env.CI;
 
-const WEB_BASE_URL = process.env.NF_WEB_URL ?? 'http://localhost:5173';
+const WEB_BASE_URL = process.env.NF_ACCOUNTS_WEB_URL ?? 'http://localhost:5175';
 
 export default defineConfig({
-  testDir: './e2e',
-  testMatch: /.*\.spec\.ts$/,
   globalSetup: './e2e/fixtures/global-setup.ts',
   globalTeardown: './e2e/fixtures/global-teardown.ts',
-  globalTimeout: 10 * 60_000,
+  testDir: './e2e',
+  testMatch: /.*\.spec\.ts$/,
   fullyParallel: true,
+  globalTimeout: 10 * 60 * 1000, // 10 min — includes rate-limit waits in global setup
   forbidOnly: isCI,
-  retries: isCI ? 2 : 1,
-  ...(isCI ? { workers: 2 } : { workers: 3 }),
+  retries: isCI ? 2 : 0,
+  workers: isCI ? 2 : 3,
   reporter: [['html', { open: 'never' }]],
-  snapshotDir: './e2e/snapshots',
-  snapshotPathTemplate: '{snapshotDir}/{arg}{ext}',
   expect: {
     toHaveScreenshot: {
       maxDiffPixelRatio: 0.01,

@@ -158,6 +158,11 @@ type Config struct {
 	// SmtpFrom is the default envelope sender address.
 	SmtpFrom string `env:"NF_FLOW_SMTP_FROM" envDefault:"noreply@nodate-flow.local"`
 
+	// DisableRateLimit turns off all per-IP rate limiters. Intended for
+	// local development and E2E test runs where many requests happen
+	// from the same loopback address.
+	DisableRateLimit bool `env:"NF_FLOW_DISABLE_RATE_LIMIT" envDefault:"false"`
+
 	// RegistrationOpen controls whether new user sign-up is allowed.
 	// When false, the POST /auth/register endpoint returns 403.
 	RegistrationOpen bool `env:"NF_REGISTRATION_OPEN" envDefault:"true"`

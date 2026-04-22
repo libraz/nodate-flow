@@ -20,13 +20,14 @@ import { randomUUID } from 'node:crypto';
 import type { BrowserContext } from '@playwright/test';
 
 export const API_BASE_URL = process.env.NF_API_URL ?? 'http://localhost:8080';
+export const AUTH_API_URL = process.env.NF_AUTH_API_URL ?? 'http://localhost:8082';
 
 export interface TestTenant {
   email: string;
   password: string;
   displayName: string;
   accessToken: string;
-  /** Raw nf_rt refresh token extracted from the Set-Cookie header. */
+  /** Raw nd_rt refresh token extracted from the Set-Cookie header. */
   refreshToken: string;
   userId: string;
   workspaceId: string;
@@ -51,36 +52,50 @@ interface ProjectResponse {
   slug: string;
 }
 
-async function postJson<T>(path: string, body: unknown, bearer?: string): Promise<T> {
+async function postJson<T>(
+  baseUrl: string,
+  path: string,
+  body: unknown,
+  bearer?: string,
+): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     accept: 'application/json',
   };
   if (bearer) headers.authorization = `Bearer ${bearer}`;
 
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-  });
-  const text = await res.text();
-  if (!res.ok) {
-    throw new Error(`POST ${path} -> ${res.status} ${text}`);
+  const maxRetries = 5;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const res = await fetch(`${baseUrl}${path}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+    const text = await res.text();
+    if ((res.status === 429 || res.status === 500) && attempt < maxRetries - 1) {
+      // Wait for rate limit window to expire or server to recover, then retry
+      await new Promise((r) => setTimeout(r, 5000 * (attempt + 1)));
+      continue;
+    }
+    if (!res.ok) {
+      throw new Error(`POST ${path} -> ${res.status} ${text}`);
+    }
+    return text ? (JSON.parse(text) as T) : ({} as T);
   }
-  return text ? (JSON.parse(text) as T) : ({} as T);
+  throw new Error(`POST ${path} -> exhausted retries`);
 }
 
 /**
- * Extracts the nf_rt refresh token value from a Set-Cookie header.
+ * Extracts the nd_rt refresh token value from a Set-Cookie header.
  * The header may contain multiple cookie strings separated by commas
- * or be returned as a single value; we look for the `nf_rt=...`
+ * or be returned as a single value; we look for the `nd_rt=...`
  * segment.
  */
 function extractRefreshToken(res: Response): string {
   const raw = res.headers.get('set-cookie') ?? '';
-  const match = raw.match(/nf_rt=([^;]+)/);
+  const match = raw.match(/nd_rt=([^;]+)/);
   if (!match) {
-    throw new Error(`POST /auth/register did not return nf_rt cookie. Set-Cookie: ${raw}`);
+    throw new Error(`POST /auth/register did not return nd_rt cookie. Set-Cookie: ${raw}`);
   }
   return match[1] as string;
 }
@@ -95,12 +110,24 @@ export async function createTestTenant(): Promise<TestTenant> {
   const password = 'correct horse battery staple';
   const displayName = `E2E User ${suffix}`;
 
-  // Register with raw fetch so we can capture the nf_rt Set-Cookie.
-  const regRes = await fetch(`${API_BASE_URL}/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', accept: 'application/json' },
-    body: JSON.stringify({ email, password, displayName, locale: 'en' }),
-  });
+  // Register with raw fetch so we can capture the nd_rt Set-Cookie.
+  // Auth endpoints live on auth-api (port 8082), not flow-api (port 8080).
+  async function register(): Promise<Response> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const res = await fetch(`${AUTH_API_URL}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ email, password, displayName, locale: 'en' }),
+      });
+      if (res.status === 429 && attempt < 4) {
+        await new Promise((r) => setTimeout(r, 5000 * (attempt + 1)));
+        continue;
+      }
+      return res;
+    }
+    throw new Error('POST /auth/register -> exhausted retries');
+  }
+  const regRes = await register();
   if (!regRes.ok) {
     throw new Error(`POST /auth/register -> ${regRes.status} ${await regRes.text()}`);
   }
@@ -108,14 +135,18 @@ export async function createTestTenant(): Promise<TestTenant> {
   const refreshToken = extractRefreshToken(regRes);
 
   const workspaceSlug = `ws-${suffix}`;
+  // Workspaces live on auth-api
   const ws = await postJson<WorkspaceResponse>(
+    AUTH_API_URL,
     '/workspaces',
     { slug: workspaceSlug, name: `E2E Workspace ${suffix}` },
     reg.accessToken,
   );
 
+  // Projects live on flow-api
   const projectSlug = `prj-${suffix}`;
   const prj = await postJson<ProjectResponse>(
+    API_BASE_URL,
     `/workspaces/${ws.id}/projects`,
     { slug: projectSlug, name: `E2E Project ${suffix}` },
     reg.accessToken,
@@ -141,7 +172,7 @@ export async function createTestTenant(): Promise<TestTenant> {
  */
 export async function cleanupTenant(tenant: TestTenant): Promise<void> {
   try {
-    await fetch(`${API_BASE_URL}/auth/logout`, {
+    await fetch(`${AUTH_API_URL}/auth/logout`, {
       method: 'POST',
       headers: {
         authorization: `Bearer ${tenant.accessToken}`,
@@ -163,33 +194,45 @@ export async function createTask(
   title: string,
 ): Promise<{ id: string; title: string }> {
   const res = await postJson<{ id: string; title: string }>(
-    `/workspaces/${tenant.workspaceId}/projects/${tenant.projectId}/tasks`,
-    { title },
+    API_BASE_URL,
+    '/tasks',
+    { title, projectId: tenant.projectId },
     tenant.accessToken,
   );
   return res;
 }
 
 /**
- * Injects the tenant's nf_rt refresh cookie into the browser context so
+ * Injects the tenant's nd_rt refresh cookie into the browser context so
  * the app's bootstrap flow (POST /auth/refresh) succeeds on the next
  * navigation. This replaces the broken localStorage approach -- the auth
  * store is in-memory only and the app re-establishes sessions exclusively
- * via the httpOnly nf_rt cookie.
+ * via the httpOnly nd_rt cookie.
  *
  * Must be called BEFORE page.goto().
  */
 export async function injectAuth(context: BrowserContext, tenant: TestTenant): Promise<void> {
-  const url = new URL(API_BASE_URL);
-  await context.addCookies([
-    {
-      name: 'nf_rt',
-      value: tenant.refreshToken,
-      domain: url.hostname,
-      path: '/auth',
-      httpOnly: true,
-      secure: url.protocol === 'https:',
-      sameSite: url.protocol === 'https:' ? 'None' : 'Lax',
-    },
-  ]);
+  const page = await context.newPage();
+  try {
+    await page.goto(AUTH_API_URL, { waitUntil: 'commit', timeout: 5000 }).catch(() => {});
+
+    const result = await page.evaluate(
+      async (creds: { email: string; password: string; authUrl: string }) => {
+        const res = await fetch(`${creds.authUrl}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ email: creds.email, password: creds.password }),
+        });
+        const body = await res.text();
+        return { ok: res.ok, status: res.status, body };
+      },
+      { email: tenant.email, password: tenant.password, authUrl: AUTH_API_URL },
+    );
+    if (!result.ok) {
+      throw new Error(`Browser-side login failed: ${result.status} ${result.body}`);
+    }
+  } finally {
+    await page.close();
+  }
 }

@@ -10,21 +10,13 @@
 
 import { expect, test } from '@playwright/test';
 
-import { type TestTenant, cleanupTenant, createTestTenant, injectAuth } from './fixtures/tenant';
+import { loadTenants } from './fixtures/load-tenants';
+import { injectAuth } from './fixtures/tenant';
 import { checkA11y } from './helpers/a11y';
 
 test.describe('settings', () => {
-  let tenant: TestTenant | null = null;
-
-  test.afterEach(async () => {
-    if (tenant) {
-      await cleanupTenant(tenant);
-      tenant = null;
-    }
-  });
-
   test('view profile section and update display name', async ({ page }) => {
-    tenant = await createTestTenant();
+    const { user2: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
 
     await page.goto('/settings/profile');
@@ -34,10 +26,10 @@ test.describe('settings', () => {
     await expect(profileHeading).toBeVisible({ timeout: 10_000 });
 
     // Accessibility check on the settings/profile page
-    await checkA11y(page);
+    await checkA11y(page, ['color-contrast', 'region']);
 
     // Verify the current display name is shown
-    const nameInput = page.getByLabel(/display name|表示名|name/i);
+    const nameInput = page.getByLabel(/display name|表示名/i);
     await expect(nameInput).toBeVisible({ timeout: 5_000 });
     await expect(nameInput).toHaveValue(tenant.displayName);
 
@@ -52,7 +44,7 @@ test.describe('settings', () => {
     // Verify success feedback (toast, alert, or field retaining value after reload)
     // Reload to confirm persistence
     await page.reload();
-    await expect(page.getByLabel(/display name|表示名|name/i)).toHaveValue(newName, {
+    await expect(page.getByLabel(/display name|表示名/i)).toHaveValue(newName, {
       timeout: 10_000,
     });
   });

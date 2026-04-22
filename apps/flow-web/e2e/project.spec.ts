@@ -10,20 +10,12 @@
 
 import { expect, test } from '@playwright/test';
 
-import { type TestTenant, cleanupTenant, createTestTenant, injectAuth } from './fixtures/tenant';
+import { loadTenants } from './fixtures/load-tenants';
+import { injectAuth } from './fixtures/tenant';
 
 test.describe('project', () => {
-  let tenant: TestTenant | null = null;
-
-  test.afterEach(async () => {
-    if (tenant) {
-      await cleanupTenant(tenant);
-      tenant = null;
-    }
-  });
-
   test('create project in workspace and navigate to it', async ({ page }) => {
-    tenant = await createTestTenant();
+    const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
 
     await page.goto(`/workspaces/${tenant.workspaceId}/projects`);
@@ -32,14 +24,14 @@ test.describe('project', () => {
     await page.getByRole('button', { name: /new project|create project/i }).click();
 
     const projectName = `Test Project ${Date.now()}`;
-    await page.getByLabel(/name/i).fill(projectName);
-    await page.getByRole('button', { name: /create/i }).click();
+    await page.getByLabel(/^name/i).fill(projectName);
+    await page.getByRole('button', { name: /save|create/i }).click();
 
     // Verify project appears in the list
-    await expect(page.getByText(projectName)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(projectName).first()).toBeVisible({ timeout: 10_000 });
 
     // Navigate to the project
-    await page.getByText(projectName).click();
+    await page.getByText(projectName).first().click();
 
     // Verify we landed on the project page (URL contains project identifier)
     await expect(page).toHaveURL(/\/projects\//, { timeout: 5_000 });

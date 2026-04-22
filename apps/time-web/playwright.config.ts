@@ -1,30 +1,25 @@
 /**
- * Playwright config for the nodate-flow web app.
+ * Playwright config for time-web (calendar UI).
  *
- * The webServer block boots the Vite dev server on :5173. The backend
- * API must be running separately (see e2e/README.md). The base URL of
- * the backend is read from NF_API_URL inside the test fixtures.
+ * The webServer block boots the Vite dev server on :5174. The time-api
+ * backend must be running separately on :8081. Auth goes through
+ * auth-api on :8082.
  */
 
 import { defineConfig, devices } from '@playwright/test';
 
 const isCI = !!process.env.CI;
 
-const WEB_BASE_URL = process.env.NF_WEB_URL ?? 'http://localhost:5173';
+const WEB_BASE_URL = process.env.NF_TIME_WEB_URL ?? 'http://localhost:5174';
 
 export default defineConfig({
   testDir: './e2e',
   testMatch: /.*\.spec\.ts$/,
-  globalSetup: './e2e/fixtures/global-setup.ts',
-  globalTeardown: './e2e/fixtures/global-teardown.ts',
-  globalTimeout: 10 * 60_000,
   fullyParallel: true,
   forbidOnly: isCI,
-  retries: isCI ? 2 : 1,
-  ...(isCI ? { workers: 2 } : { workers: 3 }),
+  retries: isCI ? 2 : 0,
+  ...(isCI ? { workers: 2 } : {}),
   reporter: [['html', { open: 'never' }]],
-  snapshotDir: './e2e/snapshots',
-  snapshotPathTemplate: '{snapshotDir}/{arg}{ext}',
   expect: {
     toHaveScreenshot: {
       maxDiffPixelRatio: 0.01,

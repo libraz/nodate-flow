@@ -42,6 +42,14 @@ type Deps struct {
 	RegistrationOpen  bool
 	MinPasswordLength int
 	DisableRateLimit  bool
+
+	// Rate-limit tunables (from config).
+	RateLimitGlobalMax        int
+	RateLimitGlobalWindowSec  int
+	RateLimitAuthMax          int
+	RateLimitAuthWindowSec    int
+	RateLimitSessionMax       int
+	RateLimitSessionWindowSec int
 	EmailSender      email.Sender
 	FlowWebURL       string
 	AccountsWebURL   string
@@ -87,8 +95,8 @@ func BuildResult(deps Deps) Result {
 	// loopback address.
 	if !deps.DisableRateLimit {
 		globalRL := middleware.NewIPRateLimiter(middleware.RateLimitConfig{
-			MaxRequests: 200,
-			Window:      time.Minute,
+			MaxRequests: deps.RateLimitGlobalMax,
+			Window:      time.Duration(deps.RateLimitGlobalWindowSec) * time.Second,
 		})
 		r.Use(globalRL.Middleware())
 	}
@@ -152,8 +160,8 @@ func BuildResult(deps Deps) Result {
 	r.Group(func(sub chi.Router) {
 		if !deps.DisableRateLimit {
 			authRateLimiter := middleware.NewIPRateLimiter(middleware.RateLimitConfig{
-				MaxRequests: 5,
-				Window:      15 * time.Minute,
+				MaxRequests: deps.RateLimitAuthMax,
+				Window:      time.Duration(deps.RateLimitAuthWindowSec) * time.Second,
 			})
 			sub.Use(authRateLimiter.Middleware())
 		}
@@ -224,8 +232,8 @@ func BuildResult(deps Deps) Result {
 	r.Group(func(sub chi.Router) {
 		if !deps.DisableRateLimit {
 			cookieRateLimiter := middleware.NewIPRateLimiter(middleware.RateLimitConfig{
-				MaxRequests: 30,
-				Window:      15 * time.Minute,
+				MaxRequests: deps.RateLimitSessionMax,
+				Window:      time.Duration(deps.RateLimitSessionWindowSec) * time.Second,
 			})
 			sub.Use(cookieRateLimiter.Middleware())
 		}
@@ -490,8 +498,8 @@ func BuildResult(deps Deps) Result {
 	r.Group(func(sub chi.Router) {
 		if !deps.DisableRateLimit {
 			inviteRateLimiter := middleware.NewIPRateLimiter(middleware.RateLimitConfig{
-				MaxRequests: 30,
-				Window:      15 * time.Minute,
+				MaxRequests: deps.RateLimitSessionMax,
+				Window:      time.Duration(deps.RateLimitSessionWindowSec) * time.Second,
 			})
 			sub.Use(inviteRateLimiter.Middleware())
 		}

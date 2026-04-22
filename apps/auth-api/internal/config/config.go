@@ -36,6 +36,28 @@ type Config struct {
 	// registration and password changes. Defaults to 8.
 	MinPasswordLength int `env:"NF_AUTH_MIN_PASSWORD_LENGTH" envDefault:"8"`
 
+	// DisableRateLimit turns off all per-IP rate limiters. Intended for
+	// local development and E2E test runs where many registrations happen
+	// from the same loopback address.
+	DisableRateLimit bool `env:"NF_AUTH_DISABLE_RATE_LIMIT" envDefault:"false"`
+
+	// RateLimitGlobalMax is the global per-IP request cap (all endpoints).
+	RateLimitGlobalMax int `env:"NF_AUTH_RATE_LIMIT_GLOBAL_MAX" envDefault:"200"`
+	// RateLimitGlobalWindowSec is the global rate-limit window in seconds.
+	RateLimitGlobalWindowSec int `env:"NF_AUTH_RATE_LIMIT_GLOBAL_WINDOW" envDefault:"60"`
+
+	// RateLimitAuthMax is the per-IP cap for public auth endpoints
+	// (login, register, magic-link). Shared-NAT offices need headroom.
+	RateLimitAuthMax int `env:"NF_AUTH_RATE_LIMIT_AUTH_MAX" envDefault:"20"`
+	// RateLimitAuthWindowSec is the auth rate-limit window in seconds.
+	RateLimitAuthWindowSec int `env:"NF_AUTH_RATE_LIMIT_AUTH_WINDOW" envDefault:"900"`
+
+	// RateLimitSessionMax is the per-IP cap for cookie-auth endpoints
+	// (refresh, logout, TOTP).
+	RateLimitSessionMax int `env:"NF_AUTH_RATE_LIMIT_SESSION_MAX" envDefault:"60"`
+	// RateLimitSessionWindowSec is the session rate-limit window in seconds.
+	RateLimitSessionWindowSec int `env:"NF_AUTH_RATE_LIMIT_SESSION_WINDOW" envDefault:"900"`
+
 	// CorsAllowedOrigins is the comma-separated list of origins allowed to
 	// call the auth API with credentials. Must include accounts-web,
 	// flow-web, and time-web origins.

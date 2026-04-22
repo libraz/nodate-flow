@@ -60,13 +60,20 @@ type Limiter struct {
 // New creates a [Limiter] with the given configuration and starts a
 // background goroutine that evicts stale buckets every 2x the window
 // duration. Call [Limiter.Stop] on shutdown to release it.
+//
+// When cfg.Window is zero the cleanup goroutine is skipped. This mode is
+// intended for codegen utilities (dump-openapi and similar) that construct
+// the router only to inspect its shape and never serve traffic. Production
+// callers must supply a non-zero Window.
 func New(cfg Config) *Limiter {
 	l := &Limiter{
 		buckets: make(map[string]*entry),
 		config:  cfg,
 		done:    make(chan struct{}),
 	}
-	go l.cleanup(cfg.Window * 2)
+	if cfg.Window > 0 {
+		go l.cleanup(cfg.Window * 2)
+	}
 	return l
 }
 

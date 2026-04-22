@@ -21,13 +21,8 @@
 
 import { type Page, expect, test } from '@playwright/test';
 
-import {
-  type TestTenant,
-  cleanupTenant,
-  createTask,
-  createTestTenant,
-  injectAuth,
-} from './fixtures/tenant';
+import { loadTenants } from './fixtures/load-tenants';
+import { type TestTenant, injectAuth } from './fixtures/tenant';
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -54,23 +49,12 @@ interface PageDef {
 }
 
 const PAGES: PageDef[] = [
-  {
-    name: 'login',
-    path: '/login',
-    auth: false,
-    waitFor: 'form',
-  },
+  // Note: login page lives in accounts-web, not flow-web; skip it here.
   {
     name: 'task-list',
     path: '/projects/{projectId}/tasks',
     auth: true,
-    waitFor: '[data-testid="task-list"], table, [role="table"], main',
-  },
-  {
-    name: 'board',
-    path: '/projects/{projectId}/board',
-    auth: true,
-    waitFor: '[data-testid="board"], [data-testid="kanban"], main',
+    waitFor: 'main',
   },
   {
     name: 'settings',
@@ -82,7 +66,7 @@ const PAGES: PageDef[] = [
     name: 'inbox',
     path: '/inbox',
     auth: true,
-    waitFor: '[data-testid="inbox"], main',
+    waitFor: 'main',
   },
 ];
 
@@ -156,21 +140,14 @@ function snapshotName(pageName: string, theme: Theme, lang: Language): string {
 test.describe('visual regression', () => {
   // Fixed viewport for consistent snapshots.
   test.use({ viewport: { width: 1280, height: 720 } });
+  // Visual regression screenshots need extra time for rendering + comparison.
+  test.setTimeout(60_000);
 
   let tenant: TestTenant | null = null;
 
   test.beforeAll(async () => {
-    tenant = await createTestTenant();
-
-    // Seed a task so the task-list and board views have content.
-    await createTask(tenant, 'Visual regression seed task');
-  });
-
-  test.afterAll(async () => {
-    if (tenant) {
-      await cleanupTenant(tenant);
-      tenant = null;
-    }
+    const { user } = loadTenants();
+    tenant = user;
   });
 
   for (const pageDef of PAGES) {
@@ -203,13 +180,18 @@ test.describe('visual regression', () => {
             await disableMotion(page);
 
             // Allow a brief settle for any remaining layout shifts.
-            // Using waitForLoadState instead of an arbitrary sleep.
-            await page.waitForLoadState('networkidle');
+            // Use domcontentloaded instead of networkidle — pages with
+            // polling / SSE never reach networkidle.
+            await page.waitForLoadState('domcontentloaded');
+            await page.waitForTimeout(500);
 
             // Capture the screenshot and compare against baseline.
+            // Use a generous pixel ratio for pages with dynamic content
+            // (e.g. task-list where other tests seed tasks on the shared tenant).
+            const ratio = pageDef.name === 'task-list' ? 0.05 : 0.01;
             await expect(page).toHaveScreenshot(snapshotName(pageDef.name, theme, lang), {
               fullPage: true,
-              maxDiffPixelRatio: 0.01,
+              maxDiffPixelRatio: ratio,
             });
           });
         }

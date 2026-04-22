@@ -165,6 +165,13 @@ func main() {
 		CookieSecure:     cfg.CookieSecure,
 		RegistrationOpen:  cfg.RegistrationOpen,
 		MinPasswordLength: cfg.MinPasswordLength,
+		DisableRateLimit:          cfg.DisableRateLimit,
+		RateLimitGlobalMax:        cfg.RateLimitGlobalMax,
+		RateLimitGlobalWindowSec:  cfg.RateLimitGlobalWindowSec,
+		RateLimitAuthMax:          cfg.RateLimitAuthMax,
+		RateLimitAuthWindowSec:    cfg.RateLimitAuthWindowSec,
+		RateLimitSessionMax:       cfg.RateLimitSessionMax,
+		RateLimitSessionWindowSec: cfg.RateLimitSessionWindowSec,
 		EmailSender:      emailSender,
 		FlowWebURL:       cfg.FlowWebURL,
 		AccountsWebURL:   cfg.AccountsWebURL,
@@ -172,6 +179,10 @@ func main() {
 		PublicBaseURL:     cfg.PublicBaseURL,
 		WebBaseURL:        cfg.FlowWebURL,
 	})
+
+	if cfg.DisableRateLimit {
+		logger.Warn("rate limiting disabled (NF_AUTH_DISABLE_RATE_LIMIT=true)")
+	}
 
 	outer := chi.NewRouter()
 	outer.Use(httputil.BuildCORS(cfg.CorsAllowedOrigins))
