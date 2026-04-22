@@ -280,7 +280,35 @@ jobs:
       - name: Bun dependency audit
         run: bunx npm-audit --production
 
-  # ---------- Job 5: Contract tests (Schemathesis against OpenAPI spec) ----------
+  # ---------- Job 5a: OpenAPI drift guard ----------
+  # Regenerate every OpenAPI spec from the current Go sources and fail if
+  # the committed copies differ. Catches silent spec drift before it
+  # reaches schemathesis or the TS SDK consumers.
+  openapi-diff:
+    name: OpenAPI drift guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: |
+            apps/flow-api/go.sum
+            apps/auth-api/go.sum
+            apps/time-api/go.sum
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install JS dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Verify OpenAPI specs match Go sources
+        run: ./scripts/openapi-diff.sh
+
+  # ---------- Job 5b: Contract tests (Schemathesis against OpenAPI spec) ----------
   contract-tests:
     name: Contract tests
     runs-on: ubuntu-latest

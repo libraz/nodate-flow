@@ -143,6 +143,9 @@ test-e2e: ## Playwright E2E
 test-contract: ## Schemathesis contract tests (requires running API)
 	./scripts/contract-test.sh
 
+test-openapi-diff: ## Fail if the committed OpenAPI specs drift from the live Go sources
+	./scripts/openapi-diff.sh
+
 lighthouse: build-web ## Run Lighthouse CI (a11y 95+, perf 70+)
 	$(PKG_X) @lhci/cli autorun
 
