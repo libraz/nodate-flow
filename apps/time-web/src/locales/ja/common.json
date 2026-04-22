@@ -208,30 +208,30 @@
   },
   "invites": {
     "inbox": {
-      "title": "",
-      "empty": "",
-      "rsvp_hint": "",
-      "load_error": "",
-      "calendar_workspace": "",
-      "undated": "",
-      "expired": "",
-      "expires_in_hours": "",
-      "expires_at": ""
+      "title": "招待",
+      "empty": "保留中の招待はありません。",
+      "rsvp_hint": "返信は招待メール内のリンクからお願いします。",
+      "load_error": "招待の取得に失敗しました。",
+      "calendar_workspace": "{calendar}・{workspace}",
+      "undated": "日程未定",
+      "expired": "期限切れ",
+      "expires_in_hours": "{count, plural, other {残り # 時間}}",
+      "expires_at": "有効期限: {date}"
     },
     "accept": {
-      "title": "",
-      "prompt": "",
-      "action_accept": "",
-      "action_tentative": "",
-      "action_decline": "",
-      "submitting": "",
-      "success_title": "",
-      "success_accepted": "",
-      "success_tentative": "",
-      "success_declined": "",
-      "invalid_link": "",
-      "not_found": "",
-      "error_generic": ""
+      "title": "招待が届いています",
+      "prompt": "どのように返信しますか？",
+      "action_accept": "参加",
+      "action_tentative": "仮参加",
+      "action_decline": "不参加",
+      "submitting": "返信を記録しています...",
+      "success_title": "返信を記録しました",
+      "success_accepted": "この招待に「参加」で返信しました。",
+      "success_tentative": "この招待に「仮参加」で返信しました。",
+      "success_declined": "この招待に「不参加」で返信しました。",
+      "invalid_link": "招待リンクが無効です。",
+      "not_found": "招待が見つからないか、有効期限が切れています。",
+      "error_generic": "エラーが発生しました。もう一度お試しください。"
     }
   }
 }

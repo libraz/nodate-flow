@@ -159,14 +159,24 @@
 .cellDateInput {
   inline-size: 100%;
   block-size: 100%;
+  display: flex;
+  align-items: center;
   padding-block: var(--nf-space-1);
   padding-inline: var(--nf-space-2);
-  border: none;
-  outline: none;
   background: var(--nf-color-bg);
   color: var(--nf-color-fg);
   font-size: var(--nf-text-sm);
   font-family: inherit;
+}
+
+.cellDateTrigger {
+  inline-size: 100%;
+  padding-block: var(--nf-space-0-5);
+  padding-inline: var(--nf-space-2);
+  background: transparent;
+  color: var(--nf-color-fg);
+  font-size: var(--nf-text-sm);
+  text-align: start;
 }
 
 /* ── Status / Priority indicators ───────────────────────────── */

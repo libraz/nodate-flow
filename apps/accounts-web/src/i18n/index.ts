@@ -4,8 +4,10 @@ import { initReactI18next } from 'react-i18next';
 
 import enAdmin from '../../locales/en/admin.json';
 import enAuth from '../../locales/en/auth.json';
+import enCommon from '../../locales/en/common.json';
 import jaAdmin from '../../locales/ja/admin.json';
 import jaAuth from '../../locales/ja/auth.json';
+import jaCommon from '../../locales/ja/common.json';
 
 /** Supported UI languages. */
 export const supportedLanguages = ['en', 'ja'] as const;
@@ -40,15 +42,17 @@ export function initI18n(): typeof i18n {
       fallbackLng: 'en',
       supportedLngs: supportedLanguages as unknown as string[],
       defaultNS: 'auth',
-      ns: ['auth', 'admin'],
+      ns: ['auth', 'admin', 'common'],
       resources: {
         en: {
           auth: enAuth,
           admin: enAdmin,
+          common: enCommon,
         },
         ja: {
           auth: jaAuth,
           admin: jaAdmin,
+          common: jaCommon,
         },
       },
       interpolation: { escapeValue: false },

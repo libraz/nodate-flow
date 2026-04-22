@@ -9,9 +9,9 @@
 
 import Button from '@nodate-flow/ui/primitives/button';
 import Checkbox from '@nodate-flow/ui/primitives/checkbox';
+import DatePicker from '@nodate-flow/ui/primitives/date-picker';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
 import FormField from '@nodate-flow/ui/primitives/form-field';
-import Input from '@nodate-flow/ui/primitives/input';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ReactElement, Suspense, useMemo, useState } from 'react';
@@ -63,6 +63,10 @@ export default function AddEventsDialog({
   onClose,
 }: AddEventsDialogProps): ReactElement {
   const { t } = useTranslation('settings');
+  const { t: tCommon } = useTranslation('common');
+  const weekdayLabels = tCommon('common.date.weekdays', { returnObjects: true }) as string[];
+  const formatMonthYear = (year: number, month: number): string =>
+    tCommon('common.date.monthYear', { year, month });
   const defaults = useMemo(defaultRange, []);
   const [from, setFrom] = useState(defaults.from);
   const [to, setTo] = useState(defaults.to);
@@ -77,14 +81,13 @@ export default function AddEventsDialog({
             label={t('workspace.public_shares.detail.picker.range_from')}
             style={{ flex: 1 }}
           >
-            {(control) => (
-              <Input
-                {...control}
-                type="date"
+            {() => (
+              <DatePicker
                 value={from}
-                onChange={(e) => {
-                  setFrom(e.currentTarget.value);
-                }}
+                onChange={setFrom}
+                weekdayLabels={weekdayLabels}
+                formatMonthYear={formatMonthYear}
+                triggerLabel={from || tCommon('common.date.placeholder')}
               />
             )}
           </FormField>
@@ -92,14 +95,14 @@ export default function AddEventsDialog({
             label={t('workspace.public_shares.detail.picker.range_to')}
             style={{ flex: 1 }}
           >
-            {(control) => (
-              <Input
-                {...control}
-                type="date"
+            {() => (
+              <DatePicker
                 value={to}
-                onChange={(e) => {
-                  setTo(e.currentTarget.value);
-                }}
+                onChange={setTo}
+                weekdayLabels={weekdayLabels}
+                formatMonthYear={formatMonthYear}
+                triggerLabel={to || tCommon('common.date.placeholder')}
+                {...(from ? { minDate: from } : {})}
               />
             )}
           </FormField>

@@ -11,6 +11,7 @@ import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
 import Button, { type ButtonVariant } from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
 import Combobox from '@nodate-flow/ui/primitives/combobox';
+import DatePicker from '@nodate-flow/ui/primitives/date-picker';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import Select from '@nodate-flow/ui/primitives/select';
@@ -480,8 +481,10 @@ function Sidebar({
   startOn,
   dueOn,
 }: SidebarProps): ReactElement {
-  const { t, i18n } = useTranslation('common');
-  const dateLocale = i18n.resolvedLanguage ?? 'en';
+  const { t } = useTranslation('common');
+  const weekdayLabels = t('common.date.weekdays', { returnObjects: true }) as string[];
+  const formatMonthYear = (year: number, month: number): string =>
+    t('common.date.monthYear', { year, month });
   const update = useUpdateTask();
   const transition = useTransitionTask();
 
@@ -576,28 +579,28 @@ function Sidebar({
           )}
         </FormField>
         <FormField label={t('tasks.form.start')}>
-          {(control) => (
-            <Input
-              {...control}
-              type="date"
-              lang={dateLocale}
+          {() => (
+            <DatePicker
               value={startOn ?? ''}
-              onChange={(e) => {
-                void handleStartChange(e.target.value);
+              onChange={(next) => {
+                void handleStartChange(next);
               }}
+              weekdayLabels={weekdayLabels}
+              formatMonthYear={formatMonthYear}
+              triggerLabel={startOn ?? t('common.date.placeholder')}
             />
           )}
         </FormField>
         <FormField label={t('tasks.detail.due_label')}>
-          {(control) => (
-            <Input
-              {...control}
-              type="date"
-              lang={dateLocale}
+          {() => (
+            <DatePicker
               value={dueOn ?? ''}
-              onChange={(e) => {
-                void handleDueChange(e.target.value);
+              onChange={(next) => {
+                void handleDueChange(next);
               }}
+              weekdayLabels={weekdayLabels}
+              formatMonthYear={formatMonthYear}
+              triggerLabel={dueOn ?? t('common.date.placeholder')}
             />
           )}
         </FormField>

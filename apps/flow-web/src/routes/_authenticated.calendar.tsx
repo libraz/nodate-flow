@@ -15,6 +15,7 @@ import type { components } from '@nodate-flow/sdk';
 import type { components as timeComponents } from '@nodate-flow/time-sdk';
 import Button from '@nodate-flow/ui/primitives/button';
 import Checkbox from '@nodate-flow/ui/primitives/checkbox';
+import DatePicker from '@nodate-flow/ui/primitives/date-picker';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
@@ -114,6 +115,9 @@ function QuickCreateDialog({
   onCreated,
 }: QuickCreateDialogProps): ReactElement {
   const { t } = useTranslation('common');
+  const weekdayLabels = t('common.date.weekdays', { returnObjects: true }) as string[];
+  const formatMonthYear = (year: number, month: number): string =>
+    t('common.date.monthYear', { year, month });
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TaskPriority>(2);
@@ -205,22 +209,25 @@ function QuickCreateDialog({
 
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <FormField label={t('tasks.form.start')} style={{ flex: 1 }}>
-            {(control) => (
-              <Input
-                {...control}
-                type="date"
+            {() => (
+              <DatePicker
                 value={startOn}
-                onChange={(e) => setStartOn(e.currentTarget.value)}
+                onChange={setStartOn}
+                weekdayLabels={weekdayLabels}
+                formatMonthYear={formatMonthYear}
+                triggerLabel={startOn || t('common.date.placeholder')}
               />
             )}
           </FormField>
           <FormField label={t('tasks.form.due')} style={{ flex: 1 }}>
-            {(control) => (
-              <Input
-                {...control}
-                type="date"
+            {() => (
+              <DatePicker
                 value={endOn}
-                onChange={(e) => setEndOn(e.currentTarget.value)}
+                onChange={setEndOn}
+                weekdayLabels={weekdayLabels}
+                formatMonthYear={formatMonthYear}
+                triggerLabel={endOn || t('common.date.placeholder')}
+                {...(startOn ? { minDate: startOn } : {})}
               />
             )}
           </FormField>

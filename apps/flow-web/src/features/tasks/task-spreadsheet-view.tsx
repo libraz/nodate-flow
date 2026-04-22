@@ -8,6 +8,7 @@
  * for row virtualization to handle 500+ tasks smoothly.
  */
 
+import DatePicker from '@nodate-flow/ui/primitives/date-picker';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { ReactElement } from 'react';
@@ -145,6 +146,9 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
   const filters = useTaskFilters(projectId);
   const { data: tasks } = useTasksQuery(projectId, filters);
   const locale = i18n.resolvedLanguage ?? 'en';
+  const weekdayLabels = t('common.date.weekdays', { returnObjects: true }) as string[];
+  const formatMonthYear = (year: number, month: number): string =>
+    t('common.date.monthYear', { year, month });
   const updateTask = useUpdateTask();
 
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -450,19 +454,20 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
 
     if (isEditing(rowIdx, 'due')) {
       return (
-        <input
-          type="date"
-          className={css.cellDateInput}
-          defaultValue={dueOn ?? ''}
-          aria-label={t('tasks.inline.edit_due')}
-          // biome-ignore lint/a11y/noAutofocus: inline edit cell needs focus
-          autoFocus
-          onChange={(e) => {
-            setEditDraft(e.target.value);
-          }}
-          onKeyDown={handleCellKeyDown}
-          onBlur={commitAndStop}
-        />
+        <div className={css.cellDateInput}>
+          <DatePicker
+            value={editDraft}
+            onChange={(next) => {
+              setEditDraft(next);
+              commitEdit(rowIdx, 'due', next);
+              setEditingCell(null);
+            }}
+            weekdayLabels={weekdayLabels}
+            formatMonthYear={formatMonthYear}
+            triggerLabel={editDraft || t('common.date.placeholder')}
+            {...(css.cellDateTrigger ? { className: css.cellDateTrigger } : {})}
+          />
+        </div>
       );
     }
 

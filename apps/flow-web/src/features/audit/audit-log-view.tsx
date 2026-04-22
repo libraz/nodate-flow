@@ -9,6 +9,7 @@
 import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
+import DatePicker from '@nodate-flow/ui/primitives/date-picker';
 import Input from '@nodate-flow/ui/primitives/input';
 import Select from '@nodate-flow/ui/primitives/select';
 import { type ChangeEvent, type ReactElement, useState } from 'react';
@@ -158,6 +159,10 @@ export default function AuditLogView({
   workspaceId: string;
 }): ReactElement {
   const { t } = useTranslation('settings');
+  const { t: tCommon } = useTranslation('common');
+  const weekdayLabels = tCommon('common.date.weekdays', { returnObjects: true }) as string[];
+  const formatMonthYear = (year: number, month: number): string =>
+    tCommon('common.date.monthYear', { year, month });
 
   const [filters, setFilters] = useState<AuditLogFilters>({
     limit: PAGE_SIZE,
@@ -204,13 +209,11 @@ export default function AuditLogView({
     setFilters((prev) => buildNext(prev, v ? { actorSearch: v } : {}));
   };
 
-  const handleDateFromChange = (e: ChangeEvent<HTMLInputElement>): void => {
-    const v = e.target.value;
+  const handleDateFromChange = (v: string): void => {
     setFilters((prev) => buildNext(prev, v ? { dateFrom: v } : {}));
   };
 
-  const handleDateToChange = (e: ChangeEvent<HTMLInputElement>): void => {
-    const v = e.target.value;
+  const handleDateToChange = (v: string): void => {
     setFilters((prev) => buildNext(prev, v ? { dateTo: v } : {}));
   };
 
@@ -332,32 +335,29 @@ export default function AuditLogView({
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-            <label
-              htmlFor="audit-date-from"
-              style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}
-            >
+            <span style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}>
               {t('audit_log.filter.date_from')}
-            </label>
-            <Input
-              id="audit-date-from"
-              type="date"
+            </span>
+            <DatePicker
               value={filters.dateFrom ?? ''}
               onChange={handleDateFromChange}
+              weekdayLabels={weekdayLabels}
+              formatMonthYear={formatMonthYear}
+              triggerLabel={filters.dateFrom || tCommon('common.date.placeholder')}
             />
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-            <label
-              htmlFor="audit-date-to"
-              style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}
-            >
+            <span style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}>
               {t('audit_log.filter.date_to')}
-            </label>
-            <Input
-              id="audit-date-to"
-              type="date"
+            </span>
+            <DatePicker
               value={filters.dateTo ?? ''}
               onChange={handleDateToChange}
+              weekdayLabels={weekdayLabels}
+              formatMonthYear={formatMonthYear}
+              triggerLabel={filters.dateTo || tCommon('common.date.placeholder')}
+              {...(filters.dateFrom ? { minDate: filters.dateFrom } : {})}
             />
           </div>
 

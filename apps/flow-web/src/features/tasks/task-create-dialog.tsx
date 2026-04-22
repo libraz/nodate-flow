@@ -10,6 +10,7 @@
 import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import Checkbox from '@nodate-flow/ui/primitives/checkbox';
+import DatePicker from '@nodate-flow/ui/primitives/date-picker';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
@@ -70,7 +71,10 @@ export default function TaskCreateDialog({
   open,
   onClose,
 }: TaskCreateDialogProps): ReactElement {
-  const { t, i18n } = useTranslation('common');
+  const { t } = useTranslation('common');
+  const weekdayLabels = t('common.date.weekdays', { returnObjects: true }) as string[];
+  const formatMonthYear = (year: number, month: number): string =>
+    t('common.date.monthYear', { year, month });
   const create = useCreateTask();
   const propose = useProposeSmartTask();
   const applySmartMutation = useApplySmartTask();
@@ -293,15 +297,13 @@ export default function TaskCreateDialog({
           label={t('tasks.form.due')}
           {...(errors.dueOn ? { error: t(errors.dueOn) } : {})}
         >
-          {(control) => (
-            <Input
-              {...control}
-              type="date"
-              lang={i18n.resolvedLanguage ?? 'en'}
+          {() => (
+            <DatePicker
               value={dueOn}
-              onChange={(e) => {
-                setDueOn(e.target.value);
-              }}
+              onChange={setDueOn}
+              weekdayLabels={weekdayLabels}
+              formatMonthYear={formatMonthYear}
+              triggerLabel={dueOn || t('common.date.placeholder')}
             />
           )}
         </FormField>

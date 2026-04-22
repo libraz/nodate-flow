@@ -3,6 +3,7 @@
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
+import DatePicker from '@nodate-flow/ui/primitives/date-picker';
 import Input from '@nodate-flow/ui/primitives/input';
 import { createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
@@ -51,6 +52,10 @@ function formatTimestamp(ts: number): string {
 
 function AuditLogsPage(): ReactElement {
   const { t } = useTranslation('admin');
+  const { t: tCommon } = useTranslation('common');
+  const weekdayLabels = tCommon('common.date.weekdays', { returnObjects: true }) as string[];
+  const formatMonthYear = (year: number, month: number): string =>
+    tCommon('common.date.monthYear', { year, month });
   const [entries, setEntries] = useState<AuditLogEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -110,13 +115,13 @@ function AuditLogsPage(): ReactElement {
     setPage(1);
   };
 
-  const handleFromChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFromDate(e.target.value);
+  const handleFromChange = (value: string) => {
+    setFromDate(value);
     setPage(1);
   };
 
-  const handleToChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setToDate(e.target.value);
+  const handleToChange = (value: string) => {
+    setToDate(value);
     setPage(1);
   };
 
@@ -148,53 +153,44 @@ function AuditLogsPage(): ReactElement {
             onChange={handleActionChange}
           />
         </div>
-        <div>
-          <label
+        <div
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1, 0.25rem)' }}
+        >
+          <span
             style={{
               fontSize: 'var(--nf-text-xs, 0.75rem)',
               color: 'var(--nf-color-fg-muted)',
             }}
           >
             {t('audit_logs.filter_from')}
-            <input
-              type="date"
-              value={fromDate}
-              onChange={handleFromChange}
-              style={{
-                display: 'block',
-                padding: '0.375rem 0.5rem',
-                borderRadius: 'var(--nf-radius-md, 0.375rem)',
-                border: 'var(--nf-space-px, 1px) solid var(--nf-color-border)',
-                background: 'var(--nf-color-bg)',
-                color: 'var(--nf-color-fg)',
-                fontSize: 'var(--nf-text-sm, 0.875rem)',
-              }}
-            />
-          </label>
+          </span>
+          <DatePicker
+            value={fromDate}
+            onChange={handleFromChange}
+            weekdayLabels={weekdayLabels}
+            formatMonthYear={formatMonthYear}
+            triggerLabel={fromDate || tCommon('common.date.placeholder')}
+          />
         </div>
-        <div>
-          <label
+        <div
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1, 0.25rem)' }}
+        >
+          <span
             style={{
               fontSize: 'var(--nf-text-xs, 0.75rem)',
               color: 'var(--nf-color-fg-muted)',
             }}
           >
             {t('audit_logs.filter_to')}
-            <input
-              type="date"
-              value={toDate}
-              onChange={handleToChange}
-              style={{
-                display: 'block',
-                padding: '0.375rem 0.5rem',
-                borderRadius: 'var(--nf-radius-md, 0.375rem)',
-                border: 'var(--nf-space-px, 1px) solid var(--nf-color-border)',
-                background: 'var(--nf-color-bg)',
-                color: 'var(--nf-color-fg)',
-                fontSize: 'var(--nf-text-sm, 0.875rem)',
-              }}
-            />
-          </label>
+          </span>
+          <DatePicker
+            value={toDate}
+            onChange={handleToChange}
+            weekdayLabels={weekdayLabels}
+            formatMonthYear={formatMonthYear}
+            triggerLabel={toDate || tCommon('common.date.placeholder')}
+            {...(fromDate ? { minDate: fromDate } : {})}
+          />
         </div>
       </div>
 

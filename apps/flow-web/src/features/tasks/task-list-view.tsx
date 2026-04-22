@@ -8,6 +8,7 @@
  */
 
 import DataGrid from '@nodate-flow/ui/primitives/data-grid';
+import DatePicker from '@nodate-flow/ui/primitives/date-picker';
 import Input from '@nodate-flow/ui/primitives/input';
 import Select from '@nodate-flow/ui/primitives/select';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
@@ -381,47 +382,26 @@ function InlineDueCell({
   locale: string;
 }): ReactElement {
   const { t } = useTranslation('common');
-  const inputRef = useRef<HTMLInputElement>(null);
+  const weekdayLabels = t('common.date.weekdays', { returnObjects: true }) as string[];
+  const formatMonthYear = (year: number, month: number): string =>
+    t('common.date.monthYear', { year, month });
   const dueOn = task.dueOn;
   const overdue =
     isOverdue(dueOn) && task.derivedState !== 'done' && task.derivedState !== 'cancelled';
 
-  /* Auto-focus when switching to edit mode. */
-  if (editing && inputRef.current && document.activeElement !== inputRef.current) {
-    requestAnimationFrame(() => inputRef.current?.focus());
-  }
-
   if (editing) {
     return (
-      <input
-        ref={inputRef}
-        type="date"
-        aria-label={t('tasks.inline.edit_due')}
-        defaultValue={dueOn ?? ''}
-        onChange={(e) => {
-          const val = e.target.value;
-          if (val !== (dueOn ?? '')) {
-            onSave(val);
+      <DatePicker
+        value={dueOn ?? ''}
+        onChange={(next) => {
+          if (next !== (dueOn ?? '')) {
+            onSave(next);
           }
+          onStopEdit();
         }}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') {
-            onStopEdit();
-          } else if (e.key === 'Enter') {
-            onStopEdit();
-          }
-        }}
-        onBlur={() => onStopEdit()}
-        style={{
-          width: '100%',
-          fontSize: '0.8125rem',
-          padding: '0.125rem 0.25rem',
-          margin: '-0.125rem -0.25rem',
-          border: '1px solid var(--nf-color-border, var(--nf-color-hairline))',
-          borderRadius: '0.25rem',
-          background: 'var(--nf-color-surface)',
-          color: 'var(--nf-color-fg)',
-        }}
+        weekdayLabels={weekdayLabels}
+        formatMonthYear={formatMonthYear}
+        triggerLabel={dueOn ?? t('common.date.placeholder')}
       />
     );
   }
