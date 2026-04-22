@@ -14,6 +14,7 @@ const routeApi = getRouteApi('/_authenticated/workspaces/$id/settings');
 
 type SubNavKey =
   | 'general'
+  | 'public_shares'
   | 'mcp_tokens'
   | 'ai_providers'
   | 'ai_agents'
@@ -26,6 +27,7 @@ interface SubNavItem {
   key: SubNavKey;
   to:
     | '/workspaces/$id/settings/general'
+    | '/workspaces/$id/settings/public-shares'
     | '/workspaces/$id/settings/mcp-tokens'
     | '/workspaces/$id/settings/ai-providers'
     | '/workspaces/$id/settings/ai-agents'
@@ -37,6 +39,7 @@ interface SubNavItem {
 
 const SUB_NAV: readonly SubNavItem[] = [
   { key: 'general', to: '/workspaces/$id/settings/general' },
+  { key: 'public_shares', to: '/workspaces/$id/settings/public-shares' },
   { key: 'mcp_tokens', to: '/workspaces/$id/settings/mcp-tokens' },
   { key: 'ai_providers', to: '/workspaces/$id/settings/ai-providers' },
   { key: 'ai_agents', to: '/workspaces/$id/settings/ai-agents' },
@@ -50,6 +53,7 @@ function labelKeyFor(
   key: SubNavKey,
 ):
   | 'nav.general'
+  | 'nav.public_shares'
   | 'nav.mcp_tokens'
   | 'nav.ai_providers'
   | 'nav.ai_agents'
@@ -60,6 +64,8 @@ function labelKeyFor(
   switch (key) {
     case 'general':
       return 'nav.general';
+    case 'public_shares':
+      return 'nav.public_shares';
     case 'mcp_tokens':
       return 'nav.mcp_tokens';
     case 'ai_providers':

@@ -1,7 +1,20 @@
 // Command seed-dev inserts a minimum set of rows to make a fresh
-// nodate-flow database usable for local development: one user (with a
-// local password identity), one workspace, one workspace_members owner
-// grant, and one instance_admins grant so the user can reach admin UIs.
+// nodate-flow database usable for local development:
+//
+//   - two users (one owner "admin" with instance-admin + one member
+//     "alice"), each with a local password identity;
+//   - one workspace, with both users as workspace_members;
+//   - a personal calendar + subscription for each user;
+//   - a JP-holidays system calendar with a sample holiday and a
+//     subscription for the owner;
+//   - one dated event on the owner's calendar with the second user as
+//     an attendee (RSVP pending);
+//   - one undated event (start_at NULL) demonstrating date-free items;
+//   - a demo project + five tasks, the first of which is linked to the
+//     dated event via task_event_links (relation 'contributes_to');
+//   - a workspace-owned public share page with the dated event
+//     attached so the /share/cal/{token} render path has something to
+//     display.
 //
 // Usage:
 //
@@ -10,6 +23,9 @@
 //	NF_SEED_EMAIL=admin@example.com \
 //	NF_SEED_PASSWORD=password123 \
 //	NF_SEED_DISPLAY_NAME=Admin \
+//	NF_SEED_USER2_EMAIL=alice@example.com \
+//	NF_SEED_USER2_PASSWORD=password123 \
+//	NF_SEED_USER2_DISPLAY_NAME=Alice \
 //	NF_SEED_WORKSPACE_SLUG=demo \
 //	NF_SEED_WORKSPACE_NAME="Demo Workspace" \
 //	  go run ./cmd/seed-dev
@@ -17,15 +33,19 @@
 // NF_SEED_LOCALE selects the language for display names, project names,
 // and task titles. Supported values: "en" (default), "ja".
 //
-// Re-running is safe: existing rows (matched by email / slug) are
-// detected and the command becomes a no-op with an informational log.
-// This is a development helper ONLY - never run against production.
+// Re-running is safe: existing rows (matched by email / slug / title)
+// are detected and the command becomes a no-op with an informational
+// log. This is a development helper ONLY - never run against production.
 package main
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"embed"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -52,23 +72,35 @@ func main() {
 }
 
 type seedConfig struct {
-	dsn           string
-	email         string
-	password      string
-	displayName   string
-	workspaceSlug string
-	workspaceName string
-	locale        string
+	dsn              string
+	email            string
+	password         string
+	displayName      string
+	user2Email       string
+	user2Password    string
+	user2DisplayName string
+	workspaceSlug    string
+	workspaceName    string
+	locale           string
 }
 
 // seedLocale holds locale-specific default values for seed data.
 // Loaded from locales/*.json via embed.FS.
 type seedLocale struct {
-	DisplayName   string     `json:"displayName"`
-	WorkspaceName string     `json:"workspaceName"`
-	ProjectName   string     `json:"projectName"`
-	ProjectDesc   string     `json:"projectDesc"`
-	Tasks         []seedTask `json:"tasks"`
+	DisplayName            string     `json:"displayName"`
+	WorkspaceName          string     `json:"workspaceName"`
+	ProjectName            string     `json:"projectName"`
+	ProjectDesc            string     `json:"projectDesc"`
+	SecondUserDisplayName  string     `json:"secondUserDisplayName"`
+	HolidaysCalendarName   string     `json:"holidaysCalendarName"`
+	HolidayEventTitle      string     `json:"holidayEventTitle"`
+	SampleEventTitle       string     `json:"sampleEventTitle"`
+	SampleEventLocation    string     `json:"sampleEventLocation"`
+	UndatedEventTitle      string     `json:"undatedEventTitle"`
+	UndatedEventMemo       string     `json:"undatedEventMemo"`
+	PublicShareTitle       string     `json:"publicShareTitle"`
+	PublicShareDescription string     `json:"publicShareDescription"`
+	Tasks                  []seedTask `json:"tasks"`
 }
 
 type seedTask struct {
@@ -95,19 +127,25 @@ func loadConfig() (seedConfig, seedLocale, error) {
 		return seedConfig{}, seedLocale{}, err
 	}
 	c := seedConfig{
-		dsn:           os.Getenv("NF_DB_DSN"),
-		email:         envOr("NF_SEED_EMAIL", "admin@example.com"),
-		password:      envOr("NF_SEED_PASSWORD", "password123"),
-		displayName:   envOr("NF_SEED_DISPLAY_NAME", l.DisplayName),
-		workspaceSlug: envOr("NF_SEED_WORKSPACE_SLUG", "demo"),
-		workspaceName: envOr("NF_SEED_WORKSPACE_NAME", l.WorkspaceName),
-		locale:        locale,
+		dsn:              os.Getenv("NF_DB_DSN"),
+		email:            envOr("NF_SEED_EMAIL", "admin@example.com"),
+		password:         envOr("NF_SEED_PASSWORD", "password123"),
+		displayName:      envOr("NF_SEED_DISPLAY_NAME", l.DisplayName),
+		user2Email:       envOr("NF_SEED_USER2_EMAIL", "alice@example.com"),
+		user2Password:    envOr("NF_SEED_USER2_PASSWORD", "password123"),
+		user2DisplayName: envOr("NF_SEED_USER2_DISPLAY_NAME", l.SecondUserDisplayName),
+		workspaceSlug:    envOr("NF_SEED_WORKSPACE_SLUG", "demo"),
+		workspaceName:    envOr("NF_SEED_WORKSPACE_NAME", l.WorkspaceName),
+		locale:           locale,
 	}
 	if c.dsn == "" {
 		return c, seedLocale{}, errors.New("NF_DB_DSN is required")
 	}
 	if len(c.password) < 8 {
 		return c, seedLocale{}, errors.New("NF_SEED_PASSWORD must be >= 8 chars")
+	}
+	if len(c.user2Password) < 8 {
+		return c, seedLocale{}, errors.New("NF_SEED_USER2_PASSWORD must be >= 8 chars")
 	}
 	return c, l, nil
 }
@@ -135,37 +173,22 @@ func run(ctx context.Context, logger *slog.Logger) error {
 
 	q := generated.New(db)
 
-	// 1. User (idempotent on email).
-	userID, created, err := ensureUser(ctx, q, cfg)
+	// 1. Owner user (idempotent on email).
+	ownerID, created, err := ensureUser(ctx, q, cfg.email, cfg.displayName, cfg.locale)
 	if err != nil {
-		return fmt.Errorf("ensure user: %w", err)
+		return fmt.Errorf("ensure owner: %w", err)
 	}
 	if created {
-		logger.Info("created user", "email", cfg.email, "id", userID)
-	} else {
-		logger.Info("user exists", "email", cfg.email, "id", userID)
-	}
-
-	// 2. Local identity (skip if user already existed - we don't want
-	// to overwrite a password that might be newer than the default).
-	if created {
-		hash, err := auth.HashPassword(cfg.password)
-		if err != nil {
-			return fmt.Errorf("hash password: %w", err)
-		}
-		if _, err := q.CreateIdentity(ctx, generated.CreateIdentityParams{
-			PublicID:     types.New(),
-			UserID:       uint32(userID),
-			Provider:     generated.IdentitiesProvider("local"),
-			Subject:      cfg.email,
-			PasswordHash: sql.NullString{String: hash, Valid: true},
-		}); err != nil {
-			return fmt.Errorf("create identity: %w", err)
+		logger.Info("created user", "email", cfg.email, "id", ownerID)
+		if err := createLocalIdentity(ctx, q, uint32(ownerID), cfg.email, cfg.password); err != nil {
+			return fmt.Errorf("owner identity: %w", err)
 		}
 		logger.Info("created local identity", "email", cfg.email)
+	} else {
+		logger.Info("user exists", "email", cfg.email, "id", ownerID)
 	}
 
-	// 3. Workspace (idempotent on slug).
+	// 2. Workspace (idempotent on slug).
 	wsID, wsCreated, err := ensureWorkspace(ctx, db, q, cfg)
 	if err != nil {
 		return fmt.Errorf("ensure workspace: %w", err)
@@ -176,22 +199,61 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		logger.Info("workspace exists", "slug", cfg.workspaceSlug, "id", wsID)
 	}
 
-	// 4. workspace_members (owner) - idempotent on (workspace_id, user_id).
-	if err := ensureMembership(ctx, db, q, uint32(wsID), uint32(userID), logger); err != nil {
-		return fmt.Errorf("ensure membership: %w", err)
+	// 3. Owner membership + instance admin grant.
+	if err := ensureMembership(ctx, db, q, uint32(wsID), uint32(ownerID), generated.WorkspaceMembersRoleOwner, logger); err != nil {
+		return fmt.Errorf("ensure owner membership: %w", err)
 	}
-
-	// 5. instance_admins - idempotent on user_id.
-	if err := ensureInstanceAdmin(ctx, db, uint32(userID), logger); err != nil {
+	if err := ensureInstanceAdmin(ctx, db, uint32(ownerID), logger); err != nil {
 		return fmt.Errorf("ensure instance admin: %w", err)
 	}
 
-	// 6. Default calendar + subscription (idempotent on kind=shared).
-	if err := ensureCalendar(ctx, db, q, uint32(wsID), uint32(userID), cfg.workspaceName, logger); err != nil {
-		return fmt.Errorf("ensure calendar: %w", err)
+	// 4. Owner personal calendar + subscription.
+	ownerCalID, err := ensurePersonalCalendar(ctx, db, uint32(wsID), uint32(ownerID), cfg.workspaceName, logger)
+	if err != nil {
+		return fmt.Errorf("ensure owner calendar: %w", err)
+	}
+	if err := ensureSubscription(ctx, db, uint32(wsID), ownerCalID, uint32(ownerID), logger); err != nil {
+		return fmt.Errorf("ensure owner subscription: %w", err)
 	}
 
-	// 7. Demo project + tasks (idempotent on project slug).
+	// 5. Second user (idempotent on email).
+	secondID, secondCreated, err := ensureUser(ctx, q, cfg.user2Email, cfg.user2DisplayName, cfg.locale)
+	if err != nil {
+		return fmt.Errorf("ensure second user: %w", err)
+	}
+	if secondCreated {
+		logger.Info("created user", "email", cfg.user2Email, "id", secondID)
+		if err := createLocalIdentity(ctx, q, uint32(secondID), cfg.user2Email, cfg.user2Password); err != nil {
+			return fmt.Errorf("second identity: %w", err)
+		}
+		logger.Info("created local identity", "email", cfg.user2Email)
+	} else {
+		logger.Info("user exists", "email", cfg.user2Email, "id", secondID)
+	}
+	if err := ensureMembership(ctx, db, q, uint32(wsID), uint32(secondID), generated.WorkspaceMembersRoleMember, logger); err != nil {
+		return fmt.Errorf("ensure second membership: %w", err)
+	}
+	secondCalID, err := ensurePersonalCalendar(ctx, db, uint32(wsID), uint32(secondID), cfg.user2DisplayName, logger)
+	if err != nil {
+		return fmt.Errorf("ensure second calendar: %w", err)
+	}
+	if err := ensureSubscription(ctx, db, uint32(wsID), secondCalID, uint32(secondID), logger); err != nil {
+		return fmt.Errorf("ensure second subscription: %w", err)
+	}
+
+	// 6. JP holidays system calendar (subscribed by owner).
+	holidayCalID, err := ensureHolidayCalendar(ctx, db, uint32(wsID), l.HolidaysCalendarName, logger)
+	if err != nil {
+		return fmt.Errorf("ensure holiday calendar: %w", err)
+	}
+	if err := ensureSubscription(ctx, db, uint32(wsID), holidayCalID, uint32(ownerID), logger); err != nil {
+		return fmt.Errorf("ensure holiday subscription: %w", err)
+	}
+	if err := ensureHolidayEvent(ctx, db, q, uint32(wsID), holidayCalID, uint32(ownerID), l.HolidayEventTitle, logger); err != nil {
+		return fmt.Errorf("ensure holiday event: %w", err)
+	}
+
+	// 7. Demo project + tasks.
 	projID, projCreated, err := ensureProject(ctx, db, q, uint32(wsID), l)
 	if err != nil {
 		return fmt.Errorf("ensure project: %w", err)
@@ -201,20 +263,53 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	} else {
 		logger.Info("project exists", "id", projID)
 	}
-	if err := ensureTasks(ctx, db, q, uint32(wsID), uint32(projID), uint32(userID), l, logger); err != nil {
+	firstTaskID, err := ensureTasks(ctx, db, q, uint32(wsID), uint32(projID), uint32(ownerID), l, logger)
+	if err != nil {
 		return fmt.Errorf("ensure tasks: %w", err)
+	}
+
+	// 8. Owner's sample event with second-user attendee.
+	sampleEventID, err := ensureSampleEvent(ctx, db, q, uint32(wsID), ownerCalID, uint32(ownerID), l.SampleEventTitle, l.SampleEventLocation, logger)
+	if err != nil {
+		return fmt.Errorf("ensure sample event: %w", err)
+	}
+	if err := ensureAttendee(ctx, db, q, uint32(wsID), sampleEventID, uint32(secondID), logger); err != nil {
+		return fmt.Errorf("ensure attendee: %w", err)
+	}
+
+	// 9. Undated event on owner's calendar.
+	if _, err := ensureUndatedEvent(ctx, db, q, uint32(wsID), ownerCalID, uint32(ownerID), l.UndatedEventTitle, l.UndatedEventMemo, logger); err != nil {
+		return fmt.Errorf("ensure undated event: %w", err)
+	}
+
+	// 10. Task-event link: first task contributes_to the sample event.
+	if firstTaskID > 0 {
+		if err := ensureTaskEventLink(ctx, q, uint32(wsID), uint32(firstTaskID), sampleEventID, logger); err != nil {
+			return fmt.Errorf("ensure task-event link: %w", err)
+		}
+	}
+
+	// 11. Workspace public share + attach the sample event.
+	shareID, err := ensurePublicShare(ctx, db, q, uint32(wsID), uint32(ownerID), l.PublicShareTitle, l.PublicShareDescription, logger)
+	if err != nil {
+		return fmt.Errorf("ensure public share: %w", err)
+	}
+	if err := ensureShareEvent(ctx, db, q, uint32(wsID), shareID, sampleEventID, logger); err != nil {
+		return fmt.Errorf("ensure share event: %w", err)
 	}
 
 	logger.Info("seed complete",
 		"email", cfg.email,
 		"password", cfg.password,
+		"user2_email", cfg.user2Email,
+		"user2_password", cfg.user2Password,
 		"workspace", cfg.workspaceSlug,
 	)
 	return nil
 }
 
-func ensureUser(ctx context.Context, q *generated.Queries, cfg seedConfig) (int64, bool, error) {
-	row, err := q.FindUserByEmail(ctx, cfg.email)
+func ensureUser(ctx context.Context, q *generated.Queries, email, displayName, locale string) (int64, bool, error) {
+	row, err := q.FindUserByEmail(ctx, email)
 	if err == nil {
 		return int64(row.ID), false, nil
 	}
@@ -223,9 +318,9 @@ func ensureUser(ctx context.Context, q *generated.Queries, cfg seedConfig) (int6
 	}
 	id, err := q.RegisterUser(ctx, generated.RegisterUserParams{
 		PublicID:        types.New(),
-		Email:           cfg.email,
-		DisplayName:     cfg.displayName,
-		Locale:          cfg.locale,
+		Email:           email,
+		DisplayName:     displayName,
+		Locale:          locale,
 		Timezone:        "UTC",
 		Country:         sql.NullString{},
 		ThemePreference: generated.UsersThemePreference("system"),
@@ -234,6 +329,23 @@ func ensureUser(ctx context.Context, q *generated.Queries, cfg seedConfig) (int6
 		return 0, false, err
 	}
 	return id, true, nil
+}
+
+func createLocalIdentity(ctx context.Context, q *generated.Queries, userID uint32, email, password string) error {
+	hash, err := auth.HashPassword(password)
+	if err != nil {
+		return fmt.Errorf("hash password: %w", err)
+	}
+	if _, err := q.CreateIdentity(ctx, generated.CreateIdentityParams{
+		PublicID:     types.New(),
+		UserID:       userID,
+		Provider:     generated.IdentitiesProvider("local"),
+		Subject:      email,
+		PasswordHash: sql.NullString{String: hash, Valid: true},
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func ensureWorkspace(ctx context.Context, db *sql.DB, q *generated.Queries, cfg seedConfig) (int64, bool, error) {
@@ -258,7 +370,7 @@ func ensureWorkspace(ctx context.Context, db *sql.DB, q *generated.Queries, cfg 
 	return newID, true, nil
 }
 
-func ensureMembership(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, userID uint32, logger *slog.Logger) error {
+func ensureMembership(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, userID uint32, role generated.WorkspaceMembersRole, logger *slog.Logger) error {
 	var existing uint32
 	err := db.QueryRowContext(ctx,
 		"SELECT id FROM workspace_members WHERE workspace_id = ? AND user_id = ?",
@@ -276,12 +388,12 @@ func ensureMembership(ctx context.Context, db *sql.DB, q *generated.Queries, wsI
 		PublicID:    types.New(),
 		WorkspaceID: wsID,
 		UserID:      userID,
-		Role:        generated.WorkspaceMembersRole("owner"),
+		Role:        role,
 		JoinedAt:    now,
 	}); err != nil {
 		return err
 	}
-	logger.Info("created workspace membership", "workspace_id", wsID, "user_id", userID, "role", "owner")
+	logger.Info("created workspace membership", "workspace_id", wsID, "user_id", userID, "role", string(role))
 	return nil
 }
 
@@ -312,43 +424,56 @@ func ensureProject(ctx context.Context, db *sql.DB, q *generated.Queries, wsID u
 	return newID, true, nil
 }
 
-func ensureTasks(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, projID, userID uint32, l seedLocale, logger *slog.Logger) error {
+// ensureTasks returns the internal id of the lowest-numbered seed task,
+// which the caller uses as the link anchor for task_event_links.
+func ensureTasks(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, projID, userID uint32, l seedLocale, logger *slog.Logger) (uint32, error) {
 	var count int
 	if err := db.QueryRowContext(ctx,
 		"SELECT COUNT(*) FROM tasks WHERE workspace_id = ? AND project_id = ? AND enabled = TRUE",
 		wsID, projID,
 	).Scan(&count); err != nil {
-		return err
+		return 0, err
 	}
-	if count > 0 {
+	if count == 0 {
+		createdBy := sql.NullInt32{Int32: int32(userID), Valid: true}
+		for _, s := range l.Tasks {
+			nextNum, err := q.AssignTaskNumber(ctx, projID)
+			if err != nil {
+				return 0, fmt.Errorf("assign task number: %w", err)
+			}
+			if _, err := q.CreateTask(ctx, generated.CreateTaskParams{
+				PublicID:        types.New(),
+				WorkspaceID:     wsID,
+				ProjectID:       projID,
+				CreatedByUserID: createdBy,
+				TaskNumber:      uint32(nextNum),
+				Title:           s.Title,
+				Priority:        s.Priority,
+				Visibility:      generated.TasksVisibilityPublic,
+			}); err != nil {
+				return 0, err
+			}
+		}
+		logger.Info("created seed tasks", "project_id", projID, "count", len(l.Tasks))
+	} else {
 		logger.Info("tasks exist, skipping", "project_id", projID, "count", count)
-		return nil
 	}
-	createdBy := sql.NullInt32{Int32: int32(userID), Valid: true}
-	for _, s := range l.Tasks {
-		nextNum, err := q.AssignTaskNumber(ctx, projID)
-		if err != nil {
-			return fmt.Errorf("assign task number: %w", err)
+	var firstID uint32
+	if err := db.QueryRowContext(ctx,
+		`SELECT id FROM tasks
+		 WHERE workspace_id = ? AND project_id = ? AND enabled = TRUE
+		 ORDER BY task_number ASC, id ASC LIMIT 1`,
+		wsID, projID,
+	).Scan(&firstID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, nil
 		}
-		if _, err := q.CreateTask(ctx, generated.CreateTaskParams{
-			PublicID:        types.New(),
-			WorkspaceID:     wsID,
-			ProjectID:       projID,
-			CreatedByUserID: createdBy,
-			TaskNumber:      uint32(nextNum),
-			Title:           s.Title,
-			Priority:        s.Priority,
-			Visibility:      generated.TasksVisibilityPublic,
-		}); err != nil {
-			return err
-		}
+		return 0, err
 	}
-	logger.Info("created seed tasks", "project_id", projID, "count", len(l.Tasks))
-	return nil
+	return firstID, nil
 }
 
-func ensureCalendar(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, userID uint32, wsName string, logger *slog.Logger) error {
-	// Check if a personal calendar already exists for this user in this workspace.
+func ensurePersonalCalendar(ctx context.Context, db *sql.DB, wsID, userID uint32, name string, logger *slog.Logger) (uint32, error) {
 	var calID uint32
 	err := db.QueryRowContext(ctx,
 		`SELECT id FROM calendars
@@ -357,34 +482,63 @@ func ensureCalendar(ctx context.Context, db *sql.DB, q *generated.Queries, wsID,
 		wsID, userID,
 	).Scan(&calID)
 	if err == nil {
-		logger.Info("calendar exists", "calendar_id", calID)
-		return ensureSubscription(ctx, db, q, wsID, calID, userID, logger)
+		logger.Info("calendar exists", "calendar_id", calID, "user_id", userID)
+		return calID, nil
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
-		return err
+		return 0, err
 	}
-
-	// Insert directly: the generated CreateCalendar signature drops
-	// owner_user_id after the subscription cleanup; keep the
-	// personal-calendar seed until queries are rebuilt.
 	pub := types.New()
 	res, err := db.ExecContext(ctx,
 		`INSERT INTO calendars (public_id, workspace_id, kind, name, color, owner_user_id)
 		 VALUES (?, ?, 'personal', ?, '#4285F4', ?)`,
-		pub, wsID, wsName, userID,
+		pub, wsID, name, userID,
 	)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	newID64, err := res.LastInsertId()
 	if err != nil {
-		return err
+		return 0, err
 	}
-	logger.Info("created personal calendar", "id", newID64)
-	return ensureSubscription(ctx, db, q, wsID, uint32(newID64), userID, logger)
+	logger.Info("created personal calendar", "id", newID64, "user_id", userID)
+	return uint32(newID64), nil
 }
 
-func ensureSubscription(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, calID, userID uint32, logger *slog.Logger) error {
+func ensureHolidayCalendar(ctx context.Context, db *sql.DB, wsID uint32, name string, logger *slog.Logger) (uint32, error) {
+	const slug = "holidays.jp"
+	var calID uint32
+	err := db.QueryRowContext(ctx,
+		`SELECT id FROM calendars
+		 WHERE workspace_id = ? AND kind = 'system' AND system_slug = ? AND enabled = TRUE
+		 LIMIT 1`,
+		wsID, slug,
+	).Scan(&calID)
+	if err == nil {
+		logger.Info("holiday calendar exists", "calendar_id", calID)
+		return calID, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return 0, err
+	}
+	pub := types.New()
+	res, err := db.ExecContext(ctx,
+		`INSERT INTO calendars (public_id, workspace_id, kind, name, color, system_slug)
+		 VALUES (?, ?, 'system', ?, '#DC2626', ?)`,
+		pub, wsID, name, slug,
+	)
+	if err != nil {
+		return 0, err
+	}
+	newID64, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	logger.Info("created holiday calendar", "id", newID64, "slug", slug)
+	return uint32(newID64), nil
+}
+
+func ensureSubscription(ctx context.Context, db *sql.DB, wsID, calID, userID uint32, logger *slog.Logger) error {
 	var existing uint32
 	err := db.QueryRowContext(ctx,
 		"SELECT id FROM calendar_subscriptions WHERE calendar_id = ? AND user_id = ? AND workspace_id = ?",
@@ -397,8 +551,6 @@ func ensureSubscription(ctx context.Context, db *sql.DB, q *generated.Queries, w
 	if !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
-
-	// Insert subscription directly since we know the schema.
 	pub := types.New()
 	if _, err := db.ExecContext(ctx,
 		`INSERT INTO calendar_subscriptions (public_id, calendar_id, user_id, workspace_id, display_color, visible, sort_weight)
@@ -432,4 +584,272 @@ func ensureInstanceAdmin(ctx context.Context, db *sql.DB, userID uint32, logger 
 	}
 	logger.Info("created instance admin grant", "user_id", userID)
 	return nil
+}
+
+// findEventIDByTitle matches seed events by (calendar_id, title) since
+// calendar_events has no slug. Seed titles are unique per calendar.
+func findEventIDByTitle(ctx context.Context, db *sql.DB, calID uint32, title string) (uint32, error) {
+	var id uint32
+	err := db.QueryRowContext(ctx,
+		`SELECT id FROM calendar_events
+		 WHERE calendar_id = ? AND title = ? AND enabled = TRUE
+		 ORDER BY id ASC LIMIT 1`,
+		calID, title,
+	).Scan(&id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return id, nil
+}
+
+// nextNoonUTC returns today at 12:00 UTC if the current time is before
+// that, otherwise tomorrow at 12:00 UTC. Keeps the sample event in the
+// future for a consistent demo.
+func nextNoonUTC() time.Time {
+	now := time.Now().UTC()
+	noon := time.Date(now.Year(), now.Month(), now.Day(), 12, 0, 0, 0, time.UTC)
+	if !noon.After(now) {
+		noon = noon.Add(24 * time.Hour)
+	}
+	return noon
+}
+
+func ensureSampleEvent(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, calID, ownerID uint32, title, location string, logger *slog.Logger) (uint32, error) {
+	if existing, err := findEventIDByTitle(ctx, db, calID, title); err != nil {
+		return 0, err
+	} else if existing > 0 {
+		logger.Info("sample event exists", "id", existing, "title", title)
+		return existing, nil
+	}
+	start := nextNoonUTC()
+	end := start.Add(time.Hour)
+	id, err := q.CreateCalendarEvent(ctx, generated.CreateCalendarEventParams{
+		PublicID:        types.New(),
+		WorkspaceID:     wsID,
+		CalendarID:      calID,
+		Kind:            generated.CalendarEventsKindEvent,
+		Visibility:      generated.CalendarEventsVisibilityPublic,
+		ShowAs:          generated.CalendarEventsShowAsBusy,
+		Title:           title,
+		AllDay:          false,
+		StartAt:         sql.NullTime{Time: start, Valid: true},
+		EndAt:           sql.NullTime{Time: end, Valid: true},
+		Timezone:        "UTC",
+		Location:        sql.NullString{String: location, Valid: location != ""},
+		OwnerUserID:     ownerID,
+		CreatedByUserID: ownerID,
+	})
+	if err != nil {
+		return 0, err
+	}
+	logger.Info("created sample event", "id", id, "title", title, "start_at", start.Format(time.RFC3339))
+	return uint32(id), nil
+}
+
+func ensureUndatedEvent(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, calID, ownerID uint32, title, memo string, logger *slog.Logger) (uint32, error) {
+	if existing, err := findEventIDByTitle(ctx, db, calID, title); err != nil {
+		return 0, err
+	} else if existing > 0 {
+		logger.Info("undated event exists", "id", existing, "title", title)
+		return existing, nil
+	}
+	id, err := q.CreateCalendarEvent(ctx, generated.CreateCalendarEventParams{
+		PublicID:        types.New(),
+		WorkspaceID:     wsID,
+		CalendarID:      calID,
+		Kind:            generated.CalendarEventsKindEvent,
+		Visibility:      generated.CalendarEventsVisibilityPrivate,
+		ShowAs:          generated.CalendarEventsShowAsFree,
+		Title:           title,
+		AllDay:          false,
+		StartAt:         sql.NullTime{},
+		EndAt:           sql.NullTime{},
+		Timezone:        "UTC",
+		Memo:            sql.NullString{String: memo, Valid: memo != ""},
+		OwnerUserID:     ownerID,
+		CreatedByUserID: ownerID,
+	})
+	if err != nil {
+		return 0, err
+	}
+	logger.Info("created undated event", "id", id, "title", title)
+	return uint32(id), nil
+}
+
+func ensureHolidayEvent(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, calID, ownerID uint32, title string, logger *slog.Logger) error {
+	if existing, err := findEventIDByTitle(ctx, db, calID, title); err != nil {
+		return err
+	} else if existing > 0 {
+		logger.Info("holiday event exists", "id", existing, "title", title)
+		return nil
+	}
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := start.Add(24 * time.Hour)
+	id, err := q.CreateCalendarEvent(ctx, generated.CreateCalendarEventParams{
+		PublicID:        types.New(),
+		WorkspaceID:     wsID,
+		CalendarID:      calID,
+		Kind:            generated.CalendarEventsKindBlock,
+		Visibility:      generated.CalendarEventsVisibilityPublic,
+		ShowAs:          generated.CalendarEventsShowAsFree,
+		Title:           title,
+		AllDay:          true,
+		StartAt:         sql.NullTime{Time: start, Valid: true},
+		EndAt:           sql.NullTime{Time: end, Valid: true},
+		Timezone:        "UTC",
+		OwnerUserID:     ownerID,
+		CreatedByUserID: ownerID,
+	})
+	if err != nil {
+		return err
+	}
+	logger.Info("created holiday event", "id", id, "title", title)
+	return nil
+}
+
+func ensureAttendee(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, eventID, userID uint32, logger *slog.Logger) error {
+	var existing uint32
+	err := db.QueryRowContext(ctx,
+		`SELECT id FROM calendar_event_attendees
+		 WHERE event_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`,
+		eventID, userID,
+	).Scan(&existing)
+	if err == nil {
+		logger.Info("attendee exists", "event_id", eventID, "user_id", userID)
+		return nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	if _, err := q.CreateCalendarEventAttendee(ctx, generated.CreateCalendarEventAttendeeParams{
+		PublicID:    types.New(),
+		WorkspaceID: wsID,
+		EventID:     eventID,
+		UserID:      userID,
+		Rsvp:        generated.CalendarEventAttendeesRsvpPending,
+		CanEdit:     false,
+	}); err != nil {
+		return err
+	}
+	logger.Info("created attendee", "event_id", eventID, "user_id", userID)
+	return nil
+}
+
+func ensureTaskEventLink(ctx context.Context, q *generated.Queries, wsID, taskID, eventID uint32, logger *slog.Logger) error {
+	relation := generated.TaskEventLinksRelationContributesTo
+	existing, err := q.FindActiveLink(ctx, generated.FindActiveLinkParams{
+		WorkspaceID: wsID,
+		TaskID:      taskID,
+		EventID:     eventID,
+		Relation:    relation,
+	})
+	if err == nil {
+		logger.Info("task-event link exists", "link_id", existing.ID)
+		return nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	id, err := q.CreateTaskEventLink(ctx, generated.CreateTaskEventLinkParams{
+		PublicID:    types.New(),
+		WorkspaceID: wsID,
+		TaskID:      taskID,
+		EventID:     eventID,
+		Relation:    relation,
+		SortWeight:  0,
+	})
+	if err != nil {
+		return err
+	}
+	logger.Info("created task-event link", "id", id, "task_id", taskID, "event_id", eventID)
+	return nil
+}
+
+// findShareIDByTitle matches seed shares by (workspace_id, title) so
+// re-runs find the prior row without exposing the plaintext token.
+func findShareIDByTitle(ctx context.Context, db *sql.DB, wsID uint32, title string) (uint32, error) {
+	var id uint32
+	err := db.QueryRowContext(ctx,
+		`SELECT id FROM calendar_public_shares
+		 WHERE workspace_id = ? AND title = ? AND enabled = TRUE
+		 ORDER BY id ASC LIMIT 1`,
+		wsID, title,
+	).Scan(&id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return id, nil
+}
+
+func ensurePublicShare(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, ownerID uint32, title, description string, logger *slog.Logger) (uint32, error) {
+	if existing, err := findShareIDByTitle(ctx, db, wsID, title); err != nil {
+		return 0, err
+	} else if existing > 0 {
+		logger.Info("public share exists", "id", existing, "title", title)
+		return existing, nil
+	}
+	token, err := mintShareToken()
+	if err != nil {
+		return 0, fmt.Errorf("mint token: %w", err)
+	}
+	sum := sha256.Sum256([]byte(token))
+	tokenHash := hex.EncodeToString(sum[:])
+	id, err := q.CreatePublicShare(ctx, generated.CreatePublicShareParams{
+		PublicID:            types.New(),
+		WorkspaceID:         wsID,
+		CreatedByUserID:     sql.NullInt32{Int32: int32(ownerID), Valid: true},
+		TokenHash:           tokenHash,
+		Title:               title,
+		Description:         sql.NullString{String: description, Valid: description != ""},
+		Timezone:            "UTC",
+		ShowHolidaysCountry: sql.NullString{String: "JP", Valid: true},
+	})
+	if err != nil {
+		return 0, err
+	}
+	logger.Info("created public share", "id", id, "title", title, "token", token)
+	return uint32(id), nil
+}
+
+func ensureShareEvent(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, shareID, eventID uint32, logger *slog.Logger) error {
+	var existing uint32
+	err := db.QueryRowContext(ctx,
+		`SELECT id FROM calendar_public_share_events
+		 WHERE share_id = ? AND event_id = ? AND enabled = TRUE LIMIT 1`,
+		shareID, eventID,
+	).Scan(&existing)
+	if err == nil {
+		logger.Info("share event exists", "share_id", shareID, "event_id", eventID)
+		return nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	if _, err := q.AttachEventToShare(ctx, generated.AttachEventToShareParams{
+		PublicID:    types.New(),
+		WorkspaceID: wsID,
+		ShareID:     shareID,
+		EventID:     eventID,
+		SortWeight:  0,
+	}); err != nil {
+		return err
+	}
+	logger.Info("attached event to share", "share_id", shareID, "event_id", eventID)
+	return nil
+}
+
+// mintShareToken mirrors the handler's token minting (24 random bytes
+// -> RawURLEncoding -> SHA-256) so seeded shares look like real ones.
+func mintShareToken() (string, error) {
+	b := make([]byte, 24)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
 }

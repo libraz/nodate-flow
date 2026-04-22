@@ -3,6 +3,7 @@
     "profile": "プロフィール",
     "notifications": "通知",
     "general": "一般",
+    "public_shares": "公開シェアページ",
     "mcp_tokens": "MCP トークン",
     "ai_providers": "AI プロバイダ",
     "ai_agents": "AI エージェント",
@@ -269,6 +270,88 @@
       },
       "errors": {
         "update_failed": "ワークスペースを更新できませんでした。もう一度お試しください。"
+      }
+    },
+    "public_shares": {
+      "title": "公開シェアページ",
+      "description": "選択したイベントを外部に公開するための読み取り専用 URL です。URL を知っている人は誰でもページを閲覧できます。",
+      "create": "シェアを作成",
+      "empty": "公開シェアページはまだありません。",
+      "rotate": "URL を再発行",
+      "rotate_confirm": "URL を再発行しますか？ 現在の URL は即座に無効になります。",
+      "delete": "削除",
+      "delete_confirm": "「{{title}}」を削除しますか？ URL は無効になり、イベントも公開されなくなります。",
+      "deleted": "シェアページを削除しました",
+      "never_expires": "—",
+      "table": {
+        "title": "タイトル",
+        "events": "イベント数",
+        "expires_at": "有効期限",
+        "created_at": "作成日時",
+        "actions": "操作"
+      },
+      "errors": {
+        "create_failed": "シェアページを作成できませんでした。もう一度お試しください。",
+        "delete_failed": "シェアページを削除できませんでした。削除はワークスペース管理者またはオーナーのみが可能です。",
+        "rotate_failed": "URL トークンを再発行できませんでした。もう一度お試しください。"
+      },
+      "dialog": {
+        "create_title": "公開シェアページを作成",
+        "reveal_title": "シェアページを作成しました",
+        "rotate_title": "トークンを再発行しました",
+        "field": {
+          "title": "タイトル",
+          "title_placeholder": "例: グループ A 公式スケジュール",
+          "description": "説明",
+          "description_help": "Markdown はまだ描画されません。プレーンテキストのみです。",
+          "holidays_country": "祝日オーバーレイの国",
+          "holidays_country_help": "ISO 3166-1 alpha-2 コード (例: JP、US)。空欄の場合は祝日を表示しません。"
+        },
+        "reveal_warning": "この URL をいま必ずコピーしてください。トークンはハッシュ化されて保管されるため、再表示はできません。",
+        "rotate_warning": "以前の URL は無効になりました。新しい URL を必要な相手に共有してください。",
+        "url_label": "シェア URL",
+        "copy": "コピー",
+        "copied": "コピーしました",
+        "done": "完了",
+        "cancel": "キャンセル",
+        "submit": "作成"
+      },
+      "detail": {
+        "back": "シェアページ一覧へ戻る",
+        "events_title": "公開中のイベント",
+        "events_description": "ここに並んだ順で公開ページにイベントが表示されます。非公開 (confidential) のイベントは追加時に拒否されます。",
+        "empty_events": "まだイベントが登録されていません。ワークスペースのイベントを追加して公開してください。",
+        "add_events": "イベントを追加",
+        "detach": "外す",
+        "detach_confirm": "「{{title}}」をこのシェアページから外しますか？ 公開ページには表示されなくなります。",
+        "detached": "イベントを外しました",
+        "event_undated": "日付なし",
+        "event_all_day": "終日",
+        "table": {
+          "event": "イベント",
+          "when": "日時",
+          "calendar": "カレンダー",
+          "actions": "操作"
+        },
+        "picker": {
+          "title": "シェアにイベントを追加",
+          "range_label": "期間",
+          "range_from": "開始",
+          "range_to": "終了",
+          "hint": "選択した期間内のイベントを表示しています。公開したいイベントにチェックを入れてください。",
+          "no_candidates": "この期間にはイベントがありません。",
+          "already_attached": "公開済み",
+          "confidential": "非公開",
+          "select": "選択",
+          "attach": "{count} 件を追加",
+          "attached_toast": "{{attached}} 件追加、{{skipped}} 件スキップ",
+          "cancel": "キャンセル",
+          "attaching": "追加中..."
+        },
+        "errors": {
+          "detach_failed": "イベントを外せませんでした。もう一度お試しください。",
+          "attach_failed": "イベントを追加できませんでした。もう一度お試しください。"
+        }
       }
     },
     "mcp_tokens": {

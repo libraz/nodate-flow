@@ -3,6 +3,7 @@
     "profile": "Profile",
     "notifications": "Notifications",
     "general": "General",
+    "public_shares": "Public share pages",
     "mcp_tokens": "MCP tokens",
     "ai_providers": "AI providers",
     "ai_agents": "AI agents",
@@ -269,6 +270,88 @@
       },
       "errors": {
         "update_failed": "Could not update the workspace. Please try again."
+      }
+    },
+    "public_shares": {
+      "title": "Public share pages",
+      "description": "Workspace-owned read-only URLs for publishing selected events to the public. The URL is the capability — anyone with it can view the page.",
+      "create": "Create share",
+      "empty": "No public share pages yet.",
+      "rotate": "Rotate",
+      "rotate_confirm": "Rotate the URL? The current URL will stop working immediately.",
+      "delete": "Delete",
+      "delete_confirm": "Delete \"{{title}}\"? The URL will become invalid and events will no longer be published.",
+      "deleted": "Share page deleted",
+      "never_expires": "—",
+      "table": {
+        "title": "Title",
+        "events": "Events",
+        "expires_at": "Expires",
+        "created_at": "Created",
+        "actions": "Actions"
+      },
+      "errors": {
+        "create_failed": "Could not create the share page. Please try again.",
+        "delete_failed": "Could not delete the share page. Only workspace admins or owners can delete a share.",
+        "rotate_failed": "Could not rotate the URL token. Please try again."
+      },
+      "dialog": {
+        "create_title": "Create public share page",
+        "reveal_title": "Share page created",
+        "rotate_title": "Token rotated",
+        "field": {
+          "title": "Title",
+          "title_placeholder": "e.g. Group A Official Schedule",
+          "description": "Description",
+          "description_help": "Markdown is not rendered yet; plain text only.",
+          "holidays_country": "Holiday overlay country",
+          "holidays_country_help": "ISO 3166-1 alpha-2 code (e.g. JP, US). Leave blank for no holiday overlay."
+        },
+        "reveal_warning": "Copy this URL now. The token is stored hashed — you will not be able to see it again.",
+        "rotate_warning": "The previous URL has been invalidated. Share this new URL with anyone who still needs access.",
+        "url_label": "Share URL",
+        "copy": "Copy",
+        "copied": "Copied",
+        "done": "Done",
+        "cancel": "Cancel",
+        "submit": "Create"
+      },
+      "detail": {
+        "back": "Back to share pages",
+        "events_title": "Published events",
+        "events_description": "Events listed here appear on the public page in the order shown. Confidential events are refused at attach time.",
+        "empty_events": "No events yet. Add events from this workspace to publish them.",
+        "add_events": "Add events",
+        "detach": "Remove",
+        "detach_confirm": "Remove \"{{title}}\" from this share page? It will no longer appear on the public page.",
+        "detached": "Event removed",
+        "event_undated": "No date",
+        "event_all_day": "All day",
+        "table": {
+          "event": "Event",
+          "when": "When",
+          "calendar": "Calendar",
+          "actions": "Actions"
+        },
+        "picker": {
+          "title": "Add events to share",
+          "range_label": "Date range",
+          "range_from": "From",
+          "range_to": "To",
+          "hint": "Showing events within the selected range. Use the checkboxes to pick the events to publish.",
+          "no_candidates": "No events in this range.",
+          "already_attached": "Already published",
+          "confidential": "Confidential",
+          "select": "Select",
+          "attach": "Attach {count, plural, one {# event} other {# events}}",
+          "attached_toast": "{{attached}} attached, {{skipped}} skipped",
+          "cancel": "Cancel",
+          "attaching": "Attaching..."
+        },
+        "errors": {
+          "detach_failed": "Could not remove the event. Please try again.",
+          "attach_failed": "Could not attach the events. Please try again."
+        }
       }
     },
     "mcp_tokens": {
