@@ -22,7 +22,7 @@ type CreateEventFromTaskInput struct {
 	CalId string `path:"calId" doc:"Calendar public ID"`
 	Body  struct {
 		TaskID   string `json:"taskId" doc:"Task public ID (UUID)"`
-		Timezone string `json:"timezone,omitempty" doc:"IANA timezone (e.g. America/New_York). Defaults to Asia/Tokyo if omitted."`
+		Timezone string `json:"timezone,omitempty" doc:"IANA timezone (e.g. America/New_York). Defaults to the caller's user or workspace timezone when omitted, falling back to UTC."`
 	}
 }
 
@@ -71,10 +71,10 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 			return nil, httpErr(apierrors.CalendarTaskSyncTaskLookupInterrupted)
 		}
 
-		// Determine timezone from request or default.
-		tzName := input.Body.Timezone
-		if tzName == "" {
-			tzName = "Asia/Tokyo"
+		// Determine timezone from request or caller/workspace preference.
+		tzName, tzErr := resolveEffectiveTimezone(ctx, deps.Queries, wsID, actorID, input.Body.Timezone)
+		if tzErr != nil {
+			return nil, httpErr(apierrors.CalendarTaskSyncTimezoneUnrecognized)
 		}
 		loc, locErr := time.LoadLocation(tzName)
 		if locErr != nil {

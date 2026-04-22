@@ -46,6 +46,78 @@ export function useCalendarsQuery() {
   });
 }
 
+/**
+ * Subscribes the caller to the holiday feed for a country (ISO 3166-1 alpha-2).
+ * The backend creates the system calendar on first subscription and
+ * tolerates duplicate calls.
+ */
+export function useSubscribeSystemCalendarMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (country: string) => {
+      const wsId = workspaceStore.getState().workspaceId;
+      const result = await sdk.POST('/workspaces/{wsId}/calendars/subscribe-system', {
+        params: { path: { wsId: wsId ?? '' } },
+        body: { country },
+      });
+      return unwrap(result, 'Failed to subscribe to holidays');
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: calendarKeys.all });
+    },
+  });
+}
+
+/**
+ * Deletes a calendar. Used here to unsubscribe from a system (holiday) feed;
+ * the backend enforces that only owners/admins can delete, but deleting a
+ * system calendar removes it for the whole workspace.
+ */
+export function useDeleteCalendarMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (calendarId: string) => {
+      const wsId = workspaceStore.getState().workspaceId;
+      const result = await sdk.DELETE('/workspaces/{wsId}/calendars/{calendarId}', {
+        params: { path: { wsId: wsId ?? '', calendarId } },
+      });
+      return unwrap(result, 'Failed to delete calendar');
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: calendarKeys.all });
+    },
+  });
+}
+
+/**
+ * Per `docs/conventions/api-types.md`, the API returns `*_at` fields as
+ * `int64` unix seconds. The frontend carries them as ISO strings (typed
+ * on `CalendarEvent`) so display code can use `DateTime.fromISO(...)`.
+ * Normalize here, at the boundary, preserving the event's zone so ISO
+ * offsets match the event timezone at that instant.
+ */
+type RawEvent = Omit<CalendarEvent, 'startAt' | 'endAt'> & {
+  startAt: number | string;
+  endAt: number | string;
+};
+
+function toIsoInZone(value: number | string, zone: string | undefined): string {
+  if (typeof value === 'number') {
+    const dt = zone ? DateTime.fromSeconds(value, { zone }) : DateTime.fromSeconds(value);
+    return dt.toISO() ?? '';
+  }
+  return value;
+}
+
+function normalizeEvent(raw: RawEvent): CalendarEvent {
+  const zone = raw.timezone || undefined;
+  return {
+    ...raw,
+    startAt: toIsoInZone(raw.startAt, zone),
+    endAt: toIsoInZone(raw.endAt, zone),
+  };
+}
+
 export function useCalendarEventsQuery(start: string, end: string, enabled = true) {
   const wsId = useWorkspace((s) => s.workspaceId);
   return useQuery({
@@ -57,8 +129,9 @@ export function useCalendarEventsQuery(start: string, end: string, enabled = tru
           query: { start, end },
         },
       });
-      const body = unwrap(result, 'Failed to fetch events') as { events: CalendarEvent[] };
-      return expandAllRecurrences(body.events, DateTime.fromISO(start), DateTime.fromISO(end));
+      const body = unwrap(result, 'Failed to fetch events') as { events: RawEvent[] };
+      const events = body.events.map(normalizeEvent);
+      return expandAllRecurrences(events, DateTime.fromISO(start), DateTime.fromISO(end));
     },
     enabled: enabled && !!wsId,
   });

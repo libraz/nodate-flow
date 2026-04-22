@@ -5,8 +5,10 @@ INSERT INTO users (
   email,
   display_name,
   locale,
+  timezone,
+  country,
   theme_preference
-) VALUES (?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?);
 
 -- name: FindUserByEmail :one
 -- Lookup a user by email for login. Returns internal id for the auth pipeline.
@@ -18,6 +20,8 @@ SELECT
   display_name,
   avatar_url,
   locale,
+  timezone,
+  country,
   theme_preference,
   last_login_at,
   enabled,
@@ -38,6 +42,8 @@ SELECT
   display_name,
   avatar_url,
   locale,
+  timezone,
+  country,
   theme_preference,
   last_login_at,
   enabled,
@@ -54,8 +60,10 @@ INSERT INTO users (
   email,
   display_name,
   locale,
+  timezone,
+  country,
   theme_preference
-) VALUES (?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?);
 
 -- name: CreateIdentity :execlastid
 -- Insert a new identity row (local password or OIDC binding) for a user.
@@ -187,7 +195,7 @@ LIMIT 1;
 
 -- name: FindUserProfileById :one
 -- Fetch the minimal profile for the /me endpoint by internal id.
-SELECT public_id, email, display_name, locale, theme_preference, avatar_url,
+SELECT public_id, email, display_name, locale, timezone, country, theme_preference, avatar_url,
        notif_email_digest_enabled, notif_email_mention_enabled,
        notif_email_assignment_enabled, notif_email_due_soon_enabled,
        notif_web_push_enabled
@@ -201,6 +209,8 @@ LIMIT 1;
 UPDATE users
 SET display_name                   = COALESCE(sqlc.narg('display_name'), display_name),
     locale                         = COALESCE(sqlc.narg('locale'), locale),
+    timezone                       = COALESCE(sqlc.narg('timezone'), timezone),
+    country                        = COALESCE(sqlc.narg('country'), country),
     theme_preference               = COALESCE(sqlc.narg('theme_preference'), theme_preference),
     avatar_url                     = COALESCE(sqlc.narg('avatar_url'), avatar_url),
     notif_email_digest_enabled     = COALESCE(sqlc.narg('notif_email_digest_enabled'), notif_email_digest_enabled),

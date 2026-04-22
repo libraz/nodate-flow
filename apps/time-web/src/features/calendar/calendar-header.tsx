@@ -23,8 +23,19 @@ export default function CalendarHeader(): ReactElement {
 
   const title =
     currentView === 'week'
-      ? `${selectedDate.startOf('week', { useLocaleWeeks: true }).setLocale(i18n.language).toLocaleString({ month: 'short', day: 'numeric' })} - ${selectedDate.endOf('week', { useLocaleWeeks: true }).setLocale(i18n.language).toLocaleString(DateTime.DATE_MED)}`
-      : displayMonth.toLocaleString({ month: 'long', year: 'numeric' });
+      ? (() => {
+          const start = selectedDate
+            .startOf('week', { useLocaleWeeks: true })
+            .setLocale(i18n.language);
+          const end = selectedDate.endOf('week', { useLocaleWeeks: true }).setLocale(i18n.language);
+          const startStr = start.toLocaleString(DateTime.DATE_MED);
+          const endStr =
+            start.year === end.year
+              ? end.toLocaleString({ month: 'short', day: 'numeric' })
+              : end.toLocaleString(DateTime.DATE_MED);
+          return `${startStr} - ${endStr}`;
+        })()
+      : displayMonth.setLocale(i18n.language).toLocaleString({ month: 'long', year: 'numeric' });
 
   const prevLabel =
     currentView === 'week' ? t('calendar.previous_week') : t('calendar.previous_month');

@@ -1,4 +1,3 @@
-import { getOrCreateProvider } from '@nodate-flow/holidays';
 import { DateTime, Info } from 'luxon';
 import {
   Fragment,
@@ -9,15 +8,15 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useCalendarUi } from '../../stores/calendar-ui-store';
 import { useCalendarEventsQuery, useUpdateEventMutation } from './api';
 import styles from './calendar-grid.module.css';
 import DayCell from './day-cell';
 import type { CalendarEvent } from './types';
+import { type AggregateHolidayProvider, useHolidayProviders } from './use-holiday-providers';
 
-const WEEKDAY_NAMES = Info.weekdays('short');
-const SUNDAY_FIRST = [WEEKDAY_NAMES[6] ?? 'Sun', ...WEEKDAY_NAMES.slice(0, 6)];
 const MONTHS_BUFFER = 4;
 
 interface MonthDay {
@@ -80,12 +79,14 @@ function WeekRow({
   week,
   eventsByDay,
   holidayProvider,
+  locale,
   weekCount,
   onEventDrop,
 }: {
   week: MonthDay[];
   eventsByDay: Map<string, CalendarEvent[]>;
-  holidayProvider: ReturnType<typeof getOrCreateProvider>;
+  holidayProvider: AggregateHolidayProvider;
+  locale: string;
   weekCount: number;
   onEventDrop: (event: CalendarEvent, targetDate: DateTime) => void;
 }): ReactElement {
@@ -95,7 +96,7 @@ function WeekRow({
         const isoDate = day.date.toISODate() ?? '';
         const dow = day.date.weekday % 7;
         const isWeekend = dow === 0 || dow === 6;
-        const holiday = holidayProvider.isHoliday(day.date.toJSDate());
+        const holiday = holidayProvider.isHoliday(day.date.toJSDate(), locale);
         return (
           <DayCell
             key={isoDate}
@@ -116,11 +117,13 @@ function MonthSection({
   month,
   eventsByDay,
   holidayProvider,
+  locale,
   onEventDrop,
 }: {
   month: DateTime;
   eventsByDay: Map<string, CalendarEvent[]>;
-  holidayProvider: ReturnType<typeof getOrCreateProvider>;
+  holidayProvider: AggregateHolidayProvider;
+  locale: string;
   onEventDrop: (event: CalendarEvent, targetDate: DateTime) => void;
 }): ReactElement {
   const days = useMemo(() => buildMonthGrid(month.year, month.month), [month.year, month.month]);
@@ -134,6 +137,7 @@ function MonthSection({
           week={week}
           eventsByDay={eventsByDay}
           holidayProvider={holidayProvider}
+          locale={locale}
           weekCount={weeks.length}
           onEventDrop={onEventDrop}
         />
@@ -142,22 +146,28 @@ function MonthSection({
   );
 }
 
-function MonthBoundary({ month }: { month: DateTime }): ReactElement {
+function MonthBoundary({ month, locale }: { month: DateTime; locale: string }): ReactElement {
   return (
     <div className={styles.boundary} data-boundary-month={month.toFormat('yyyy-MM')}>
       <span className={styles.boundaryLabel}>
-        {month.toLocaleString({ month: 'long', year: 'numeric' })}
+        {month.setLocale(locale).toLocaleString({ month: 'long', year: 'numeric' })}
       </span>
     </div>
   );
 }
 
 export default function CalendarGrid(): ReactElement {
+  const { i18n } = useTranslation();
   const displayMonth = useCalendarUi((s) => s.displayMonth);
   const setDisplayMonth = useCalendarUi((s) => s.setDisplayMonth);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastDisplayKey = useRef(displayMonth.toFormat('yyyy-MM'));
   const programmaticScroll = useRef(false);
+
+  const sundayFirstWeekdays = useMemo(() => {
+    const names = Info.weekdays('short', { locale: i18n.language });
+    return [names[6] ?? 'Sun', ...names.slice(0, 6)];
+  }, [i18n.language]);
 
   const [renderCenter, setRenderCenter] = useState(displayMonth.startOf('month'));
 
@@ -172,7 +182,7 @@ export default function CalendarGrid(): ReactElement {
 
   const { data: events } = useCalendarEventsQuery(rangeStart, rangeEnd);
   const eventsByDay = useMemo(() => groupEventsByDay(events ?? []), [events]);
-  const holidayProvider = useMemo(() => getOrCreateProvider('JP'), []);
+  const holidayProvider = useHolidayProviders();
   const updateMutation = useUpdateEventMutation();
 
   const handleEventDrop = useCallback(
@@ -286,7 +296,7 @@ export default function CalendarGrid(): ReactElement {
     <div className={styles.wrapper}>
       {/* Sticky weekday header */}
       <div className={styles.weekdayStrip}>
-        {SUNDAY_FIRST.map((name, i) => {
+        {sundayFirstWeekdays.map((name, i) => {
           let colorStyle: string;
           if (i === 0) colorStyle = 'var(--nf-cal-sunday)';
           else if (i === 6) colorStyle = 'var(--nf-cal-saturday)';
@@ -302,11 +312,12 @@ export default function CalendarGrid(): ReactElement {
       <div ref={scrollRef} className={styles.scrollArea}>
         {months.map((month, idx) => (
           <Fragment key={month.toFormat('yyyy-MM')}>
-            {idx > 0 && <MonthBoundary month={month} />}
+            {idx > 0 && <MonthBoundary month={month} locale={i18n.language} />}
             <MonthSection
               month={month}
               eventsByDay={eventsByDay}
               holidayProvider={holidayProvider}
+              locale={i18n.language}
               onEventDrop={handleEventDrop}
             />
           </Fragment>

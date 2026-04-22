@@ -1,4 +1,3 @@
-import { getOrCreateProvider } from '@nodate-flow/holidays';
 import { BP } from '@nodate-flow/ui/tokens/breakpoints';
 import { DateTime } from 'luxon';
 import {
@@ -15,6 +14,7 @@ import { useCalendarUi } from '../../stores/calendar-ui-store';
 import { useCalendarEventsQuery, useUpdateEventMutation } from './api';
 import { getEventStyle } from './event-styles';
 import type { CalendarEvent } from './types';
+import { useHolidayProviders } from './use-holiday-providers';
 import styles from './week-view.module.css';
 
 const HOUR_HEIGHT = 60;
@@ -149,7 +149,7 @@ export default function WeekView(): ReactElement {
     [events, visibleDays],
   );
 
-  const holidayProvider = useMemo(() => getOrCreateProvider('JP'), []);
+  const holidayProvider = useHolidayProviders();
   const todayIso = DateTime.now().toISODate();
 
   useEffect(() => {
@@ -221,7 +221,7 @@ export default function WeekView(): ReactElement {
           const iso = day.toISODate() ?? '';
           const isToday = iso === todayIso;
           const dow = day.weekday % 7;
-          const holiday = holidayProvider.isHoliday(day.toJSDate());
+          const holiday = holidayProvider.isHoliday(day.toJSDate(), i18n.language);
           const isSunday = dow === 0;
           const isSaturday = dow === 6;
 
@@ -333,7 +333,7 @@ export default function WeekView(): ReactElement {
             const dayEvents = timed.get(iso) ?? [];
             const isToday = iso === todayIso;
             const dow = day.weekday % 7;
-            const holiday = holidayProvider.isHoliday(day.toJSDate());
+            const holiday = holidayProvider.isHoliday(day.toJSDate(), i18n.language);
             const isNonWorking = dow === 0 || dow === 6 || holiday != null;
 
             return (

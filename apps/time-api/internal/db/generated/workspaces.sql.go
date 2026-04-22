@@ -19,8 +19,10 @@ INSERT INTO workspaces (
   slug,
   name,
   description,
-  icon_url
-) VALUES (?, ?, ?, ?, ?)
+  icon_url,
+  timezone,
+  country
+) VALUES (?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateWorkspaceParams struct {
@@ -29,6 +31,8 @@ type CreateWorkspaceParams struct {
 	Name        string         `json:"name"`
 	Description sql.NullString `json:"description"`
 	IconUrl     sql.NullString `json:"iconUrl"`
+	Timezone    string         `json:"timezone"`
+	Country     sql.NullString `json:"country"`
 }
 
 // Insert a new workspace. Slug uniqueness is enforced at the DB level.
@@ -39,6 +43,8 @@ func (q *Queries) CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams
 		arg.Name,
 		arg.Description,
 		arg.IconUrl,
+		arg.Timezone,
+		arg.Country,
 	)
 	if err != nil {
 		return 0, err
@@ -66,6 +72,8 @@ SELECT
   name,
   description,
   icon_url,
+  timezone,
+  country,
   enabled,
   updated_at,
   created_at
@@ -82,6 +90,8 @@ type FindWorkspaceByPublicIdRow struct {
 	Name        string         `json:"name"`
 	Description sql.NullString `json:"description"`
 	IconUrl     sql.NullString `json:"iconUrl"`
+	Timezone    string         `json:"timezone"`
+	Country     sql.NullString `json:"country"`
 	Enabled     bool           `json:"enabled"`
 	UpdatedAt   sql.NullTime   `json:"updatedAt"`
 	CreatedAt   time.Time      `json:"createdAt"`
@@ -98,6 +108,8 @@ func (q *Queries) FindWorkspaceByPublicId(ctx context.Context, publicID types.Pu
 		&i.Name,
 		&i.Description,
 		&i.IconUrl,
+		&i.Timezone,
+		&i.Country,
 		&i.Enabled,
 		&i.UpdatedAt,
 		&i.CreatedAt,
@@ -113,6 +125,8 @@ SELECT
   name,
   description,
   icon_url,
+  timezone,
+  country,
   enabled,
   updated_at,
   created_at
@@ -129,6 +143,8 @@ type FindWorkspaceBySlugRow struct {
 	Name        string         `json:"name"`
 	Description sql.NullString `json:"description"`
 	IconUrl     sql.NullString `json:"iconUrl"`
+	Timezone    string         `json:"timezone"`
+	Country     sql.NullString `json:"country"`
 	Enabled     bool           `json:"enabled"`
 	UpdatedAt   sql.NullTime   `json:"updatedAt"`
 	CreatedAt   time.Time      `json:"createdAt"`
@@ -145,10 +161,34 @@ func (q *Queries) FindWorkspaceBySlug(ctx context.Context, slug string) (FindWor
 		&i.Name,
 		&i.Description,
 		&i.IconUrl,
+		&i.Timezone,
+		&i.Country,
 		&i.Enabled,
 		&i.UpdatedAt,
 		&i.CreatedAt,
 	)
+	return i, err
+}
+
+const findWorkspaceTimezoneCountryById = `-- name: FindWorkspaceTimezoneCountryById :one
+SELECT timezone, country
+FROM workspaces
+WHERE id = ?
+  AND enabled = TRUE
+LIMIT 1
+`
+
+type FindWorkspaceTimezoneCountryByIdRow struct {
+	Timezone string         `json:"timezone"`
+	Country  sql.NullString `json:"country"`
+}
+
+// Fetch just the timezone and country columns by internal id. Used by
+// time-api when resolving the effective timezone for a request.
+func (q *Queries) FindWorkspaceTimezoneCountryById(ctx context.Context, id uint32) (FindWorkspaceTimezoneCountryByIdRow, error) {
+	row := q.db.QueryRowContext(ctx, findWorkspaceTimezoneCountryById, id)
+	var i FindWorkspaceTimezoneCountryByIdRow
+	err := row.Scan(&i.Timezone, &i.Country)
 	return i, err
 }
 
@@ -159,6 +199,8 @@ SELECT
   w.name,
   w.description,
   w.icon_url,
+  w.timezone,
+  w.country,
   wm.role,
   w.updated_at,
   w.created_at,
@@ -190,6 +232,8 @@ type ListWorkspacesForUserRow struct {
 	Name        string               `json:"name"`
 	Description sql.NullString       `json:"description"`
 	IconUrl     sql.NullString       `json:"iconUrl"`
+	Timezone    string               `json:"timezone"`
+	Country     sql.NullString       `json:"country"`
 	Role        WorkspaceMembersRole `json:"role"`
 	UpdatedAt   sql.NullTime         `json:"updatedAt"`
 	CreatedAt   time.Time            `json:"createdAt"`
@@ -213,6 +257,8 @@ func (q *Queries) ListWorkspacesForUser(ctx context.Context, arg ListWorkspacesF
 			&i.Name,
 			&i.Description,
 			&i.IconUrl,
+			&i.Timezone,
+			&i.Country,
 			&i.Role,
 			&i.UpdatedAt,
 			&i.CreatedAt,
@@ -237,7 +283,9 @@ UPDATE workspaces
 SET name        = COALESCE(?, name),
     slug        = COALESCE(?, slug),
     description = COALESCE(?, description),
-    icon_url    = COALESCE(?, icon_url)
+    icon_url    = COALESCE(?, icon_url),
+    timezone    = COALESCE(?, timezone),
+    country     = COALESCE(?, country)
 WHERE public_id = ?
   AND enabled = TRUE
 `
@@ -247,6 +295,8 @@ type PatchWorkspaceParams struct {
 	Slug        sql.NullString `json:"slug"`
 	Description sql.NullString `json:"description"`
 	IconUrl     sql.NullString `json:"iconUrl"`
+	Timezone    sql.NullString `json:"timezone"`
+	Country     sql.NullString `json:"country"`
 	PublicID    types.PublicID `json:"publicId"`
 }
 
@@ -257,6 +307,8 @@ func (q *Queries) PatchWorkspace(ctx context.Context, arg PatchWorkspaceParams) 
 		arg.Slug,
 		arg.Description,
 		arg.IconUrl,
+		arg.Timezone,
+		arg.Country,
 		arg.PublicID,
 	)
 	return err

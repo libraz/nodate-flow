@@ -9,6 +9,8 @@ SELECT
   u.display_name,
   u.avatar_url,
   u.locale,
+  u.timezone,
+  u.country,
   u.last_login_at,
   u.email_verified_at,
   u.enabled,

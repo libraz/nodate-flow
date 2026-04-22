@@ -50,6 +50,8 @@ func CreateTestTenant(t *testing.T, srv *TestServer) *TestTenant {
 		Email:           email,
 		DisplayName:     displayName,
 		Locale:          "en",
+		Timezone:        "UTC",
+		Country:         sql.NullString{},
 		ThemePreference: generated.UsersThemePreferenceSystem,
 	})
 	require.NoError(t, err, "create test user")
@@ -61,6 +63,7 @@ func CreateTestTenant(t *testing.T, srv *TestServer) *TestTenant {
 		PublicID: wsPub,
 		Slug:     wsSlug,
 		Name:     "Test Workspace " + suffix,
+		Timezone: "UTC",
 	})
 	require.NoError(t, err, "create test workspace")
 	wsID := uint32(wsID64)
@@ -115,6 +118,8 @@ func CreateExtraMember(
 		Email:           email,
 		DisplayName:     displayName,
 		Locale:          "en",
+		Timezone:        "UTC",
+		Country:         sql.NullString{},
 		ThemePreference: generated.UsersThemePreferenceSystem,
 	})
 	require.NoError(t, err)

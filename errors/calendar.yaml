@@ -561,3 +561,10 @@ resources:
         message: "Could not verify membership"
         description: "Returned when checking whether a user already has a subscription encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
+
+      country_invalid:
+        code: CALENDAR.SUBSCRIPTION.COUNTRY_INVALID
+        status: 400
+        message: "Country code is invalid or not supported"
+        description: "Returned when the ISO 3166-1 alpha-2 country code supplied to the subscribe-system endpoint is not recognised or has no holiday feed available."
+        userAction: "Pick a supported country code (e.g. JP, US, GB) from the selector."

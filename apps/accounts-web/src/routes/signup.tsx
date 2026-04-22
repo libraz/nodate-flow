@@ -34,6 +34,8 @@ interface MeResponse {
   email: string;
   displayName: string;
   locale: string;
+  timezone: string;
+  country: string;
   themePreference: string;
   isInstanceAdmin: boolean;
 }
@@ -88,6 +90,8 @@ function SignupPage(): ReactElement {
         email: me.email,
         displayName: me.displayName,
         locale: me.locale,
+        timezone: me.timezone,
+        country: me.country,
         themePreference: me.themePreference,
         isInstanceAdmin: me.isInstanceAdmin,
       };

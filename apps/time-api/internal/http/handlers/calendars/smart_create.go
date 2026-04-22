@@ -18,7 +18,7 @@ type SmartCreateInput struct {
 	CalId string `path:"calId" doc:"Calendar public ID"`
 	Body  struct {
 		Text     string `json:"text" minLength:"1" maxLength:"1000" doc:"Natural language event description"`
-		Timezone string `json:"timezone,omitempty" doc:"IANA timezone (e.g. America/New_York). Defaults to Asia/Tokyo if omitted."`
+		Timezone string `json:"timezone,omitempty" doc:"IANA timezone (e.g. America/New_York). Defaults to the caller's user or workspace timezone when omitted, falling back to UTC."`
 	}
 }
 
@@ -52,9 +52,9 @@ func SmartCreate(deps Deps) func(context.Context, *SmartCreateInput) (*SmartCrea
 			return nil, err
 		}
 
-		tz := input.Body.Timezone
-		if tz == "" {
-			tz = "Asia/Tokyo"
+		tz, tzErr := resolveEffectiveTimezone(ctx, deps.Queries, wsID, actorID, input.Body.Timezone)
+		if tzErr != nil {
+			return nil, httpErr(apierrors.CalendarSmartCreateTextUnparseable)
 		}
 		proposal, err := ParseEventFromText(input.Body.Text, time.Now(), tz)
 		if err != nil {

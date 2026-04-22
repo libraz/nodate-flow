@@ -9,6 +9,8 @@ SELECT
   u.display_name,
   u.avatar_url,
   u.locale,
+  u.timezone,
+  u.country,
   u.theme_preference,
   wm.role AS workspace_role,
   u.last_login_at,

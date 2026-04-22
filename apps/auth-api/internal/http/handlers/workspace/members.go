@@ -84,6 +84,8 @@ func InviteMember(deps Deps) func(context.Context, *AddWorkspaceMemberInput) (*A
 				Email:           emailAddr,
 				DisplayName:     emailAddr,
 				Locale:          "en",
+				Timezone:        "UTC",
+				Country:         sql.NullString{},
 				ThemePreference: generated.UsersThemePreferenceSystem,
 			})
 			if ierr != nil {

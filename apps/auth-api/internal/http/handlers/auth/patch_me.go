@@ -8,6 +8,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/region"
 )
 
 // PatchMe handles PATCH /me. Only fields explicitly supplied in the
@@ -26,6 +27,19 @@ func PatchMe(deps Deps) func(context.Context, *PatchMeInput) (*PatchMeOutput, er
 		}
 		if in.Body.Locale != nil {
 			params.Locale = sql.NullString{String: *in.Body.Locale, Valid: true}
+		}
+		if in.Body.Timezone != nil {
+			if err := region.ValidateTimezone(*in.Body.Timezone); err != nil {
+				return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+			}
+			params.Timezone = sql.NullString{String: *in.Body.Timezone, Valid: true}
+		}
+		if in.Body.Country != nil {
+			if err := region.ValidateCountry(*in.Body.Country); err != nil {
+				return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+			}
+			// Empty string clears the column; NULL in DB.
+			params.Country = sql.NullString{String: *in.Body.Country, Valid: *in.Body.Country != ""}
 		}
 		if in.Body.ThemePreference != nil {
 			params.ThemePreference = generated.NullUsersThemePreference{

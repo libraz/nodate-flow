@@ -5,6 +5,7 @@ import type { RecurrenceRule } from './types';
 interface RecurrenceEvent {
   startAt: string;
   endAt: string;
+  timezone?: string | undefined;
   recurrenceRule: RecurrenceRule | null;
   recurrenceExceptions?: string[] | undefined;
 }
@@ -46,6 +47,15 @@ function matchesByMonthDay(dt: DateTime, byMonthDay: number[]): boolean {
   return byMonthDay.includes(dt.day);
 }
 
+/**
+ * Parse an ISO timestamp and anchor it to `zone` if provided, so subsequent
+ * calendar arithmetic preserves wall-clock time across DST transitions.
+ * Returns an invalid DateTime if parsing fails.
+ */
+function parseInZone(iso: string, zone: string | undefined): DateTime {
+  return zone ? DateTime.fromISO(iso, { zone }) : DateTime.fromISO(iso);
+}
+
 /** Expand a recurring event into concrete instances within [rangeStart, rangeEnd). */
 export function expandRecurrence(
   event: RecurrenceEvent,
@@ -55,14 +65,15 @@ export function expandRecurrence(
   const rule = event.recurrenceRule;
   if (!rule) return [];
 
-  const eventStart = DateTime.fromISO(event.startAt);
-  const eventEnd = DateTime.fromISO(event.endAt);
+  const zone = event.timezone || undefined;
+  const eventStart = parseInZone(event.startAt, zone);
+  const eventEnd = parseInZone(event.endAt, zone);
   const duration = eventEnd.diff(eventStart);
   const interval = rule.interval ?? 1;
-  const until = rule.until ? DateTime.fromISO(rule.until) : null;
+  const until = rule.until ? parseInZone(rule.until, zone) : null;
   const maxCount = rule.count ?? Number.POSITIVE_INFINITY;
 
-  // Build a set of exception timestamps for fast lookup.
+  // Exceptions compare instants (UTC ms), so zone doesn't matter for the key.
   const exceptions = new Set(
     event.recurrenceExceptions?.map((d) => DateTime.fromISO(d).toMillis()) ?? [],
   );
@@ -80,7 +91,6 @@ export function expandRecurrence(
 
     if (passesDay && passesMonthDay) {
       emitted++;
-      // Skip instances that match a recurrence exception date.
       if (!exceptions.has(candidate.toMillis())) {
         const instanceEnd = candidate.plus(duration);
         if (instanceEnd > rangeStart) {
@@ -100,6 +110,7 @@ export function expandAllRecurrences<
   T extends {
     startAt: string;
     endAt: string;
+    timezone?: string;
     recurrenceRule?: RecurrenceRule | null;
     recurrenceExceptions?: string[];
   },
@@ -116,6 +127,7 @@ export function expandAllRecurrences<
       {
         startAt: event.startAt,
         endAt: event.endAt,
+        timezone: event.timezone,
         recurrenceRule: event.recurrenceRule,
         recurrenceExceptions: event.recurrenceExceptions,
       },

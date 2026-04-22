@@ -212,6 +212,23 @@ export interface paths {
         patch: operations["admin-patch-workspace"];
         trace?: never;
     };
+    "/auth/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List available authentication methods */
+        get: operations["auth-capabilities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -3413,6 +3430,20 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        CapabilitiesBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            magicLink: boolean;
+            oidcGithub: boolean;
+            oidcGoogle: boolean;
+            oidcMicrosoft: boolean;
+            passwordLogin: boolean;
+            registrationOpen: boolean;
+            totp: boolean;
+        };
         ChangePasswordInputBody: {
             /**
              * Format: uri
@@ -3818,10 +3849,12 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
+            country?: string;
             description?: string;
             iconUrl?: string;
             name: string;
             slug: string;
+            timezone?: string;
         };
         CreateWorkspaceInviteInputBody: {
             /**
@@ -5057,6 +5090,7 @@ export interface components {
              */
             readonly $schema?: string;
             avatarUrl?: string;
+            country: string;
             displayName: string;
             email: string;
             id: string;
@@ -5069,6 +5103,7 @@ export interface components {
             notifWebPush: boolean;
             /** @enum {string} */
             themePreference: "aurora-light" | "aurora-dark" | "dotline-light" | "dotline-dark" | "glass-light" | "glass-dark" | "system";
+            timezone: string;
         };
         ModelSummary: {
             displayName: string;
@@ -5267,6 +5302,7 @@ export interface components {
              */
             readonly $schema?: string;
             avatarUrl?: string;
+            country?: string;
             displayName?: string;
             locale?: string;
             notifEmailAssignment?: boolean;
@@ -5276,6 +5312,7 @@ export interface components {
             notifWebPush?: boolean;
             /** @enum {string} */
             themePreference?: "aurora-light" | "aurora-dark" | "dotline-light" | "dotline-dark" | "glass-light" | "glass-dark" | "system";
+            timezone?: string;
         };
         PatchProjectBody: {
             /**
@@ -5372,10 +5409,12 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
+            country?: string;
             description?: string;
             iconUrl?: string;
             name?: string;
             slug?: string;
+            timezone?: string;
         };
         PauseAgentInputBody: {
             /**
@@ -5576,11 +5615,13 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
+            country?: string;
             displayName: string;
             /** Format: email */
             email: string;
             locale?: string;
             password: string;
+            timezone?: string;
         };
         RemoveProjectMemberBody: {
             /**
@@ -6641,6 +6682,7 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
+            country: string;
             /** Format: int64 */
             createdAt: number;
             description?: string;
@@ -6656,6 +6698,7 @@ export interface components {
             /** @description Caller's role in this workspace */
             role?: string;
             slug: string;
+            timezone: string;
             /** Format: int64 */
             updatedAt?: number;
         };
@@ -7214,6 +7257,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminPatchWorkspaceOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "auth-capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CapabilitiesBody"];
                 };
             };
             /** @description Error */
@@ -7988,7 +8061,10 @@ export interface operations {
     };
     "favorites-delete": {
         parameters: {
-            query?: never;
+            query: {
+                /** @description Workspace public id (UUID v7) */
+                workspaceId: string;
+            };
             header?: never;
             path: {
                 /** @description Favorite public id (UUID v7) */

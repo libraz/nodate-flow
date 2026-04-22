@@ -20,7 +20,7 @@ CREATE TABLE calendar_events (
   all_day BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'All-day event flag',
   start_at DATETIME NOT NULL COMMENT 'Start time (UTC or with timezone context)',
   end_at DATETIME NOT NULL COMMENT 'End time',
-  timezone VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT 'Asia/Tokyo' COMMENT 'IANA timezone identifier',
+  timezone VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT 'UTC' COMMENT 'IANA timezone identifier; resolved from event > user > workspace > UTC',
 
   location VARCHAR(500) NULL COMMENT 'Location text',
   memo MEDIUMTEXT NULL COMMENT 'Free-form notes (markdown)',

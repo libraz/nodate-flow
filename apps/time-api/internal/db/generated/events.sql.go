@@ -578,7 +578,7 @@ SELECT
   ce.block_label,
   ce.recurrence_rule,
   ce.recurrence_end,
-  ce.recurrence_exceptions,
+  COALESCE(ce.recurrence_exceptions, CAST('null' AS JSON)) AS recurrence_exceptions,
   ce.task_id,
   ce.updated_at,
   ce.created_at
@@ -699,7 +699,7 @@ SELECT
   ce.block_label,
   ce.recurrence_rule,
   ce.recurrence_end,
-  ce.recurrence_exceptions,
+  COALESCE(ce.recurrence_exceptions, CAST('null' AS JSON)) AS recurrence_exceptions,
   ce.notification_offset,
   ce.task_id,
   ce.updated_at,

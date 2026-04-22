@@ -2176,7 +2176,7 @@ type CalendarEvent struct {
 	StartAt time.Time `json:"startAt"`
 	// End time
 	EndAt time.Time `json:"endAt"`
-	// IANA timezone identifier
+	// IANA timezone identifier; resolved from event > user > workspace > UTC
 	Timezone string `json:"timezone"`
 	// Location text
 	Location sql.NullString `json:"location"`
@@ -3508,6 +3508,10 @@ type User struct {
 	AvatarUrl sql.NullString `json:"avatarUrl"`
 	// Preferred locale tag (BCP 47)
 	Locale string `json:"locale"`
+	// Preferred IANA timezone (independent of locale)
+	Timezone string `json:"timezone"`
+	// ISO 3166-1 alpha-2 country (independent of locale); drives default holiday subscription
+	Country sql.NullString `json:"country"`
 	// UI theme preference
 	ThemePreference UsersThemePreference `json:"themePreference"`
 	// Last successful login
@@ -3657,6 +3661,8 @@ type VAdminUser struct {
 	DisplayName     string         `json:"displayName"`
 	AvatarUrl       sql.NullString `json:"avatarUrl"`
 	Locale          string         `json:"locale"`
+	Timezone        string         `json:"timezone"`
+	Country         sql.NullString `json:"country"`
 	LastLoginAt     sql.NullTime   `json:"lastLoginAt"`
 	EmailVerifiedAt sql.NullTime   `json:"emailVerifiedAt"`
 	Enabled         bool           `json:"enabled"`
@@ -3866,6 +3872,8 @@ type VUser struct {
 	DisplayName     string               `json:"displayName"`
 	AvatarUrl       sql.NullString       `json:"avatarUrl"`
 	Locale          string               `json:"locale"`
+	Timezone        string               `json:"timezone"`
+	Country         sql.NullString       `json:"country"`
 	ThemePreference UsersThemePreference `json:"themePreference"`
 	WorkspaceRole   WorkspaceMembersRole `json:"workspaceRole"`
 	LastLoginAt     sql.NullTime         `json:"lastLoginAt"`
@@ -3973,6 +3981,10 @@ type Workspace struct {
 	Description sql.NullString `json:"description"`
 	// Icon image URL
 	IconUrl sql.NullString `json:"iconUrl"`
+	// Default IANA timezone for the workspace; user tz overrides per-user
+	Timezone string `json:"timezone"`
+	// ISO 3166-1 alpha-2 country; drives default holiday subscription
+	Country sql.NullString `json:"country"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes

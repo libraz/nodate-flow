@@ -10,7 +10,31 @@ import (
 	generated "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/types"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/region"
 )
+
+// resolveEffectiveTimezone returns the IANA timezone to use for a request in
+// priority order: explicit request value > user preference > workspace default
+// > region.DefaultTimezone. The returned string is validated; if explicit is
+// provided but invalid, the error is surfaced so the caller can return 422.
+func resolveEffectiveTimezone(ctx context.Context, q *generated.Queries, wsID, actorID uint32, explicit string) (string, error) {
+	if explicit != "" {
+		if err := region.ValidateTimezone(explicit); err != nil {
+			return "", err
+		}
+		return explicit, nil
+	}
+	var userTz string
+	if profile, err := q.FindUserProfileById(ctx, actorID); err == nil {
+		userTz = profile.Timezone
+	}
+	var wsTz string
+	// Best-effort workspace lookup; fallback to UTC if it fails.
+	if row, err := q.FindWorkspaceTimezoneCountryById(ctx, wsID); err == nil {
+		wsTz = row.Timezone
+	}
+	return region.EffectiveTimezone(userTz, wsTz), nil
+}
 
 // resolveWorkspace parses the wsId UUID string, looks up the internal workspace
 // ID, and verifies the actor is a workspace member.

@@ -60,6 +60,8 @@ func rowToWorkspaceFromFind(r generated.FindWorkspaceByPublicIdRow) Workspace {
 		Name:        r.Name,
 		Description: nullStr(r.Description),
 		IconURL:     nullStr(r.IconUrl),
+		Timezone:    r.Timezone,
+		Country:     nullStr(r.Country),
 		UpdatedAt:   nullTimeUnix(r.UpdatedAt),
 		CreatedAt:   r.CreatedAt.Unix(),
 	}
@@ -73,6 +75,8 @@ func rowToWorkspaceFromList(r generated.ListWorkspacesForUserRow) Workspace {
 		Name:        r.Name,
 		Description: nullStr(r.Description),
 		IconURL:     nullStr(r.IconUrl),
+		Timezone:    r.Timezone,
+		Country:     nullStr(r.Country),
 		Role:        string(r.Role),
 		MemberCount: r.MemberCount,
 		UpdatedAt:   nullTimeUnix(r.UpdatedAt),

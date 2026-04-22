@@ -153,7 +153,13 @@
     "mode_dark": "Dark",
     "mode_system": "System",
     "language_en": "English",
-    "language_ja": "\u65e5\u672c\u8a9e"
+    "language_ja": "日本語",
+    "holiday_subscriptions": "Holiday calendars",
+    "holiday_subscriptions_empty": "No holiday calendars subscribed yet.",
+    "holiday_add_placeholder": "Select a country…",
+    "holiday_add": "Add",
+    "holiday_add_failed": "Couldn't subscribe to this holiday feed.",
+    "holiday_unsubscribe_aria": "Unsubscribe from {{country}} holidays"
   },
   "search": {
     "placeholder": "Search events...",

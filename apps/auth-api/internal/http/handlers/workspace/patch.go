@@ -12,6 +12,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/middleware"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/region"
 )
 
 // Patch handles PATCH /workspaces/{wsId}. Only workspace admins or owners
@@ -52,6 +53,18 @@ func Patch(deps Deps) func(context.Context, *PatchWorkspaceInput) (*PatchWorkspa
 		}
 		if in.Body.IconURL != nil {
 			params.IconUrl = sql.NullString{String: *in.Body.IconURL, Valid: true}
+		}
+		if in.Body.Timezone != nil {
+			if err := region.ValidateTimezone(*in.Body.Timezone); err != nil {
+				return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+			}
+			params.Timezone = sql.NullString{String: *in.Body.Timezone, Valid: true}
+		}
+		if in.Body.Country != nil {
+			if err := region.ValidateCountry(*in.Body.Country); err != nil {
+				return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+			}
+			params.Country = sql.NullString{String: *in.Body.Country, Valid: *in.Body.Country != ""}
 		}
 
 		if err := deps.Queries.PatchWorkspace(ctx, params); err != nil {

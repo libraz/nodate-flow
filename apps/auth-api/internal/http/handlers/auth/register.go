@@ -13,6 +13,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/region"
 )
 
 // Register handles POST /auth/register and creates a new local-password
@@ -43,11 +44,23 @@ func Register(deps Deps) func(context.Context, *RegisterInput) (*RegisterOutput,
 		if locale == "" {
 			locale = "en"
 		}
+		tz := in.Body.Timezone
+		if tz == "" {
+			tz = region.DefaultTimezone
+		} else if err := region.ValidateTimezone(tz); err != nil {
+			return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+		}
+		country := in.Body.Country
+		if err := region.ValidateCountry(country); err != nil {
+			return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+		}
 		uid, err := deps.Queries.RegisterUser(ctx, generated.RegisterUserParams{
 			PublicID:        userPub,
 			Email:           email,
 			DisplayName:     in.Body.DisplayName,
 			Locale:          locale,
+			Timezone:        tz,
+			Country:         sql.NullString{String: country, Valid: country != ""},
 			ThemePreference: generated.UsersThemePreference("system"),
 		})
 		if err != nil {

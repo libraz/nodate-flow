@@ -135,6 +135,12 @@ func BuildResult(deps Deps) Result {
 			Path:        "/workspaces/{wsId}/calendars",
 			Summary:     "Create a calendar",
 		}, calendars.CreateCalendar(calDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "calendars-subscribe-system",
+			Method:      http.MethodPost,
+			Path:        "/workspaces/{wsId}/calendars/subscribe-system",
+			Summary:     "Subscribe the caller to the holiday feed for a country",
+		}, calendars.SubscribeSystemCalendar(calDeps))
 
 		// Cross-calendar event query (no calId, outside calendar member scope).
 		huma.Register(subAPI, huma.Operation{

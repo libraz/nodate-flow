@@ -4,11 +4,17 @@
  */
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import {
+  SUPPORTED_COUNTRIES,
+  detectTimezone,
+  formatTimezoneLabel,
+  groupTimezonesByRegion,
+} from '@nodate-flow/sdk';
 import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import { Link, createFileRoute } from '@tanstack/react-router';
-import { type ReactElement, useState } from 'react';
+import { type ReactElement, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
@@ -24,6 +30,8 @@ interface MeResponse {
   email: string;
   displayName: string;
   locale: string;
+  timezone: string;
+  country: string;
   themePreference: string;
   isInstanceAdmin: boolean;
 }
@@ -35,15 +43,25 @@ function ProfilePage(): ReactElement {
   const [serverError, setServerError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  const timezoneGroups = useMemo(() => groupTimezonesByRegion(), []);
+  const countries = useMemo(
+    () => Object.entries(SUPPORTED_COUNTRIES).sort(([, a], [, b]) => a.localeCompare(b)),
+    [],
+  );
+
+  // `values` keeps the form in sync with the auth store; essential because
+  // the user profile may populate asynchronously after the form mounts.
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
-    defaultValues: {
+    values: {
       displayName: user?.displayName ?? '',
       locale: (user?.locale as 'en' | 'ja') ?? 'en',
+      timezone: user?.timezone || detectTimezone(),
+      country: user?.country ?? '',
       themePreference: (user?.themePreference as ProfileFormValues['themePreference']) ?? 'system',
     },
   });
@@ -56,6 +74,8 @@ function ProfilePage(): ReactElement {
         body: {
           displayName: values.displayName,
           locale: values.locale,
+          timezone: values.timezone,
+          country: values.country,
           themePreference: values.themePreference,
         },
       });
@@ -69,6 +89,8 @@ function ProfilePage(): ReactElement {
         email: me.email,
         displayName: me.displayName,
         locale: me.locale,
+        timezone: me.timezone,
+        country: me.country,
         themePreference: me.themePreference,
         isInstanceAdmin: authStore.getState().user?.isInstanceAdmin ?? false,
       };
@@ -82,7 +104,7 @@ function ProfilePage(): ReactElement {
   };
 
   return (
-    <AuthCard>
+    <AuthCard width="wide">
       <form
         onSubmit={(e) => {
           void handleSubmit(onSubmit)(e);
@@ -130,6 +152,71 @@ function ProfilePage(): ReactElement {
               >
                 <option value="en">{t('profile.locale_en')}</option>
                 <option value="ja">{t('profile.locale_ja')}</option>
+              </select>
+            );
+          }}
+        </FormField>
+
+        <FormField
+          label={t('profile.timezone')}
+          {...(errors.timezone?.message ? { error: t(errors.timezone.message) } : {})}
+        >
+          {(control) => {
+            const { ref, ...field } = register('timezone');
+            return (
+              <select
+                {...control}
+                {...field}
+                ref={ref}
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: 'var(--nf-radius-md, 0.375rem)',
+                  border: 'var(--nf-space-px, 1px) solid var(--nf-color-border)',
+                  background: 'var(--nf-color-bg)',
+                  color: 'var(--nf-color-fg)',
+                  fontSize: 'var(--nf-text-sm, 0.875rem)',
+                }}
+              >
+                {timezoneGroups.map(({ region, zones }) => (
+                  <optgroup key={region} label={region}>
+                    {zones.map((tz) => (
+                      <option key={tz} value={tz}>
+                        {region === 'Global' ? tz : formatTimezoneLabel(tz)}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            );
+          }}
+        </FormField>
+
+        <FormField
+          label={t('profile.country')}
+          {...(errors.country?.message ? { error: t(errors.country.message) } : {})}
+        >
+          {(control) => {
+            const { ref, ...field } = register('country');
+            return (
+              <select
+                {...control}
+                {...field}
+                ref={ref}
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: 'var(--nf-radius-md, 0.375rem)',
+                  border: 'var(--nf-space-px, 1px) solid var(--nf-color-border)',
+                  background: 'var(--nf-color-bg)',
+                  color: 'var(--nf-color-fg)',
+                  fontSize: 'var(--nf-text-sm, 0.875rem)',
+                }}
+              >
+                <option value="">{t('profile.country_unset')}</option>
+                {countries.map(([code, name]) => (
+                  <option key={code} value={code}>
+                    {code} — {name}
+                  </option>
+                ))}
               </select>
             );
           }}
@@ -189,7 +276,7 @@ function ProfilePage(): ReactElement {
           </output>
         ) : null}
 
-        <Button type="submit" variant="primary" disabled={isSubmitting}>
+        <Button type="submit" variant="primary" disabled={isSubmitting || !isDirty}>
           {isSubmitting ? t('profile.saving') : t('profile.save')}
         </Button>
 
@@ -198,9 +285,12 @@ function ProfilePage(): ReactElement {
             margin: 0,
             fontSize: 'var(--nf-text-sm, 0.875rem)',
             color: 'var(--nf-color-fg-muted)',
+            display: 'flex',
+            gap: 'var(--nf-space-4)',
           }}
         >
           <Link to="/security">{t('profile.security_link')}</Link>
+          <Link to="/workspaces">{t('profile.workspaces_link')}</Link>
         </p>
       </form>
     </AuthCard>

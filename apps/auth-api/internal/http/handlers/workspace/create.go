@@ -12,6 +12,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/region"
 )
 
 // Create handles POST /workspaces. The authenticated actor becomes the
@@ -33,6 +34,17 @@ func Create(deps Deps) func(context.Context, *CreateWorkspaceInput) (*CreateWork
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
+		tz := in.Body.Timezone
+		if tz == "" {
+			tz = region.DefaultTimezone
+		} else if err := region.ValidateTimezone(tz); err != nil {
+			return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+		}
+		country := in.Body.Country
+		if err := region.ValidateCountry(country); err != nil {
+			return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+		}
+
 		pub := types.New()
 		desc := sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""}
 		icon := sql.NullString{String: in.Body.IconURL, Valid: in.Body.IconURL != ""}
@@ -42,6 +54,8 @@ func Create(deps Deps) func(context.Context, *CreateWorkspaceInput) (*CreateWork
 			Name:        in.Body.Name,
 			Description: desc,
 			IconUrl:     icon,
+			Timezone:    tz,
+			Country:     sql.NullString{String: country, Valid: country != ""},
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -74,6 +88,8 @@ func Create(deps Deps) func(context.Context, *CreateWorkspaceInput) (*CreateWork
 			Name:        in.Body.Name,
 			Description: in.Body.Description,
 			IconURL:     in.Body.IconURL,
+			Timezone:    tz,
+			Country:     country,
 			Role:        string(generated.WorkspaceMembersRoleOwner),
 			CreatedAt:   time.Now().Unix(),
 		}}

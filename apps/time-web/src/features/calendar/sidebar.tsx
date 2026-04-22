@@ -1,3 +1,4 @@
+import { getOrCreateProvider } from '@nodate-flow/holidays';
 import { LogOut, Settings } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +14,29 @@ import { useCalendarsQuery } from './api';
 import styles from './sidebar.module.css';
 import type { Calendar } from './types';
 
+const HOLIDAY_PREFIX = 'holidays.';
+
+/**
+ * Returns the locale-aware display name for a calendar. System holiday
+ * calendars dispatch to the holidays provider's displayName(locale); all
+ * other kinds fall back to the stored name.
+ */
+function calendarDisplayName(calendar: Calendar, locale: string): string {
+  if (calendar.kind === 'system' && calendar.systemSlug?.startsWith(HOLIDAY_PREFIX)) {
+    const cc = calendar.systemSlug.slice(HOLIDAY_PREFIX.length).toUpperCase();
+    if (/^[A-Z]{2}$/.test(cc)) {
+      try {
+        return getOrCreateProvider(cc).displayName(locale) || calendar.name;
+      } catch {
+        return calendar.name;
+      }
+    }
+  }
+  return calendar.name;
+}
+
 function CalendarItem({ calendar }: { calendar: Calendar }): ReactElement {
+  const { i18n } = useTranslation();
   const selectedCalendarIds = useCalendarUi((s) => s.selectedCalendarIds);
   const toggleCalendar = useCalendarUi((s) => s.toggleCalendar);
   const isVisible = selectedCalendarIds.has(calendar.id);
@@ -35,7 +58,7 @@ function CalendarItem({ calendar }: { calendar: Calendar }): ReactElement {
         className={styles.calendarName}
         style={{ color: isVisible ? 'var(--nf-color-fg)' : 'var(--nf-color-fg-subtle)' }}
       >
-        {calendar.name}
+        {calendarDisplayName(calendar, i18n.language)}
       </span>
     </button>
   );

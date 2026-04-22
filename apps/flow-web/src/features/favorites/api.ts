@@ -76,9 +76,9 @@ export interface RemoveFavoriteArgs {
 export function useRemoveFavorite(): UseMutationResult<void, ApiError, RemoveFavoriteArgs> {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id }: RemoveFavoriteArgs): Promise<void> => {
+    mutationFn: async ({ id, workspaceId }: RemoveFavoriteArgs): Promise<void> => {
       const { error } = await sdk.DELETE('/me/favorites/{id}', {
-        params: { path: { id } },
+        params: { path: { id }, query: { workspaceId } },
       });
       if (error) throw toApiError(error, 'Failed to remove favorite');
     },

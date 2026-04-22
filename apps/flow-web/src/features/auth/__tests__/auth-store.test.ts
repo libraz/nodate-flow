@@ -17,6 +17,8 @@ describe('authStore', () => {
     email: 'test@example.com',
     displayName: 'Test User',
     locale: 'en',
+    timezone: 'UTC',
+    country: '',
     themePreference: 'aurora-dark',
     isInstanceAdmin: false,
   };

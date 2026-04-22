@@ -14,6 +14,11 @@ export interface Calendar {
   memberColor: string;
   displayColor: string;
   visible: boolean;
+  /**
+   * For kind==='system' calendars, the provider identifier such as
+   * 'holidays.jp'. Undefined on personal/shared calendars.
+   */
+  systemSlug?: string;
 }
 
 export interface RecurrenceRule {

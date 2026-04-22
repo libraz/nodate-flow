@@ -130,6 +130,8 @@ var (
 	CalendarMemoStoreWriteInterrupted = &Spec{Code: "CALENDAR.MEMO.STORE_WRITE_INTERRUPTED", Status: 500, Message: "Could not save memo"}
 	// CALENDAR.SMART_CREATE.TEXT_UNPARSEABLE — Could not parse event from text
 	CalendarSmartCreateTextUnparseable = &Spec{Code: "CALENDAR.SMART_CREATE.TEXT_UNPARSEABLE", Status: 422, Message: "Could not parse event from text"}
+	// CALENDAR.SUBSCRIPTION.COUNTRY_INVALID — Country code is invalid or not supported
+	CalendarSubscriptionCountryInvalid = &Spec{Code: "CALENDAR.SUBSCRIPTION.COUNTRY_INVALID", Status: 400, Message: "Country code is invalid or not supported"}
 	// CALENDAR.SUBSCRIPTION.MEMBERSHIP_CHECK_INTERRUPTED — Could not verify membership
 	CalendarSubscriptionMembershipCheckInterrupted = &Spec{Code: "CALENDAR.SUBSCRIPTION.MEMBERSHIP_CHECK_INTERRUPTED", Status: 500, Message: "Could not verify membership"}
 	// CALENDAR.SUBSCRIPTION.STORE_WRITE_INTERRUPTED — Could not create calendar subscription

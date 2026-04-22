@@ -10,6 +10,21 @@
       href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('nf.lang');
+          var lang = stored && /^(en|ja)$/.test(stored)
+            ? stored
+            : (navigator.language || 'en').toLowerCase().indexOf('ja') === 0
+              ? 'ja'
+              : 'en';
+          document.documentElement.setAttribute('lang', lang);
+        } catch (e) {
+          document.documentElement.setAttribute('lang', 'en');
+        }
+      })();
+    </script>
   </head>
   <body class="h-full">
     <div id="root" class="h-full"></div>

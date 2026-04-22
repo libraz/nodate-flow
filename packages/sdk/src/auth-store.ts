@@ -14,6 +14,8 @@ export interface AuthUser {
   email: string;
   displayName: string;
   locale: string;
+  timezone: string;
+  country: string;
   themePreference: string;
   isInstanceAdmin: boolean;
 }

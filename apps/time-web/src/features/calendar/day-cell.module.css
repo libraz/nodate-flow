@@ -64,29 +64,55 @@
   inline-size: 100%;
   display: flex;
   flex-direction: column;
-  gap: 0.125rem;
+  gap: 2px;
+  padding-inline: 2px;
 }
 
 .eventChip {
   all: unset;
   cursor: grab;
+  position: relative;
   display: block;
   inline-size: 100%;
-  margin-inline: 0.125rem;
+  box-sizing: border-box;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  border-radius: var(--nf-radius-pill);
-  border-inline-start: 3px solid;
-  padding: 0 var(--nf-space-1);
+  border-radius: var(--nf-radius-sm, 4px);
+  padding-block: 1px;
+  padding-inline: calc(var(--nf-space-1) + 5px) var(--nf-space-1);
   text-align: start;
   font-size: 11px;
-  font-weight: var(--nf-weight-semibold);
-  line-height: 20px;
+  font-weight: var(--nf-weight-medium);
+  line-height: 18px;
+  transition:
+    background var(--nf-duration-fast) var(--nf-ease-standard),
+    transform var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+/* Solid left accent strip clipped to the rounded rectangle. */
+.eventChip::before {
+  content: '';
+  position: absolute;
+  inset-block: 2px;
+  inset-inline-start: 2px;
+  inline-size: 3px;
+  border-radius: 1.5px;
+  background: currentColor;
+}
+
+.eventChip:hover {
+  filter: brightness(0.96);
+}
+
+.eventChip:focus-visible {
+  outline: 2px solid var(--nf-color-accent);
+  outline-offset: 1px;
 }
 
 .eventChip:active {
   cursor: grabbing;
+  transform: translateY(0.5px);
 }
 
 .eventLabelDesktop {

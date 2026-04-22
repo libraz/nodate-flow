@@ -38,6 +38,8 @@ async function runBootstrap(): Promise<AuthBootstrapStatus> {
     email: string;
     displayName: string;
     locale: string;
+    timezone: string;
+    country: string;
     themePreference: string;
     isInstanceAdmin: boolean;
   };
@@ -46,6 +48,8 @@ async function runBootstrap(): Promise<AuthBootstrapStatus> {
     email: data.email,
     displayName: data.displayName,
     locale: data.locale,
+    timezone: data.timezone,
+    country: data.country,
     themePreference: data.themePreference,
     isInstanceAdmin: data.isInstanceAdmin,
   };

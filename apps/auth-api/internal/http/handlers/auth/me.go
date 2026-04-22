@@ -38,11 +38,17 @@ func rowToMe(row generated.FindUserProfileByIdRow) MeBody {
 		s := row.AvatarUrl.String
 		avatar = &s
 	}
+	country := ""
+	if row.Country.Valid {
+		country = row.Country.String
+	}
 	return MeBody{
 		ID:                   row.PublicID.String(),
 		Email:                row.Email,
 		DisplayName:          row.DisplayName,
 		Locale:               row.Locale,
+		Timezone:             row.Timezone,
+		Country:              country,
 		ThemePreference:      string(row.ThemePreference),
 		AvatarURL:            avatar,
 		NotifEmailDigest:     row.NotifEmailDigestEnabled,

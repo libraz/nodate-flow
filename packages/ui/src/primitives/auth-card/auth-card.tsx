@@ -8,9 +8,16 @@ import type { ReactElement, ReactNode } from 'react';
 
 export interface AuthCardProps {
   children: ReactNode;
+  /**
+   * Controls the card width. 'narrow' (default) uses ~28rem and fits auth
+   * flows; 'wide' uses ~36rem for settings pages with longer form fields
+   * like IANA timezone names.
+   */
+  width?: 'narrow' | 'wide';
 }
 
-export default function AuthCard({ children }: AuthCardProps): ReactElement {
+export default function AuthCard({ children, width = 'narrow' }: AuthCardProps): ReactElement {
+  const maxWidth = width === 'wide' ? '36rem' : '28rem';
   return (
     <main
       style={{
@@ -46,7 +53,7 @@ export default function AuthCard({ children }: AuthCardProps): ReactElement {
       </div>
       <section
         style={{
-          inlineSize: 'min(28rem, 100%)',
+          inlineSize: `min(${maxWidth}, 100%)`,
           background: 'var(--nf-color-bg-elevated, var(--color-surface))',
           border: 'var(--nf-space-px, 1px) solid var(--nf-color-border, var(--color-hairline))',
           borderRadius: 'var(--nf-radius-lg, 0.75rem)',

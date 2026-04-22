@@ -39,6 +39,11 @@ type Workspace struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 	IconURL     string `json:"iconUrl,omitempty"`
+	// Timezone is the workspace-level default IANA timezone.
+	Timezone string `json:"timezone"`
+	// Country is the workspace-level ISO 3166-1 alpha-2 code, or empty
+	// when unset. Drives the default holiday subscription.
+	Country     string `json:"country"`
 	Role        string `json:"role,omitempty" doc:"Caller's role in this workspace"`
 	MemberCount int64  `json:"memberCount" doc:"Number of enabled members in this workspace"`
 	UpdatedAt   *int64 `json:"updatedAt,omitempty"`
@@ -70,6 +75,10 @@ type CreateWorkspaceInputBody struct {
 	Name        string `json:"name" minLength:"1" maxLength:"100"`
 	Description string `json:"description,omitempty" maxLength:"500"`
 	IconURL     string `json:"iconUrl,omitempty" maxLength:"500"`
+	// Timezone defaults to "UTC" when omitted; must be a valid IANA identifier.
+	Timezone string `json:"timezone,omitempty" maxLength:"64"`
+	// Country is an optional ISO 3166-1 alpha-2 code. Empty string means unset.
+	Country string `json:"country,omitempty" pattern:"^$|^[A-Z]{2}$"`
 }
 
 // CreateWorkspaceOutput is the response for POST /workspaces.
@@ -117,6 +126,10 @@ type PatchWorkspaceInputBody struct {
 	Name        *string `json:"name,omitempty" minLength:"1" maxLength:"100"`
 	Description *string `json:"description,omitempty" maxLength:"500"`
 	IconURL     *string `json:"iconUrl,omitempty" maxLength:"500"`
+	// Timezone is an optional IANA identifier; invalid values return 422.
+	Timezone *string `json:"timezone,omitempty" maxLength:"64"`
+	// Country is an optional ISO 3166-1 alpha-2 code; empty string clears it.
+	Country *string `json:"country,omitempty" pattern:"^$|^[A-Z]{2}$"`
 }
 
 // PatchWorkspaceOutput is the response for PATCH /workspaces/{wsId}.

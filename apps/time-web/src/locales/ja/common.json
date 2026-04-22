@@ -153,7 +153,13 @@
     "mode_dark": "ダーク",
     "mode_system": "システム",
     "language_en": "English",
-    "language_ja": "日本語"
+    "language_ja": "日本語",
+    "holiday_subscriptions": "祝日カレンダー",
+    "holiday_subscriptions_empty": "祝日カレンダーは購読していません。",
+    "holiday_add_placeholder": "国を選択…",
+    "holiday_add": "追加",
+    "holiday_add_failed": "この祝日フィードに購読できませんでした。",
+    "holiday_unsubscribe_aria": "{{country}}の祝日の購読を解除"
   },
   "search": {
     "placeholder": "予定を検索...",

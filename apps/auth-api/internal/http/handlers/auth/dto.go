@@ -94,6 +94,12 @@ type RegisterInput struct {
 		Password    string `json:"password" minLength:"8" maxLength:"256"`
 		DisplayName string `json:"displayName" minLength:"1" maxLength:"100"`
 		Locale      string `json:"locale,omitempty" maxLength:"10"`
+		// Timezone is an optional IANA identifier. Defaults to "UTC" when
+		// omitted. Independent of Locale.
+		Timezone string `json:"timezone,omitempty" maxLength:"64"`
+		// Country is an optional ISO 3166-1 alpha-2 code. Drives the
+		// initial holiday subscription. Independent of Locale.
+		Country string `json:"country,omitempty" pattern:"^$|^[A-Z]{2}$"`
 	}
 }
 
@@ -215,6 +221,13 @@ type MeBody struct {
 	Email           string  `json:"email"`
 	DisplayName     string  `json:"displayName"`
 	Locale          string  `json:"locale"`
+	// Timezone is the user-level IANA timezone preference. May be "UTC"
+	// when the user has not customized it; the client should fall back to
+	// the workspace timezone for presentation if desired.
+	Timezone string `json:"timezone"`
+	// Country is the user-level ISO 3166-1 alpha-2 country, or empty
+	// string when unset.
+	Country         string  `json:"country"`
 	ThemePreference string  `json:"themePreference" enum:"aurora-light,aurora-dark,dotline-light,dotline-dark,glass-light,glass-dark,system"`
 	AvatarURL       *string `json:"avatarUrl,omitempty"`
 
@@ -245,6 +258,11 @@ type PatchMeInput struct {
 type PatchMeInputBody struct {
 	DisplayName     *string `json:"displayName,omitempty" minLength:"1" maxLength:"100"`
 	Locale          *string `json:"locale,omitempty" maxLength:"10"`
+	// Timezone is an optional IANA timezone. Validated via time.LoadLocation;
+	// invalid values return AUTH.VALIDATION.
+	Timezone *string `json:"timezone,omitempty" maxLength:"64"`
+	// Country is an optional ISO 3166-1 alpha-2 code. Empty string clears it.
+	Country         *string `json:"country,omitempty" pattern:"^$|^[A-Z]{2}$"`
 	ThemePreference *string `json:"themePreference,omitempty" enum:"aurora-light,aurora-dark,dotline-light,dotline-dark,glass-light,glass-dark,system"`
 	AvatarURL       *string `json:"avatarUrl,omitempty" maxLength:"1024"`
 

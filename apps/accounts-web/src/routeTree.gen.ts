@@ -13,10 +13,12 @@ import { Route as SignupRouteImport } from './routes/signup';
 import { Route as LoginRouteImport } from './routes/login';
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated';
 import { Route as IndexRouteImport } from './routes/index';
+import { Route as AuthenticatedWorkspacesRouteImport } from './routes/_authenticated/workspaces';
 import { Route as AuthenticatedSecurityRouteImport } from './routes/_authenticated/security';
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile';
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin';
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index';
+import { Route as AuthenticatedWorkspacesWsIdRouteImport } from './routes/_authenticated/workspaces_.$wsId';
 import { Route as AuthenticatedAdminWorkspacesRouteImport } from './routes/_authenticated/admin/workspaces';
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users';
 import { Route as AuthenticatedAdminSettingsRouteImport } from './routes/_authenticated/admin/settings';
@@ -44,6 +46,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any);
+const AuthenticatedWorkspacesRoute = AuthenticatedWorkspacesRouteImport.update({
+  id: '/workspaces',
+  path: '/workspaces',
+  getParentRoute: () => AuthenticatedRoute,
+} as any);
 const AuthenticatedSecurityRoute = AuthenticatedSecurityRouteImport.update({
   id: '/security',
   path: '/security',
@@ -64,6 +71,12 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any);
+const AuthenticatedWorkspacesWsIdRoute =
+  AuthenticatedWorkspacesWsIdRouteImport.update({
+    id: '/workspaces_/$wsId',
+    path: '/workspaces/$wsId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any);
 const AuthenticatedAdminWorkspacesRoute =
   AuthenticatedAdminWorkspacesRouteImport.update({
     id: '/workspaces',
@@ -113,11 +126,13 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRouteWithChildren;
   '/profile': typeof AuthenticatedProfileRoute;
   '/security': typeof AuthenticatedSecurityRoute;
+  '/workspaces': typeof AuthenticatedWorkspacesRoute;
   '/admin/admins': typeof AuthenticatedAdminAdminsRoute;
   '/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute;
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute;
   '/admin/users': typeof AuthenticatedAdminUsersRoute;
   '/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute;
+  '/workspaces/$wsId': typeof AuthenticatedWorkspacesWsIdRoute;
   '/admin/': typeof AuthenticatedAdminIndexRoute;
   '/admin/users/$userId': typeof AuthenticatedAdminUsersUserIdRoute;
   '/admin/workspaces/$wsId': typeof AuthenticatedAdminWorkspacesWsIdRoute;
@@ -128,11 +143,13 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute;
   '/profile': typeof AuthenticatedProfileRoute;
   '/security': typeof AuthenticatedSecurityRoute;
+  '/workspaces': typeof AuthenticatedWorkspacesRoute;
   '/admin/admins': typeof AuthenticatedAdminAdminsRoute;
   '/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute;
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute;
   '/admin/users': typeof AuthenticatedAdminUsersRoute;
   '/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute;
+  '/workspaces/$wsId': typeof AuthenticatedWorkspacesWsIdRoute;
   '/admin': typeof AuthenticatedAdminIndexRoute;
   '/admin/users/$userId': typeof AuthenticatedAdminUsersUserIdRoute;
   '/admin/workspaces/$wsId': typeof AuthenticatedAdminWorkspacesWsIdRoute;
@@ -146,11 +163,13 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren;
   '/_authenticated/profile': typeof AuthenticatedProfileRoute;
   '/_authenticated/security': typeof AuthenticatedSecurityRoute;
+  '/_authenticated/workspaces': typeof AuthenticatedWorkspacesRoute;
   '/_authenticated/admin/admins': typeof AuthenticatedAdminAdminsRoute;
   '/_authenticated/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute;
   '/_authenticated/admin/settings': typeof AuthenticatedAdminSettingsRoute;
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute;
   '/_authenticated/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute;
+  '/_authenticated/workspaces_/$wsId': typeof AuthenticatedWorkspacesWsIdRoute;
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute;
   '/_authenticated/admin/users_/$userId': typeof AuthenticatedAdminUsersUserIdRoute;
   '/_authenticated/admin/workspaces_/$wsId': typeof AuthenticatedAdminWorkspacesWsIdRoute;
@@ -164,11 +183,13 @@ export interface FileRouteTypes {
     | '/admin'
     | '/profile'
     | '/security'
+    | '/workspaces'
     | '/admin/admins'
     | '/admin/audit-logs'
     | '/admin/settings'
     | '/admin/users'
     | '/admin/workspaces'
+    | '/workspaces/$wsId'
     | '/admin/'
     | '/admin/users/$userId'
     | '/admin/workspaces/$wsId';
@@ -179,11 +200,13 @@ export interface FileRouteTypes {
     | '/signup'
     | '/profile'
     | '/security'
+    | '/workspaces'
     | '/admin/admins'
     | '/admin/audit-logs'
     | '/admin/settings'
     | '/admin/users'
     | '/admin/workspaces'
+    | '/workspaces/$wsId'
     | '/admin'
     | '/admin/users/$userId'
     | '/admin/workspaces/$wsId';
@@ -196,11 +219,13 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/profile'
     | '/_authenticated/security'
+    | '/_authenticated/workspaces'
     | '/_authenticated/admin/admins'
     | '/_authenticated/admin/audit-logs'
     | '/_authenticated/admin/settings'
     | '/_authenticated/admin/users'
     | '/_authenticated/admin/workspaces'
+    | '/_authenticated/workspaces_/$wsId'
     | '/_authenticated/admin/'
     | '/_authenticated/admin/users_/$userId'
     | '/_authenticated/admin/workspaces_/$wsId';
@@ -243,6 +268,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/_authenticated/workspaces': {
+      id: '/_authenticated/workspaces';
+      path: '/workspaces';
+      fullPath: '/workspaces';
+      preLoaderRoute: typeof AuthenticatedWorkspacesRouteImport;
+      parentRoute: typeof AuthenticatedRoute;
+    };
     '/_authenticated/security': {
       id: '/_authenticated/security';
       path: '/security';
@@ -270,6 +302,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/';
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport;
       parentRoute: typeof AuthenticatedAdminRoute;
+    };
+    '/_authenticated/workspaces_/$wsId': {
+      id: '/_authenticated/workspaces_/$wsId';
+      path: '/workspaces/$wsId';
+      fullPath: '/workspaces/$wsId';
+      preLoaderRoute: typeof AuthenticatedWorkspacesWsIdRouteImport;
+      parentRoute: typeof AuthenticatedRoute;
     };
     '/_authenticated/admin/workspaces': {
       id: '/_authenticated/admin/workspaces';
@@ -352,12 +391,16 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren;
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute;
   AuthenticatedSecurityRoute: typeof AuthenticatedSecurityRoute;
+  AuthenticatedWorkspacesRoute: typeof AuthenticatedWorkspacesRoute;
+  AuthenticatedWorkspacesWsIdRoute: typeof AuthenticatedWorkspacesWsIdRoute;
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedSecurityRoute: AuthenticatedSecurityRoute,
+  AuthenticatedWorkspacesRoute: AuthenticatedWorkspacesRoute,
+  AuthenticatedWorkspacesWsIdRoute: AuthenticatedWorkspacesWsIdRoute,
 };
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

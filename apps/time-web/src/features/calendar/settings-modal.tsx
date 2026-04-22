@@ -12,6 +12,7 @@ import type { ColorMode, ThemeFamily } from '@nodate-flow/ui/providers/theme-pro
 import { type SupportedLanguage, i18n, setLanguage } from '../../i18n';
 import { useTheme } from '../../providers/theme-provider';
 import { useCalendarUi } from '../../stores/calendar-ui-store';
+import HolidaySubscriptions from './holiday-subscriptions';
 
 function useLanguageOptions(): { value: SupportedLanguage; label: string }[] {
   const { t } = useTranslation();
@@ -136,6 +137,8 @@ export default function SettingsModal(): ReactElement | null {
             })}
           </div>
         </div>
+
+        <HolidaySubscriptions />
       </div>
     </Dialog>
   );

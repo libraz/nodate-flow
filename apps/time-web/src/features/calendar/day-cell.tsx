@@ -145,8 +145,7 @@ export default function DayCell(props: DayCellProps): ReactElement {
               }}
               className={styles.eventChip}
               style={{
-                backgroundColor: `${color}18`,
-                borderLeftColor: color,
+                backgroundColor: `${color}1a`,
                 color: color,
               }}
             >

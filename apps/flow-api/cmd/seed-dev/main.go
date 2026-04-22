@@ -226,6 +226,8 @@ func ensureUser(ctx context.Context, q *generated.Queries, cfg seedConfig) (int6
 		Email:           cfg.email,
 		DisplayName:     cfg.displayName,
 		Locale:          cfg.locale,
+		Timezone:        "UTC",
+		Country:         sql.NullString{},
 		ThemePreference: generated.UsersThemePreference("system"),
 	})
 	if err != nil {
@@ -247,6 +249,8 @@ func ensureWorkspace(ctx context.Context, db *sql.DB, q *generated.Queries, cfg 
 		PublicID: types.New(),
 		Slug:     cfg.workspaceSlug,
 		Name:     cfg.workspaceName,
+		Timezone: "UTC",
+		Country:  sql.NullString{},
 	})
 	if err != nil {
 		return 0, false, err

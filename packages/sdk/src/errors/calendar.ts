@@ -316,6 +316,11 @@ export const CalendarErrors = {
     status: 422,
     message: "Could not parse event from text",
   },
+  CALENDAR_SUBSCRIPTION_COUNTRY_INVALID: {
+    code: "CALENDAR.SUBSCRIPTION.COUNTRY_INVALID",
+    status: 400,
+    message: "Country code is invalid or not supported",
+  },
   CALENDAR_SUBSCRIPTION_MEMBERSHIP_CHECK_INTERRUPTED: {
     code: "CALENDAR.SUBSCRIPTION.MEMBERSHIP_CHECK_INTERRUPTED",
     status: 500,
