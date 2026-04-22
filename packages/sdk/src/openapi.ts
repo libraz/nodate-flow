@@ -1539,6 +1539,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/{id}/linked-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List calendar events a task is linked to via task_event_links */
+        get: operations["tasks-linked-events-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Link a task to a calendar event (contributes_to / blocks / ...) */
+        post: operations["tasks-event-links-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/links/{linkId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Soft-disable a task↔event link */
+        delete: operations["tasks-event-links-remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{id}/propose-steps": {
         parameters: {
             query?: never;
@@ -2103,6 +2154,57 @@ export interface paths {
         get: operations["ai-weekly-digest"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendar-events/{evtId}/apply-shift": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Shift an umbrella event and move confirmed contributes_to-linked tasks by the same day delta */
+        post: operations["calendar-events-shift-apply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendar-events/{evtId}/linked-tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List tasks linked to a calendar event via task_event_links */
+        get: operations["calendar-events-linked-tasks-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendar-events/{evtId}/propose-shift": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Propose shifting an umbrella event and partition linked tasks into safe vs conflict */
+        post: operations["calendar-events-shift-propose"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3220,6 +3322,34 @@ export interface components {
             /** Format: float */
             score: number;
         };
+        ApplyShiftBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Public IDs of tasks the user agreed to shift along with the umbrella event */
+            confirmedTaskIds: string[] | null;
+            /**
+             * Format: int64
+             * @description Target start time for the umbrella event (unix seconds)
+             */
+            newStartAt: number;
+        };
+        ApplyShiftOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            deltaSeconds: number;
+            /** Format: int64 */
+            newStartAt: number;
+            ok: boolean;
+            /** Format: int32 */
+            shiftedTasks: number;
+        };
         ApplySmartInputBody: {
             /**
              * Format: uri
@@ -3723,6 +3853,25 @@ export interface components {
              */
             visibility: "public" | "project" | "private";
         };
+        CreateTaskEventLinkBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Target calendar event public id */
+            eventId: string;
+            /**
+             * @description How the task relates to the event
+             * @enum {string}
+             */
+            relation: "contributes_to" | "blocks" | "depends_on" | "prep_for";
+            /**
+             * Format: int32
+             * @description Display order hint
+             */
+            sortWeight?: number;
+        };
         CreateTimeboxBody: {
             /**
              * Format: uri
@@ -3864,6 +4013,14 @@ export interface components {
             ok: boolean;
         };
         DeleteTaskCommentBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        DeleteTaskEventLinkOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
@@ -4526,6 +4683,26 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ListLinkedEventsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            links: components["schemas"]["TaskEventLink"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
+        ListLinkedTasksOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            links: components["schemas"]["TaskEventLink"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
         ListMcpTokensOutputBody: {
             /**
              * Format: uri
@@ -5039,6 +5216,12 @@ export interface components {
             authorizationUrl: string;
             state: string;
         };
+        OtherEventLinkDTO: {
+            eventId: string;
+            /** Format: int64 */
+            eventStartAt?: number;
+            eventTitle: string;
+        };
         OutboundLimitStat: {
             /** Format: int64 */
             allowed: number;
@@ -5373,6 +5556,34 @@ export interface components {
             id: string;
             role: string;
             userId: string;
+        };
+        ProposeShiftBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description Target start time for the umbrella event (unix seconds)
+             */
+            newStartAt: number;
+        };
+        ProposeShiftOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            conflictTasks: components["schemas"]["ShiftCandidateDTO"][] | null;
+            /** Format: int64 */
+            deltaSeconds: number;
+            eventId: string;
+            /** Format: int64 */
+            newStartAt: number;
+            /** Format: int64 */
+            oldStartAt: number;
+            safeTasks: components["schemas"]["ShiftCandidateDTO"][] | null;
         };
         ProposeSmartInputBody: {
             /**
@@ -5748,6 +5959,12 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        ShiftCandidateDTO: {
+            linkId: string;
+            otherLinks?: components["schemas"]["OtherEventLinkDTO"][] | null;
+            taskId: string;
+            taskTitle: string;
+        };
         Signal: {
             /**
              * Format: uri
@@ -6026,6 +6243,29 @@ export interface components {
             otherTaskDerivedState: string;
             otherTaskId: string;
             otherTaskTitle: string;
+        };
+        TaskEventLink: {
+            calendarId?: string;
+            calendarName?: string;
+            /** Format: int64 */
+            createdAt: number;
+            eventAllDay?: boolean;
+            /** Format: int64 */
+            eventEndAt?: number;
+            eventId?: string;
+            /** Format: int64 */
+            eventStartAt?: number;
+            eventTimezone?: string;
+            eventTitle?: string;
+            id: string;
+            relation: string;
+            /** Format: int32 */
+            sortWeight: number;
+            taskDerivedState?: string;
+            taskDueOn?: string;
+            taskEventOn?: string;
+            taskId?: string;
+            taskTitle?: string;
         };
         TaskLabel: {
             /**
@@ -10269,6 +10509,109 @@ export interface operations {
             };
         };
     };
+    "tasks-linked-events-list": {
+        parameters: {
+            query?: {
+                /** @description Optional filter; empty = all relations */
+                relation?: "contributes_to" | "blocks" | "depends_on" | "prep_for";
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListLinkedEventsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-event-links-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTaskEventLinkBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskEventLink"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-event-links-remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                linkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteTaskEventLinkOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "tasks-propose-steps": {
         parameters: {
             query?: never;
@@ -11651,6 +11994,113 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WeeklyDigestOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "calendar-events-shift-apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                evtId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyShiftBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplyShiftOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "calendar-events-linked-tasks-list": {
+        parameters: {
+            query?: {
+                relation?: "contributes_to" | "blocks" | "depends_on" | "prep_for";
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                evtId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListLinkedTasksOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "calendar-events-shift-propose": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                evtId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposeShiftBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposeShiftOutputBody"];
                 };
             };
             /** @description Error */

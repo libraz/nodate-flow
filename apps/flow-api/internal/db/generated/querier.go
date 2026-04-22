@@ -212,6 +212,9 @@ type Querier interface {
 	// Insert a new task. derived_state defaults to 'open' and must NOT be set
 	// directly here; the constraint engine and event bus mutate it.
 	CreateTask(ctx context.Context, arg CreateTaskParams) (int64, error)
+	// Insert a new link between a task and an event. Caller must validate
+	// the task and event belong to workspace_id and are enabled.
+	CreateTaskEventLink(ctx context.Context, arg CreateTaskEventLinkParams) (int64, error)
 	// Attach a label to a task.
 	CreateTaskLabel(ctx context.Context, arg CreateTaskLabelParams) (int64, error)
 	// Insert a new timebox (sprint / iteration / cycle).
@@ -255,6 +258,8 @@ type Querier interface {
 	// CASCADE already handles task deletion; this query is for the
 	// re-embed-on-edit flow when a workspace switches to a different model.
 	DeleteTaskEmbeddingsForTask(ctx context.Context, taskID uint32) error
+	// Soft-delete a link by public id within a workspace.
+	DeleteTaskEventLink(ctx context.Context, arg DeleteTaskEventLinkParams) error
 	// Remove a label from a task (hard delete from junction).
 	DeleteTaskLabel(ctx context.Context, arg DeleteTaskLabelParams) error
 	// Hard-delete a single integration row (user-scoped).
@@ -313,6 +318,9 @@ type Querier interface {
 	// Mark a constraint as currently failing. Clears satisfied_at so the
 	// transition is visible in v_task_constraint_satisfaction.
 	FailConstraint(ctx context.Context, arg FailConstraintParams) error
+	// Lookup the single active (task, event, relation) tuple. Used by
+	// itemkit to detect duplicates before attempting to insert.
+	FindActiveLink(ctx context.Context, arg FindActiveLinkParams) (FindActiveLinkRow, error)
 	// Resolve an ai_agents public id to its internal id, scoped to the
 	// workspace. Used by task actor handlers to bind by public id.
 	// id is required: returned as FK value for task_actors.agent_id.
@@ -418,6 +426,8 @@ type Querier interface {
 	FindSystemCalendarBySlug(ctx context.Context, arg FindSystemCalendarBySlugParams) (FindSystemCalendarBySlugRow, error)
 	// Detail projection via v_task_detail. Workspace-scoped.
 	FindTaskByPublicId(ctx context.Context, arg FindTaskByPublicIdParams) (FindTaskByPublicIdRow, error)
+	// Resolve a single link (enabled only) inside a workspace.
+	FindTaskEventLinkByPublicId(ctx context.Context, arg FindTaskEventLinkByPublicIdParams) (FindTaskEventLinkByPublicIdRow, error)
 	// Check if a specific task-label junction exists.
 	FindTaskLabelByIds(ctx context.Context, arg FindTaskLabelByIdsParams) (FindTaskLabelByIdsRow, error)
 	// Resolve an unused recovery code by (user_id, hash).
@@ -628,6 +638,11 @@ type Querier interface {
 	ListLabelsForWorkspace(ctx context.Context, arg ListLabelsForWorkspaceParams) ([]ListLabelsForWorkspaceRow, error)
 	// List enabled lenses scoped to a workspace + project (or workspace-wide when project_id IS NULL).
 	ListLensesForProject(ctx context.Context, arg ListLensesForProjectParams) ([]ListLensesForProjectRow, error)
+	// List the events a task is linked to (optionally filtered by relation).
+	// @relation may be an empty string to include all relations.
+	ListLinkedEventsForTask(ctx context.Context, arg ListLinkedEventsForTaskParams) ([]ListLinkedEventsForTaskRow, error)
+	// List the tasks linked to an event (optionally filtered by relation).
+	ListLinkedTasksForEvent(ctx context.Context, arg ListLinkedTasksForEventParams) ([]ListLinkedTasksForEventRow, error)
 	// List a user's MCP tokens in a workspace, masked.
 	ListMcpTokensForUser(ctx context.Context, arg ListMcpTokensForUserParams) ([]ListMcpTokensForUserRow, error)
 	// List all mentions within a specific task (description or comments).

@@ -106,6 +106,61 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (int64, 
 	return result.LastInsertId()
 }
 
+const createTaskEventLink = `-- name: CreateTaskEventLink :execlastid
+INSERT INTO task_event_links (
+  public_id,
+  workspace_id,
+  task_id,
+  event_id,
+  relation,
+  sort_weight
+) VALUES (?, ?, ?, ?, ?, ?)
+`
+
+type CreateTaskEventLinkParams struct {
+	PublicID    types.PublicID         `json:"publicId"`
+	WorkspaceID uint32                 `json:"-"`
+	TaskID      uint32                 `json:"-"`
+	EventID     uint32                 `json:"-"`
+	Relation    TaskEventLinksRelation `json:"relation"`
+	SortWeight  int32                  `json:"sortWeight"`
+}
+
+// Insert a new link between a task and an event. Caller must validate
+// the task and event belong to workspace_id and are enabled.
+func (q *Queries) CreateTaskEventLink(ctx context.Context, arg CreateTaskEventLinkParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, createTaskEventLink,
+		arg.PublicID,
+		arg.WorkspaceID,
+		arg.TaskID,
+		arg.EventID,
+		arg.Relation,
+		arg.SortWeight,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
+
+const deleteTaskEventLink = `-- name: DeleteTaskEventLink :exec
+UPDATE task_event_links
+SET enabled = FALSE
+WHERE workspace_id = ?
+  AND public_id = ?
+`
+
+type DeleteTaskEventLinkParams struct {
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+// Soft-delete a link by public id within a workspace.
+func (q *Queries) DeleteTaskEventLink(ctx context.Context, arg DeleteTaskEventLinkParams) error {
+	_, err := q.db.ExecContext(ctx, deleteTaskEventLink, arg.WorkspaceID, arg.PublicID)
+	return err
+}
+
 const disableTask = `-- name: DisableTask :exec
 UPDATE tasks
 SET enabled = FALSE
@@ -122,6 +177,66 @@ type DisableTaskParams struct {
 func (q *Queries) DisableTask(ctx context.Context, arg DisableTaskParams) error {
 	_, err := q.db.ExecContext(ctx, disableTask, arg.WorkspaceID, arg.PublicID)
 	return err
+}
+
+const findActiveLink = `-- name: FindActiveLink :one
+SELECT
+  id,
+  public_id,
+  workspace_id,
+  task_id,
+  event_id,
+  relation,
+  enabled,
+  created_at
+FROM task_event_links
+WHERE workspace_id = ?
+  AND task_id = ?
+  AND event_id = ?
+  AND relation = ?
+  AND enabled = TRUE
+LIMIT 1
+`
+
+type FindActiveLinkParams struct {
+	WorkspaceID uint32                 `json:"-"`
+	TaskID      uint32                 `json:"-"`
+	EventID     uint32                 `json:"-"`
+	Relation    TaskEventLinksRelation `json:"relation"`
+}
+
+type FindActiveLinkRow struct {
+	ID          uint32                 `json:"-"`
+	PublicID    types.PublicID         `json:"publicId"`
+	WorkspaceID uint32                 `json:"-"`
+	TaskID      uint32                 `json:"-"`
+	EventID     uint32                 `json:"-"`
+	Relation    TaskEventLinksRelation `json:"relation"`
+	Enabled     bool                   `json:"enabled"`
+	CreatedAt   time.Time              `json:"createdAt"`
+}
+
+// Lookup the single active (task, event, relation) tuple. Used by
+// itemkit to detect duplicates before attempting to insert.
+func (q *Queries) FindActiveLink(ctx context.Context, arg FindActiveLinkParams) (FindActiveLinkRow, error) {
+	row := q.db.QueryRowContext(ctx, findActiveLink,
+		arg.WorkspaceID,
+		arg.TaskID,
+		arg.EventID,
+		arg.Relation,
+	)
+	var i FindActiveLinkRow
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.WorkspaceID,
+		&i.TaskID,
+		&i.EventID,
+		&i.Relation,
+		&i.Enabled,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const findTaskByPublicId = `-- name: FindTaskByPublicId :one
@@ -221,6 +336,62 @@ func (q *Queries) FindTaskByPublicId(ctx context.Context, arg FindTaskByPublicId
 		&i.DependencyCount,
 		&i.ActorCount,
 		&i.SortWeight,
+		&i.UpdatedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const findTaskEventLinkByPublicId = `-- name: FindTaskEventLinkByPublicId :one
+SELECT
+  id,
+  public_id,
+  workspace_id,
+  task_id,
+  event_id,
+  relation,
+  sort_weight,
+  enabled,
+  updated_at,
+  created_at
+FROM task_event_links
+WHERE workspace_id = ?
+  AND public_id = ?
+  AND enabled = TRUE
+LIMIT 1
+`
+
+type FindTaskEventLinkByPublicIdParams struct {
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+type FindTaskEventLinkByPublicIdRow struct {
+	ID          uint32                 `json:"-"`
+	PublicID    types.PublicID         `json:"publicId"`
+	WorkspaceID uint32                 `json:"-"`
+	TaskID      uint32                 `json:"-"`
+	EventID     uint32                 `json:"-"`
+	Relation    TaskEventLinksRelation `json:"relation"`
+	SortWeight  int32                  `json:"sortWeight"`
+	Enabled     bool                   `json:"enabled"`
+	UpdatedAt   sql.NullTime           `json:"updatedAt"`
+	CreatedAt   time.Time              `json:"createdAt"`
+}
+
+// Resolve a single link (enabled only) inside a workspace.
+func (q *Queries) FindTaskEventLinkByPublicId(ctx context.Context, arg FindTaskEventLinkByPublicIdParams) (FindTaskEventLinkByPublicIdRow, error) {
+	row := q.db.QueryRowContext(ctx, findTaskEventLinkByPublicId, arg.WorkspaceID, arg.PublicID)
+	var i FindTaskEventLinkByPublicIdRow
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.WorkspaceID,
+		&i.TaskID,
+		&i.EventID,
+		&i.Relation,
+		&i.SortWeight,
+		&i.Enabled,
 		&i.UpdatedAt,
 		&i.CreatedAt,
 	)
@@ -383,6 +554,189 @@ func (q *Queries) ListChildTasksByParentID(ctx context.Context, arg ListChildTas
 			&i.Description,
 			&i.Priority,
 			&i.DerivedState,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLinkedEventsForTask = `-- name: ListLinkedEventsForTask :many
+SELECT
+  tel.public_id   AS link_public_id,
+  tel.relation,
+  tel.sort_weight,
+  tel.created_at  AS link_created_at,
+  ce.public_id    AS event_public_id,
+  ce.title        AS event_title,
+  ce.start_at,
+  ce.end_at,
+  ce.all_day,
+  ce.timezone,
+  c.public_id     AS calendar_public_id,
+  c.name          AS calendar_name,
+  COUNT(*) OVER() AS total
+FROM task_event_links tel
+INNER JOIN tasks t ON t.id = tel.task_id AND t.enabled = TRUE
+INNER JOIN calendar_events ce ON ce.id = tel.event_id AND ce.enabled = TRUE
+INNER JOIN calendars c ON c.id = ce.calendar_id AND c.enabled = TRUE
+WHERE tel.workspace_id = ?
+  AND t.public_id = ?
+  AND tel.enabled = TRUE
+  AND (? = '' OR tel.relation = ?)
+ORDER BY tel.sort_weight ASC, tel.created_at ASC, tel.public_id ASC
+LIMIT ? OFFSET ?
+`
+
+type ListLinkedEventsForTaskParams struct {
+	WorkspaceID uint32                 `json:"-"`
+	PublicID    types.PublicID         `json:"publicId"`
+	Relation    TaskEventLinksRelation `json:"relation"`
+	Limit       int32                  `json:"limit"`
+	Offset      int32                  `json:"offset"`
+}
+
+type ListLinkedEventsForTaskRow struct {
+	LinkPublicID     types.PublicID         `json:"linkPublicId"`
+	Relation         TaskEventLinksRelation `json:"relation"`
+	SortWeight       int32                  `json:"sortWeight"`
+	LinkCreatedAt    time.Time              `json:"linkCreatedAt"`
+	EventPublicID    types.PublicID         `json:"eventPublicId"`
+	EventTitle       string                 `json:"eventTitle"`
+	StartAt          sql.NullTime           `json:"startAt"`
+	EndAt            sql.NullTime           `json:"endAt"`
+	AllDay           bool                   `json:"allDay"`
+	Timezone         string                 `json:"timezone"`
+	CalendarPublicID types.PublicID         `json:"calendarPublicId"`
+	CalendarName     string                 `json:"calendarName"`
+	Total            interface{}            `json:"total"`
+}
+
+// List the events a task is linked to (optionally filtered by relation).
+// @relation may be an empty string to include all relations.
+func (q *Queries) ListLinkedEventsForTask(ctx context.Context, arg ListLinkedEventsForTaskParams) ([]ListLinkedEventsForTaskRow, error) {
+	rows, err := q.db.QueryContext(ctx, listLinkedEventsForTask,
+		arg.WorkspaceID,
+		arg.PublicID,
+		arg.Relation,
+		arg.Relation,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLinkedEventsForTaskRow{}
+	for rows.Next() {
+		var i ListLinkedEventsForTaskRow
+		if err := rows.Scan(
+			&i.LinkPublicID,
+			&i.Relation,
+			&i.SortWeight,
+			&i.LinkCreatedAt,
+			&i.EventPublicID,
+			&i.EventTitle,
+			&i.StartAt,
+			&i.EndAt,
+			&i.AllDay,
+			&i.Timezone,
+			&i.CalendarPublicID,
+			&i.CalendarName,
+			&i.Total,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLinkedTasksForEvent = `-- name: ListLinkedTasksForEvent :many
+SELECT
+  tel.public_id   AS link_public_id,
+  tel.relation,
+  tel.sort_weight,
+  tel.created_at  AS link_created_at,
+  t.public_id     AS task_public_id,
+  t.title         AS task_title,
+  t.derived_state AS task_derived_state,
+  t.event_on      AS task_event_on,
+  t.due_on        AS task_due_on,
+  COUNT(*) OVER() AS total
+FROM task_event_links tel
+INNER JOIN tasks t ON t.id = tel.task_id AND t.enabled = TRUE
+INNER JOIN calendar_events ce ON ce.id = tel.event_id AND ce.enabled = TRUE
+WHERE tel.workspace_id = ?
+  AND ce.public_id = ?
+  AND tel.enabled = TRUE
+  AND (? = '' OR tel.relation = ?)
+ORDER BY tel.sort_weight ASC, tel.created_at ASC, tel.public_id ASC
+LIMIT ? OFFSET ?
+`
+
+type ListLinkedTasksForEventParams struct {
+	WorkspaceID uint32                 `json:"-"`
+	PublicID    types.PublicID         `json:"publicId"`
+	Relation    TaskEventLinksRelation `json:"relation"`
+	Limit       int32                  `json:"limit"`
+	Offset      int32                  `json:"offset"`
+}
+
+type ListLinkedTasksForEventRow struct {
+	LinkPublicID     types.PublicID         `json:"linkPublicId"`
+	Relation         TaskEventLinksRelation `json:"relation"`
+	SortWeight       int32                  `json:"sortWeight"`
+	LinkCreatedAt    time.Time              `json:"linkCreatedAt"`
+	TaskPublicID     types.PublicID         `json:"taskPublicId"`
+	TaskTitle        string                 `json:"taskTitle"`
+	TaskDerivedState TasksDerivedState      `json:"taskDerivedState"`
+	TaskEventOn      sql.NullTime           `json:"taskEventOn"`
+	TaskDueOn        sql.NullTime           `json:"taskDueOn"`
+	Total            interface{}            `json:"total"`
+}
+
+// List the tasks linked to an event (optionally filtered by relation).
+func (q *Queries) ListLinkedTasksForEvent(ctx context.Context, arg ListLinkedTasksForEventParams) ([]ListLinkedTasksForEventRow, error) {
+	rows, err := q.db.QueryContext(ctx, listLinkedTasksForEvent,
+		arg.WorkspaceID,
+		arg.PublicID,
+		arg.Relation,
+		arg.Relation,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLinkedTasksForEventRow{}
+	for rows.Next() {
+		var i ListLinkedTasksForEventRow
+		if err := rows.Scan(
+			&i.LinkPublicID,
+			&i.Relation,
+			&i.SortWeight,
+			&i.LinkCreatedAt,
+			&i.TaskPublicID,
+			&i.TaskTitle,
+			&i.TaskDerivedState,
+			&i.TaskEventOn,
+			&i.TaskDueOn,
+			&i.Total,
 		); err != nil {
 			return nil, err
 		}

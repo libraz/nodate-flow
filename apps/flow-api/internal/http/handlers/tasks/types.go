@@ -894,3 +894,165 @@ type RestoreDescriptionVersionOutput struct {
 		Ok bool `json:"ok"`
 	}
 }
+
+// ---- Task ↔ Event M:N links -----------------------------------------------
+
+// TaskEventLink is the public DTO for a task_event_links row seen from
+// either side. Callers fill LinkedEvent or LinkedTask according to the
+// direction of the listing query.
+type TaskEventLink struct {
+	ID         string `json:"id"`
+	Relation   string `json:"relation"`
+	SortWeight int32  `json:"sortWeight"`
+	CreatedAt  int64  `json:"createdAt"`
+
+	// Event side — populated by GET /tasks/{id}/linked-events.
+	EventID        string `json:"eventId,omitempty"`
+	EventTitle     string `json:"eventTitle,omitempty"`
+	EventStartAt   *int64 `json:"eventStartAt,omitempty"`
+	EventEndAt     *int64 `json:"eventEndAt,omitempty"`
+	EventAllDay    bool   `json:"eventAllDay,omitempty"`
+	EventTimezone  string `json:"eventTimezone,omitempty"`
+	CalendarID     string `json:"calendarId,omitempty"`
+	CalendarName   string `json:"calendarName,omitempty"`
+
+	// Task side — populated by GET /calendar-events/{evtId}/linked-tasks.
+	TaskID            string `json:"taskId,omitempty"`
+	TaskTitle         string `json:"taskTitle,omitempty"`
+	TaskDerivedState  string `json:"taskDerivedState,omitempty"`
+	TaskEventOn       string `json:"taskEventOn,omitempty"`
+	TaskDueOn         string `json:"taskDueOn,omitempty"`
+}
+
+// CreateTaskEventLinkBody is the request body for POST /tasks/{id}/links.
+type CreateTaskEventLinkBody struct {
+	EventID    string `json:"eventId" doc:"Target calendar event public id"`
+	Relation   string `json:"relation" enum:"contributes_to,blocks,depends_on,prep_for" doc:"How the task relates to the event"`
+	SortWeight int32  `json:"sortWeight,omitempty" doc:"Display order hint"`
+}
+
+// CreateTaskEventLinkInput is the request for POST /tasks/{id}/links.
+type CreateTaskEventLinkInput struct {
+	ID   string `path:"id"`
+	Body CreateTaskEventLinkBody
+}
+
+// CreateTaskEventLinkOutput is the response for POST /tasks/{id}/links.
+type CreateTaskEventLinkOutput struct {
+	Body TaskEventLink
+}
+
+// DeleteTaskEventLinkInput is the path for DELETE /tasks/{id}/links/{linkId}.
+type DeleteTaskEventLinkInput struct {
+	ID     string `path:"id"`
+	LinkID string `path:"linkId"`
+}
+
+// DeleteTaskEventLinkOutput is the response for DELETE /tasks/{id}/links/{linkId}.
+type DeleteTaskEventLinkOutput struct {
+	Body struct {
+		Ok bool `json:"ok"`
+	}
+}
+
+// ListLinkedEventsInput is the path for GET /tasks/{id}/linked-events.
+type ListLinkedEventsInput struct {
+	ID       string `path:"id"`
+	Relation string `query:"relation" enum:"contributes_to,blocks,depends_on,prep_for" doc:"Optional filter; empty = all relations"`
+	Limit    int32  `query:"limit" default:"100" minimum:"1" maximum:"500"`
+	Offset   int32  `query:"offset" default:"0" minimum:"0"`
+}
+
+// ListLinkedEventsOutput is the response for GET /tasks/{id}/linked-events.
+type ListLinkedEventsOutput struct {
+	Body struct {
+		Links []TaskEventLink `json:"links"`
+		Total int64           `json:"total"`
+	}
+}
+
+// ListLinkedTasksInput is the path for GET /calendar-events/{evtId}/linked-tasks.
+type ListLinkedTasksInput struct {
+	EventID  string `path:"evtId"`
+	Relation string `query:"relation" enum:"contributes_to,blocks,depends_on,prep_for"`
+	Limit    int32  `query:"limit" default:"100" minimum:"1" maximum:"500"`
+	Offset   int32  `query:"offset" default:"0" minimum:"0"`
+}
+
+// ListLinkedTasksOutput is the response for GET /calendar-events/{evtId}/linked-tasks.
+type ListLinkedTasksOutput struct {
+	Body struct {
+		Links []TaskEventLink `json:"links"`
+		Total int64           `json:"total"`
+	}
+}
+
+// ---- Shift proposal / apply -----------------------------------------------
+
+// OtherEventLinkDTO describes a contributes_to event the candidate
+// task is ALSO linked to, beyond the umbrella being shifted. Surfaced
+// so the UI can warn the user about cross-event impact when the task
+// is bulk-shifted.
+type OtherEventLinkDTO struct {
+	EventID      string `json:"eventId"`
+	EventTitle   string `json:"eventTitle"`
+	EventStartAt *int64 `json:"eventStartAt,omitempty"`
+}
+
+// ShiftCandidateDTO is one task in a shift proposal. SafeTasks carry
+// empty OtherLinks; ConflictTasks carry at least one.
+type ShiftCandidateDTO struct {
+	TaskID     string              `json:"taskId"`
+	TaskTitle  string              `json:"taskTitle"`
+	LinkID     string              `json:"linkId"`
+	OtherLinks []OtherEventLinkDTO `json:"otherLinks,omitempty"`
+}
+
+// ProposeShiftBody is the JSON body for POST
+// /workspaces/{wsId}/calendar-events/{evtId}/propose-shift.
+type ProposeShiftBody struct {
+	NewStartAt int64 `json:"newStartAt" required:"true" doc:"Target start time for the umbrella event (unix seconds)"`
+}
+
+// ProposeShiftInput is the request for POST propose-shift.
+type ProposeShiftInput struct {
+	WsID    string `path:"wsId"`
+	EventID string `path:"evtId"`
+	Body    ProposeShiftBody
+}
+
+// ProposeShiftOutput is the response for POST propose-shift.
+type ProposeShiftOutput struct {
+	Body struct {
+		EventID       string              `json:"eventId"`
+		OldStartAt    int64               `json:"oldStartAt"`
+		NewStartAt    int64               `json:"newStartAt"`
+		DeltaSeconds  int64               `json:"deltaSeconds"`
+		SafeTasks     []ShiftCandidateDTO `json:"safeTasks"`
+		ConflictTasks []ShiftCandidateDTO `json:"conflictTasks"`
+	}
+}
+
+// ApplyShiftBody is the JSON body for POST
+// /workspaces/{wsId}/calendar-events/{evtId}/apply-shift.
+type ApplyShiftBody struct {
+	NewStartAt       int64    `json:"newStartAt" required:"true" doc:"Target start time for the umbrella event (unix seconds)"`
+	ConfirmedTaskIDs []string `json:"confirmedTaskIds" doc:"Public IDs of tasks the user agreed to shift along with the umbrella event"`
+}
+
+// ApplyShiftInput is the request for POST apply-shift.
+type ApplyShiftInput struct {
+	WsID    string `path:"wsId"`
+	EventID string `path:"evtId"`
+	Body    ApplyShiftBody
+}
+
+// ApplyShiftOutput is the response for POST apply-shift.
+type ApplyShiftOutput struct {
+	Body struct {
+		Ok            bool  `json:"ok"`
+		ShiftedTasks  int32 `json:"shiftedTasks"`
+		DeltaSeconds  int64 `json:"deltaSeconds"`
+		NewStartAt    int64 `json:"newStartAt"`
+	}
+}

@@ -165,6 +165,27 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 	}, RemoveDependency(deps))
 
 	huma.Register(api, huma.Operation{
+		OperationID: "tasks-linked-events-list",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/linked-events",
+		Summary:     "List calendar events a task is linked to via task_event_links",
+	}, ListLinkedEvents(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-event-links-create",
+		Method:      http.MethodPost,
+		Path:        "/tasks/{id}/links",
+		Summary:     "Link a task to a calendar event (contributes_to / blocks / ...)",
+	}, CreateTaskEventLink(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-event-links-remove",
+		Method:      http.MethodDelete,
+		Path:        "/tasks/{id}/links/{linkId}",
+		Summary:     "Soft-disable a task↔event link",
+	}, DeleteTaskEventLink(deps))
+
+	huma.Register(api, huma.Operation{
 		OperationID: "tasks-actors-list",
 		Method:      http.MethodGet,
 		Path:        "/tasks/{id}/actors",
@@ -308,4 +329,25 @@ func RegisterWorkspaceScoped(api huma.API, deps Deps) {
 		Path:        "/workspaces/{wsId}/tasks/archived",
 		Summary:     "List archived tasks in a workspace",
 	}, ListArchived(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "calendar-events-linked-tasks-list",
+		Method:      http.MethodGet,
+		Path:        "/workspaces/{wsId}/calendar-events/{evtId}/linked-tasks",
+		Summary:     "List tasks linked to a calendar event via task_event_links",
+	}, ListLinkedTasks(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "calendar-events-shift-propose",
+		Method:      http.MethodPost,
+		Path:        "/workspaces/{wsId}/calendar-events/{evtId}/propose-shift",
+		Summary:     "Propose shifting an umbrella event and partition linked tasks into safe vs conflict",
+	}, ProposeShift(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "calendar-events-shift-apply",
+		Method:      http.MethodPost,
+		Path:        "/workspaces/{wsId}/calendar-events/{evtId}/apply-shift",
+		Summary:     "Shift an umbrella event and move confirmed contributes_to-linked tasks by the same day delta",
+	}, ApplyShift(deps))
 }

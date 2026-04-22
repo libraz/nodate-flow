@@ -700,6 +700,61 @@
         ],
         "type": "object"
       },
+      "ApplyShiftBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ApplyShiftBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "confirmedTaskIds": {
+            "description": "Public IDs of tasks the user agreed to shift along with the umbrella event",
+            "items": {
+              "type": "string"
+            },
+            "type": ["array", "null"]
+          },
+          "newStartAt": {
+            "description": "Target start time for the umbrella event (unix seconds)",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["newStartAt", "confirmedTaskIds"],
+        "type": "object"
+      },
+      "ApplyShiftOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ApplyShiftOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "deltaSeconds": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "newStartAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "shiftedTasks": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": ["ok", "shiftedTasks", "deltaSeconds", "newStartAt"],
+        "type": "object"
+      },
       "ApplySmartInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -1916,6 +1971,34 @@
         "required": ["projectId", "title"],
         "type": "object"
       },
+      "CreateTaskEventLinkBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateTaskEventLinkBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "eventId": {
+            "description": "Target calendar event public id",
+            "type": "string"
+          },
+          "relation": {
+            "description": "How the task relates to the event",
+            "enum": ["contributes_to", "blocks", "depends_on", "prep_for"],
+            "type": "string"
+          },
+          "sortWeight": {
+            "description": "Display order hint",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": ["eventId", "relation"],
+        "type": "object"
+      },
       "CreateTimeboxBody": {
         "additionalProperties": false,
         "properties": {
@@ -2239,6 +2322,23 @@
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
             "examples": ["https://example.com/schemas/DeleteTaskCommentBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
+      "DeleteTaskEventLinkOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/DeleteTaskEventLinkOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -3744,6 +3844,54 @@
         "required": ["total", "lenses"],
         "type": "object"
       },
+      "ListLinkedEventsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListLinkedEventsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/TaskEventLink"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["links", "total"],
+        "type": "object"
+      },
+      "ListLinkedTasksOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListLinkedTasksOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/TaskEventLink"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["links", "total"],
+        "type": "object"
+      },
       "ListMcpTokensOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -5030,6 +5178,23 @@
         "required": ["authorizationUrl", "state"],
         "type": "object"
       },
+      "OtherEventLinkDTO": {
+        "additionalProperties": false,
+        "properties": {
+          "eventId": {
+            "type": "string"
+          },
+          "eventStartAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "eventTitle": {
+            "type": "string"
+          }
+        },
+        "required": ["eventId", "eventTitle"],
+        "type": "object"
+      },
       "OutboundLimitStat": {
         "additionalProperties": false,
         "properties": {
@@ -5839,6 +6004,73 @@
         "required": ["id", "userId", "email", "displayName", "role", "createdAt"],
         "type": "object"
       },
+      "ProposeShiftBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ProposeShiftBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "newStartAt": {
+            "description": "Target start time for the umbrella event (unix seconds)",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["newStartAt"],
+        "type": "object"
+      },
+      "ProposeShiftOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ProposeShiftOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "conflictTasks": {
+            "items": {
+              "$ref": "#/components/schemas/ShiftCandidateDTO"
+            },
+            "type": ["array", "null"]
+          },
+          "deltaSeconds": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "newStartAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "oldStartAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "safeTasks": {
+            "items": {
+              "$ref": "#/components/schemas/ShiftCandidateDTO"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": [
+          "eventId",
+          "oldStartAt",
+          "newStartAt",
+          "deltaSeconds",
+          "safeTasks",
+          "conflictTasks"
+        ],
+        "type": "object"
+      },
       "ProposeSmartInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -6627,6 +6859,28 @@
         "required": ["ok"],
         "type": "object"
       },
+      "ShiftCandidateDTO": {
+        "additionalProperties": false,
+        "properties": {
+          "linkId": {
+            "type": "string"
+          },
+          "otherLinks": {
+            "items": {
+              "$ref": "#/components/schemas/OtherEventLinkDTO"
+            },
+            "type": ["array", "null"]
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "taskTitle": {
+            "type": "string"
+          }
+        },
+        "required": ["taskId", "taskTitle", "linkId"],
+        "type": "object"
+      },
       "Signal": {
         "additionalProperties": false,
         "properties": {
@@ -7325,6 +7579,68 @@
           "otherTaskDerivedState",
           "createdAt"
         ],
+        "type": "object"
+      },
+      "TaskEventLink": {
+        "additionalProperties": false,
+        "properties": {
+          "calendarId": {
+            "type": "string"
+          },
+          "calendarName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "eventAllDay": {
+            "type": "boolean"
+          },
+          "eventEndAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "eventStartAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "eventTimezone": {
+            "type": "string"
+          },
+          "eventTitle": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "relation": {
+            "type": "string"
+          },
+          "sortWeight": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "taskDerivedState": {
+            "type": "string"
+          },
+          "taskDueOn": {
+            "type": "string"
+          },
+          "taskEventOn": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "taskTitle": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "relation", "sortWeight", "createdAt"],
         "type": "object"
       },
       "TaskLabel": {
@@ -13833,6 +14149,172 @@
         "summary": "Remove a label from a task"
       }
     },
+    "/tasks/{id}/linked-events": {
+      "get": {
+        "operationId": "tasks-linked-events-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional filter; empty = all relations",
+            "explode": false,
+            "in": "query",
+            "name": "relation",
+            "schema": {
+              "description": "Optional filter; empty = all relations",
+              "enum": ["contributes_to", "blocks", "depends_on", "prep_for"],
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 100,
+              "format": "int32",
+              "maximum": 500,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListLinkedEventsOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List calendar events a task is linked to via task_event_links"
+      }
+    },
+    "/tasks/{id}/links": {
+      "post": {
+        "operationId": "tasks-event-links-create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTaskEventLinkBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskEventLink"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Link a task to a calendar event (contributes_to / blocks / ...)"
+      }
+    },
+    "/tasks/{id}/links/{linkId}": {
+      "delete": {
+        "operationId": "tasks-event-links-remove",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "linkId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteTaskEventLinkOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Soft-disable a task↔event link"
+      }
+    },
     "/tasks/{id}/propose-steps": {
       "post": {
         "operationId": "tasks-propose-steps",
@@ -15796,6 +16278,188 @@
           }
         },
         "summary": "Deterministic weekly digest markdown for a workspace"
+      }
+    },
+    "/workspaces/{wsId}/calendar-events/{evtId}/apply-shift": {
+      "post": {
+        "operationId": "calendar-events-shift-apply",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "evtId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyShiftBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplyShiftOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Shift an umbrella event and move confirmed contributes_to-linked tasks by the same day delta"
+      }
+    },
+    "/workspaces/{wsId}/calendar-events/{evtId}/linked-tasks": {
+      "get": {
+        "operationId": "calendar-events-linked-tasks-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "evtId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "relation",
+            "schema": {
+              "enum": ["contributes_to", "blocks", "depends_on", "prep_for"],
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 100,
+              "format": "int32",
+              "maximum": 500,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListLinkedTasksOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List tasks linked to a calendar event via task_event_links"
+      }
+    },
+    "/workspaces/{wsId}/calendar-events/{evtId}/propose-shift": {
+      "post": {
+        "operationId": "calendar-events-shift-propose",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "evtId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposeShiftBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposeShiftOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Propose shifting an umbrella event and partition linked tasks into safe vs conflict"
       }
     },
     "/workspaces/{wsId}/dashboard/widgets": {
