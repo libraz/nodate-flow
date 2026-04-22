@@ -133,6 +133,11 @@ type Config struct {
 	// actually mutating the database. Useful for tuning thresholds.
 	AutoActionDryRun bool `env:"NF_FLOW_AUTO_ACTION_DRY_RUN" envDefault:"false"`
 
+	// ItemReconcilerInterval controls how often the item-consistency
+	// reconciler scans tasks and calendar_events for drift. Set to 0
+	// to disable. Default: 5m.
+	ItemReconcilerInterval time.Duration `env:"NF_FLOW_ITEM_RECONCILER_INTERVAL" envDefault:"5m"`
+
 	// MetricsPort is the port for the internal-only Prometheus metrics
 	// HTTP server. Metrics are served on a separate listener so they are
 	// never exposed through the public-facing API port.

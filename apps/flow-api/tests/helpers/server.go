@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -30,10 +31,23 @@ type TestServer struct {
 	DB      *sql.DB
 }
 
-// testCipherKey is a fixed 32-byte master key used only by
-// StartTestServer to construct a deterministic Cipher for tests. It MUST
-// NOT be used outside the test harness.
-var testCipherKey = []byte("test-cipher-key-aaaaaaaaaaaaaaaa")
+// testCipherHex is a 64-char hex string (32 bytes) used only by the
+// test harness to construct a deterministic Cipher and derive the
+// shared JWT key. authn.DeriveEd25519Key requires hex or base64;
+// crypto.New wants the raw 32 bytes.
+const testCipherHex = "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899"
+
+// testCipherKey is the decoded 32-byte form of testCipherHex, suitable
+// for crypto.New. It MUST NOT be used outside the test harness.
+var testCipherKey = mustDecodeHex(testCipherHex)
+
+func mustDecodeHex(s string) []byte {
+	b, err := hex.DecodeString(s)
+	if err != nil {
+		panic("tests/helpers: testCipherHex is not valid hex: " + err.Error())
+	}
+	return b
+}
 
 // StartTestServer boots an httptest.Server that mounts both the
 // auth-api and flow-api routers against the supplied *sql.DB. Auth
@@ -48,7 +62,7 @@ func StartTestServer(t *testing.T, db *sql.DB) *TestServer {
 
 	// Derive a deterministic Ed25519 key so both routers share the
 	// same JWT signing/verification key pair.
-	jwtKey, err := authn.DeriveEd25519Key(string(testCipherKey), "nodate-flow:jwt:v1")
+	jwtKey, err := authn.DeriveEd25519Key(testCipherHex, "nodate-flow:jwt:v1")
 	require.NoError(t, err, "derive jwt key")
 
 	queries := generated.New(db)
@@ -98,7 +112,7 @@ func NewTestServer(db *sql.DB) (*TestServer, func(), error) {
 	if db == nil {
 		return nil, nil, fmt.Errorf("NewTestServer requires a non-nil *sql.DB")
 	}
-	jwtKey, err := authn.DeriveEd25519Key(string(testCipherKey), "nodate-flow:jwt:v1")
+	jwtKey, err := authn.DeriveEd25519Key(testCipherHex, "nodate-flow:jwt:v1")
 	if err != nil {
 		return nil, nil, fmt.Errorf("derive jwt key: %w", err)
 	}

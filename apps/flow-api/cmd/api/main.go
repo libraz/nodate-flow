@@ -30,6 +30,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/notification"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/obs"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/outbound"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/reconciler"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/storage"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/stream"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/webhook"
@@ -418,6 +419,23 @@ func main() {
 	defer autoActionCancel()
 	go autoActionExec.Start(autoActionCtx)
 
+	// Item-consistency reconciler: scans tasks and calendar_events for
+	// drift (date mismatch, orphan role, enabled-flag mismatch) and
+	// self-heals via UPDATE. 0 disables.
+	var reconcilerCancel context.CancelFunc
+	if cfg.ItemReconcilerInterval > 0 {
+		rec := &reconciler.Reconciler{
+			DB:       db,
+			Logger:   logger,
+			Metrics:  obs.ReconcilerMetrics{},
+			Interval: cfg.ItemReconcilerInterval,
+		}
+		var rctx context.Context
+		rctx, reconcilerCancel = context.WithCancel(context.Background())
+		go rec.Start(rctx)
+		logger.Info("item reconciler started", "interval", cfg.ItemReconcilerInterval)
+	}
+
 	addr := ":" + cfg.Port
 	srv := &http.Server{
 		Addr:              addr,
@@ -454,6 +472,9 @@ func main() {
 	autoActionExec.Stop()
 	webhookWorker.Stop()
 	schedulerCancel()
+	if reconcilerCancel != nil {
+		reconcilerCancel()
+	}
 	if workerCancel != nil {
 		workerCancel()
 	}
