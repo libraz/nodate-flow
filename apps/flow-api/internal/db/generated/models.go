@@ -3326,7 +3326,7 @@ type Task struct {
 	DueOn sql.NullTime `json:"dueOn"`
 	// Date work began on this task
 	StartedOn sql.NullTime `json:"startedOn"`
-	// DEPRECATED (R5.3): use calendar_events.task_role='event'. Kept for source compat until flow-api handlers and SDK rewire
+	// DEPRECATED: use calendar_events.task_role='event'. Kept for source compat until flow-api handlers and SDK rewire
 	EventOn sql.NullTime `json:"eventOn"`
 	// Time derived_state transitioned to done
 	CompletedAt sql.NullTime `json:"completedAt"`

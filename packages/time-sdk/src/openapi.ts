@@ -38,6 +38,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/share/cal/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Render a public calendar share by URL token */
+        get: operations["public-shares-render"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces": {
         parameters: {
             query?: never;
@@ -444,6 +461,94 @@ export interface paths {
         patch: operations["memos-update"];
         trace?: never;
     };
+    "/workspaces/{wsId}/public-shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List public share pages in a workspace */
+        get: operations["public-shares-list"];
+        put?: never;
+        /** Create a public share page (returns plaintext token once) */
+        post: operations["public-shares-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/public-shares/{shareId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a public share page with its published events */
+        get: operations["public-shares-get"];
+        put?: never;
+        post?: never;
+        /** Delete a public share page (admin or owner only) */
+        delete: operations["public-shares-delete"];
+        options?: never;
+        head?: never;
+        /** Update public share page metadata */
+        patch: operations["public-shares-patch"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/public-shares/{shareId}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Attach events to a public share page */
+        post: operations["public-shares-events-attach"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/public-shares/{shareId}/events/{evtId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Detach an event from a public share page */
+        delete: operations["public-shares-events-detach"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/public-shares/{shareId}/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rotate the URL token for a public share page */
+        post: operations["public-shares-rotate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -478,6 +583,26 @@ export interface components {
              * @enum {string}
              */
             role: "manager" | "editor" | "viewer";
+        };
+        AttachEventsToShareInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Event public IDs to attach; confidential events are rejected */
+            eventIds: string[] | null;
+        };
+        AttachEventsToShareOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            attached: number;
+            /** Format: int64 */
+            skipped: number;
         };
         AttachmentResponse: {
             /**
@@ -710,6 +835,30 @@ export interface components {
             /** @description Memo title */
             title: string;
         };
+        CreatePublicShareInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Cover image URL */
+            coverUrl?: string;
+            /** @description Markdown description */
+            description?: string;
+            /**
+             * Format: int64
+             * @description Unix seconds; omit for no expiry
+             */
+            expiresAt?: number;
+            /** @description Icon image URL */
+            iconUrl?: string;
+            /** @description ISO 3166-1 alpha-2 country code; enables holiday overlay */
+            showHolidaysCountry?: string;
+            /** @description IANA timezone; defaults to workspace tz */
+            timezone?: string;
+            /** @description Public-facing title */
+            title: string;
+        };
         CrossCalendarEventResponse: {
             allDay: boolean;
             blockLabel?: string;
@@ -781,6 +930,22 @@ export interface components {
              */
             readonly $schema?: string;
             deleted: boolean;
+        };
+        DeletePublicShareOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            deleted: boolean;
+        };
+        DetachEventFromShareOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            removed: boolean;
         };
         EditCommentInputBody: {
             /**
@@ -877,6 +1042,15 @@ export interface components {
             url?: string;
             visibility: string;
         };
+        GetPublicShareOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            events: components["schemas"]["ShareEventResponse"][] | null;
+            share: components["schemas"]["PublicShareResponse"];
+        };
         HealthOutputBody: {
             /**
              * Format: uri
@@ -964,6 +1138,14 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["WorkspaceResponse"][] | null;
+        };
+        ListPublicSharesOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            shares: components["schemas"]["PublicShareResponse"][] | null;
         };
         MemberResponse: {
             /**
@@ -1090,6 +1272,83 @@ export interface components {
             /** @description Visibility */
             visibility?: string;
         };
+        PatchPublicShareInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            clearExpiresAt?: boolean;
+            clearShowHolidaysCountry?: boolean;
+            coverUrl?: string;
+            description?: string;
+            /** Format: int64 */
+            expiresAt?: number;
+            iconUrl?: string;
+            showHolidaysCountry?: string;
+            /** Format: int32 */
+            sortWeight?: number;
+            timezone?: string;
+            title?: string;
+        };
+        PublicShareRenderEvent: {
+            allDay: boolean;
+            blockLabel?: string;
+            /** Format: int64 */
+            endAt?: number;
+            id: string;
+            kind: string;
+            location?: string;
+            memo?: string;
+            /** Format: int64 */
+            recurrenceEnd?: number;
+            recurrenceRule?: string;
+            showAs: string;
+            /** Format: int64 */
+            startAt?: number;
+            timezone: string;
+            title: string;
+            url?: string;
+        };
+        PublicShareRenderPage: {
+            coverUrl?: string;
+            /** Format: int64 */
+            createdAt: number;
+            description?: string;
+            iconUrl?: string;
+            showHolidaysCountry?: string;
+            timezone: string;
+            title: string;
+            workspaceId: string;
+            workspaceName: string;
+        };
+        PublicShareResponse: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            coverUrl?: string;
+            /** Format: int64 */
+            createdAt: number;
+            creatorDisplayName?: string;
+            creatorId?: string;
+            description?: string;
+            /** Format: int64 */
+            eventCount: number;
+            /** Format: int64 */
+            expiresAt?: number;
+            iconUrl?: string;
+            id: string;
+            showHolidaysCountry?: string;
+            /** Format: int32 */
+            sortWeight: number;
+            timezone: string;
+            title: string;
+            token?: string;
+            /** Format: int64 */
+            updatedAt?: number;
+        };
         RemoveAttendeeOutputBody: {
             /**
              * Format: uri
@@ -1105,6 +1364,34 @@ export interface components {
              */
             readonly $schema?: string;
             removed: boolean;
+        };
+        RenderPublicShareOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            events: components["schemas"]["PublicShareRenderEvent"][] | null;
+            page: components["schemas"]["PublicShareRenderPage"];
+        };
+        ShareEventResponse: {
+            allDay: boolean;
+            calendarId: string;
+            calendarName: string;
+            /** Format: int64 */
+            endAt?: number;
+            eventId: string;
+            /** Format: int64 */
+            linkCreatedAt: number;
+            linkId: string;
+            /** Format: int32 */
+            linkSortWeight: number;
+            location?: string;
+            /** Format: int64 */
+            startAt?: number;
+            timezone: string;
+            title: string;
+            visibility: string;
         };
         SmartCreateInputBody: {
             /**
@@ -1310,6 +1597,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListMyCalendarEventsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "public-shares-render": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Public share URL token */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RenderPublicShareOutputBody"];
                 };
             };
             /** @description Error */
@@ -2733,6 +3052,288 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UpdateMemoOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "public-shares-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListPublicSharesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "public-shares-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePublicShareInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicShareResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "public-shares-get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Share public ID */
+                shareId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GetPublicShareOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "public-shares-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Share public ID */
+                shareId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletePublicShareOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "public-shares-patch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Share public ID */
+                shareId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchPublicShareInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicShareResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "public-shares-events-attach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Share public ID */
+                shareId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttachEventsToShareInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachEventsToShareOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "public-shares-events-detach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Share public ID */
+                shareId: string;
+                /** @description Event public ID */
+                evtId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetachEventFromShareOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "public-shares-rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Share public ID */
+                shareId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicShareResponse"];
                 };
             };
             /** @description Error */

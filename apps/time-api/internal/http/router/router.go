@@ -82,7 +82,13 @@ func BuildResult(deps Deps) Result {
 		return out, nil
 	})
 
-	// Public share endpoints will be rebuilt against calendar_public_shares.
+	// Public share render (unauthenticated; token is the capability).
+	huma.Register(api, huma.Operation{
+		OperationID: "public-shares-render",
+		Method:      http.MethodGet,
+		Path:        "/share/cal/{token}",
+		Summary:     "Render a public calendar share by URL token",
+	}, calendars.RenderPublicShare(calDeps))
 
 	// Protected routes (RequireAuth).
 	aclDB := passthroughDB{deps.DB}
@@ -143,6 +149,56 @@ func BuildResult(deps Deps) Result {
 		}, calendars.ListMyCalendarEvents(calDeps))
 
 		// Calendar-invite accept is gone; ws joining uses workspace_invites.
+
+		// Public share pages (workspace-scoped admin endpoints).
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "public-shares-list",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/public-shares",
+			Summary:     "List public share pages in a workspace",
+		}, calendars.ListPublicShares(calDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "public-shares-create",
+			Method:      http.MethodPost,
+			Path:        "/workspaces/{wsId}/public-shares",
+			Summary:     "Create a public share page (returns plaintext token once)",
+		}, calendars.CreatePublicShare(calDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "public-shares-get",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/public-shares/{shareId}",
+			Summary:     "Get a public share page with its published events",
+		}, calendars.GetPublicShare(calDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "public-shares-patch",
+			Method:      http.MethodPatch,
+			Path:        "/workspaces/{wsId}/public-shares/{shareId}",
+			Summary:     "Update public share page metadata",
+		}, calendars.PatchPublicShare(calDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "public-shares-rotate",
+			Method:      http.MethodPost,
+			Path:        "/workspaces/{wsId}/public-shares/{shareId}/rotate",
+			Summary:     "Rotate the URL token for a public share page",
+		}, calendars.RotatePublicShareToken(calDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "public-shares-delete",
+			Method:      http.MethodDelete,
+			Path:        "/workspaces/{wsId}/public-shares/{shareId}",
+			Summary:     "Delete a public share page (admin or owner only)",
+		}, calendars.DeletePublicShare(calDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "public-shares-events-attach",
+			Method:      http.MethodPost,
+			Path:        "/workspaces/{wsId}/public-shares/{shareId}/events",
+			Summary:     "Attach events to a public share page",
+		}, calendars.AttachEventsToShare(calDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "public-shares-events-detach",
+			Method:      http.MethodDelete,
+			Path:        "/workspaces/{wsId}/public-shares/{shareId}/events/{evtId}",
+			Summary:     "Detach an event from a public share page",
+		}, calendars.DetachEventFromShare(calDeps))
 	})
 
 	// Calendar-scoped routes (RequireAuth + RequireCalendarMember).

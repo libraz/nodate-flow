@@ -318,7 +318,7 @@ type FindCalendarEventOwnerRow struct {
 }
 
 // ListAllCalendarEvents was consumed only by the deleted ICS export path;
-// the replacement (R5.14) will query via calendar_public_shares.
+// the replacement will query via calendar_public_shares.
 // Quick lookup for permission checks: who owns this event?
 func (q *Queries) FindCalendarEventOwner(ctx context.Context, arg FindCalendarEventOwnerParams) (FindCalendarEventOwnerRow, error) {
 	row := q.db.QueryRowContext(ctx, findCalendarEventOwner, arg.PublicID, arg.WorkspaceID)

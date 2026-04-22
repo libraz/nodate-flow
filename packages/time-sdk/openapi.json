@@ -67,6 +67,51 @@
         "required": ["email", "role"],
         "type": "object"
       },
+      "AttachEventsToShareInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AttachEventsToShareInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "eventIds": {
+            "description": "Event public IDs to attach; confidential events are rejected",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["eventIds"],
+        "type": "object"
+      },
+      "AttachEventsToShareOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AttachEventsToShareOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "attached": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "skipped": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["attached", "skipped"],
+        "type": "object"
+      },
       "AttachmentResponse": {
         "additionalProperties": false,
         "properties": {
@@ -548,6 +593,55 @@
         "required": ["title"],
         "type": "object"
       },
+      "CreatePublicShareInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreatePublicShareInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "coverUrl": {
+            "description": "Cover image URL",
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "description": {
+            "description": "Markdown description",
+            "type": "string"
+          },
+          "expiresAt": {
+            "description": "Unix seconds; omit for no expiry",
+            "format": "int64",
+            "type": "integer"
+          },
+          "iconUrl": {
+            "description": "Icon image URL",
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "showHolidaysCountry": {
+            "description": "ISO 3166-1 alpha-2 country code; enables holiday overlay",
+            "maxLength": 2,
+            "minLength": 2,
+            "type": "string"
+          },
+          "timezone": {
+            "description": "IANA timezone; defaults to workspace tz",
+            "type": "string"
+          },
+          "title": {
+            "description": "Public-facing title",
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["title"],
+        "type": "object"
+      },
       "CrossCalendarEventResponse": {
         "additionalProperties": false,
         "properties": {
@@ -717,6 +811,40 @@
           }
         },
         "required": ["deleted"],
+        "type": "object"
+      },
+      "DeletePublicShareOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/DeletePublicShareOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "deleted": {
+            "type": "boolean"
+          }
+        },
+        "required": ["deleted"],
+        "type": "object"
+      },
+      "DetachEventFromShareOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/DetachEventFromShareOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "removed": {
+            "type": "boolean"
+          }
+        },
+        "required": ["removed"],
         "type": "object"
       },
       "EditCommentInputBody": {
@@ -926,6 +1054,29 @@
           "timezone",
           "createdAt"
         ],
+        "type": "object"
+      },
+      "GetPublicShareOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/GetPublicShareOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/ShareEventResponse"
+            },
+            "type": ["array", "null"]
+          },
+          "share": {
+            "$ref": "#/components/schemas/PublicShareResponse"
+          }
+        },
+        "required": ["share", "events"],
         "type": "object"
       },
       "HealthOutputBody": {
@@ -1143,6 +1294,26 @@
           }
         },
         "required": ["items"],
+        "type": "object"
+      },
+      "ListPublicSharesOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListPublicSharesOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "shares": {
+            "items": {
+              "$ref": "#/components/schemas/PublicShareResponse"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["shares"],
         "type": "object"
       },
       "MemberResponse": {
@@ -1415,6 +1586,208 @@
         },
         "type": "object"
       },
+      "PatchPublicShareInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PatchPublicShareInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "clearExpiresAt": {
+            "type": "boolean"
+          },
+          "clearShowHolidaysCountry": {
+            "type": "boolean"
+          },
+          "coverUrl": {
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "iconUrl": {
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "showHolidaysCountry": {
+            "maxLength": 2,
+            "minLength": 2,
+            "type": "string"
+          },
+          "sortWeight": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PublicShareRenderEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "allDay": {
+            "type": "boolean"
+          },
+          "blockLabel": {
+            "type": "string"
+          },
+          "endAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "memo": {
+            "type": "string"
+          },
+          "recurrenceEnd": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "recurrenceRule": {
+            "type": "string"
+          },
+          "showAs": {
+            "type": "string"
+          },
+          "startAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "title", "allDay", "timezone", "kind", "showAs"],
+        "type": "object"
+      },
+      "PublicShareRenderPage": {
+        "additionalProperties": false,
+        "properties": {
+          "coverUrl": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "iconUrl": {
+            "type": "string"
+          },
+          "showHolidaysCountry": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          },
+          "workspaceName": {
+            "type": "string"
+          }
+        },
+        "required": ["title", "timezone", "workspaceId", "workspaceName", "createdAt"],
+        "type": "object"
+      },
+      "PublicShareResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PublicShareResponse.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "coverUrl": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "creatorDisplayName": {
+            "type": "string"
+          },
+          "creatorId": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "eventCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "expiresAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "iconUrl": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "showHolidaysCountry": {
+            "type": "string"
+          },
+          "sortWeight": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["id", "title", "timezone", "sortWeight", "eventCount", "createdAt"],
+        "type": "object"
+      },
       "RemoveAttendeeOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -1447,6 +1820,90 @@
           }
         },
         "required": ["removed"],
+        "type": "object"
+      },
+      "RenderPublicShareOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/RenderPublicShareOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/PublicShareRenderEvent"
+            },
+            "type": ["array", "null"]
+          },
+          "page": {
+            "$ref": "#/components/schemas/PublicShareRenderPage"
+          }
+        },
+        "required": ["page", "events"],
+        "type": "object"
+      },
+      "ShareEventResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "allDay": {
+            "type": "boolean"
+          },
+          "calendarId": {
+            "type": "string"
+          },
+          "calendarName": {
+            "type": "string"
+          },
+          "endAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "linkCreatedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "linkId": {
+            "type": "string"
+          },
+          "linkSortWeight": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "location": {
+            "type": "string"
+          },
+          "startAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "linkId",
+          "eventId",
+          "title",
+          "allDay",
+          "timezone",
+          "visibility",
+          "calendarId",
+          "calendarName",
+          "linkSortWeight",
+          "linkCreatedAt"
+        ],
         "type": "object"
       },
       "SmartCreateInputBody": {
@@ -1824,6 +2281,46 @@
           }
         },
         "summary": "List events across every workspace the caller belongs to"
+      }
+    },
+    "/share/cal/{token}": {
+      "get": {
+        "operationId": "public-shares-render",
+        "parameters": [
+          {
+            "description": "Public share URL token",
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "description": "Public share URL token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderPublicShareOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Render a public calendar share by URL token"
       }
     },
     "/workspaces": {
@@ -4158,6 +4655,420 @@
           }
         },
         "summary": "Update a memo"
+      }
+    },
+    "/workspaces/{wsId}/public-shares": {
+      "get": {
+        "operationId": "public-shares-list",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListPublicSharesOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List public share pages in a workspace"
+      },
+      "post": {
+        "operationId": "public-shares-create",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePublicShareInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicShareResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create a public share page (returns plaintext token once)"
+      }
+    },
+    "/workspaces/{wsId}/public-shares/{shareId}": {
+      "delete": {
+        "operationId": "public-shares-delete",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Share public ID",
+            "in": "path",
+            "name": "shareId",
+            "required": true,
+            "schema": {
+              "description": "Share public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletePublicShareOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete a public share page (admin or owner only)"
+      },
+      "get": {
+        "operationId": "public-shares-get",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Share public ID",
+            "in": "path",
+            "name": "shareId",
+            "required": true,
+            "schema": {
+              "description": "Share public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetPublicShareOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get a public share page with its published events"
+      },
+      "patch": {
+        "operationId": "public-shares-patch",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Share public ID",
+            "in": "path",
+            "name": "shareId",
+            "required": true,
+            "schema": {
+              "description": "Share public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchPublicShareInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicShareResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update public share page metadata"
+      }
+    },
+    "/workspaces/{wsId}/public-shares/{shareId}/events": {
+      "post": {
+        "operationId": "public-shares-events-attach",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Share public ID",
+            "in": "path",
+            "name": "shareId",
+            "required": true,
+            "schema": {
+              "description": "Share public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachEventsToShareInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachEventsToShareOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Attach events to a public share page"
+      }
+    },
+    "/workspaces/{wsId}/public-shares/{shareId}/events/{evtId}": {
+      "delete": {
+        "operationId": "public-shares-events-detach",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Share public ID",
+            "in": "path",
+            "name": "shareId",
+            "required": true,
+            "schema": {
+              "description": "Share public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Event public ID",
+            "in": "path",
+            "name": "evtId",
+            "required": true,
+            "schema": {
+              "description": "Event public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetachEventFromShareOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Detach an event from a public share page"
+      }
+    },
+    "/workspaces/{wsId}/public-shares/{shareId}/rotate": {
+      "post": {
+        "operationId": "public-shares-rotate",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Share public ID",
+            "in": "path",
+            "name": "shareId",
+            "required": true,
+            "schema": {
+              "description": "Share public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicShareResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Rotate the URL token for a public share page"
       }
     }
   }

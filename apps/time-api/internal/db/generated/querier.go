@@ -11,6 +11,11 @@ import (
 )
 
 type Querier interface {
+	// Publish one event on a share page. Caller validates:
+	//   - event.visibility != 'confidential' (otherwise SHARE.SHARE_EVENT.EVENT_NOT_VISIBLE).
+	//   - event.workspace_id matches share.workspace_id.
+	// Uniqueness (share_id, event_id, enabled) is enforced by the table.
+	AttachEventToShare(ctx context.Context, arg AttachEventToShareParams) (int64, error)
 	// Verify that a user is an enabled member of a workspace. Returns 1 if
 	// the membership exists, sql.ErrNoRows otherwise.
 	CheckWorkspaceMemberExists(ctx context.Context, arg CheckWorkspaceMemberExistsParams) (int32, error)
@@ -18,6 +23,9 @@ type Querier interface {
 	CleanupExpiredMagicLinks(ctx context.Context) error
 	// Disable TOTP on a local identity.
 	ClearIdentityMfa(ctx context.Context, id uint32) error
+	// Dedicated setter that clears expires_at (COALESCE-based patch cannot
+	// distinguish "leave unchanged" from "clear" for nullable columns).
+	ClearPublicShareExpiresAt(ctx context.Context, arg ClearPublicShareExpiresAtParams) error
 	// Mark a pending TOTP enrollment as confirmed by stamping
 	// mfa_confirmed_at. The caller must have already validated a code
 	// against the stored secret.
@@ -48,6 +56,10 @@ type Querier interface {
 	CreateMagicLinkToken(ctx context.Context, arg CreateMagicLinkTokenParams) (int64, error)
 	// Insert a new personal access token. Plain token is shown to the user once.
 	CreatePat(ctx context.Context, arg CreatePatParams) (int64, error)
+	// Insert a new workspace-owned public share page. Token is pre-hashed
+	// by the handler (SHA-256); the plaintext is returned to the caller
+	// exactly once at create time.
+	CreatePublicShare(ctx context.Context, arg CreatePublicShareParams) (int64, error)
 	// Insert a new refresh-token session for a user.
 	CreateSession(ctx context.Context, arg CreateSessionParams) (int64, error)
 	// Insert a stub user for invitations: no identity row, display_name defaults to email.
@@ -62,6 +74,9 @@ type Querier interface {
 	DeleteAllCalendarEventAttendees(ctx context.Context, eventID uint32) error
 	// Delete every recovery code (used or not) for a user.
 	DeleteAllRecoveryCodesForUser(ctx context.Context, userID uint32) error
+	// Remove one event from a share (soft). Looks up the link by share +
+	// event internal ids (caller resolves both via their public ids first).
+	DetachEventFromShare(ctx context.Context, arg DetachEventFromShareParams) error
 	// Soft-delete a calendar.
 	DisableCalendar(ctx context.Context, arg DisableCalendarParams) error
 	// Soft-delete a checklist item.
@@ -78,6 +93,10 @@ type Querier interface {
 	DisableCalendarMemo(ctx context.Context, arg DisableCalendarMemoParams) error
 	// Remove a user from a calendar (soft-delete).
 	DisableCalendarSubscription(ctx context.Context, arg DisableCalendarSubscriptionParams) error
+	// Soft-delete a share page. Child rows in calendar_public_share_events
+	// are left as-is (soft-disabled at the share level is sufficient; the
+	// render query joins through cps.enabled).
+	DisablePublicShare(ctx context.Context, arg DisablePublicShareParams) error
 	// Soft-disable a workspace. Cascade is handled by FK ON DELETE for hard purges.
 	DisableWorkspace(ctx context.Context, publicID types.PublicID) error
 	// Resolve a calendar by UUID v7 within a workspace.
@@ -93,13 +112,17 @@ type Querier interface {
 	// Resolve a comment by UUID v7.
 	FindCalendarEventCommentByPublicId(ctx context.Context, arg FindCalendarEventCommentByPublicIdParams) (FindCalendarEventCommentByPublicIdRow, error)
 	// ListAllCalendarEvents was consumed only by the deleted ICS export path;
-	// the replacement (R5.14) will query via calendar_public_shares.
+	// the replacement will query via calendar_public_shares.
 	// Quick lookup for permission checks: who owns this event?
 	FindCalendarEventOwner(ctx context.Context, arg FindCalendarEventOwnerParams) (FindCalendarEventOwnerRow, error)
 	// Resolve a memo by UUID v7.
 	FindCalendarMemoByPublicId(ctx context.Context, arg FindCalendarMemoByPublicIdParams) (FindCalendarMemoByPublicIdRow, error)
 	// Look up a user's subscription to a specific calendar.
 	FindCalendarSubscription(ctx context.Context, arg FindCalendarSubscriptionParams) (FindCalendarSubscriptionRow, error)
+	// Lightweight resolver used by the public-share attach path to translate
+	// an event public_id into its internal id + visibility within a workspace.
+	// Enforces workspace isolation so a share cannot publish another ws's events.
+	FindEventIDAndVisibility(ctx context.Context, arg FindEventIDAndVisibilityParams) (FindEventIDAndVisibilityRow, error)
 	// Resolve an identity by (provider, subject) pair for OIDC login flows.
 	FindIdentityByProviderSubject(ctx context.Context, arg FindIdentityByProviderSubjectParams) (FindIdentityByProviderSubjectRow, error)
 	// Resolve a local-password identity by user email for the login pipeline.
@@ -118,6 +141,12 @@ type Querier interface {
 	FindPatByHash(ctx context.Context, tokenHash string) (FindPatByHashRow, error)
 	// Find the personal calendar for a user in a workspace.
 	FindPersonalCalendar(ctx context.Context, arg FindPersonalCalendarParams) (FindPersonalCalendarRow, error)
+	// Resolve a share within a workspace for the authenticated editor UI.
+	FindPublicShareByPublicId(ctx context.Context, arg FindPublicShareByPublicIdParams) (FindPublicShareByPublicIdRow, error)
+	// Resolve a share by its SHA-256 token hash for the unauthenticated
+	// public render path. Returns only enabled rows; caller applies the
+	// expires_at gate so the 410 code path can be distinguished from 404.
+	FindPublicShareByTokenHash(ctx context.Context, tokenHash string) (FindPublicShareByTokenHashRow, error)
 	// Resolve a session by its external public_id (UUID v7).
 	// id is required: used internally for session operations.
 	FindSessionByPublicId(ctx context.Context, publicID types.PublicID) (FindSessionByPublicIdRow, error)
@@ -197,6 +226,19 @@ type Querier interface {
 	ListMyRecurringCalendarEventsAcrossWorkspaces(ctx context.Context, arg ListMyRecurringCalendarEventsAcrossWorkspacesParams) ([]ListMyRecurringCalendarEventsAcrossWorkspacesRow, error)
 	// List a user's PATs in a workspace, masked (no token_hash).
 	ListPatsForUser(ctx context.Context, arg ListPatsForUserParams) ([]ListPatsForUserRow, error)
+	// Unauthenticated public-render query. Final safety gate on event
+	// visibility and start_at IS NOT NULL. expires_at is checked in the
+	// handler (not here) so 410 can be differentiated from 404.
+	ListPublicShareEventsByTokenHash(ctx context.Context, tokenHash string) ([]ListPublicShareEventsByTokenHashRow, error)
+	// List events published on a share for the workspace-authenticated
+	// editor UI. Returns full event metadata so the editor can show what is
+	// currently public. Does not filter by visibility (the editor needs to
+	// see even confidential events that slipped through so they can be
+	// detached, though AttachEventToShare prevents that path going forward).
+	ListPublicShareEventsForEditor(ctx context.Context, arg ListPublicShareEventsForEditorParams) ([]ListPublicShareEventsForEditorRow, error)
+	// List workspace shares for the admin UI. Ordered by sort_weight then
+	// creation time; no pagination (shares are expected to be few per ws).
+	ListPublicShares(ctx context.Context, workspaceID uint32) ([]ListPublicSharesRow, error)
 	// Cross-calendar query: list recurring events across multiple calendars
 	// whose recurrence window overlaps the query range.
 	ListRecurringCalendarEventsAcrossCalendars(ctx context.Context, arg ListRecurringCalendarEventsAcrossCalendarsParams) ([]ListRecurringCalendarEventsAcrossCalendarsRow, error)
@@ -222,6 +264,8 @@ type Querier interface {
 	PatchCalendarSubscription(ctx context.Context, arg PatchCalendarSubscriptionParams) error
 	// Patch the authenticated user's profile. NULL params leave the column untouched.
 	PatchMe(ctx context.Context, arg PatchMeParams) error
+	// Update mutable share fields. NULL arguments leave columns untouched.
+	PatchPublicShare(ctx context.Context, arg PatchPublicShareParams) error
 	// Patch a workspace via COALESCE; NULL params leave existing columns untouched.
 	PatchWorkspace(ctx context.Context, arg PatchWorkspaceParams) error
 	// Insert a new global user account. The caller supplies a UUID v7 public_id.
@@ -241,6 +285,8 @@ type Querier interface {
 	RevokeSession(ctx context.Context, arg RevokeSessionParams) error
 	// Disable an invite link (soft delete).
 	RevokeWorkspaceInvite(ctx context.Context, arg RevokeWorkspaceInviteParams) error
+	// Regenerate the token hash; invalidates any previously issued URL.
+	RotatePublicShareToken(ctx context.Context, arg RotatePublicShareTokenParams) error
 	// Replace the refresh token hash, extend expiry, and record last usage on a refresh rotation.
 	RotateSessionRefreshHash(ctx context.Context, arg RotateSessionRefreshHashParams) error
 	// Begin (or restart) TOTP enrollment by writing a fresh encrypted
