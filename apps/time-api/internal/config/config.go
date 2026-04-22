@@ -14,6 +14,14 @@ type Config struct {
 	Port     string `env:"NF_TIME_PORT" envDefault:"8081"`
 	LogLevel string `env:"NF_TIME_LOG_LEVEL" envDefault:"info"`
 
+	// Env names the deployment environment — one of "dev", "test",
+	// "staging", "prod". It drives behaviour that should only run
+	// outside production (for example, the schema-presence probe that
+	// warns developers their MySQL volume is out of date). Defaults to
+	// "dev" so local developers get the extra diagnostics without
+	// having to opt in; production deploys should set NF_ENV=prod.
+	Env string `env:"NF_ENV" envDefault:"dev"`
+
 	// DbDsn is the MySQL DSN. The time-api shares the same database as
 	// flow-api; only the env prefix differs.
 	DbDsn string `env:"NF_DB_DSN,required"`
@@ -31,8 +39,11 @@ type Config struct {
 	CookieSecure bool `env:"NF_COOKIE_SECURE" envDefault:"true"`
 
 	// CorsAllowedOrigins is the comma-separated list of origins allowed
-	// to call the API with credentials.
-	CorsAllowedOrigins []string `env:"NF_TIME_CORS" envSeparator:"," envDefault:"http://localhost:5174,http://127.0.0.1:5174"`
+	// to call the API with credentials. Both time-web (:5174) and
+	// flow-web (:5173) are first-class consumers of time-api — the
+	// latter hits the API from its /calendar route — so both Vite dev
+	// origins are allow-listed by default.
+	CorsAllowedOrigins []string `env:"NF_TIME_CORS" envSeparator:"," envDefault:"http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174"`
 
 	// S3-compatible object storage for calendar attachments.
 	S3Endpoint  string `env:"NF_S3_ENDPOINT" envDefault:""`

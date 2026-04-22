@@ -17,6 +17,7 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/config"
+	timedb "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/http/router"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/notifications"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
@@ -51,6 +52,18 @@ func main() {
 		os.Exit(1)
 	}
 	defer db.Close()
+
+	// Schema-presence probe — warns when the connected database is
+	// missing a table time-api relies on. The production deployment
+	// path skips the probe to avoid an information_schema enumeration
+	// on every boot; local / staging / test runs opt in so a stale
+	// MySQL volume surfaces a clear message instead of a generic 500
+	// at request time. Intentionally fail-open.
+	if cfg.Env != "prod" {
+		probeCtx, probeCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		timedb.VerifySchema(probeCtx, db, logger)
+		probeCancel()
+	}
 
 	jwtPriv, err := authn.DeriveEd25519Key(os.Getenv("NF_SECRET_KEY"), "nodate-flow:jwt:v1")
 	if err != nil {
