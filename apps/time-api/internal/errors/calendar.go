@@ -32,8 +32,6 @@ var (
 	CalendarCalendarAccessDenied = &Spec{Code: "CALENDAR.CALENDAR.ACCESS_DENIED", Status: 403, Message: "You do not have access to this calendar"}
 	// CALENDAR.CALENDAR.LIST_QUERY_INTERRUPTED — Could not retrieve calendars
 	CalendarCalendarListQueryInterrupted = &Spec{Code: "CALENDAR.CALENDAR.LIST_QUERY_INTERRUPTED", Status: 500, Message: "Could not retrieve calendars"}
-	// CALENDAR.CALENDAR.MANAGER_ROLE_REQUIRED — You do not have permission to perform this action
-	CalendarCalendarManagerRoleRequired = &Spec{Code: "CALENDAR.CALENDAR.MANAGER_ROLE_REQUIRED", Status: 403, Message: "You do not have permission to perform this action"}
 	// CALENDAR.CALENDAR.NOT_FOUND — Calendar not found
 	CalendarCalendarNotFound = &Spec{Code: "CALENDAR.CALENDAR.NOT_FOUND", Status: 404, Message: "Calendar not found"}
 	// CALENDAR.CALENDAR.OWNER_ROLE_REQUIRED — Only calendar owners can perform this action

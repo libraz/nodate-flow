@@ -71,11 +71,6 @@ export const CalendarErrors = {
     status: 500,
     message: "Could not retrieve calendars",
   },
-  CALENDAR_CALENDAR_MANAGER_ROLE_REQUIRED: {
-    code: "CALENDAR.CALENDAR.MANAGER_ROLE_REQUIRED",
-    status: 403,
-    message: "You do not have permission to perform this action",
-  },
   CALENDAR_CALENDAR_NOT_FOUND: {
     code: "CALENDAR.CALENDAR.NOT_FOUND",
     status: 404,

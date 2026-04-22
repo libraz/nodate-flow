@@ -36,13 +36,6 @@ resources:
         description: "Returned when a non-owner attempts an owner-only operation such as deleting a calendar."
         userAction: "Ask a calendar owner to perform this action on your behalf."
 
-      manager_role_required:
-        code: CALENDAR.CALENDAR.MANAGER_ROLE_REQUIRED
-        status: 403
-        message: "You do not have permission to perform this action"
-        description: "Returned when the actor lacks the owner or manager role required for the operation (e.g., editing calendar settings, managing members, or creating invites)."
-        userAction: "Ask a calendar owner or manager to perform this action or upgrade your role."
-
       list_query_interrupted:
         code: CALENDAR.CALENDAR.LIST_QUERY_INTERRUPTED
         status: 500

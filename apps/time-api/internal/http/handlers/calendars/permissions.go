@@ -16,7 +16,7 @@ var (
 	errCalendarAccessDenied = httpErr(apierrors.CalendarCalendarAccessDenied)
 	errAccessDenied         = httpErr(apierrors.CalendarCalendarAccessDenied)
 	errEventNotFound        = httpErr(apierrors.CalendarEventNotFound)
-	errForbidden            = httpErr(apierrors.CalendarCalendarManagerRoleRequired)
+	errForbidden            = httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 	errInviteNotFound       = httpErr(apierrors.CalendarInviteNotFound)
 )
 

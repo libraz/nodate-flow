@@ -166,7 +166,7 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 		// Owner gate. Attendee edit rights are irrelevant here: invite
 		// lifecycle is owner-only.
 		if evt.OwnerUserID != actorID {
-			return nil, httpErr(apierrors.CalendarCalendarManagerRoleRequired)
+			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
 
 		// Resolve the attendee row by its public ID. We don't have a
@@ -514,7 +514,7 @@ func RevokeEventInvite(deps Deps) func(context.Context, *RevokeEventInviteInput)
 			return nil, err
 		}
 		if evt.OwnerUserID != actorID {
-			return nil, httpErr(apierrors.CalendarCalendarManagerRoleRequired)
+			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
 		invitePID, err := parsePublicID(input.InviteId)
 		if err != nil {
@@ -565,7 +565,7 @@ func ListEventInvites(deps Deps) func(context.Context, *ListEventInvitesInput) (
 			return nil, err
 		}
 		if evt.OwnerUserID != actorID {
-			return nil, httpErr(apierrors.CalendarCalendarManagerRoleRequired)
+			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
 		rows, err := deps.Queries.ListCalendarEventInvitesForEvent(ctx, evt.ID)
 		if err != nil {
