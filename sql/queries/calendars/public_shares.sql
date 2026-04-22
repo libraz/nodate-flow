@@ -168,6 +168,17 @@ WHERE share_id = ?
   AND event_id = ?
   AND enabled = TRUE;
 
+-- name: UpdateShareEventSortWeight :exec
+-- Update the sort_weight of a single share-event link.
+-- Called in a loop (inside a tx) when a user reorders the events on a
+-- public share. Scoped to (share_id, public_id) so a caller cannot
+-- accidentally reorder a link belonging to a different share.
+UPDATE calendar_public_share_events
+SET sort_weight = ?
+WHERE share_id = ?
+  AND public_id = ?
+  AND enabled = TRUE;
+
 -- name: ListPublicShareEventsForEditor :many
 -- List events published on a share for the workspace-authenticated
 -- editor UI. Returns full event metadata so the editor can show what is

@@ -195,6 +195,41 @@ export function useAttachEventsToShare(
   });
 }
 
+/**
+ * Mutation: reorder the events attached to a share. The body must be the
+ * complete new ordering, identified by the `linkId` (share-event link
+ * public ID) of every row currently attached — a strict permutation.
+ * Invalidates the detail query on success so the server order re-hydrates.
+ */
+export function useReorderShareEvents(
+  workspaceId: string,
+  shareId: string,
+): UseMutationResult<components['schemas']['ReorderShareEventsOutputBody'], ApiError, string[]> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      linkPublicIds: string[],
+    ): Promise<components['schemas']['ReorderShareEventsOutputBody']> => {
+      const { data, error } = await timeSdk.PATCH(
+        '/workspaces/{wsId}/public-shares/{shareId}/events/reorder',
+        {
+          params: { path: { wsId: workspaceId, shareId } },
+          body: { linkPublicIds },
+        },
+      );
+      if (error || !data) throw toApiError(error, 'Failed to reorder events');
+      return data;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: publicSharesKeys.detail(workspaceId, shareId) });
+    },
+    onError: () => {
+      // On failure, invalidate so the UI reverts to the server's truth.
+      void qc.invalidateQueries({ queryKey: publicSharesKeys.detail(workspaceId, shareId) });
+    },
+  });
+}
+
 /** Mutation: detach a single event from a share. */
 export function useDetachEventFromShare(
   workspaceId: string,

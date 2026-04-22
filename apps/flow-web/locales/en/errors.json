@@ -190,6 +190,7 @@
   "SHARE.SHARE.NOT_FOUND": "Share page not found",
   "SHARE.SHARE.TOKEN_INVALID": "Share token is invalid",
   "SHARE.SHARE_EVENT.EVENT_NOT_VISIBLE": "Event cannot be published",
+  "SHARE.SHARE_EVENT.REORDER_INVALID": "Reorder input must be a permutation of the share's current events",
   "TIMEBOX.TASK.ALREADY_ADDED": "Task is already in this timebox",
   "TIMEBOX.TASK.NOT_IN_TIMEBOX": "Task not found in this timebox",
   "TIMEBOX.TIMEBOX.ALREADY_COMPLETED": "Cannot modify a completed timebox",

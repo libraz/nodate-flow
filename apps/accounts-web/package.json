@@ -30,8 +30,8 @@
   "devDependencies": {
     "@nodate-flow/ui": "workspace:*",
     "@tailwindcss/vite": "^4.1.0",
-    "@tanstack/router-devtools": "1.168.10",
-    "@tanstack/router-plugin": "1.168.10",
+    "@tanstack/router-devtools": "1.166.11",
+    "@tanstack/router-plugin": "1.167.12",
     "@testing-library/react": "16.0.1",
     "@types/react": "19.0.0",
     "@types/react-dom": "19.0.0",

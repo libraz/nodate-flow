@@ -44,19 +44,19 @@ type PublicShareResponse struct {
 
 // ShareEventResponse is the editor-facing projection of an event published on a share.
 type ShareEventResponse struct {
-	LinkID           string  `json:"linkId"`
-	EventID          string  `json:"eventId"`
-	Title            string  `json:"title"`
-	StartAt          *int64  `json:"startAt,omitempty"`
-	EndAt            *int64  `json:"endAt,omitempty"`
-	AllDay           bool    `json:"allDay"`
-	Timezone         string  `json:"timezone"`
-	Location         *string `json:"location,omitempty"`
-	Visibility       string  `json:"visibility"`
-	CalendarID       string  `json:"calendarId"`
-	CalendarName     string  `json:"calendarName"`
-	LinkSortWeight   int32   `json:"linkSortWeight"`
-	LinkCreatedAt    int64   `json:"linkCreatedAt"`
+	LinkID         string  `json:"linkId"`
+	EventID        string  `json:"eventId"`
+	Title          string  `json:"title"`
+	StartAt        *int64  `json:"startAt,omitempty"`
+	EndAt          *int64  `json:"endAt,omitempty"`
+	AllDay         bool    `json:"allDay"`
+	Timezone       string  `json:"timezone"`
+	Location       *string `json:"location,omitempty"`
+	Visibility     string  `json:"visibility"`
+	CalendarID     string  `json:"calendarId"`
+	CalendarName   string  `json:"calendarName"`
+	LinkSortWeight int32   `json:"linkSortWeight"`
+	LinkCreatedAt  int64   `json:"linkCreatedAt"`
 }
 
 // CreatePublicShareInput is the body for creating a new share page.
@@ -168,6 +168,25 @@ type AttachEventsToShareOutput struct {
 	Body struct {
 		Attached int `json:"attached"`
 		Skipped  int `json:"skipped"`
+	}
+}
+
+// ReorderShareEventsInput batch-reorders the events published on a share
+// by supplying the complete new ordering of link public IDs. The array
+// must be a permutation of the share's current links — no partial
+// reorders.
+type ReorderShareEventsInput struct {
+	WsId    string `path:"wsId" doc:"Workspace public ID"`
+	ShareId string `path:"shareId" doc:"Share public ID"`
+	Body    struct {
+		LinkPublicIDs []string `json:"linkPublicIds" minItems:"0" maxItems:"500" doc:"Complete new ordering of share-event link public IDs; must be a permutation of the share's current links"`
+	}
+}
+
+// ReorderShareEventsOutput confirms the reorder applied.
+type ReorderShareEventsOutput struct {
+	Body struct {
+		Reordered bool `json:"reordered"`
 	}
 }
 
@@ -519,6 +538,108 @@ func AttachEventsToShare(deps Deps) func(context.Context, *AttachEventsToShareIn
 		out := &AttachEventsToShareOutput{}
 		out.Body.Attached = attached
 		out.Body.Skipped = skipped
+		return out, nil
+	}
+}
+
+// ReorderShareEvents atomically rewrites sort_weight for every share-event
+// link on a share. The caller must supply the complete new ordering — the
+// input array must be a permutation of the share's current links, else the
+// request is rejected with SHARE.SHARE_EVENT.REORDER_INVALID and nothing
+// is persisted. Authorised for any non-guest workspace member (same as
+// AttachEventsToShare).
+func ReorderShareEvents(deps Deps) func(context.Context, *ReorderShareEventsInput) (*ReorderShareEventsOutput, error) {
+	return func(ctx context.Context, input *ReorderShareEventsInput) (*ReorderShareEventsOutput, error) {
+		wsID, actorID, err := resolveWorkspaceNonGuest(ctx, deps.Queries, input.WsId)
+		if err != nil {
+			return nil, err
+		}
+		sharePID, err := parsePublicID(input.ShareId)
+		if err != nil {
+			return nil, errShareNotFound
+		}
+		share, err := deps.Queries.FindPublicShareByPublicId(ctx, generated.FindPublicShareByPublicIdParams{
+			WorkspaceID: wsID,
+			PublicID:    sharePID,
+		})
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, errShareNotFound
+			}
+			return nil, httpErr(apierrors.CalendarCalendarStoreReadInterrupted)
+		}
+
+		// Parse and de-duplicate the requested ordering up front so a
+		// repeated public ID is treated as the permutation invariant
+		// violation it is, rather than silently collapsing.
+		requested := make([]types.PublicID, len(input.Body.LinkPublicIDs))
+		requestedSet := make(map[types.PublicID]struct{}, len(input.Body.LinkPublicIDs))
+		for i, raw := range input.Body.LinkPublicIDs {
+			pid, err := parsePublicID(raw)
+			if err != nil {
+				return nil, httpErr(apierrors.ShareShareEventReorderInvalid)
+			}
+			if _, dup := requestedSet[pid]; dup {
+				return nil, httpErr(apierrors.ShareShareEventReorderInvalid)
+			}
+			requestedSet[pid] = struct{}{}
+			requested[i] = pid
+		}
+
+		// Load the current set of links for this share and verify the
+		// input is a permutation. sqlc's :exec directive does not expose
+		// RowsAffected, so we validate up front and trust the tx.
+		existing, err := deps.Queries.ListPublicShareEventsForEditor(ctx, generated.ListPublicShareEventsForEditorParams{
+			WorkspaceID: wsID,
+			PublicID:    sharePID,
+		})
+		if err != nil {
+			return nil, httpErr(apierrors.CalendarCalendarStoreReadInterrupted)
+		}
+		if len(existing) != len(requested) {
+			return nil, httpErr(apierrors.ShareShareEventReorderInvalid)
+		}
+		for _, e := range existing {
+			if _, ok := requestedSet[e.LinkPublicID]; !ok {
+				return nil, httpErr(apierrors.ShareShareEventReorderInvalid)
+			}
+		}
+
+		// Short-circuit empty reorder: nothing to do, no tx needed.
+		if len(requested) == 0 {
+			out := &ReorderShareEventsOutput{}
+			out.Body.Reordered = true
+			return out, nil
+		}
+
+		tx, err := deps.DB.BeginTx(ctx, nil)
+		if err != nil {
+			return nil, httpErr(apierrors.CalendarCalendarStoreWriteInterrupted)
+		}
+		defer func() { _ = tx.Rollback() }()
+		qtx := deps.Queries.WithTx(tx)
+
+		for i, pid := range requested {
+			if err := qtx.UpdateShareEventSortWeight(ctx, generated.UpdateShareEventSortWeightParams{
+				SortWeight: int32(i),
+				ShareID:    share.ID,
+				PublicID:   pid,
+			}); err != nil {
+				return nil, httpErr(apierrors.CalendarCalendarStoreWriteInterrupted)
+			}
+		}
+
+		if err := tx.Commit(); err != nil {
+			return nil, httpErr(apierrors.CalendarCalendarStoreWriteInterrupted)
+		}
+
+		_ = eventbus.Append(ctx, deps.DB, wsID, "public_share.events_reordered", &actorID, map[string]any{
+			"shareId": input.ShareId,
+			"count":   len(requested),
+		})
+
+		out := &ReorderShareEventsOutput{}
+		out.Body.Reordered = true
 		return out, nil
 	}
 }

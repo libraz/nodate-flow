@@ -662,3 +662,26 @@ func (q *Queries) RotatePublicShareToken(ctx context.Context, arg RotatePublicSh
 	_, err := q.db.ExecContext(ctx, rotatePublicShareToken, arg.TokenHash, arg.WorkspaceID, arg.PublicID)
 	return err
 }
+
+const updateShareEventSortWeight = `-- name: UpdateShareEventSortWeight :exec
+UPDATE calendar_public_share_events
+SET sort_weight = ?
+WHERE share_id = ?
+  AND public_id = ?
+  AND enabled = TRUE
+`
+
+type UpdateShareEventSortWeightParams struct {
+	SortWeight int32          `json:"sortWeight"`
+	ShareID    uint32         `json:"shareId"`
+	PublicID   types.PublicID `json:"publicId"`
+}
+
+// Update the sort_weight of a single share-event link.
+// Called in a loop (inside a tx) when a user reorders the events on a
+// public share. Scoped to (share_id, public_id) so a caller cannot
+// accidentally reorder a link belonging to a different share.
+func (q *Queries) UpdateShareEventSortWeight(ctx context.Context, arg UpdateShareEventSortWeightParams) error {
+	_, err := q.db.ExecContext(ctx, updateShareEventSortWeight, arg.SortWeight, arg.ShareID, arg.PublicID)
+	return err
+}

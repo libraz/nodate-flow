@@ -26,6 +26,11 @@ export const ShareErrors = {
     status: 422,
     message: "Event cannot be published",
   },
+  SHARE_SHARE_EVENT_REORDER_INVALID: {
+    code: "SHARE.SHARE_EVENT.REORDER_INVALID",
+    status: 400,
+    message: "Reorder input must be a permutation of the share's current events",
+  },
 } as const;
 
 export type ShareErrorCode = (typeof ShareErrors)[keyof typeof ShareErrors]["code"];

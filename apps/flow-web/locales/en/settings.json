@@ -350,7 +350,15 @@
         },
         "errors": {
           "detach_failed": "Could not remove the event. Please try again.",
-          "attach_failed": "Could not attach the events. Please try again."
+          "attach_failed": "Could not attach the events. Please try again.",
+          "reorder_failed": "Could not save the new order. The list has been reset to the saved order."
+        },
+        "reorder_handle_label": "Drag to reorder event",
+        "reorder_a11y": {
+          "lifted": "Picked up event {{id}}. Use the arrow keys to move, space to drop, escape to cancel.",
+          "over": "Event {{active}} is now over event {{over}}.",
+          "dropped": "Event {{active}} was dropped over event {{over}}.",
+          "cancelled": "Drag for event {{id}} was cancelled."
         }
       }
     },

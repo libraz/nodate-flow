@@ -600,6 +600,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{wsId}/public-shares/{shareId}/events/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Batch-reorder the events published on a public share page */
+        patch: operations["public-shares-events-reorder"];
+        trace?: never;
+    };
     "/workspaces/{wsId}/public-shares/{shareId}/events/{evtId}": {
         parameters: {
             query?: never;
@@ -1559,6 +1576,23 @@ export interface components {
             readonly $schema?: string;
             events: components["schemas"]["PublicShareRenderEvent"][] | null;
             page: components["schemas"]["PublicShareRenderPage"];
+        };
+        ReorderShareEventsInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Complete new ordering of share-event link public IDs; must be a permutation of the share's current links */
+            linkPublicIds: string[] | null;
+        };
+        ReorderShareEventsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            reordered: boolean;
         };
         RevokeEventInviteOutputBody: {
             /**
@@ -3636,6 +3670,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AttachEventsToShareOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "public-shares-events-reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Share public ID */
+                shareId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReorderShareEventsInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReorderShareEventsOutputBody"];
                 };
             };
             /** @description Error */

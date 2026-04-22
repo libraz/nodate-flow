@@ -345,6 +345,11 @@ type Querier interface {
 	UpdateMemberRole(ctx context.Context, arg UpdateMemberRoleParams) error
 	// Change a member's role keyed by user_id.
 	UpdateMemberRoleByUserId(ctx context.Context, arg UpdateMemberRoleByUserIdParams) error
+	// Update the sort_weight of a single share-event link.
+	// Called in a loop (inside a tx) when a user reorders the events on a
+	// public share. Scoped to (share_id, public_id) so a caller cannot
+	// accidentally reorder a link belonging to a different share.
+	UpdateShareEventSortWeight(ctx context.Context, arg UpdateShareEventSortWeightParams) error
 	// Stamp last successful login time on a user account.
 	UpdateUserLastLoginAt(ctx context.Context, id uint32) error
 	// Update mutable workspace fields by public_id.

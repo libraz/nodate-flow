@@ -350,7 +350,15 @@
         },
         "errors": {
           "detach_failed": "イベントを外せませんでした。もう一度お試しください。",
-          "attach_failed": "イベントを追加できませんでした。もう一度お試しください。"
+          "attach_failed": "イベントを追加できませんでした。もう一度お試しください。",
+          "reorder_failed": ""
+        },
+        "reorder_handle_label": "",
+        "reorder_a11y": {
+          "lifted": "",
+          "over": "",
+          "dropped": "",
+          "cancelled": ""
         }
       }
     },

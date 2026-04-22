@@ -236,6 +236,12 @@ func BuildResult(deps Deps) Result {
 			Path:        "/workspaces/{wsId}/public-shares/{shareId}/events/{evtId}",
 			Summary:     "Detach an event from a public share page",
 		}, calendars.DetachEventFromShare(calDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "public-shares-events-reorder",
+			Method:      http.MethodPatch,
+			Path:        "/workspaces/{wsId}/public-shares/{shareId}/events/reorder",
+			Summary:     "Batch-reorder the events published on a public share page",
+		}, calendars.ReorderShareEvents(calDeps))
 	})
 
 	// Calendar-scoped routes (RequireAuth + RequireCalendarMember).

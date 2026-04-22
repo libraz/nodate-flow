@@ -47,3 +47,10 @@ resources:
         message: "Event cannot be published"
         description: "Returned when attaching an event with visibility='confidential' to a share page. Confidential events are gated from the public surface."
         userAction: "Change the event's visibility to public or private before attaching, or pick a different event."
+
+      reorder_invalid:
+        code: SHARE.SHARE_EVENT.REORDER_INVALID
+        status: 400
+        message: "Reorder input must be a permutation of the share's current events"
+        description: "Returned when a batch reorder request supplies a linkPublicIds array that is missing an existing link, references a link that does not belong to the share, or contains duplicates. The reorder is atomic and requires the full current set."
+        userAction: "Refetch the share's event list and resubmit the reorder with every current link exactly once."

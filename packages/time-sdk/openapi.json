@@ -2083,6 +2083,46 @@
         "required": ["page", "events"],
         "type": "object"
       },
+      "ReorderShareEventsInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ReorderShareEventsInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "linkPublicIds": {
+            "description": "Complete new ordering of share-event link public IDs; must be a permutation of the share's current links",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 500,
+            "minItems": 0,
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["linkPublicIds"],
+        "type": "object"
+      },
+      "ReorderShareEventsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ReorderShareEventsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "reordered": {
+            "type": "boolean"
+          }
+        },
+        "required": ["reordered"],
+        "type": "object"
+      },
       "RevokeEventInviteOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -5490,6 +5530,66 @@
           }
         },
         "summary": "Attach events to a public share page"
+      }
+    },
+    "/workspaces/{wsId}/public-shares/{shareId}/events/reorder": {
+      "patch": {
+        "operationId": "public-shares-events-reorder",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Share public ID",
+            "in": "path",
+            "name": "shareId",
+            "required": true,
+            "schema": {
+              "description": "Share public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReorderShareEventsInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReorderShareEventsOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Batch-reorder the events published on a public share page"
       }
     },
     "/workspaces/{wsId}/public-shares/{shareId}/events/{evtId}": {
