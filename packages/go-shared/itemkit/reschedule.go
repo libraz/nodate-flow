@@ -25,6 +25,10 @@ type RescheduleEventArgs struct {
 	// set zero times on a task-linked event.
 	StartAt time.Time
 	EndAt   time.Time
+
+	// Snap carries the actor's working-day preferences. Zero value
+	// disables snap behavior.
+	Snap SnapConfig
 }
 
 // RescheduleEvent updates a calendar_events row's start/end times
@@ -54,6 +58,10 @@ func RescheduleEvent(ctx context.Context, tx TX, args RescheduleEventArgs) error
 		}
 	}
 
+	snap := applySnap(args.StartAt, args.EndAt, args.Snap)
+	args.StartAt = snap.NewStart
+	args.EndAt = snap.NewEnd
+
 	const updateSQL = `UPDATE calendar_events
 	                   SET start_at = ?, end_at = ?
 	                   WHERE id = ? AND workspace_id = ?`
@@ -61,6 +69,10 @@ func RescheduleEvent(ctx context.Context, tx TX, args RescheduleEventArgs) error
 	endVal := sql.NullTime{Time: args.EndAt, Valid: !args.EndAt.IsZero()}
 	if _, err := tx.ExecContext(ctx, updateSQL, startVal, endVal, evt.id, args.WorkspaceID); err != nil {
 		return fmt.Errorf("itemkit: update event times: %w", err)
+	}
+
+	if err := applySnapFlags(ctx, tx, evt.id, snap); err != nil {
+		return err
 	}
 
 	// Propagate to task only when linked and the DATE component changed.
@@ -103,6 +115,12 @@ type RescheduleTaskArgs struct {
 	EventOn    time.Time
 	SetDueOn   bool
 	DueOn      time.Time
+
+	// Snap carries the actor's working-day preferences. Zero value
+	// disables snap behavior. When SnapAuto adjusts the target DATE,
+	// itemkit writes the snapped date into tasks.*_on as well so the
+	// task and its projection event stay in lockstep.
+	Snap SnapConfig
 }
 
 // RescheduleTask updates tasks.event_on / tasks.due_on per the args
@@ -121,20 +139,32 @@ func RescheduleTask(ctx context.Context, tx TX, args RescheduleTaskArgs) error {
 	}
 
 	if args.SetEventOn {
-		if err := updateTaskDateColumn(ctx, tx, task.id, "event_on", args.EventOn); err != nil {
+		snappedEventOn := args.EventOn
+		if !snappedEventOn.IsZero() {
+			out := applySnap(snappedEventOn, snappedEventOn, args.Snap)
+			snappedEventOn = out.NewStart
+		}
+		if err := updateTaskDateColumn(ctx, tx, task.id, "event_on", snappedEventOn); err != nil {
 			return err
 		}
-		if err := propagateEventFromTaskDate(ctx, tx, task, RoleEvent, args.EventOn, args.ActorUserID); err != nil {
+		if err := propagateEventFromTaskDate(ctx, tx, task, RoleEvent, snappedEventOn, args.ActorUserID, args.Snap); err != nil {
 			return err
 		}
+		args.EventOn = snappedEventOn
 	}
 	if args.SetDueOn {
-		if err := updateTaskDateColumn(ctx, tx, task.id, "due_on", args.DueOn); err != nil {
+		snappedDueOn := args.DueOn
+		if !snappedDueOn.IsZero() {
+			out := applySnap(snappedDueOn, snappedDueOn, args.Snap)
+			snappedDueOn = out.NewStart
+		}
+		if err := updateTaskDateColumn(ctx, tx, task.id, "due_on", snappedDueOn); err != nil {
 			return err
 		}
-		if err := propagateEventFromTaskDate(ctx, tx, task, RoleDue, args.DueOn, args.ActorUserID); err != nil {
+		if err := propagateEventFromTaskDate(ctx, tx, task, RoleDue, snappedDueOn, args.ActorUserID, args.Snap); err != nil {
 			return err
 		}
+		args.DueOn = snappedDueOn
 	}
 
 	payload := map[string]any{
@@ -166,8 +196,10 @@ func updateTaskDateColumn(ctx context.Context, tx TX, taskID uint32, col string,
 // propagateEventFromTaskDate updates the start/end of the linked
 // event for the given role to reflect a new task date. Preserves the
 // event's original time-of-day and duration. Clears the link when
-// the task date is zero (unscheduled task).
-func propagateEventFromTaskDate(ctx context.Context, tx TX, task taskRow, role DateRole, newDate time.Time, actorID uint32) error {
+// the task date is zero (unscheduled task). snap carries the actor's
+// snap-to-working-day preference so the mirrored event gets the same
+// badge treatment as a direct RescheduleEvent call.
+func propagateEventFromTaskDate(ctx context.Context, tx TX, task taskRow, role DateRole, newDate time.Time, actorID uint32, snap SnapConfig) error {
 	existing, err := findLinkedEvent(ctx, tx, task.id, role)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -188,12 +220,20 @@ func propagateEventFromTaskDate(ctx context.Context, tx TX, task taskRow, role D
 		existing.startAt.Time.Hour(), existing.startAt.Time.Minute(), existing.startAt.Time.Second(), 0,
 		existing.startAt.Time.Location())
 	newEnd := newStart.Add(dur)
+
+	// Task date has already been snapped upstream; re-run snap here only
+	// to badge the mirrored event's flags consistently.
+	out := applySnap(newStart, newEnd, snap)
+
 	const upd = `UPDATE calendar_events SET start_at = ?, end_at = ? WHERE id = ?`
 	if _, err := tx.ExecContext(ctx, upd,
-		sql.NullTime{Time: newStart, Valid: true},
-		sql.NullTime{Time: newEnd, Valid: true},
+		sql.NullTime{Time: out.NewStart, Valid: true},
+		sql.NullTime{Time: out.NewEnd, Valid: true},
 		existing.id); err != nil {
 		return fmt.Errorf("itemkit: mirror event times from task date: %w", err)
+	}
+	if err := applySnapFlags(ctx, tx, existing.id, out); err != nil {
+		return err
 	}
 	return nil
 }

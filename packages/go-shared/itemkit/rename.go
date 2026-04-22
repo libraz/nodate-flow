@@ -25,9 +25,9 @@ type RenameItemArgs struct {
 // RenameItem propagates a title change across the linked task and
 // all of its linked calendar_events (or, when the origin is an
 // event, to the task's linked calendar_events plus the task row).
-// Titles stay in lockstep for the R5 release; if that later feels
-// too aggressive, the plan notes a "linked-origin title" shadow
-// column can be introduced without altering this API.
+// Titles stay in lockstep; if that later feels too aggressive, a
+// "linked-origin title" shadow column can be introduced without
+// altering this API.
 func RenameItem(ctx context.Context, tx TX, args RenameItemArgs) error {
 	if args.NewTitle == "" {
 		return wrapInvariant("title_required", "new title is empty")

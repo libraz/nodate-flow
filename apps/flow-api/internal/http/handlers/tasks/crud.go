@@ -611,6 +611,14 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 					return nil, translateItemkitTaskError(err)
 				}
 			}
+			var snap itemkit.SnapConfig
+			if eventOnChanged || dueOnChanged {
+				resolved, err := itemkit.ResolveSnapConfig(ctx, tx, ws.ID, actorID)
+				if err != nil {
+					return nil, httpErr(apierrors.InternalUnexpected)
+				}
+				snap = resolved
+			}
 			if eventOnChanged {
 				var t time.Time
 				if newEvent.Valid {
@@ -622,6 +630,7 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 					ActorUserID: actorID,
 					SetEventOn:  true,
 					EventOn:     t,
+					Snap:        snap,
 				}); err != nil {
 					return nil, translateItemkitTaskError(err)
 				}
@@ -637,6 +646,7 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 					ActorUserID: actorID,
 					SetDueOn:    true,
 					DueOn:       t,
+					Snap:        snap,
 				}); err != nil {
 					return nil, translateItemkitTaskError(err)
 				}

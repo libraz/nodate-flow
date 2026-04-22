@@ -36,6 +36,10 @@ type ScheduleTaskArgs struct {
 	// ShowAs is the calendar_events.show_as enum value; empty defaults
 	// to "busy".
 	ShowAs string
+
+	// Snap carries the actor's working-day preferences. Zero value
+	// disables snap behavior; see SnapConfig for semantics.
+	Snap SnapConfig
 }
 
 // ScheduleTask links (or updates the link between) a task and a
@@ -50,7 +54,7 @@ type ScheduleTaskArgs struct {
 //
 // ScheduleTask also updates tasks.event_on / tasks.due_on to mirror
 // the projection date so the task's own DATE columns remain in sync
-// until they are dropped in R5.3.
+// until they are dropped.
 func ScheduleTask(ctx context.Context, tx TX, args ScheduleTaskArgs) (dbtype.PublicID, uint32, error) {
 	if !args.Role.IsValid() {
 		return dbtype.PublicID{}, 0, wrapInvariant("role_valid", fmt.Sprintf("unknown role %q", args.Role))
@@ -71,6 +75,10 @@ func ScheduleTask(ctx context.Context, tx TX, args ScheduleTaskArgs) (dbtype.Pub
 		return dbtype.PublicID{}, 0, wrapInvariant("chronology", "end_at before start_at")
 	}
 
+	snap := applySnap(args.StartAt, args.EndAt, args.Snap)
+	args.StartAt = snap.NewStart
+	args.EndAt = snap.NewEnd
+
 	task, err := findTaskByID(ctx, tx, args.WorkspaceID, args.TaskID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -83,7 +91,7 @@ func ScheduleTask(ctx context.Context, tx TX, args ScheduleTaskArgs) (dbtype.Pub
 		existing, err := findLinkedEvent(ctx, tx, task.id, args.Role)
 		switch {
 		case err == nil:
-			return reschedulePutExisting(ctx, tx, task, existing, args)
+			return reschedulePutExisting(ctx, tx, task, existing, args, snap)
 		case !errors.Is(err, sql.ErrNoRows):
 			return dbtype.PublicID{}, 0, fmt.Errorf("itemkit: find linked event: %w", err)
 		}
@@ -119,6 +127,10 @@ func ScheduleTask(ctx context.Context, tx TX, args ScheduleTaskArgs) (dbtype.Pub
 	}
 	eventID := uint32(id64)
 
+	if err := applySnapFlags(ctx, tx, eventID, snap); err != nil {
+		return dbtype.PublicID{}, 0, err
+	}
+
 	if err := propagateTaskDateFromRole(ctx, tx, task.id, args.Role, args.StartAt); err != nil {
 		return dbtype.PublicID{}, 0, err
 	}
@@ -137,7 +149,7 @@ func ScheduleTask(ctx context.Context, tx TX, args ScheduleTaskArgs) (dbtype.Pub
 // reschedulePutExisting updates an already-linked event in place
 // rather than creating a duplicate. Called from ScheduleTask when it
 // finds a pre-existing role link.
-func reschedulePutExisting(ctx context.Context, tx TX, task taskRow, existing eventRow, args ScheduleTaskArgs) (dbtype.PublicID, uint32, error) {
+func reschedulePutExisting(ctx context.Context, tx TX, task taskRow, existing eventRow, args ScheduleTaskArgs, snap snapOutcome) (dbtype.PublicID, uint32, error) {
 	title := args.Title
 	if title == "" {
 		title = task.title
@@ -160,6 +172,10 @@ func reschedulePutExisting(ctx context.Context, tx TX, task taskRow, existing ev
 		existing.id, args.WorkspaceID,
 	); err != nil {
 		return dbtype.PublicID{}, 0, fmt.Errorf("itemkit: update linked event: %w", err)
+	}
+
+	if err := applySnapFlags(ctx, tx, existing.id, snap); err != nil {
+		return dbtype.PublicID{}, 0, err
 	}
 
 	if err := propagateTaskDateFromRole(ctx, tx, task.id, args.Role, args.StartAt); err != nil {
