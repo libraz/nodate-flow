@@ -2,8 +2,8 @@
 // shared package so existing flow-api call sites continue to compile
 // without churn. New code should import
 // github.com/nodate-flow/nodate-flow/packages/go-shared/eventbus
-// directly. These aliases are removed alongside the R5 calendar
-// unification cleanup.
+// directly. These aliases will be removed once the calendar
+// unification cleanup has landed everywhere.
 package eventbus
 
 import sharedbus "github.com/nodate-flow/nodate-flow/packages/go-shared/eventbus"
@@ -192,14 +192,14 @@ const (
 	ImportJobCancelled = sharedbus.ImportJobCancelled
 )
 
-// Workspace membership lifecycle events (emitted by memberkit in R5.9).
+// Workspace membership lifecycle events (emitted by memberkit).
 const (
 	WorkspaceMemberAdded       = sharedbus.WorkspaceMemberAdded
 	WorkspaceMemberRemoved     = sharedbus.WorkspaceMemberRemoved
 	WorkspaceMemberRoleChanged = sharedbus.WorkspaceMemberRoleChanged
 )
 
-// Item (unified task+event) lifecycle events — R5 itemkit.
+// Item (unified task+event) lifecycle events — itemkit.
 const (
 	ItemScheduled            = sharedbus.ItemScheduled
 	ItemUnscheduled          = sharedbus.ItemUnscheduled
@@ -214,7 +214,7 @@ const (
 	ItemMilestoneLinkRemoved = sharedbus.ItemMilestoneLinkRemoved
 )
 
-// Public share events — R5.14 calendar_public_shares.
+// Public share events — calendar_public_shares.
 const (
 	SharePublished     = sharedbus.SharePublished
 	ShareUpdated       = sharedbus.ShareUpdated

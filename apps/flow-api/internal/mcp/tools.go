@@ -2636,9 +2636,9 @@ func nullTimeFormat(t sql.NullTime, layout string) string {
 }
 
 // calendarRoleFor derives the MCP-exposed role string for a calendar
-// row. post-R5.1: calendar_subscriptions.role is gone; we mirror the
-// HTTP handler convention (personal owner -> "owner", system ->
-// "viewer", otherwise "editor" since every ws member has edit access).
+// row. calendar_subscriptions.role is gone; we mirror the HTTP handler
+// convention (personal owner -> "owner", system -> "viewer", otherwise
+// "editor" since every ws member has edit access).
 func calendarRoleFor(kind generated.CalendarsKind, ownerUserID sql.NullInt32, actorUserID uint32) string {
 	if ownerUserID.Valid && uint32(ownerUserID.Int32) == actorUserID {
 		return "owner"
@@ -2666,13 +2666,13 @@ func runListCalendars(ctx context.Context, deps Deps, s *session, _ json.RawMess
 			"id":   r.PublicID.String(),
 			"kind": string(r.Kind),
 			"name": r.Name,
-			// post-R5.1: calendar_subscriptions.role was dropped. Derive
+			// calendar_subscriptions.role has been dropped. Derive
 			// the role from ownership so existing MCP clients keep a
 			// stable shape.
 			"role":  calendarRoleFor(r.Kind, r.OwnerUserID, s.userID),
 			"color": r.Color,
-			// post-R5.1: member_color was dropped from
-			// calendar_subscriptions; fall back to display_color.
+			// member_color has been dropped from calendar_subscriptions;
+			// fall back to display_color.
 			"memberColor": r.DisplayColor,
 			"visible":     r.Visible,
 		})
@@ -2794,10 +2794,10 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 
 	ownerUserID := s.userID
 	if in.OwnerUserID != "" {
-		// post-R5.1: calendar_subscriptions.role is gone, so "manager/owner"
-		// tiers no longer exist. Only the personal-calendar owner can
-		// set a different ownerUserId here. System calendars have no
-		// editable owner. post-R5.1: event-level ACL (attendee can_edit) TBD in R5.3.
+		// calendar_subscriptions.role is gone, so "manager/owner" tiers
+		// no longer exist. Only the personal-calendar owner can set a
+		// different ownerUserId here. System calendars have no editable
+		// owner. Event-level ACL (attendee can_edit) is still TBD.
 		const qCalOwner = `SELECT owner_user_id FROM calendars WHERE id = ? AND enabled = TRUE LIMIT 1`
 		var calOwner sql.NullInt32
 		if serr := deps.DB.QueryRowContext(ctx, qCalOwner, calID).Scan(&calOwner); serr != nil {
@@ -3150,7 +3150,7 @@ func runListFreeSlots(ctx context.Context, deps Deps, s *session, raw json.RawMe
 		if string(r.ShowAs) == "free" {
 			continue
 		}
-		// post-R5.1: start_at / end_at are nullable. Undated events
+		// start_at / end_at are nullable. Undated events
 		// (planning-stage placeholders) don't contribute to busy
 		// intervals, so skip them.
 		if !r.StartAt.Valid || !r.EndAt.Valid {

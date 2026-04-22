@@ -8,7 +8,7 @@
  *
  * Visual components (grid, day cell, week view) live in consumer apps
  * for now because they still couple to app-specific zustand stores and
- * react-query hooks; they will land here once the R5.6 flow-web rewrite
+ * react-query hooks; they will land here once the flow-web rewrite
  * settles on a common shape.
  */
 

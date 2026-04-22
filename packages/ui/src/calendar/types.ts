@@ -7,10 +7,9 @@
  * generated clients. Apps should map their SDK responses to these types
  * at the boundary.
  *
- * The enums below track the live MySQL schema as of R5 (unified calendar
- * + task integration). Downstream: the R5.14 follow-up drops `shared`
- * from CalendarKind; keeping it here for one release while the schema
- * migration bakes.
+ * The enums below track the live MySQL schema (unified calendar + task
+ * integration). A follow-up drops `shared` from CalendarKind; keeping
+ * it here for one release while the schema migration bakes.
  */
 
 export type CalendarKind = 'personal' | 'shared' | 'system';
@@ -68,8 +67,8 @@ export interface CalendarEvent {
   allDay: boolean;
   /**
    * ISO 8601 start instant. May be empty / undefined for planning-stage
-   * (undated) events introduced in R5.1. Consumers should filter out
-   * undated events from date-grid views.
+   * (undated) events. Consumers should filter out undated events
+   * from date-grid views.
    */
   startAt: string;
   endAt: string;

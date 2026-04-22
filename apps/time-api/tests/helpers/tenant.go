@@ -94,7 +94,7 @@ func CreateTestTenant(t *testing.T, srv *TestServer) *TestTenant {
 
 // CreateExtraMember creates an additional user, adds them to the given workspace
 // and subscribes them to the given calendar. The calSubRole parameter is kept
-// for test call-site compatibility but ignored post-R5.1 (subscription role
+// for test call-site compatibility but ignored (subscription role has been
 // dropped; event-level visibility is the ACL axis).
 func CreateExtraMember(
 	t *testing.T,

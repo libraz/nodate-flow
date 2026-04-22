@@ -82,7 +82,7 @@ func BuildResult(deps Deps) Result {
 		return out, nil
 	})
 
-	// Public share endpoints are rebuilt in R5.14 against calendar_public_shares.
+	// Public share endpoints will be rebuilt against calendar_public_shares.
 
 	// Protected routes (RequireAuth).
 	aclDB := passthroughDB{deps.DB}
@@ -142,7 +142,7 @@ func BuildResult(deps Deps) Result {
 			Summary:     "List events across every workspace the caller belongs to",
 		}, calendars.ListMyCalendarEvents(calDeps))
 
-		// Calendar-invite accept is gone; ws joining uses workspace_invites in R5.9.
+		// Calendar-invite accept is gone; ws joining uses workspace_invites.
 	})
 
 	// Calendar-scoped routes (RequireAuth + RequireCalendarMember).
@@ -218,7 +218,7 @@ func BuildResult(deps Deps) Result {
 			Summary:     "Parse natural language text into an event proposal",
 		}, calendars.SmartCreate(calDeps))
 
-		// iCalendar export is rebuilt in R5.14 against calendar_public_shares.
+		// iCalendar export will be rebuilt against calendar_public_shares.
 
 		// Task-to-calendar sync.
 		huma.Register(calAPI, huma.Operation{
@@ -254,8 +254,8 @@ func BuildResult(deps Deps) Result {
 			Summary:     "Remove a member from a calendar",
 		}, calendars.RemoveMember(calDeps))
 
-		// Calendar-scoped invite links are gone; public share pages replace
-		// them in R5.14 (calendar_public_shares), and workspace-level
+		// Calendar-scoped invite links are gone; public share pages
+		// (calendar_public_shares) replace them, and workspace-level
 		// joining uses workspace_invites.
 
 		// Event attendees.

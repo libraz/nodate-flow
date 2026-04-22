@@ -365,7 +365,7 @@ func ensureCalendar(ctx context.Context, db *sql.DB, q *generated.Queries, wsID,
 	}
 
 	// Insert directly: the generated CreateCalendar signature drops
-	// owner_user_id after the R5 subscription cleanup; keep the
+	// owner_user_id after the subscription cleanup; keep the
 	// personal-calendar seed until queries are rebuilt.
 	pub := types.New()
 	res, err := db.ExecContext(ctx,

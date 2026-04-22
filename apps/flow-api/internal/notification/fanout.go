@@ -210,7 +210,7 @@ func classifyEvent(eventType string) (title string, resourceType string, severit
 	case "task.transition.cancel":
 		return "A task was cancelled", "task", generated.NotificationsSeverityNormal
 
-	// itemkit kinds (R5.1): task ↔ calendar_event atomic mutations.
+	// itemkit kinds: task ↔ calendar_event atomic mutations.
 	// The reader for these events is the "item" (task + its projections);
 	// resourceType stays "task" because downstream routing is the same.
 	case "item.scheduled":

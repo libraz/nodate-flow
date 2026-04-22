@@ -201,7 +201,7 @@ func resolveCalendar(ctx context.Context, deps Deps, s *session, publicID string
 // event. Returns true if the user is the event owner, a can_edit
 // attendee, or the personal-calendar owner.
 //
-// post-R5.1: calendar_subscriptions.role was dropped, so there is no
+// calendar_subscriptions.role has been dropped, so there is no
 // per-subscription manager/owner tier anymore. The calendar-level
 // "owner" is whoever holds calendars.owner_user_id (personal layer).
 // System calendars (kind=system) are read-only and have no editable

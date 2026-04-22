@@ -29,8 +29,8 @@ type ListEventsInput struct {
 }
 
 // EventResponse is the JSON representation of a calendar event.
-// StartAt / EndAt are nullable because R5.1 introduced "planning stage"
-// events that may be dateless until scheduled (see calendar_events.sql).
+// StartAt / EndAt are nullable to support "planning stage" events
+// that may be dateless until scheduled (see calendar_events.sql).
 type EventResponse struct {
 	ID                   string           `json:"id"`
 	Kind                 string           `json:"kind"`
@@ -463,8 +463,8 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		}
 
 		// Pair invariant: explicit partial start_at without end_at (or
-		// vice versa) is ambiguous. R5.14 allows undated transitions but
-		// those must come through unlink first.
+		// vice versa) is ambiguous. Undated transitions are supported,
+		// but they must come through unlink first.
 		if (input.Body.StartAt == nil) != (input.Body.EndAt == nil) {
 			return nil, httpErr(apierrors.CalendarEventStartEndPairRequired)
 		}

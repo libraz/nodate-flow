@@ -36,8 +36,8 @@ const EDGES: { from: GraphState; to: GraphState; label: string }[] = [
 /**
  * External signal sources that may feed this task. Rendered as
  * floating square nodes with a dashed edge into `open`, so the
- * Phase 4 state graph (4.WEB-2) shows clearly that github / slack /
- * google can drive transitions from outside.
+ * state graph shows clearly that github / slack / google can
+ * drive transitions from outside.
  */
 /** Brand colors for external integration sources (fixed, not theme-dependent). */
 const BRAND_COLOR = {

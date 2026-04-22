@@ -194,9 +194,9 @@ func CreateCalendar(deps Deps) func(context.Context, *CreateCalendarInput) (*Cre
 			Color:       input.Body.Color,
 			CoverUrl:    input.Body.CoverUrl,
 			SystemSlug:  input.Body.SystemSlug,
-			// post-R5.1: calendar_subscriptions.role was dropped. Creator is
+			// calendar_subscriptions.role has been dropped. Creator is
 			// the calendar owner (cal.owner_user_id); DTO surfaces "owner" to
-			// preserve SDK shape. Rebuilt properly in R5.2.
+			// preserve SDK shape.
 			Role:                   "owner",
 			MemberColor:            input.Body.Color,
 			DisplayColor:           input.Body.Color,
@@ -309,8 +309,8 @@ func DeleteCalendar(deps Deps) func(context.Context, *DeleteCalendarInput) (*Del
 		if err != nil {
 			return nil, err
 		}
-		// post-R5.1: subscription role was dropped; fall back to calendar
-		// ownership (cal.owner_user_id). Rebuilt properly in R5.2.
+		// Subscription role has been dropped; fall back to calendar
+		// ownership (cal.owner_user_id).
 		if !(cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(actorID)) {
 			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
@@ -339,7 +339,7 @@ func DeleteCalendar(deps Deps) func(context.Context, *DeleteCalendarInput) (*Del
 // --- Mapping helpers ---
 
 func calendarFromListRow(r generated.ListCalendarsForUserRow) CalendarResponse {
-	// post-R5.1: subscription role + member_color were dropped. Expose a
+	// Subscription role + member_color have been dropped. Expose a
 	// stable DTO shape: derive "role" from calendar ownership, and fall back
 	// to display_color for member_color so SDK consumers keep rendering.
 	role := "editor"
@@ -374,7 +374,7 @@ func calendarFromListRow(r generated.ListCalendarsForUserRow) CalendarResponse {
 }
 
 func calendarFromRow(c generated.FindCalendarByPublicIdRow, s generated.FindCalendarSubscriptionRow) CalendarResponse {
-	// post-R5.1: subscription role + member_color were dropped. Derive "role"
+	// Subscription role + member_color have been dropped. Derive "role"
 	// from calendar ownership; fall back to display_color for member_color.
 	role := "editor"
 	if c.OwnerUserID.Valid {

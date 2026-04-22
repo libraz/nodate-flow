@@ -75,7 +75,7 @@ const (
 	KindCalendarChanged Kind = "calendar.changed"
 
 	// KindItemChanged fires on any `item.*` append from itemkit
-	// (R5 unified task+event facade). The frontend invalidates both
+	// (the unified task+event facade). The frontend invalidates both
 	// task and calendar-event caches because an item change touches
 	// both sides of the link in one transaction.
 	KindItemChanged Kind = "item.changed"

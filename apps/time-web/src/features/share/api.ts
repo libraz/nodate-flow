@@ -1,7 +1,7 @@
 /**
  * share/api — hooks for the public share route.
  *
- * The internal calendar UX lives in flow-web now (R5.6). time-web keeps
+ * The internal calendar UX now lives in flow-web. time-web keeps
  * only the public share flow and the invite-accept handoff it triggers
  * after login. This file replaces the narrow slice of the former
  * `features/calendar/api.ts` that the share page still needs.

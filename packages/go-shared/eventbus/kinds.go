@@ -202,20 +202,21 @@ const (
 	ImportJobCancelled Kind = "import.job.cancelled"
 )
 
-// Workspace membership lifecycle events (emitted by memberkit in R5.9).
+// Workspace membership lifecycle events (emitted by memberkit).
 const (
 	WorkspaceMemberAdded       Kind = "workspace.member.added"
 	WorkspaceMemberRemoved     Kind = "workspace.member.removed"
 	WorkspaceMemberRoleChanged Kind = "workspace.member.role_changed"
 )
 
-// Item (unified task+event) lifecycle events — R5 itemkit.
+// Item (unified task+event) lifecycle events.
 //
 // These fire whenever itemkit mutates the linked (task ↔ calendar_event)
-// pair atomically. During the R5 dual-append transition window, itemkit
+// pair atomically. During the dual-append transition window, itemkit
 // ALSO emits the legacy `task.*` and `calendar.event.*` kinds so
 // existing webhook subscribers and notification consumers keep working.
-// The legacy parallel emission is removed in R6.1.
+// The legacy parallel emission is removed once all subscribers have
+// migrated off the deprecated kinds.
 const (
 	// ItemScheduled is appended when a task gains a linked calendar
 	// event (1:1 projection via calendar_events.task_id).
@@ -232,7 +233,7 @@ const (
 	// ItemDeleted is appended when a cascade delete removes both the
 	// task and every linked event in one transaction.
 	ItemDeleted Kind = "item.deleted"
-	// ItemReconciled is appended by the R5.8 reconciler when it
+	// ItemReconciled is appended by the reconciler when it
 	// self-heals a drift between a task and its linked event(s).
 	ItemReconciled Kind = "item.reconciled"
 
@@ -254,7 +255,7 @@ const (
 	ItemMilestoneLinkRemoved Kind = "item.milestone.link.removed"
 )
 
-// Public share events — R5.14 calendar_public_shares.
+// Public share events — calendar_public_shares.
 const (
 	SharePublished      Kind = "share.published"
 	ShareUpdated        Kind = "share.updated"

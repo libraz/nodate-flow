@@ -47,8 +47,8 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 			return nil, err
 		}
 
-		// post-R5.1: ws members have edit access; event-level visibility is
-		// the real ACL (applied later). Rebuilt properly in R5.2.
+		// Ws members have edit access; event-level visibility is the
+		// real ACL (applied later).
 
 		taskUID, err := uuid.Parse(input.Body.TaskID)
 		if err != nil {

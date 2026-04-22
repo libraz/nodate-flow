@@ -271,8 +271,8 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteCommentInput) (*Delet
 		}
 
 		isAuthor := comment.AuthorID == actorID
-		// post-R5.1: subscription role was dropped; fall back to calendar
-		// ownership. Rebuilt properly in R5.2.
+		// Subscription role has been dropped; fall back to calendar
+		// ownership.
 		isCalOwner := cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(actorID)
 		if !isAuthor && !isCalOwner {
 			return nil, httpErr(apierrors.CalendarCommentAuthorOrOwnerRequired)

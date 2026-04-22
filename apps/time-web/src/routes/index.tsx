@@ -12,8 +12,8 @@ export const Route = createFileRoute('/')({
 
 /**
  * Authenticated users are handed off to flow-web, which owns the
- * unified /calendar UX from R5.6 onward. time-web keeps only the
- * public share flow, auth bridge, and workspace setup.
+ * unified /calendar UX. time-web keeps only the public share flow,
+ * auth bridge, and workspace setup.
  */
 function IndexRedirect(): ReactElement | null {
   const { status } = useAuthBootstrap();

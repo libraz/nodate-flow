@@ -339,7 +339,7 @@ WHERE public_id = ?
   AND workspace_id = ?;
 
 -- ListAllCalendarEvents was consumed only by the deleted ICS export path;
--- the replacement (R5.14) will query via calendar_public_shares.
+-- the replacement will query via calendar_public_shares.
 
 -- name: FindCalendarEventOwner :one
 -- Quick lookup for permission checks: who owns this event?

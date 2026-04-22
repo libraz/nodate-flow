@@ -194,9 +194,9 @@ func ListMembers(deps Deps) func(context.Context, *ListMembersInput) (*ListMembe
 		out := &ListMembersOutput{}
 		out.Body.Members = make([]MemberResponse, len(rows))
 		for i, r := range rows {
-			// post-R5.1: member_color + role columns dropped from
+			// member_color + role columns have been dropped from
 			// calendar_subscriptions. Surface an empty color and the previous
-			// DEFAULT role so the DTO shape stays stable. Rebuilt in R5.2.
+			// DEFAULT role so the DTO shape stays stable.
 			resp := MemberResponse{
 				ID:          r.PublicID.String(),
 				UserID:      r.UserPublicID.String(),
@@ -225,8 +225,8 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 		if err != nil {
 			return nil, err
 		}
-		// post-R5.1: subscription role was dropped; fall back to calendar
-		// ownership. Rebuilt properly in R5.2.
+		// Subscription role has been dropped; fall back to calendar
+		// ownership.
 		if !(cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(actorID)) {
 			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
@@ -240,8 +240,8 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 			return nil, httpErr(apierrors.CalendarMemberUserNotFound)
 		}
 
-		// post-R5.1: subscription role was dropped; this endpoint is a no-op
-		// until R5.2's itemkit rebuild. Kept so existing clients keep 200 OK.
+		// Subscription role has been dropped; this endpoint is a no-op
+		// until the itemkit rebuild. Kept so existing clients keep 200 OK.
 		_ = cal
 		_ = targetUserID
 
@@ -281,8 +281,8 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 		}
 
 		isSelf := targetUserID == actorID
-		// post-R5.1: subscription role was dropped; fall back to calendar
-		// ownership. Rebuilt properly in R5.2.
+		// Subscription role has been dropped; fall back to calendar
+		// ownership.
 		isOwner := cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(actorID)
 
 		if !isSelf && !isOwner {
@@ -301,9 +301,9 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 			return nil, httpErr(apierrors.CalendarMemberStoreReadInterrupted)
 		}
 
-		// post-R5.1: last-owner protection now lives on calendars.owner_user_id
+		// Last-owner protection now lives on calendars.owner_user_id
 		// (not subscription role). Prevent removing the single calendar owner
-		// via self-leave. Rebuilt properly in R5.2.
+		// via self-leave.
 		if cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(targetUserID) {
 			return nil, httpErr(apierrors.CalendarMemberLastOwnerRemovalBlocked)
 		}

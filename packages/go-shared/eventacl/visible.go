@@ -2,13 +2,13 @@
 // calendar_events rows. The same predicate is applied by:
 //   - time-api list / detail handlers
 //   - itemkit (before mutating any cross-table link)
-//   - the R5.8 reconciler when scanning for drift
+//   - the reconciler when scanning for drift
 //
 // Keeping the rule in one place prevents the "I'm assigned but can't
 // see the event" bug and the reverse — confidential events leaking
 // through a list endpoint that forgot a filter.
 //
-// Rule (per plan D4 + R5.14):
+// Rule:
 //
 //	visibility='public'       → every ws member sees the event
 //	visibility='default'      → inherits calendar's effective visibility

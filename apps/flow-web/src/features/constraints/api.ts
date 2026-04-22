@@ -1,10 +1,10 @@
 /**
- * Constraints feature — Phase 3 constraint engine hooks.
+ * Constraints feature — constraint engine hooks.
  *
  * - useEvaluateConstraints: POST /tasks/{id}/constraints/evaluate
- *   (3.WEB-1 constraint editor — "evaluate now" button)
+ *   (constraint editor — "evaluate now" button)
  * - useAddConstraint: POST /tasks/{id}/constraints
- *   (3.WEB-1 constraint editor — "save" action)
+ *   (constraint editor — "save" action)
  */
 
 import type { components } from '@nodate-flow/sdk';

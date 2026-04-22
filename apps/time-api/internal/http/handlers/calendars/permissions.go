@@ -22,9 +22,9 @@ var (
 
 // canEditEvent checks if the actor can modify an event.
 //
-// post-R5.1: calendar_subscriptions.role was dropped; ws members have edit
-// access. event-level visibility plus the event owner / can_edit attendee
-// relationship is the real ACL (rebuilt properly in R5.2 via itemkit).
+// calendar_subscriptions.role has been dropped; ws members have edit
+// access. Event-level visibility plus the event owner / can_edit
+// attendee relationship is the real ACL (rebuilt via itemkit).
 func canEditEvent(
 	actorUserID uint32,
 	event generated.FindCalendarEventByPublicIdRow,
@@ -42,7 +42,7 @@ func canEditEvent(
 
 // canSetOwner checks if the actor can create events on behalf of another user.
 //
-// post-R5.1: ws members have edit access; rebuilt properly in R5.2.
+// Ws members have edit access; rebuilt properly via itemkit.
 func canSetOwner(
 	actorUserID uint32,
 	ownerUserID uint32,
@@ -56,8 +56,8 @@ func canSetOwner(
 
 // isOwnerOrManager previously checked the subscription role.
 //
-// post-R5.1: ws members have edit access; event-level visibility is the real
-// ACL (applied later). Always returns true; rebuilt properly in R5.2.
+// Ws members have edit access; event-level visibility is the real
+// ACL (applied later). Always returns true; rebuilt properly via itemkit.
 func isOwnerOrManager(_ generated.FindCalendarSubscriptionRow) bool {
 	return true
 }

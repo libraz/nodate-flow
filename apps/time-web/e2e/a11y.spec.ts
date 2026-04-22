@@ -2,9 +2,9 @@
  * Time-web accessibility e2e tests.
  *
  * Runs axe-core checks on the remaining time-web surfaces (setup +
- * share). The authenticated /calendar UX moved to flow-web in R5.6;
+ * share). The authenticated /calendar UX now lives in flow-web;
  * accessibility coverage for the unified calendar lives in
- * `apps/flow-web/e2e/` now.
+ * `apps/flow-web/e2e/`.
  */
 
 import { test } from '@playwright/test';

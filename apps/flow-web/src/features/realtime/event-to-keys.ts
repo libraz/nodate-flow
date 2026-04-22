@@ -93,9 +93,8 @@ export function keysForEvent(evt: StreamEvent): readonly (readonly unknown[])[] 
       return [['imports', 'list', ws]];
     case 'calendar.changed':
       // calendar.* and share.* appends: public-shares, calendars,
-      // events, members, memos. flow-web's /calendar view consumes
-      // these keys once R5.6 lands; in the meantime the invalidations
-      // are no-ops for pages that don't subscribe.
+      // events, members, memos. Invalidations are no-ops for pages
+      // that don't subscribe.
       return [
         ['calendars', ws],
         ['events', ws],

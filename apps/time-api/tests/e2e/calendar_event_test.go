@@ -12,8 +12,8 @@ import (
 )
 
 // createCalendar is a test helper that creates a personal calendar and returns its public ID.
-// Post-R5.14 the only user-facing calendar kind is "personal"; "system"
-// calendars are provisioned automatically per workspace country.
+// The only user-facing calendar kind is "personal"; "system" calendars
+// are provisioned automatically per workspace country.
 func createCalendar(t *testing.T, tt *helpers.TestTenant) string {
 	t.Helper()
 	var cal struct {

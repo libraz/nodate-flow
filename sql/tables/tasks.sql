@@ -19,7 +19,7 @@ CREATE TABLE tasks (
   priority INT NOT NULL DEFAULT 0 COMMENT 'LLM-optimized heuristic priority',
   due_on DATE NULL COMMENT 'Deadline for task completion; drives constraint evaluation',
   started_on DATE NULL COMMENT 'Date work began on this task',
-  event_on DATE NULL COMMENT 'DEPRECATED (R5.3): use calendar_events.task_role=''event''. Kept for source compat until flow-api handlers and SDK rewire',
+  event_on DATE NULL COMMENT 'DEPRECATED: use calendar_events.task_role=''event''. Kept for source compat until flow-api handlers and SDK rewire',
   completed_at DATETIME NULL COMMENT 'Time derived_state transitioned to done',
   archived_at DATETIME NULL COMMENT 'Set when task is archived (distinct from enabled)',
 

@@ -1,4 +1,4 @@
-// Package region — working-day / working-hour resolver (R5.12).
+// Package region — working-day / working-hour resolver.
 //
 // A workspace and each user carry a 7-character working-day string
 // (Mon..Sun) plus working-hour window. The string format is letter =
