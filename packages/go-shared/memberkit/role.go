@@ -1,0 +1,80 @@
+package memberkit
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/eventbus"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/eventlog"
+)
+
+// UpdateMemberRoleArgs carries the arguments for UpdateMemberRole.
+type UpdateMemberRoleArgs struct {
+	WorkspaceID uint32
+	UserID      uint32
+	NewRole     Role
+	// ActorUserID is the admin / owner performing the change. Used
+	// for the audit event.
+	ActorUserID uint32
+}
+
+// UpdateMemberRole changes workspace_members.role and appends the
+// audit event. Returns sql.ErrNoRows when the membership does not
+// exist.
+//
+// No downstream row is touched: the current design drops the
+// workspace-role → calendar-role mapping (calendars no longer have
+// cross-member ACL), so a role change is a single UPDATE.
+func UpdateMemberRole(ctx context.Context, tx TX, args UpdateMemberRoleArgs) error {
+	if !args.NewRole.IsValid() {
+		return fmt.Errorf("memberkit: invalid role %q", args.NewRole)
+	}
+	if args.WorkspaceID == 0 || args.UserID == 0 {
+		return fmt.Errorf("memberkit: WorkspaceID and UserID required")
+	}
+
+	// Load the current role so the audit event records both sides.
+	var oldRole string
+	err := tx.QueryRowContext(ctx,
+		`SELECT role FROM workspace_members
+		 WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE
+		 LIMIT 1`,
+		args.WorkspaceID, args.UserID).Scan(&oldRole)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		return fmt.Errorf("memberkit: load current role: %w", err)
+	}
+
+	if oldRole == string(args.NewRole) {
+		return nil // no-op, no audit row
+	}
+
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE workspace_members SET role = ?
+		 WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE`,
+		string(args.NewRole), args.WorkspaceID, args.UserID); err != nil {
+		return fmt.Errorf("memberkit: update role: %w", err)
+	}
+
+	actor := args.ActorUserID
+	if actor == 0 {
+		actor = args.UserID
+	}
+	if _, err := eventlog.Append(ctx, tx, eventlog.Event{
+		Type:        string(eventbus.WorkspaceMemberRoleChanged),
+		WorkspaceID: args.WorkspaceID,
+		ActorUserID: &actor,
+		Payload: map[string]any{
+			"userId":  args.UserID,
+			"oldRole": oldRole,
+			"newRole": string(args.NewRole),
+		},
+	}); err != nil {
+		return fmt.Errorf("memberkit: append event: %w", err)
+	}
+	return nil
+}

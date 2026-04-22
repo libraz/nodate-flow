@@ -13,10 +13,20 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/middleware"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/memberkit"
 )
 
 // PrefixInvite is the user-visible prefix for workspace invite tokens.
 const PrefixInvite = "inv_"
+
+// uint32FromNullInt32 extracts a uint32 from a sql.NullInt32; returns
+// 0 when the null flag is unset.
+func uint32FromNullInt32(n sql.NullInt32) uint32 {
+	if !n.Valid {
+		return 0
+	}
+	return uint32(n.Int32)
+}
 
 // CreateInvite handles POST /workspaces/{wsId}/invites. It generates a
 // shareable invite token and stores its SHA-256 hash. The plaintext
@@ -195,22 +205,33 @@ func AcceptInvite(deps InviteDeps) func(context.Context, *AcceptWorkspaceInviteI
 			}}, nil
 		}
 
-		// Create workspace member.
+		// Create the member + materialise personal calendar + use-count
+		// bump in a single tx so a mid-flight failure never leaves the
+		// user half-joined.
+		tx, err := deps.DB.BeginTx(ctx, nil)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		defer func() { _ = tx.Rollback() }()
+
+		txQueries := deps.Queries.WithTx(tx)
 		now := time.Now()
-		memPub := types.New()
-		memberRole := generated.WorkspaceMembersRole(invite.Role)
-		if _, err := deps.Queries.CreateWorkspaceMember(ctx, generated.CreateWorkspaceMemberParams{
-			PublicID:    memPub,
-			WorkspaceID: invite.WorkspaceID,
-			UserID:      actorID,
-			Role:        memberRole,
-			JoinedAt:    sql.NullTime{Time: now, Valid: true},
+		if _, err := memberkit.AddWorkspaceMember(ctx, tx, memberkit.AddWorkspaceMemberArgs{
+			WorkspaceID:              invite.WorkspaceID,
+			UserID:                   actorID,
+			Role:                     memberkit.Role(invite.Role),
+			InvitedByUserID:          uint32FromNullInt32(invite.CreatedByUserID),
+			InvitedAt:                invite.CreatedAt,
+			JoinedAt:                 now,
+			EnsurePersonalCalendar:   true,
+			SubscribeHolidayCalendar: true,
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-
-		// Increment use count.
-		if err := deps.Queries.IncrementInviteUseCount(ctx, invite.ID); err != nil {
+		if err := txQueries.IncrementInviteUseCount(ctx, invite.ID); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if err := tx.Commit(); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 

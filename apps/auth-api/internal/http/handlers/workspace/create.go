@@ -12,6 +12,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/memberkit"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/region"
 )
 
@@ -48,7 +49,15 @@ func Create(deps Deps) func(context.Context, *CreateWorkspaceInput) (*CreateWork
 		pub := types.New()
 		desc := sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""}
 		icon := sql.NullString{String: in.Body.IconURL, Valid: in.Body.IconURL != ""}
-		wsID, err := deps.Queries.CreateWorkspace(ctx, generated.CreateWorkspaceParams{
+
+		tx, err := deps.DB.BeginTx(ctx, nil)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		defer func() { _ = tx.Rollback() }()
+		txQueries := deps.Queries.WithTx(tx)
+
+		wsID, err := txQueries.CreateWorkspace(ctx, generated.CreateWorkspaceParams{
 			PublicID:    pub,
 			Slug:        slug,
 			Name:        in.Body.Name,
@@ -61,15 +70,18 @@ func Create(deps Deps) func(context.Context, *CreateWorkspaceInput) (*CreateWork
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		now := sql.NullTime{Time: time.Now(), Valid: true}
-		memPub := types.New()
-		if _, err := deps.Queries.CreateWorkspaceMember(ctx, generated.CreateWorkspaceMemberParams{
-			PublicID:    memPub,
-			WorkspaceID: uint32(wsID),
-			UserID:      uid,
-			Role:        generated.WorkspaceMembersRoleOwner,
-			JoinedAt:    now,
+		// Add the creator as owner through memberkit so their
+		// personal calendar layer materialises in the same tx.
+		if _, err := memberkit.AddWorkspaceMember(ctx, tx, memberkit.AddWorkspaceMemberArgs{
+			WorkspaceID:              uint32(wsID),
+			UserID:                   uid,
+			Role:                     memberkit.RoleOwner,
+			EnsurePersonalCalendar:   true,
+			SubscribeHolidayCalendar: country != "",
 		}); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if err := tx.Commit(); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 

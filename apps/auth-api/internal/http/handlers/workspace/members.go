@@ -12,6 +12,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/middleware"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/memberkit"
 )
 
 // resolveUserInternalID looks up the internal numeric users.id for the
@@ -97,46 +98,52 @@ func InviteMember(deps Deps) func(context.Context, *AddWorkspaceMemberInput) (*A
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		// Idempotency: if already a member, return that record.
-		if existingMem, merr := deps.Queries.FindWorkspaceMemberByUserId(ctx, generated.FindWorkspaceMemberByUserIdParams{
+		// Route member creation through memberkit so the personal
+		// calendar layer and (if applicable) holiday subscription
+		// materialise in the same transaction as the member row.
+		now := time.Now()
+		tx, err := deps.DB.BeginTx(ctx, nil)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		defer func() { _ = tx.Rollback() }()
+
+		mkRes, err := memberkit.AddWorkspaceMember(ctx, tx, memberkit.AddWorkspaceMemberArgs{
+			WorkspaceID:              ws.ID,
+			UserID:                   userID,
+			Role:                     memberkit.Role(role),
+			InvitedByUserID:          actorID,
+			InvitedAt:                now,
+			EnsurePersonalCalendar:   true,
+			SubscribeHolidayCalendar: true,
+		})
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
+		// Fetch the member row to build the response with canonical
+		// timestamps. This second read is deliberate: memberkit does
+		// not marshal to the handler DTO.
+		mem, err := deps.Queries.FindWorkspaceMemberByUserId(ctx, generated.FindWorkspaceMemberByUserIdParams{
 			WorkspaceID: ws.ID,
 			UserID:      userID,
-		}); merr == nil {
-			return &AddWorkspaceMemberOutput{Body: WorkspaceMember{
-				ID:          existingMem.PublicID.String(),
-				UserID:      userPub.String(),
-				Email:       emailAddr,
-				DisplayName: displayName,
-				Role:        string(existingMem.Role),
-				InvitedAt:   nullTimeUnix(existingMem.InvitedAt),
-				JoinedAt:    nullTimeUnix(existingMem.JoinedAt),
-				CreatedAt:   existingMem.CreatedAt.Unix(),
-			}}, nil
-		} else if !errors.Is(merr, sql.ErrNoRows) {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-
-		now := time.Now()
-		memPub := types.New()
-		if _, err := deps.Queries.CreateWorkspaceMember(ctx, generated.CreateWorkspaceMemberParams{
-			PublicID:        memPub,
-			WorkspaceID:     ws.ID,
-			UserID:          userID,
-			Role:            role,
-			InvitedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
-			InvitedAt:       sql.NullTime{Time: now, Valid: true},
-		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
+		_ = mkRes // result struct reserved for future UI signals (created calendar, etc.)
 		return &AddWorkspaceMemberOutput{Body: WorkspaceMember{
-			ID:          memPub.String(),
+			ID:          mem.PublicID.String(),
 			UserID:      userPub.String(),
 			Email:       emailAddr,
 			DisplayName: displayName,
-			Role:        string(role),
-			InvitedAt:   int64Ptr(now.Unix()),
-			CreatedAt:   now.Unix(),
+			Role:        string(mem.Role),
+			InvitedAt:   nullTimeUnix(mem.InvitedAt),
+			JoinedAt:    nullTimeUnix(mem.JoinedAt),
+			CreatedAt:   mem.CreatedAt.Unix(),
 		}}, nil
 	}
 }
@@ -148,6 +155,7 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateWorkspaceMemberRol
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
+		actorID, _ := authn.ActorFromContext(ctx)
 		userPub, err := types.Parse(in.UserID)
 		if err != nil {
 			return nil, httpErr(apierrors.WsMemberNotFound)
@@ -159,28 +167,38 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateWorkspaceMemberRol
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		mem, err := deps.Queries.FindWorkspaceMemberByUserId(ctx, generated.FindWorkspaceMemberByUserIdParams{
+
+		tx, err := deps.DB.BeginTx(ctx, nil)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		defer func() { _ = tx.Rollback() }()
+		if err := memberkit.UpdateMemberRole(ctx, tx, memberkit.UpdateMemberRoleArgs{
 			WorkspaceID: ws.ID,
 			UserID:      uid,
-		})
-		if err != nil {
+			NewRole:     memberkit.Role(in.Body.Role),
+			ActorUserID: actorID,
+		}); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, httpErr(apierrors.WsMemberNotFound)
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		role := generated.WorkspaceMembersRole(in.Body.Role)
-		if err := deps.Queries.UpdateMemberRoleByUserId(ctx, generated.UpdateMemberRoleByUserIdParams{
-			Role:        role,
+		if err := tx.Commit(); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
+		mem, err := deps.Queries.FindWorkspaceMemberByUserId(ctx, generated.FindWorkspaceMemberByUserIdParams{
 			WorkspaceID: ws.ID,
 			UserID:      uid,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		return &UpdateWorkspaceMemberRoleOutput{Body: WorkspaceMember{
 			ID:        mem.PublicID.String(),
 			UserID:    userPub.String(),
-			Role:      string(role),
+			Role:      string(mem.Role),
 			InvitedAt: nullTimeUnix(mem.InvitedAt),
 			JoinedAt:  nullTimeUnix(mem.JoinedAt),
 			CreatedAt: mem.CreatedAt.Unix(),
@@ -195,6 +213,7 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveWorkspaceMemberInput) 
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
+		actorID, _ := authn.ActorFromContext(ctx)
 		userPub, err := types.Parse(in.UserID)
 		if err != nil {
 			return nil, httpErr(apierrors.WsMemberNotFound)
@@ -206,12 +225,26 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveWorkspaceMemberInput) 
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		if err := deps.Queries.RemoveWorkspaceMemberByUserId(ctx, generated.RemoveWorkspaceMemberByUserIdParams{
-			WorkspaceID: ws.ID,
-			UserID:      uid,
-		}); err != nil {
+
+		tx, err := deps.DB.BeginTx(ctx, nil)
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		defer func() { _ = tx.Rollback() }()
+		if _, err := memberkit.RemoveWorkspaceMember(ctx, tx, memberkit.RemoveWorkspaceMemberArgs{
+			WorkspaceID: ws.ID,
+			UserID:      uid,
+			ActorUserID: actorID,
+		}); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, httpErr(apierrors.WsMemberNotFound)
+			}
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
 		out := &RemoveWorkspaceMemberOutput{}
 		out.Body.Ok = true
 		return out, nil
