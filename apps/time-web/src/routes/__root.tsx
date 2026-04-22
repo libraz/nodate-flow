@@ -1,4 +1,4 @@
-import { Link, Outlet, createRootRouteWithContext } from '@tanstack/react-router';
+import { Link, Outlet, createRootRouteWithContext, useRouterState } from '@tanstack/react-router';
 import { type ReactElement, Suspense, lazy } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
@@ -138,10 +138,15 @@ function FatalFallback({
 }
 
 function RootLayout(): ReactElement {
+  // Reset the root ErrorBoundary whenever the pathname changes so a single
+  // failing route does not permanently wedge the entire app. Without this,
+  // react-error-boundary keeps rendering the fallback across navigations
+  // until the user explicitly clicks the retry button.
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (
     <div className={`app-bg ${styles.root}`}>
       <ThemeInitializer />
-      <ErrorBoundary FallbackComponent={FatalFallback}>
+      <ErrorBoundary FallbackComponent={FatalFallback} resetKeys={[pathname]}>
         <Suspense fallback={<PageSkeleton sidebar />}>
           <div className={styles.main}>
             <Outlet />
