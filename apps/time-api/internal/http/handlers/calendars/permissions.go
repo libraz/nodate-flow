@@ -20,11 +20,9 @@ var (
 	errInviteNotFound       = httpErr(apierrors.CalendarInviteNotFound)
 )
 
-// canEditEvent checks if the actor can modify an event.
-//
-// calendar_subscriptions.role has been dropped; ws members have edit
-// access. Event-level visibility plus the event owner / can_edit
-// attendee relationship is the real ACL (rebuilt via itemkit).
+// canEditEvent returns true iff the actor is the event owner or an attendee
+// with can_edit. Workspace membership alone does not grant edit access;
+// event-level owner/attendee relationship is the edit gate.
 func canEditEvent(
 	actorUserID uint32,
 	event generated.FindCalendarEventByPublicIdRow,
@@ -37,12 +35,13 @@ func canEditEvent(
 	if attendee != nil && attendee.CanEdit {
 		return true
 	}
-	return true
+	return false
 }
 
-// canSetOwner checks if the actor can create events on behalf of another user.
-//
-// Ws members have edit access; rebuilt properly via itemkit.
+// canSetOwner returns true iff the actor sets themselves as the event owner.
+// Setting another user as owner (manager-style delegation) is not supported
+// in the current post-itemkit model — rebuilt later when manager role is
+// reintroduced.
 func canSetOwner(
 	actorUserID uint32,
 	ownerUserID uint32,
@@ -51,15 +50,7 @@ func canSetOwner(
 	if actorUserID == ownerUserID {
 		return true
 	}
-	return true
-}
-
-// isOwnerOrManager previously checked the subscription role.
-//
-// Ws members have edit access; event-level visibility is the real
-// ACL (applied later). Always returns true; rebuilt properly via itemkit.
-func isOwnerOrManager(_ generated.FindCalendarSubscriptionRow) bool {
-	return true
+	return false
 }
 
 // validateInvite checks that the invite has not expired and has not exceeded its use limit.

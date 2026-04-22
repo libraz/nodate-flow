@@ -197,7 +197,7 @@ func TestDeleteEvent(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, status)
 }
 
-func TestEventPermission_EditorCannotEditOthersEvent(t *testing.T) {
+func TestEventPermission_NonOwnerCannotEditOthersEvent(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
 
@@ -205,9 +205,8 @@ func TestEventPermission_EditorCannotEditOthersEvent(t *testing.T) {
 	calID := createCalendar(t, owner)
 
 	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
-	editor := helpers.CreateExtraMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+	member := helpers.CreateExtraMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
 
-	// Owner creates an event.
 	var evt struct {
 		ID string `json:"id"`
 	}
@@ -219,14 +218,14 @@ func TestEventPermission_EditorCannotEditOthersEvent(t *testing.T) {
 		"timezone": "UTC",
 	}, &evt)
 
-	// Editor tries to PATCH it.
-	status, _ := helpers.DoJSONStatus(t, http.MethodPatch, editor.WsPath("calendars", calID, "events", evt.ID), editor.AccessToken, map[string]any{
-		"title": "Hacked",
+	status, body := helpers.DoJSONStatus(t, http.MethodPatch, member.WsPath("calendars", calID, "events", evt.ID), member.AccessToken, map[string]any{
+		"title": "Hostile Update",
 	})
-	assert.Equal(t, http.StatusForbidden, status, "editor should not be able to edit owner's event")
+	assert.Equal(t, http.StatusForbidden, status)
+	assert.Contains(t, string(body), "CALENDAR.EVENT.EDIT_PERMISSION_REQUIRED")
 }
 
-func TestEventPermission_ManagerCanEditOthersEvent(t *testing.T) {
+func TestEventPermission_NonOwnerCannotSetOtherOwner(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
 
@@ -234,74 +233,142 @@ func TestEventPermission_ManagerCanEditOthersEvent(t *testing.T) {
 	calID := createCalendar(t, owner)
 
 	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
-	manager := helpers.CreateExtraMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+	member := helpers.CreateExtraMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
 
-	// Owner creates an event.
-	var evt struct {
-		ID string `json:"id"`
-	}
-	helpers.DoJSON(t, http.MethodPost, owner.WsPath("calendars", calID, "events"), owner.AccessToken, map[string]any{
-		"kind":     "event",
-		"title":    "Owner Event",
-		"startAt":  time.Date(2026, 10, 1, 10, 0, 0, 0, time.UTC).Format(time.RFC3339),
-		"endAt":    time.Date(2026, 10, 1, 11, 0, 0, 0, time.UTC).Format(time.RFC3339),
-		"timezone": "UTC",
-	}, &evt)
-
-	// Manager patches it.
-	var patched struct {
-		Title string `json:"title"`
-	}
-	helpers.DoJSON(t, http.MethodPatch, manager.WsPath("calendars", calID, "events", evt.ID), manager.AccessToken, map[string]any{
-		"title": "Manager Updated",
-	}, &patched)
-	assert.Equal(t, "Manager Updated", patched.Title)
-}
-
-func TestManagerDelegation_CreateEventOnBehalf(t *testing.T) {
-	bootstrap(t)
-	t.Parallel()
-
-	owner := newTenant(t)
-	calID := createCalendar(t, owner)
-
-	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
-	manager := helpers.CreateExtraMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
-
-	// Manager creates an event with ownerUserId set to the calendar owner.
-	var resp struct {
-		ID string `json:"id"`
-	}
-	helpers.DoJSON(t, http.MethodPost, manager.WsPath("calendars", calID, "events"), manager.AccessToken, map[string]any{
+	status, body := helpers.DoJSONStatus(t, http.MethodPost, member.WsPath("calendars", calID, "events"), member.AccessToken, map[string]any{
 		"kind":        "event",
-		"title":       "Delegated Event",
-		"startAt":     time.Date(2026, 11, 1, 10, 0, 0, 0, time.UTC).Format(time.RFC3339),
-		"endAt":       time.Date(2026, 11, 1, 11, 0, 0, 0, time.UTC).Format(time.RFC3339),
-		"timezone":    "UTC",
-		"ownerUserId": owner.UserPublicID.String(),
-	}, &resp)
-
-	require.NotEmpty(t, resp.ID, "manager should be able to create event on behalf of another member")
-}
-
-func TestEditorCannotSetOtherOwner(t *testing.T) {
-	bootstrap(t)
-	t.Parallel()
-
-	owner := newTenant(t)
-	calID := createCalendar(t, owner)
-
-	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
-	editor := helpers.CreateExtraMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
-
-	// Editor tries to create an event with ownerUserId set to the calendar owner.
-	status, _ := helpers.DoJSONStatus(t, http.MethodPost, editor.WsPath("calendars", calID, "events"), editor.AccessToken, map[string]any{
-		"kind":        "event",
-		"title":       "Sneaky Event",
+		"title":       "Forged Delegation",
 		"startAt":     time.Date(2026, 12, 1, 10, 0, 0, 0, time.UTC).Format(time.RFC3339),
 		"endAt":       time.Date(2026, 12, 1, 11, 0, 0, 0, time.UTC).Format(time.RFC3339),
 		"timezone":    "UTC",
 		"ownerUserId": owner.UserPublicID.String(),
 	})
-	assert.Equal(t, http.StatusForbidden, status, "editor should not be able to set another user as event owner")
+	assert.Equal(t, http.StatusForbidden, status)
+	assert.Contains(t, string(body), "CALENDAR.EVENT.EDIT_PERMISSION_REQUIRED")
+}
+
+func TestEventPermission_NonOwnerCannotDeleteOthersEvent(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	owner := newTenant(t)
+	calID := createCalendar(t, owner)
+
+	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
+	member := helpers.CreateExtraMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+
+	var evt struct {
+		ID string `json:"id"`
+	}
+	helpers.DoJSON(t, http.MethodPost, owner.WsPath("calendars", calID, "events"), owner.AccessToken, map[string]any{
+		"kind":     "event",
+		"title":    "Do Not Delete",
+		"startAt":  time.Date(2026, 10, 1, 10, 0, 0, 0, time.UTC).Format(time.RFC3339),
+		"endAt":    time.Date(2026, 10, 1, 11, 0, 0, 0, time.UTC).Format(time.RFC3339),
+		"timezone": "UTC",
+	}, &evt)
+
+	status, body := helpers.DoJSONStatus(t, http.MethodDelete, member.WsPath("calendars", calID, "events", evt.ID), member.AccessToken, nil)
+	assert.Equal(t, http.StatusForbidden, status)
+	assert.Contains(t, string(body), "CALENDAR.EVENT.EDIT_PERMISSION_REQUIRED")
+}
+
+func TestEventPermission_AttendeeWithCanEditCanEdit(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	owner := newTenant(t)
+	calID := createCalendar(t, owner)
+
+	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
+	member := helpers.CreateExtraMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+
+	var evt struct {
+		ID string `json:"id"`
+	}
+	helpers.DoJSON(t, http.MethodPost, owner.WsPath("calendars", calID, "events"), owner.AccessToken, map[string]any{
+		"kind":     "event",
+		"title":    "Team Meeting",
+		"startAt":  time.Date(2026, 11, 1, 10, 0, 0, 0, time.UTC).Format(time.RFC3339),
+		"endAt":    time.Date(2026, 11, 1, 11, 0, 0, 0, time.UTC).Format(time.RFC3339),
+		"timezone": "UTC",
+	}, &evt)
+
+	helpers.DoJSON(t, http.MethodPost, owner.WsPath("calendars", calID, "events", evt.ID, "attendees"), owner.AccessToken, map[string]any{
+		"userIds": []string{member.UserPublicID.String()},
+	}, nil)
+
+	helpers.DoJSON(t, http.MethodPatch, owner.WsPath("calendars", calID, "events", evt.ID, "attendees", member.UserPublicID.String(), "can-edit"), owner.AccessToken, map[string]any{
+		"canEdit": true,
+	}, nil)
+
+	var patched struct {
+		Title string `json:"title"`
+	}
+	helpers.DoJSON(t, http.MethodPatch, member.WsPath("calendars", calID, "events", evt.ID), member.AccessToken, map[string]any{
+		"title": "Attendee Updated",
+	}, &patched)
+	assert.Equal(t, "Attendee Updated", patched.Title)
+}
+
+func TestPrivateEventVisibility_ScrubsFieldsForNonOwner(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	owner := newTenant(t)
+	calID := createCalendar(t, owner)
+
+	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
+	member := helpers.CreateExtraMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+
+	start := time.Date(2027, 1, 15, 9, 0, 0, 0, time.UTC)
+	end := time.Date(2027, 1, 15, 10, 0, 0, 0, time.UTC)
+
+	var created struct {
+		ID string `json:"id"`
+	}
+	helpers.DoJSON(t, http.MethodPost, owner.WsPath("calendars", calID, "events"), owner.AccessToken, map[string]any{
+		"kind":       "event",
+		"visibility": "private",
+		"title":      "Private Meeting",
+		"startAt":    start.Format(time.RFC3339),
+		"endAt":      end.Format(time.RFC3339),
+		"timezone":   "UTC",
+		"location":   "HQ Room 3",
+		"memo":       "Budget review notes",
+		"url":        "https://internal.example/meet",
+	}, &created)
+	require.NotEmpty(t, created.ID)
+
+	type eventView struct {
+		Title    string  `json:"title"`
+		StartAt  *int64  `json:"startAt"`
+		EndAt    *int64  `json:"endAt"`
+		Location *string `json:"location"`
+		Memo     *string `json:"memo"`
+		Url      *string `json:"url"`
+	}
+
+	var memberView eventView
+	helpers.DoJSON(t, http.MethodGet, member.WsPath("calendars", calID, "events", created.ID), member.AccessToken, nil, &memberView)
+
+	assert.Equal(t, "Private Meeting", memberView.Title)
+	require.NotNil(t, memberView.StartAt)
+	require.NotNil(t, memberView.EndAt)
+	assert.Equal(t, start.Unix(), *memberView.StartAt)
+	assert.Equal(t, end.Unix(), *memberView.EndAt)
+	assert.Nil(t, memberView.Location, "location must be scrubbed for non-owner on private event")
+	assert.Nil(t, memberView.Memo, "memo must be scrubbed for non-owner on private event")
+	assert.Nil(t, memberView.Url, "url must be scrubbed for non-owner on private event")
+
+	var ownerView eventView
+	helpers.DoJSON(t, http.MethodGet, owner.WsPath("calendars", calID, "events", created.ID), owner.AccessToken, nil, &ownerView)
+
+	assert.Equal(t, "Private Meeting", ownerView.Title)
+	require.NotNil(t, ownerView.Location)
+	require.NotNil(t, ownerView.Memo)
+	require.NotNil(t, ownerView.Url)
+	assert.Equal(t, "HQ Room 3", *ownerView.Location)
+	assert.Equal(t, "Budget review notes", *ownerView.Memo)
+	assert.Equal(t, "https://internal.example/meet", *ownerView.Url)
 }

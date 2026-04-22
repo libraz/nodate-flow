@@ -245,8 +245,10 @@ func PatchCalendar(deps Deps) func(context.Context, *PatchCalendarInput) (*Patch
 		if err != nil {
 			return nil, err
 		}
-		if !isOwnerOrManager(sub) {
-			return nil, httpErr(apierrors.CalendarCalendarManagerRoleRequired)
+		// Only the calendar owner can modify calendar metadata.
+		// Subscription role has been dropped; owner-only is the new gate.
+		if !(cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(actorID)) {
+			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
 
 		patchName := sql.NullString{}

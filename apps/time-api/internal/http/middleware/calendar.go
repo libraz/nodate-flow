@@ -22,8 +22,7 @@ type CalendarContext struct {
 // SubscriptionContext holds the caller's subscription (membership) info for the
 // resolved calendar. It is populated by RequireCalendarMember.
 type SubscriptionContext struct {
-	ID   uint32
-	Role string
+	ID uint32
 }
 
 // CalendarFromContext extracts the calendar metadata established by
@@ -55,7 +54,7 @@ func SubscriptionFromContext(ctx context.Context) (SubscriptionContext, bool) {
 // resolveWorkspace + resolveCalendar manually.
 func RequireCalendarMember(db ACLDB) func(http.Handler) http.Handler {
 	const calQuery = `SELECT id FROM calendars WHERE public_id = ? AND enabled = TRUE LIMIT 1`
-	const subQuery = `SELECT id, role FROM calendar_subscriptions WHERE calendar_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
+	const subQuery = `SELECT id FROM calendar_subscriptions WHERE calendar_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -87,8 +86,7 @@ func RequireCalendarMember(db ACLDB) func(http.Handler) http.Handler {
 
 			// Verify the actor has an active subscription (membership).
 			var subID uint32
-			var role string
-			if err := db.QueryRowContext(r.Context(), subQuery, calID, actorID).Scan(&subID, &role); err != nil {
+			if err := db.QueryRowContext(r.Context(), subQuery, calID, actorID).Scan(&subID); err != nil {
 				if errors.Is(err, sql.ErrNoRows) {
 					writeError(w, http.StatusForbidden, apierrors.CalendarCalendarAccessDenied.Code,
 						apierrors.CalendarCalendarAccessDenied.Message)
@@ -100,10 +98,7 @@ func RequireCalendarMember(db ACLDB) func(http.Handler) http.Handler {
 
 			ctx := context.WithValue(r.Context(), ctxKeyCalendarID, calID)
 			ctx = context.WithValue(ctx, ctxKeyCalendarIDPublic, pub)
-			ctx = context.WithValue(ctx, ctxKeySubscription, SubscriptionContext{
-				ID:   subID,
-				Role: role,
-			})
+			ctx = context.WithValue(ctx, ctxKeySubscription, SubscriptionContext{ID: subID})
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

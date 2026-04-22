@@ -43,14 +43,12 @@ func TestSubscriptionFromContext_Empty(t *testing.T) {
 func TestSubscriptionFromContext_WithValues(t *testing.T) {
 	t.Parallel()
 	ctx := context.WithValue(context.Background(), ctxKeySubscription, SubscriptionContext{
-		ID:   7,
-		Role: "editor",
+		ID: 7,
 	})
 
 	sub, ok := SubscriptionFromContext(ctx)
 	require.True(t, ok)
 	assert.Equal(t, uint32(7), sub.ID)
-	assert.Equal(t, "editor", sub.Role)
 }
 
 // TestRequireCalendarMember_NoActor verifies that requests without an

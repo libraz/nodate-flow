@@ -101,12 +101,14 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 		if err != nil {
 			return nil, err
 		}
-		cal, sub, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
-		if !isOwnerOrManager(sub) {
-			return nil, httpErr(apierrors.CalendarCalendarManagerRoleRequired)
+		// Only the calendar owner can add members.
+		// Subscription role has been dropped; owner-only is the new gate.
+		if !(cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(actorID)) {
+			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
 
 		user, err := deps.Queries.FindUserByEmail(ctx, input.Body.Email)

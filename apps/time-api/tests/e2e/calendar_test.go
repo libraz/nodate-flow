@@ -17,7 +17,7 @@ func TestCreateCalendar(t *testing.T) {
 	tt := newTenant(t)
 
 	body := map[string]any{
-		"kind":  "shared",
+		"kind":  "personal",
 		"name":  "Team Calendar",
 		"color": "#4285F4",
 	}
@@ -26,15 +26,13 @@ func TestCreateCalendar(t *testing.T) {
 		Kind  string `json:"kind"`
 		Name  string `json:"name"`
 		Color string `json:"color"`
-		Role  string `json:"role"`
 	}
 	helpers.DoJSON(t, http.MethodPost, tt.WsPath("calendars"), tt.AccessToken, body, &resp)
 
 	require.NotEmpty(t, resp.ID)
-	assert.Equal(t, "shared", resp.Kind)
+	assert.Equal(t, "personal", resp.Kind)
 	assert.Equal(t, "Team Calendar", resp.Name)
 	assert.Equal(t, "#4285F4", resp.Color)
-	assert.Equal(t, "owner", resp.Role)
 }
 
 func TestListCalendars(t *testing.T) {
@@ -44,10 +42,10 @@ func TestListCalendars(t *testing.T) {
 	tt := newTenant(t)
 
 	helpers.DoJSON(t, http.MethodPost, tt.WsPath("calendars"), tt.AccessToken, map[string]any{
-		"kind": "shared", "name": "Cal A", "color": "#FF0000",
+		"kind": "personal", "name": "Cal A", "color": "#FF0000",
 	}, nil)
 	helpers.DoJSON(t, http.MethodPost, tt.WsPath("calendars"), tt.AccessToken, map[string]any{
-		"kind": "shared", "name": "Cal B", "color": "#00FF00",
+		"kind": "personal", "name": "Cal B", "color": "#00FF00",
 	}, nil)
 
 	var resp struct {
@@ -79,7 +77,7 @@ func TestGetCalendar(t *testing.T) {
 		Name string `json:"name"`
 	}
 	helpers.DoJSON(t, http.MethodPost, tt.WsPath("calendars"), tt.AccessToken, map[string]any{
-		"kind": "shared", "name": "Get Test", "color": "#123456",
+		"kind": "personal", "name": "Get Test", "color": "#123456",
 	}, &created)
 
 	var got struct {
@@ -102,7 +100,7 @@ func TestPatchCalendar(t *testing.T) {
 		ID string `json:"id"`
 	}
 	helpers.DoJSON(t, http.MethodPost, tt.WsPath("calendars"), tt.AccessToken, map[string]any{
-		"kind": "shared", "name": "Before", "color": "#000000",
+		"kind": "personal", "name": "Before", "color": "#000000",
 	}, &created)
 
 	var patched struct {
@@ -115,6 +113,54 @@ func TestPatchCalendar(t *testing.T) {
 	assert.Equal(t, "After", patched.Name)
 }
 
+func TestPatchCalendar_NonOwnerForbidden(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	owner := newTenant(t)
+
+	var created struct {
+		ID string `json:"id"`
+	}
+	helpers.DoJSON(t, http.MethodPost, owner.WsPath("calendars"), owner.AccessToken, map[string]any{
+		"kind": "personal", "name": "Owner Cal", "color": "#123456",
+	}, &created)
+
+	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, created.ID)
+	member := helpers.CreateExtraMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+
+	status, body := helpers.DoJSONStatus(t, http.MethodPatch, member.WsPath("calendars", created.ID), member.AccessToken, map[string]any{
+		"name": "Renamed By Member",
+	})
+	assert.Equal(t, http.StatusForbidden, status)
+	assert.Contains(t, string(body), "CALENDAR.CALENDAR.OWNER_ROLE_REQUIRED")
+}
+
+func TestAddMember_NonOwnerForbidden(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	owner := newTenant(t)
+
+	var created struct {
+		ID string `json:"id"`
+	}
+	helpers.DoJSON(t, http.MethodPost, owner.WsPath("calendars"), owner.AccessToken, map[string]any{
+		"kind": "personal", "name": "Shared Cal", "color": "#ABCDEF",
+	}, &created)
+
+	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, created.ID)
+	member := helpers.CreateExtraMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+	third := helpers.CreateExtraMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+
+	status, body := helpers.DoJSONStatus(t, http.MethodPost, member.WsPath("calendars", created.ID, "members"), member.AccessToken, map[string]any{
+		"email": third.Email,
+		"role":  "editor",
+	})
+	assert.Equal(t, http.StatusForbidden, status)
+	assert.Contains(t, string(body), "CALENDAR.CALENDAR.OWNER_ROLE_REQUIRED")
+}
+
 func TestDeleteCalendar(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -125,7 +171,7 @@ func TestDeleteCalendar(t *testing.T) {
 		ID string `json:"id"`
 	}
 	helpers.DoJSON(t, http.MethodPost, tt.WsPath("calendars"), tt.AccessToken, map[string]any{
-		"kind": "shared", "name": "Doomed", "color": "#FF0000",
+		"kind": "personal", "name": "Doomed", "color": "#FF0000",
 	}, &created)
 
 	var deleted struct {

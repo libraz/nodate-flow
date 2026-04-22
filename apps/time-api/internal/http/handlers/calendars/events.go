@@ -379,7 +379,7 @@ func GetEvent(deps Deps) func(context.Context, *GetEventInput) (*GetEventOutput,
 		if err != nil {
 			return nil, err
 		}
-		cal, sub, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
@@ -400,11 +400,11 @@ func GetEvent(deps Deps) func(context.Context, *GetEventInput) (*GetEventOutput,
 			return nil, httpErr(apierrors.CalendarEventStoreReadInterrupted)
 		}
 
-		// Visibility filtering: private events show only title/times to non-owners.
+		// Visibility filtering: private events scrub memo/location/url for
+		// ws members other than the owner. Event-level visibility is the
+		// real ACL; ws membership is the edit gate.
 		resp := eventFromFullRow(evt)
-		if evt.Visibility == generated.CalendarEventsVisibilityPrivate &&
-			evt.OwnerUserID != actorID &&
-			!isOwnerOrManager(sub) {
+		if evt.Visibility == generated.CalendarEventsVisibilityPrivate && evt.OwnerUserID != actorID {
 			resp.Memo = nil
 			resp.Location = nil
 			resp.Url = nil

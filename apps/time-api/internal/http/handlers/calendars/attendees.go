@@ -131,7 +131,7 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 		if err != nil {
 			return nil, err
 		}
-		cal, sub, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
@@ -141,8 +141,9 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 			return nil, err
 		}
 
-		// Only the event owner or calendar owner/manager can add attendees.
-		if evt.OwnerUserID != actorID && !isOwnerOrManager(sub) {
+		// Only the event owner can add attendees. Event-level visibility is
+		// the real ACL; ws membership is the edit gate.
+		if evt.OwnerUserID != actorID {
 			return nil, httpErr(apierrors.CalendarEventEditPermissionRequired)
 		}
 
@@ -209,7 +210,7 @@ func RemoveAttendee(deps Deps) func(context.Context, *RemoveAttendeeInput) (*Rem
 		if err != nil {
 			return nil, err
 		}
-		cal, sub, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
@@ -219,7 +220,7 @@ func RemoveAttendee(deps Deps) func(context.Context, *RemoveAttendeeInput) (*Rem
 			return nil, err
 		}
 
-		if evt.OwnerUserID != actorID && !isOwnerOrManager(sub) {
+		if evt.OwnerUserID != actorID {
 			return nil, httpErr(apierrors.CalendarEventEditPermissionRequired)
 		}
 
