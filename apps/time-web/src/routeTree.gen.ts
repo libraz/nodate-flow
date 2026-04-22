@@ -13,6 +13,8 @@ import { Route as SetupRouteImport } from './routes/setup';
 import { Route as RegisterRouteImport } from './routes/register';
 import { Route as LoginRouteImport } from './routes/login';
 import { Route as IndexRouteImport } from './routes/index';
+import { Route as MeInvitesRouteImport } from './routes/me/invites';
+import { Route as InvitesAcceptRouteImport } from './routes/invites/accept';
 import { Route as ShareCalTokenRouteImport } from './routes/share/cal/$token';
 
 const SetupRoute = SetupRouteImport.update({
@@ -35,6 +37,16 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any);
+const MeInvitesRoute = MeInvitesRouteImport.update({
+  id: '/me/invites',
+  path: '/me/invites',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const InvitesAcceptRoute = InvitesAcceptRouteImport.update({
+  id: '/invites/accept',
+  path: '/invites/accept',
+  getParentRoute: () => rootRouteImport,
+} as any);
 const ShareCalTokenRoute = ShareCalTokenRouteImport.update({
   id: '/share/cal/$token',
   path: '/share/cal/$token',
@@ -46,6 +58,8 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute;
   '/register': typeof RegisterRoute;
   '/setup': typeof SetupRoute;
+  '/invites/accept': typeof InvitesAcceptRoute;
+  '/me/invites': typeof MeInvitesRoute;
   '/share/cal/$token': typeof ShareCalTokenRoute;
 }
 export interface FileRoutesByTo {
@@ -53,6 +67,8 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute;
   '/register': typeof RegisterRoute;
   '/setup': typeof SetupRoute;
+  '/invites/accept': typeof InvitesAcceptRoute;
+  '/me/invites': typeof MeInvitesRoute;
   '/share/cal/$token': typeof ShareCalTokenRoute;
 }
 export interface FileRoutesById {
@@ -61,19 +77,37 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute;
   '/register': typeof RegisterRoute;
   '/setup': typeof SetupRoute;
+  '/invites/accept': typeof InvitesAcceptRoute;
+  '/me/invites': typeof MeInvitesRoute;
   '/share/cal/$token': typeof ShareCalTokenRoute;
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths: '/' | '/login' | '/register' | '/setup' | '/share/cal/$token';
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/register'
+    | '/setup'
+    | '/invites/accept'
+    | '/me/invites'
+    | '/share/cal/$token';
   fileRoutesByTo: FileRoutesByTo;
-  to: '/' | '/login' | '/register' | '/setup' | '/share/cal/$token';
+  to:
+    | '/'
+    | '/login'
+    | '/register'
+    | '/setup'
+    | '/invites/accept'
+    | '/me/invites'
+    | '/share/cal/$token';
   id:
     | '__root__'
     | '/'
     | '/login'
     | '/register'
     | '/setup'
+    | '/invites/accept'
+    | '/me/invites'
     | '/share/cal/$token';
   fileRoutesById: FileRoutesById;
 }
@@ -82,6 +116,8 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute;
   RegisterRoute: typeof RegisterRoute;
   SetupRoute: typeof SetupRoute;
+  InvitesAcceptRoute: typeof InvitesAcceptRoute;
+  MeInvitesRoute: typeof MeInvitesRoute;
   ShareCalTokenRoute: typeof ShareCalTokenRoute;
 }
 
@@ -115,6 +151,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/me/invites': {
+      id: '/me/invites';
+      path: '/me/invites';
+      fullPath: '/me/invites';
+      preLoaderRoute: typeof MeInvitesRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/invites/accept': {
+      id: '/invites/accept';
+      path: '/invites/accept';
+      fullPath: '/invites/accept';
+      preLoaderRoute: typeof InvitesAcceptRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/share/cal/$token': {
       id: '/share/cal/$token';
       path: '/share/cal/$token';
@@ -130,6 +180,8 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
   SetupRoute: SetupRoute,
+  InvitesAcceptRoute: InvitesAcceptRoute,
+  MeInvitesRoute: MeInvitesRoute,
   ShareCalTokenRoute: ShareCalTokenRoute,
 };
 export const routeTree = rootRouteImport

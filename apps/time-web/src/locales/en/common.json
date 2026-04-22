@@ -205,5 +205,33 @@
     "pending": "Pending",
     "accepted": "Accepted",
     "declined": "Declined"
+  },
+  "invites": {
+    "inbox": {
+      "title": "Invites",
+      "empty": "No pending invites.",
+      "rsvp_hint": "To RSVP, click the link in the invite email.",
+      "load_error": "Failed to load invites.",
+      "calendar_workspace": "{calendar} · {workspace}",
+      "undated": "Date to be announced",
+      "expired": "Expired",
+      "expires_in_hours": "{count, plural, one {# hour remaining} other {# hours remaining}}",
+      "expires_at": "Expires {date}"
+    },
+    "accept": {
+      "title": "You've been invited",
+      "prompt": "How would you like to respond?",
+      "action_accept": "Accept",
+      "action_tentative": "Tentative",
+      "action_decline": "Decline",
+      "submitting": "Recording your response...",
+      "success_title": "Your RSVP has been recorded",
+      "success_accepted": "You accepted this invite.",
+      "success_tentative": "You marked this invite as tentative.",
+      "success_declined": "You declined this invite.",
+      "invalid_link": "Invalid invite link.",
+      "not_found": "Invite not found or expired.",
+      "error_generic": "Something went wrong. Please try again."
+    }
   }
 }

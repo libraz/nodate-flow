@@ -205,5 +205,33 @@
     "pending": "未回答",
     "accepted": "参加済み",
     "declined": "不参加"
+  },
+  "invites": {
+    "inbox": {
+      "title": "",
+      "empty": "",
+      "rsvp_hint": "",
+      "load_error": "",
+      "calendar_workspace": "",
+      "undated": "",
+      "expired": "",
+      "expires_in_hours": "",
+      "expires_at": ""
+    },
+    "accept": {
+      "title": "",
+      "prompt": "",
+      "action_accept": "",
+      "action_tentative": "",
+      "action_decline": "",
+      "submitting": "",
+      "success_title": "",
+      "success_accepted": "",
+      "success_tentative": "",
+      "success_declined": "",
+      "invalid_link": "",
+      "not_found": "",
+      "error_generic": ""
+    }
   }
 }
