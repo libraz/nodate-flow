@@ -14,6 +14,8 @@ import { createTestTenant, grantInstanceAdmin } from './tenant';
 
 export interface SharedTenants {
   user: Awaited<ReturnType<typeof createTestTenant>>;
+  /** Second user tenant for tests that mutate user profile (avoids conflicts). */
+  user2: Awaited<ReturnType<typeof createTestTenant>>;
   admin: Awaited<ReturnType<typeof createTestTenant>>;
   /** Whether the admin tenant actually has instance-admin privileges. */
   adminGranted: boolean;
@@ -31,10 +33,14 @@ async function globalSetup(): Promise<void> {
   // Wait before next registration to avoid rate limiter
   await new Promise((r) => setTimeout(r, 2000));
 
+  const user2 = await createTestTenant();
+
+  await new Promise((r) => setTimeout(r, 2000));
+
   const admin = await createTestTenant();
   const adminGranted = await grantInstanceAdmin(admin);
 
-  const tenants: SharedTenants = { user, admin, adminGranted };
+  const tenants: SharedTenants = { user, user2, admin, adminGranted };
   writeFileSync(TENANTS_PATH, JSON.stringify(tenants, null, 2));
 }
 

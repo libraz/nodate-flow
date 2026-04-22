@@ -13,6 +13,7 @@ async function globalTeardown(): Promise<void> {
   try {
     const tenants = JSON.parse(readFileSync(TENANTS_PATH, 'utf-8')) as SharedTenants;
     await cleanupTenant(tenants.user);
+    await cleanupTenant(tenants.user2);
     await cleanupTenant(tenants.admin);
   } catch {
     // Best-effort cleanup
