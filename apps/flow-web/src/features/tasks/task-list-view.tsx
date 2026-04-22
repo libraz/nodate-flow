@@ -101,7 +101,7 @@ function BulkActionBar({
         padding: '0.5rem 0.75rem',
         borderRadius: '0.5rem',
         background: 'var(--nf-color-accent, var(--nf-color-accent))',
-        color: 'var(--nf-color-accent, white)',
+        color: 'white',
         fontSize: '0.8125rem',
         marginBottom: '0.5rem',
       }}

@@ -77,9 +77,9 @@
       "hint_nav": "移動",
       "hint_select": "選択",
       "hint_close": "閉じる",
-      "placeholder_command": "自然言語でコマンドを入力\u2026",
+      "placeholder_command": "自然言語でコマンドを入力…",
       "group_command": "AI コマンド",
-      "resolving": "コマンドを解析中\u2026",
+      "resolving": "コマンドを解析中…",
       "confidence": "信頼度: {score}%",
       "confirm_execute": "Enter で実行",
       "confirm_low": "確認: {tool} を実行しますか？",
@@ -94,6 +94,8 @@
     "aurora-dark": "オーロラ ダーク",
     "dotline-light": "ドットライン ライト",
     "dotline-dark": "ドットライン ダーク",
+    "glass-light": "グラス ライト",
+    "glass-dark": "グラス ダーク",
     "system": "システム"
   },
   "lang": {
@@ -558,7 +560,7 @@
     "steps": {
       "title": "ステップ分解",
       "propose_button": "ステップに分解する",
-      "proposing": "タスクを分析中\u2026",
+      "proposing": "タスクを分析中…",
       "propose_error": "ステップの生成に失敗しました。もう一度お試しください。",
       "empty": "提案されたステップはありません。",
       "toggle_step": "ステップを含める: {title}",
@@ -569,7 +571,7 @@
       "expand": "説明を表示",
       "collapse": "説明を非表示",
       "apply_button": "サブタスクとして作成",
-      "applying": "作成中\u2026",
+      "applying": "作成中…",
       "apply_success": "{count, plural, other {# 件のサブタスクを作成しました。}}",
       "apply_error": "サブタスクの作成に失敗しました。もう一度お試しください。",
       "discard": "破棄",
@@ -580,7 +582,7 @@
     },
     "smart_create": {
       "assist_button": "AI アシスト",
-      "suggesting": "過去のタスクを分析中\u2026",
+      "suggesting": "過去のタスクを分析中…",
       "assignee_section": "担当者の提案",
       "subtask_section": "サブタスクの提案",
       "confidence": "一致度 {value}%",

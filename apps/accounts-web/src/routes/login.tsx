@@ -16,6 +16,7 @@ import { Link, createFileRoute, useNavigate, useSearch } from '@tanstack/react-r
 import { type FormEvent, type ReactElement, useCallback, useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { useCapabilities } from '../features/auth/use-capabilities';
 
 import AuthCard from '../components/auth-card';
 import { type LoginFormValues, loginSchema } from '../features/auth/auth-schemas';
@@ -57,6 +58,7 @@ function LoginPage(): ReactElement {
   const navigate = useNavigate();
   const isAuthenticated = useAuth(selectIsAuthenticated);
   const { redirect: redirectTarget } = useSearch({ from: '/login' });
+  const caps = useCapabilities();
 
   const {
     register,
@@ -95,7 +97,7 @@ function LoginPage(): ReactElement {
 
   const completeSignIn = async (accessToken: string): Promise<void> => {
     authStore.getState().setAccessToken(accessToken);
-    const { data, error } = await sdk.GET('/auth/me');
+    const { data, error } = await sdk.GET('/me');
     if (error || !data) {
       setServerError(mapAuthError(error as ProblemJson | undefined));
       authStore.getState().clearSession();
@@ -504,86 +506,118 @@ function LoginPage(): ReactElement {
           {isSubmitting ? t('login.submitting') : t('login.submit')}
         </Button>
 
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--nf-space-3, 0.75rem)',
-            color: 'var(--nf-color-fg-muted)',
-            fontSize: 'var(--nf-text-sm, 0.875rem)',
-          }}
-        >
-          <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--nf-color-border)' }} />
-          <span>{t('login.sso_divider')}</span>
-          <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--nf-color-border)' }} />
-        </div>
+        {caps && (caps.oidcGoogle || caps.oidcGithub || caps.oidcMicrosoft) && (
+          <>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--nf-space-3, 0.75rem)',
+                color: 'var(--nf-color-fg-muted)',
+                fontSize: 'var(--nf-text-sm, 0.875rem)',
+              }}
+            >
+              <hr
+                style={{ flex: 1, border: 'none', borderTop: '1px solid var(--nf-color-border)' }}
+              />
+              <span>{t('login.sso_divider')}</span>
+              <hr
+                style={{ flex: 1, border: 'none', borderTop: '1px solid var(--nf-color-border)' }}
+              />
+            </div>
 
-        <div
-          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3, 0.75rem)' }}
-        >
-          <Button
-            type="button"
-            variant="default"
-            onClick={() => {
-              void handleSSOStart('google');
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 'var(--nf-space-3, 0.75rem)',
+              }}
+            >
+              {caps.oidcGoogle && (
+                <Button
+                  type="button"
+                  variant="default"
+                  onClick={() => {
+                    void handleSSOStart('google');
+                  }}
+                >
+                  {t('login.sso_google')}
+                </Button>
+              )}
+              {caps.oidcGithub && (
+                <Button
+                  type="button"
+                  variant="default"
+                  onClick={() => {
+                    void handleSSOStart('github');
+                  }}
+                >
+                  {t('login.sso_github')}
+                </Button>
+              )}
+              {caps.oidcMicrosoft && (
+                <Button
+                  type="button"
+                  variant="default"
+                  onClick={() => {
+                    void handleSSOStart('microsoft');
+                  }}
+                >
+                  {t('login.sso_microsoft')}
+                </Button>
+              )}
+            </div>
+          </>
+        )}
+
+        {caps?.magicLink && (
+          <>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--nf-space-3, 0.75rem)',
+                color: 'var(--nf-color-fg-muted)',
+                fontSize: 'var(--nf-text-sm, 0.875rem)',
+              }}
+            >
+              <hr
+                style={{ flex: 1, border: 'none', borderTop: '1px solid var(--nf-color-border)' }}
+              />
+              <span>{t('login.magic_link_divider')}</span>
+              <hr
+                style={{ flex: 1, border: 'none', borderTop: '1px solid var(--nf-color-border)' }}
+              />
+            </div>
+
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setShowMagicLink(true);
+                setServerError(null);
+              }}
+            >
+              {t('login.magic_link_button')}
+            </Button>
+          </>
+        )}
+
+        {caps?.registrationOpen !== false && (
+          <p
+            style={{
+              margin: 0,
+              fontSize: 'var(--nf-text-sm, 0.875rem)',
+              color: 'var(--nf-color-fg-muted)',
+              textAlign: 'center',
             }}
           >
-            {t('login.sso_google')}
-          </Button>
-          <Button
-            type="button"
-            variant="default"
-            onClick={() => {
-              void handleSSOStart('github');
-            }}
-          >
-            {t('login.sso_github')}
-          </Button>
-          <Button
-            type="button"
-            variant="default"
-            onClick={() => {
-              void handleSSOStart('microsoft');
-            }}
-          >
-            {t('login.sso_microsoft')}
-          </Button>
-        </div>
-
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--nf-space-3, 0.75rem)',
-            color: 'var(--nf-color-fg-muted)',
-            fontSize: 'var(--nf-text-sm, 0.875rem)',
-          }}
-        >
-          <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--nf-color-border)' }} />
-          <span>{t('login.magic_link_divider')}</span>
-          <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--nf-color-border)' }} />
-        </div>
-
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => {
-            setShowMagicLink(true);
-            setServerError(null);
-          }}
-        >
-          {t('login.magic_link_button')}
-        </Button>
-
-        <p
-          style={{
-            margin: 0,
-            fontSize: 'var(--nf-text-sm, 0.875rem)',
-            color: 'var(--nf-color-fg-muted)',
-          }}
-        >
-          {t('login.no_account')} <Link to="/signup">{t('login.signup_link')}</Link>
-        </p>
+            {t('login.no_account')}{' '}
+            <Link to="/signup" style={{ fontWeight: 500, color: 'var(--nf-color-accent)' }}>
+              {t('login.signup_link')}
+            </Link>
+          </p>
+        )}
       </form>
     </AuthCard>
   );

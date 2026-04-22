@@ -73,7 +73,10 @@
     "granted_by": "Granted By",
     "revoke": "Revoke",
     "grant": "Grant Admin",
-    "grant_user_id_label": "User ID (UUID)",
+    "grant_search_label": "Search user",
+    "grant_search_placeholder": "Search by name or email\u2026",
+    "clear_selection": "Clear selection",
+    "grant_hint": "Search for a user by name or email, or grant admin privileges directly from a user's detail page.",
     "grant_submit": "Grant",
     "confirm_revoke": "Are you sure you want to revoke admin privileges?",
     "no_admins": "No instance administrators found."

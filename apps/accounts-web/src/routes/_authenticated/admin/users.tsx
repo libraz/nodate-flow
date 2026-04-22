@@ -40,6 +40,7 @@ const thStyle: React.CSSProperties = {
   borderBlockEnd: '2px solid var(--nf-color-border)',
   fontWeight: 600,
   color: 'var(--nf-color-fg-muted)',
+  whiteSpace: 'nowrap',
 };
 
 const tdStyle: React.CSSProperties = {
@@ -212,8 +213,8 @@ function UsersPage(): ReactElement {
                       style={{
                         ...badgeBase,
                         background: u.enabled
-                          ? 'var(--nf-color-success, rgba(0,128,0,0.1))'
-                          : 'var(--nf-color-danger, rgba(255,0,0,0.1))',
+                          ? 'color-mix(in srgb, var(--nf-color-success, green) 15%, transparent)'
+                          : 'color-mix(in srgb, var(--nf-color-danger, red) 15%, transparent)',
                         color: u.enabled
                           ? 'var(--nf-color-success, green)'
                           : 'var(--nf-color-danger, red)',

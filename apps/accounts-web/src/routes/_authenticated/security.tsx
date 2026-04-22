@@ -58,7 +58,7 @@ function SecurityPage(): ReactElement {
     setPasswordError(null);
     setPasswordSuccess(false);
     try {
-      const { error } = await sdk.PUT('/auth/password', {
+      const { error } = await sdk.PUT('/me/password', {
         body: {
           currentPassword: values.currentPassword,
           newPassword: values.newPassword,
@@ -82,7 +82,7 @@ function SecurityPage(): ReactElement {
   useEffect(() => {
     let cancelled = false;
     void sdk
-      .GET('/auth/totp/status')
+      .GET('/me/totp')
       .then((res) => {
         if (!cancelled && res.data) {
           const status = res.data as TotpStatusResponse;
@@ -107,7 +107,7 @@ function SecurityPage(): ReactElement {
   useEffect(() => {
     let cancelled = false;
     void sdk
-      .GET('/auth/sessions')
+      .GET('/me/sessions')
       .then((res) => {
         if (!cancelled) {
           const body = res.data as SessionsResponse | undefined;
@@ -129,7 +129,7 @@ function SecurityPage(): ReactElement {
   const handleRevokeSession = async (sessionId: string): Promise<void> => {
     setRevokingId(sessionId);
     try {
-      await sdk.DELETE('/auth/sessions/{sessionId}', {
+      await sdk.DELETE('/me/sessions/{sessionId}', {
         params: { path: { sessionId } },
       });
       setSessions((prev) => prev.filter((s) => s.id !== sessionId));
@@ -144,12 +144,12 @@ function SecurityPage(): ReactElement {
     setTotpLoading(true);
     try {
       if (totpEnrolled) {
-        const { error } = await sdk.DELETE('/auth/totp');
+        const { error } = await sdk.DELETE('/me/totp');
         if (!error) {
           setTotpEnrolled(false);
         }
       } else {
-        const { error } = await sdk.POST('/auth/totp');
+        const { error } = await sdk.POST('/me/totp/enroll');
         if (!error) {
           setTotpEnrolled(true);
         }

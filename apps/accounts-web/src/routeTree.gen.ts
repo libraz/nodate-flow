@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root';
 import { Route as SignupRouteImport } from './routes/signup';
 import { Route as LoginRouteImport } from './routes/login';
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated';
+import { Route as IndexRouteImport } from './routes/index';
 import { Route as AuthenticatedSecurityRouteImport } from './routes/_authenticated/security';
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile';
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin';
@@ -36,6 +37,11 @@ const LoginRoute = LoginRouteImport.update({
 } as any);
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any);
 const AuthenticatedSecurityRoute = AuthenticatedSecurityRouteImport.update({
@@ -101,7 +107,7 @@ const AuthenticatedAdminUsersUserIdRoute =
   } as any);
 
 export interface FileRoutesByFullPath {
-  '/': typeof AuthenticatedRouteWithChildren;
+  '/': typeof IndexRoute;
   '/login': typeof LoginRoute;
   '/signup': typeof SignupRoute;
   '/admin': typeof AuthenticatedAdminRouteWithChildren;
@@ -117,7 +123,7 @@ export interface FileRoutesByFullPath {
   '/admin/workspaces/$wsId': typeof AuthenticatedAdminWorkspacesWsIdRoute;
 }
 export interface FileRoutesByTo {
-  '/': typeof AuthenticatedRouteWithChildren;
+  '/': typeof IndexRoute;
   '/login': typeof LoginRoute;
   '/signup': typeof SignupRoute;
   '/profile': typeof AuthenticatedProfileRoute;
@@ -133,6 +139,7 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
+  '/': typeof IndexRoute;
   '/_authenticated': typeof AuthenticatedRouteWithChildren;
   '/login': typeof LoginRoute;
   '/signup': typeof SignupRoute;
@@ -182,6 +189,7 @@ export interface FileRouteTypes {
     | '/admin/workspaces/$wsId';
   id:
     | '__root__'
+    | '/'
     | '/_authenticated'
     | '/login'
     | '/signup'
@@ -199,6 +207,7 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
+  IndexRoute: typeof IndexRoute;
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren;
   LoginRoute: typeof LoginRoute;
   SignupRoute: typeof SignupRoute;
@@ -225,6 +234,13 @@ declare module '@tanstack/react-router' {
       path: '';
       fullPath: '/';
       preLoaderRoute: typeof AuthenticatedRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/': {
+      id: '/';
+      path: '/';
+      fullPath: '/';
+      preLoaderRoute: typeof IndexRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/_authenticated/security': {
@@ -349,6 +365,7 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 );
 
 const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,

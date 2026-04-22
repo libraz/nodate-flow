@@ -153,7 +153,7 @@ function TodayRoute(): ReactElement {
               padding: '0.5rem 1rem',
               borderRadius: '0.5rem',
               background: 'var(--nf-color-accent, var(--nf-color-accent))',
-              color: 'var(--nf-color-accent, white)',
+              color: 'white',
               border: 'none',
               cursor: 'pointer',
               fontSize: '0.875rem',

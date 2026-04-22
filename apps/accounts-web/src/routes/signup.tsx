@@ -76,7 +76,7 @@ function SignupPage(): ReactElement {
       }
       const reg = data as RegisterResponse;
       authStore.getState().setAccessToken(reg.accessToken);
-      const { data: meData, error: meError } = await sdk.GET('/auth/me');
+      const { data: meData, error: meError } = await sdk.GET('/me');
       if (meError || !meData) {
         setServerError(mapAuthError(meError as ProblemJson | undefined));
         authStore.getState().clearSession();
@@ -182,9 +182,13 @@ function SignupPage(): ReactElement {
             margin: 0,
             fontSize: 'var(--nf-text-sm, 0.875rem)',
             color: 'var(--nf-color-fg-muted)',
+            textAlign: 'center',
           }}
         >
-          {t('signup.have_account')} <Link to="/login">{t('signup.login_link')}</Link>
+          {t('signup.have_account')}{' '}
+          <Link to="/login" style={{ fontWeight: 500, color: 'var(--nf-color-accent)' }}>
+            {t('signup.login_link')}
+          </Link>
         </p>
       </form>
     </AuthCard>

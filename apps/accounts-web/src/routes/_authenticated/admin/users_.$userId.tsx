@@ -131,10 +131,12 @@ function UserDetailPage(): ReactElement {
     if (user.isInstanceAdmin) {
       if (!window.confirm(t('admins.confirm_revoke'))) return;
       setActionLoading(true);
-      await sdk.DELETE('/admin/admins/{adminId}', { params: { path: { adminId: userId } } });
+      await sdk.DELETE('/admin/instance-admins/{adminId}', {
+        params: { path: { adminId: userId } },
+      });
     } else {
       setActionLoading(true);
-      await sdk.POST('/admin/admins', {
+      await sdk.POST('/admin/instance-admins', {
         body: { userId: user.id },
       });
     }
@@ -225,8 +227,8 @@ function UserDetailPage(): ReactElement {
             style={{
               ...badgeBase,
               background: user.enabled
-                ? 'var(--nf-color-success, rgba(0,128,0,0.1))'
-                : 'var(--nf-color-danger, rgba(255,0,0,0.1))',
+                ? 'color-mix(in srgb, var(--nf-color-success, green) 15%, transparent)'
+                : 'color-mix(in srgb, var(--nf-color-danger, red) 15%, transparent)',
               color: user.enabled
                 ? 'var(--nf-color-success, green)'
                 : 'var(--nf-color-danger, red)',

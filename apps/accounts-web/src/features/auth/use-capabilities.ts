@@ -1,0 +1,58 @@
+import { useEffect, useState } from 'react';
+import { sdk } from '../../lib/sdk';
+
+/** Boolean flags describing which auth methods are available. */
+export interface AuthCapabilities {
+  passwordLogin: boolean;
+  oidcGoogle: boolean;
+  oidcGithub: boolean;
+  oidcMicrosoft: boolean;
+  magicLink: boolean;
+  totp: boolean;
+  registrationOpen: boolean;
+}
+
+/** Conservative default: only password login shown until the server responds. */
+const defaultCaps: AuthCapabilities = {
+  passwordLogin: true,
+  oidcGoogle: false,
+  oidcGithub: false,
+  oidcMicrosoft: false,
+  magicLink: false,
+  totp: false,
+  registrationOpen: true,
+};
+
+// Module-level cache so only one fetch happens per page load.
+let cached: AuthCapabilities | null = null;
+
+/**
+ * Fetches auth capabilities once (GET /auth/capabilities) and caches
+ * the result for the lifetime of the page. Returns null while loading.
+ */
+export function useCapabilities(): AuthCapabilities | null {
+  const [caps, setCaps] = useState<AuthCapabilities | null>(cached);
+
+  useEffect(() => {
+    if (cached) return;
+    let cancelled = false;
+    void sdk
+      .GET('/auth/capabilities' as never)
+      .then(({ data }) => {
+        if (cancelled) return;
+        const result = (data as AuthCapabilities | undefined) ?? defaultCaps;
+        cached = result;
+        setCaps(result);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        cached = defaultCaps;
+        setCaps(defaultCaps);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return caps;
+}

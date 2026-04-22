@@ -73,7 +73,7 @@ export default function NotFound(): ReactElement {
           padding: '0.5rem 1.25rem',
           borderRadius: '0.5rem',
           background: 'var(--nf-color-accent, var(--nf-color-accent))',
-          color: 'var(--nf-color-accent, white)',
+          color: 'var(--nf-color-fg-on-accent, white)',
           textDecoration: 'none',
           fontWeight: 500,
         }}

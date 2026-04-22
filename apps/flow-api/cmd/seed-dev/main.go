@@ -322,11 +322,16 @@ func ensureTasks(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, pr
 	}
 	createdBy := sql.NullInt32{Int32: int32(userID), Valid: true}
 	for _, s := range l.Tasks {
+		nextNum, err := q.AssignTaskNumber(ctx, projID)
+		if err != nil {
+			return fmt.Errorf("assign task number: %w", err)
+		}
 		if _, err := q.CreateTask(ctx, generated.CreateTaskParams{
 			PublicID:        types.New(),
 			WorkspaceID:     wsID,
 			ProjectID:       projID,
 			CreatedByUserID: createdBy,
+			TaskNumber:      uint32(nextNum),
 			Title:           s.Title,
 			Priority:        s.Priority,
 			Visibility:      generated.TasksVisibilityPublic,

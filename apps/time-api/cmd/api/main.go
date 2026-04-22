@@ -19,6 +19,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/config"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/http/router"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/notifications"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/httputil"
 )
 
@@ -50,7 +51,12 @@ func main() {
 	}
 	defer db.Close()
 
-	jwtIssuer, err := auth.NewJWTIssuer(nil, "nodate-flow", "api", 15*time.Minute)
+	jwtPriv, err := authn.DeriveEd25519Key(os.Getenv("NF_SECRET_KEY"), "nodate-flow:jwt:v1")
+	if err != nil {
+		logger.Error("jwt key derivation failed", "err", err)
+		os.Exit(1)
+	}
+	jwtIssuer, err := auth.NewJWTIssuer(jwtPriv, "nodate-flow", "api", 15*time.Minute)
 	if err != nil {
 		logger.Error("jwt issuer init failed", "err", err)
 		os.Exit(1)

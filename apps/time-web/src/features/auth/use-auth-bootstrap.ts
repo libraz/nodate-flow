@@ -1,9 +1,9 @@
 /**
  * On app mount, attempts to re-establish a session from the httpOnly
- * nd_rt refresh cookie:
+ * nf_rt refresh cookie:
  *
  *   1. POST /auth/refresh
- *   2. on success, GET /auth/me to populate the user profile
+ *   2. on success, GET /me to populate the user profile
  *   3. on any failure, leave the store empty (status: 'unauthenticated')
  *
  * Idempotent under React 19 StrictMode double-invoke (the refresh helper
@@ -12,9 +12,8 @@
 
 import { useEffect, useState } from 'react';
 
-import type { AuthUser } from '../features/auth/auth-store';
-import { authStore } from '../features/auth/auth-store';
-import { refreshAccessToken, sdk } from '../lib/sdk';
+import { authApiBaseUrl, refreshAccessToken } from '../../lib/sdk';
+import { type AuthUser, authStore } from './auth-store';
 
 export type AuthBootstrapStatus = 'loading' | 'authenticated' | 'unauthenticated';
 
@@ -22,33 +21,33 @@ interface BootstrapResult {
   status: AuthBootstrapStatus;
 }
 
-interface MeResponse {
-  id: string;
-  email: string;
-  displayName: string;
-  locale: string;
-  themePreference: string;
-  isInstanceAdmin: boolean;
-}
-
 let bootstrapPromise: Promise<AuthBootstrapStatus> | null = null;
 
 async function runBootstrap(): Promise<AuthBootstrapStatus> {
   const token = await refreshAccessToken();
   if (!token) return 'unauthenticated';
-  const { data, error } = await sdk.GET('/me');
-  if (error || !data) {
+  const meRes = await fetch(`${authApiBaseUrl}/me`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  if (!meRes.ok) {
     authStore.getState().clearSession();
     return 'unauthenticated';
   }
-  const me = data as MeResponse;
+  const data = (await meRes.json()) as {
+    id: string;
+    email: string;
+    displayName: string;
+    locale: string;
+    themePreference: string;
+    isInstanceAdmin: boolean;
+  };
   const user: AuthUser = {
-    id: me.id,
-    email: me.email,
-    displayName: me.displayName,
-    locale: me.locale,
-    themePreference: me.themePreference,
-    isInstanceAdmin: me.isInstanceAdmin,
+    id: data.id,
+    email: data.email,
+    displayName: data.displayName,
+    locale: data.locale,
+    themePreference: data.themePreference,
+    isInstanceAdmin: data.isInstanceAdmin,
   };
   authStore.getState().setSession(token, user);
   return 'authenticated';

@@ -39,8 +39,8 @@ describe('ThemeProvider delegation', () => {
 describe('ThemeProvider backend sync', () => {
   const source = readFileSync(resolve(testDir, '../theme-provider.tsx'), 'utf-8');
 
-  it('syncs preference to server via sdk.PATCH /auth/me', () => {
-    expect(source).toContain("'/auth/me'");
+  it('syncs preference to server via sdk.PATCH /me', () => {
+    expect(source).toContain("'/me'");
     expect(source).toContain('PATCH');
     expect(source).toContain('themePreference');
   });

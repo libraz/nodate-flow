@@ -39,7 +39,7 @@ async function fetchServerTheme(): Promise<ThemePreference | null> {
 async function syncServerTheme(pref: ThemePreference): Promise<void> {
   const token = authStore.getState().accessToken;
   if (!token) return;
-  await sdk.PATCH('/auth/me', {
+  await sdk.PATCH('/me', {
     body: { themePreference: pref },
   });
 }

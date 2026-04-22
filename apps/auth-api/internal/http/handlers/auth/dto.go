@@ -60,6 +60,32 @@ func (d Deps) minPwLen() int {
 	return 8
 }
 
+// CapabilitiesOutput is the response for GET /auth/capabilities.
+type CapabilitiesOutput struct {
+	CacheControl string `header:"Cache-Control"`
+	Body         CapabilitiesBody
+}
+
+// CapabilitiesBody describes which authentication methods are available
+// on this instance. Only boolean flags are exposed — no client IDs,
+// secrets, or internal configuration details.
+type CapabilitiesBody struct {
+	// PasswordLogin is always true; local password auth cannot be disabled.
+	PasswordLogin bool `json:"passwordLogin"`
+	// OIDCGoogle indicates whether Google SSO is configured.
+	OIDCGoogle bool `json:"oidcGoogle"`
+	// OIDCGithub indicates whether GitHub SSO is configured.
+	OIDCGithub bool `json:"oidcGithub"`
+	// OIDCMicrosoft indicates whether Microsoft SSO is configured.
+	OIDCMicrosoft bool `json:"oidcMicrosoft"`
+	// MagicLink indicates whether passwordless magic-link login is available.
+	MagicLink bool `json:"magicLink"`
+	// Totp indicates whether TOTP 2FA enrollment is available.
+	Totp bool `json:"totp"`
+	// RegistrationOpen indicates whether self-service signup is allowed.
+	RegistrationOpen bool `json:"registrationOpen"`
+}
+
 // RegisterInput is the body for POST /auth/register.
 type RegisterInput struct {
 	UserAgent string `header:"User-Agent"`

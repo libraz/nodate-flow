@@ -52,7 +52,7 @@ function ProfilePage(): ReactElement {
     setServerError(null);
     setSuccess(false);
     try {
-      const { data, error } = await sdk.PATCH('/auth/me', {
+      const { data, error } = await sdk.PATCH('/me', {
         body: {
           displayName: values.displayName,
           locale: values.locale,

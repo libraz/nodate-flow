@@ -117,6 +117,7 @@ func BuildResult(deps Deps) Result {
 		return out, nil
 	})
 
+
 	sessionStore := deps.Sessions
 	if sessionStore == nil {
 		sessionStore = sessadapter.NewMySQLStore(deps.DB, deps.Queries)
@@ -138,6 +139,14 @@ func BuildResult(deps Deps) Result {
 		EmailSender:      deps.EmailSender,
 		AccountsWebURL:   deps.AccountsWebURL,
 	}
+
+	// Auth capabilities — public, no rate limit, cacheable.
+	huma.Register(api, huma.Operation{
+		OperationID: "auth-capabilities",
+		Method:      http.MethodGet,
+		Path:        "/auth/capabilities",
+		Summary:     "List available authentication methods",
+	}, authhandlers.Capabilities(authDeps))
 
 	// Public auth endpoints (login / register) behind per-IP rate limiter.
 	r.Group(func(sub chi.Router) {
