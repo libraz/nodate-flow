@@ -1,18 +1,17 @@
 /**
- * /workspaces/$id/settings/public-shares — manage workspace-owned public
- * share pages (lazy).
+ * /workspaces/$id/settings/public-shares — layout wrapper (lazy).
+ *
+ * Renders only an `<Outlet />` so the nested index (share list) and
+ * `$shareId` (share detail) routes can mount. The previous implementation
+ * rendered the list here directly, which left no slot for the detail child
+ * and silently hid `/public-shares/$shareId`.
  */
 
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
-import { createLazyFileRoute, getRouteApi } from '@tanstack/react-router';
+import { Outlet, createLazyFileRoute } from '@tanstack/react-router';
 import { type ReactElement, Suspense } from 'react';
 
-import ShareList from '../features/public-shares/share-list';
-
-const routeApi = getRouteApi('/_authenticated/workspaces/$id/settings/public-shares');
-
-function WorkspacePublicSharesRoute(): ReactElement {
-  const { id } = routeApi.useParams();
+function WorkspacePublicSharesLayout(): ReactElement {
   return (
     <Suspense
       fallback={
@@ -22,11 +21,11 @@ function WorkspacePublicSharesRoute(): ReactElement {
         </div>
       }
     >
-      <ShareList workspaceId={id} />
+      <Outlet />
     </Suspense>
   );
 }
 
 export const Route = createLazyFileRoute('/_authenticated/workspaces/$id/settings/public-shares')({
-  component: WorkspacePublicSharesRoute,
+  component: WorkspacePublicSharesLayout,
 });
