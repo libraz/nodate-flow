@@ -9,6 +9,7 @@ resources:
         code: AI.PROVIDER.NOT_CONFIGURED
         status: 412
         message: "AI provider is not configured"
+        message_ja: "AI プロバイダが設定されていません"
         description: "Returned when an AI feature is invoked but no provider credentials have been configured for the workspace or instance."
         userAction: "Configure an AI provider in workspace or instance settings."
 
@@ -16,6 +17,7 @@ resources:
         code: AI.PROVIDER.UPSTREAM_CALL_FAILED
         status: 502
         message: "AI provider call failed"
+        message_ja: "AI プロバイダの呼び出しに失敗しました"
         description: "Returned when the upstream LLM provider returned a non-success response or could not be reached."
         userAction: "Retry in a moment; if the problem persists, check the provider's status page."
 
@@ -23,6 +25,7 @@ resources:
         code: AI.PROVIDER.UPSTREAM_TIMEOUT
         status: 504
         message: "AI provider call timed out"
+        message_ja: "AI プロバイダの呼び出しがタイムアウトしました"
         description: "Returned when the upstream LLM provider did not respond within the configured timeout."
         userAction: "Retry the request, or reduce the prompt size."
 
@@ -33,6 +36,7 @@ resources:
         code: AI.COST.GUARD_EXCEEDED
         status: 402
         message: "AI cost guard threshold exceeded"
+        message_ja: "AI の利用上限に達しました"
         description: "Returned when the workspace's monthly AI spend has reached the configured cost guard limit."
         userAction: "Wait for the next billing period or raise the cost guard in workspace settings."
 
@@ -43,6 +47,7 @@ resources:
         code: AI.RESPONSE.PARSE_FAILED
         status: 502
         message: "AI provider response could not be parsed"
+        message_ja: "AI プロバイダの応答を解析できませんでした"
         description: "Returned when the upstream LLM returned a completion whose body could not be decoded into the expected JSON shape."
         userAction: "Retry the request; if the problem persists, check the provider or model configuration."
 
@@ -53,6 +58,7 @@ resources:
         code: AI.NL_QUERY.UNPARSEABLE
         status: 422
         message: "Could not turn that into a filter"
+        message_ja: "入力をフィルタに変換できませんでした"
         description: "Returned when the NL query compiler could not produce a valid Lens JSON from the user's prose, either because the upstream LLM emitted malformed output or because the result failed schema validation against the closed Lens grammar (ADR 0004)."
         userAction: "Rephrase the request — e.g. \"blocked tasks due this week\"."
 
@@ -63,6 +69,7 @@ resources:
         code: AI.REDACTION.PIPELINE_FAILED
         status: 500
         message: "Sensitive data redaction failed"
+        message_ja: "機密情報の除去処理に失敗しました"
         description: "Returned when the pre-LLM redaction pipeline raised an error and the request was blocked to prevent leaking secrets."
         userAction: "Retry; if the problem persists, contact your administrator."
 
@@ -73,6 +80,7 @@ resources:
         code: AI.AGENT.NOT_FOUND
         status: 404
         message: "AI agent not found"
+        message_ja: "AI エージェントが見つかりません"
         description: "Returned when an operation targets an ai_agents row that does not exist in the workspace or has been disabled."
         userAction: "Verify the agent id and that it belongs to this workspace."
 
@@ -80,6 +88,7 @@ resources:
         code: AI.AGENT.PAUSED
         status: 409
         message: "AI agent is paused"
+        message_ja: "AI エージェントは一時停止中です"
         description: "Returned when a manual trigger targets an agent whose paused=TRUE kill switch is engaged."
         userAction: "Resume the agent from the agents settings page before triggering it."
 
@@ -87,6 +96,7 @@ resources:
         code: AI.AGENT.RUNTIME_DISABLED
         status: 503
         message: "AI agent runtime is not configured"
+        message_ja: "AI エージェントのランタイムが設定されていません"
         description: "Returned when a trigger endpoint is reached but neither the scheduler queue nor a synchronous runner is wired on this replica."
         userAction: "NF_AGENT_RUNNER defaults to 'orchestrator'. Set it to 'log' only for debugging. Ensure a provider is configured."
 
@@ -97,6 +107,7 @@ resources:
         code: AI.MODEL.NOT_FOUND
         status: 404
         message: "AI model not found"
+        message_ja: "AI モデルが見つかりません"
         description: "Returned when an operation references an ai_models row that does not exist in the workspace or has been disabled."
         userAction: "Pick a model from the workspace's registered providers."
 
@@ -107,5 +118,6 @@ resources:
         code: AI.SAFETY.BLOCKED
         status: 422
         message: "Request blocked by safety policy"
+        message_ja: "安全ポリシーによりリクエストがブロックされました"
         description: "Returned when the prompt or response was blocked by the configured safety filters."
         userAction: "Rephrase the request to comply with the safety policy."

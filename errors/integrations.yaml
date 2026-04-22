@@ -9,6 +9,7 @@ resources:
         code: INTEGRATION.OAUTH.PROVIDER_UNSUPPORTED
         status: 400
         message: "Unknown integration provider"
+        message_ja: "未知の連携プロバイダです"
         description: "Returned when the {provider} path parameter is not one of the supported providers (github, slack, google_calendar)."
         userAction: "Choose a supported provider from the integrations list."
 
@@ -16,6 +17,7 @@ resources:
         code: INTEGRATION.OAUTH.PROVIDER_NOT_CONFIGURED
         status: 503
         message: "Integration provider is not configured on this server"
+        message_ja: "このサーバーでは連携プロバイダが設定されていません"
         description: "Returned when the api has no client id or client secret set for the requested provider (the NF_<provider>_CLIENT_ID/SECRET env vars are empty)."
         userAction: "Ask the instance administrator to set the OAuth credentials."
 
@@ -23,6 +25,7 @@ resources:
         code: INTEGRATION.OAUTH.STATE_INVALID
         status: 400
         message: "OAuth state token is missing, unknown, or expired"
+        message_ja: "OAuth の state トークンが欠落または無効、期限切れです"
         description: "Returned by the OAuth callback handler when the state query parameter does not match a row in oauth_states, or the row has expired."
         userAction: "Start the connect flow again."
 
@@ -30,6 +33,7 @@ resources:
         code: INTEGRATION.OAUTH.EXCHANGE_FAILED
         status: 502
         message: "Could not exchange the OAuth code for an access token"
+        message_ja: "OAuth コードをアクセストークンに交換できませんでした"
         description: "Returned when the provider's token endpoint rejects the authorization code or returns an unparseable response."
         userAction: "Try the connect flow again. If the problem persists, check the server logs."
 
@@ -37,6 +41,7 @@ resources:
         code: INTEGRATION.OAUTH.ACCOUNT_FETCH_FAILED
         status: 502
         message: "Could not fetch the provider account profile"
+        message_ja: "プロバイダのアカウント情報を取得できませんでした"
         description: "Returned when the token exchange succeeded but the subsequent call to the provider's /me / user identity endpoint failed."
         userAction: "Try the connect flow again."
 
@@ -47,5 +52,6 @@ resources:
         code: INTEGRATION.CONNECTION.NOT_FOUND
         status: 404
         message: "Integration connection not found"
+        message_ja: "連携設定が見つかりません"
         description: "Returned by DELETE /me/integrations/{publicId} when the row does not exist or does not belong to the caller."
         userAction: "Refresh the integrations list."

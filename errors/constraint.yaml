@@ -9,6 +9,7 @@ resources:
         code: CONSTRAINT.PARSE.INVALID_JSON
         status: 422
         message: "Constraint expression is not valid JSON"
+        message_ja: "制約式が有効な JSON ではありません"
         description: "Returned when the stored constraint expression cannot be decoded as JSON before the DSL validator even runs."
         userAction: "Fix the JSON syntax in the constraint expression."
 
@@ -16,6 +17,7 @@ resources:
         code: CONSTRAINT.PARSE.UNKNOWN_OP
         status: 422
         message: "Constraint expression uses an unknown operator"
+        message_ja: "制約式に未知の演算子が含まれています"
         description: "Returned when a constraint node references an op that is not in the closed DSL whitelist (ADR 0006)."
         userAction: "Use one of the documented ops (and, or, not, time.*, dependency.*, actor.*, signal.*, approval.*, ci.*)."
 
@@ -23,6 +25,7 @@ resources:
         code: CONSTRAINT.PARSE.MISSING_ARG
         status: 422
         message: "Constraint expression is missing a required argument"
+        message_ja: "制約式に必須の引数が欠落しています"
         description: "Returned when a builtin is used without its required arg / taskIds / max field."
         userAction: "Provide the argument listed in the constraint DSL reference."
 
@@ -30,6 +33,7 @@ resources:
         code: CONSTRAINT.PARSE.EMPTY_TERMS
         status: 422
         message: "Constraint and/or requires at least one term"
+        message_ja: "and / or には少なくとも 1 つの要素が必要です"
         description: "Returned when an and / or node is supplied with an empty terms list."
         userAction: "Add at least one child expression to the and / or node."
 
@@ -40,5 +44,6 @@ resources:
         code: CONSTRAINT.EVAL.BAD_DATE
         status: 422
         message: "Constraint date argument is not a valid YYYY-MM-DD"
+        message_ja: "制約の日付は YYYY-MM-DD 形式で指定してください"
         description: "Returned when time.* builtins receive a non-parseable date literal at evaluation time."
         userAction: "Send the date as a YYYY-MM-DD string (for example 2026-04-08)."

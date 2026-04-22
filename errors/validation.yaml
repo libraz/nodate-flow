@@ -9,6 +9,7 @@ resources:
         code: VALIDATION.BODY.FIELD_MISSING
         status: 422
         message: "A required field is missing in the request body"
+        message_ja: "リクエストボディに必須フィールドがありません"
         description: "Returned when one or more required fields are absent from the request body. The missing field paths are listed in details."
         userAction: "Add the missing fields listed in the error details and retry."
 
@@ -16,6 +17,7 @@ resources:
         code: VALIDATION.BODY.FIELD_INVALID
         status: 422
         message: "A field in the request body is invalid"
+        message_ja: "リクエストボディのフィールドが不正です"
         description: "Returned when one or more fields fail schema validation (type, format, range). Failing field paths are listed in details."
         userAction: "Correct the fields listed in the error details and retry."
 
@@ -23,6 +25,7 @@ resources:
         code: VALIDATION.BODY.DATE_FORMAT_INVALID
         status: 400
         message: "Date must be in YYYY-MM-DD format"
+        message_ja: "日付は YYYY-MM-DD 形式で指定してください"
         description: "Returned when a date field fails to parse as an ISO 8601 calendar date (YYYY-MM-DD)."
         userAction: "Send the date as a YYYY-MM-DD string (for example 2026-04-08)."
 
@@ -30,6 +33,7 @@ resources:
         code: VALIDATION.BODY.UNPARSEABLE
         status: 400
         message: "Request body could not be parsed"
+        message_ja: "リクエストボディを解析できませんでした"
         description: "Returned when the request body is not valid JSON or does not match the declared content-type."
         userAction: "Send a syntactically valid JSON body matching the API schema."
 
@@ -40,6 +44,7 @@ resources:
         code: VALIDATION.QUERY.FIELD_INVALID
         status: 422
         message: "A query parameter is invalid"
+        message_ja: "クエリパラメータが不正です"
         description: "Returned when a query parameter fails schema validation (type, range, enum)."
         userAction: "Correct the query parameter listed in details and retry."
 
@@ -47,6 +52,7 @@ resources:
         code: VALIDATION.QUERY.UNKNOWN_FIELD
         status: 422
         message: "Unknown query parameter"
+        message_ja: "未知のクエリパラメータです"
         description: "Returned when an unknown query parameter is supplied and strict mode is enabled."
         userAction: "Remove the unknown query parameter."
 
@@ -57,6 +63,7 @@ resources:
         code: VALIDATION.FILE.TYPE_NOT_ALLOWED
         status: 415
         message: "File type is not allowed"
+        message_ja: "許可されていないファイル形式です"
         description: "Returned when the uploaded file's MIME type is not in the allowlist."
         userAction: "Upload a file with an allowed type (images, documents, archives, text)."
 
@@ -64,6 +71,7 @@ resources:
         code: VALIDATION.FILE.TOO_LARGE
         status: 413
         message: "File exceeds the maximum allowed size"
+        message_ja: "ファイルサイズが上限を超えています"
         description: "Returned when the uploaded file exceeds the per-file size limit."
         userAction: "Reduce the file size and try again."
 
@@ -74,5 +82,6 @@ resources:
         code: VALIDATION.PATH.PARAM_INVALID
         status: 400
         message: "A path parameter is invalid"
+        message_ja: "パスパラメータが不正です"
         description: "Returned when a URL path parameter does not match its expected format (UUID, slug, integer)."
         userAction: "Check the URL and correct the malformed parameter."

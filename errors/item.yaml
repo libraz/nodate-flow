@@ -14,6 +14,7 @@ resources:
         code: ITEM.ITEMKIT.INVARIANT_VIOLATION
         status: 422
         message: "Item invariant violated"
+        message_ja: "アイテムの整合性制約に違反しました"
         description: "Returned when a requested mutation would break a documented task ↔ calendar_event invariant (e.g. task_id set without task_role, two 'event'-role events for one task, chronology reversed). Usually indicates a caller bug or a race the reconciler has not yet healed."
         userAction: "Retry after refreshing the task and event. If it persists, report the task + event IDs — the reconciler should have caught this."
 
@@ -21,6 +22,7 @@ resources:
         code: ITEM.ITEMKIT.RECURRENCE_WITH_TASK_LINK
         status: 422
         message: "Recurring events cannot be linked to a task"
+        message_ja: "繰り返しイベントはタスクと紐付けできません"
         description: "Returned when an actor tries to add recurrence_rule to an event that is a task projection (task_id + task_role set), or tries to link a task to an event that already has a recurrence_rule. Task-projection events must be single-instance."
         userAction: "Unlink the task from this event first, or create the recurrence on a separate non-linked event."
 
@@ -28,6 +30,7 @@ resources:
         code: ITEM.ITEMKIT.SHIFT_CONFLICT
         status: 409
         message: "Shift proposal has unresolved conflicts"
+        message_ja: "シフト提案に未解決の競合があります"
         description: "Returned when ApplyShiftProposal is invoked with tasks that also contribute to other events whose dates are not moving. Each conflicting task must either be confirmed explicitly or excluded before the shift can proceed."
         userAction: "Review the conflict list on the proposal, choose shift / skip / unlink per task, and resubmit."
 
@@ -35,6 +38,7 @@ resources:
         code: ITEM.ITEMKIT.OPTIMISTIC_LOCK
         status: 409
         message: "Item was modified by another actor"
+        message_ja: "このアイテムは他のユーザーに更新されました"
         description: "Returned when the caller's If-Unchanged-Since header does not match the current updated_at of the task or a linked event. Someone else committed a write between the read and the write."
         userAction: "Reload the item and retry the edit against the current state."
 
@@ -42,5 +46,6 @@ resources:
         code: ITEM.ITEMKIT.SCHEDULED_LINK_COUNT_HIGH
         status: 422
         message: "Too many scheduled events linked to this task"
+        message_ja: "このタスクに紐付くスケジュール済みイベントが多すぎます"
         description: "Returned as a soft warning when a task accumulates more than the recommended number of 'scheduled'-role events. No DB-level cap exists; this is a caller signal that auto-scheduling may be producing explosion."
         userAction: "Review and prune time-block events on this task, or raise the soft limit in a new PR if genuinely needed."

@@ -9,6 +9,7 @@ resources:
         code: CALENDAR.WORKSPACE.NOT_FOUND
         status: 404
         message: "Workspace not found"
+        message_ja: "ワークスペースが見つかりません"
         description: "Returned when the workspace public_id in the request path does not match any active workspace."
         userAction: "Verify the workspace ID in the URL."
 
@@ -19,6 +20,7 @@ resources:
         code: CALENDAR.CALENDAR.NOT_FOUND
         status: 404
         message: "Calendar not found"
+        message_ja: "カレンダーが見つかりません"
         description: "Returned when a calendar with the given public_id does not exist or the actor has no visibility into it."
         userAction: "Verify the calendar ID, or ask the calendar owner to share it with you."
 
@@ -26,6 +28,7 @@ resources:
         code: CALENDAR.CALENDAR.ACCESS_DENIED
         status: 403
         message: "You do not have access to this calendar"
+        message_ja: "このカレンダーへのアクセス権がありません"
         description: "Returned when the actor is authenticated but does not hold an active subscription to the target calendar."
         userAction: "Ask the calendar owner or an admin to grant you access."
 
@@ -33,6 +36,7 @@ resources:
         code: CALENDAR.CALENDAR.OWNER_ROLE_REQUIRED
         status: 403
         message: "Only calendar owners can perform this action"
+        message_ja: "この操作はカレンダーのオーナーのみ実行できます"
         description: "Returned when a non-owner attempts an owner-only operation such as deleting a calendar."
         userAction: "Ask a calendar owner to perform this action on your behalf."
 
@@ -40,6 +44,7 @@ resources:
         code: CALENDAR.CALENDAR.LIST_QUERY_INTERRUPTED
         status: 500
         message: "Could not retrieve calendars"
+        message_ja: "カレンダーを取得できませんでした"
         description: "Returned when the database query to list the user's subscribed calendars encounters an unexpected error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -47,6 +52,7 @@ resources:
         code: CALENDAR.CALENDAR.STORE_WRITE_INTERRUPTED
         status: 500
         message: "Could not save calendar"
+        message_ja: "カレンダーを保存できませんでした"
         description: "Returned when inserting or updating a calendar row encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -54,6 +60,7 @@ resources:
         code: CALENDAR.CALENDAR.STORE_READ_INTERRUPTED
         status: 500
         message: "Could not read calendar after update"
+        message_ja: "更新後のカレンダーを読み込めませんでした"
         description: "Returned when re-reading the calendar row after a successful patch encounters an unexpected error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -61,6 +68,7 @@ resources:
         code: CALENDAR.CALENDAR.STORE_DELETE_INTERRUPTED
         status: 500
         message: "Could not delete calendar"
+        message_ja: "カレンダーを削除できませんでした"
         description: "Returned when the soft-delete query for a calendar encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -71,6 +79,7 @@ resources:
         code: CALENDAR.EVENT.NOT_FOUND
         status: 404
         message: "Event not found"
+        message_ja: "イベントが見つかりません"
         description: "Returned when an event with the given public_id does not exist in the specified calendar."
         userAction: "Verify the event ID, or refresh the calendar to see current events."
 
@@ -78,6 +87,7 @@ resources:
         code: CALENDAR.EVENT.EDIT_PERMISSION_REQUIRED
         status: 403
         message: "You do not have permission to edit this event"
+        message_ja: "このイベントを編集する権限がありません"
         description: "Returned when the actor is neither the event owner, a calendar owner/manager, nor an attendee with edit rights."
         userAction: "Ask the event owner to grant you edit access or to make the change."
 
@@ -85,6 +95,7 @@ resources:
         code: CALENDAR.EVENT.LIST_QUERY_INTERRUPTED
         status: 500
         message: "Could not retrieve events"
+        message_ja: "イベントを取得できませんでした"
         description: "Returned when the database query to list events (including recurring events) encounters an unexpected error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -92,6 +103,7 @@ resources:
         code: CALENDAR.EVENT.STORE_WRITE_INTERRUPTED
         status: 500
         message: "Could not save event"
+        message_ja: "イベントを保存できませんでした"
         description: "Returned when inserting or updating an event row encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -99,6 +111,7 @@ resources:
         code: CALENDAR.EVENT.STORE_READ_INTERRUPTED
         status: 500
         message: "Could not read event"
+        message_ja: "イベントを読み込めませんでした"
         description: "Returned when reading an event row (including after a patch) encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -106,6 +119,7 @@ resources:
         code: CALENDAR.EVENT.STORE_DELETE_INTERRUPTED
         status: 500
         message: "Could not delete event"
+        message_ja: "イベントを削除できませんでした"
         description: "Returned when the soft-delete query for an event encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -113,6 +127,7 @@ resources:
         code: CALENDAR.EVENT.OWNER_USER_ID_MALFORMED
         status: 400
         message: "Invalid ownerUserId"
+        message_ja: "ownerUserId の形式が正しくありません"
         description: "Returned when the ownerUserId field is not a valid UUID."
         userAction: "Provide a valid UUID for the owner user."
 
@@ -120,6 +135,7 @@ resources:
         code: CALENDAR.EVENT.OWNER_USER_NOT_FOUND
         status: 400
         message: "Owner user not found"
+        message_ja: "オーナーに指定したユーザーが見つかりません"
         description: "Returned when the specified ownerUserId does not match any active user."
         userAction: "Verify the owner user ID and ensure the user account is active."
 
@@ -127,6 +143,7 @@ resources:
         code: CALENDAR.EVENT.OWNER_USER_RESOLVE_INTERRUPTED
         status: 500
         message: "Could not resolve owner user"
+        message_ja: "オーナーユーザーを解決できませんでした"
         description: "Returned when looking up the owner user's internal ID encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -134,6 +151,7 @@ resources:
         code: CALENDAR.EVENT.DATE_RANGE_UNPARSEABLE
         status: 422
         message: "Could not parse date or datetime parameter"
+        message_ja: "日付または日時パラメータを解析できませんでした"
         description: "Returned when the start or end query parameter cannot be parsed as an RFC 3339 datetime or YYYY-MM-DD date."
         userAction: "Provide dates in YYYY-MM-DD or RFC 3339 format (e.g. 2024-01-15 or 2024-01-15T09:00:00Z)."
 
@@ -141,6 +159,7 @@ resources:
         code: CALENDAR.EVENT.START_END_PAIR_REQUIRED
         status: 422
         message: "startAt and endAt must be provided together"
+        message_ja: "startAt と endAt はセットで指定してください"
         description: "Returned when a create or patch request supplies one of startAt / endAt without the other. Undated events must omit both."
         userAction: "Provide both startAt and endAt, or omit both to create a planning-stage (undated) event."
 
@@ -151,6 +170,7 @@ resources:
         code: CALENDAR.MEMO.NOT_FOUND
         status: 404
         message: "Memo not found"
+        message_ja: "メモが見つかりません"
         description: "Returned when a memo with the given public_id does not exist in the specified calendar."
         userAction: "Verify the memo ID, or refresh the list to see current memos."
 
@@ -158,6 +178,7 @@ resources:
         code: CALENDAR.MEMO.LIST_QUERY_INTERRUPTED
         status: 500
         message: "Could not retrieve memos"
+        message_ja: "メモを取得できませんでした"
         description: "Returned when the database query to list memos encounters an unexpected error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -165,6 +186,7 @@ resources:
         code: CALENDAR.MEMO.STORE_WRITE_INTERRUPTED
         status: 500
         message: "Could not save memo"
+        message_ja: "メモを保存できませんでした"
         description: "Returned when inserting or updating a memo row encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -172,6 +194,7 @@ resources:
         code: CALENDAR.MEMO.STORE_READ_INTERRUPTED
         status: 500
         message: "Could not find memo"
+        message_ja: "メモを検索できませんでした"
         description: "Returned when looking up a memo row encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -179,6 +202,7 @@ resources:
         code: CALENDAR.MEMO.STORE_DELETE_INTERRUPTED
         status: 500
         message: "Could not delete memo"
+        message_ja: "メモを削除できませんでした"
         description: "Returned when the soft-delete query for a memo encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -189,6 +213,7 @@ resources:
         code: CALENDAR.COMMENT.NOT_FOUND
         status: 404
         message: "Comment not found"
+        message_ja: "コメントが見つかりません"
         description: "Returned when a comment with the given public_id does not exist on the specified event."
         userAction: "Verify the comment ID."
 
@@ -196,6 +221,7 @@ resources:
         code: CALENDAR.COMMENT.AUTHOR_OR_OWNER_REQUIRED
         status: 403
         message: "Only the comment author or calendar owner can delete this comment"
+        message_ja: "このコメントはコメント投稿者またはカレンダーオーナーのみ削除できます"
         description: "Returned when a user who is neither the comment author nor the calendar owner attempts to delete the comment."
         userAction: "Ask the comment author or calendar owner to delete the comment."
 
@@ -203,6 +229,7 @@ resources:
         code: CALENDAR.COMMENT.LIST_QUERY_INTERRUPTED
         status: 500
         message: "Could not retrieve comments"
+        message_ja: "コメントを取得できませんでした"
         description: "Returned when the database query to list comments encounters an unexpected error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -210,6 +237,7 @@ resources:
         code: CALENDAR.COMMENT.STORE_WRITE_INTERRUPTED
         status: 500
         message: "Could not save comment"
+        message_ja: "コメントを保存できませんでした"
         description: "Returned when inserting or updating a comment row encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -217,6 +245,7 @@ resources:
         code: CALENDAR.COMMENT.STORE_READ_INTERRUPTED
         status: 500
         message: "Could not find comment"
+        message_ja: "コメントを検索できませんでした"
         description: "Returned when looking up a comment row encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -224,6 +253,7 @@ resources:
         code: CALENDAR.COMMENT.STORE_DELETE_INTERRUPTED
         status: 500
         message: "Could not delete comment"
+        message_ja: "コメントを削除できませんでした"
         description: "Returned when the soft-delete query for a comment encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -234,6 +264,7 @@ resources:
         code: CALENDAR.ATTACHMENT.NOT_FOUND
         status: 404
         message: "Attachment not found"
+        message_ja: "添付ファイルが見つかりません"
         description: "Returned when an attachment with the given public_id does not exist on the specified event."
         userAction: "Verify the attachment ID."
 
@@ -241,6 +272,7 @@ resources:
         code: CALENDAR.ATTACHMENT.UPLOADER_OR_OWNER_REQUIRED
         status: 403
         message: "Only the uploader or calendar owner can delete this attachment"
+        message_ja: "この添付ファイルはアップロード者またはカレンダーオーナーのみ削除できます"
         description: "Returned when a user who is neither the attachment uploader nor the calendar owner attempts to delete the attachment."
         userAction: "Ask the uploader or calendar owner to delete the attachment."
 
@@ -248,6 +280,7 @@ resources:
         code: CALENDAR.ATTACHMENT.LIST_QUERY_INTERRUPTED
         status: 500
         message: "Could not retrieve attachments"
+        message_ja: "添付ファイルを取得できませんでした"
         description: "Returned when the database query to list attachments encounters an unexpected error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -255,6 +288,7 @@ resources:
         code: CALENDAR.ATTACHMENT.STORE_WRITE_INTERRUPTED
         status: 500
         message: "Could not save attachment"
+        message_ja: "添付ファイルを保存できませんでした"
         description: "Returned when inserting an attachment row encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -262,6 +296,7 @@ resources:
         code: CALENDAR.ATTACHMENT.STORE_READ_INTERRUPTED
         status: 500
         message: "Could not find attachment"
+        message_ja: "添付ファイルを検索できませんでした"
         description: "Returned when looking up an attachment row encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -269,6 +304,7 @@ resources:
         code: CALENDAR.ATTACHMENT.STORE_DELETE_INTERRUPTED
         status: 500
         message: "Could not delete attachment"
+        message_ja: "添付ファイルを削除できませんでした"
         description: "Returned when the soft-delete query for an attachment encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -279,6 +315,7 @@ resources:
         code: CALENDAR.CHECKLIST.ITEM_NOT_FOUND
         status: 404
         message: "Checklist item not found"
+        message_ja: "チェックリスト項目が見つかりません"
         description: "Returned when a checklist item with the given public_id does not exist on the specified event."
         userAction: "Verify the checklist item ID."
 
@@ -286,6 +323,7 @@ resources:
         code: CALENDAR.CHECKLIST.LIST_QUERY_INTERRUPTED
         status: 500
         message: "Could not retrieve checklist items"
+        message_ja: "チェックリスト項目を取得できませんでした"
         description: "Returned when the database query to list checklist items encounters an unexpected error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -293,6 +331,7 @@ resources:
         code: CALENDAR.CHECKLIST.STORE_WRITE_INTERRUPTED
         status: 500
         message: "Could not save checklist item"
+        message_ja: "チェックリスト項目を保存できませんでした"
         description: "Returned when inserting or updating a checklist item row encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -300,6 +339,7 @@ resources:
         code: CALENDAR.CHECKLIST.STORE_DELETE_INTERRUPTED
         status: 500
         message: "Could not delete checklist item"
+        message_ja: "チェックリスト項目を削除できませんでした"
         description: "Returned when the soft-delete query for a checklist item encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -310,6 +350,7 @@ resources:
         code: CALENDAR.ATTENDEE.USER_ID_MALFORMED
         status: 400
         message: "Invalid user ID"
+        message_ja: "ユーザー ID の形式が正しくありません"
         description: "Returned when the user ID path parameter is not a valid UUID."
         userAction: "Provide a valid UUID for the user."
 
@@ -317,6 +358,7 @@ resources:
         code: CALENDAR.ATTENDEE.USER_NOT_FOUND
         status: 404
         message: "User not found"
+        message_ja: "ユーザーが見つかりません"
         description: "Returned when the specified user public_id does not match any active user."
         userAction: "Verify the user ID."
 
@@ -324,6 +366,7 @@ resources:
         code: CALENDAR.ATTENDEE.STORE_REMOVE_INTERRUPTED
         status: 500
         message: "Could not remove attendee"
+        message_ja: "参加者を削除できませんでした"
         description: "Returned when the query to remove an attendee encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -331,6 +374,7 @@ resources:
         code: CALENDAR.ATTENDEE.RSVP_UPDATE_INTERRUPTED
         status: 500
         message: "Could not update RSVP"
+        message_ja: "出欠を更新できませんでした"
         description: "Returned when the query to update an attendee's RSVP status encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -338,6 +382,7 @@ resources:
         code: CALENDAR.ATTENDEE.CAN_EDIT_UPDATE_INTERRUPTED
         status: 500
         message: "Could not update edit permission"
+        message_ja: "編集権限を更新できませんでした"
         description: "Returned when the query to toggle an attendee's can_edit flag encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -345,6 +390,7 @@ resources:
         code: CALENDAR.ATTENDEE.OWNER_REQUIRED_TO_TOGGLE_EDIT
         status: 403
         message: "Only the event owner can change edit permissions"
+        message_ja: "編集権限はイベントオーナーのみ変更できます"
         description: "Returned when a non-owner attempts to toggle the can_edit permission on an attendee."
         userAction: "Ask the event owner to change the attendee's edit permission."
 
@@ -355,6 +401,7 @@ resources:
         code: CALENDAR.INVITE.NOT_FOUND
         status: 404
         message: "Invite not found or expired"
+        message_ja: "招待が見つからないか期限切れです"
         description: "Returned when the invite token or public_id does not match any active invite, or the invite has expired or exhausted its use limit."
         userAction: "Ask the calendar owner for a new invite link."
 
@@ -362,6 +409,7 @@ resources:
         code: CALENDAR.INVITE.TOKEN_GENERATE_INTERRUPTED
         status: 500
         message: "Could not generate invite token"
+        message_ja: "招待トークンを生成できませんでした"
         description: "Returned when cryptographic random generation for the invite token encounters an error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -369,6 +417,7 @@ resources:
         code: CALENDAR.INVITE.STORE_WRITE_INTERRUPTED
         status: 500
         message: "Could not save invite"
+        message_ja: "招待を保存できませんでした"
         description: "Returned when inserting an invite row encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -376,6 +425,7 @@ resources:
         code: CALENDAR.INVITE.LIST_QUERY_INTERRUPTED
         status: 500
         message: "Could not retrieve invites"
+        message_ja: "招待一覧を取得できませんでした"
         description: "Returned when the database query to list invites encounters an unexpected error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -383,6 +433,7 @@ resources:
         code: CALENDAR.INVITE.STORE_REVOKE_INTERRUPTED
         status: 500
         message: "Could not revoke invite"
+        message_ja: "招待を取り消せませんでした"
         description: "Returned when the disable query for an invite encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -390,6 +441,7 @@ resources:
         code: CALENDAR.INVITE.STORE_LOOKUP_INTERRUPTED
         status: 500
         message: "Could not look up invite"
+        message_ja: "招待を検索できませんでした"
         description: "Returned when looking up an invite by token hash encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -397,6 +449,7 @@ resources:
         code: CALENDAR.INVITE.EMAIL_SEND_INTERRUPTED
         status: 500
         message: "Could not send invite email"
+        message_ja: "招待メールを送信できませんでした"
         description: "Returned when sending the magic-link invite email fails. The invite row is persisted; the email dispatch can be retried via resend."
         userAction: "Retry the resend action. If the problem persists, contact support."
 
@@ -407,6 +460,7 @@ resources:
         code: CALENDAR.MEMBER.USER_NOT_FOUND
         status: 404
         message: "User not found"
+        message_ja: "ユーザーが見つかりません"
         description: "Returned when the specified user (by email or public_id) does not match any active user."
         userAction: "Verify the user email or ID."
 
@@ -414,6 +468,7 @@ resources:
         code: CALENDAR.MEMBER.USER_ID_MALFORMED
         status: 400
         message: "Invalid user ID"
+        message_ja: "ユーザー ID の形式が正しくありません"
         description: "Returned when the user ID path parameter is not a valid UUID."
         userAction: "Provide a valid UUID for the user."
 
@@ -421,6 +476,7 @@ resources:
         code: CALENDAR.MEMBER.ALREADY_SUBSCRIBED
         status: 409
         message: "User is already a member of this calendar"
+        message_ja: "このユーザーは既にカレンダーのメンバーです"
         description: "Returned when attempting to add a user who already has an active subscription to the calendar."
         userAction: "The user is already a member. Update their role instead if needed."
 
@@ -428,6 +484,7 @@ resources:
         code: CALENDAR.MEMBER.NOT_FOUND
         status: 404
         message: "Member not found"
+        message_ja: "メンバーが見つかりません"
         description: "Returned when the target user does not have a subscription to the specified calendar."
         userAction: "Verify the user is a member of this calendar."
 
@@ -435,6 +492,7 @@ resources:
         code: CALENDAR.MEMBER.LAST_OWNER_REMOVAL_BLOCKED
         status: 409
         message: "Cannot remove the last owner of a calendar"
+        message_ja: "カレンダーの最後のオーナーは削除できません"
         description: "Returned when attempting to remove or downgrade the sole remaining owner of a calendar. At least one owner must remain."
         userAction: "Transfer ownership to another member before removing the current owner."
 
@@ -442,6 +500,7 @@ resources:
         code: CALENDAR.MEMBER.LIST_QUERY_INTERRUPTED
         status: 500
         message: "Could not retrieve members"
+        message_ja: "メンバーを取得できませんでした"
         description: "Returned when the database query to list calendar subscribers encounters an unexpected error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -449,6 +508,7 @@ resources:
         code: CALENDAR.MEMBER.STORE_WRITE_INTERRUPTED
         status: 500
         message: "Could not add member"
+        message_ja: "メンバーを追加できませんでした"
         description: "Returned when inserting a subscription row encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -456,6 +516,7 @@ resources:
         code: CALENDAR.MEMBER.STORE_READ_INTERRUPTED
         status: 500
         message: "Could not look up member"
+        message_ja: "メンバーを検索できませんでした"
         description: "Returned when looking up a subscription row encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -463,6 +524,7 @@ resources:
         code: CALENDAR.MEMBER.STORE_ROLE_UPDATE_INTERRUPTED
         status: 500
         message: "Could not update member role"
+        message_ja: "メンバーの役割を更新できませんでした"
         description: "Returned when the query to patch a subscription role encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -470,6 +532,7 @@ resources:
         code: CALENDAR.MEMBER.STORE_REMOVE_INTERRUPTED
         status: 500
         message: "Could not remove member"
+        message_ja: "メンバーを削除できませんでした"
         description: "Returned when the disable query for a subscription encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -477,6 +540,7 @@ resources:
         code: CALENDAR.MEMBER.OWNER_COUNT_QUERY_INTERRUPTED
         status: 500
         message: "Could not verify owner count"
+        message_ja: "オーナー数を確認できませんでした"
         description: "Returned when the query to count remaining calendar owners encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -487,6 +551,7 @@ resources:
         code: CALENDAR.TASK_SYNC.TASK_NOT_FOUND
         status: 404
         message: "Task not found"
+        message_ja: "タスクが見つかりません"
         description: "Returned when the specified task public_id does not match any active task in the workspace."
         userAction: "Verify the task ID and ensure it belongs to the current workspace."
 
@@ -494,6 +559,7 @@ resources:
         code: CALENDAR.TASK_SYNC.TASK_ID_MALFORMED
         status: 400
         message: "Invalid taskId format"
+        message_ja: "taskId の形式が正しくありません"
         description: "Returned when the taskId field is not a valid UUID."
         userAction: "Provide a valid UUID for the task."
 
@@ -501,6 +567,7 @@ resources:
         code: CALENDAR.TASK_SYNC.TIMEZONE_UNRECOGNIZED
         status: 400
         message: "Unrecognized timezone"
+        message_ja: "タイムゾーンを認識できません"
         description: "Returned when the timezone field is not a valid IANA timezone name."
         userAction: "Provide a valid IANA timezone (e.g. America/New_York, Asia/Tokyo)."
 
@@ -508,6 +575,7 @@ resources:
         code: CALENDAR.TASK_SYNC.TASK_LOOKUP_INTERRUPTED
         status: 500
         message: "Could not look up task"
+        message_ja: "タスクを検索できませんでした"
         description: "Returned when the raw query to read the task row encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -515,6 +583,7 @@ resources:
         code: CALENDAR.TASK_SYNC.STORE_WRITE_INTERRUPTED
         status: 500
         message: "Could not create event from task"
+        message_ja: "タスクからイベントを作成できませんでした"
         description: "Returned when inserting the calendar event for the linked task encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -522,6 +591,7 @@ resources:
         code: CALENDAR.TASK_SYNC.VIEWER_ROLE_INSUFFICIENT
         status: 403
         message: "Viewers cannot create events"
+        message_ja: "閲覧者はイベントを作成できません"
         description: "Returned when a calendar viewer attempts to create a task-synced event. At least editor role is required."
         userAction: "Ask a calendar owner or manager to upgrade your role."
 
@@ -532,6 +602,7 @@ resources:
         code: CALENDAR.SMART_CREATE.TEXT_UNPARSEABLE
         status: 422
         message: "Could not parse event from text"
+        message_ja: "テキストからイベントを解析できませんでした"
         description: "Returned when the natural language parser cannot extract event parameters from the submitted text."
         userAction: "Try rephrasing the event description with clearer date, time, and title information."
 
@@ -542,6 +613,7 @@ resources:
         code: CALENDAR.USER_PROFILE.LOOKUP_INTERRUPTED
         status: 500
         message: "Could not retrieve user profile"
+        message_ja: "ユーザープロフィールを取得できませんでした"
         description: "Returned when looking up the actor's user profile encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -549,6 +621,7 @@ resources:
         code: CALENDAR.USER_PROFILE.USER_LOOKUP_INTERRUPTED
         status: 500
         message: "Could not look up user"
+        message_ja: "ユーザーを検索できませんでした"
         description: "Returned when resolving a user by email encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -559,6 +632,7 @@ resources:
         code: CALENDAR.SUBSCRIPTION.STORE_WRITE_INTERRUPTED
         status: 500
         message: "Could not create calendar subscription"
+        message_ja: "カレンダー購読を作成できませんでした"
         description: "Returned when inserting a calendar subscription row encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -566,6 +640,7 @@ resources:
         code: CALENDAR.SUBSCRIPTION.MEMBERSHIP_CHECK_INTERRUPTED
         status: 500
         message: "Could not verify membership"
+        message_ja: "メンバーシップを確認できませんでした"
         description: "Returned when checking whether a user already has a subscription encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
@@ -573,5 +648,6 @@ resources:
         code: CALENDAR.SUBSCRIPTION.COUNTRY_INVALID
         status: 400
         message: "Country code is invalid or not supported"
+        message_ja: "国コードが無効か未対応です"
         description: "Returned when the ISO 3166-1 alpha-2 country code supplied to the subscribe-system endpoint is not recognised or has no holiday feed available."
         userAction: "Pick a supported country code (e.g. JP, US, GB) from the selector."

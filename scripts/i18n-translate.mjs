@@ -7,11 +7,18 @@
 // GitHub Actions translator job). A future LLM path can replace the
 // placeholder generator without changing the CLI contract.
 //
+// The --check mode also scans every apps/*/locales/*/*.json (and
+// apps/*/src/locales/*/*.json for apps that co-locate locales with the
+// source tree, e.g. time-web) for string values that are empty, so a
+// regressed codegen pipeline — like the one that previously shipped
+// apps/flow-web/locales/ja/errors.json as 253 empty strings — fails CI
+// instead of silently surfacing English copy inside the JA UI.
+//
 // Usage:
-//   node scripts/i18n-translate.mjs --check   # exit 1 if ja is missing keys
+//   node scripts/i18n-translate.mjs --check   # exit 1 if ja is missing keys or any value is empty
 //   node scripts/i18n-translate.mjs --write   # patch ja files in place
 
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -81,10 +88,98 @@ if (report.length > 0) {
   }
 }
 
-if (mode === 'check' && missingTotal > 0) {
-  console.error(
-    `\n${missingTotal} key(s) missing in ja locales. Run \`node scripts/i18n-translate.mjs --write\` to scaffold placeholders.`,
-  );
+// --- Empty-value lint ---------------------------------------------------
+//
+// Scan every apps/*/locales/<lang>/errors.json and flag any string leaf
+// whose value is "". Empty values are indistinguishable from a real
+// translation at runtime, so i18next returns "" and the UI falls back to
+// the English server message — exactly the failure mode that shipped
+// ja/errors.json as 253 empty strings. Scope is intentionally limited to
+// errors.json (the codegen'd catalog) so we only catch regressions in the
+// file this check exists to guard; hand-authored common.json / etc. are
+// caught by the existing missing-key check above.
+
+const emptyFindings = [];
+
+function collectErrorsJsonFiles() {
+  const files = [];
+  const appsDir = join(repo, 'apps');
+  let apps = [];
+  try {
+    apps = readdirSync(appsDir);
+  } catch {
+    return files;
+  }
+  for (const app of apps) {
+    const candidates = [join(appsDir, app, 'locales'), join(appsDir, app, 'src', 'locales')];
+    for (const root of candidates) {
+      let langs = [];
+      try {
+        langs = readdirSync(root);
+      } catch {
+        continue;
+      }
+      for (const lang of langs) {
+        const leaf = join(root, lang);
+        let s;
+        try {
+          s = statSync(leaf);
+        } catch {
+          continue;
+        }
+        if (!s.isDirectory()) continue;
+        const candidate = join(leaf, 'errors.json');
+        try {
+          statSync(candidate);
+        } catch {
+          continue;
+        }
+        files.push(candidate);
+      }
+    }
+  }
+  return files;
+}
+
+function scanForEmpty(full) {
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(full, 'utf8'));
+  } catch (err) {
+    emptyFindings.push({ file: full, path: '<root>', reason: `invalid json: ${err.message}` });
+    return;
+  }
+  const flat = new Map();
+  walk(parsed, '', flat);
+  for (const [path, value] of flat) {
+    if (typeof value === 'string' && value.length === 0) {
+      emptyFindings.push({ file: full, path, reason: 'empty string' });
+    }
+  }
+}
+
+for (const file of collectErrorsJsonFiles()) scanForEmpty(file);
+
+if (emptyFindings.length > 0) {
+  console.error(`\n${emptyFindings.length} empty locale value(s) found:`);
+  for (const { file, path, reason } of emptyFindings) {
+    // Trim repo prefix for readable output.
+    const rel = file.startsWith(`${repo}/`) ? file.slice(repo.length + 1) : file;
+    console.error(`  ${rel} :: ${path} (${reason})`);
+  }
+}
+
+if (mode === 'check' && (missingTotal > 0 || emptyFindings.length > 0)) {
+  if (missingTotal > 0) {
+    console.error(
+      `\n${missingTotal} key(s) missing in ja locales. Run \`node scripts/i18n-translate.mjs --write\` to scaffold placeholders.`,
+    );
+  }
+  if (emptyFindings.length > 0) {
+    console.error(
+      `\n${emptyFindings.length} empty string value(s) in locale files. Every leaf must carry a translation (or a "[TODO:ja] ..." placeholder).`,
+    );
+  }
   process.exit(1);
 }
 console.info(

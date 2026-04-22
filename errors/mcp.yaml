@@ -9,6 +9,7 @@ resources:
         code: MCP.TOKEN.UNKNOWN
         status: 401
         message: "MCP token is invalid"
+        message_ja: "MCP トークンが無効です"
         description: "Returned when the bearer token presented to the MCP endpoint is unknown or malformed."
         userAction: "Re-issue an MCP token from your account settings."
 
@@ -16,6 +17,7 @@ resources:
         code: MCP.TOKEN.EXPIRED
         status: 401
         message: "MCP token has expired"
+        message_ja: "MCP トークンの有効期限が切れました"
         description: "Returned when the MCP token has passed its expiration timestamp."
         userAction: "Re-issue a new MCP token."
 
@@ -23,6 +25,7 @@ resources:
         code: MCP.TOKEN.REVOKED
         status: 401
         message: "MCP token has been revoked"
+        message_ja: "MCP トークンは取り消されました"
         description: "Returned when the MCP token has been explicitly revoked by the user or an admin."
         userAction: "Re-issue a new MCP token."
 
@@ -30,6 +33,7 @@ resources:
         code: MCP.TOKEN.WORKSPACE_MISMATCH
         status: 403
         message: "MCP token is bound to a different workspace"
+        message_ja: "MCP トークンは別のワークスペースに紐付けられています"
         description: "Returned when the MCP token is bound to one workspace but the tool arguments reference a resource belonging to another workspace."
         userAction: "Use an MCP token issued for the workspace that owns the target resource."
 
@@ -40,6 +44,7 @@ resources:
         code: MCP.SCOPE.INSUFFICIENT
         status: 403
         message: "MCP token does not have the required scope"
+        message_ja: "MCP トークンに必要なスコープが付与されていません"
         description: "Returned when the requested tool or resource requires a scope not granted to the presented MCP token."
         userAction: "Re-issue the MCP token with the required scope."
 
@@ -50,6 +55,7 @@ resources:
         code: MCP.TOOL.NOT_FOUND
         status: 404
         message: "MCP tool not found"
+        message_ja: "MCP ツールが見つかりません"
         description: "Returned when the client requests a tool name that is not registered on this MCP server."
         userAction: "Check the tool name against the list returned by tools/list."
 
@@ -57,6 +63,7 @@ resources:
         code: MCP.TOOL.ARGUMENTS_INVALID
         status: 422
         message: "MCP tool arguments are invalid"
+        message_ja: "MCP ツールの引数が不正です"
         description: "Returned when the supplied arguments do not match the tool's input schema."
         userAction: "Inspect the tool schema and correct the argument types or required fields."
 
@@ -64,6 +71,7 @@ resources:
         code: MCP.TOOL.EXECUTION_FAILED
         status: 500
         message: "MCP tool execution failed"
+        message_ja: "MCP ツールの実行に失敗しました"
         description: "Returned when an internal error occurs inside the tool body, such as a database error while executing the tool."
         userAction: "Retry the call; if the problem persists, contact the server administrator."
 
@@ -74,6 +82,7 @@ resources:
         code: MCP.PROTOCOL.FRAME_MALFORMED
         status: 400
         message: "MCP protocol frame is malformed"
+        message_ja: "MCP プロトコルのフレームが不正です"
         description: "Returned when the incoming JSON-RPC frame cannot be parsed, uses an unsupported method, or declares a jsonrpc version other than 2.0."
         userAction: "Ensure the client sends a well-formed JSON-RPC 2.0 request with a supported method."
 
@@ -84,5 +93,6 @@ resources:
         code: MCP.RATE.LIMITED
         status: 429
         message: "MCP request rate limit exceeded"
+        message_ja: "MCP リクエストのレート制限を超えました"
         description: "Returned when the per-token MCP call rate limit has been reached."
         userAction: "Slow down the request rate and retry after the Retry-After interval."

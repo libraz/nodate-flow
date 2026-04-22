@@ -9,6 +9,7 @@ resources:
         code: INTEGRATION.SLACK.WEBHOOK_SIGNING_FAILED
         status: 401
         message: "Slack request signature verification failed"
+        message_ja: "Slack リクエストの署名検証に失敗しました"
         description: "Returned when the X-Slack-Signature header does not match the HMAC computed from the configured signing secret, or the timestamp is outside the allowed window."
         userAction: "Verify that the signing secret in Slack matches the one configured in the integration settings."
 
@@ -16,6 +17,7 @@ resources:
         code: INTEGRATION.SLACK.WEBHOOK_PAYLOAD_UNPARSEABLE
         status: 400
         message: "Slack webhook payload could not be parsed"
+        message_ja: "Slack Webhook のペイロードを解析できませんでした"
         description: "Returned when the Slack event payload is malformed or missing required fields."
         userAction: "Check the Slack app event subscription configuration."
 
@@ -26,6 +28,7 @@ resources:
         code: INTEGRATION.SLACK.TOKEN_INVALID
         status: 401
         message: "Slack API token is invalid"
+        message_ja: "Slack API トークンが無効です"
         description: "Returned when Slack rejects the integration's bot or user token."
         userAction: "Re-authorize the Slack integration."
 
@@ -33,5 +36,6 @@ resources:
         code: INTEGRATION.SLACK.RATE_LIMITED
         status: 429
         message: "Slack API rate limit exceeded"
+        message_ja: "Slack API のレート制限を超えました"
         description: "Returned when Slack returns a 429 due to method-level rate limiting."
         userAction: "Wait for the Retry-After interval before retrying."

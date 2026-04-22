@@ -26,6 +26,7 @@ type errorEntry struct {
 	Code        string `yaml:"code"`
 	Status      int    `yaml:"status"`
 	Message     string `yaml:"message"`
+	MessageJA   string `yaml:"message_ja"`
 	Description string `yaml:"description"`
 	UserAction  string `yaml:"userAction"`
 }
@@ -51,6 +52,7 @@ type record struct {
 	Code        string
 	Status      int
 	Message     string
+	MessageJA   string
 	Description string
 	UserAction  string
 	Breadcrumb  string // resource breadcrumb (fallback to domain)
@@ -121,6 +123,9 @@ func run() error {
 				if bc == "" {
 					bc = df.Breadcrumb
 				}
+				if e.MessageJA == "" {
+					fmt.Fprintf(os.Stderr, "gen-errors: warning: %s: %s missing 'message_ja'\n", path, e.Code)
+				}
 				recs = append(recs, record{
 					Domain:      df.Domain,
 					File:        base,
@@ -129,6 +134,7 @@ func run() error {
 					Code:        e.Code,
 					Status:      e.Status,
 					Message:     e.Message,
+					MessageJA:   e.MessageJA,
 					Description: e.Description,
 					UserAction:  e.UserAction,
 					Breadcrumb:  bc,
@@ -217,10 +223,10 @@ func run() error {
 		if err := os.MkdirAll(jaDir, 0o755); err != nil {
 			return err
 		}
-		if err := writeFile(filepath.Join(enDir, "errors.json"), genLocale(all, false)); err != nil {
+		if err := writeFile(filepath.Join(enDir, "errors.json"), genLocale(all, "en")); err != nil {
 			return err
 		}
-		if err := writeFile(filepath.Join(jaDir, "errors.json"), genLocale(all, true)); err != nil {
+		if err := writeFile(filepath.Join(jaDir, "errors.json"), genLocale(all, "ja")); err != nil {
 			return err
 		}
 	}
@@ -465,13 +471,22 @@ func genTsBarrel(names []string) []byte {
 
 // ----- locales -----
 
-func genLocale(all []record, blank bool) []byte {
+// genLocale emits the errors.json file for a specific language.
+//
+// For "en" we always use record.Message. For "ja" we use record.MessageJA
+// when set; otherwise we emit an empty string so the i18n lint in
+// scripts/i18n-translate.mjs (--check) fails loudly rather than silently
+// falling back to English copy inside the JA locale.
+func genLocale(all []record, lang string) []byte {
 	var b bytes.Buffer
 	b.WriteString("{\n")
 	for i, r := range all {
-		val := r.Message
-		if blank {
-			val = ""
+		var val string
+		switch lang {
+		case "ja":
+			val = r.MessageJA
+		default:
+			val = r.Message
 		}
 		fmt.Fprintf(&b, "  %q: %q", r.Code, val)
 		if i < len(all)-1 {

@@ -9,6 +9,7 @@ resources:
         code: WS.WORKSPACE.NOT_FOUND
         status: 404
         message: "Workspace not found"
+        message_ja: "ワークスペースが見つかりません"
         description: "Returned when a workspace with the given public_id does not exist or the actor has no visibility into it."
         userAction: "Verify the workspace ID, or ask an admin to add you as a member."
 
@@ -16,6 +17,7 @@ resources:
         code: WS.WORKSPACE.ACCESS_DENIED
         status: 403
         message: "You do not have access to this workspace"
+        message_ja: "このワークスペースへのアクセス権がありません"
         description: "Returned when the actor is authenticated but is not a member of the target workspace."
         userAction: "Ask a workspace admin to invite you."
 
@@ -23,6 +25,7 @@ resources:
         code: WS.WORKSPACE.SLUG_ALREADY_TAKEN
         status: 409
         message: "Workspace slug is already taken"
+        message_ja: "このワークスペース slug は既に使用されています"
         description: "Returned when the requested workspace slug conflicts with an existing workspace on the same instance."
         userAction: "Choose a different slug."
 
@@ -33,6 +36,7 @@ resources:
         code: WS.PROJECT.NOT_FOUND
         status: 404
         message: "Project not found"
+        message_ja: "プロジェクトが見つかりません"
         description: "Returned when a project does not exist or when the actor cannot access it (404 to avoid leaking existence)."
         userAction: "Verify the project ID, or contact a workspace admin if you should have access."
 
@@ -40,6 +44,7 @@ resources:
         code: WS.PROJECT.ACCESS_DENIED
         status: 403
         message: "You do not have access to this project"
+        message_ja: "このプロジェクトへのアクセス権がありません"
         description: "Returned when the actor is a workspace member but lacks the required project role."
         userAction: "Ask a project lead to grant you access."
 
@@ -47,6 +52,7 @@ resources:
         code: WS.PROJECT.SLUG_ALREADY_TAKEN
         status: 409
         message: "Project slug is already taken"
+        message_ja: "このプロジェクト slug は既に使用されています"
         description: "Returned when the requested project slug already exists within the workspace."
         userAction: "Choose a different slug."
 
@@ -54,6 +60,7 @@ resources:
         code: WS.PROJECT.IDENTIFIER_ALREADY_TAKEN
         status: 409
         message: "Project identifier is already taken"
+        message_ja: "このプロジェクト識別子は既に使用されています"
         description: "Returned when the requested project identifier already exists within the workspace."
         userAction: "Choose a different identifier."
 
@@ -61,6 +68,7 @@ resources:
         code: WS.PROJECT.FEATURE_DISABLED
         status: 403
         message: "This feature is disabled for the project"
+        message_ja: "この機能はプロジェクトで無効化されています"
         description: "Returned when a request targets a feature that has been disabled in the project settings."
         userAction: "Enable the feature in project settings, or contact a project admin."
 
@@ -71,6 +79,7 @@ resources:
         code: WS.TASK.NOT_FOUND
         status: 404
         message: "Task not found"
+        message_ja: "タスクが見つかりません"
         description: "Returned when a task with the given public_id does not exist or has been deleted in the current workspace."
         userAction: "Verify the task ID, or refresh the list to see current tasks."
 
@@ -78,6 +87,7 @@ resources:
         code: WS.TASK.ACCESS_DENIED
         status: 403
         message: "You do not have access to this task"
+        message_ja: "このタスクへのアクセス権がありません"
         description: "Returned when the actor lacks the required project role to read or modify the task."
         userAction: "Ask a project lead to grant you access."
 
@@ -85,6 +95,7 @@ resources:
         code: WS.TASK.UPDATE_CONFLICT
         status: 409
         message: "Task was modified by someone else"
+        message_ja: "このタスクは他のユーザーに更新されました"
         description: "Returned when an optimistic concurrency check (version or updated_at) fails during update."
         userAction: "Reload the task to see the latest version, then re-apply your changes."
 
@@ -92,6 +103,7 @@ resources:
         code: WS.TASK.TITLE_TOO_LONG
         status: 422
         message: "Task title is too long"
+        message_ja: "タスクのタイトルが長すぎます"
         description: "Returned when the submitted title exceeds the maximum allowed length."
         userAction: "Shorten the title and retry."
 
@@ -99,6 +111,7 @@ resources:
         code: WS.TASK.STATE_TRANSITION_BLOCKED_BY_CONSTRAINT
         status: 422
         message: "Task cannot transition to the requested state"
+        message_ja: "タスクを指定した状態に遷移できません"
         description: "Returned when an unsatisfied constraint blocks the requested lifecycle transition."
         userAction: "Review unmet constraints in the task detail panel and resolve them before retrying."
 
@@ -106,6 +119,7 @@ resources:
         code: WS.TASK.TRANSITION_UNKNOWN
         status: 400
         message: "Unknown task transition"
+        message_ja: "未知のタスク遷移です"
         description: "Returned when the client submits a transition name that is not one of {start|block|unblock|submit|complete|reopen|cancel}. Rejected at the HTTP layer before the constraint engine runs."
         userAction: "Use one of the supported transition names defined by the API."
 
@@ -113,6 +127,7 @@ resources:
         code: WS.TASK.TRANSITION_REJECTED
         status: 422
         message: "Task transition not allowed in current state"
+        message_ja: "現在の状態ではこのタスク遷移は許可されていません"
         description: "Returned by the constraint engine when the requested transition is illegal for the task's current lifecycle state."
         userAction: "Refresh the task to see its current state and choose a valid transition."
 
@@ -120,6 +135,7 @@ resources:
         code: WS.TASK.ALREADY_ARCHIVED
         status: 409
         message: "Task is already archived"
+        message_ja: "このタスクは既にアーカイブ済みです"
         description: "Returned when attempting to archive a task that is already in the archived state."
         userAction: "The task is already archived."
 
@@ -127,6 +143,7 @@ resources:
         code: WS.TASK.NOT_ARCHIVED
         status: 409
         message: "Task is not archived"
+        message_ja: "このタスクはアーカイブされていません"
         description: "Returned when attempting to unarchive a task that is not in the archived state."
         userAction: "The task is not archived."
 
@@ -137,6 +154,7 @@ resources:
         code: WS.MEMBER.ROLE_DENIED
         status: 403
         message: "Your role does not permit this action"
+        message_ja: "現在の役割ではこの操作を実行できません"
         description: "Returned when the actor's workspace role is insufficient for the attempted operation."
         userAction: "Ask a workspace admin to elevate your role."
 
@@ -144,6 +162,7 @@ resources:
         code: WS.MEMBER.NOT_FOUND
         status: 404
         message: "Workspace member not found"
+        message_ja: "ワークスペースメンバーが見つかりません"
         description: "Returned when the target user is not a member of the workspace."
         userAction: "Invite the user to the workspace first."
 
@@ -154,6 +173,7 @@ resources:
         code: WS.NOTIFICATION.NOT_FOUND
         status: 404
         message: "Notification not found"
+        message_ja: "通知が見つかりません"
         description: "Returned when a notification with the given public_id does not exist or belongs to another user."
         userAction: "Verify the notification ID."
 
@@ -164,6 +184,7 @@ resources:
         code: WS.LENS.NOT_FOUND
         status: 404
         message: "Saved view not found"
+        message_ja: "保存済みビューが見つかりません"
         description: "Returned when a lens with the given public_id does not exist or has been deleted."
         userAction: "Verify the view ID, or refresh the list to see current saved views."
 
@@ -171,6 +192,7 @@ resources:
         code: WS.LENS.NAME_ALREADY_TAKEN
         status: 409
         message: "A saved view with this name already exists"
+        message_ja: "同名の保存済みビューが既に存在します"
         description: "Returned when the requested lens name already exists within the same workspace/project scope."
         userAction: "Choose a different name."
 
@@ -178,6 +200,7 @@ resources:
         code: WS.LENS.ALREADY_PUBLIC
         status: 409
         message: "This saved view is already published"
+        message_ja: "この保存済みビューは既に公開されています"
         description: "Returned when attempting to publish a lens that is already shared publicly."
         userAction: "The view is already public. Use the existing share link."
 
@@ -185,6 +208,7 @@ resources:
         code: WS.LENS.ALREADY_PRIVATE
         status: 409
         message: "This saved view is already private"
+        message_ja: "この保存済みビューは既に非公開です"
         description: "Returned when attempting to unpublish a lens that is not currently shared."
         userAction: "The view is already private."
 
@@ -192,6 +216,7 @@ resources:
         code: WS.LENS.PUBLIC_TOKEN_INVALID
         status: 404
         message: "Public share link not found or expired"
+        message_ja: "公開共有リンクが見つからないか期限切れです"
         description: "Returned when a public lens token does not match any published lens."
         userAction: "Verify the share link is correct and the view is still published."
 
@@ -202,6 +227,7 @@ resources:
         code: WS.LABEL.NOT_FOUND
         status: 404
         message: "Label not found"
+        message_ja: "ラベルが見つかりません"
         description: "Returned when a label with the given public_id does not exist or has been deleted."
         userAction: "Verify the label ID, or refresh the list to see current labels."
 
@@ -209,6 +235,7 @@ resources:
         code: WS.LABEL.NAME_ALREADY_TAKEN
         status: 409
         message: "A label with this name already exists"
+        message_ja: "同名のラベルが既に存在します"
         description: "Returned when the requested label name already exists within the same workspace/project scope."
         userAction: "Choose a different name."
 
@@ -219,6 +246,7 @@ resources:
         code: WS.FAVORITE.NOT_FOUND
         status: 404
         message: "Favorite not found"
+        message_ja: "お気に入りが見つかりません"
         description: "Returned when a favorite with the given public_id does not exist or belongs to another user."
         userAction: "Verify the favorite ID."
 
@@ -226,6 +254,7 @@ resources:
         code: WS.FAVORITE.ALREADY_EXISTS
         status: 409
         message: "This item is already in your favorites"
+        message_ja: "このアイテムは既にお気に入りに追加されています"
         description: "Returned when the actor attempts to add an item that is already in their favorites list."
         userAction: "The item is already favorited."
 
@@ -236,6 +265,7 @@ resources:
         code: WS.REACTION.NOT_FOUND
         status: 404
         message: "Reaction not found"
+        message_ja: "リアクションが見つかりません"
         description: "Returned when a reaction with the given public_id does not exist or has been removed."
         userAction: "Verify the reaction ID."
 
@@ -243,6 +273,7 @@ resources:
         code: WS.REACTION.ALREADY_EXISTS
         status: 409
         message: "You already reacted with this emoji"
+        message_ja: "この絵文字では既にリアクション済みです"
         description: "Returned when the actor attempts to add a duplicate reaction with the same emoji to the same target."
         userAction: "Remove the existing reaction first if you want to change it."
 
@@ -253,6 +284,7 @@ resources:
         code: WS.MENTION.NOT_FOUND
         status: 404
         message: "Mention not found"
+        message_ja: "メンションが見つかりません"
         description: "Returned when a mention with the given public_id does not exist or has been removed."
         userAction: "Verify the mention ID."
 
@@ -263,6 +295,7 @@ resources:
         code: WS.VIEW_PREFERENCE.NOT_FOUND
         status: 404
         message: "View preference not found"
+        message_ja: "ビュー設定が見つかりません"
         description: "Returned when a view preference with the given public_id does not exist for the current user."
         userAction: "Verify the view preference ID, or create a new one."
 
@@ -273,6 +306,7 @@ resources:
         code: WS.NOTIFICATION_PREFERENCE.NOT_FOUND
         status: 404
         message: "Notification preference not found"
+        message_ja: "通知設定が見つかりません"
         description: "Returned when a notification preference with the given public_id does not exist for the current user."
         userAction: "Verify the notification preference ID, or create a new one."
 
@@ -283,6 +317,7 @@ resources:
         code: WS.INTAKE.NOT_FOUND
         status: 404
         message: "Intake item not found"
+        message_ja: "インテークアイテムが見つかりません"
         description: "Returned when an intake item with the given public_id does not exist or has been removed."
         userAction: "Verify the intake item ID, or refresh the list to see current items."
 
@@ -290,6 +325,7 @@ resources:
         code: WS.INTAKE.ALREADY_TRIAGED
         status: 409
         message: "This intake item has already been triaged"
+        message_ja: "このインテークアイテムは既に振り分け済みです"
         description: "Returned when attempting to triage an intake item that has already been triaged."
         userAction: "The item has already been triaged. No further action is needed."
 
@@ -297,6 +333,7 @@ resources:
         code: WS.INTAKE.ALREADY_CONVERTED
         status: 409
         message: "This intake item has already been converted to a task"
+        message_ja: "このインテークアイテムは既にタスクに変換済みです"
         description: "Returned when attempting to convert an intake item that has already been converted to a task."
         userAction: "The item has already been converted. Open the linked task instead."
 
@@ -307,6 +344,7 @@ resources:
         code: WS.DESCRIPTION_VERSION.NOT_FOUND
         status: 404
         message: "Description version not found"
+        message_ja: "説明文のバージョンが見つかりません"
         description: "Returned when a description version with the given public_id does not exist or has been removed."
         userAction: "Verify the version ID, or refresh the version history."
 
@@ -317,6 +355,7 @@ resources:
         code: WS.IMPORT.NOT_FOUND
         status: 404
         message: "Import job not found"
+        message_ja: "インポートジョブが見つかりません"
         description: "Returned when an import job with the given public_id does not exist or belongs to a different workspace."
         userAction: "Verify the import job ID, or refresh the list to see current imports."
 
@@ -324,6 +363,7 @@ resources:
         code: WS.IMPORT.ALREADY_RUNNING
         status: 409
         message: "An import job is already running for this project"
+        message_ja: "このプロジェクトでは既にインポートジョブが実行中です"
         description: "Returned when a new import is requested while another import job is still in progress for the same project."
         userAction: "Wait for the current import to finish, or cancel it before starting a new one."
 
@@ -331,5 +371,6 @@ resources:
         code: WS.IMPORT.CANNOT_CANCEL
         status: 409
         message: "Only pending or running import jobs can be cancelled"
+        message_ja: "キャンセルできるのは待機中または実行中のインポートジョブのみです"
         description: "Returned when attempting to cancel an import job that has already completed, failed, or been cancelled."
         userAction: "The import job is no longer in a cancellable state."

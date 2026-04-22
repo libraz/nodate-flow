@@ -9,6 +9,7 @@ resources:
         code: PAGE.PAGE.NOT_FOUND
         status: 404
         message: "Page not found"
+        message_ja: "ページが見つかりません"
         description: "Returned when a page with the given public_id does not exist or the actor has no visibility into it."
         userAction: "Verify the page ID, or refresh the list to see current pages."
 
@@ -16,6 +17,7 @@ resources:
         code: PAGE.PAGE.TITLE_TAKEN
         status: 409
         message: "A page with this title already exists under the same parent"
+        message_ja: "同じ階層に同名のページが既に存在します"
         description: "Returned when the requested page title conflicts with an existing page that shares the same parent in the hierarchy."
         userAction: "Choose a different title or move the page to a different parent."
 
@@ -23,6 +25,7 @@ resources:
         code: PAGE.PAGE.MAX_DEPTH
         status: 400
         message: "Maximum nesting depth exceeded"
+        message_ja: "ネストの最大階層を超えました"
         description: "Returned when creating or moving a page would exceed the maximum allowed nesting depth of 5 levels."
         userAction: "Restructure the page hierarchy to reduce nesting, or place the page at a shallower level."
 
@@ -30,6 +33,7 @@ resources:
         code: PAGE.PAGE.CIRCULAR_PARENT
         status: 400
         message: "Cannot set parent to self or descendant"
+        message_ja: "自身または子孫ページを親に設定できません"
         description: "Returned when a page move would create a circular reference by setting the parent to the page itself or one of its descendants."
         userAction: "Choose a parent that is not the page itself or any of its children."
 
@@ -40,5 +44,6 @@ resources:
         code: PAGE.GENERATION.UPSTREAM_UNAVAILABLE
         status: 502
         message: "AI page generation failed"
+        message_ja: "AI によるページ生成に失敗しました"
         description: "Returned when the upstream LLM provider did not return a usable response while generating page content."
         userAction: "Retry the generation; if the problem persists, check the AI provider status."

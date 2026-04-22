@@ -9,6 +9,7 @@ resources:
         code: TIMEBOX.TIMEBOX.NOT_FOUND
         status: 404
         message: "Timebox not found"
+        message_ja: "タイムボックスが見つかりません"
         description: "Returned when a timebox with the given public_id does not exist or the actor has no visibility into it."
         userAction: "Verify the timebox ID, or refresh the list to see current timeboxes."
 
@@ -16,6 +17,7 @@ resources:
         code: TIMEBOX.TIMEBOX.NAME_TAKEN
         status: 409
         message: "A timebox with this name already exists in the workspace"
+        message_ja: "このワークスペースに同名のタイムボックスが既に存在します"
         description: "Returned when the requested timebox name conflicts with an existing timebox in the same workspace."
         userAction: "Choose a different name."
 
@@ -23,6 +25,7 @@ resources:
         code: TIMEBOX.TIMEBOX.INVALID_DATES
         status: 422
         message: "Timebox end date must be after start date"
+        message_ja: "終了日は開始日より後にしてください"
         description: "Returned when ends_on is not strictly after starts_on."
         userAction: "Adjust the start or end date so that the end date comes after the start date."
 
@@ -30,6 +33,7 @@ resources:
         code: TIMEBOX.TIMEBOX.ALREADY_COMPLETED
         status: 409
         message: "Cannot modify a completed timebox"
+        message_ja: "完了済みのタイムボックスは変更できません"
         description: "Returned when an update or state change is attempted on a timebox that has already been marked as completed."
         userAction: "Reopen the timebox before making changes, or create a new one."
 
@@ -40,6 +44,7 @@ resources:
         code: TIMEBOX.TASK.ALREADY_ADDED
         status: 409
         message: "Task is already in this timebox"
+        message_ja: "このタスクは既にタイムボックスに追加されています"
         description: "Returned when the task has already been added to the target timebox."
         userAction: "No action needed; the task is already present in the timebox."
 
@@ -47,5 +52,6 @@ resources:
         code: TIMEBOX.TASK.NOT_IN_TIMEBOX
         status: 404
         message: "Task not found in this timebox"
+        message_ja: "このタイムボックスにタスクが見つかりません"
         description: "Returned when attempting to remove or reference a task that is not a member of the specified timebox."
         userAction: "Verify the task ID and the timebox it belongs to."

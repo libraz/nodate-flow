@@ -9,6 +9,7 @@ resources:
         code: RELATION.SUGGESTION.NOT_FOUND
         status: 404
         message: "Relation suggestion not found"
+        message_ja: "関連の提案が見つかりません"
         description: "Returned when a relation suggestion with the given public_id does not exist or has been deleted."
         userAction: "Verify the suggestion ID, or refresh the list to see current suggestions."
 
@@ -16,5 +17,6 @@ resources:
         code: RELATION.SUGGESTION.ALREADY_RESOLVED
         status: 409
         message: "Relation suggestion has already been resolved"
+        message_ja: "この関連の提案は既に処理済みです"
         description: "Returned when attempting to accept or dismiss a suggestion that has already been accepted or dismissed."
         userAction: "No action needed; the suggestion has already been resolved."

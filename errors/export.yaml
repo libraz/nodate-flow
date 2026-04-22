@@ -10,6 +10,7 @@ resources:
         code: EXPORT.TASK.FORMAT_UNSUPPORTED
         status: 400
         message: "Unsupported export format"
+        message_ja: "対応していないエクスポート形式です"
         description: "Returned when the requested export format is not one of the supported types (csv, json)."
         userAction: "Use csv or json as the export format."
 
@@ -17,6 +18,7 @@ resources:
         code: EXPORT.TASK.LENS_NOT_FOUND
         status: 404
         message: "Lens referenced for export not found"
+        message_ja: "エクスポート対象のビューが見つかりません"
         description: "Returned when the saved view (lens) specified as the source for the export does not exist or has been deleted."
         userAction: "Verify the lens ID, or choose a different saved view."
 
@@ -24,6 +26,7 @@ resources:
         code: EXPORT.TASK.TOO_MANY_ROWS
         status: 422
         message: "Export exceeds maximum row limit"
+        message_ja: "エクスポート件数が上限を超えています"
         description: "Returned when the result set for the export exceeds the configured maximum number of rows."
         userAction: "Apply filters or narrow the lens to reduce the number of rows."
 
@@ -31,5 +34,6 @@ resources:
         code: EXPORT.TASK.GENERATION_FAILED
         status: 500
         message: "Export file generation failed"
+        message_ja: "エクスポートファイルの生成に失敗しました"
         description: "Returned when an internal error occurred while generating the export file."
         userAction: "Retry the export; if the problem persists, contact your administrator."

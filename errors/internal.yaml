@@ -9,6 +9,7 @@ resources:
         code: INTERNAL.UNEXPECTED
         status: 500
         message: "An unexpected internal error occurred"
+        message_ja: "予期しない内部エラーが発生しました"
         description: "Final catch-all for unhandled panics or bugs. Should never be thrown explicitly from a handler; always paired with a request_id in the structured log for triage."
         userAction: "Retry; if the problem persists, contact your administrator with the request ID."
 
@@ -19,5 +20,6 @@ resources:
         code: INTERNAL.DB.UNAVAILABLE
         status: 503
         message: "Database is temporarily unavailable"
+        message_ja: "データベースに一時的にアクセスできません"
         description: "Returned when the API cannot reach the database (connection refused, timeout, failover in progress)."
         userAction: "Retry shortly; contact your administrator if the problem persists."

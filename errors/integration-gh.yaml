@@ -9,6 +9,7 @@ resources:
         code: INTEGRATION.GH.WEBHOOK_INVALID_SIGNATURE
         status: 401
         message: "GitHub webhook signature is invalid"
+        message_ja: "GitHub Webhook の署名が無効です"
         description: "Returned when the X-Hub-Signature-256 header does not match the HMAC computed from the configured webhook secret."
         userAction: "Verify that the webhook secret in GitHub matches the one configured in the integration settings."
 
@@ -16,6 +17,7 @@ resources:
         code: INTEGRATION.GH.WEBHOOK_PAYLOAD_UNPARSEABLE
         status: 400
         message: "GitHub webhook payload could not be parsed"
+        message_ja: "GitHub Webhook のペイロードを解析できませんでした"
         description: "Returned when the webhook body is not valid JSON or does not match the expected event schema."
         userAction: "Check the webhook delivery in GitHub for the failing payload."
 
@@ -23,6 +25,7 @@ resources:
         code: INTEGRATION.GH.WEBHOOK_EVENT_UNSUPPORTED
         status: 400
         message: "GitHub webhook event type is not supported"
+        message_ja: "GitHub Webhook のイベント種別は未対応です"
         description: "Returned when the X-GitHub-Event header indicates an event that this integration does not handle."
         userAction: "Disable unsupported event types in the GitHub webhook configuration."
 
@@ -33,6 +36,7 @@ resources:
         code: INTEGRATION.GH.RATE_LIMITED
         status: 429
         message: "GitHub API rate limit exceeded"
+        message_ja: "GitHub API のレート制限を超えました"
         description: "Returned when the GitHub REST or GraphQL API rejected the request because the integration token has hit its rate limit."
         userAction: "Wait for the rate limit window to reset, or use a token with higher quota."
 
@@ -40,5 +44,6 @@ resources:
         code: INTEGRATION.GH.TOKEN_INVALID
         status: 401
         message: "GitHub API token is invalid"
+        message_ja: "GitHub API トークンが無効です"
         description: "Returned when GitHub rejects the integration's installation or PAT credentials."
         userAction: "Re-authorize the GitHub integration."

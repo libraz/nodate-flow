@@ -176,7 +176,7 @@ vet: ## go vet
 
 # ---------- codegen ----------
 
-.PHONY: gen gen-sqlc gen-errors gen-sdk gen-openapi
+.PHONY: gen gen-sqlc gen-errors gen-sdk gen-openapi i18n-check
 gen: gen-sqlc gen-errors gen-sdk ## Run all codegen (sqlc + errors + sdk)
 
 gen-sqlc: ## sqlc generate (requires sqlc installed)
@@ -184,6 +184,9 @@ gen-sqlc: ## sqlc generate (requires sqlc installed)
 
 gen-errors: ## Regenerate Go/TS error modules + locale stubs + docs from errors/*.yaml
 	go -C scripts run gen-errors.go
+
+i18n-check: ## Fail if any apps/*/locales/**/*.json has missing ja keys or empty string values
+	node scripts/i18n-translate.mjs --check
 
 gen-openapi: ## Dump merged OpenAPI 3.1 (flow-api + auth-api) to packages/sdk/openapi.json
 	cd apps/flow-api && go run ./cmd/dump-openapi -o ../../packages/sdk/openapi-flow.json
