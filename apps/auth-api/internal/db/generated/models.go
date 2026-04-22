@@ -2369,6 +2369,38 @@ type CalendarEventComment struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
+// Magic-link invite rows for calendar event attendees
+type CalendarEventInvite struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Internal FK to calendars.id
+	CalendarID uint32 `json:"calendarId"`
+	// Internal FK to calendar_events.id
+	EventID uint32 `json:"eventId"`
+	// Internal FK to calendar_event_attendees.id
+	AttendeeID uint32 `json:"attendeeId"`
+	// Recipient email, denormalized from attendee for inbox queries
+	Email string `json:"email"`
+	// SHA-256 digest of the plaintext magic-link token
+	TokenHash []byte `json:"tokenHash"`
+	// Magic-link expiry
+	ExpiresAt time.Time `json:"expiresAt"`
+	// Set when the recipient clicks the link
+	AcceptedAt sql.NullTime `json:"acceptedAt"`
+	// Set when the invite email is dispatched
+	SentAt sql.NullTime `json:"sentAt"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag; disabled rows are revoked invites
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
 // Calendar-level shared memos / to-do items
 type CalendarMemo struct {
 	// Internal PK, never exposed

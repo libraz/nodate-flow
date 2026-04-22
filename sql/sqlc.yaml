@@ -104,6 +104,8 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.event_id"
             go_struct_tag: 'json:"-"'
+          - column: "*.attendee_id"
+            go_struct_tag: 'json:"-"'
           - column: "*.owner_user_id"
             go_struct_tag: 'json:"-"'
           - column: "*.created_by_user_id"
@@ -194,6 +196,8 @@ sql:
           - column: "*.calendar_id"
             go_struct_tag: 'json:"-"'
           - column: "*.event_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.attendee_id"
             go_struct_tag: 'json:"-"'
           - column: "*.owner_user_id"
             go_struct_tag: 'json:"-"'

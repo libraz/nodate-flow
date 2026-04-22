@@ -6,6 +6,7 @@ package generated
 
 import (
 	"context"
+	"database/sql"
 
 	types "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/types"
 )
@@ -19,6 +20,8 @@ type Querier interface {
 	// Verify that a user is an enabled member of a workspace. Returns 1 if
 	// the membership exists, sql.ErrNoRows otherwise.
 	CheckWorkspaceMemberExists(ctx context.Context, arg CheckWorkspaceMemberExistsParams) (int32, error)
+	// TTL sweep: disable any invite whose expires_at is in the past.
+	CleanupExpiredCalendarEventInvites(ctx context.Context) error
 	// Delete tokens that are either expired-and-used or expired-and-unused, for periodic cleanup.
 	CleanupExpiredMagicLinks(ctx context.Context) error
 	// Disable TOTP on a local identity.
@@ -45,6 +48,10 @@ type Querier interface {
 	CreateCalendarEventAttendee(ctx context.Context, arg CreateCalendarEventAttendeeParams) (int64, error)
 	// Add a comment to a calendar event.
 	CreateCalendarEventComment(ctx context.Context, arg CreateCalendarEventCommentParams) (int64, error)
+	// Insert a new magic-link invite for a calendar event attendee.
+	// accepted_at and sent_at are left NULL by default; the caller uses
+	// LastInsertId from the returned sql.Result to follow up with reads.
+	CreateCalendarEventInvite(ctx context.Context, arg CreateCalendarEventInviteParams) (sql.Result, error)
 	// Add a shared memo/to-do item to a calendar.
 	CreateCalendarMemo(ctx context.Context, arg CreateCalendarMemoParams) (int64, error)
 	// Subscribe a user to a calendar with display preferences.
@@ -89,6 +96,8 @@ type Querier interface {
 	DisableCalendarEventAttendee(ctx context.Context, arg DisableCalendarEventAttendeeParams) error
 	// Soft-delete a comment (author or calendar owner).
 	DisableCalendarEventComment(ctx context.Context, arg DisableCalendarEventCommentParams) error
+	// Soft-disable (revoke) an invite by internal id.
+	DisableCalendarEventInvite(ctx context.Context, id uint32) error
 	// Soft-delete a memo.
 	DisableCalendarMemo(ctx context.Context, arg DisableCalendarMemoParams) error
 	// Remove a user from a calendar (soft-delete).
@@ -99,6 +108,10 @@ type Querier interface {
 	DisablePublicShare(ctx context.Context, arg DisablePublicShareParams) error
 	// Soft-disable a workspace. Cascade is handled by FK ON DELETE for hard purges.
 	DisableWorkspace(ctx context.Context, publicID types.PublicID) error
+	// Find the currently active invite for a given (event_id, attendee_id)
+	// pair. Used before create to decide "insert new vs rotate existing",
+	// since the UNIQUE(event_id, attendee_id) constraint forces upsert.
+	FindActiveCalendarEventInvite(ctx context.Context, arg FindActiveCalendarEventInviteParams) (CalendarEventInvite, error)
 	// Resolve a calendar by UUID v7 within a workspace.
 	FindCalendarByPublicId(ctx context.Context, arg FindCalendarByPublicIdParams) (FindCalendarByPublicIdRow, error)
 	// Resolve a checklist item by UUID v7.
@@ -111,6 +124,12 @@ type Querier interface {
 	FindCalendarEventByPublicId(ctx context.Context, arg FindCalendarEventByPublicIdParams) (FindCalendarEventByPublicIdRow, error)
 	// Resolve a comment by UUID v7.
 	FindCalendarEventCommentByPublicId(ctx context.Context, arg FindCalendarEventCommentByPublicIdParams) (FindCalendarEventCommentByPublicIdRow, error)
+	// Look up an enabled invite by its public UUID.
+	FindCalendarEventInviteByPublicId(ctx context.Context, publicID types.PublicID) (CalendarEventInvite, error)
+	// Look up an enabled invite by its SHA-256 token hash.
+	// Expiry is intentionally NOT filtered here so the handler can
+	// distinguish "expired" from "not found" and return clearer errors.
+	FindCalendarEventInviteByTokenHash(ctx context.Context, tokenHash []byte) (CalendarEventInvite, error)
 	// ListAllCalendarEvents was consumed only by the deleted ICS export path;
 	// the replacement will query via calendar_public_shares.
 	// Quick lookup for permission checks: who owns this event?
@@ -201,6 +220,8 @@ type Querier interface {
 	ListCalendarEventAttendees(ctx context.Context, eventID uint32) ([]ListCalendarEventAttendeesRow, error)
 	// List comments on an event in chronological order.
 	ListCalendarEventComments(ctx context.Context, eventID uint32) ([]ListCalendarEventCommentsRow, error)
+	// List all active invites for a single event, newest first.
+	ListCalendarEventInvitesForEvent(ctx context.Context, eventID uint32) ([]CalendarEventInvite, error)
 	// Cross-calendar query: list events across multiple calendars for a user
 	// within a workspace and time range. Used by the unified calendar view.
 	ListCalendarEventsAcrossCalendars(ctx context.Context, arg ListCalendarEventsAcrossCalendarsParams) ([]ListCalendarEventsAcrossCalendarsRow, error)
@@ -212,6 +233,11 @@ type Querier interface {
 	ListCalendarSubscribers(ctx context.Context, arg ListCalendarSubscribersParams) ([]ListCalendarSubscribersRow, error)
 	// List all calendars a user subscribes to within a workspace.
 	ListCalendarsForUser(ctx context.Context, arg ListCalendarsForUserParams) ([]ListCalendarsForUserRow, error)
+	// Inbox query for /me/invites: active, unaccepted, non-expired invites
+	// addressed to the authenticated user's primary email. JOINs event,
+	// calendar, and workspace metadata so the handler can build a rich
+	// inbox response without extra round trips.
+	ListMyCalendarEventInvites(ctx context.Context, email string) ([]ListMyCalendarEventInvitesRow, error)
 	// Cross-workspace variant: list non-recurring events on every calendar
 	// the caller is subscribed to, across every workspace where the caller
 	// is still an active member. workspace_members is joined so that a
@@ -252,6 +278,11 @@ type Querier interface {
 	ListWorkspaceMembers(ctx context.Context, arg ListWorkspaceMembersParams) ([]ListWorkspaceMembersRow, error)
 	// List workspaces a user belongs to.
 	ListWorkspacesForUser(ctx context.Context, arg ListWorkspacesForUserParams) ([]ListWorkspacesForUserRow, error)
+	// Stamp accepted_at when the recipient clicks the magic link
+	// successfully.
+	MarkCalendarEventInviteAccepted(ctx context.Context, id uint32) error
+	// Stamp sent_at when the invite email is actually dispatched.
+	MarkCalendarEventInviteSent(ctx context.Context, id uint32) error
 	// Stamp used_at on a magic link token after successful verification.
 	MarkMagicLinkUsed(ctx context.Context, id uint32) error
 	// Stamp used_at on a recovery code by internal id.
@@ -285,6 +316,10 @@ type Querier interface {
 	RevokeSession(ctx context.Context, arg RevokeSessionParams) error
 	// Disable an invite link (soft delete).
 	RevokeWorkspaceInvite(ctx context.Context, arg RevokeWorkspaceInviteParams) error
+	// Rotate the token on an existing invite row (resend flow): install a
+	// fresh token_hash + expires_at and clear sent_at / accepted_at so the
+	// UI reflects a fresh, undelivered invite.
+	RotateCalendarEventInviteToken(ctx context.Context, arg RotateCalendarEventInviteTokenParams) error
 	// Regenerate the token hash; invalidates any previously issued URL.
 	RotatePublicShareToken(ctx context.Context, arg RotatePublicShareTokenParams) error
 	// Replace the refresh token hash, extend expiry, and record last usage on a refresh rotation.
