@@ -401,7 +401,6 @@
       "assignee": "Assignee",
       "start": "Start date",
       "due": "Due date",
-      "event": "Event date",
       "submit": "Create",
       "cancel": "Cancel"
     },

@@ -19,7 +19,6 @@ CREATE TABLE tasks (
   priority INT NOT NULL DEFAULT 0 COMMENT 'LLM-optimized heuristic priority',
   due_on DATE NULL COMMENT 'Deadline for task completion; drives constraint evaluation',
   started_on DATE NULL COMMENT 'Date work began on this task',
-  event_on DATE NULL COMMENT 'DEPRECATED: use calendar_events.task_role=''event''. Kept for source compat until flow-api handlers and SDK rewire',
   completed_at DATETIME NULL COMMENT 'Time derived_state transitioned to done',
   archived_at DATETIME NULL COMMENT 'Set when task is archived (distinct from enabled)',
 
@@ -33,7 +32,6 @@ CREATE TABLE tasks (
   UNIQUE KEY uniq_tasks_public_id (public_id),
   KEY idx_tasks_workspace_id_project_id (workspace_id, project_id),
   KEY idx_tasks_workspace_id_due_on (workspace_id, due_on),
-  KEY idx_tasks_workspace_id_event_on (workspace_id, event_on),
   KEY idx_tasks_workspace_id_derived_state (workspace_id, derived_state),
   UNIQUE KEY uniq_tasks_project_id_task_number (project_id, task_number),
   KEY idx_tasks_workspace_id_archived_at (workspace_id, archived_at),

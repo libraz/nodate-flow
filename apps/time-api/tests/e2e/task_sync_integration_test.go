@@ -26,12 +26,12 @@ func publicIDFromString(t *testing.T, s string) types.PublicID {
 	return types.FromUUID(uid)
 }
 
-// seedTaskWithEventOn inserts a project + task directly so the tests can
+// seedTaskWithDueOn inserts a project + task directly so the tests can
 // exercise time-api's cross-table writes. time-api has no task endpoints
 // by design; tasks belong to flow-api, but schema / rows are shared.
 //
 // Returns the task's public ID and internal ID.
-func seedTaskWithEventOn(t *testing.T, tt *helpers.TestTenant, eventOn *time.Time) (string, uint32) {
+func seedTaskWithDueOn(t *testing.T, tt *helpers.TestTenant, dueOn *time.Time) (string, uint32) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -50,14 +50,14 @@ func seedTaskWithEventOn(t *testing.T, tt *helpers.TestTenant, eventOn *time.Tim
 	projectID = uint32(id64)
 
 	taskPub := types.New()
-	var eventOnNT sql.NullTime
-	if eventOn != nil {
-		eventOnNT = sql.NullTime{Time: *eventOn, Valid: true}
+	var dueOnNT sql.NullTime
+	if dueOn != nil {
+		dueOnNT = sql.NullTime{Time: *dueOn, Valid: true}
 	}
 	res, err = testDB.ExecContext(ctx,
-		`INSERT INTO tasks (public_id, workspace_id, project_id, task_number, title, visibility, event_on)
+		`INSERT INTO tasks (public_id, workspace_id, project_id, task_number, title, visibility, due_on)
 		 VALUES (?, ?, ?, 1, ?, 'public', ?)`,
-		taskPub, tt.WorkspaceID, projectID, "Sync Me", eventOnNT,
+		taskPub, tt.WorkspaceID, projectID, "Sync Me", dueOnNT,
 	)
 	require.NoError(t, err, "insert task")
 	id64, err = res.LastInsertId()
@@ -67,7 +67,7 @@ func seedTaskWithEventOn(t *testing.T, tt *helpers.TestTenant, eventOn *time.Tim
 
 // TestCreateEventFromTaskLinksTaskRole verifies the POST
 // /events/from-task handler routes through itemkit.ScheduleTask and
-// writes task_id + task_role = 'event' on the new calendar_events row.
+// writes task_id + task_role = 'due' on the new calendar_events row.
 func TestCreateEventFromTaskLinksTaskRole(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -75,8 +75,8 @@ func TestCreateEventFromTaskLinksTaskRole(t *testing.T) {
 	tt := newTenant(t)
 	calID := createCalendar(t, tt)
 
-	eventOn := time.Date(2026, 6, 10, 0, 0, 0, 0, time.UTC)
-	taskPubStr, taskInternal := seedTaskWithEventOn(t, tt, &eventOn)
+	dueOn := time.Date(2026, 6, 10, 0, 0, 0, 0, time.UTC)
+	taskPubStr, taskInternal := seedTaskWithDueOn(t, tt, &dueOn)
 
 	var resp struct {
 		ID string `json:"id"`
@@ -89,7 +89,7 @@ func TestCreateEventFromTaskLinksTaskRole(t *testing.T) {
 	)
 	require.NotEmpty(t, resp.ID)
 
-	// DB-level assertion: linked event has task_id + task_role='event'
+	// DB-level assertion: linked event has task_id + task_role='due'
 	var gotTaskID sql.NullInt32
 	var gotTaskRole sql.NullString
 	err := testDB.QueryRowContext(context.Background(),
@@ -101,12 +101,12 @@ func TestCreateEventFromTaskLinksTaskRole(t *testing.T) {
 	require.True(t, gotTaskID.Valid, "task_id must be set on linked event")
 	assert.Equal(t, int32(taskInternal), gotTaskID.Int32)
 	require.True(t, gotTaskRole.Valid)
-	assert.Equal(t, "event", gotTaskRole.String)
+	assert.Equal(t, "due", gotTaskRole.String)
 }
 
 // TestPatchLinkedEventPropagatesToTask verifies the PATCH /events/{evt}
 // handler routes through itemkit.RescheduleEvent when the event is
-// linked, so tasks.event_on mirrors the new DATE portion.
+// linked, so tasks.due_on mirrors the new DATE portion.
 func TestPatchLinkedEventPropagatesToTask(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -115,7 +115,7 @@ func TestPatchLinkedEventPropagatesToTask(t *testing.T) {
 	calID := createCalendar(t, tt)
 
 	initialDate := time.Date(2026, 6, 10, 0, 0, 0, 0, time.UTC)
-	taskPubStr, taskInternal := seedTaskWithEventOn(t, tt, &initialDate)
+	taskPubStr, taskInternal := seedTaskWithDueOn(t, tt, &initialDate)
 
 	// Create the linked event via from-task.
 	var createResp struct {
@@ -142,18 +142,18 @@ func TestPatchLinkedEventPropagatesToTask(t *testing.T) {
 		nil,
 	)
 
-	// tasks.event_on should now reflect the new DATE component.
-	var gotEventOn sql.NullTime
+	// tasks.due_on should now reflect the new DATE component.
+	var gotDueOn sql.NullTime
 	err := testDB.QueryRowContext(context.Background(),
-		`SELECT event_on FROM tasks WHERE id = ?`, taskInternal,
-	).Scan(&gotEventOn)
+		`SELECT due_on FROM tasks WHERE id = ?`, taskInternal,
+	).Scan(&gotDueOn)
 	require.NoError(t, err)
-	require.True(t, gotEventOn.Valid, "event_on must stay set after reschedule")
-	assert.Equal(t, "2026-06-15", gotEventOn.Time.Format("2006-01-02"))
+	require.True(t, gotDueOn.Valid, "due_on must stay set after reschedule")
+	assert.Equal(t, "2026-06-15", gotDueOn.Time.Format("2006-01-02"))
 }
 
 // TestDeleteLinkedEventClearsTaskColumn verifies the DELETE /events/{evt}
-// handler routes through itemkit.DeleteEvent so tasks.event_on becomes
+// handler routes through itemkit.DeleteEvent so tasks.due_on becomes
 // NULL while the task row itself survives.
 func TestDeleteLinkedEventClearsTaskColumn(t *testing.T) {
 	bootstrap(t)
@@ -163,7 +163,7 @@ func TestDeleteLinkedEventClearsTaskColumn(t *testing.T) {
 	calID := createCalendar(t, tt)
 
 	initialDate := time.Date(2026, 6, 10, 0, 0, 0, 0, time.UTC)
-	taskPubStr, taskInternal := seedTaskWithEventOn(t, tt, &initialDate)
+	taskPubStr, taskInternal := seedTaskWithDueOn(t, tt, &initialDate)
 
 	var createResp struct {
 		ID string `json:"id"`
@@ -180,13 +180,13 @@ func TestDeleteLinkedEventClearsTaskColumn(t *testing.T) {
 		tt.AccessToken, nil, nil,
 	)
 
-	var gotEventOn sql.NullTime
+	var gotDueOn sql.NullTime
 	var gotEnabled bool
 	err := testDB.QueryRowContext(context.Background(),
-		`SELECT event_on, enabled FROM tasks WHERE id = ?`, taskInternal,
-	).Scan(&gotEventOn, &gotEnabled)
+		`SELECT due_on, enabled FROM tasks WHERE id = ?`, taskInternal,
+	).Scan(&gotDueOn, &gotEnabled)
 	require.NoError(t, err)
-	assert.False(t, gotEventOn.Valid, "event_on must be cleared after event delete")
+	assert.False(t, gotDueOn.Valid, "due_on must be cleared after event delete")
 	assert.True(t, gotEnabled, "task itself must remain enabled")
 
 	// Event row is soft-disabled, not removed.

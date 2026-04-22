@@ -22,7 +22,6 @@ SELECT
   t.priority,
   t.due_on,
   t.started_on,
-  t.event_on,
   t.completed_at,
   p.public_id AS project_public_id,
   p.name AS project_name,
@@ -58,7 +57,6 @@ type ExportTasksForLensRow struct {
 	Priority            int32             `json:"priority"`
 	DueOn               sql.NullTime      `json:"dueOn"`
 	StartedOn           sql.NullTime      `json:"startedOn"`
-	EventOn             sql.NullTime      `json:"eventOn"`
 	CompletedAt         sql.NullTime      `json:"completedAt"`
 	ProjectPublicID     types.PublicID    `json:"projectPublicId"`
 	ProjectName         string            `json:"projectName"`
@@ -87,7 +85,6 @@ func (q *Queries) ExportTasksForLens(ctx context.Context, arg ExportTasksForLens
 			&i.Priority,
 			&i.DueOn,
 			&i.StartedOn,
-			&i.EventOn,
 			&i.CompletedAt,
 			&i.ProjectPublicID,
 			&i.ProjectName,
@@ -118,7 +115,6 @@ SELECT
   t.priority,
   t.due_on,
   t.started_on,
-  t.event_on,
   t.completed_at,
   p.public_id AS project_public_id,
   p.name AS project_name,
@@ -152,7 +148,6 @@ type ExportTasksForWorkspaceRow struct {
 	Priority            int32             `json:"priority"`
 	DueOn               sql.NullTime      `json:"dueOn"`
 	StartedOn           sql.NullTime      `json:"startedOn"`
-	EventOn             sql.NullTime      `json:"eventOn"`
 	CompletedAt         sql.NullTime      `json:"completedAt"`
 	ProjectPublicID     types.PublicID    `json:"projectPublicId"`
 	ProjectName         string            `json:"projectName"`
@@ -181,7 +176,6 @@ func (q *Queries) ExportTasksForWorkspace(ctx context.Context, arg ExportTasksFo
 			&i.Priority,
 			&i.DueOn,
 			&i.StartedOn,
-			&i.EventOn,
 			&i.CompletedAt,
 			&i.ProjectPublicID,
 			&i.ProjectName,

@@ -241,9 +241,6 @@ func ListLinkedTasks(deps Deps) func(context.Context, *ListLinkedTasksInput) (*L
 				TaskTitle:        r.TaskTitle,
 				TaskDerivedState: string(r.TaskDerivedState),
 			}
-			if r.TaskEventOn.Valid {
-				link.TaskEventOn = r.TaskEventOn.Time.UTC().Format("2006-01-02")
-			}
 			if r.TaskDueOn.Valid {
 				link.TaskDueOn = r.TaskDueOn.Time.UTC().Format("2006-01-02")
 			}

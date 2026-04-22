@@ -61,9 +61,8 @@ INSERT INTO tasks (
   priority,
   due_on,
   started_on,
-  event_on,
   visibility
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateTaskParams struct {
@@ -78,7 +77,6 @@ type CreateTaskParams struct {
 	Priority        int32           `json:"priority"`
 	DueOn           sql.NullTime    `json:"dueOn"`
 	StartedOn       sql.NullTime    `json:"startedOn"`
-	EventOn         sql.NullTime    `json:"eventOn"`
 	Visibility      TasksVisibility `json:"visibility"`
 }
 
@@ -97,7 +95,6 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (int64, 
 		arg.Priority,
 		arg.DueOn,
 		arg.StartedOn,
-		arg.EventOn,
 		arg.Visibility,
 	)
 	if err != nil {
@@ -254,7 +251,6 @@ SELECT
   v.priority,
   v.due_on,
   v.started_on,
-  v.event_on,
   v.completed_at,
   v.project_identifier,
   v.task_number,
@@ -292,7 +288,6 @@ type FindTaskByPublicIdRow struct {
 	Priority                 int32             `json:"priority"`
 	DueOn                    sql.NullTime      `json:"dueOn"`
 	StartedOn                sql.NullTime      `json:"startedOn"`
-	EventOn                  sql.NullTime      `json:"eventOn"`
 	CompletedAt              sql.NullTime      `json:"completedAt"`
 	ProjectIdentifier        string            `json:"projectIdentifier"`
 	TaskNumber               uint32            `json:"taskNumber"`
@@ -325,7 +320,6 @@ func (q *Queries) FindTaskByPublicId(ctx context.Context, arg FindTaskByPublicId
 		&i.Priority,
 		&i.DueOn,
 		&i.StartedOn,
-		&i.EventOn,
 		&i.CompletedAt,
 		&i.ProjectIdentifier,
 		&i.TaskNumber,
@@ -412,7 +406,6 @@ SELECT
   v.priority,
   v.due_on,
   v.started_on,
-  v.event_on,
   v.completed_at,
   v.archived_at,
   v.sort_weight,
@@ -447,7 +440,6 @@ type ListArchivedTasksForWorkspaceRow struct {
 	Priority                int32             `json:"priority"`
 	DueOn                   sql.NullTime      `json:"dueOn"`
 	StartedOn               sql.NullTime      `json:"startedOn"`
-	EventOn                 sql.NullTime      `json:"eventOn"`
 	CompletedAt             sql.NullTime      `json:"completedAt"`
 	ArchivedAt              sql.NullTime      `json:"archivedAt"`
 	SortWeight              int32             `json:"sortWeight"`
@@ -482,7 +474,6 @@ func (q *Queries) ListArchivedTasksForWorkspace(ctx context.Context, arg ListArc
 			&i.Priority,
 			&i.DueOn,
 			&i.StartedOn,
-			&i.EventOn,
 			&i.CompletedAt,
 			&i.ArchivedAt,
 			&i.SortWeight,
@@ -674,7 +665,6 @@ SELECT
   t.public_id     AS task_public_id,
   t.title         AS task_title,
   t.derived_state AS task_derived_state,
-  t.event_on      AS task_event_on,
   t.due_on        AS task_due_on,
   COUNT(*) OVER() AS total
 FROM task_event_links tel
@@ -704,7 +694,6 @@ type ListLinkedTasksForEventRow struct {
 	TaskPublicID     types.PublicID         `json:"taskPublicId"`
 	TaskTitle        string                 `json:"taskTitle"`
 	TaskDerivedState TasksDerivedState      `json:"taskDerivedState"`
-	TaskEventOn      sql.NullTime           `json:"taskEventOn"`
 	TaskDueOn        sql.NullTime           `json:"taskDueOn"`
 	Total            interface{}            `json:"total"`
 }
@@ -734,7 +723,6 @@ func (q *Queries) ListLinkedTasksForEvent(ctx context.Context, arg ListLinkedTas
 			&i.TaskPublicID,
 			&i.TaskTitle,
 			&i.TaskDerivedState,
-			&i.TaskEventOn,
 			&i.TaskDueOn,
 			&i.Total,
 		); err != nil {
@@ -845,7 +833,6 @@ SELECT
   v.priority,
   v.due_on,
   v.started_on,
-  v.event_on,
   v.actor_role,
   v.updated_at,
   v.created_at,
@@ -875,7 +862,6 @@ type ListMyTasksGlobalRow struct {
 	Priority          int32             `json:"priority"`
 	DueOn             sql.NullTime      `json:"dueOn"`
 	StartedOn         sql.NullTime      `json:"startedOn"`
-	EventOn           sql.NullTime      `json:"eventOn"`
 	ActorRole         TaskActorsRole    `json:"actorRole"`
 	UpdatedAt         sql.NullTime      `json:"updatedAt"`
 	CreatedAt         time.Time         `json:"createdAt"`
@@ -907,7 +893,6 @@ func (q *Queries) ListMyTasksGlobal(ctx context.Context, arg ListMyTasksGlobalPa
 			&i.Priority,
 			&i.DueOn,
 			&i.StartedOn,
-			&i.EventOn,
 			&i.ActorRole,
 			&i.UpdatedAt,
 			&i.CreatedAt,
@@ -938,7 +923,6 @@ SELECT
   v.priority,
   v.due_on,
   v.started_on,
-  v.event_on,
   v.actor_role,
   v.updated_at,
   v.created_at,
@@ -947,13 +931,10 @@ FROM v_my_tasks v
 INNER JOIN workspaces w
   ON w.id = v.workspace_id AND w.enabled = TRUE
 WHERE v.user_public_id = ?
-  AND (
-    (v.event_on IS NOT NULL AND v.event_on BETWEEN ? AND ?)
-    OR
-    (v.due_on   IS NOT NULL AND v.due_on   BETWEEN ? AND ?)
-  )
+  AND v.due_on IS NOT NULL
+  AND v.due_on BETWEEN ? AND ?
 ORDER BY
-  COALESCE(v.event_on, v.due_on) ASC,
+  v.due_on ASC,
   v.priority DESC,
   v.created_at DESC,
   v.public_id DESC
@@ -962,8 +943,6 @@ LIMIT ? OFFSET ?
 
 type ListMyTasksWithDatesParams struct {
 	UserPublicID types.PublicID `json:"userPublicId"`
-	FromEventOn  sql.NullTime   `json:"fromEventOn"`
-	ToEventOn    sql.NullTime   `json:"toEventOn"`
 	FromDueOn    sql.NullTime   `json:"fromDueOn"`
 	ToDueOn      sql.NullTime   `json:"toDueOn"`
 	Limit        int32          `json:"limit"`
@@ -981,24 +960,21 @@ type ListMyTasksWithDatesRow struct {
 	Priority          int32             `json:"priority"`
 	DueOn             sql.NullTime      `json:"dueOn"`
 	StartedOn         sql.NullTime      `json:"startedOn"`
-	EventOn           sql.NullTime      `json:"eventOn"`
 	ActorRole         TaskActorsRole    `json:"actorRole"`
 	UpdatedAt         sql.NullTime      `json:"updatedAt"`
 	CreatedAt         time.Time         `json:"createdAt"`
 	Total             interface{}       `json:"total"`
 }
 
-// Cross-workspace variant scoped to tasks whose event_on OR due_on falls
-// inside the requested [from, to] inclusive date range. Backs the unified
-// flow-web calendar: combined with /me/calendar-events it gives a single
-// round-trip answer for "what is on my plate across every workspace on
-// these days". Undated tasks are excluded; use ListMyTasksGlobal for the
-// planning bucket.
+// Cross-workspace variant scoped to tasks whose due_on falls inside the
+// requested [from, to] inclusive date range. Backs the unified flow-web
+// calendar: combined with /me/calendar-events it gives a single round-trip
+// answer for "what is on my plate across every workspace on these days".
+// Undated tasks are excluded; use ListMyTasksGlobal for the planning
+// bucket.
 func (q *Queries) ListMyTasksWithDates(ctx context.Context, arg ListMyTasksWithDatesParams) ([]ListMyTasksWithDatesRow, error) {
 	rows, err := q.db.QueryContext(ctx, listMyTasksWithDates,
 		arg.UserPublicID,
-		arg.FromEventOn,
-		arg.ToEventOn,
 		arg.FromDueOn,
 		arg.ToDueOn,
 		arg.Limit,
@@ -1022,7 +998,6 @@ func (q *Queries) ListMyTasksWithDates(ctx context.Context, arg ListMyTasksWithD
 			&i.Priority,
 			&i.DueOn,
 			&i.StartedOn,
-			&i.EventOn,
 			&i.ActorRole,
 			&i.UpdatedAt,
 			&i.CreatedAt,
@@ -1053,7 +1028,6 @@ SELECT
   v.priority,
   v.due_on,
   v.started_on,
-  v.event_on,
   v.completed_at,
   v.project_identifier,
   v.task_number,
@@ -1090,7 +1064,6 @@ type ListTasksForProjectRow struct {
 	Priority                int32             `json:"priority"`
 	DueOn                   sql.NullTime      `json:"dueOn"`
 	StartedOn               sql.NullTime      `json:"startedOn"`
-	EventOn                 sql.NullTime      `json:"eventOn"`
 	CompletedAt             sql.NullTime      `json:"completedAt"`
 	ProjectIdentifier       string            `json:"projectIdentifier"`
 	TaskNumber              uint32            `json:"taskNumber"`
@@ -1130,7 +1103,6 @@ func (q *Queries) ListTasksForProject(ctx context.Context, arg ListTasksForProje
 			&i.Priority,
 			&i.DueOn,
 			&i.StartedOn,
-			&i.EventOn,
 			&i.CompletedAt,
 			&i.ProjectIdentifier,
 			&i.TaskNumber,
@@ -1168,7 +1140,6 @@ SELECT
   v.priority,
   v.due_on,
   v.started_on,
-  v.event_on,
   v.completed_at,
   v.project_identifier,
   v.task_number,
@@ -1203,7 +1174,6 @@ type ListTasksForWorkspaceRow struct {
 	Priority                int32             `json:"priority"`
 	DueOn                   sql.NullTime      `json:"dueOn"`
 	StartedOn               sql.NullTime      `json:"startedOn"`
-	EventOn                 sql.NullTime      `json:"eventOn"`
 	CompletedAt             sql.NullTime      `json:"completedAt"`
 	ProjectIdentifier       string            `json:"projectIdentifier"`
 	TaskNumber              uint32            `json:"taskNumber"`
@@ -1238,7 +1208,6 @@ func (q *Queries) ListTasksForWorkspace(ctx context.Context, arg ListTasksForWor
 			&i.Priority,
 			&i.DueOn,
 			&i.StartedOn,
-			&i.EventOn,
 			&i.CompletedAt,
 			&i.ProjectIdentifier,
 			&i.TaskNumber,
@@ -1378,7 +1347,6 @@ SET title = ?,
     priority = ?,
     due_on = ?,
     started_on = ?,
-    event_on = ?,
     sort_weight = ?,
     visibility = ?
 WHERE workspace_id = ?
@@ -1392,7 +1360,6 @@ type UpdateTaskParams struct {
 	Priority    int32           `json:"priority"`
 	DueOn       sql.NullTime    `json:"dueOn"`
 	StartedOn   sql.NullTime    `json:"startedOn"`
-	EventOn     sql.NullTime    `json:"eventOn"`
 	SortWeight  int32           `json:"sortWeight"`
 	Visibility  TasksVisibility `json:"visibility"`
 	WorkspaceID uint32          `json:"-"`
@@ -1407,7 +1374,6 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) error {
 		arg.Priority,
 		arg.DueOn,
 		arg.StartedOn,
-		arg.EventOn,
 		arg.SortWeight,
 		arg.Visibility,
 		arg.WorkspaceID,

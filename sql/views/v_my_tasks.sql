@@ -13,7 +13,6 @@ SELECT
   t.priority,
   t.due_on,
   t.started_on,
-  t.event_on,
   a.role AS actor_role,
   t.updated_at,
   t.created_at

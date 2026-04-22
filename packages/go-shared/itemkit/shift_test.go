@@ -10,24 +10,21 @@ import (
 )
 
 // seedExtraTask inserts an additional tasks row in the same project
-// as the primary fixture task, with optional event_on/due_on dates.
+// as the primary fixture task, with an optional due_on date.
 // Returns the internal id + public id.
-func seedExtraTask(t *testing.T, ctx context.Context, db *sql.DB, f fixtures, title string, eventOn, dueOn time.Time) (uint32, dbtype.PublicID) {
+func seedExtraTask(t *testing.T, ctx context.Context, db *sql.DB, f fixtures, title string, dueOn time.Time) (uint32, dbtype.PublicID) {
 	t.Helper()
 	pub := dbtype.New()
-	var eventOnArg, dueOnArg any
-	if !eventOn.IsZero() {
-		eventOnArg = eventOn.Format("2006-01-02")
-	}
+	var dueOnArg any
 	if !dueOn.IsZero() {
 		dueOnArg = dueOn.Format("2006-01-02")
 	}
 	// task_number must be unique per project — use a time-derived value.
 	num := int32(time.Now().UnixNano() % 1_000_000)
 	res, err := db.ExecContext(ctx,
-		`INSERT INTO tasks (public_id, workspace_id, project_id, task_number, title, visibility, event_on, due_on)
-		 VALUES (?, ?, ?, ?, ?, 'public', ?, ?)`,
-		pub, f.wsID, f.projectID, num, title, eventOnArg, dueOnArg,
+		`INSERT INTO tasks (public_id, workspace_id, project_id, task_number, title, visibility, due_on)
+		 VALUES (?, ?, ?, ?, ?, 'public', ?)`,
+		pub, f.wsID, f.projectID, num, title, dueOnArg,
 	)
 	if err != nil {
 		t.Fatalf("seed extra task: %v", err)
@@ -100,7 +97,7 @@ func TestProposeShiftEventAndChildren_PartitionsSafeAndConflict(t *testing.T) {
 	linkContributesTo(t, ctx, db, f, f.taskID, umbrella)
 
 	// A second task that contributes to BOTH events = conflict.
-	conflictTaskID, conflictTaskPub := seedExtraTask(t, ctx, db, f, "Conflict task", time.Time{}, time.Time{})
+	conflictTaskID, conflictTaskPub := seedExtraTask(t, ctx, db, f, "Conflict task", time.Time{})
 	linkContributesTo(t, ctx, db, f, conflictTaskID, umbrella)
 	linkContributesTo(t, ctx, db, f, conflictTaskID, other)
 
@@ -183,7 +180,7 @@ func TestApplyShiftEventAndChildren_ShiftsUmbrellaAndSafeTasks(t *testing.T) {
 	umbrella, _ := seedEvent(t, ctx, db, f, umbrellaStart)
 
 	dueDate := time.Date(2026, 5, 28, 0, 0, 0, 0, time.UTC)
-	safeTaskID, _ := seedExtraTask(t, ctx, db, f, "Safe", time.Time{}, dueDate)
+	safeTaskID, _ := seedExtraTask(t, ctx, db, f, "Safe", dueDate)
 	linkContributesTo(t, ctx, db, f, safeTaskID, umbrella)
 
 	tx, err := db.BeginTx(ctx, nil)
@@ -239,7 +236,7 @@ func TestApplyShiftEventAndChildren_IgnoresUnconfirmedTasks(t *testing.T) {
 	umbrella, _ := seedEvent(t, ctx, db, f, umbrellaStart)
 
 	dueDate := time.Date(2026, 5, 28, 0, 0, 0, 0, time.UTC)
-	skippedTaskID, _ := seedExtraTask(t, ctx, db, f, "Skipped", time.Time{}, dueDate)
+	skippedTaskID, _ := seedExtraTask(t, ctx, db, f, "Skipped", dueDate)
 	linkContributesTo(t, ctx, db, f, skippedTaskID, umbrella)
 
 	tx, err := db.BeginTx(ctx, nil)
@@ -282,7 +279,7 @@ func TestApplyShiftEventAndChildren_IgnoresStaleTaskIDs(t *testing.T) {
 	umbrella, _ := seedEvent(t, ctx, db, f, umbrellaStart)
 
 	dueDate := time.Date(2026, 5, 28, 0, 0, 0, 0, time.UTC)
-	unrelatedTaskID, _ := seedExtraTask(t, ctx, db, f, "Unrelated", time.Time{}, dueDate)
+	unrelatedTaskID, _ := seedExtraTask(t, ctx, db, f, "Unrelated", dueDate)
 	// Note: NOT linked to umbrella.
 
 	tx, err := db.BeginTx(ctx, nil)
@@ -325,7 +322,7 @@ func TestApplyShiftEventAndChildren_TimeOnlyChangeSkipsTasks(t *testing.T) {
 	umbrella, _ := seedEvent(t, ctx, db, f, umbrellaStart)
 
 	dueDate := time.Date(2026, 5, 28, 0, 0, 0, 0, time.UTC)
-	taskID, _ := seedExtraTask(t, ctx, db, f, "Same-day", time.Time{}, dueDate)
+	taskID, _ := seedExtraTask(t, ctx, db, f, "Same-day", dueDate)
 	linkContributesTo(t, ctx, db, f, taskID, umbrella)
 
 	tx, err := db.BeginTx(ctx, nil)
@@ -406,4 +403,3 @@ func TestApplyShiftEventAndChildren_RejectsUndatedUmbrella(t *testing.T) {
 		t.Fatal("expected invariant error for undated umbrella, got nil")
 	}
 }
-

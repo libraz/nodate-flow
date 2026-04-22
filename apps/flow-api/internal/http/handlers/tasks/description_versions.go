@@ -154,7 +154,6 @@ func RestoreDescriptionVersion(deps Deps) func(context.Context, *RestoreDescript
 			Priority:    taskRow.Priority,
 			DueOn:       taskRow.DueOn,
 			StartedOn:   taskRow.StartedOn,
-			EventOn:     taskRow.EventOn,
 			SortWeight:  taskRow.SortWeight,
 			Visibility:  taskRow.Visibility,
 			WorkspaceID: ws.ID,

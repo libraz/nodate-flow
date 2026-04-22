@@ -10,8 +10,8 @@ import (
 )
 
 // UnscheduleTaskArgs removes a projection link without deleting the
-// task. For RoleEvent / RoleDue the linked event is soft-disabled
-// and the corresponding tasks.*_on column is cleared.
+// task. For RoleDue the linked event is soft-disabled and
+// tasks.due_on is cleared.
 type UnscheduleTaskArgs struct {
 	WorkspaceID uint32
 	TaskID      uint32
@@ -20,10 +20,10 @@ type UnscheduleTaskArgs struct {
 }
 
 // UnscheduleTask removes a projection event for a task. When Role is
-// RoleEvent or RoleDue, the single linked event is disabled and the
-// task's *_on column is cleared. When Role is RoleScheduled, every
-// time-block event on the task is disabled (there is no single
-// "scheduled" link by design).
+// RoleDue, the single linked event is disabled and the task's due_on
+// column is cleared. When Role is RoleScheduled, every time-block
+// event on the task is disabled (there is no single "scheduled" link
+// by design).
 func UnscheduleTask(ctx context.Context, tx TX, args UnscheduleTaskArgs) error {
 	if !args.Role.IsValid() {
 		return wrapInvariant("role_valid", fmt.Sprintf("unknown role %q", args.Role))
@@ -37,7 +37,7 @@ func UnscheduleTask(ctx context.Context, tx TX, args UnscheduleTaskArgs) error {
 	}
 
 	switch args.Role {
-	case RoleEvent, RoleDue:
+	case RoleDue:
 		existing, err := findLinkedEvent(ctx, tx, task.id, args.Role)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -48,14 +48,8 @@ func UnscheduleTask(ctx context.Context, tx TX, args UnscheduleTaskArgs) error {
 		if err := unlinkEventRow(ctx, tx, existing, args.ActorUserID, "unschedule"); err != nil {
 			return err
 		}
-		col := ""
-		if args.Role == RoleEvent {
-			col = "event_on"
-		} else {
-			col = "due_on"
-		}
-		if _, err := tx.ExecContext(ctx, "UPDATE tasks SET "+col+" = NULL WHERE id = ?", task.id); err != nil {
-			return fmt.Errorf("itemkit: clear task %s: %w", col, err)
+		if _, err := tx.ExecContext(ctx, "UPDATE tasks SET due_on = NULL WHERE id = ?", task.id); err != nil {
+			return fmt.Errorf("itemkit: clear task due_on: %w", err)
 		}
 	case RoleScheduled:
 		if _, err := tx.ExecContext(ctx,
@@ -116,8 +110,8 @@ func DeleteTask(ctx context.Context, tx TX, workspaceID, taskID, actorID uint32)
 }
 
 // DeleteEvent soft-disables a single calendar_events row. When the
-// event is task-linked with RoleEvent or RoleDue, the corresponding
-// task *_on column is cleared but the task itself survives.
+// event is task-linked with RoleDue, the task's due_on column is
+// cleared but the task itself survives.
 func DeleteEvent(ctx context.Context, tx TX, workspaceID, eventID, actorID uint32) error {
 	evt, err := findEventByID(ctx, tx, workspaceID, eventID)
 	if err != nil {
@@ -133,12 +127,7 @@ func DeleteEvent(ctx context.Context, tx TX, workspaceID, eventID, actorID uint3
 	if evt.taskID.Valid && evt.taskRole.Valid {
 		tid := uint32(evt.taskID.Int32)
 		taskPtr = &tid
-		switch DateRole(evt.taskRole.String) {
-		case RoleEvent:
-			if _, err := tx.ExecContext(ctx, `UPDATE tasks SET event_on = NULL WHERE id = ?`, tid); err != nil {
-				return fmt.Errorf("itemkit: clear task event_on: %w", err)
-			}
-		case RoleDue:
+		if DateRole(evt.taskRole.String) == RoleDue {
 			if _, err := tx.ExecContext(ctx, `UPDATE tasks SET due_on = NULL WHERE id = ?`, tid); err != nil {
 				return fmt.Errorf("itemkit: clear task due_on: %w", err)
 			}

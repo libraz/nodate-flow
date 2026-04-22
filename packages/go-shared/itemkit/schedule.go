@@ -13,10 +13,10 @@ import (
 )
 
 // ScheduleTaskArgs carries everything needed to place or move a
-// projection-style calendar event for a task. For RoleEvent / RoleDue
-// the operation is idempotent: calling twice with the same (task,
-// role) updates the existing link in place. For RoleScheduled every
-// call creates an additional time-block event.
+// projection-style calendar event for a task. For RoleDue the
+// operation is idempotent: calling twice with the same (task, role)
+// updates the existing link in place. For RoleScheduled every call
+// creates an additional time-block event.
 type ScheduleTaskArgs struct {
 	WorkspaceID uint32
 	TaskID      uint32
@@ -46,15 +46,14 @@ type ScheduleTaskArgs struct {
 // projection calendar event. Returns the event's public_id and
 // internal id.
 //
-// For RoleEvent and RoleDue, the call is idempotent: re-invoking with
-// the same (task_id, role) pair moves the existing event. For
-// RoleScheduled every invocation creates a new event — callers that
-// want idempotent scheduled blocks must pass the existing event
-// through RescheduleEvent.
+// For RoleDue, the call is idempotent: re-invoking with the same
+// (task_id, role) pair moves the existing event. For RoleScheduled
+// every invocation creates a new event — callers that want
+// idempotent scheduled blocks must pass the existing event through
+// RescheduleEvent.
 //
-// ScheduleTask also updates tasks.event_on / tasks.due_on to mirror
-// the projection date so the task's own DATE columns remain in sync
-// until they are dropped.
+// ScheduleTask also updates tasks.due_on to mirror the projection
+// date so the task's own DATE column remains in sync.
 func ScheduleTask(ctx context.Context, tx TX, args ScheduleTaskArgs) (dbtype.PublicID, uint32, error) {
 	if !args.Role.IsValid() {
 		return dbtype.PublicID{}, 0, wrapInvariant("role_valid", fmt.Sprintf("unknown role %q", args.Role))
@@ -87,7 +86,7 @@ func ScheduleTask(ctx context.Context, tx TX, args ScheduleTaskArgs) (dbtype.Pub
 		return dbtype.PublicID{}, 0, fmt.Errorf("itemkit: read task: %w", err)
 	}
 
-	if args.Role == RoleEvent || args.Role == RoleDue {
+	if args.Role == RoleDue {
 		existing, err := findLinkedEvent(ctx, tx, task.id, args.Role)
 		switch {
 		case err == nil:
@@ -193,25 +192,15 @@ func reschedulePutExisting(ctx context.Context, tx TX, task taskRow, existing ev
 	return existing.publicID, existing.id, nil
 }
 
-// propagateTaskDateFromRole writes tasks.event_on / tasks.due_on from
-// the scheduled event's start date. Has no effect for RoleScheduled.
+// propagateTaskDateFromRole writes tasks.due_on from the scheduled
+// event's start date. Has no effect for RoleScheduled.
 func propagateTaskDateFromRole(ctx context.Context, tx TX, taskID uint32, role DateRole, startAt time.Time) error {
-	if startAt.IsZero() {
+	if startAt.IsZero() || role != RoleDue {
 		return nil
 	}
-	col := ""
-	switch role {
-	case RoleEvent:
-		col = "event_on"
-	case RoleDue:
-		col = "due_on"
-	case RoleScheduled:
-		return nil
-	}
-	query := "UPDATE tasks SET " + col + " = ? WHERE id = ?"
 	date := dateOnly(startAt)
-	if _, err := tx.ExecContext(ctx, query, date, taskID); err != nil {
-		return fmt.Errorf("itemkit: propagate task date (%s): %w", col, err)
+	if _, err := tx.ExecContext(ctx, "UPDATE tasks SET due_on = ? WHERE id = ?", date, taskID); err != nil {
+		return fmt.Errorf("itemkit: propagate task due_on: %w", err)
 	}
 	return nil
 }

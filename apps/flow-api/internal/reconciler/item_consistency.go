@@ -79,26 +79,26 @@ func (r *Reconciler) runOnce(ctx context.Context) {
 	// UPDATE per row. Errors are logged and metered; they do not
 	// abort the rest of the pass because the drift kinds are
 	// independent.
-	r.scanEventDateDrift(ctx, "event", "event_on")
-	r.scanEventDateDrift(ctx, "due", "due_on")
+	r.scanDueDateDrift(ctx)
 	r.scanOrphanRole(ctx)
 	r.scanEnabledMismatch(ctx)
 }
 
-// scanEventDateDrift finds linked calendar_events whose DATE(start_at)
-// disagrees with the corresponding tasks.event_on / tasks.due_on
-// column, then heals by copying from the event (richer source — it
-// carries the time-of-day too).
-func (r *Reconciler) scanEventDateDrift(ctx context.Context, role, taskCol string) {
+// scanDueDateDrift finds linked calendar_events (task_role = 'due')
+// whose DATE(start_at) disagrees with tasks.due_on, then heals by
+// copying from the event (richer source — it carries the time-of-day
+// too).
+func (r *Reconciler) scanDueDateDrift(ctx context.Context) {
+	const role = "due"
 	// The JOIN uses the (task_id, task_role, enabled) index. DATE() is
 	// a row-level filter applied after the join.
-	q := `SELECT t.id, ce.id, t.` + taskCol + `, DATE(ce.start_at)
+	const q = `SELECT t.id, ce.id, t.due_on, DATE(ce.start_at)
 	      FROM tasks t
 	      JOIN calendar_events ce ON ce.task_id = t.id AND ce.enabled
 	      WHERE t.enabled
 	        AND ce.task_role = ?
 	        AND ce.start_at IS NOT NULL
-	        AND (t.` + taskCol + ` IS NULL OR DATE(ce.start_at) <> t.` + taskCol + `)`
+	        AND (t.due_on IS NULL OR DATE(ce.start_at) <> t.due_on)`
 	rows, err := r.DB.QueryContext(ctx, q, role)
 	if err != nil {
 		r.logError("scan drift failed", err, "role", role)
@@ -106,12 +106,12 @@ func (r *Reconciler) scanEventDateDrift(ctx context.Context, role, taskCol strin
 	}
 	defer rows.Close()
 
-	kind := "date_drift_" + role
+	const kind = "date_drift_due"
 	type drift struct {
-		taskID       uint32
-		eventID      uint32
-		taskDate     sql.NullTime
-		eventDate    sql.NullTime
+		taskID    uint32
+		eventID   uint32
+		taskDate  sql.NullTime
+		eventDate sql.NullTime
 	}
 	var drifts []drift
 	for rows.Next() {
@@ -139,7 +139,7 @@ func (r *Reconciler) scanEventDateDrift(ctx context.Context, role, taskCol strin
 		// Heal: copy event.start_at's date onto the task. This is
 		// the direction itemkit uses for linked writes — the event
 		// is the richer source.
-		upd := `UPDATE tasks SET ` + taskCol + ` = ? WHERE id = ? AND enabled`
+		const upd = `UPDATE tasks SET due_on = ? WHERE id = ? AND enabled`
 		if _, err := r.DB.ExecContext(ctx, upd, d.eventDate, d.taskID); err != nil {
 			r.logError("heal drift failed", err,
 				"kind", kind, "task_id", d.taskID, "event_id", d.eventID)

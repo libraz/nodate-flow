@@ -78,7 +78,6 @@ type Task struct {
 	Priority                 int32  `json:"priority"`
 	DueOn                    string `json:"dueOn,omitempty"`
 	StartedOn                string `json:"startedOn,omitempty"`
-	EventOn                  string `json:"eventOn,omitempty"`
 	CompletedAt              *int64 `json:"completedAt,omitempty"`
 	ProjectIdentifier        string `json:"projectIdentifier,omitempty"`
 	TaskNumber               int32  `json:"taskNumber"`
@@ -105,7 +104,6 @@ type TaskListItem struct {
 	Priority          int32   `json:"priority"`
 	DueOn             string  `json:"dueOn,omitempty"`
 	StartedOn         string  `json:"startedOn,omitempty"`
-	EventOn           string  `json:"eventOn,omitempty"`
 	CompletedAt       *int64  `json:"completedAt,omitempty"`
 	ProjectIdentifier string  `json:"projectIdentifier,omitempty"`
 	TaskNumber        int32   `json:"taskNumber"`
@@ -190,7 +188,6 @@ type CreateTaskBody struct {
 	Priority    int32  `json:"priority,omitempty" minimum:"0" maximum:"4"`
 	DueOn       string `json:"dueOn,omitempty" doc:"YYYY-MM-DD"`
 	StartOn     string `json:"startOn,omitempty" doc:"YYYY-MM-DD"`
-	EventOn     string `json:"eventOn,omitempty" doc:"YYYY-MM-DD event or milestone date"`
 	Visibility  string `json:"visibility,omitempty" enum:"public,project,private" default:"public" doc:"Task visibility: public (workspace), project (project members), or private (task actors only)"`
 }
 
@@ -241,7 +238,6 @@ type MyTaskListItem struct {
 	DerivedState  string `json:"derivedState"`
 	Priority      int32  `json:"priority"`
 	DueOn         string `json:"dueOn,omitempty"`
-	EventOn       string `json:"eventOn,omitempty"`
 	ActorRole     string `json:"actorRole"`
 	UpdatedAt     *int64 `json:"updatedAt,omitempty"`
 	CreatedAt     int64  `json:"createdAt"`
@@ -304,7 +300,6 @@ type PatchTaskBody struct {
 	Priority    *int32  `json:"priority,omitempty" minimum:"0" maximum:"4"`
 	DueOn       *string `json:"dueOn,omitempty" doc:"YYYY-MM-DD or empty string to clear"`
 	StartOn     *string `json:"startOn,omitempty" doc:"YYYY-MM-DD or empty string to clear"`
-	EventOn     *string `json:"eventOn,omitempty" doc:"YYYY-MM-DD or empty string to clear"`
 	SortWeight  *int32  `json:"sortWeight,omitempty" doc:"Display order weight. Lower values sort first."`
 	Visibility  *string `json:"visibility,omitempty" enum:"public,project,private" doc:"Task visibility: public (workspace), project (project members), or private (task actors only)"`
 }
@@ -907,21 +902,20 @@ type TaskEventLink struct {
 	CreatedAt  int64  `json:"createdAt"`
 
 	// Event side — populated by GET /tasks/{id}/linked-events.
-	EventID        string `json:"eventId,omitempty"`
-	EventTitle     string `json:"eventTitle,omitempty"`
-	EventStartAt   *int64 `json:"eventStartAt,omitempty"`
-	EventEndAt     *int64 `json:"eventEndAt,omitempty"`
-	EventAllDay    bool   `json:"eventAllDay,omitempty"`
-	EventTimezone  string `json:"eventTimezone,omitempty"`
-	CalendarID     string `json:"calendarId,omitempty"`
-	CalendarName   string `json:"calendarName,omitempty"`
+	EventID       string `json:"eventId,omitempty"`
+	EventTitle    string `json:"eventTitle,omitempty"`
+	EventStartAt  *int64 `json:"eventStartAt,omitempty"`
+	EventEndAt    *int64 `json:"eventEndAt,omitempty"`
+	EventAllDay   bool   `json:"eventAllDay,omitempty"`
+	EventTimezone string `json:"eventTimezone,omitempty"`
+	CalendarID    string `json:"calendarId,omitempty"`
+	CalendarName  string `json:"calendarName,omitempty"`
 
 	// Task side — populated by GET /calendar-events/{evtId}/linked-tasks.
-	TaskID            string `json:"taskId,omitempty"`
-	TaskTitle         string `json:"taskTitle,omitempty"`
-	TaskDerivedState  string `json:"taskDerivedState,omitempty"`
-	TaskEventOn       string `json:"taskEventOn,omitempty"`
-	TaskDueOn         string `json:"taskDueOn,omitempty"`
+	TaskID           string `json:"taskId,omitempty"`
+	TaskTitle        string `json:"taskTitle,omitempty"`
+	TaskDerivedState string `json:"taskDerivedState,omitempty"`
+	TaskDueOn        string `json:"taskDueOn,omitempty"`
 }
 
 // CreateTaskEventLinkBody is the request body for POST /tasks/{id}/links.
@@ -1050,9 +1044,9 @@ type ApplyShiftInput struct {
 // ApplyShiftOutput is the response for POST apply-shift.
 type ApplyShiftOutput struct {
 	Body struct {
-		Ok            bool  `json:"ok"`
-		ShiftedTasks  int32 `json:"shiftedTasks"`
-		DeltaSeconds  int64 `json:"deltaSeconds"`
-		NewStartAt    int64 `json:"newStartAt"`
+		Ok           bool  `json:"ok"`
+		ShiftedTasks int32 `json:"shiftedTasks"`
+		DeltaSeconds int64 `json:"deltaSeconds"`
+		NewStartAt   int64 `json:"newStartAt"`
 	}
 }

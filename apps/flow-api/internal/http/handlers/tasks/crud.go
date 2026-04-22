@@ -134,7 +134,6 @@ func listTasksFiltered(
   v.priority,
   v.due_on,
   v.started_on,
-  v.event_on,
   v.completed_at,
   v.archived_at,
   v.label_ids,
@@ -175,7 +174,6 @@ LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
 			&r.Priority,
 			&r.DueOn,
 			&r.StartedOn,
-			&r.EventOn,
 			&r.CompletedAt,
 			&r.ArchivedAt,
 			&r.LabelIds,
@@ -256,10 +254,6 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 		if err != nil {
 			return nil, httpErr(apierrors.ValidationBodyDateFormatInvalid)
 		}
-		event, err := parseDateOrNullTime(in.Body.EventOn)
-		if err != nil {
-			return nil, httpErr(apierrors.ValidationBodyDateFormatInvalid)
-		}
 
 		pub := types.New()
 		desc := sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""}
@@ -292,7 +286,6 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 			Priority:        in.Body.Priority,
 			DueOn:           due,
 			StartedOn:       start,
-			EventOn:         event,
 			Visibility:      vis,
 		})
 		if err != nil {
@@ -539,14 +532,6 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			}
 			newStart = parsed
 		}
-		newEvent := current.EventOn
-		if in.Body.EventOn != nil {
-			parsed, err := parseDateOrNullTime(*in.Body.EventOn)
-			if err != nil {
-				return nil, httpErr(apierrors.ValidationBodyDateFormatInvalid)
-			}
-			newEvent = parsed
-		}
 		newSortWeight := current.SortWeight
 		if in.Body.SortWeight != nil {
 			newSortWeight = *in.Body.SortWeight
@@ -557,11 +542,10 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 		}
 
 		titleChanged := in.Body.Title != nil && *in.Body.Title != "" && newTitle != current.Title
-		eventOnChanged := in.Body.EventOn != nil && newEvent != current.EventOn
 		dueOnChanged := in.Body.DueOn != nil && newDue != current.DueOn
 
 		needsItemkit := false
-		if titleChanged || eventOnChanged || dueOnChanged {
+		if titleChanged || dueOnChanged {
 			var linkedCount int
 			if err := deps.DB.QueryRowContext(ctx,
 				`SELECT COUNT(*) FROM calendar_events WHERE task_id = ? AND enabled = TRUE`,
@@ -580,7 +564,6 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			Priority:    newPriority,
 			DueOn:       newDue,
 			StartedOn:   newStart,
-			EventOn:     newEvent,
 			SortWeight:  newSortWeight,
 			Visibility:  newVisibility,
 			WorkspaceID: ws.ID,
@@ -611,31 +594,11 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 					return nil, translateItemkitTaskError(err)
 				}
 			}
-			var snap itemkit.SnapConfig
-			if eventOnChanged || dueOnChanged {
-				resolved, err := itemkit.ResolveSnapConfig(ctx, tx, ws.ID, actorID)
+			if dueOnChanged {
+				snap, err := itemkit.ResolveSnapConfig(ctx, tx, ws.ID, actorID)
 				if err != nil {
 					return nil, httpErr(apierrors.InternalUnexpected)
 				}
-				snap = resolved
-			}
-			if eventOnChanged {
-				var t time.Time
-				if newEvent.Valid {
-					t = newEvent.Time
-				}
-				if err := itemkit.RescheduleTask(ctx, tx, itemkit.RescheduleTaskArgs{
-					WorkspaceID: ws.ID,
-					TaskID:      task.ID,
-					ActorUserID: actorID,
-					SetEventOn:  true,
-					EventOn:     t,
-					Snap:        snap,
-				}); err != nil {
-					return nil, translateItemkitTaskError(err)
-				}
-			}
-			if dueOnChanged {
 				var t time.Time
 				if newDue.Valid {
 					t = newDue.Time

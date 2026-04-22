@@ -74,7 +74,6 @@ SELECT
   t.public_id     AS task_public_id,
   t.title         AS task_title,
   t.derived_state AS task_derived_state,
-  t.event_on      AS task_event_on,
   t.due_on        AS task_due_on,
   COUNT(*) OVER() AS total
 FROM task_event_links tel

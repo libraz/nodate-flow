@@ -28,21 +28,19 @@ import (
 )
 
 // DateRole encodes how a calendar event relates to its linked task.
-//   - RoleEvent     — event projects task.event_on (external milestone date).
 //   - RoleDue       — event projects task.due_on (hard deadline).
 //   - RoleScheduled — event is a time-block (multiple allowed per task).
 type DateRole string
 
 const (
-	RoleEvent     DateRole = "event"
 	RoleDue       DateRole = "due"
 	RoleScheduled DateRole = "scheduled"
 )
 
-// IsValid reports whether the role is one of the three allowed values.
+// IsValid reports whether the role is one of the allowed values.
 func (r DateRole) IsValid() bool {
 	switch r {
-	case RoleEvent, RoleDue, RoleScheduled:
+	case RoleDue, RoleScheduled:
 		return true
 	}
 	return false
@@ -65,7 +63,6 @@ type taskRow struct {
 	publicID    dbtype.PublicID
 	workspaceID uint32
 	title       string
-	eventOn     sql.NullTime
 	dueOn       sql.NullTime
 	updatedAt   time.Time
 }
@@ -90,12 +87,12 @@ type eventRow struct {
 // findTaskByID reads the minimal task row under the given workspace.
 // Returns sql.ErrNoRows when the task is missing or disabled.
 func findTaskByID(ctx context.Context, tx TX, workspaceID, taskID uint32) (taskRow, error) {
-	const q = `SELECT id, public_id, workspace_id, title, event_on, due_on, updated_at
+	const q = `SELECT id, public_id, workspace_id, title, due_on, updated_at
 	           FROM tasks
 	           WHERE id = ? AND workspace_id = ? AND enabled = TRUE`
 	var t taskRow
 	err := tx.QueryRowContext(ctx, q, taskID, workspaceID).Scan(
-		&t.id, &t.publicID, &t.workspaceID, &t.title, &t.eventOn, &t.dueOn, &t.updatedAt,
+		&t.id, &t.publicID, &t.workspaceID, &t.title, &t.dueOn, &t.updatedAt,
 	)
 	return t, err
 }
@@ -134,7 +131,7 @@ func findLinkedEvent(ctx context.Context, tx TX, taskID uint32, role DateRole) (
 }
 
 // dateOnly returns t truncated to local midnight in its own Location.
-// Used when projecting event.start_at onto task.event_on / task.due_on.
+// Used when projecting event.start_at onto task.due_on.
 func dateOnly(t time.Time) time.Time {
 	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
 }

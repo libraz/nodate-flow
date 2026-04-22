@@ -42,7 +42,7 @@ CREATE TABLE calendar_events (
 
   -- Cross-module link to nodate-flow tasks
   task_id INT UNSIGNED NULL COMMENT 'Linked task (optional, for task-calendar sync)',
-  task_role ENUM('event','due','scheduled') NULL COMMENT 'When task_id IS NOT NULL: which task field this event represents. event=task.event_on (legacy, being removed), due=task.due_on, scheduled=time-blocked (multi-link allowed).',
+  task_role ENUM('due','scheduled') NULL COMMENT 'When task_id IS NOT NULL: which task field this event represents. due=task.due_on, scheduled=time-blocked (multi-link allowed).',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',

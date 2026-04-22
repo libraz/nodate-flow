@@ -766,7 +766,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List tasks with event_on or due_on in range across every workspace */
+        /** List tasks with due_on in range across every workspace */
         get: operations["me-tasks-with-dates-list"];
         put?: never;
         post?: never;
@@ -3837,8 +3837,6 @@ export interface components {
             description?: string;
             /** @description YYYY-MM-DD */
             dueOn?: string;
-            /** @description YYYY-MM-DD event or milestone date */
-            eventOn?: string;
             /** Format: int32 */
             priority?: number;
             /** @description Project public id (UUID v7) */
@@ -5175,7 +5173,6 @@ export interface components {
             createdAt: number;
             derivedState: string;
             dueOn?: string;
-            eventOn?: string;
             id: string;
             /** Format: int32 */
             priority: number;
@@ -5415,8 +5412,6 @@ export interface components {
             description?: string;
             /** @description YYYY-MM-DD or empty string to clear */
             dueOn?: string;
-            /** @description YYYY-MM-DD or empty string to clear */
-            eventOn?: string;
             /** Format: int32 */
             priority?: number;
             /**
@@ -6081,7 +6076,6 @@ export interface components {
             derivedState: string;
             description?: string;
             dueOn?: string;
-            eventOn?: string;
             id: string;
             /** Format: int64 */
             labelCount: number;
@@ -6263,7 +6257,6 @@ export interface components {
             sortWeight: number;
             taskDerivedState?: string;
             taskDueOn?: string;
-            taskEventOn?: string;
             taskId?: string;
             taskTitle?: string;
         };
@@ -6294,7 +6287,6 @@ export interface components {
             createdAt: number;
             derivedState: string;
             dueOn?: string;
-            eventOn?: string;
             id: string;
             labelIds?: string;
             parentTaskId?: string;

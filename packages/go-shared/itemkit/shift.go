@@ -186,9 +186,9 @@ type ApplyShiftEventAndChildrenArgs struct {
 //  1. RescheduleEvent on the umbrella to NewStartAt / NewStartAt+oldDuration.
 //  2. Compute a day-precision delta (tasks have DATE, not DATETIME).
 //  3. For each confirmed task that is still contributes_to-linked,
-//     shift its own DATE columns (event_on / due_on) by the day delta
-//     via RescheduleTask. That call cascades into the task's own
-//     projection events (RoleEvent / RoleDue), not the umbrella.
+//     shift its own due_on column by the day delta via RescheduleTask.
+//     That call cascades into the task's own projection event
+//     (RoleDue), not the umbrella.
 func ApplyShiftEventAndChildren(ctx context.Context, tx TX, args ApplyShiftEventAndChildrenArgs) error {
 	if args.WorkspaceID == 0 || args.EventID == 0 {
 		return wrapInvariant("shift_ids_required", "workspaceID and eventID must be non-zero")
@@ -283,15 +283,11 @@ func ApplyShiftEventAndChildren(ctx context.Context, tx TX, args ApplyShiftEvent
 			ActorUserID: args.ActorUserID,
 			Snap:        args.Snap,
 		}
-		if task.eventOn.Valid {
-			shiftArgs.SetEventOn = true
-			shiftArgs.EventOn = task.eventOn.Time.AddDate(0, 0, dayDeltaInt)
-		}
 		if task.dueOn.Valid {
 			shiftArgs.SetDueOn = true
 			shiftArgs.DueOn = task.dueOn.Time.AddDate(0, 0, dayDeltaInt)
 		}
-		if !shiftArgs.SetEventOn && !shiftArgs.SetDueOn {
+		if !shiftArgs.SetDueOn {
 			continue
 		}
 		if err := RescheduleTask(ctx, tx, shiftArgs); err != nil {

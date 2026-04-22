@@ -325,7 +325,6 @@ func (ns NullCalendarEventsShowAs) Value() (driver.Value, error) {
 type CalendarEventsTaskRole string
 
 const (
-	CalendarEventsTaskRoleEvent     CalendarEventsTaskRole = "event"
 	CalendarEventsTaskRoleDue       CalendarEventsTaskRole = "due"
 	CalendarEventsTaskRoleScheduled CalendarEventsTaskRole = "scheduled"
 )
@@ -2245,7 +2244,7 @@ type CalendarEvent struct {
 	NotifiedAt sql.NullTime `json:"notifiedAt"`
 	// Linked task (optional, for task-calendar sync)
 	TaskID sql.NullInt32 `json:"-"`
-	// When task_id IS NOT NULL: which task field this event represents. event=task.event_on (legacy, being removed), due=task.due_on, scheduled=time-blocked (multi-link allowed).
+	// When task_id IS NOT NULL: which task field this event represents. due=task.due_on, scheduled=time-blocked (multi-link allowed).
 	TaskRole NullCalendarEventsTaskRole `json:"taskRole"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
@@ -3358,8 +3357,6 @@ type Task struct {
 	DueOn sql.NullTime `json:"dueOn"`
 	// Date work began on this task
 	StartedOn sql.NullTime `json:"startedOn"`
-	// DEPRECATED: use calendar_events.task_role='event'. Kept for source compat until flow-api handlers and SDK rewire
-	EventOn sql.NullTime `json:"eventOn"`
 	// Time derived_state transitioned to done
 	CompletedAt sql.NullTime `json:"completedAt"`
 	// Set when task is archived (distinct from enabled)
@@ -3848,7 +3845,6 @@ type VMyTask struct {
 	Priority        int32             `json:"priority"`
 	DueOn           sql.NullTime      `json:"dueOn"`
 	StartedOn       sql.NullTime      `json:"startedOn"`
-	EventOn         sql.NullTime      `json:"eventOn"`
 	ActorRole       TaskActorsRole    `json:"actorRole"`
 	UpdatedAt       sql.NullTime      `json:"updatedAt"`
 	CreatedAt       time.Time         `json:"createdAt"`
@@ -3904,7 +3900,6 @@ type VTaskDetail struct {
 	Priority                 int32             `json:"priority"`
 	DueOn                    sql.NullTime      `json:"dueOn"`
 	StartedOn                sql.NullTime      `json:"startedOn"`
-	EventOn                  sql.NullTime      `json:"eventOn"`
 	CompletedAt              sql.NullTime      `json:"completedAt"`
 	ArchivedAt               sql.NullTime      `json:"archivedAt"`
 	ConstraintCount          int64             `json:"constraintCount"`
@@ -3934,7 +3929,6 @@ type VTaskList struct {
 	Priority                int32             `json:"priority"`
 	DueOn                   sql.NullTime      `json:"dueOn"`
 	StartedOn               sql.NullTime      `json:"startedOn"`
-	EventOn                 sql.NullTime      `json:"eventOn"`
 	CompletedAt             sql.NullTime      `json:"completedAt"`
 	ArchivedAt              sql.NullTime      `json:"archivedAt"`
 	SortWeight              int32             `json:"sortWeight"`
@@ -3962,7 +3956,6 @@ type VTaskListArchived struct {
 	Priority                int32             `json:"priority"`
 	DueOn                   sql.NullTime      `json:"dueOn"`
 	StartedOn               sql.NullTime      `json:"startedOn"`
-	EventOn                 sql.NullTime      `json:"eventOn"`
 	CompletedAt             sql.NullTime      `json:"completedAt"`
 	ArchivedAt              sql.NullTime      `json:"archivedAt"`
 	SortWeight              int32             `json:"sortWeight"`

@@ -297,7 +297,6 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 			Priority:        0,
 			DueOn:           sql.NullTime{},
 			StartedOn:       sql.NullTime{},
-			EventOn:         sql.NullTime{},
 			Visibility:      generated.TasksVisibilityPublic,
 		})
 		if err != nil {

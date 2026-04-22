@@ -223,7 +223,6 @@ func runConvertIntakeToTask(ctx context.Context, deps Deps, s *session, raw json
 		Priority:        0,
 		DueOn:           sql.NullTime{},
 		StartedOn:       sql.NullTime{},
-		EventOn:         sql.NullTime{},
 		Visibility:      generated.TasksVisibilityPublic,
 	})
 	if err != nil {
@@ -368,7 +367,6 @@ func runRestoreDescriptionVersion(ctx context.Context, deps Deps, s *session, ra
 		Priority:    taskRow.Priority,
 		DueOn:       taskRow.DueOn,
 		StartedOn:   taskRow.StartedOn,
-		EventOn:     taskRow.EventOn,
 		SortWeight:  taskRow.SortWeight,
 		Visibility:  taskRow.Visibility,
 		WorkspaceID: s.workspaceID,

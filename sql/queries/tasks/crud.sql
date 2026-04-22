@@ -13,9 +13,8 @@ INSERT INTO tasks (
   priority,
   due_on,
   started_on,
-  event_on,
   visibility
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: FindTaskByPublicId :one
 -- Detail projection via v_task_detail. Workspace-scoped.
@@ -33,7 +32,6 @@ SELECT
   v.priority,
   v.due_on,
   v.started_on,
-  v.event_on,
   v.completed_at,
   v.project_identifier,
   v.task_number,
@@ -64,7 +62,6 @@ SELECT
   v.priority,
   v.due_on,
   v.started_on,
-  v.event_on,
   v.completed_at,
   v.project_identifier,
   v.task_number,
@@ -95,7 +92,6 @@ SELECT
   v.priority,
   v.due_on,
   v.started_on,
-  v.event_on,
   v.completed_at,
   v.project_identifier,
   v.task_number,
@@ -120,7 +116,6 @@ SET title = ?,
     priority = ?,
     due_on = ?,
     started_on = ?,
-    event_on = ?,
     sort_weight = ?,
     visibility = ?
 WHERE workspace_id = ?
@@ -191,7 +186,6 @@ SELECT
   v.priority,
   v.due_on,
   v.started_on,
-  v.event_on,
   v.actor_role,
   v.updated_at,
   v.created_at,
@@ -204,12 +198,12 @@ ORDER BY v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
 
 -- name: ListMyTasksWithDates :many
--- Cross-workspace variant scoped to tasks whose event_on OR due_on falls
--- inside the requested [from, to] inclusive date range. Backs the unified
--- flow-web calendar: combined with /me/calendar-events it gives a single
--- round-trip answer for "what is on my plate across every workspace on
--- these days". Undated tasks are excluded; use ListMyTasksGlobal for the
--- planning bucket.
+-- Cross-workspace variant scoped to tasks whose due_on falls inside the
+-- requested [from, to] inclusive date range. Backs the unified flow-web
+-- calendar: combined with /me/calendar-events it gives a single round-trip
+-- answer for "what is on my plate across every workspace on these days".
+-- Undated tasks are excluded; use ListMyTasksGlobal for the planning
+-- bucket.
 SELECT
   v.public_id,
   w.public_id AS workspace_public_id,
@@ -221,7 +215,6 @@ SELECT
   v.priority,
   v.due_on,
   v.started_on,
-  v.event_on,
   v.actor_role,
   v.updated_at,
   v.created_at,
@@ -230,13 +223,10 @@ FROM v_my_tasks v
 INNER JOIN workspaces w
   ON w.id = v.workspace_id AND w.enabled = TRUE
 WHERE v.user_public_id = ?
-  AND (
-    (v.event_on IS NOT NULL AND v.event_on BETWEEN ? AND ?)
-    OR
-    (v.due_on   IS NOT NULL AND v.due_on   BETWEEN ? AND ?)
-  )
+  AND v.due_on IS NOT NULL
+  AND v.due_on BETWEEN ? AND ?
 ORDER BY
-  COALESCE(v.event_on, v.due_on) ASC,
+  v.due_on ASC,
   v.priority DESC,
   v.created_at DESC,
   v.public_id DESC
@@ -292,7 +282,6 @@ SELECT
   v.priority,
   v.due_on,
   v.started_on,
-  v.event_on,
   v.completed_at,
   v.archived_at,
   v.sort_weight,

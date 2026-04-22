@@ -209,60 +209,6 @@ func TestScheduleTaskCreatesLink(t *testing.T) {
 	}
 }
 
-func TestScheduleTaskIdempotentForEventRole(t *testing.T) {
-	db := startDB(t)
-	fx := seed(t, context.Background(), db)
-	defer purge(t, db, fx.wsID)
-
-	start := time.Date(2030, 6, 3, 10, 0, 0, 0, time.UTC)
-	end := start.Add(time.Hour)
-	args := ScheduleTaskArgs{
-		WorkspaceID: fx.wsID,
-		TaskID:      fx.taskID,
-		CalendarID:  fx.calendarID,
-		ActorUserID: fx.userID,
-		Role:        RoleEvent,
-		Title:       "Test task",
-		StartAt:     start,
-		EndAt:       end,
-		Timezone:    "UTC",
-	}
-
-	var firstID uint32
-	withTx(t, db, func(tx *sql.Tx) {
-		_, id, err := ScheduleTask(context.Background(), tx, args)
-		if err != nil {
-			t.Fatalf("ScheduleTask first: %v", err)
-		}
-		firstID = id
-	})
-
-	args.StartAt = start.Add(24 * time.Hour)
-	args.EndAt = args.StartAt.Add(time.Hour)
-	var secondID uint32
-	withTx(t, db, func(tx *sql.Tx) {
-		_, id, err := ScheduleTask(context.Background(), tx, args)
-		if err != nil {
-			t.Fatalf("ScheduleTask second: %v", err)
-		}
-		secondID = id
-	})
-
-	if firstID != secondID {
-		t.Fatalf("idempotency broken: got two distinct event ids %d and %d", firstID, secondID)
-	}
-	var count int
-	if err := db.QueryRow(
-		`SELECT COUNT(*) FROM calendar_events WHERE task_id = ? AND task_role = 'event'`,
-		fx.taskID,
-	).Scan(&count); err != nil {
-		t.Fatalf("count events: %v", err)
-	}
-	if count != 1 {
-		t.Fatalf("duplicate event_role events: got %d rows, want 1", count)
-	}
-}
-
 func TestRescheduleTaskPropagatesToEvent(t *testing.T) {
 	db := startDB(t)
 	fx := seed(t, context.Background(), db)

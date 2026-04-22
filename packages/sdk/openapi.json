@@ -1938,10 +1938,6 @@
             "description": "YYYY-MM-DD",
             "type": "string"
           },
-          "eventOn": {
-            "description": "YYYY-MM-DD event or milestone date",
-            "type": "string"
-          },
           "priority": {
             "format": "int32",
             "maximum": 4,
@@ -5051,9 +5047,6 @@
           "dueOn": {
             "type": "string"
           },
-          "eventOn": {
-            "type": "string"
-          },
           "id": {
             "type": "string"
           },
@@ -5658,10 +5651,6 @@
             "type": "string"
           },
           "dueOn": {
-            "description": "YYYY-MM-DD or empty string to clear",
-            "type": "string"
-          },
-          "eventOn": {
             "description": "YYYY-MM-DD or empty string to clear",
             "type": "string"
           },
@@ -7145,9 +7134,6 @@
           "dueOn": {
             "type": "string"
           },
-          "eventOn": {
-            "type": "string"
-          },
           "id": {
             "type": "string"
           },
@@ -7630,9 +7616,6 @@
           "taskDueOn": {
             "type": "string"
           },
-          "taskEventOn": {
-            "type": "string"
-          },
           "taskId": {
             "type": "string"
           },
@@ -7701,9 +7684,6 @@
             "type": "string"
           },
           "dueOn": {
-            "type": "string"
-          },
-          "eventOn": {
             "type": "string"
           },
           "id": {
@@ -11429,7 +11409,7 @@
             "description": "Error"
           }
         },
-        "summary": "List tasks with event_on or due_on in range across every workspace"
+        "summary": "List tasks with due_on in range across every workspace"
       }
     },
     "/me/totp": {

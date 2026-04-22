@@ -143,7 +143,6 @@ func mapArchivedTaskListItem(r generated.ListArchivedTasksForWorkspaceRow) TaskL
 		Priority:          r.Priority,
 		DueOn:             nullDate(r.DueOn),
 		StartedOn:         nullDate(r.StartedOn),
-		EventOn:           nullDate(r.EventOn),
 		CompletedAt:       nullTimeUnix(r.CompletedAt),
 		ArchivedAt:        nullTimeUnix(r.ArchivedAt),
 		LabelIDs:          nullStr(r.LabelIds),

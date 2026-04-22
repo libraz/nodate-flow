@@ -44,7 +44,7 @@ func RegisterCollection(api huma.API, deps Deps) {
 		OperationID: "me-tasks-with-dates-list",
 		Method:      http.MethodGet,
 		Path:        "/me/tasks-with-dates",
-		Summary:     "List tasks with event_on or due_on in range across every workspace",
+		Summary:     "List tasks with due_on in range across every workspace",
 	}, ListMyTasksWithDates(deps))
 }
 

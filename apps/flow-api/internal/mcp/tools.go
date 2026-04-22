@@ -847,7 +847,6 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		Priority    int32  `json:"priority"`
 		DueOn       string `json:"dueOn"`
 		StartOn     string `json:"startOn"`
-		EventOn     string `json:"eventOn"`
 	}
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
@@ -870,10 +869,6 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	if err != nil {
 		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 	}
-	event, err := parseDateOrNull(in.EventOn)
-	if err != nil {
-		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
-	}
 	pub := newPublicID()
 	desc := sql.NullString{String: in.Description, Valid: in.Description != ""}
 	taskID, err := deps.Queries.CreateTask(ctx, generated.CreateTaskParams{
@@ -887,7 +882,6 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		Priority:        in.Priority,
 		DueOn:           due,
 		StartedOn:       start,
-		EventOn:         event,
 	})
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
@@ -915,7 +909,6 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		Priority    *int32  `json:"priority"`
 		DueOn       *string `json:"dueOn"`
 		StartOn     *string `json:"startOn"`
-		EventOn     *string `json:"eventOn"`
 	}
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
@@ -962,21 +955,12 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		}
 		start = p
 	}
-	evt := current.EventOn
-	if in.EventOn != nil {
-		p, err := parseDateOrNull(*in.EventOn)
-		if err != nil {
-			return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
-		}
-		evt = p
-	}
 
 	titleChanged := in.Title != nil && *in.Title != "" && title != current.Title
-	eventOnChanged := in.EventOn != nil && evt != current.EventOn
 	dueOnChanged := in.DueOn != nil && due != current.DueOn
 
 	needsItemkit := false
-	if titleChanged || eventOnChanged || dueOnChanged {
+	if titleChanged || dueOnChanged {
 		n, cerr := countLinkedEvents(ctx, deps, taskInternal)
 		if cerr != nil {
 			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, cerr)
@@ -990,7 +974,6 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		Priority:    prio,
 		DueOn:       due,
 		StartedOn:   start,
-		EventOn:     evt,
 		SortWeight:  current.SortWeight,
 		Visibility:  current.Visibility,
 		WorkspaceID: s.workspaceID,
@@ -1017,21 +1000,6 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 				ActorUserID: s.userID,
 				TaskID:      taskInternal,
 				NewTitle:    title,
-			}); err != nil {
-				return nil, translateItemkitMCPError(err)
-			}
-		}
-		if eventOnChanged {
-			var t time.Time
-			if evt.Valid {
-				t = evt.Time
-			}
-			if err := itemkit.RescheduleTask(ctx, tx, itemkit.RescheduleTaskArgs{
-				WorkspaceID: s.workspaceID,
-				TaskID:      taskInternal,
-				ActorUserID: s.userID,
-				SetEventOn:  true,
-				EventOn:     t,
 			}); err != nil {
 				return nil, translateItemkitMCPError(err)
 			}
@@ -1845,7 +1813,6 @@ func runExportTasks(ctx context.Context, deps Deps, s *session, raw json.RawMess
 		Priority            int32
 		DueOn               sql.NullTime
 		StartedOn           sql.NullTime
-		EventOn             sql.NullTime
 		ProjectName         string
 		AssigneeDisplayName sql.NullString
 	}
@@ -1872,7 +1839,6 @@ func runExportTasks(ctx context.Context, deps Deps, s *session, raw json.RawMess
 				Priority:            r.Priority,
 				DueOn:               r.DueOn,
 				StartedOn:           r.StartedOn,
-				EventOn:             r.EventOn,
 				ProjectName:         r.ProjectName,
 				AssigneeDisplayName: r.AssigneeDisplayName,
 			})
@@ -1894,7 +1860,6 @@ func runExportTasks(ctx context.Context, deps Deps, s *session, raw json.RawMess
 				Priority:            r.Priority,
 				DueOn:               r.DueOn,
 				StartedOn:           r.StartedOn,
-				EventOn:             r.EventOn,
 				ProjectName:         r.ProjectName,
 				AssigneeDisplayName: r.AssigneeDisplayName,
 			})

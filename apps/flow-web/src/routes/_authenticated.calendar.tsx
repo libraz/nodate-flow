@@ -2,7 +2,7 @@
  * /calendar — unified cross-workspace calendar.
  *
  * Consumes two aggregated endpoints instead of per-workspace fan-out:
- *   - `GET /me/tasks-with-dates?from=&to=` (flow-api)   — tasks with due_on or event_on
+ *   - `GET /me/tasks-with-dates?from=&to=` (flow-api)   — tasks with due_on
  *   - `GET /me/calendar-events?start=&end=` (time-api)  — calendar events
  *
  * The month grid overlays three toggleable layers: task-due,

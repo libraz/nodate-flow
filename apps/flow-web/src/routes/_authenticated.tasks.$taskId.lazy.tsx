@@ -469,7 +469,6 @@ interface SidebarProps {
   priority: TaskPriority;
   startOn: string | undefined;
   dueOn: string | undefined;
-  eventOn: string | undefined;
 }
 
 function Sidebar({
@@ -480,7 +479,6 @@ function Sidebar({
   priority,
   startOn,
   dueOn,
-  eventOn,
 }: SidebarProps): ReactElement {
   const { t, i18n } = useTranslation('common');
   const dateLocale = i18n.resolvedLanguage ?? 'en';
@@ -506,14 +504,6 @@ function Sidebar({
   const handleDueChange = async (next: string): Promise<void> => {
     try {
       await update.mutateAsync({ id, patch: { dueOn: next } });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('tasks.errors.update_failed') });
-    }
-  };
-
-  const handleEventChange = async (next: string): Promise<void> => {
-    try {
-      await update.mutateAsync({ id, patch: { eventOn: next } });
     } catch {
       toaster.show({ tone: 'danger', message: t('tasks.errors.update_failed') });
     }
@@ -607,19 +597,6 @@ function Sidebar({
               value={dueOn ?? ''}
               onChange={(e) => {
                 void handleDueChange(e.target.value);
-              }}
-            />
-          )}
-        </FormField>
-        <FormField label={t('tasks.form.event')}>
-          {(control) => (
-            <Input
-              {...control}
-              type="date"
-              lang={dateLocale}
-              value={eventOn ?? ''}
-              onChange={(e) => {
-                void handleEventChange(e.target.value);
               }}
             />
           )}
@@ -1040,7 +1017,6 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
         priority={priority}
         startOn={task.startedOn ?? undefined}
         dueOn={task.dueOn}
-        eventOn={task.eventOn ?? undefined}
       />
     </section>
   );

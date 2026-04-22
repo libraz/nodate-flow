@@ -19,7 +19,6 @@ SELECT
   t.priority,
   t.due_on,
   t.started_on,
-  t.event_on,
   t.completed_at,
   t.archived_at,
   (SELECT COUNT(*) FROM task_constraints c WHERE c.task_id = t.id AND c.enabled = TRUE) AS constraint_count,

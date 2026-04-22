@@ -565,7 +565,7 @@ CREATE TABLE calendar_events (
 
   -- Cross-module link to nodate-flow tasks
   task_id INT UNSIGNED NULL COMMENT 'Linked task (optional, for task-calendar sync)',
-  task_role ENUM('event','due','scheduled') NULL COMMENT 'When task_id IS NOT NULL: which task field this event represents. event=task.event_on (legacy, being removed), due=task.due_on, scheduled=time-blocked (multi-link allowed).',
+  task_role ENUM('due','scheduled') NULL COMMENT 'When task_id IS NOT NULL: which task field this event represents. due=task.due_on, scheduled=time-blocked (multi-link allowed).',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
@@ -1939,7 +1939,6 @@ CREATE TABLE tasks (
   priority INT NOT NULL DEFAULT 0 COMMENT 'LLM-optimized heuristic priority',
   due_on DATE NULL COMMENT 'Deadline for task completion; drives constraint evaluation',
   started_on DATE NULL COMMENT 'Date work began on this task',
-  event_on DATE NULL COMMENT 'DEPRECATED: use calendar_events.task_role=''event''. Kept for source compat until flow-api handlers and SDK rewire',
   completed_at DATETIME NULL COMMENT 'Time derived_state transitioned to done',
   archived_at DATETIME NULL COMMENT 'Set when task is archived (distinct from enabled)',
 
@@ -1953,7 +1952,6 @@ CREATE TABLE tasks (
   UNIQUE KEY uniq_tasks_public_id (public_id),
   KEY idx_tasks_workspace_id_project_id (workspace_id, project_id),
   KEY idx_tasks_workspace_id_due_on (workspace_id, due_on),
-  KEY idx_tasks_workspace_id_event_on (workspace_id, event_on),
   KEY idx_tasks_workspace_id_derived_state (workspace_id, derived_state),
   UNIQUE KEY uniq_tasks_project_id_task_number (project_id, task_number),
   KEY idx_tasks_workspace_id_archived_at (workspace_id, archived_at),
@@ -2519,7 +2517,6 @@ SELECT
   t.priority,
   t.due_on,
   t.started_on,
-  t.event_on,
   a.role AS actor_role,
   t.updated_at,
   t.created_at
@@ -2606,7 +2603,6 @@ SELECT
   t.priority,
   t.due_on,
   t.started_on,
-  t.event_on,
   t.completed_at,
   t.archived_at,
   (SELECT COUNT(*) FROM task_constraints c WHERE c.task_id = t.id AND c.enabled = TRUE) AS constraint_count,
@@ -2650,7 +2646,6 @@ SELECT
   t.priority,
   t.due_on,
   t.started_on,
-  t.event_on,
   t.completed_at,
   t.archived_at,
   t.sort_weight,
@@ -2713,7 +2708,6 @@ SELECT
   t.priority,
   t.due_on,
   t.started_on,
-  t.event_on,
   t.completed_at,
   t.archived_at,
   t.sort_weight,

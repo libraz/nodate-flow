@@ -64,7 +64,6 @@ func rowToMyTaskListItem(r generated.ListMyTasksGlobalRow) MyTaskListItem {
 		DerivedState:  string(r.DerivedState),
 		Priority:      r.Priority,
 		DueOn:         nullDate(r.DueOn),
-		EventOn:       nullDate(r.EventOn),
 		ActorRole:     string(r.ActorRole),
 		UpdatedAt:     nullTimeUnix(r.UpdatedAt),
 		CreatedAt:     r.CreatedAt.Unix(),
@@ -73,10 +72,10 @@ func rowToMyTaskListItem(r generated.ListMyTasksGlobalRow) MyTaskListItem {
 
 // ListMyTasksWithDates handles GET /me/tasks-with-dates?from=&to=. It
 // returns tasks assigned to the authenticated user in any workspace
-// whose event_on or due_on falls inside the requested inclusive date
-// range. Pairs with time-api's GET /me/calendar-events so the unified
-// flow-web calendar can render tasks and events with two cross-service
-// requests instead of fanning out per-workspace.
+// whose due_on falls inside the requested inclusive date range. Pairs
+// with time-api's GET /me/calendar-events so the unified flow-web
+// calendar can render tasks and events with two cross-service requests
+// instead of fanning out per-workspace.
 func ListMyTasksWithDates(deps Deps) func(context.Context, *ListMyTasksWithDatesInput) (*ListMyTasksWithDatesOutput, error) {
 	return func(ctx context.Context, in *ListMyTasksWithDatesInput) (*ListMyTasksWithDatesOutput, error) {
 		uid, ok := middleware.ActorFromContext(ctx)
@@ -110,8 +109,6 @@ func ListMyTasksWithDates(deps Deps) func(context.Context, *ListMyTasksWithDates
 
 		rows, err := deps.Queries.ListMyTasksWithDates(ctx, generated.ListMyTasksWithDatesParams{
 			UserPublicID: profile.PublicID,
-			FromEventOn:  fromNT,
-			ToEventOn:    toNT,
 			FromDueOn:    fromNT,
 			ToDueOn:      toNT,
 			Limit:        limit,
@@ -144,7 +141,6 @@ func rowToMyTaskWithDatesItem(r generated.ListMyTasksWithDatesRow) MyTaskListIte
 		DerivedState:  string(r.DerivedState),
 		Priority:      r.Priority,
 		DueOn:         nullDate(r.DueOn),
-		EventOn:       nullDate(r.EventOn),
 		ActorRole:     string(r.ActorRole),
 		UpdatedAt:     nullTimeUnix(r.UpdatedAt),
 		CreatedAt:     r.CreatedAt.Unix(),

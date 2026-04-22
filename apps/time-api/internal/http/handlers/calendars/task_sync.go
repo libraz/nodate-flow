@@ -34,8 +34,8 @@ type CreateEventFromTaskOutput struct {
 
 // CreateEventFromTask creates a calendar event from an existing task.
 // It delegates the cross-table write (inserting calendar_events +
-// mirroring tasks.event_on / tasks.due_on) to itemkit.ScheduleTask so
-// the task and event move in lockstep inside one transaction.
+// mirroring tasks.due_on) to itemkit.ScheduleTask so the task and
+// event move in lockstep inside one transaction.
 func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskInput) (*CreateEventFromTaskOutput, error) {
 	return func(ctx context.Context, input *CreateEventFromTaskInput) (*CreateEventFromTaskOutput, error) {
 		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
@@ -59,11 +59,11 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 		// Raw query: time-api does not have sqlc-generated task queries.
 		var taskID uint32
 		var title string
-		var eventOn, dueOn *time.Time
+		var dueOn *time.Time
 		err = deps.DB.QueryRowContext(ctx,
-			`SELECT id, title, event_on, due_on FROM tasks WHERE public_id = ? AND workspace_id = ? AND enabled = TRUE`,
+			`SELECT id, title, due_on FROM tasks WHERE public_id = ? AND workspace_id = ? AND enabled = TRUE`,
 			taskPublicID, wsID,
-		).Scan(&taskID, &title, &eventOn, &dueOn)
+		).Scan(&taskID, &title, &dueOn)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, httpErr(apierrors.CalendarTaskSyncTaskNotFound)
@@ -81,20 +81,14 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 			return nil, httpErr(apierrors.CalendarTaskSyncTimezoneUnrecognized)
 		}
 
-		// Pick the role: event_on wins, then due_on, else today as a
-		// RoleEvent placeholder. This mirrors the pre-itemkit behaviour.
-		role := itemkit.RoleEvent
+		// Pick the base date: prefer the task's due_on, otherwise today.
+		// RoleDue is the only role meaningful for task-projected events.
+		role := itemkit.RoleDue
 		var baseDate time.Time
-		switch {
-		case eventOn != nil:
-			baseDate = *eventOn
-			role = itemkit.RoleEvent
-		case dueOn != nil:
+		if dueOn != nil {
 			baseDate = *dueOn
-			role = itemkit.RoleDue
-		default:
+		} else {
 			baseDate = time.Now().In(loc)
-			role = itemkit.RoleEvent
 		}
 		startAt := time.Date(baseDate.Year(), baseDate.Month(), baseDate.Day(), 9, 0, 0, 0, loc)
 		endAt := startAt.Add(time.Hour)

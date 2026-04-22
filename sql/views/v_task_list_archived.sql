@@ -18,7 +18,6 @@ SELECT
   t.priority,
   t.due_on,
   t.started_on,
-  t.event_on,
   t.completed_at,
   t.archived_at,
   t.sort_weight,

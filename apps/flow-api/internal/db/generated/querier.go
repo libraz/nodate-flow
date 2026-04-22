@@ -725,12 +725,12 @@ type Querier interface {
 	// GET /me/tasks to power the cross-workspace "Today" / Calendar views in
 	// the web client without fanning out one request per workspace.
 	ListMyTasksGlobal(ctx context.Context, arg ListMyTasksGlobalParams) ([]ListMyTasksGlobalRow, error)
-	// Cross-workspace variant scoped to tasks whose event_on OR due_on falls
-	// inside the requested [from, to] inclusive date range. Backs the unified
-	// flow-web calendar: combined with /me/calendar-events it gives a single
-	// round-trip answer for "what is on my plate across every workspace on
-	// these days". Undated tasks are excluded; use ListMyTasksGlobal for the
-	// planning bucket.
+	// Cross-workspace variant scoped to tasks whose due_on falls inside the
+	// requested [from, to] inclusive date range. Backs the unified flow-web
+	// calendar: combined with /me/calendar-events it gives a single round-trip
+	// answer for "what is on my plate across every workspace on these days".
+	// Undated tasks are excluded; use ListMyTasksGlobal for the planning
+	// bucket.
 	ListMyTasksWithDates(ctx context.Context, arg ListMyTasksWithDatesParams) ([]ListMyTasksWithDatesRow, error)
 	// List all notification preferences for a user in a workspace.
 	ListNotificationPreferencesForUser(ctx context.Context, arg ListNotificationPreferencesForUserParams) ([]ListNotificationPreferencesForUserRow, error)
@@ -1040,6 +1040,11 @@ type Querier interface {
 	UpdateProjectFull(ctx context.Context, arg UpdateProjectFullParams) error
 	// Rotate a provider's API key. Caller passes new ciphertext + prefix + suffix.
 	UpdateProviderKey(ctx context.Context, arg UpdateProviderKeyParams) error
+	// Update the sort_weight of a single share-event link.
+	// Called in a loop (inside a tx) when a user reorders the events on a
+	// public share. Scoped to (share_id, public_id) so a caller cannot
+	// accidentally reorder a link belonging to a different share.
+	UpdateShareEventSortWeight(ctx context.Context, arg UpdateShareEventSortWeightParams) error
 	// Update mutable task fields. derived_state is intentionally NOT writable.
 	UpdateTask(ctx context.Context, arg UpdateTaskParams) error
 	// Update only the sort_weight for a single task within a workspace.

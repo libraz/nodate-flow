@@ -12,8 +12,7 @@ import (
 
 // RescheduleEventArgs moves a single calendar_events row in time.
 // When the event is task-linked (task_id + task_role set) and the
-// role is RoleEvent or RoleDue, the change propagates to the
-// corresponding task date column.
+// role is RoleDue, the change propagates to tasks.due_on.
 type RescheduleEventArgs struct {
 	WorkspaceID uint32
 	EventID     uint32
@@ -33,9 +32,8 @@ type RescheduleEventArgs struct {
 
 // RescheduleEvent updates a calendar_events row's start/end times
 // and, when the event is a task projection, mirrors the date into
-// tasks.event_on or tasks.due_on. Pure time-of-day changes (same
-// date) do NOT touch the task — tasks have DATE precision, not
-// DATETIME.
+// tasks.due_on. Pure time-of-day changes (same date) do NOT touch
+// the task — tasks have DATE precision, not DATETIME.
 func RescheduleEvent(ctx context.Context, tx TX, args RescheduleEventArgs) error {
 	if !args.StartAt.IsZero() && !args.EndAt.IsZero() && args.EndAt.Before(args.StartAt) {
 		return wrapInvariant("chronology", "end_at before start_at")
@@ -48,11 +46,10 @@ func RescheduleEvent(ctx context.Context, tx TX, args RescheduleEventArgs) error
 		return fmt.Errorf("itemkit: read event: %w", err)
 	}
 	// Undated flip is forbidden while a task-projection role is
-	// attached (RoleEvent / RoleDue). Scheduled role (time-block)
-	// may be cleared but the plan keeps that out of MVP.
+	// attached (RoleDue). Scheduled role (time-block) may be cleared
+	// but the plan keeps that out of MVP.
 	if (args.StartAt.IsZero() || args.EndAt.IsZero()) && evt.taskRole.Valid {
-		role := DateRole(evt.taskRole.String)
-		if role == RoleEvent || role == RoleDue {
+		if DateRole(evt.taskRole.String) == RoleDue {
 			return wrapInvariant("undated_projection",
 				"cannot clear start/end on a task-projection event; unlink first")
 		}
@@ -78,7 +75,7 @@ func RescheduleEvent(ctx context.Context, tx TX, args RescheduleEventArgs) error
 	// Propagate to task only when linked and the DATE component changed.
 	if evt.taskID.Valid && evt.taskRole.Valid {
 		role := DateRole(evt.taskRole.String)
-		if role == RoleEvent || role == RoleDue {
+		if role == RoleDue {
 			if !args.StartAt.IsZero() {
 				if err := propagateTaskDateFromRole(ctx, tx, uint32(evt.taskID.Int32), role, args.StartAt); err != nil {
 					return err
@@ -101,33 +98,31 @@ func RescheduleEvent(ctx context.Context, tx TX, args RescheduleEventArgs) error
 	return appendItemEvents(ctx, tx, eventbus.ItemRescheduled, args.WorkspaceID, &args.ActorUserID, taskPtr, payload)
 }
 
-// RescheduleTaskArgs moves a task's date columns and propagates to
+// RescheduleTaskArgs moves a task's due_on column and propagates to
 // linked projection events.
 type RescheduleTaskArgs struct {
 	WorkspaceID uint32
 	TaskID      uint32
 	ActorUserID uint32
 
-	// SetEventOn / SetDueOn carry the new DATE value. When the Set*
-	// flag is false the corresponding column is untouched. Zero Time
-	// with Set*=true clears the column.
-	SetEventOn bool
-	EventOn    time.Time
-	SetDueOn   bool
-	DueOn      time.Time
+	// SetDueOn carries the new DATE value. When the flag is false the
+	// column is untouched. Zero Time with SetDueOn=true clears the
+	// column.
+	SetDueOn bool
+	DueOn    time.Time
 
 	// Snap carries the actor's working-day preferences. Zero value
 	// disables snap behavior. When SnapAuto adjusts the target DATE,
-	// itemkit writes the snapped date into tasks.*_on as well so the
+	// itemkit writes the snapped date into tasks.due_on as well so the
 	// task and its projection event stay in lockstep.
 	Snap SnapConfig
 }
 
-// RescheduleTask updates tasks.event_on / tasks.due_on per the args
-// and mirrors the change onto any linked projection events,
-// preserving the event's time-of-day portion.
+// RescheduleTask updates tasks.due_on per the args and mirrors the
+// change onto any linked projection event, preserving the event's
+// time-of-day portion.
 func RescheduleTask(ctx context.Context, tx TX, args RescheduleTaskArgs) error {
-	if !args.SetEventOn && !args.SetDueOn {
+	if !args.SetDueOn {
 		return nil
 	}
 	task, err := findTaskByID(ctx, tx, args.WorkspaceID, args.TaskID)
@@ -138,20 +133,6 @@ func RescheduleTask(ctx context.Context, tx TX, args RescheduleTaskArgs) error {
 		return fmt.Errorf("itemkit: read task: %w", err)
 	}
 
-	if args.SetEventOn {
-		snappedEventOn := args.EventOn
-		if !snappedEventOn.IsZero() {
-			out := applySnap(snappedEventOn, snappedEventOn, args.Snap)
-			snappedEventOn = out.NewStart
-		}
-		if err := updateTaskDateColumn(ctx, tx, task.id, "event_on", snappedEventOn); err != nil {
-			return err
-		}
-		if err := propagateEventFromTaskDate(ctx, tx, task, RoleEvent, snappedEventOn, args.ActorUserID, args.Snap); err != nil {
-			return err
-		}
-		args.EventOn = snappedEventOn
-	}
 	if args.SetDueOn {
 		snappedDueOn := args.DueOn
 		if !snappedDueOn.IsZero() {
@@ -170,16 +151,13 @@ func RescheduleTask(ctx context.Context, tx TX, args RescheduleTaskArgs) error {
 	payload := map[string]any{
 		"taskPublicId": task.publicID.String(),
 	}
-	if args.SetEventOn {
-		payload["eventOn"] = dateOrNull(args.EventOn)
-	}
 	if args.SetDueOn {
 		payload["dueOn"] = dateOrNull(args.DueOn)
 	}
 	return appendItemEvents(ctx, tx, eventbus.ItemRescheduled, args.WorkspaceID, &args.ActorUserID, &task.id, payload)
 }
 
-// updateTaskDateColumn writes a DATE column (event_on or due_on).
+// updateTaskDateColumn writes the due_on DATE column.
 // A zero Time is stored as SQL NULL.
 func updateTaskDateColumn(ctx context.Context, tx TX, taskID uint32, col string, d time.Time) error {
 	var val sql.NullTime

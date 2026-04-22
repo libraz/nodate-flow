@@ -633,8 +633,8 @@ func translateItemkitError(err error) error {
 
 // DeleteEvent soft-deletes a calendar event. Requires edit permission.
 // Delegates to itemkit.DeleteEvent which clears the corresponding
-// tasks.event_on / due_on column when the event was task-linked
-// (task_role = 'event' or 'due'), leaving the task itself intact.
+// tasks.due_on column when the event was task-linked
+// (task_role = 'due'), leaving the task itself intact.
 func DeleteEvent(deps Deps) func(context.Context, *DeleteEventInput) (*DeleteEventOutput, error) {
 	return func(ctx context.Context, input *DeleteEventInput) (*DeleteEventOutput, error) {
 		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)

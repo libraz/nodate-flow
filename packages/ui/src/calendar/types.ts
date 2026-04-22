@@ -21,12 +21,11 @@ export type Rsvp = 'pending' | 'accepted' | 'declined' | 'tentative' | 'needs_ac
 
 /**
  * Task role attached to a calendar event. Matches `calendar_events.task_role`:
- *  - `event`     — this event is the 1:1 projection of tasks.event_on
  *  - `due`       — this event is the 1:1 projection of tasks.due_on
  *  - `scheduled` — this event is a time-block for work on the task (M:N)
  * `null` means the event has no task link.
  */
-export type TaskRole = 'event' | 'due' | 'scheduled' | null;
+export type TaskRole = 'due' | 'scheduled' | null;
 
 export interface Calendar {
   id: string;

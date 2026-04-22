@@ -54,53 +54,9 @@ func (r *recordingMetrics) IncError() {
 	r.errs++
 }
 
-// TestReconcilerHealsEventOnDrift seeds a task and a linked calendar
-// event whose DATE(start_at) disagrees with task.event_on, runs the
+// TestReconcilerHealsDueOnDrift seeds a task and a linked calendar
+// event whose DATE(start_at) disagrees with task.due_on, runs the
 // reconciler once, and asserts that the task row now matches the event.
-func TestReconcilerHealsEventOnDrift(t *testing.T) {
-	bootstrap(t)
-	t.Parallel()
-
-	tenant := newTenant(t)
-	t.Cleanup(func() { helpers.PurgeWorkspace(t, testDB, tenant.WorkspacePublicID) })
-
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	wsID, userID := lookupWorkspaceAndOwner(t, ctx, tenant.WorkspacePublicID)
-	calID := seedPersonalCalendar(t, ctx, wsID, userID, "drift-event")
-
-	// Task has event_on = 2026-05-10; linked event has start_at = 2026-05-15.
-	// After reconcile the task must agree with the event (event is the
-	// richer source).
-	taskID := seedTask(t, ctx, wsID, userID, "drift task", "2026-05-10", "")
-	seedLinkedEvent(t, ctx, wsID, calID, userID, taskID, "event",
-		"2026-05-15 10:00:00", "2026-05-15 11:00:00")
-
-	sink := newRecordingMetrics()
-	rec := &reconciler.Reconciler{
-		DB:      testDB,
-		Logger:  slog.Default(),
-		Metrics: sink,
-	}
-	rec.RunOnce(ctx)
-
-	// Task's event_on should now be 2026-05-15.
-	var eventOn sql.NullString
-	require.NoError(t, testDB.QueryRowContext(ctx,
-		`SELECT DATE_FORMAT(event_on, '%Y-%m-%d') FROM tasks WHERE id = ?`, taskID).
-		Scan(&eventOn))
-	require.True(t, eventOn.Valid)
-	require.Equal(t, "2026-05-15", eventOn.String)
-
-	require.GreaterOrEqual(t, sink.inconsistency["date_drift_event"], 1)
-	require.GreaterOrEqual(t, sink.heal["date_drift_event"], 1)
-	require.Equal(t, 1, sink.runs)
-	require.Equal(t, 0, sink.errs)
-}
-
-// TestReconcilerHealsDueOnDrift mirrors the event-drift test for the
-// due_on role.
 func TestReconcilerHealsDueOnDrift(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -114,7 +70,7 @@ func TestReconcilerHealsDueOnDrift(t *testing.T) {
 	wsID, userID := lookupWorkspaceAndOwner(t, ctx, tenant.WorkspacePublicID)
 	calID := seedPersonalCalendar(t, ctx, wsID, userID, "drift-due")
 
-	taskID := seedTask(t, ctx, wsID, userID, "drift due task", "", "2026-06-01")
+	taskID := seedTask(t, ctx, wsID, userID, "drift due task", "2026-06-01")
 	seedLinkedEvent(t, ctx, wsID, calID, userID, taskID, "due",
 		"2026-06-08 09:00:00", "2026-06-08 10:00:00")
 
@@ -148,8 +104,8 @@ func TestReconcilerHealsEnabledMismatch(t *testing.T) {
 
 	wsID, userID := lookupWorkspaceAndOwner(t, ctx, tenant.WorkspacePublicID)
 	calID := seedPersonalCalendar(t, ctx, wsID, userID, "drift-enabled")
-	taskID := seedTask(t, ctx, wsID, userID, "orphaned task", "2026-07-01", "")
-	eventID := seedLinkedEvent(t, ctx, wsID, calID, userID, taskID, "event",
+	taskID := seedTask(t, ctx, wsID, userID, "orphaned task", "2026-07-01")
+	eventID := seedLinkedEvent(t, ctx, wsID, calID, userID, taskID, "due",
 		"2026-07-01 00:00:00", "2026-07-01 01:00:00")
 
 	// Disable the task directly (simulating a crashed DeleteTask tx
@@ -170,7 +126,7 @@ func TestReconcilerHealsEnabledMismatch(t *testing.T) {
 }
 
 // TestReconcilerCleanStateLeavesTaskAlone verifies that the
-// reconciler does not alter a task whose event_on already matches its
+// reconciler does not alter a task whose due_on already matches its
 // linked event's start date. (Drift counts cannot be asserted to 0
 // here because other parallel tests share the DB.)
 func TestReconcilerCleanStateLeavesTaskAlone(t *testing.T) {
@@ -185,20 +141,20 @@ func TestReconcilerCleanStateLeavesTaskAlone(t *testing.T) {
 
 	wsID, userID := lookupWorkspaceAndOwner(t, ctx, tenant.WorkspacePublicID)
 	calID := seedPersonalCalendar(t, ctx, wsID, userID, "clean")
-	taskID := seedTask(t, ctx, wsID, userID, "clean task", "2026-08-15", "")
-	seedLinkedEvent(t, ctx, wsID, calID, userID, taskID, "event",
+	taskID := seedTask(t, ctx, wsID, userID, "clean task", "2026-08-15")
+	seedLinkedEvent(t, ctx, wsID, calID, userID, taskID, "due",
 		"2026-08-15 14:00:00", "2026-08-15 15:00:00")
 
 	sink := newRecordingMetrics()
 	rec := &reconciler.Reconciler{DB: testDB, Logger: slog.Default(), Metrics: sink}
 	rec.RunOnce(ctx)
 
-	var eventOn sql.NullString
+	var dueOn sql.NullString
 	require.NoError(t, testDB.QueryRowContext(ctx,
-		`SELECT DATE_FORMAT(event_on, '%Y-%m-%d') FROM tasks WHERE id = ?`, taskID).
-		Scan(&eventOn))
-	require.True(t, eventOn.Valid)
-	require.Equal(t, "2026-08-15", eventOn.String, "reconciler must not alter clean rows")
+		`SELECT DATE_FORMAT(due_on, '%Y-%m-%d') FROM tasks WHERE id = ?`, taskID).
+		Scan(&dueOn))
+	require.True(t, dueOn.Valid)
+	require.Equal(t, "2026-08-15", dueOn.String, "reconciler must not alter clean rows")
 	require.Equal(t, 1, sink.runs)
 	require.Equal(t, 0, sink.errs, "reconciler must not raise errors in a clean scan")
 }
@@ -230,9 +186,9 @@ func seedPersonalCalendar(t *testing.T, ctx context.Context, wsID, userID uint32
 	return uint32(id)
 }
 
-// seedTask inserts a minimal tasks row. eventOn / dueOn are empty
-// strings when the caller wants NULL.
-func seedTask(t *testing.T, ctx context.Context, wsID, userID uint32, title, eventOn, dueOn string) uint32 {
+// seedTask inserts a minimal tasks row. dueOn is empty string when the
+// caller wants NULL.
+func seedTask(t *testing.T, ctx context.Context, wsID, userID uint32, title, dueOn string) uint32 {
 	t.Helper()
 	// Every task needs a project. Look up the tenant's default project.
 	var projID uint32
@@ -240,18 +196,15 @@ func seedTask(t *testing.T, ctx context.Context, wsID, userID uint32, title, eve
 		`SELECT id FROM projects WHERE workspace_id = ? ORDER BY id LIMIT 1`, wsID).Scan(&projID)
 	require.NoError(t, err)
 
-	var eOn, dOn sql.NullString
-	if eventOn != "" {
-		eOn = sql.NullString{String: eventOn, Valid: true}
-	}
+	var dOn sql.NullString
 	if dueOn != "" {
 		dOn = sql.NullString{String: dueOn, Valid: true}
 	}
 	res, err := testDB.ExecContext(ctx,
 		`INSERT INTO tasks (public_id, workspace_id, project_id, title,
-		                    event_on, due_on, created_by_user_id)
-		 VALUES (UUID_TO_BIN(UUID(), 0), ?, ?, ?, ?, ?, ?)`,
-		wsID, projID, title, eOn, dOn, userID)
+		                    due_on, created_by_user_id)
+		 VALUES (UUID_TO_BIN(UUID(), 0), ?, ?, ?, ?, ?)`,
+		wsID, projID, title, dOn, userID)
 	require.NoError(t, err)
 	id, err := res.LastInsertId()
 	require.NoError(t, err)
