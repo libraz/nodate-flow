@@ -34,6 +34,7 @@
   },
   "devDependencies": {
     "@nodate-flow/sdk": "workspace:*",
+    "@nodate-flow/time-sdk": "workspace:*",
     "@nodate-flow/ui": "workspace:*",
     "@axe-core/playwright": "^4.10.0",
     "@playwright/test": "1.48.2",

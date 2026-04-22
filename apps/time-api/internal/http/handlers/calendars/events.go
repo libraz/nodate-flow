@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,6 +15,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/time-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/internal/eventbus"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/itemkit"
 )
 
 // --- Input/Output types ---
@@ -27,6 +29,8 @@ type ListEventsInput struct {
 }
 
 // EventResponse is the JSON representation of a calendar event.
+// StartAt / EndAt are nullable because R5.1 introduced "planning stage"
+// events that may be dateless until scheduled (see calendar_events.sql).
 type EventResponse struct {
 	ID                   string           `json:"id"`
 	Kind                 string           `json:"kind"`
@@ -34,8 +38,8 @@ type EventResponse struct {
 	ShowAs               string           `json:"showAs"`
 	Title                string           `json:"title"`
 	AllDay               bool             `json:"allDay"`
-	StartAt              int64            `json:"startAt"`
-	EndAt                int64            `json:"endAt"`
+	StartAt              *int64           `json:"startAt,omitempty"`
+	EndAt                *int64           `json:"endAt,omitempty"`
 	Timezone             string           `json:"timezone"`
 	Location             *string          `json:"location,omitempty"`
 	Memo                 *string          `json:"memo,omitempty"`
@@ -61,13 +65,13 @@ type CreateEventInput struct {
 	WsId  string `path:"wsId" doc:"Workspace public ID"`
 	CalId string `path:"calId" doc:"Calendar public ID"`
 	Body  struct {
-		Kind               string           `json:"kind" enum:"event,block,free" doc:"Event kind"`
+		Kind               string           `json:"kind" enum:"event,block,free,milestone" doc:"Event kind"`
 		Visibility         string           `json:"visibility,omitempty" required:"false" enum:"default,public,private,confidential" doc:"Visibility"`
 		ShowAs             string           `json:"showAs,omitempty" required:"false" enum:"busy,free,tentative,oof" doc:"Show-as status"`
 		Title              string           `json:"title" minLength:"1" maxLength:"500" doc:"Event title"`
 		AllDay             bool             `json:"allDay" required:"false" doc:"All-day event flag"`
-		StartAt            time.Time        `json:"startAt" doc:"Start time"`
-		EndAt              time.Time        `json:"endAt" doc:"End time"`
+		StartAt            *time.Time       `json:"startAt,omitempty" required:"false" doc:"Start time; omit for a planning-stage (undated) event"`
+		EndAt              *time.Time       `json:"endAt,omitempty" required:"false" doc:"End time; omit for a planning-stage (undated) event"`
 		Timezone           string           `json:"timezone" doc:"IANA timezone"`
 		Location           *string          `json:"location,omitempty" required:"false" doc:"Location"`
 		Memo               *string          `json:"memo,omitempty" required:"false" doc:"Memo / notes"`
@@ -149,6 +153,7 @@ type ListCalendarEventsInput struct {
 }
 
 // CrossCalendarEventResponse is the JSON representation of a cross-calendar event.
+// StartAt / EndAt are nullable (see EventResponse).
 type CrossCalendarEventResponse struct {
 	ID                   string           `json:"id"`
 	CalendarID           string           `json:"calendarId"`
@@ -157,8 +162,8 @@ type CrossCalendarEventResponse struct {
 	ShowAs               string           `json:"showAs"`
 	Title                string           `json:"title"`
 	AllDay               bool             `json:"allDay"`
-	StartAt              int64            `json:"startAt"`
-	EndAt                int64            `json:"endAt"`
+	StartAt              *int64           `json:"startAt,omitempty"`
+	EndAt                *int64           `json:"endAt,omitempty"`
 	Timezone             string           `json:"timezone"`
 	Location             *string          `json:"location,omitempty"`
 	BlockLabel           *string          `json:"blockLabel,omitempty"`
@@ -194,8 +199,8 @@ func ListEvents(deps Deps) func(context.Context, *ListEventsInput) (*ListEventsO
 		// Non-recurring events: start_at < end, end_at > start (overlap check).
 		nonRecurring, err := deps.Queries.ListCalendarEventsByRange(ctx, generated.ListCalendarEventsByRangeParams{
 			CalendarID: cal.ID,
-			StartAt:    input.End,
-			EndAt:      input.Start,
+			StartAt:    sql.NullTime{Time: input.End, Valid: true},
+			EndAt:      sql.NullTime{Time: input.Start, Valid: true},
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarEventListQueryInterrupted)
@@ -204,7 +209,7 @@ func ListEvents(deps Deps) func(context.Context, *ListEventsInput) (*ListEventsO
 		// Recurring events whose recurrence window overlaps the query range.
 		recurring, err := deps.Queries.ListRecurringCalendarEventsByRange(ctx, generated.ListRecurringCalendarEventsByRangeParams{
 			CalendarID:    cal.ID,
-			StartAt:       input.End,
+			StartAt:       sql.NullTime{Time: input.End, Valid: true},
 			RecurrenceEnd: sql.NullTime{Time: input.Start, Valid: true},
 		})
 		if err != nil {
@@ -270,6 +275,18 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 			showAs = generated.CalendarEventsShowAs(input.Body.ShowAs)
 		}
 
+		// Planning-stage undated events: both start and end may be omitted
+		// (persisted as NULL). Requesting start without end (or vice versa)
+		// is rejected to keep the pair invariant enforced by
+		// chk_calendar_events_start_end_pair.
+		if (input.Body.StartAt == nil) != (input.Body.EndAt == nil) {
+			return nil, httpErr(apierrors.CalendarEventStartEndPairRequired)
+		}
+		var startAtNT, endAtNT sql.NullTime
+		if input.Body.StartAt != nil {
+			startAtNT = sql.NullTime{Time: *input.Body.StartAt, Valid: true}
+			endAtNT = sql.NullTime{Time: *input.Body.EndAt, Valid: true}
+		}
 		params := generated.CreateCalendarEventParams{
 			PublicID:        eventPublicID,
 			WorkspaceID:     wsID,
@@ -279,8 +296,8 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 			ShowAs:          showAs,
 			Title:           input.Body.Title,
 			AllDay:          input.Body.AllDay,
-			StartAt:         input.Body.StartAt,
-			EndAt:           input.Body.EndAt,
+			StartAt:         startAtNT,
+			EndAt:           endAtNT,
 			Timezone:        input.Body.Timezone,
 			OwnerUserID:     ownerUserID,
 			CreatedByUserID: actorID,
@@ -320,8 +337,8 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 			ShowAs:     string(showAs),
 			Title:      input.Body.Title,
 			AllDay:     input.Body.AllDay,
-			StartAt:    input.Body.StartAt.Unix(),
-			EndAt:      input.Body.EndAt.Unix(),
+			StartAt:    nullTimeUnixPtr(startAtNT),
+			EndAt:      nullTimeUnixPtr(endAtNT),
 			Timezone:   input.Body.Timezone,
 			Location:   input.Body.Location,
 			Memo:       input.Body.Memo,
@@ -339,14 +356,17 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 			out.Body.NotificationOffset = input.Body.NotificationOffset
 		}
 
-		_ = eventbus.Append(ctx, deps.DB, wsID, "calendar.event.created", &actorID, map[string]any{
+		eventBusPayload := map[string]any{
 			"eventId":    eventPublicID.String(),
 			"calendarId": input.CalId,
 			"title":      input.Body.Title,
-			"startAt":    input.Body.StartAt,
-			"endAt":      input.Body.EndAt,
 			"kind":       input.Body.Kind,
-		})
+		}
+		if startAtNT.Valid {
+			eventBusPayload["startAt"] = startAtNT.Time
+			eventBusPayload["endAt"] = endAtNT.Time
+		}
+		_ = eventbus.Append(ctx, deps.DB, wsID, "calendar.event.created", &actorID, eventBusPayload)
 
 		return out, nil
 	}
@@ -397,6 +417,11 @@ func GetEvent(deps Deps) func(context.Context, *GetEventInput) (*GetEventOutput,
 }
 
 // PatchEvent updates mutable event fields. Requires edit permission.
+// When the event is task-linked (task_id set), title changes are routed
+// through itemkit.RenameItem and start/end changes through
+// itemkit.RescheduleEvent so the linked task stays in lockstep. Other
+// fields (location, memo, visibility, etc.) are applied via the plain
+// sqlc PATCH inside the same transaction.
 func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventOutput, error) {
 	return func(ctx context.Context, input *PatchEventInput) (*PatchEventOutput, error) {
 		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
@@ -435,6 +460,52 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		}
 		if !canEditEvent(actorID, evt, sub, attendee) {
 			return nil, httpErr(apierrors.CalendarEventEditPermissionRequired)
+		}
+
+		// Pair invariant: explicit partial start_at without end_at (or
+		// vice versa) is ambiguous. R5.14 allows undated transitions but
+		// those must come through unlink first.
+		if (input.Body.StartAt == nil) != (input.Body.EndAt == nil) {
+			return nil, httpErr(apierrors.CalendarEventStartEndPairRequired)
+		}
+
+		tx, err := deps.DB.BeginTx(ctx, nil)
+		if err != nil {
+			return nil, httpErr(apierrors.CalendarEventStoreWriteInterrupted)
+		}
+		defer func() { _ = tx.Rollback() }()
+		qtx := deps.Queries.WithTx(tx)
+
+		isLinked := evt.TaskID.Valid
+		titleChanged := input.Body.Title != nil && *input.Body.Title != evt.Title
+		timeChanged := input.Body.StartAt != nil // pair invariant guarantees EndAt also set
+
+		// Linked title change → itemkit.RenameItem (propagates to task + siblings)
+		if isLinked && titleChanged {
+			if err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
+				WorkspaceID: wsID,
+				ActorUserID: actorID,
+				NewTitle:    *input.Body.Title,
+				EventID:     evt.ID,
+			}); err != nil {
+				return nil, translateItemkitError(err)
+			}
+			// Prevent the sqlc PATCH below from redundantly touching title.
+			input.Body.Title = nil
+		}
+		// Linked time change → itemkit.RescheduleEvent (propagates to task date)
+		if isLinked && timeChanged {
+			if err := itemkit.RescheduleEvent(ctx, tx, itemkit.RescheduleEventArgs{
+				WorkspaceID: wsID,
+				EventID:     evt.ID,
+				ActorUserID: actorID,
+				StartAt:     *input.Body.StartAt,
+				EndAt:       *input.Body.EndAt,
+			}); err != nil {
+				return nil, translateItemkitError(err)
+			}
+			input.Body.StartAt = nil
+			input.Body.EndAt = nil
 		}
 
 		params := generated.PatchCalendarEventParams{
@@ -488,6 +559,12 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 			params.BlockLabel = sql.NullString{String: *input.Body.BlockLabel, Valid: true}
 		}
 		if input.Body.RecurrenceRule != nil {
+			// A task-linked event may not become recurring — invariant
+			// enforced in itemkit. Flag here so the tx rolls back
+			// deterministically.
+			if isLinked {
+				return nil, httpErr(apierrors.ItemItemkitRecurrenceWithTaskLink)
+			}
 			params.RecurrenceRule = json.RawMessage(*input.Body.RecurrenceRule)
 		}
 		if input.Body.RecurrenceEnd != nil {
@@ -500,13 +577,13 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 			params.NotificationOffset = sql.NullInt32{Int32: *input.Body.NotificationOffset, Valid: true}
 		}
 
-		err = deps.Queries.PatchCalendarEvent(ctx, params)
-		if err != nil {
+		if err := qtx.PatchCalendarEvent(ctx, params); err != nil {
 			return nil, httpErr(apierrors.CalendarEventStoreWriteInterrupted)
 		}
 
-		// Re-read.
-		evt, err = deps.Queries.FindCalendarEventByPublicId(ctx, generated.FindCalendarEventByPublicIdParams{
+		// Re-read inside the tx so the response reflects what itemkit
+		// + sqlc jointly wrote.
+		evt, err = qtx.FindCalendarEventByPublicId(ctx, generated.FindCalendarEventByPublicIdParams{
 			PublicID:    types.FromUUID(evtUID),
 			CalendarID:  cal.ID,
 			WorkspaceID: wsID,
@@ -515,19 +592,49 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 			return nil, httpErr(apierrors.CalendarEventStoreReadInterrupted)
 		}
 
+		if err := tx.Commit(); err != nil {
+			return nil, httpErr(apierrors.CalendarEventStoreWriteInterrupted)
+		}
+
 		out := &PatchEventOutput{}
 		out.Body = eventFromFullRow(evt)
 
-		_ = eventbus.Append(ctx, deps.DB, wsID, "calendar.event.updated", &actorID, map[string]any{
-			"eventId":    input.EvtId,
-			"calendarId": input.CalId,
-		})
+		// When itemkit fired item.rescheduled / item.renamed it already
+		// dual-emitted the legacy calendar.event.updated kind, so no
+		// extra append is needed for linked events. For unlinked events
+		// we preserve the existing kind to keep webhook subscribers
+		// working.
+		if !isLinked {
+			_ = eventbus.Append(ctx, deps.DB, wsID, "calendar.event.updated", &actorID, map[string]any{
+				"eventId":    input.EvtId,
+				"calendarId": input.CalId,
+			})
+		}
 
 		return out, nil
 	}
 }
 
+// translateItemkitError maps itemkit invariant / generic errors to
+// time-api's apierrors spec set. Unknown errors surface as 500.
+func translateItemkitError(err error) error {
+	if err == nil {
+		return nil
+	}
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "recurrence"):
+		return httpErr(apierrors.ItemItemkitRecurrenceWithTaskLink)
+	case strings.Contains(msg, "itemkit invariant"):
+		return httpErr(apierrors.ItemItemkitInvariantViolation)
+	}
+	return httpErr(apierrors.CalendarEventStoreWriteInterrupted)
+}
+
 // DeleteEvent soft-deletes a calendar event. Requires edit permission.
+// Delegates to itemkit.DeleteEvent which clears the corresponding
+// tasks.event_on / due_on column when the event was task-linked
+// (task_role = 'event' or 'due'), leaving the task itself intact.
 func DeleteEvent(deps Deps) func(context.Context, *DeleteEventInput) (*DeleteEventOutput, error) {
 	return func(ctx context.Context, input *DeleteEventInput) (*DeleteEventOutput, error) {
 		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
@@ -567,22 +674,24 @@ func DeleteEvent(deps Deps) func(context.Context, *DeleteEventInput) (*DeleteEve
 			return nil, httpErr(apierrors.CalendarEventEditPermissionRequired)
 		}
 
-		err = deps.Queries.DisableCalendarEvent(ctx, generated.DisableCalendarEventParams{
-			PublicID:    types.FromUUID(evtUID),
-			CalendarID:  cal.ID,
-			WorkspaceID: wsID,
-		})
+		tx, err := deps.DB.BeginTx(ctx, nil)
 		if err != nil {
+			return nil, httpErr(apierrors.CalendarEventStoreDeleteInterrupted)
+		}
+		defer func() { _ = tx.Rollback() }()
+
+		if err := itemkit.DeleteEvent(ctx, tx, wsID, evt.ID, actorID); err != nil {
+			return nil, translateItemkitError(err)
+		}
+		if err := tx.Commit(); err != nil {
 			return nil, httpErr(apierrors.CalendarEventStoreDeleteInterrupted)
 		}
 
 		out := &DeleteEventOutput{}
 		out.Body.Deleted = true
 
-		_ = eventbus.Append(ctx, deps.DB, wsID, "calendar.event.deleted", &actorID, map[string]any{
-			"eventId":    input.EvtId,
-			"calendarId": input.CalId,
-		})
+		// itemkit already emitted item.unscheduled + legacy
+		// calendar.event.deleted. No extra append.
 
 		return out, nil
 	}
@@ -610,8 +719,8 @@ func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInpu
 		rows, err := deps.Queries.ListCalendarEventsAcrossCalendars(ctx, generated.ListCalendarEventsAcrossCalendarsParams{
 			UserID:      actorID,
 			WorkspaceID: wsID,
-			StartAt:     endTime,
-			EndAt:       startTime,
+			StartAt:     sql.NullTime{Time: endTime, Valid: true},
+			EndAt:       sql.NullTime{Time: startTime, Valid: true},
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarEventListQueryInterrupted)
@@ -621,7 +730,7 @@ func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInpu
 		recurringRows, err := deps.Queries.ListRecurringCalendarEventsAcrossCalendars(ctx, generated.ListRecurringCalendarEventsAcrossCalendarsParams{
 			UserID:        actorID,
 			WorkspaceID:   wsID,
-			StartAt:       endTime,
+			StartAt:       sql.NullTime{Time: endTime, Valid: true},
 			RecurrenceEnd: sql.NullTime{Time: startTime, Valid: true},
 		})
 		if err != nil {
@@ -640,8 +749,8 @@ func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInpu
 				ShowAs:     string(r.ShowAs),
 				Title:      r.Title,
 				AllDay:     r.AllDay,
-				StartAt:    r.StartAt.Unix(),
-				EndAt:      r.EndAt.Unix(),
+				StartAt:    nullTimeUnixPtr(r.StartAt),
+				EndAt:      nullTimeUnixPtr(r.EndAt),
 				Timezone:   r.Timezone,
 				CreatedAt:  r.CreatedAt.Unix(),
 			}
@@ -666,8 +775,8 @@ func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInpu
 				ShowAs:     string(r.ShowAs),
 				Title:      r.Title,
 				AllDay:     r.AllDay,
-				StartAt:    r.StartAt.Unix(),
-				EndAt:      r.EndAt.Unix(),
+				StartAt:    nullTimeUnixPtr(r.StartAt),
+				EndAt:      nullTimeUnixPtr(r.EndAt),
 				Timezone:   r.Timezone,
 				CreatedAt:  r.CreatedAt.Unix(),
 			}
@@ -708,8 +817,8 @@ func eventFromRangeRow(e generated.ListCalendarEventsByRangeRow) EventResponse {
 		ShowAs:     string(e.ShowAs),
 		Title:      e.Title,
 		AllDay:     e.AllDay,
-		StartAt:    e.StartAt.Unix(),
-		EndAt:      e.EndAt.Unix(),
+		StartAt:    nullTimeUnixPtr(e.StartAt),
+		EndAt:      nullTimeUnixPtr(e.EndAt),
 		Timezone:   e.Timezone,
 		CreatedAt:  e.CreatedAt.Unix(),
 	}
@@ -742,8 +851,8 @@ func eventFromRecurringRow(e generated.ListRecurringCalendarEventsByRangeRow) Ev
 		ShowAs:     string(e.ShowAs),
 		Title:      e.Title,
 		AllDay:     e.AllDay,
-		StartAt:    e.StartAt.Unix(),
-		EndAt:      e.EndAt.Unix(),
+		StartAt:    nullTimeUnixPtr(e.StartAt),
+		EndAt:      nullTimeUnixPtr(e.EndAt),
 		Timezone:   e.Timezone,
 		CreatedAt:  e.CreatedAt.Unix(),
 	}
@@ -799,8 +908,8 @@ func eventFromFullRow(e generated.FindCalendarEventByPublicIdRow) EventResponse 
 		ShowAs:     string(e.ShowAs),
 		Title:      e.Title,
 		AllDay:     e.AllDay,
-		StartAt:    e.StartAt.Unix(),
-		EndAt:      e.EndAt.Unix(),
+		StartAt:    nullTimeUnixPtr(e.StartAt),
+		EndAt:      nullTimeUnixPtr(e.EndAt),
 		Timezone:   e.Timezone,
 		CreatedAt:  e.CreatedAt.Unix(),
 	}

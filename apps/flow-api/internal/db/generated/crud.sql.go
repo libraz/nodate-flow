@@ -572,6 +572,121 @@ func (q *Queries) ListMyTasksGlobal(ctx context.Context, arg ListMyTasksGlobalPa
 	return items, nil
 }
 
+const listMyTasksWithDates = `-- name: ListMyTasksWithDates :many
+SELECT
+  v.public_id,
+  w.public_id AS workspace_public_id,
+  w.name AS workspace_name,
+  v.project_public_id,
+  v.project_name,
+  v.title,
+  v.derived_state,
+  v.priority,
+  v.due_on,
+  v.started_on,
+  v.event_on,
+  v.actor_role,
+  v.updated_at,
+  v.created_at,
+  COUNT(*) OVER() AS total
+FROM v_my_tasks v
+INNER JOIN workspaces w
+  ON w.id = v.workspace_id AND w.enabled = TRUE
+WHERE v.user_public_id = ?
+  AND (
+    (v.event_on IS NOT NULL AND v.event_on BETWEEN ? AND ?)
+    OR
+    (v.due_on   IS NOT NULL AND v.due_on   BETWEEN ? AND ?)
+  )
+ORDER BY
+  COALESCE(v.event_on, v.due_on) ASC,
+  v.priority DESC,
+  v.created_at DESC,
+  v.public_id DESC
+LIMIT ? OFFSET ?
+`
+
+type ListMyTasksWithDatesParams struct {
+	UserPublicID types.PublicID `json:"userPublicId"`
+	FromEventOn  sql.NullTime   `json:"fromEventOn"`
+	ToEventOn    sql.NullTime   `json:"toEventOn"`
+	FromDueOn    sql.NullTime   `json:"fromDueOn"`
+	ToDueOn      sql.NullTime   `json:"toDueOn"`
+	Limit        int32          `json:"limit"`
+	Offset       int32          `json:"offset"`
+}
+
+type ListMyTasksWithDatesRow struct {
+	PublicID          types.PublicID    `json:"publicId"`
+	WorkspacePublicID types.PublicID    `json:"workspacePublicId"`
+	WorkspaceName     string            `json:"workspaceName"`
+	ProjectPublicID   []byte            `json:"projectPublicId"`
+	ProjectName       string            `json:"projectName"`
+	Title             string            `json:"title"`
+	DerivedState      TasksDerivedState `json:"derivedState"`
+	Priority          int32             `json:"priority"`
+	DueOn             sql.NullTime      `json:"dueOn"`
+	StartedOn         sql.NullTime      `json:"startedOn"`
+	EventOn           sql.NullTime      `json:"eventOn"`
+	ActorRole         TaskActorsRole    `json:"actorRole"`
+	UpdatedAt         sql.NullTime      `json:"updatedAt"`
+	CreatedAt         time.Time         `json:"createdAt"`
+	Total             interface{}       `json:"total"`
+}
+
+// Cross-workspace variant scoped to tasks whose event_on OR due_on falls
+// inside the requested [from, to] inclusive date range. Backs the unified
+// flow-web calendar: combined with /me/calendar-events it gives a single
+// round-trip answer for "what is on my plate across every workspace on
+// these days". Undated tasks are excluded; use ListMyTasksGlobal for the
+// planning bucket.
+func (q *Queries) ListMyTasksWithDates(ctx context.Context, arg ListMyTasksWithDatesParams) ([]ListMyTasksWithDatesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listMyTasksWithDates,
+		arg.UserPublicID,
+		arg.FromEventOn,
+		arg.ToEventOn,
+		arg.FromDueOn,
+		arg.ToDueOn,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMyTasksWithDatesRow{}
+	for rows.Next() {
+		var i ListMyTasksWithDatesRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.WorkspacePublicID,
+			&i.WorkspaceName,
+			&i.ProjectPublicID,
+			&i.ProjectName,
+			&i.Title,
+			&i.DerivedState,
+			&i.Priority,
+			&i.DueOn,
+			&i.StartedOn,
+			&i.EventOn,
+			&i.ActorRole,
+			&i.UpdatedAt,
+			&i.CreatedAt,
+			&i.Total,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTasksForProject = `-- name: ListTasksForProject :many
 SELECT
   v.public_id,

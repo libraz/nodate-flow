@@ -1,21 +1,27 @@
 /**
- * /calendar — monthly grid of workspace tasks with a due date.
+ * /calendar — unified cross-workspace calendar.
  *
- * Fetches tasks from all user workspaces via `GET /tasks?workspaceId=...`.
- * Renders a 7-column grid for the current month with up to N tasks
- * per cell; overflow collapses to "+N more". Supports drag-and-drop
- * to reschedule tasks and clicking a date to open a quick-create form.
+ * Consumes two aggregated endpoints instead of per-workspace fan-out:
+ *   - `GET /me/tasks-with-dates?from=&to=` (flow-api)   — tasks with due_on or event_on
+ *   - `GET /me/calendar-events?start=&end=` (time-api)  — calendar events
+ *
+ * The month grid overlays three toggleable layers: task-due,
+ * calendar events, and blocks (`kind='block'`). Dragging a task cell
+ * reschedules it through itemkit (PATCH /tasks), and clicking a cell
+ * opens the quick-create task dialog.
  */
 
 import type { components } from '@nodate-flow/sdk';
+import type { components as timeComponents } from '@nodate-flow/time-sdk';
 import Button from '@nodate-flow/ui/primitives/button';
+import Checkbox from '@nodate-flow/ui/primitives/checkbox';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import Select from '@nodate-flow/ui/primitives/select';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import {
@@ -23,6 +29,7 @@ import {
   type FormEvent,
   type ReactElement,
   useCallback,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -34,9 +41,10 @@ import { TASK_PRIORITIES, type TaskDerivedState, type TaskPriority } from '../fe
 import { PRIORITY_KEY, STATE_COLOR } from '../features/tasks/constants';
 import { useWorkspacesQuery } from '../features/workspaces/api';
 import { dateKey } from '../lib/date-utils';
-import { sdk } from '../lib/sdk';
+import { sdk, timeSdk } from '../lib/sdk';
 
-type CalendarTask = components['schemas']['TaskListItem'] & { workspaceName?: string };
+type CalendarTask = components['schemas']['MyTaskListItem'];
+type CalendarEvent = timeComponents['schemas']['MyCalendarEventResponse'];
 
 const WEEKDAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
 
@@ -79,8 +87,13 @@ function buildMonthGrid(year: number, monthIndex: number): MonthCell[] {
   return cells;
 }
 
+/** Unix seconds → YYYY-MM-DD in the local tz. */
+function dateKeyFromUnix(unixSeconds: number): string {
+  return dateKey(new Date(unixSeconds * 1000));
+}
+
 // ---------------------------------------------------------------------------
-// Quick-create dialog (extracted for readability)
+// Quick-create dialog
 // ---------------------------------------------------------------------------
 
 interface QuickCreateDialogProps {
@@ -107,15 +120,12 @@ function QuickCreateDialog({
   const [projectId, setProjectId] = useState<string>(projects[0]?.id ?? '');
   const [startOn, setStartOn] = useState(dueOn);
   const [endOn, setEndOn] = useState(dueOn);
-  const [eventOn, setEventOn] = useState('');
 
-  // Sync defaults when the dialog opens for a different date.
   const prevDueOn = useRef(dueOn);
   if (dueOn !== prevDueOn.current) {
     prevDueOn.current = dueOn;
     setStartOn(dueOn);
     setEndOn(dueOn);
-    setEventOn('');
   }
 
   const createMut = useMutation({
@@ -126,7 +136,6 @@ function QuickCreateDialog({
           title: title.trim(),
           ...(description.trim() ? { description: description.trim() } : {}),
           ...(startOn ? { startOn } : {}),
-          ...(eventOn ? { eventOn } : {}),
           dueOn: endOn || dueOn,
           priority,
           visibility: 'project',
@@ -142,7 +151,6 @@ function QuickCreateDialog({
       setPriority(2);
       setStartOn(dueOn);
       setEndOn(dueOn);
-      setEventOn('');
       onCreated();
     },
     onError: () => {
@@ -163,7 +171,6 @@ function QuickCreateDialog({
     setPriority(2);
     setStartOn(dueOn);
     setEndOn(dueOn);
-    setEventOn('');
     onClose();
   };
 
@@ -219,17 +226,6 @@ function QuickCreateDialog({
           </FormField>
         </div>
 
-        <FormField label={t('tasks.form.event')}>
-          {(control) => (
-            <Input
-              {...control}
-              type="date"
-              value={eventOn}
-              onChange={(e) => setEventOn(e.currentTarget.value)}
-            />
-          )}
-        </FormField>
-
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           {projects.length > 1 ? (
             <FormField label={t('tasks.select_project')} style={{ flex: 1 }}>
@@ -283,6 +279,12 @@ function QuickCreateDialog({
 // Main calendar route
 // ---------------------------------------------------------------------------
 
+interface LayerFlags {
+  tasksDue: boolean;
+  events: boolean;
+  blocks: boolean;
+}
+
 function CalendarRoute(): ReactElement {
   const { t, i18n } = useTranslation('common');
   const locale = i18n.resolvedLanguage ?? 'en';
@@ -294,38 +296,62 @@ function CalendarRoute(): ReactElement {
   });
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const dragDataRef = useRef<{ taskId: string; fromDate: string } | null>(null);
-  // Counter to track nested dragenter/dragleave pairs per cell. Native
-  // HTML5 D&D fires leave/enter when the cursor crosses child elements
-  // inside a cell, which would otherwise cause the highlight to flicker.
   const enterCountRef = useRef<Record<string, number>>({});
 
-  // Quick-create dialog state
   const [createDate, setCreateDate] = useState<string | null>(null);
+  const [layers, setLayers] = useState<LayerFlags>({ tasksDue: true, events: true, blocks: false });
+  const tasksDueCheckboxId = useId();
+  const eventsCheckboxId = useId();
+  const blocksCheckboxId = useId();
 
   const { data: workspaces } = useWorkspacesQuery();
 
-  // Fetch tasks from every workspace the user belongs to.
-  const taskQueries = useQueries({
-    queries: workspaces.map((w) => ({
-      queryKey: ['calendar', 'tasks', w.id] as const,
-      staleTime: 30_000,
-      queryFn: async (): Promise<CalendarTask[]> => {
-        const { data, error } = await sdk.GET('/tasks', {
-          params: { query: { workspaceId: w.id, limit: 200, offset: 0 } },
-        });
-        if (error || !data) return [];
-        return (data.tasks ?? []).map((task) => ({ ...task, workspaceName: w.name }));
-      },
-    })),
+  // Range that covers the full 42-cell month grid (may span adjacent months).
+  const { fromDate, toDate, fromIso, toIso } = useMemo(() => {
+    const cells = buildMonthGrid(cursor.year, cursor.month);
+    const first = cells[0]?.date ?? new Date(cursor.year, cursor.month, 1);
+    const last = cells[cells.length - 1]?.date ?? new Date(cursor.year, cursor.month, 1);
+    const start = new Date(first);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(last);
+    end.setHours(23, 59, 59, 999);
+    return {
+      fromDate: dateKey(start),
+      toDate: dateKey(last),
+      fromIso: start.toISOString(),
+      toIso: end.toISOString(),
+    };
+  }, [cursor]);
+
+  // Single cross-workspace task query (flow-api /me/tasks-with-dates).
+  const tasksQuery = useQuery({
+    queryKey: ['calendar', 'me-tasks', fromDate, toDate] as const,
+    staleTime: 30_000,
+    queryFn: async (): Promise<CalendarTask[]> => {
+      const { data, error } = await sdk.GET('/me/tasks-with-dates', {
+        params: { query: { from: fromDate, to: toDate, limit: 1000 } },
+      });
+      if (error || !data) return [];
+      return data.tasks ?? [];
+    },
   });
 
-  const tasks = useMemo<CalendarTask[]>(() => {
-    const out: CalendarTask[] = [];
-    for (const q of taskQueries) {
-      if (q.data) out.push(...q.data);
-    }
-    return out;
-  }, [taskQueries]);
+  const tasks = tasksQuery.data ?? [];
+
+  // Single cross-workspace event query (time-api /me/calendar-events).
+  const eventsQuery = useQuery({
+    queryKey: ['calendar', 'me-events', fromIso, toIso] as const,
+    staleTime: 30_000,
+    queryFn: async (): Promise<CalendarEvent[]> => {
+      const { data, error } = await timeSdk.GET('/me/calendar-events', {
+        params: { query: { start: fromIso, end: toIso } },
+      });
+      if (error || !data) return [];
+      return data.events ?? [];
+    },
+  });
+
+  const events = eventsQuery.data ?? [];
 
   const rescheduleMut = useMutation({
     mutationFn: async ({ taskId, dueOn }: { taskId: string; dueOn: string }) => {
@@ -337,9 +363,8 @@ function CalendarRoute(): ReactElement {
       return data;
     },
     onSuccess: () => {
-      for (const w of workspaces) {
-        void qc.invalidateQueries({ queryKey: ['calendar', 'tasks', w.id] });
-      }
+      void qc.invalidateQueries({ queryKey: ['calendar', 'me-tasks'] });
+      void qc.invalidateQueries({ queryKey: ['calendar', 'me-events'] });
       toaster.show({ tone: 'success', message: t('calendar.reschedule_success') });
     },
     onError: () => {
@@ -381,7 +406,7 @@ function CalendarRoute(): ReactElement {
     [rescheduleMut],
   );
 
-  // Fetch projects for all workspaces (for quick-create picker).
+  // Projects per workspace, just for the quick-create project picker.
   const projectQueries = useQueries({
     queries: workspaces.map((w) => ({
       queryKey: ['calendar', 'projects', w.id] as const,
@@ -410,49 +435,47 @@ function CalendarRoute(): ReactElement {
 
   const handleCreated = useCallback(() => {
     setCreateDate(null);
-    for (const w of workspaces) {
-      void qc.invalidateQueries({ queryKey: ['calendar', 'tasks', w.id] });
-    }
-  }, [workspaces, qc]);
+    void qc.invalidateQueries({ queryKey: ['calendar', 'me-tasks'] });
+    void qc.invalidateQueries({ queryKey: ['calendar', 'me-events'] });
+  }, [qc]);
 
   const cells = useMemo(() => buildMonthGrid(cursor.year, cursor.month), [cursor]);
 
-  /** dueOn → tasks for the current month grid. */
+  /** dueOn → tasks for the current grid (after layer filtering). */
   const byDate = useMemo(() => {
     const map = new Map<string, CalendarTask[]>();
+    if (!layers.tasksDue) return map;
     for (const task of tasks) {
       if (!task.dueOn) continue;
       if (task.derivedState === 'cancelled') continue;
       const arr = map.get(task.dueOn);
-      if (arr) {
-        arr.push(task);
-      } else {
-        map.set(task.dueOn, [task]);
-      }
+      if (arr) arr.push(task);
+      else map.set(task.dueOn, [task]);
     }
     for (const arr of map.values()) {
       arr.sort((a, b) => b.priority - a.priority);
     }
     return map;
-  }, [tasks]);
+  }, [tasks, layers.tasksDue]);
 
-  /** eventOn → tasks whose event date falls on this cell (separate from due). */
-  const eventByDate = useMemo(() => {
-    const map = new Map<string, CalendarTask[]>();
-    for (const task of tasks) {
-      if (!task.eventOn) continue;
-      if (task.derivedState === 'cancelled') continue;
-      // Skip if eventOn === dueOn (already shown in the due list).
-      if (task.eventOn === task.dueOn) continue;
-      const arr = map.get(task.eventOn);
-      if (arr) {
-        arr.push(task);
-      } else {
-        map.set(task.eventOn, [task]);
-      }
+  /** dateKey → calendar events (after layer filtering by kind). */
+  const eventsByDate = useMemo(() => {
+    const map = new Map<string, CalendarEvent[]>();
+    for (const ev of events) {
+      if (!ev.startAt) continue;
+      const isBlock = ev.kind === 'block';
+      if (isBlock && !layers.blocks) continue;
+      if (!isBlock && !layers.events) continue;
+      const k = dateKeyFromUnix(ev.startAt);
+      const arr = map.get(k);
+      if (arr) arr.push(ev);
+      else map.set(k, [ev]);
+    }
+    for (const arr of map.values()) {
+      arr.sort((a, b) => (a.startAt ?? 0) - (b.startAt ?? 0));
     }
     return map;
-  }, [tasks]);
+  }, [events, layers.events, layers.blocks]);
 
   const todayKey = dateKey(today);
   const monthLabel = useMemo(
@@ -520,6 +543,7 @@ function CalendarRoute(): ReactElement {
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: '0.75rem',
+          flexWrap: 'wrap',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -546,6 +570,55 @@ function CalendarRoute(): ReactElement {
             {t('calendar.today')}
           </Button>
         </div>
+
+        <fieldset
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            border: 'none',
+            margin: 0,
+            padding: 0,
+            fontSize: '0.8125rem',
+          }}
+        >
+          <legend style={{ position: 'absolute', inlineSize: 1, blockSize: 1, overflow: 'hidden' }}>
+            {t('calendar.layers')}
+          </legend>
+          <label
+            htmlFor={tasksDueCheckboxId}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+          >
+            <Checkbox
+              id={tasksDueCheckboxId}
+              checked={layers.tasksDue}
+              onChange={(e) => setLayers((s) => ({ ...s, tasksDue: e.currentTarget.checked }))}
+            />
+            {t('calendar.layer.tasks_due')}
+          </label>
+          <label
+            htmlFor={eventsCheckboxId}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+          >
+            <Checkbox
+              id={eventsCheckboxId}
+              checked={layers.events}
+              onChange={(e) => setLayers((s) => ({ ...s, events: e.currentTarget.checked }))}
+            />
+            {t('calendar.layer.events')}
+          </label>
+          <label
+            htmlFor={blocksCheckboxId}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+          >
+            <Checkbox
+              id={blocksCheckboxId}
+              checked={layers.blocks}
+              onChange={(e) => setLayers((s) => ({ ...s, blocks: e.currentTarget.checked }))}
+            />
+            {t('calendar.layer.blocks')}
+          </label>
+        </fieldset>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -581,7 +654,7 @@ function CalendarRoute(): ReactElement {
         >
           {cells.map((cell) => {
             const dayTasks = byDate.get(cell.key) ?? [];
-            const dayEvents = eventByDate.get(cell.key) ?? [];
+            const dayEvents = eventsByDate.get(cell.key) ?? [];
             const totalCount = dayTasks.length + dayEvents.length;
             const isToday = cell.key === todayKey;
             const isDragOver = dragOverKey === cell.key;
@@ -615,9 +688,9 @@ function CalendarRoute(): ReactElement {
                   padding: '0.5rem',
                   borderRadius: '0.5rem',
                   background: isDragOver
-                    ? 'var(--nf-color-accent-subtle))'
+                    ? 'var(--nf-color-accent-subtle)'
                     : cell.inMonth
-                      ? 'var(--nf-color-surface))'
+                      ? 'var(--nf-color-surface)'
                       : 'transparent',
                   border: isDragOver
                     ? '2px dashed var(--nf-color-accent)'
@@ -679,7 +752,7 @@ function CalendarRoute(): ReactElement {
                           textDecoration: 'none',
                           padding: '0.125rem 0.25rem',
                           borderRadius: '0.25rem',
-                          background: 'var(--nf-color-bg))',
+                          background: 'var(--nf-color-bg)',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
@@ -724,52 +797,63 @@ function CalendarRoute(): ReactElement {
                       {t('calendar.more', { count: dayTasks.length - 3 })}
                     </li>
                   ) : null}
-                  {dayEvents.slice(0, 2).map((task) => (
-                    <li key={`ev-${task.id}`}>
-                      <Link
-                        to="/tasks/$taskId"
-                        params={{ taskId: task.id }}
-                        title={`${task.title} · ${t('tasks.form.event')}`}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.25rem',
-                          fontSize: '0.75rem',
-                          color: 'inherit',
-                          textDecoration: 'none',
-                          padding: '0.125rem 0.25rem',
-                          borderRadius: '0.25rem',
-                          background: 'var(--nf-color-accent-subtle, rgba(155,89,182,0.08))',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                        }}
-                      >
+                  {dayEvents.slice(0, 2).map((ev) => {
+                    const isBlock = ev.kind === 'block';
+                    return (
+                      <li key={`ev-${ev.id}`}>
                         <span
-                          aria-hidden
+                          title={`${ev.title} · ${ev.workspaceName}`}
                           style={{
-                            inlineSize: '0.5rem',
-                            blockSize: '0.5rem',
-                            transform: 'rotate(45deg)',
-                            background: 'var(--nf-color-accent)',
-                            flexShrink: 0,
-                          }}
-                        />
-                        <span
-                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                            fontSize: '0.75rem',
+                            padding: '0.125rem 0.25rem',
+                            borderRadius: '0.25rem',
+                            background: isBlock
+                              ? 'var(--nf-color-bg-subtle)'
+                              : 'var(--nf-color-accent-subtle)',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
                           }}
                         >
-                          {task.title}
+                          <span
+                            aria-hidden
+                            style={{
+                              inlineSize: '0.5rem',
+                              blockSize: '0.5rem',
+                              transform: 'rotate(45deg)',
+                              background: isBlock
+                                ? 'var(--nf-color-fg-muted)'
+                                : 'var(--nf-color-accent)',
+                              flexShrink: 0,
+                            }}
+                          />
+                          <span
+                            style={{
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {ev.title}
+                          </span>
                         </span>
-                      </Link>
+                      </li>
+                    );
+                  })}
+                  {dayEvents.length > 2 ? (
+                    <li
+                      style={{
+                        fontSize: '0.6875rem',
+                        color: 'var(--nf-color-fg-muted)',
+                        paddingInline: '0.25rem',
+                      }}
+                    >
+                      {t('calendar.more', { count: dayEvents.length - 2 })}
                     </li>
-                  ))}
+                  ) : null}
                 </ul>
               </div>
             );

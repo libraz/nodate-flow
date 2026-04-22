@@ -77,8 +77,10 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, State> 
         <DefaultFallback
           error={error}
           resetErrorBoundary={this.reset}
-          title={this.props.fallbackTitle}
-          action={this.props.fallbackAction}
+          {...(this.props.fallbackTitle !== undefined ? { title: this.props.fallbackTitle } : {})}
+          {...(this.props.fallbackAction !== undefined
+            ? { action: this.props.fallbackAction }
+            : {})}
         />
       );
     }

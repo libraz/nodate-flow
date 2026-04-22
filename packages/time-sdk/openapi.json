@@ -1,29 +1,6 @@
 {
   "components": {
     "schemas": {
-      "AcceptInviteOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/AcceptInviteOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "calendarId": {
-            "type": "string"
-          },
-          "calendarName": {
-            "type": "string"
-          },
-          "role": {
-            "type": "string"
-          }
-        },
-        "required": ["calendarId", "calendarName", "role"],
-        "type": "object"
-      },
       "AddAttendeesInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -479,13 +456,13 @@
             "type": "string"
           },
           "endAt": {
-            "description": "End time",
+            "description": "End time; omit for a planning-stage (undated) event",
             "format": "date-time",
             "type": "string"
           },
           "kind": {
             "description": "Event kind",
-            "enum": ["event", "block", "free"],
+            "enum": ["event", "block", "free", "milestone"],
             "type": "string"
           },
           "location": {
@@ -519,7 +496,7 @@
             "type": "string"
           },
           "startAt": {
-            "description": "Start time",
+            "description": "Start time; omit for a planning-stage (undated) event",
             "format": "date-time",
             "type": "string"
           },
@@ -543,36 +520,7 @@
             "type": "string"
           }
         },
-        "required": ["kind", "title", "startAt", "endAt", "timezone"],
-        "type": "object"
-      },
-      "CreateInviteInputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/CreateInviteInputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "expiresAt": {
-            "description": "Expiration time",
-            "format": "date-time",
-            "type": "string"
-          },
-          "maxUses": {
-            "description": "Maximum number of uses",
-            "format": "int32",
-            "type": "integer"
-          },
-          "role": {
-            "description": "Role granted on acceptance",
-            "enum": ["manager", "editor", "viewer"],
-            "type": "string"
-          }
-        },
-        "required": ["role"],
+        "required": ["kind", "title", "timezone"],
         "type": "object"
       },
       "CreateMemoInputBody": {
@@ -664,8 +612,6 @@
           "showAs",
           "title",
           "allDay",
-          "startAt",
-          "endAt",
           "timezone",
           "createdAt"
         ],
@@ -903,6 +849,13 @@
       "EventResponse": {
         "additionalProperties": false,
         "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/EventResponse.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
           "allDay": {
             "type": "boolean"
           },
@@ -970,31 +923,9 @@
           "showAs",
           "title",
           "allDay",
-          "startAt",
-          "endAt",
           "timezone",
           "createdAt"
         ],
-        "type": "object"
-      },
-      "GetShareEventsOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/GetShareEventsOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "events": {
-            "items": {
-              "$ref": "#/components/schemas/EventResponse"
-            },
-            "type": ["array", "null"]
-          }
-        },
-        "required": ["events"],
         "type": "object"
       },
       "HealthOutputBody": {
@@ -1012,46 +943,6 @@
           }
         },
         "required": ["status"],
-        "type": "object"
-      },
-      "InviteResponse": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/InviteResponse.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "createdAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "expiresAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "id": {
-            "type": "string"
-          },
-          "maxUses": {
-            "format": "int32",
-            "type": "integer"
-          },
-          "role": {
-            "type": "string"
-          },
-          "token": {
-            "type": "string"
-          },
-          "useCount": {
-            "format": "int32",
-            "minimum": 0,
-            "type": "integer"
-          }
-        },
-        "required": ["id", "token", "role", "useCount", "createdAt"],
         "type": "object"
       },
       "ListAttachmentsOutputBody": {
@@ -1174,26 +1065,6 @@
         "required": ["events"],
         "type": "object"
       },
-      "ListInvitesOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/ListInvitesOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "invites": {
-            "items": {
-              "$ref": "#/components/schemas/InviteResponse"
-            },
-            "type": ["array", "null"]
-          }
-        },
-        "required": ["invites"],
-        "type": "object"
-      },
       "ListMembersOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -1232,6 +1103,26 @@
           }
         },
         "required": ["memos"],
+        "type": "object"
+      },
+      "ListMyCalendarEventsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListMyCalendarEventsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/MyCalendarEventResponse"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["events"],
         "type": "object"
       },
       "ListOutputBody": {
@@ -1335,6 +1226,83 @@
           "sortWeight",
           "userPublicId",
           "userDisplayName",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "MyCalendarEventResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "allDay": {
+            "type": "boolean"
+          },
+          "blockLabel": {
+            "type": "string"
+          },
+          "calendarId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "endAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "recurrenceEnd": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "recurrenceExceptions": {},
+          "recurrenceRule": {},
+          "showAs": {
+            "type": "string"
+          },
+          "startAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "visibility": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          },
+          "workspaceName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "calendarId",
+          "workspaceId",
+          "workspaceName",
+          "kind",
+          "visibility",
+          "showAs",
+          "title",
+          "allDay",
+          "timezone",
           "createdAt"
         ],
         "type": "object"
@@ -1479,67 +1447,6 @@
           }
         },
         "required": ["removed"],
-        "type": "object"
-      },
-      "RevokeInviteOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/RevokeInviteOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "revoked": {
-            "type": "boolean"
-          }
-        },
-        "required": ["revoked"],
-        "type": "object"
-      },
-      "SharePageResponse": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/SharePageResponse.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "calendarColor": {
-            "type": "string"
-          },
-          "calendarId": {
-            "type": "string"
-          },
-          "calendarKind": {
-            "type": "string"
-          },
-          "calendarName": {
-            "type": "string"
-          },
-          "expiresAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "memberCount": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "role": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "calendarId",
-          "calendarName",
-          "calendarKind",
-          "calendarColor",
-          "role",
-          "memberCount"
-        ],
         "type": "object"
       },
       "SmartCreateInputBody": {
@@ -1867,121 +1774,29 @@
         "summary": "Health check"
       }
     },
-    "/invites/{token}/accept": {
-      "post": {
-        "operationId": "invites-accept",
-        "parameters": [
-          {
-            "description": "Invite token",
-            "in": "path",
-            "name": "token",
-            "required": true,
-            "schema": {
-              "description": "Invite token",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AcceptInviteOutputBody"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "default": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorModel"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Accept a calendar invite"
-      }
-    },
-    "/share/{token}": {
+    "/me/calendar-events": {
       "get": {
-        "operationId": "share-get",
+        "operationId": "me-calendar-events-list",
         "parameters": [
           {
-            "description": "Invite token",
-            "in": "path",
-            "name": "token",
-            "required": true,
-            "schema": {
-              "description": "Invite token",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SharePageResponse"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "default": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorModel"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Get a shared calendar page"
-      }
-    },
-    "/share/{token}/events": {
-      "get": {
-        "operationId": "share-events",
-        "parameters": [
-          {
-            "description": "Invite token",
-            "in": "path",
-            "name": "token",
-            "required": true,
-            "schema": {
-              "description": "Invite token",
-              "type": "string"
-            }
-          },
-          {
-            "description": "Range start",
+            "description": "Range start (inclusive, YYYY-MM-DD or RFC3339)",
             "explode": false,
             "in": "query",
             "name": "start",
             "required": true,
             "schema": {
-              "description": "Range start",
-              "format": "date-time",
+              "description": "Range start (inclusive, YYYY-MM-DD or RFC3339)",
               "type": "string"
             }
           },
           {
-            "description": "Range end",
+            "description": "Range end (exclusive, YYYY-MM-DD or RFC3339)",
             "explode": false,
             "in": "query",
             "name": "end",
             "required": true,
             "schema": {
-              "description": "Range end",
-              "format": "date-time",
+              "description": "Range end (exclusive, YYYY-MM-DD or RFC3339)",
               "type": "string"
             }
           }
@@ -1991,7 +1806,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GetShareEventsOutputBody"
+                  "$ref": "#/components/schemas/ListMyCalendarEventsOutputBody"
                 }
               }
             },
@@ -2008,59 +1823,7 @@
             "description": "Error"
           }
         },
-        "summary": "Get events from a shared calendar"
-      }
-    },
-    "/share/{token}/export.ics": {
-      "get": {
-        "operationId": "share-export-ics",
-        "parameters": [
-          {
-            "description": "Invite token",
-            "in": "path",
-            "name": "token",
-            "required": true,
-            "schema": {
-              "description": "Invite token",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "OK",
-            "headers": {
-              "Content-Disposition": {
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "Content-Type": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "default": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorModel"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Export shared calendar events as iCalendar"
+        "summary": "List events across every workspace the caller belongs to"
       }
     },
     "/workspaces": {
@@ -3923,236 +3686,6 @@
           }
         },
         "summary": "Edit a comment"
-      }
-    },
-    "/workspaces/{wsId}/calendars/{calId}/export.ics": {
-      "get": {
-        "operationId": "events-export-ics",
-        "parameters": [
-          {
-            "description": "Workspace public ID",
-            "in": "path",
-            "name": "wsId",
-            "required": true,
-            "schema": {
-              "description": "Workspace public ID",
-              "type": "string"
-            }
-          },
-          {
-            "description": "Calendar public ID",
-            "in": "path",
-            "name": "calId",
-            "required": true,
-            "schema": {
-              "description": "Calendar public ID",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "OK",
-            "headers": {
-              "Content-Disposition": {
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "Content-Type": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "default": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorModel"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Export all calendar events as iCalendar"
-      }
-    },
-    "/workspaces/{wsId}/calendars/{calId}/invites": {
-      "get": {
-        "operationId": "invites-list",
-        "parameters": [
-          {
-            "description": "Workspace public ID",
-            "in": "path",
-            "name": "wsId",
-            "required": true,
-            "schema": {
-              "description": "Workspace public ID",
-              "type": "string"
-            }
-          },
-          {
-            "description": "Calendar public ID",
-            "in": "path",
-            "name": "calId",
-            "required": true,
-            "schema": {
-              "description": "Calendar public ID",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ListInvitesOutputBody"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "default": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorModel"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "List invite links for a calendar"
-      },
-      "post": {
-        "operationId": "invites-create",
-        "parameters": [
-          {
-            "description": "Workspace public ID",
-            "in": "path",
-            "name": "wsId",
-            "required": true,
-            "schema": {
-              "description": "Workspace public ID",
-              "type": "string"
-            }
-          },
-          {
-            "description": "Calendar public ID",
-            "in": "path",
-            "name": "calId",
-            "required": true,
-            "schema": {
-              "description": "Calendar public ID",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateInviteInputBody"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InviteResponse"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "default": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorModel"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Create an invite link for a calendar"
-      }
-    },
-    "/workspaces/{wsId}/calendars/{calId}/invites/{invId}": {
-      "delete": {
-        "operationId": "invites-revoke",
-        "parameters": [
-          {
-            "description": "Workspace public ID",
-            "in": "path",
-            "name": "wsId",
-            "required": true,
-            "schema": {
-              "description": "Workspace public ID",
-              "type": "string"
-            }
-          },
-          {
-            "description": "Calendar public ID",
-            "in": "path",
-            "name": "calId",
-            "required": true,
-            "schema": {
-              "description": "Calendar public ID",
-              "type": "string"
-            }
-          },
-          {
-            "description": "Invite public ID",
-            "in": "path",
-            "name": "invId",
-            "required": true,
-            "schema": {
-              "description": "Invite public ID",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RevokeInviteOutputBody"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "default": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorModel"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Revoke an invite link"
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/members": {

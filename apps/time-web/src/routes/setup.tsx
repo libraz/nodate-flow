@@ -6,7 +6,7 @@ import Button from '@nodate-flow/ui/primitives/button';
 import Input from '@nodate-flow/ui/primitives/input';
 
 import { selectIsAuthenticated, useAuth } from '../features/auth/auth-store';
-import { authSdk } from '../lib/sdk';
+import { authSdk, flowWebUrl } from '../lib/sdk';
 import { useWorkspace } from '../stores/workspace-store';
 
 export const Route = createFileRoute('/setup')({
@@ -65,7 +65,7 @@ function SetupPage(): ReactElement {
         if (body?.workspaces && body.workspaces.length > 0) {
           const ws = body.workspaces[0] as { id: string; name: string; slug: string };
           setWorkspace(ws.id, ws.name);
-          void navigate({ to: '/calendar' });
+          window.location.replace(`${flowWebUrl}/calendar`);
           return;
         }
       } catch {
@@ -101,7 +101,7 @@ function SetupPage(): ReactElement {
       }
       const ws = data as { id: string; name: string; slug: string };
       setWorkspace(ws.id, ws.name);
-      void navigate({ to: '/calendar' });
+      window.location.replace(`${flowWebUrl}/calendar`);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('workspace.create_failed'));
     } finally {

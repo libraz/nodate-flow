@@ -39,6 +39,13 @@ func RegisterCollection(api huma.API, deps Deps) {
 		Path:        "/me/tasks",
 		Summary:     "List tasks assigned to the authenticated user across every workspace",
 	}, ListMyTasks(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "me-tasks-with-dates-list",
+		Method:      http.MethodGet,
+		Path:        "/me/tasks-with-dates",
+		Summary:     "List tasks with event_on or due_on in range across every workspace",
+	}, ListMyTasksWithDates(deps))
 }
 
 // RegisterTaskScoped wires the per-task routes that operate on a single

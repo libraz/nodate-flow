@@ -14,6 +14,9 @@ CREATE TABLE workspaces (
 
   timezone VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT 'UTC' COMMENT 'Default IANA timezone for the workspace; user tz overrides per-user',
   country CHAR(2) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'ISO 3166-1 alpha-2 country; drives default holiday subscription',
+  working_days CHAR(7) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT 'MTWTF__' COMMENT 'Per-day flag string Mon..Sun; letter = working, underscore = off. Default MTWTF__ = Mon-Fri.',
+  working_hours_start TIME NOT NULL DEFAULT '09:00:00' COMMENT 'Start of workspace working day (local tz)',
+  working_hours_end TIME NOT NULL DEFAULT '18:00:00' COMMENT 'End of workspace working day (local tz)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',

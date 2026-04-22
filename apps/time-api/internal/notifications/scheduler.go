@@ -54,6 +54,7 @@ func CheckAndNotify(ctx context.Context, db *sql.DB) {
 		SELECT ce.id, ce.public_id, ce.title, ce.start_at, ce.notification_offset, ce.owner_user_id
 		FROM calendar_events ce
 		WHERE ce.notification_offset IS NOT NULL
+		  AND ce.start_at IS NOT NULL
 		  AND ce.notified_at IS NULL
 		  AND ce.enabled = TRUE
 		  AND ce.start_at > NOW()

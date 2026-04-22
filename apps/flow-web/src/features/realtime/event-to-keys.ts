@@ -27,6 +27,8 @@ export type StreamKind =
   | 'favorite.changed'
   | 'intake.changed'
   | 'import.changed'
+  | 'calendar.changed'
+  | 'item.changed'
   | 'resync';
 
 export interface StreamEvent {
@@ -89,6 +91,21 @@ export function keysForEvent(evt: StreamEvent): readonly (readonly unknown[])[] 
       return [['intake', 'list', ws]];
     case 'import.changed':
       return [['imports', 'list', ws]];
+    case 'calendar.changed':
+      // calendar.* and share.* appends: public-shares, calendars,
+      // events, members, memos. flow-web's /calendar view consumes
+      // these keys once R5.6 lands; in the meantime the invalidations
+      // are no-ops for pages that don't subscribe.
+      return [
+        ['calendars', ws],
+        ['events', ws],
+        ['public-shares', ws],
+      ];
+    case 'item.changed':
+      // item.* is itemkit's atomic task+event mutation. Because one
+      // transaction touches both sides of the link, invalidate both
+      // caches plus any derived views the reconciler emits to.
+      return [['tasks'], ['calendars', ws], ['events', ws]];
     case 'resync':
       return [
         ['auto-actions', 'list', ws],
@@ -111,6 +128,9 @@ export function keysForEvent(evt: StreamEvent): readonly (readonly unknown[])[] 
         ['favorites', 'list', ws],
         ['intake', 'list', ws],
         ['imports', 'list', ws],
+        ['calendars', ws],
+        ['events', ws],
+        ['public-shares', ws],
         ['tasks'],
       ];
   }

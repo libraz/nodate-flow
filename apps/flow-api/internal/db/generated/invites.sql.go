@@ -13,48 +13,6 @@ import (
 	types "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 )
 
-const createCalendarInvite = `-- name: CreateCalendarInvite :execlastid
-INSERT INTO calendar_invites (
-  public_id,
-  workspace_id,
-  calendar_id,
-  created_by_user_id,
-  token_hash,
-  role,
-  max_uses,
-  expires_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-`
-
-type CreateCalendarInviteParams struct {
-	PublicID        types.PublicID      `json:"publicId"`
-	WorkspaceID     uint32              `json:"-"`
-	CalendarID      uint32              `json:"-"`
-	CreatedByUserID uint32              `json:"-"`
-	TokenHash       string              `json:"tokenHash"`
-	Role            CalendarInvitesRole `json:"role"`
-	MaxUses         sql.NullInt32       `json:"maxUses"`
-	ExpiresAt       sql.NullTime        `json:"expiresAt"`
-}
-
-// Create a shareable invite link for a calendar.
-func (q *Queries) CreateCalendarInvite(ctx context.Context, arg CreateCalendarInviteParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, createCalendarInvite,
-		arg.PublicID,
-		arg.WorkspaceID,
-		arg.CalendarID,
-		arg.CreatedByUserID,
-		arg.TokenHash,
-		arg.Role,
-		arg.MaxUses,
-		arg.ExpiresAt,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.LastInsertId()
-}
-
 const createWorkspaceInvite = `-- name: CreateWorkspaceInvite :execlastid
 INSERT INTO workspace_invites (
   public_id, workspace_id, token_hash, role,
@@ -89,134 +47,6 @@ func (q *Queries) CreateWorkspaceInvite(ctx context.Context, arg CreateWorkspace
 		return 0, err
 	}
 	return result.LastInsertId()
-}
-
-const disableCalendarInvite = `-- name: DisableCalendarInvite :exec
-UPDATE calendar_invites
-SET enabled = FALSE
-WHERE public_id = ?
-  AND calendar_id = ?
-  AND workspace_id = ?
-`
-
-type DisableCalendarInviteParams struct {
-	PublicID    types.PublicID `json:"publicId"`
-	CalendarID  uint32         `json:"-"`
-	WorkspaceID uint32         `json:"-"`
-}
-
-// Revoke an invite link.
-func (q *Queries) DisableCalendarInvite(ctx context.Context, arg DisableCalendarInviteParams) error {
-	_, err := q.db.ExecContext(ctx, disableCalendarInvite, arg.PublicID, arg.CalendarID, arg.WorkspaceID)
-	return err
-}
-
-const findCalendarInviteByTokenHash = `-- name: FindCalendarInviteByTokenHash :one
-SELECT
-  i.id,
-  i.public_id,
-  i.workspace_id,
-  i.calendar_id,
-  i.token_hash,
-  i.role,
-  i.max_uses,
-  i.use_count,
-  i.expires_at,
-  c.public_id AS calendar_public_id,
-  c.name AS calendar_name,
-  c.kind AS calendar_kind,
-  c.color AS calendar_color,
-  i.created_at
-FROM calendar_invites i
-INNER JOIN calendars c ON c.id = i.calendar_id AND c.enabled = TRUE
-WHERE i.token_hash = ?
-  AND i.enabled = TRUE
-LIMIT 1
-`
-
-type FindCalendarInviteByTokenHashRow struct {
-	ID               uint32              `json:"-"`
-	PublicID         types.PublicID      `json:"publicId"`
-	WorkspaceID      uint32              `json:"-"`
-	CalendarID       uint32              `json:"-"`
-	TokenHash        string              `json:"tokenHash"`
-	Role             CalendarInvitesRole `json:"role"`
-	MaxUses          sql.NullInt32       `json:"maxUses"`
-	UseCount         uint32              `json:"useCount"`
-	ExpiresAt        sql.NullTime        `json:"expiresAt"`
-	CalendarPublicID types.PublicID      `json:"calendarPublicId"`
-	CalendarName     string              `json:"calendarName"`
-	CalendarKind     CalendarsKind       `json:"calendarKind"`
-	CalendarColor    string              `json:"calendarColor"`
-	CreatedAt        time.Time           `json:"createdAt"`
-}
-
-// Resolve an invite by its token hash for the acceptance flow.
-func (q *Queries) FindCalendarInviteByTokenHash(ctx context.Context, tokenHash string) (FindCalendarInviteByTokenHashRow, error) {
-	row := q.db.QueryRowContext(ctx, findCalendarInviteByTokenHash, tokenHash)
-	var i FindCalendarInviteByTokenHashRow
-	err := row.Scan(
-		&i.ID,
-		&i.PublicID,
-		&i.WorkspaceID,
-		&i.CalendarID,
-		&i.TokenHash,
-		&i.Role,
-		&i.MaxUses,
-		&i.UseCount,
-		&i.ExpiresAt,
-		&i.CalendarPublicID,
-		&i.CalendarName,
-		&i.CalendarKind,
-		&i.CalendarColor,
-		&i.CreatedAt,
-	)
-	return i, err
-}
-
-const findCalendarInviteByTokenHashPublic = `-- name: FindCalendarInviteByTokenHashPublic :one
-SELECT
-  c.public_id AS calendar_public_id,
-  c.name AS calendar_name,
-  c.kind AS calendar_kind,
-  c.color AS calendar_color,
-  i.role,
-  i.expires_at,
-  (SELECT COUNT(*) FROM calendar_subscriptions cs
-   WHERE cs.calendar_id = c.id AND cs.enabled = TRUE) AS member_count
-FROM calendar_invites i
-INNER JOIN calendars c ON c.id = i.calendar_id AND c.enabled = TRUE
-WHERE i.token_hash = ?
-  AND i.enabled = TRUE
-  AND (i.expires_at IS NULL OR i.expires_at > NOW())
-  AND (i.max_uses IS NULL OR i.use_count < i.max_uses)
-LIMIT 1
-`
-
-type FindCalendarInviteByTokenHashPublicRow struct {
-	CalendarPublicID types.PublicID      `json:"calendarPublicId"`
-	CalendarName     string              `json:"calendarName"`
-	CalendarKind     CalendarsKind       `json:"calendarKind"`
-	CalendarColor    string              `json:"calendarColor"`
-	Role             CalendarInvitesRole `json:"role"`
-	ExpiresAt        sql.NullTime        `json:"expiresAt"`
-	MemberCount      int64               `json:"memberCount"`
-}
-
-// Public-facing invite lookup (for share page preview, no auth required).
-func (q *Queries) FindCalendarInviteByTokenHashPublic(ctx context.Context, tokenHash string) (FindCalendarInviteByTokenHashPublicRow, error) {
-	row := q.db.QueryRowContext(ctx, findCalendarInviteByTokenHashPublic, tokenHash)
-	var i FindCalendarInviteByTokenHashPublicRow
-	err := row.Scan(
-		&i.CalendarPublicID,
-		&i.CalendarName,
-		&i.CalendarKind,
-		&i.CalendarColor,
-		&i.Role,
-		&i.ExpiresAt,
-		&i.MemberCount,
-	)
-	return i, err
 }
 
 const findWorkspaceInviteByTokenHash = `-- name: FindWorkspaceInviteByTokenHash :one
@@ -289,18 +119,6 @@ func (q *Queries) FindWorkspaceInviteWorkspaceName(ctx context.Context, tokenHas
 	return i, err
 }
 
-const incrementCalendarInviteUseCount = `-- name: IncrementCalendarInviteUseCount :exec
-UPDATE calendar_invites
-SET use_count = use_count + 1
-WHERE id = ?
-`
-
-// Bump the use counter after a successful acceptance.
-func (q *Queries) IncrementCalendarInviteUseCount(ctx context.Context, id uint32) error {
-	_, err := q.db.ExecContext(ctx, incrementCalendarInviteUseCount, id)
-	return err
-}
-
 const incrementInviteUseCount = `-- name: IncrementInviteUseCount :exec
 UPDATE workspace_invites
 SET use_count = use_count + 1
@@ -311,69 +129,6 @@ WHERE id = ?
 func (q *Queries) IncrementInviteUseCount(ctx context.Context, id uint32) error {
 	_, err := q.db.ExecContext(ctx, incrementInviteUseCount, id)
 	return err
-}
-
-const listCalendarInvites = `-- name: ListCalendarInvites :many
-SELECT
-  public_id,
-  token_hash,
-  role,
-  max_uses,
-  use_count,
-  expires_at,
-  created_at
-FROM calendar_invites
-WHERE calendar_id = ?
-  AND workspace_id = ?
-  AND enabled = TRUE
-ORDER BY created_at DESC
-`
-
-type ListCalendarInvitesParams struct {
-	CalendarID  uint32 `json:"-"`
-	WorkspaceID uint32 `json:"-"`
-}
-
-type ListCalendarInvitesRow struct {
-	PublicID  types.PublicID      `json:"publicId"`
-	TokenHash string              `json:"tokenHash"`
-	Role      CalendarInvitesRole `json:"role"`
-	MaxUses   sql.NullInt32       `json:"maxUses"`
-	UseCount  uint32              `json:"useCount"`
-	ExpiresAt sql.NullTime        `json:"expiresAt"`
-	CreatedAt time.Time           `json:"createdAt"`
-}
-
-// List active invites for a calendar.
-func (q *Queries) ListCalendarInvites(ctx context.Context, arg ListCalendarInvitesParams) ([]ListCalendarInvitesRow, error) {
-	rows, err := q.db.QueryContext(ctx, listCalendarInvites, arg.CalendarID, arg.WorkspaceID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListCalendarInvitesRow{}
-	for rows.Next() {
-		var i ListCalendarInvitesRow
-		if err := rows.Scan(
-			&i.PublicID,
-			&i.TokenHash,
-			&i.Role,
-			&i.MaxUses,
-			&i.UseCount,
-			&i.ExpiresAt,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const listWorkspaceInvites = `-- name: ListWorkspaceInvites :many

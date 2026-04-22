@@ -209,6 +209,33 @@ func classifyEvent(eventType string) (title string, resourceType string, severit
 		return "A task was reopened", "task", generated.NotificationsSeverityNormal
 	case "task.transition.cancel":
 		return "A task was cancelled", "task", generated.NotificationsSeverityNormal
+
+	// itemkit kinds (R5.1): task ↔ calendar_event atomic mutations.
+	// The reader for these events is the "item" (task + its projections);
+	// resourceType stays "task" because downstream routing is the same.
+	case "item.scheduled":
+		return "An item was placed on a calendar", "task", generated.NotificationsSeverityNormal
+	case "item.unscheduled":
+		return "An item was removed from a calendar", "task", generated.NotificationsSeverityLow
+	case "item.rescheduled":
+		return "An item was rescheduled", "task", generated.NotificationsSeverityNormal
+	case "item.renamed":
+		return "An item was renamed", "task", generated.NotificationsSeverityLow
+	case "item.deleted":
+		return "An item was deleted", "task", generated.NotificationsSeverityNormal
+	case "item.reconciled":
+		return "An item was auto-reconciled", "task", generated.NotificationsSeverityLow
+	case "item.actor.added":
+		return "You were added to an item", "task", generated.NotificationsSeverityNormal
+	case "item.actor.removed":
+		return "You were removed from an item", "task", generated.NotificationsSeverityNormal
+	case "item.visibility.changed":
+		return "An item's visibility changed", "task", generated.NotificationsSeverityLow
+	case "item.milestone.link.added":
+		return "An item was linked to a milestone", "task", generated.NotificationsSeverityLow
+	case "item.milestone.link.removed":
+		return "An item was unlinked from a milestone", "task", generated.NotificationsSeverityLow
+
 	default:
 		return "", "", ""
 	}

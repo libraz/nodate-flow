@@ -13,76 +13,38 @@ import (
 	types "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/types"
 )
 
-const countCalendarOwners = `-- name: CountCalendarOwners :one
-SELECT COUNT(*) AS owner_count
-FROM calendar_subscriptions
-WHERE calendar_id = ?
-  AND role = 'owner'
-  AND enabled = TRUE
-`
-
-// Count how many owners a calendar has (prevent last-owner removal).
-func (q *Queries) CountCalendarOwners(ctx context.Context, calendarID uint32) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countCalendarOwners, calendarID)
-	var owner_count int64
-	err := row.Scan(&owner_count)
-	return owner_count, err
-}
-
 const createCalendarSubscription = `-- name: CreateCalendarSubscription :execlastid
 INSERT INTO calendar_subscriptions (
   public_id,
   workspace_id,
   calendar_id,
   user_id,
-  role,
-  member_color,
   display_color
-) VALUES (?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?)
 `
 
 type CreateCalendarSubscriptionParams struct {
-	PublicID     types.PublicID            `json:"publicId"`
-	WorkspaceID  uint32                    `json:"-"`
-	CalendarID   uint32                    `json:"-"`
-	UserID       uint32                    `json:"-"`
-	Role         CalendarSubscriptionsRole `json:"role"`
-	MemberColor  string                    `json:"memberColor"`
-	DisplayColor string                    `json:"displayColor"`
+	PublicID     types.PublicID `json:"publicId"`
+	WorkspaceID  uint32         `json:"-"`
+	CalendarID   uint32         `json:"-"`
+	UserID       uint32         `json:"-"`
+	DisplayColor string         `json:"displayColor"`
 }
 
-// Subscribe a user to a calendar with a role and display preferences.
+// Subscribe a user to a calendar with display preferences.
+// Not an ACL axis — event-level visibility governs access.
 func (q *Queries) CreateCalendarSubscription(ctx context.Context, arg CreateCalendarSubscriptionParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, createCalendarSubscription,
 		arg.PublicID,
 		arg.WorkspaceID,
 		arg.CalendarID,
 		arg.UserID,
-		arg.Role,
-		arg.MemberColor,
 		arg.DisplayColor,
 	)
 	if err != nil {
 		return 0, err
 	}
 	return result.LastInsertId()
-}
-
-const createMemberFilter = `-- name: CreateMemberFilter :exec
-INSERT INTO calendar_member_filters (subscription_id, target_user_id)
-VALUES (?, ?)
-ON DUPLICATE KEY UPDATE enabled = TRUE
-`
-
-type CreateMemberFilterParams struct {
-	SubscriptionID uint32 `json:"-"`
-	TargetUserID   uint32 `json:"-"`
-}
-
-// Hide a specific member's events within a shared calendar for a subscriber.
-func (q *Queries) CreateMemberFilter(ctx context.Context, arg CreateMemberFilterParams) error {
-	_, err := q.db.ExecContext(ctx, createMemberFilter, arg.SubscriptionID, arg.TargetUserID)
-	return err
 }
 
 const disableCalendarSubscription = `-- name: DisableCalendarSubscription :exec
@@ -109,8 +71,6 @@ SELECT
   public_id,
   calendar_id,
   user_id,
-  role,
-  member_color,
   display_color,
   visible,
   sort_weight,
@@ -129,17 +89,15 @@ type FindCalendarSubscriptionParams struct {
 }
 
 type FindCalendarSubscriptionRow struct {
-	ID           uint32                    `json:"-"`
-	PublicID     types.PublicID            `json:"publicId"`
-	CalendarID   uint32                    `json:"-"`
-	UserID       uint32                    `json:"-"`
-	Role         CalendarSubscriptionsRole `json:"role"`
-	MemberColor  string                    `json:"memberColor"`
-	DisplayColor string                    `json:"displayColor"`
-	Visible      bool                      `json:"visible"`
-	SortWeight   int32                     `json:"sortWeight"`
-	Enabled      bool                      `json:"enabled"`
-	CreatedAt    time.Time                 `json:"createdAt"`
+	ID           uint32         `json:"-"`
+	PublicID     types.PublicID `json:"publicId"`
+	CalendarID   uint32         `json:"-"`
+	UserID       uint32         `json:"-"`
+	DisplayColor string         `json:"displayColor"`
+	Visible      bool           `json:"visible"`
+	SortWeight   int32          `json:"sortWeight"`
+	Enabled      bool           `json:"enabled"`
+	CreatedAt    time.Time      `json:"createdAt"`
 }
 
 // Look up a user's subscription to a specific calendar.
@@ -151,8 +109,6 @@ func (q *Queries) FindCalendarSubscription(ctx context.Context, arg FindCalendar
 		&i.PublicID,
 		&i.CalendarID,
 		&i.UserID,
-		&i.Role,
-		&i.MemberColor,
 		&i.DisplayColor,
 		&i.Visible,
 		&i.SortWeight,
@@ -166,8 +122,6 @@ const listCalendarSubscribers = `-- name: ListCalendarSubscribers :many
 SELECT
   cs.public_id,
   cs.user_id,
-  cs.role,
-  cs.member_color,
   cs.visible,
   cs.sort_weight,
   u.public_id AS user_public_id,
@@ -188,16 +142,14 @@ type ListCalendarSubscribersParams struct {
 }
 
 type ListCalendarSubscribersRow struct {
-	PublicID     types.PublicID            `json:"publicId"`
-	UserID       uint32                    `json:"-"`
-	Role         CalendarSubscriptionsRole `json:"role"`
-	MemberColor  string                    `json:"memberColor"`
-	Visible      bool                      `json:"visible"`
-	SortWeight   int32                     `json:"sortWeight"`
-	UserPublicID types.PublicID            `json:"userPublicId"`
-	DisplayName  string                    `json:"displayName"`
-	AvatarUrl    sql.NullString            `json:"avatarUrl"`
-	CreatedAt    time.Time                 `json:"createdAt"`
+	PublicID     types.PublicID `json:"publicId"`
+	UserID       uint32         `json:"-"`
+	Visible      bool           `json:"visible"`
+	SortWeight   int32          `json:"sortWeight"`
+	UserPublicID types.PublicID `json:"userPublicId"`
+	DisplayName  string         `json:"displayName"`
+	AvatarUrl    sql.NullString `json:"avatarUrl"`
+	CreatedAt    time.Time      `json:"createdAt"`
 }
 
 // List all subscribers of a calendar (for member list, color resolution).
@@ -213,8 +165,6 @@ func (q *Queries) ListCalendarSubscribers(ctx context.Context, arg ListCalendarS
 		if err := rows.Scan(
 			&i.PublicID,
 			&i.UserID,
-			&i.Role,
-			&i.MemberColor,
 			&i.Visible,
 			&i.SortWeight,
 			&i.UserPublicID,
@@ -235,42 +185,9 @@ func (q *Queries) ListCalendarSubscribers(ctx context.Context, arg ListCalendarS
 	return items, nil
 }
 
-const listMemberFilters = `-- name: ListMemberFilters :many
-SELECT target_user_id
-FROM calendar_member_filters
-WHERE subscription_id = ?
-  AND enabled = TRUE
-`
-
-// List hidden members for a subscription.
-func (q *Queries) ListMemberFilters(ctx context.Context, subscriptionID uint32) ([]uint32, error) {
-	rows, err := q.db.QueryContext(ctx, listMemberFilters, subscriptionID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []uint32{}
-	for rows.Next() {
-		var target_user_id uint32
-		if err := rows.Scan(&target_user_id); err != nil {
-			return nil, err
-		}
-		items = append(items, target_user_id)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const patchCalendarSubscription = `-- name: PatchCalendarSubscription :exec
 UPDATE calendar_subscriptions
-SET role          = COALESCE(?, role),
-    member_color  = COALESCE(?, member_color),
-    display_color = COALESCE(?, display_color),
+SET display_color = COALESCE(?, display_color),
     visible       = COALESCE(?, visible),
     sort_weight   = COALESCE(?, sort_weight)
 WHERE calendar_id = ?
@@ -279,43 +196,21 @@ WHERE calendar_id = ?
 `
 
 type PatchCalendarSubscriptionParams struct {
-	Role         NullCalendarSubscriptionsRole `json:"role"`
-	MemberColor  sql.NullString                `json:"memberColor"`
-	DisplayColor sql.NullString                `json:"displayColor"`
-	Visible      sql.NullBool                  `json:"visible"`
-	SortWeight   sql.NullInt32                 `json:"sortWeight"`
-	CalendarID   uint32                        `json:"-"`
-	UserID       uint32                        `json:"-"`
+	DisplayColor sql.NullString `json:"displayColor"`
+	Visible      sql.NullBool   `json:"visible"`
+	SortWeight   sql.NullInt32  `json:"sortWeight"`
+	CalendarID   uint32         `json:"-"`
+	UserID       uint32         `json:"-"`
 }
 
-// Update a subscriber's role or display preferences.
+// Update a subscriber's display preferences.
 func (q *Queries) PatchCalendarSubscription(ctx context.Context, arg PatchCalendarSubscriptionParams) error {
 	_, err := q.db.ExecContext(ctx, patchCalendarSubscription,
-		arg.Role,
-		arg.MemberColor,
 		arg.DisplayColor,
 		arg.Visible,
 		arg.SortWeight,
 		arg.CalendarID,
 		arg.UserID,
 	)
-	return err
-}
-
-const removeMemberFilter = `-- name: RemoveMemberFilter :exec
-UPDATE calendar_member_filters
-SET enabled = FALSE
-WHERE subscription_id = ?
-  AND target_user_id = ?
-`
-
-type RemoveMemberFilterParams struct {
-	SubscriptionID uint32 `json:"-"`
-	TargetUserID   uint32 `json:"-"`
-}
-
-// Unhide a specific member's events.
-func (q *Queries) RemoveMemberFilter(ctx context.Context, arg RemoveMemberFilterParams) error {
-	_, err := q.db.ExecContext(ctx, removeMemberFilter, arg.SubscriptionID, arg.TargetUserID)
 	return err
 }

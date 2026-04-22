@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root';
 import { Route as SetupRouteImport } from './routes/setup';
 import { Route as RegisterRouteImport } from './routes/register';
 import { Route as LoginRouteImport } from './routes/login';
-import { Route as CalendarRouteImport } from './routes/calendar';
 import { Route as IndexRouteImport } from './routes/index';
 import { Route as ShareTokenRouteImport } from './routes/share/$token';
 
@@ -31,11 +30,6 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any);
-const CalendarRoute = CalendarRouteImport.update({
-  id: '/calendar',
-  path: '/calendar',
-  getParentRoute: () => rootRouteImport,
-} as any);
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -49,7 +43,6 @@ const ShareTokenRoute = ShareTokenRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute;
-  '/calendar': typeof CalendarRoute;
   '/login': typeof LoginRoute;
   '/register': typeof RegisterRoute;
   '/setup': typeof SetupRoute;
@@ -57,7 +50,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute;
-  '/calendar': typeof CalendarRoute;
   '/login': typeof LoginRoute;
   '/register': typeof RegisterRoute;
   '/setup': typeof SetupRoute;
@@ -66,7 +58,6 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   '/': typeof IndexRoute;
-  '/calendar': typeof CalendarRoute;
   '/login': typeof LoginRoute;
   '/register': typeof RegisterRoute;
   '/setup': typeof SetupRoute;
@@ -74,28 +65,14 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths:
-    | '/'
-    | '/calendar'
-    | '/login'
-    | '/register'
-    | '/setup'
-    | '/share/$token';
+  fullPaths: '/' | '/login' | '/register' | '/setup' | '/share/$token';
   fileRoutesByTo: FileRoutesByTo;
-  to: '/' | '/calendar' | '/login' | '/register' | '/setup' | '/share/$token';
-  id:
-    | '__root__'
-    | '/'
-    | '/calendar'
-    | '/login'
-    | '/register'
-    | '/setup'
-    | '/share/$token';
+  to: '/' | '/login' | '/register' | '/setup' | '/share/$token';
+  id: '__root__' | '/' | '/login' | '/register' | '/setup' | '/share/$token';
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
-  CalendarRoute: typeof CalendarRoute;
   LoginRoute: typeof LoginRoute;
   RegisterRoute: typeof RegisterRoute;
   SetupRoute: typeof SetupRoute;
@@ -125,13 +102,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport;
       parentRoute: typeof rootRouteImport;
     };
-    '/calendar': {
-      id: '/calendar';
-      path: '/calendar';
-      fullPath: '/calendar';
-      preLoaderRoute: typeof CalendarRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
     '/': {
       id: '/';
       path: '/';
@@ -151,7 +121,6 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  CalendarRoute: CalendarRoute,
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
   SetupRoute: SetupRoute,

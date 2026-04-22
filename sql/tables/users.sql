@@ -14,6 +14,11 @@ CREATE TABLE users (
   locale VARCHAR(16) NOT NULL DEFAULT 'en' COMMENT 'Preferred locale tag (BCP 47)',
   timezone VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT 'UTC' COMMENT 'Preferred IANA timezone (independent of locale)',
   country CHAR(2) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'ISO 3166-1 alpha-2 country (independent of locale); drives default holiday subscription',
+  working_days CHAR(7) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'User override of workspace working_days; NULL = inherit',
+  working_hours_start TIME NULL COMMENT 'User override of workspace working_hours_start; NULL = inherit',
+  working_hours_end TIME NULL COMMENT 'User override of workspace working_hours_end; NULL = inherit',
+  snap_to_working_day ENUM('off','warn','auto') NOT NULL DEFAULT 'warn' COMMENT 'What happens when a task/event lands on a non-working day: off=accept silently, warn=save with badge, auto=itemkit snaps forward to next working day',
+  treat_holidays_as_non_working BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'If true, subscribed system (holiday) calendar events count as non-working days',
   theme_preference ENUM('aurora-light','aurora-dark','dotline-light','dotline-dark','glass-light','glass-dark','system') NOT NULL DEFAULT 'system' COMMENT 'UI theme preference',
   last_login_at DATETIME NULL COMMENT 'Last successful login',
 

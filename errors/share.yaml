@@ -1,0 +1,49 @@
+domain: share
+breadcrumb: "Share"
+
+# Errors raised by the public-share surface (calendar_public_shares +
+# calendar_public_share_events). The public render path is unauthenticated
+# and uses the URL token as the sole capability; these codes cover the
+# ways a token can be rejected, plus workspace-side management errors.
+
+resources:
+  share:
+    breadcrumb: "Share"
+    errors:
+      not_found:
+        code: SHARE.SHARE.NOT_FOUND
+        status: 404
+        message: "Share page not found"
+        description: "Returned when a share with the given public_id or token hash does not exist."
+        userAction: "Verify the URL; if you rotated the token recently, use the new URL returned at rotate time."
+
+      expired:
+        code: SHARE.SHARE.EXPIRED
+        status: 410
+        message: "Share page has expired"
+        description: "Returned when the share's expires_at is in the past. The row still exists but the public render refuses to serve it."
+        userAction: "Ask a workspace member to extend or rotate the share, then use the new URL."
+
+      token_invalid:
+        code: SHARE.SHARE.TOKEN_INVALID
+        status: 404
+        message: "Share token is invalid"
+        description: "Returned when the URL token does not match any token_hash. Deliberately 404 (not 401) so the existence of any share is not leaked by the status code."
+        userAction: "Verify the URL was copied correctly. Rotation invalidates prior tokens."
+
+      delete_forbidden:
+        code: SHARE.SHARE.DELETE_FORBIDDEN
+        status: 403
+        message: "Only workspace admins or owners can delete a share"
+        description: "Returned when a non-admin tries to delete a share. Create / edit / rotate / add events are open to all non-guest workspace members; delete is restricted to admin/owner to prevent accidental URL loss."
+        userAction: "Ask a workspace admin or owner to delete the share on your behalf."
+
+  share_event:
+    breadcrumb: "Share > Event"
+    errors:
+      event_not_visible:
+        code: SHARE.SHARE_EVENT.EVENT_NOT_VISIBLE
+        status: 422
+        message: "Event cannot be published"
+        description: "Returned when attaching an event with visibility='confidential' to a share page. Confidential events are gated from the public surface."
+        userAction: "Change the event's visibility to public or private before attaching, or pick a different event."

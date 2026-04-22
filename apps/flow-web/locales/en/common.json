@@ -139,7 +139,7 @@
   },
   "calendar": {
     "title": "Calendar",
-    "subtitle": "Tasks with a due date across every workspace, on a monthly grid.",
+    "subtitle": "Tasks and events across every workspace, on a monthly grid.",
     "prev": "Previous month",
     "next": "Next month",
     "today": "Today",
@@ -150,6 +150,12 @@
     "drag_to_reschedule": "Drag to reschedule",
     "reschedule_success": "Due date updated",
     "reschedule_error": "Failed to update due date",
+    "layers": "Layers",
+    "layer": {
+      "tasks_due": "Tasks (due)",
+      "events": "Events",
+      "blocks": "Blocks"
+    },
     "weekday": {
       "mon": "Mon",
       "tue": "Tue",

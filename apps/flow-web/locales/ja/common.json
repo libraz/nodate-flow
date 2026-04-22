@@ -139,7 +139,7 @@
   },
   "calendar": {
     "title": "カレンダー",
-    "subtitle": "全ワークスペースの期日付きタスクを月単位で表示します。",
+    "subtitle": "全ワークスペースのタスクと予定を月単位で表示します。",
     "prev": "前の月",
     "next": "次の月",
     "today": "今日",
@@ -150,6 +150,12 @@
     "drag_to_reschedule": "ドラッグで日付変更",
     "reschedule_success": "期日を更新しました",
     "reschedule_error": "期日の更新に失敗しました",
+    "layers": "レイヤー",
+    "layer": {
+      "tasks_due": "タスク（期日）",
+      "events": "予定",
+      "blocks": "ブロック"
+    },
     "weekday": {
       "mon": "月",
       "tue": "火",

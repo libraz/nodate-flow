@@ -1,6 +1,6 @@
 -- name: CreateCalendar :execlastid
--- Insert a new calendar. kind determines behavior: personal (1:1 user),
--- shared (group), system (holidays).
+-- Insert a new calendar. kind determines behavior: personal (user-owned
+-- layer, may own many) or system (holiday feeds).
 INSERT INTO calendars (
   public_id,
   workspace_id,
@@ -47,8 +47,6 @@ SELECT
   c.cover_url,
   c.owner_user_id,
   c.system_slug,
-  cs.role,
-  cs.member_color,
   cs.display_color,
   cs.visible,
   cs.sort_weight AS subscription_sort_weight,

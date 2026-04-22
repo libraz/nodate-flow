@@ -10,9 +10,9 @@ import Card from '@nodate-flow/ui/primitives/card';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 
 import { selectIsAuthenticated, useAuth } from '../../features/auth/auth-store';
-import { useAcceptInviteMutation } from '../../features/calendar/api';
+import { useAcceptInviteMutation } from '../../features/share/api';
 import { toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { flowWebUrl, sdk } from '../../lib/sdk';
 
 interface SharedCalendar {
   id: string;
@@ -113,7 +113,7 @@ function SharePage(): ReactElement {
   const handleJoin = () => {
     acceptMutation.mutate(token, {
       onSuccess: () => {
-        window.location.href = '/calendar';
+        window.location.href = `${flowWebUrl}/calendar`;
       },
     });
   };

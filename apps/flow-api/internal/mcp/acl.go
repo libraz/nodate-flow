@@ -199,7 +199,13 @@ func resolveCalendar(ctx context.Context, deps Deps, s *session, publicID string
 
 // canEditCalendarEvent checks if the acting user can edit a calendar
 // event. Returns true if the user is the event owner, a can_edit
-// attendee, or a manager/owner on the calendar subscription.
+// attendee, or the personal-calendar owner.
+//
+// post-R5.1: calendar_subscriptions.role was dropped, so there is no
+// per-subscription manager/owner tier anymore. The calendar-level
+// "owner" is whoever holds calendars.owner_user_id (personal layer).
+// System calendars (kind=system) are read-only and have no editable
+// owner. Attendee can_edit is still honored via FindCalendarEventAttendee.
 func canEditCalendarEvent(ctx context.Context, deps Deps, s *session, eventOwnerUserID uint32, eventID uint32, calendarID uint32) (bool, error) {
 	if s.userID == eventOwnerUserID {
 		return true, nil
@@ -211,15 +217,20 @@ func canEditCalendarEvent(ctx context.Context, deps Deps, s *session, eventOwner
 	if err == nil && att.CanEdit {
 		return true, nil
 	}
-	sub, err := deps.Queries.FindCalendarSubscription(ctx, generated.FindCalendarSubscriptionParams{
-		CalendarID: calendarID,
-		UserID:     s.userID,
-	})
-	if err != nil {
+	// Look up the personal-calendar owner via raw SQL. The sqlc
+	// FindCalendarByPublicId query needs the public id, which we do
+	// not have here; a lightweight single-column lookup by internal
+	// id is appropriate and matches the pattern used elsewhere in
+	// this package.
+	const q = `SELECT owner_user_id FROM calendars WHERE id = ? AND enabled = TRUE LIMIT 1`
+	var ownerID sql.NullInt32
+	if err := deps.DB.QueryRowContext(ctx, q, calendarID).Scan(&ownerID); err != nil {
 		return false, nil
 	}
-	role := string(sub.Role)
-	return role == "manager" || role == "owner", nil
+	if ownerID.Valid && uint32(ownerID.Int32) == s.userID {
+		return true, nil
+	}
+	return false, nil
 }
 
 func newPublicID() types.PublicID { return types.New() }

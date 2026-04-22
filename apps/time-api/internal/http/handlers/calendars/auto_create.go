@@ -52,8 +52,6 @@ func EnsurePersonalCalendar(ctx context.Context, q *generated.Queries, workspace
 		WorkspaceID:  workspaceID,
 		CalendarID:   uint32(calID),
 		UserID:       userID,
-		Role:         generated.CalendarSubscriptionsRoleOwner,
-		MemberColor:  "#4285F4",
 		DisplayColor: "#4285F4",
 	})
 	return err
@@ -114,15 +112,13 @@ func SubscribeHolidayCalendar(ctx context.Context, q *generated.Queries, workspa
 		return err
 	}
 
-	// Subscribe user as viewer (idempotent — duplicate key is tolerated).
+	// Subscribe user (idempotent — duplicate key is tolerated).
 	subPublicID := types.New()
 	_, err = q.CreateCalendarSubscription(ctx, generated.CreateCalendarSubscriptionParams{
 		PublicID:     subPublicID,
 		WorkspaceID:  workspaceID,
 		CalendarID:   calID,
 		UserID:       userID,
-		Role:         generated.CalendarSubscriptionsRoleViewer,
-		MemberColor:  "#EA4335",
 		DisplayColor: "#EA4335",
 	})
 	// Duplicate subscription is fine.

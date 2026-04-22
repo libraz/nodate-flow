@@ -348,33 +348,40 @@ func ensureTasks(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, pr
 }
 
 func ensureCalendar(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, userID uint32, wsName string, logger *slog.Logger) error {
-	// Check if a shared calendar already exists for this workspace.
+	// Check if a personal calendar already exists for this user in this workspace.
 	var calID uint32
 	err := db.QueryRowContext(ctx,
-		"SELECT id FROM calendars WHERE workspace_id = ? AND kind = 'shared' AND enabled = TRUE LIMIT 1",
-		wsID,
+		`SELECT id FROM calendars
+		 WHERE workspace_id = ? AND kind = 'personal' AND owner_user_id = ? AND enabled = TRUE
+		 LIMIT 1`,
+		wsID, userID,
 	).Scan(&calID)
 	if err == nil {
 		logger.Info("calendar exists", "calendar_id", calID)
-		// Ensure subscription exists.
 		return ensureSubscription(ctx, db, q, wsID, calID, userID, logger)
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
 
-	newID, err := q.CreateCalendar(ctx, generated.CreateCalendarParams{
-		PublicID:    types.New(),
-		WorkspaceID: wsID,
-		Kind:        generated.CalendarsKindShared,
-		Name:        wsName,
-		Color:       "#4285F4",
-	})
+	// Insert directly: the generated CreateCalendar signature drops
+	// owner_user_id after the R5 subscription cleanup; keep the
+	// personal-calendar seed until queries are rebuilt.
+	pub := types.New()
+	res, err := db.ExecContext(ctx,
+		`INSERT INTO calendars (public_id, workspace_id, kind, name, color, owner_user_id)
+		 VALUES (?, ?, 'personal', ?, '#4285F4', ?)`,
+		pub, wsID, wsName, userID,
+	)
 	if err != nil {
 		return err
 	}
-	logger.Info("created shared calendar", "id", newID)
-	return ensureSubscription(ctx, db, q, wsID, uint32(newID), userID, logger)
+	newID64, err := res.LastInsertId()
+	if err != nil {
+		return err
+	}
+	logger.Info("created personal calendar", "id", newID64)
+	return ensureSubscription(ctx, db, q, wsID, uint32(newID64), userID, logger)
 }
 
 func ensureSubscription(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, calID, userID uint32, logger *slog.Logger) error {
@@ -394,8 +401,8 @@ func ensureSubscription(ctx context.Context, db *sql.DB, q *generated.Queries, w
 	// Insert subscription directly since we know the schema.
 	pub := types.New()
 	if _, err := db.ExecContext(ctx,
-		`INSERT INTO calendar_subscriptions (public_id, calendar_id, user_id, workspace_id, role, member_color, display_color, visible, sort_weight)
-		 VALUES (?, ?, ?, ?, 'owner', '#4285F4', '#4285F4', TRUE, 0)`,
+		`INSERT INTO calendar_subscriptions (public_id, calendar_id, user_id, workspace_id, display_color, visible, sort_weight)
+		 VALUES (?, ?, ?, ?, '#4285F4', TRUE, 0)`,
 		pub, calID, userID, wsID,
 	); err != nil {
 		return err

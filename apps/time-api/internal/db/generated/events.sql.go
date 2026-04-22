@@ -50,8 +50,8 @@ type CreateCalendarEventParams struct {
 	ShowAs               CalendarEventsShowAs     `json:"showAs"`
 	Title                string                   `json:"title"`
 	AllDay               bool                     `json:"allDay"`
-	StartAt              time.Time                `json:"startAt"`
-	EndAt                time.Time                `json:"endAt"`
+	StartAt              sql.NullTime             `json:"startAt"`
+	EndAt                sql.NullTime             `json:"endAt"`
 	Timezone             string                   `json:"timezone"`
 	Location             sql.NullString           `json:"location"`
 	Memo                 sql.NullString           `json:"memo"`
@@ -170,8 +170,8 @@ type FindCalendarEventByPublicIdRow struct {
 	ShowAs               CalendarEventsShowAs     `json:"showAs"`
 	Title                string                   `json:"title"`
 	AllDay               bool                     `json:"allDay"`
-	StartAt              time.Time                `json:"startAt"`
-	EndAt                time.Time                `json:"endAt"`
+	StartAt              sql.NullTime             `json:"startAt"`
+	EndAt                sql.NullTime             `json:"endAt"`
 	Timezone             string                   `json:"timezone"`
 	Location             sql.NullString           `json:"location"`
 	Memo                 sql.NullString           `json:"memo"`
@@ -225,6 +225,7 @@ func (q *Queries) FindCalendarEventByPublicId(ctx context.Context, arg FindCalen
 }
 
 const findCalendarEventOwner = `-- name: FindCalendarEventOwner :one
+
 SELECT owner_user_id, calendar_id, workspace_id
 FROM calendar_events
 WHERE public_id = ?
@@ -244,106 +245,14 @@ type FindCalendarEventOwnerRow struct {
 	WorkspaceID uint32 `json:"-"`
 }
 
+// ListAllCalendarEvents was consumed only by the deleted ICS export path;
+// the replacement (R5.14) will query via calendar_public_shares.
 // Quick lookup for permission checks: who owns this event?
 func (q *Queries) FindCalendarEventOwner(ctx context.Context, arg FindCalendarEventOwnerParams) (FindCalendarEventOwnerRow, error) {
 	row := q.db.QueryRowContext(ctx, findCalendarEventOwner, arg.PublicID, arg.WorkspaceID)
 	var i FindCalendarEventOwnerRow
 	err := row.Scan(&i.OwnerUserID, &i.CalendarID, &i.WorkspaceID)
 	return i, err
-}
-
-const listAllCalendarEvents = `-- name: ListAllCalendarEvents :many
-SELECT
-  ce.public_id,
-  ce.kind,
-  ce.visibility,
-  ce.show_as,
-  ce.title,
-  ce.all_day,
-  ce.start_at,
-  ce.end_at,
-  ce.timezone,
-  ce.location,
-  ce.memo,
-  ce.url,
-  ce.block_label,
-  ce.recurrence_rule,
-  ce.recurrence_end,
-  ce.recurrence_exceptions,
-  ce.notification_offset,
-  ce.updated_at,
-  ce.created_at
-FROM calendar_events ce
-WHERE ce.calendar_id = ?
-  AND ce.enabled = TRUE
-ORDER BY ce.start_at ASC, ce.public_id ASC
-LIMIT 10000
-`
-
-type ListAllCalendarEventsRow struct {
-	PublicID             types.PublicID           `json:"publicId"`
-	Kind                 CalendarEventsKind       `json:"kind"`
-	Visibility           CalendarEventsVisibility `json:"visibility"`
-	ShowAs               CalendarEventsShowAs     `json:"showAs"`
-	Title                string                   `json:"title"`
-	AllDay               bool                     `json:"allDay"`
-	StartAt              time.Time                `json:"startAt"`
-	EndAt                time.Time                `json:"endAt"`
-	Timezone             string                   `json:"timezone"`
-	Location             sql.NullString           `json:"location"`
-	Memo                 sql.NullString           `json:"memo"`
-	Url                  sql.NullString           `json:"url"`
-	BlockLabel           sql.NullString           `json:"blockLabel"`
-	RecurrenceRule       json.RawMessage          `json:"recurrenceRule"`
-	RecurrenceEnd        sql.NullTime             `json:"recurrenceEnd"`
-	RecurrenceExceptions json.RawMessage          `json:"recurrenceExceptions"`
-	NotificationOffset   sql.NullInt32            `json:"notificationOffset"`
-	UpdatedAt            sql.NullTime             `json:"updatedAt"`
-	CreatedAt            time.Time                `json:"createdAt"`
-}
-
-// List all enabled events in a calendar (no date filter, for export).
-func (q *Queries) ListAllCalendarEvents(ctx context.Context, calendarID uint32) ([]ListAllCalendarEventsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listAllCalendarEvents, calendarID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListAllCalendarEventsRow{}
-	for rows.Next() {
-		var i ListAllCalendarEventsRow
-		if err := rows.Scan(
-			&i.PublicID,
-			&i.Kind,
-			&i.Visibility,
-			&i.ShowAs,
-			&i.Title,
-			&i.AllDay,
-			&i.StartAt,
-			&i.EndAt,
-			&i.Timezone,
-			&i.Location,
-			&i.Memo,
-			&i.Url,
-			&i.BlockLabel,
-			&i.RecurrenceRule,
-			&i.RecurrenceEnd,
-			&i.RecurrenceExceptions,
-			&i.NotificationOffset,
-			&i.UpdatedAt,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const listCalendarEventsAcrossCalendars = `-- name: ListCalendarEventsAcrossCalendars :many
@@ -383,10 +292,10 @@ LIMIT 1000
 `
 
 type ListCalendarEventsAcrossCalendarsParams struct {
-	UserID      uint32    `json:"-"`
-	WorkspaceID uint32    `json:"-"`
-	StartAt     time.Time `json:"startAt"`
-	EndAt       time.Time `json:"endAt"`
+	UserID      uint32       `json:"-"`
+	WorkspaceID uint32       `json:"-"`
+	StartAt     sql.NullTime `json:"startAt"`
+	EndAt       sql.NullTime `json:"endAt"`
 }
 
 type ListCalendarEventsAcrossCalendarsRow struct {
@@ -398,8 +307,8 @@ type ListCalendarEventsAcrossCalendarsRow struct {
 	ShowAs           CalendarEventsShowAs     `json:"showAs"`
 	Title            string                   `json:"title"`
 	AllDay           bool                     `json:"allDay"`
-	StartAt          time.Time                `json:"startAt"`
-	EndAt            time.Time                `json:"endAt"`
+	StartAt          sql.NullTime             `json:"startAt"`
+	EndAt            sql.NullTime             `json:"endAt"`
 	Timezone         string                   `json:"timezone"`
 	Location         sql.NullString           `json:"location"`
 	OwnerUserID      uint32                   `json:"-"`
@@ -489,9 +398,9 @@ LIMIT 1000
 `
 
 type ListCalendarEventsByRangeParams struct {
-	CalendarID uint32    `json:"-"`
-	StartAt    time.Time `json:"startAt"`
-	EndAt      time.Time `json:"endAt"`
+	CalendarID uint32       `json:"-"`
+	StartAt    sql.NullTime `json:"startAt"`
+	EndAt      sql.NullTime `json:"endAt"`
 }
 
 type ListCalendarEventsByRangeRow struct {
@@ -501,8 +410,8 @@ type ListCalendarEventsByRangeRow struct {
 	ShowAs             CalendarEventsShowAs     `json:"showAs"`
 	Title              string                   `json:"title"`
 	AllDay             bool                     `json:"allDay"`
-	StartAt            time.Time                `json:"startAt"`
-	EndAt              time.Time                `json:"endAt"`
+	StartAt            sql.NullTime             `json:"startAt"`
+	EndAt              sql.NullTime             `json:"endAt"`
 	Timezone           string                   `json:"timezone"`
 	Location           sql.NullString           `json:"location"`
 	Memo               sql.NullString           `json:"memo"`
@@ -543,6 +452,261 @@ func (q *Queries) ListCalendarEventsByRange(ctx context.Context, arg ListCalenda
 			&i.CreatedByUserID,
 			&i.BlockLabel,
 			&i.NotificationOffset,
+			&i.TaskID,
+			&i.UpdatedAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMyCalendarEventsAcrossWorkspaces = `-- name: ListMyCalendarEventsAcrossWorkspaces :many
+SELECT
+  ce.public_id,
+  ce.calendar_id,
+  c.public_id AS calendar_public_id,
+  ce.workspace_id,
+  w.public_id AS workspace_public_id,
+  w.name AS workspace_name,
+  ce.kind,
+  ce.visibility,
+  ce.show_as,
+  ce.title,
+  ce.all_day,
+  ce.start_at,
+  ce.end_at,
+  ce.timezone,
+  ce.location,
+  ce.owner_user_id,
+  ce.block_label,
+  ce.task_id,
+  ce.updated_at,
+  ce.created_at
+FROM calendar_events ce
+INNER JOIN calendars c
+  ON c.id = ce.calendar_id AND c.enabled = TRUE
+INNER JOIN workspaces w
+  ON w.id = ce.workspace_id AND w.enabled = TRUE
+INNER JOIN workspace_members wm
+  ON wm.workspace_id = ce.workspace_id
+  AND wm.user_id = ?
+  AND wm.enabled = TRUE
+INNER JOIN calendar_subscriptions cs
+  ON cs.calendar_id = ce.calendar_id
+  AND cs.user_id = wm.user_id
+  AND cs.visible = TRUE
+  AND cs.enabled = TRUE
+WHERE ce.recurrence_rule IS NULL
+  AND ce.start_at IS NOT NULL
+  AND ce.start_at < ?
+  AND ce.end_at > ?
+  AND ce.enabled = TRUE
+ORDER BY ce.start_at ASC, ce.public_id ASC
+LIMIT 2000
+`
+
+type ListMyCalendarEventsAcrossWorkspacesParams struct {
+	UserID  uint32       `json:"-"`
+	StartAt sql.NullTime `json:"startAt"`
+	EndAt   sql.NullTime `json:"endAt"`
+}
+
+type ListMyCalendarEventsAcrossWorkspacesRow struct {
+	PublicID          types.PublicID           `json:"publicId"`
+	CalendarID        uint32                   `json:"-"`
+	CalendarPublicID  types.PublicID           `json:"calendarPublicId"`
+	WorkspaceID       uint32                   `json:"-"`
+	WorkspacePublicID types.PublicID           `json:"workspacePublicId"`
+	WorkspaceName     string                   `json:"workspaceName"`
+	Kind              CalendarEventsKind       `json:"kind"`
+	Visibility        CalendarEventsVisibility `json:"visibility"`
+	ShowAs            CalendarEventsShowAs     `json:"showAs"`
+	Title             string                   `json:"title"`
+	AllDay            bool                     `json:"allDay"`
+	StartAt           sql.NullTime             `json:"startAt"`
+	EndAt             sql.NullTime             `json:"endAt"`
+	Timezone          string                   `json:"timezone"`
+	Location          sql.NullString           `json:"location"`
+	OwnerUserID       uint32                   `json:"-"`
+	BlockLabel        sql.NullString           `json:"blockLabel"`
+	TaskID            sql.NullInt32            `json:"-"`
+	UpdatedAt         sql.NullTime             `json:"updatedAt"`
+	CreatedAt         time.Time                `json:"createdAt"`
+}
+
+// Cross-workspace variant: list non-recurring events on every calendar
+// the caller is subscribed to, across every workspace where the caller
+// is still an active member. workspace_members is joined so that a
+// subscription row lingering past membership removal cannot leak rows
+// (belt-and-braces beyond the soft-disable cascade). Backs GET
+// /me/calendar-events for the unified flow-web calendar so the client
+// does not fan out one request per workspace.
+func (q *Queries) ListMyCalendarEventsAcrossWorkspaces(ctx context.Context, arg ListMyCalendarEventsAcrossWorkspacesParams) ([]ListMyCalendarEventsAcrossWorkspacesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listMyCalendarEventsAcrossWorkspaces, arg.UserID, arg.StartAt, arg.EndAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMyCalendarEventsAcrossWorkspacesRow{}
+	for rows.Next() {
+		var i ListMyCalendarEventsAcrossWorkspacesRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.CalendarID,
+			&i.CalendarPublicID,
+			&i.WorkspaceID,
+			&i.WorkspacePublicID,
+			&i.WorkspaceName,
+			&i.Kind,
+			&i.Visibility,
+			&i.ShowAs,
+			&i.Title,
+			&i.AllDay,
+			&i.StartAt,
+			&i.EndAt,
+			&i.Timezone,
+			&i.Location,
+			&i.OwnerUserID,
+			&i.BlockLabel,
+			&i.TaskID,
+			&i.UpdatedAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMyRecurringCalendarEventsAcrossWorkspaces = `-- name: ListMyRecurringCalendarEventsAcrossWorkspaces :many
+SELECT
+  ce.public_id,
+  ce.calendar_id,
+  c.public_id AS calendar_public_id,
+  ce.workspace_id,
+  w.public_id AS workspace_public_id,
+  w.name AS workspace_name,
+  ce.kind,
+  ce.visibility,
+  ce.show_as,
+  ce.title,
+  ce.all_day,
+  ce.start_at,
+  ce.end_at,
+  ce.timezone,
+  ce.location,
+  ce.owner_user_id,
+  ce.block_label,
+  ce.recurrence_rule,
+  ce.recurrence_end,
+  COALESCE(ce.recurrence_exceptions, CAST('null' AS JSON)) AS recurrence_exceptions,
+  ce.task_id,
+  ce.updated_at,
+  ce.created_at
+FROM calendar_events ce
+INNER JOIN calendars c
+  ON c.id = ce.calendar_id AND c.enabled = TRUE
+INNER JOIN workspaces w
+  ON w.id = ce.workspace_id AND w.enabled = TRUE
+INNER JOIN workspace_members wm
+  ON wm.workspace_id = ce.workspace_id
+  AND wm.user_id = ?
+  AND wm.enabled = TRUE
+INNER JOIN calendar_subscriptions cs
+  ON cs.calendar_id = ce.calendar_id
+  AND cs.user_id = wm.user_id
+  AND cs.visible = TRUE
+  AND cs.enabled = TRUE
+WHERE ce.recurrence_rule IS NOT NULL
+  AND ce.start_at IS NOT NULL
+  AND ce.start_at < ?
+  AND (ce.recurrence_end IS NULL OR ce.recurrence_end > ?)
+  AND ce.enabled = TRUE
+ORDER BY ce.start_at ASC, ce.public_id ASC
+LIMIT 2000
+`
+
+type ListMyRecurringCalendarEventsAcrossWorkspacesParams struct {
+	UserID        uint32       `json:"-"`
+	StartAt       sql.NullTime `json:"startAt"`
+	RecurrenceEnd sql.NullTime `json:"recurrenceEnd"`
+}
+
+type ListMyRecurringCalendarEventsAcrossWorkspacesRow struct {
+	PublicID             types.PublicID           `json:"publicId"`
+	CalendarID           uint32                   `json:"-"`
+	CalendarPublicID     types.PublicID           `json:"calendarPublicId"`
+	WorkspaceID          uint32                   `json:"-"`
+	WorkspacePublicID    types.PublicID           `json:"workspacePublicId"`
+	WorkspaceName        string                   `json:"workspaceName"`
+	Kind                 CalendarEventsKind       `json:"kind"`
+	Visibility           CalendarEventsVisibility `json:"visibility"`
+	ShowAs               CalendarEventsShowAs     `json:"showAs"`
+	Title                string                   `json:"title"`
+	AllDay               bool                     `json:"allDay"`
+	StartAt              sql.NullTime             `json:"startAt"`
+	EndAt                sql.NullTime             `json:"endAt"`
+	Timezone             string                   `json:"timezone"`
+	Location             sql.NullString           `json:"location"`
+	OwnerUserID          uint32                   `json:"-"`
+	BlockLabel           sql.NullString           `json:"blockLabel"`
+	RecurrenceRule       json.RawMessage          `json:"recurrenceRule"`
+	RecurrenceEnd        sql.NullTime             `json:"recurrenceEnd"`
+	RecurrenceExceptions json.RawMessage          `json:"recurrenceExceptions"`
+	TaskID               sql.NullInt32            `json:"-"`
+	UpdatedAt            sql.NullTime             `json:"updatedAt"`
+	CreatedAt            time.Time                `json:"createdAt"`
+}
+
+// Cross-workspace recurring variant. Same membership guard as the
+// non-recurring query. Clients expand RRULE instances client-side via
+// the shared recurrence expander.
+func (q *Queries) ListMyRecurringCalendarEventsAcrossWorkspaces(ctx context.Context, arg ListMyRecurringCalendarEventsAcrossWorkspacesParams) ([]ListMyRecurringCalendarEventsAcrossWorkspacesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listMyRecurringCalendarEventsAcrossWorkspaces, arg.UserID, arg.StartAt, arg.RecurrenceEnd)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMyRecurringCalendarEventsAcrossWorkspacesRow{}
+	for rows.Next() {
+		var i ListMyRecurringCalendarEventsAcrossWorkspacesRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.CalendarID,
+			&i.CalendarPublicID,
+			&i.WorkspaceID,
+			&i.WorkspacePublicID,
+			&i.WorkspaceName,
+			&i.Kind,
+			&i.Visibility,
+			&i.ShowAs,
+			&i.Title,
+			&i.AllDay,
+			&i.StartAt,
+			&i.EndAt,
+			&i.Timezone,
+			&i.Location,
+			&i.OwnerUserID,
+			&i.BlockLabel,
+			&i.RecurrenceRule,
+			&i.RecurrenceEnd,
+			&i.RecurrenceExceptions,
 			&i.TaskID,
 			&i.UpdatedAt,
 			&i.CreatedAt,
@@ -602,7 +766,7 @@ LIMIT 1000
 type ListRecurringCalendarEventsAcrossCalendarsParams struct {
 	UserID        uint32       `json:"-"`
 	WorkspaceID   uint32       `json:"-"`
-	StartAt       time.Time    `json:"startAt"`
+	StartAt       sql.NullTime `json:"startAt"`
 	RecurrenceEnd sql.NullTime `json:"recurrenceEnd"`
 }
 
@@ -615,8 +779,8 @@ type ListRecurringCalendarEventsAcrossCalendarsRow struct {
 	ShowAs               CalendarEventsShowAs     `json:"showAs"`
 	Title                string                   `json:"title"`
 	AllDay               bool                     `json:"allDay"`
-	StartAt              time.Time                `json:"startAt"`
-	EndAt                time.Time                `json:"endAt"`
+	StartAt              sql.NullTime             `json:"startAt"`
+	EndAt                sql.NullTime             `json:"endAt"`
 	Timezone             string                   `json:"timezone"`
 	Location             sql.NullString           `json:"location"`
 	OwnerUserID          uint32                   `json:"-"`
@@ -716,7 +880,7 @@ LIMIT 1000
 
 type ListRecurringCalendarEventsByRangeParams struct {
 	CalendarID    uint32       `json:"-"`
-	StartAt       time.Time    `json:"startAt"`
+	StartAt       sql.NullTime `json:"startAt"`
 	RecurrenceEnd sql.NullTime `json:"recurrenceEnd"`
 }
 
@@ -727,8 +891,8 @@ type ListRecurringCalendarEventsByRangeRow struct {
 	ShowAs               CalendarEventsShowAs     `json:"showAs"`
 	Title                string                   `json:"title"`
 	AllDay               bool                     `json:"allDay"`
-	StartAt              time.Time                `json:"startAt"`
-	EndAt                time.Time                `json:"endAt"`
+	StartAt              sql.NullTime             `json:"startAt"`
+	EndAt                sql.NullTime             `json:"endAt"`
 	Timezone             string                   `json:"timezone"`
 	Location             sql.NullString           `json:"location"`
 	Memo                 sql.NullString           `json:"memo"`

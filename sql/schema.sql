@@ -18,9 +18,9 @@ DROP TABLE IF EXISTS `calendar_event_attendees`;
 DROP TABLE IF EXISTS `calendar_event_checklist_items`;
 DROP TABLE IF EXISTS `calendar_event_comments`;
 DROP TABLE IF EXISTS `calendar_events`;
-DROP TABLE IF EXISTS `calendar_invites`;
-DROP TABLE IF EXISTS `calendar_member_filters`;
 DROP TABLE IF EXISTS `calendar_memos`;
+DROP TABLE IF EXISTS `calendar_public_share_events`;
+DROP TABLE IF EXISTS `calendar_public_shares`;
 DROP TABLE IF EXISTS `calendar_subscriptions`;
 DROP TABLE IF EXISTS `calendars`;
 DROP TABLE IF EXISTS `comments`;
@@ -55,6 +55,7 @@ DROP TABLE IF EXISTS `task_constraints`;
 DROP TABLE IF EXISTS `task_dependencies`;
 DROP TABLE IF EXISTS `task_description_versions`;
 DROP TABLE IF EXISTS `task_embeddings`;
+DROP TABLE IF EXISTS `task_event_links`;
 DROP TABLE IF EXISTS `task_labels`;
 DROP TABLE IF EXISTS `tasks`;
 DROP TABLE IF EXISTS `timebox_tasks`;
@@ -522,10 +523,9 @@ CREATE TABLE calendar_event_comments (
 -- >>> calendar_events.sql
 -- ====================================
 -- calendar_events
--- Calendar event with structured kinds (event/block/free), visibility
--- levels, and show_as states. owner_user_id determines whose layer the
--- event appears on; created_by tracks who actually created it (supports
--- manager delegation).
+-- Calendar events with kind/visibility/show_as classification; nullable
+-- start/end for planning-stage placeholders; task_role links to task
+-- projection (D1).
 -- ====================================
 CREATE TABLE calendar_events (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
@@ -534,14 +534,14 @@ CREATE TABLE calendar_events (
   calendar_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to calendars.id',
 
   -- Event classification
-  kind ENUM('event','block','free') NOT NULL DEFAULT 'event' COMMENT 'event=regular, block=declarative time frame (work hours, focus), free=available slot',
+  kind ENUM('event','block','free','milestone') NOT NULL DEFAULT 'event' COMMENT 'event=regular, block=declarative time frame (work hours, focus), free=available slot, milestone=umbrella/milestone, has no duration semantics',
   visibility ENUM('default','public','private','confidential') NOT NULL DEFAULT 'default' COMMENT 'Who can see event details: default (calendar setting), public (all), private (time only), confidential (owner only)',
   show_as ENUM('busy','free','tentative','oof') NOT NULL DEFAULT 'busy' COMMENT 'Availability display: busy, free, tentative, out-of-office',
 
   title VARCHAR(500) NOT NULL COMMENT 'Event title',
   all_day BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'All-day event flag',
-  start_at DATETIME NOT NULL COMMENT 'Start time (UTC or with timezone context)',
-  end_at DATETIME NOT NULL COMMENT 'End time',
+  start_at DATETIME NULL COMMENT 'Start time (UTC or with timezone context); NULL = undated (planning-stage placeholder)',
+  end_at DATETIME NULL COMMENT 'End time; NULL = undated (planning-stage placeholder)',
   timezone VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT 'UTC' COMMENT 'IANA timezone identifier; resolved from event > user > workspace > UTC',
 
   location VARCHAR(500) NULL COMMENT 'Location text',
@@ -565,9 +565,11 @@ CREATE TABLE calendar_events (
 
   -- Cross-module link to nodate-flow tasks
   task_id INT UNSIGNED NULL COMMENT 'Linked task (optional, for task-calendar sync)',
+  task_role ENUM('event','due','scheduled') NULL COMMENT 'When task_id IS NOT NULL: which task field this event represents. event=task.event_on (legacy, being removed), due=task.due_on, scheduled=time-blocked (multi-link allowed).',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
+  flags JSON NULL COMMENT 'Structured per-event markers (non_working_day, auto_snapped, etc.); unknown keys preserved.',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -577,73 +579,28 @@ CREATE TABLE calendar_events (
   KEY idx_calendar_events_workspace_owner (workspace_id, owner_user_id, start_at),
   KEY idx_calendar_events_calendar_recurrence (calendar_id, recurrence_end),
   KEY idx_calendar_events_workspace_range (workspace_id, start_at, end_at),
-  KEY idx_calendar_events_task (task_id),
+  KEY idx_calendar_events_task_role (task_id, task_role, enabled),
   FULLTEXT KEY ft_calendar_events_title_memo (title, memo),
 
   CONSTRAINT fk_calendar_events_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_events_calendar FOREIGN KEY (calendar_id) REFERENCES calendars(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_events_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_events_creator FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_calendar_events_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Calendar events with kind/visibility/show_as classification';
+  CONSTRAINT fk_calendar_events_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
 
--- >>> calendar_invites.sql
--- ====================================
--- calendar_invites
--- Shareable invite links for joining a calendar. Supports optional
--- expiration, max usage count, and role assignment on acceptance.
--- ====================================
-CREATE TABLE calendar_invites (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
-  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
-  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
-  calendar_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to calendars.id',
-  created_by_user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id (invite creator)',
-
-  token_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'SHA-256 hex of invite token plaintext',
-  role ENUM('manager','editor','viewer') NOT NULL DEFAULT 'editor' COMMENT 'Role granted on acceptance',
-  max_uses INT UNSIGNED NULL COMMENT 'Max number of uses; NULL = unlimited',
-  use_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Current number of uses',
-  expires_at DATETIME NULL COMMENT 'Expiration time; NULL = never expires',
-
-  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
-  notes TEXT NULL COMMENT 'Admin notes',
-  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-  UNIQUE KEY uniq_calendar_invites_public_id (public_id),
-  UNIQUE KEY uniq_calendar_invites_token_hash (token_hash),
-  KEY idx_calendar_invites_calendar (workspace_id, calendar_id),
-  KEY idx_calendar_invites_creator (workspace_id, created_by_user_id),
-
-  CONSTRAINT fk_calendar_invites_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_calendar_invites_calendar FOREIGN KEY (calendar_id) REFERENCES calendars(id) ON DELETE CASCADE,
-  CONSTRAINT fk_calendar_invites_creator FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Calendar invite links';
-
--- >>> calendar_member_filters.sql
--- ====================================
--- calendar_member_filters
--- Per-subscriber toggle to hide specific members within a shared calendar.
--- Negative-list pattern: rows exist only for hidden members. If no row
--- exists for a (subscription, target_user) pair, the member is visible.
--- ====================================
-CREATE TABLE calendar_member_filters (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
-  subscription_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to calendar_subscriptions.id (the viewer)',
-  target_user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id (the member being hidden)',
-
-  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-  UNIQUE KEY uniq_calendar_member_filters_sub_target (subscription_id, target_user_id),
-  KEY idx_calendar_member_filters_target_user (target_user_id),
-
-  CONSTRAINT fk_calendar_member_filters_subscription FOREIGN KEY (subscription_id) REFERENCES calendar_subscriptions(id) ON DELETE CASCADE,
-  CONSTRAINT fk_calendar_member_filters_target FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Per-subscriber member visibility filters for shared calendars';
+  -- CHECK constraints that do not reference task_id. MySQL 8.4+
+  -- forbids CHECK constraints referencing columns used in FK
+  -- referential actions (task_id has ON DELETE SET NULL), so the
+  -- task_id-related invariants listed below are enforced by itemkit
+  -- and verified by the reconciler instead:
+  --   (task_id IS NULL) = (task_role IS NULL)
+  --   task_id IS NULL OR recurrence_rule IS NULL
+  CONSTRAINT chk_calendar_events_start_end_pair CHECK (start_at IS NULL OR end_at IS NOT NULL),
+  CONSTRAINT chk_calendar_events_recurrence_requires_start CHECK (start_at IS NOT NULL OR recurrence_rule IS NULL),
+  CONSTRAINT chk_calendar_events_notification_requires_start CHECK (start_at IS NOT NULL OR notification_offset IS NULL),
+  CONSTRAINT chk_calendar_events_chronology CHECK (end_at IS NULL OR start_at IS NULL OR end_at >= start_at),
+  CONSTRAINT chk_calendar_events_milestone_no_recurrence CHECK (kind <> 'milestone' OR recurrence_rule IS NULL)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Calendar events with kind/visibility/show_as classification; nullable start/end for planning-stage placeholders; task_role links to task projection (D1).';
 
 -- >>> calendar_memos.sql
 -- ====================================
@@ -678,13 +635,80 @@ CREATE TABLE calendar_memos (
   CONSTRAINT fk_calendar_memos_creator FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Calendar-level shared memos / to-do items';
 
+-- >>> calendar_public_share_events.sql
+-- ====================================
+-- calendar_public_share_events
+-- M:N between calendar_public_shares and calendar_events. Row
+-- existence = opt-in for external visibility on that specific share
+-- page. One event can appear on multiple shares (e.g. joint concerts
+-- listed under two artist pages); removing a row unpublishes without
+-- affecting internal visibility.
+-- ====================================
+CREATE TABLE calendar_public_share_events (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id; denormalized from share for tenant isolation',
+  share_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to calendar_public_shares.id',
+  event_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to calendar_events.id',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Override display order on the share page',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag (soft-disable)',
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  UNIQUE KEY uniq_calendar_public_share_events_public_id (public_id),
+  UNIQUE KEY uniq_calendar_public_share_events_share_event (share_id, event_id, enabled) COMMENT 'At most one enabled publication per (share, event)',
+  KEY idx_calendar_public_share_events_workspace_event (workspace_id, event_id, enabled),
+
+  CONSTRAINT fk_calendar_public_share_events_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_calendar_public_share_events_share FOREIGN KEY (share_id) REFERENCES calendar_public_shares(id) ON DELETE CASCADE,
+  CONSTRAINT fk_calendar_public_share_events_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='M:N: which events appear on which public share pages';
+
+-- >>> calendar_public_shares.sql
+-- ====================================
+-- calendar_public_shares
+-- Workspace-owned publishable read-only pages. Any ws non-guest member
+-- can create/edit; delete is admin-only to prevent accidental URL loss.
+-- Token is stored as SHA-256 hash; plaintext is returned exactly once
+-- at create or rotate.
+-- ====================================
+CREATE TABLE calendar_public_shares (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  created_by_user_id INT UNSIGNED NULL COMMENT 'Audit trail; ownership is workspace-level so shares survive creator removal',
+
+  token_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'SHA-256 hex of URL token; plaintext returned once at create/rotate',
+  title VARCHAR(255) NOT NULL COMMENT 'Public-facing page title',
+  description TEXT NULL COMMENT 'Public-facing description (markdown)',
+  icon_url VARCHAR(2048) NULL COMMENT 'Public-facing icon image URL',
+  cover_url VARCHAR(2048) NULL COMMENT 'Public-facing cover image URL',
+
+  timezone VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT 'UTC' COMMENT 'Display tz for the public page; defaults to workspace tz at create',
+  show_holidays_country CHAR(2) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'ISO 3166-1 alpha-2; NULL = no holiday overlay',
+  expires_at DATETIME NULL COMMENT 'NULL = never expires',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order within workspace admin UI',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag (soft-disable)',
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  UNIQUE KEY uniq_calendar_public_shares_public_id (public_id),
+  UNIQUE KEY uniq_calendar_public_shares_token_hash (token_hash),
+  KEY idx_calendar_public_shares_workspace (workspace_id, enabled),
+
+  CONSTRAINT fk_calendar_public_shares_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_calendar_public_shares_creator FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Workspace-owned publishable read-only share pages';
+
 -- >>> calendar_subscriptions.sql
 -- ====================================
 -- calendar_subscriptions
--- A user's relationship to a calendar: membership + display preferences.
--- For shared calendars, member_color is the per-person color visible to
--- all members (TimeTree-style). For personal/system calendars,
--- display_color is the subscriber's private display preference.
+-- Per-user display preferences for a calendar (color, visibility).
+-- Not an ACL axis — event-level visibility is the only ws-internal ACL.
 -- ====================================
 CREATE TABLE calendar_subscriptions (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
@@ -693,12 +717,7 @@ CREATE TABLE calendar_subscriptions (
   calendar_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to calendars.id',
   user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
 
-  role ENUM('owner','manager','editor','viewer') NOT NULL DEFAULT 'editor' COMMENT 'Calendar-level role: owner (full), manager (delegate), editor (own events), viewer (read-only)',
-
-  -- Shared calendar: per-member color seen by everyone in the calendar.
-  member_color VARCHAR(7) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT '#4285F4' COMMENT 'Member color in shared calendars (visible to all)',
-  -- Personal/system calendar: subscriber-private display color.
-  display_color VARCHAR(7) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT '#4285F4' COMMENT 'Display color for personal/system calendars (private to subscriber)',
+  display_color VARCHAR(7) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT '#4285F4' COMMENT 'Per-subscriber private display color',
 
   visible BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Whether this calendar layer is shown in UI',
 
@@ -716,27 +735,27 @@ CREATE TABLE calendar_subscriptions (
   CONSTRAINT fk_calendar_subscriptions_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_subscriptions_calendar FOREIGN KEY (calendar_id) REFERENCES calendars(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_subscriptions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Calendar membership and display preferences';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Per-user display preferences for a calendar (color, visibility). Not an ACL axis — event-level visibility is the only ws-internal ACL.';
 
 -- >>> calendars.sql
 -- ====================================
 -- calendars
--- Calendar container. Three kinds: personal (1:1 per user), shared
--- (TimeTree-style group calendar where person=color=layer), and system
--- (read-only holiday feeds injected at query time).
+-- Calendar containers (personal layer or system holiday feed).
+-- Workspace members share events through event-level visibility
+-- (public/private/confidential), not shared-calendar membership.
 -- ====================================
 CREATE TABLE calendars (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
 
-  kind ENUM('personal','shared','system') NOT NULL DEFAULT 'shared' COMMENT 'Calendar kind: personal (1:1 per user), shared (group), system (holidays)',
+  kind ENUM('personal','system') NOT NULL DEFAULT 'personal' COMMENT 'Calendar kind: personal (user-owned layer, may own many), system (holiday feeds).',
   name VARCHAR(255) NOT NULL COMMENT 'Display name',
   description TEXT NULL COMMENT 'Optional description',
   color VARCHAR(7) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT '#4285F4' COMMENT 'Default hex color',
   cover_url VARCHAR(2048) NULL COMMENT 'Cover image URL',
 
-  owner_user_id INT UNSIGNED NULL COMMENT 'For personal calendars: the owning user. NULL for shared/system',
+  owner_user_id INT UNSIGNED NULL COMMENT 'For personal calendars: the owning user. NULL for system',
   system_slug VARCHAR(100) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'For system calendars: provider identifier (e.g., holidays.jp)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
@@ -746,13 +765,12 @@ CREATE TABLE calendars (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   UNIQUE KEY uniq_calendars_public_id (public_id),
-  UNIQUE KEY uniq_calendars_personal (workspace_id, owner_user_id, kind, enabled) COMMENT 'At most one enabled personal calendar per user per workspace',
   UNIQUE KEY uniq_calendars_system_slug (workspace_id, system_slug),
   KEY idx_calendars_workspace_id_kind (workspace_id, kind),
 
   CONSTRAINT fk_calendars_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendars_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Calendar containers (personal/shared/system)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Calendar containers (personal layer or system holiday feed). Workspace members share events through event-level visibility (public/private/confidential), not shared-calendar membership.';
 
 -- >>> comments.sql
 -- ====================================
@@ -1838,6 +1856,40 @@ CREATE TABLE task_embeddings (
   CONSTRAINT fk_task_embeddings_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Task embedding vectors for duplicate detection (ADR 0003)';
 
+-- >>> task_event_links.sql
+-- ====================================
+-- task_event_links
+-- M:N between tasks and calendar_events. Parallel to task_dependencies
+-- (task-to-task). Encodes contribution/dependency semantics BETWEEN a
+-- task and an umbrella event or milestone; distinct from the 1:1
+-- projection relation stored via calendar_events.task_id + task_role.
+-- ====================================
+CREATE TABLE task_event_links (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  task_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to tasks.id',
+  event_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to calendar_events.id',
+
+  relation ENUM('contributes_to','blocks','depends_on','prep_for') NOT NULL DEFAULT 'contributes_to'
+    COMMENT 'contributes_to = task is work toward an umbrella event; blocks/depends_on/prep_for reserved for future',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order within an event''s linked-task list',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag (soft-disable)',
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  UNIQUE KEY uniq_task_event_links_public_id (public_id),
+  UNIQUE KEY uniq_task_event_links_task_event_relation (task_id, event_id, relation, enabled) COMMENT 'At most one enabled link per (task, event, relation)',
+  KEY idx_task_event_links_workspace_event (workspace_id, event_id, enabled),
+  KEY idx_task_event_links_workspace_task (workspace_id, task_id, enabled),
+
+  CONSTRAINT fk_task_event_links_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_task_event_links_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+  CONSTRAINT fk_task_event_links_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='M:N task-to-event relationships (umbrella events, milestones)';
+
 -- >>> task_labels.sql
 -- ====================================
 -- task_labels
@@ -1887,7 +1939,7 @@ CREATE TABLE tasks (
   priority INT NOT NULL DEFAULT 0 COMMENT 'LLM-optimized heuristic priority',
   due_on DATE NULL COMMENT 'Deadline for task completion; drives constraint evaluation',
   started_on DATE NULL COMMENT 'Date work began on this task',
-  event_on DATE NULL COMMENT 'External reference date (meeting, launch, milestone) this task relates to; NOT a constraint — use deadline constraint for enforcement',
+  event_on DATE NULL COMMENT 'DEPRECATED (R5.3): use calendar_events.task_role=''event''. Kept for source compat until flow-api handlers and SDK rewire',
   completed_at DATETIME NULL COMMENT 'Time derived_state transitioned to done',
   archived_at DATETIME NULL COMMENT 'Set when task is archived (distinct from enabled)',
 
@@ -2147,6 +2199,11 @@ CREATE TABLE users (
   locale VARCHAR(16) NOT NULL DEFAULT 'en' COMMENT 'Preferred locale tag (BCP 47)',
   timezone VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT 'UTC' COMMENT 'Preferred IANA timezone (independent of locale)',
   country CHAR(2) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'ISO 3166-1 alpha-2 country (independent of locale); drives default holiday subscription',
+  working_days CHAR(7) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'User override of workspace working_days; NULL = inherit',
+  working_hours_start TIME NULL COMMENT 'User override of workspace working_hours_start; NULL = inherit',
+  working_hours_end TIME NULL COMMENT 'User override of workspace working_hours_end; NULL = inherit',
+  snap_to_working_day ENUM('off','warn','auto') NOT NULL DEFAULT 'warn' COMMENT 'What happens when a task/event lands on a non-working day: off=accept silently, warn=save with badge, auto=itemkit snaps forward to next working day',
+  treat_holidays_as_non_working BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'If true, subscribed system (holiday) calendar events count as non-working days',
   theme_preference ENUM('aurora-light','aurora-dark','dotline-light','dotline-dark','glass-light','glass-dark','system') NOT NULL DEFAULT 'system' COMMENT 'UI theme preference',
   last_login_at DATETIME NULL COMMENT 'Last successful login',
 
@@ -2320,6 +2377,9 @@ CREATE TABLE workspaces (
 
   timezone VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT 'UTC' COMMENT 'Default IANA timezone for the workspace; user tz overrides per-user',
   country CHAR(2) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'ISO 3166-1 alpha-2 country; drives default holiday subscription',
+  working_days CHAR(7) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT 'MTWTF__' COMMENT 'Per-day flag string Mon..Sun; letter = working, underscore = off. Default MTWTF__ = Mon-Fri.',
+  working_hours_start TIME NOT NULL DEFAULT '09:00:00' COMMENT 'Start of workspace working day (local tz)',
+  working_hours_end TIME NOT NULL DEFAULT '18:00:00' COMMENT 'End of workspace working day (local tz)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',

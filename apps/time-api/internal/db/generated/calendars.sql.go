@@ -39,8 +39,8 @@ type CreateCalendarParams struct {
 	SystemSlug  sql.NullString `json:"systemSlug"`
 }
 
-// Insert a new calendar. kind determines behavior: personal (1:1 user),
-// shared (group), system (holidays).
+// Insert a new calendar. kind determines behavior: personal (user-owned
+// layer, may own many) or system (holiday feeds).
 func (q *Queries) CreateCalendar(ctx context.Context, arg CreateCalendarParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, createCalendar,
 		arg.PublicID,
@@ -251,8 +251,6 @@ SELECT
   c.cover_url,
   c.owner_user_id,
   c.system_slug,
-  cs.role,
-  cs.member_color,
   cs.display_color,
   cs.visible,
   cs.sort_weight AS subscription_sort_weight,
@@ -273,22 +271,20 @@ type ListCalendarsForUserParams struct {
 }
 
 type ListCalendarsForUserRow struct {
-	ID                     uint32                    `json:"-"`
-	PublicID               types.PublicID            `json:"publicId"`
-	Kind                   CalendarsKind             `json:"kind"`
-	Name                   string                    `json:"name"`
-	Description            sql.NullString            `json:"description"`
-	Color                  string                    `json:"color"`
-	CoverUrl               sql.NullString            `json:"coverUrl"`
-	OwnerUserID            sql.NullInt32             `json:"-"`
-	SystemSlug             sql.NullString            `json:"systemSlug"`
-	Role                   CalendarSubscriptionsRole `json:"role"`
-	MemberColor            string                    `json:"memberColor"`
-	DisplayColor           string                    `json:"displayColor"`
-	Visible                bool                      `json:"visible"`
-	SubscriptionSortWeight int32                     `json:"subscriptionSortWeight"`
-	UpdatedAt              sql.NullTime              `json:"updatedAt"`
-	CreatedAt              time.Time                 `json:"createdAt"`
+	ID                     uint32         `json:"-"`
+	PublicID               types.PublicID `json:"publicId"`
+	Kind                   CalendarsKind  `json:"kind"`
+	Name                   string         `json:"name"`
+	Description            sql.NullString `json:"description"`
+	Color                  string         `json:"color"`
+	CoverUrl               sql.NullString `json:"coverUrl"`
+	OwnerUserID            sql.NullInt32  `json:"-"`
+	SystemSlug             sql.NullString `json:"systemSlug"`
+	DisplayColor           string         `json:"displayColor"`
+	Visible                bool           `json:"visible"`
+	SubscriptionSortWeight int32          `json:"subscriptionSortWeight"`
+	UpdatedAt              sql.NullTime   `json:"updatedAt"`
+	CreatedAt              time.Time      `json:"createdAt"`
 }
 
 // List all calendars a user subscribes to within a workspace.
@@ -311,8 +307,6 @@ func (q *Queries) ListCalendarsForUser(ctx context.Context, arg ListCalendarsFor
 			&i.CoverUrl,
 			&i.OwnerUserID,
 			&i.SystemSlug,
-			&i.Role,
-			&i.MemberColor,
 			&i.DisplayColor,
 			&i.Visible,
 			&i.SubscriptionSortWeight,

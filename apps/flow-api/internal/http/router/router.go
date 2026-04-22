@@ -35,7 +35,6 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	aihandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/ai"
-	calhandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/calendars"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/dashboard"
 	exporthandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/export"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/favorites"
@@ -363,8 +362,6 @@ func BuildResult(deps Deps) Result {
 		dashboard.RegisterWorkspaceScoped(subAPI, dashDeps)
 		pageDeps := pages.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
 		pages.RegisterWorkspaceScoped(subAPI, pageDeps)
-		calDeps := calhandlers.Deps{DB: deps.DB, Queries: deps.Queries}
-		calhandlers.Register(subAPI, calDeps)
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-cost-today",
 			Method:      http.MethodGet,

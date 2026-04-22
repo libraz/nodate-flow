@@ -131,8 +131,6 @@ type Querier interface {
 	// within the given time window. Used by the AI metrics endpoint
 	// to compute acceptance rate.
 	CountAiSuggestionOutcomesForWorkspace(ctx context.Context, arg CountAiSuggestionOutcomesForWorkspaceParams) (CountAiSuggestionOutcomesForWorkspaceRow, error)
-	// Count how many owners a calendar has (prevent last-owner removal).
-	CountCalendarOwners(ctx context.Context, calendarID uint32) (int64, error)
 	// Count enabled child pages for a given parent. Used to check before deletion.
 	CountChildPages(ctx context.Context, arg CountChildPagesParams) (int64, error)
 	// Count total and completed tasks in a timebox for progress tracking.
@@ -144,8 +142,8 @@ type Querier interface {
 	CountUnreadNotificationsForWorkspace(ctx context.Context, arg CountUnreadNotificationsForWorkspaceParams) (int64, error)
 	// Insert a new reusable agent configuration.
 	CreateAgent(ctx context.Context, arg CreateAgentParams) (int64, error)
-	// Insert a new calendar. kind determines behavior: personal (1:1 user),
-	// shared (group), system (holidays).
+	// Insert a new calendar. kind determines behavior: personal (user-owned
+	// layer, may own many) or system (holiday feeds).
 	CreateCalendar(ctx context.Context, arg CreateCalendarParams) (int64, error)
 	// Add a checklist item to a calendar event.
 	CreateCalendarChecklistItem(ctx context.Context, arg CreateCalendarChecklistItemParams) (int64, error)
@@ -157,11 +155,10 @@ type Querier interface {
 	CreateCalendarEventAttendee(ctx context.Context, arg CreateCalendarEventAttendeeParams) (int64, error)
 	// Add a comment to a calendar event.
 	CreateCalendarEventComment(ctx context.Context, arg CreateCalendarEventCommentParams) (int64, error)
-	// Create a shareable invite link for a calendar.
-	CreateCalendarInvite(ctx context.Context, arg CreateCalendarInviteParams) (int64, error)
 	// Add a shared memo/to-do item to a calendar.
 	CreateCalendarMemo(ctx context.Context, arg CreateCalendarMemoParams) (int64, error)
-	// Subscribe a user to a calendar with a role and display preferences.
+	// Subscribe a user to a calendar with display preferences.
+	// Not an ACL axis — event-level visibility governs access.
 	CreateCalendarSubscription(ctx context.Context, arg CreateCalendarSubscriptionParams) (int64, error)
 	// Insert a new description version snapshot.
 	CreateDescriptionVersion(ctx context.Context, arg CreateDescriptionVersionParams) (int64, error)
@@ -181,8 +178,6 @@ type Querier interface {
 	CreateMagicLinkToken(ctx context.Context, arg CreateMagicLinkTokenParams) (int64, error)
 	// Insert a new MCP token. Plain token is shown to the user once.
 	CreateMcpToken(ctx context.Context, arg CreateMcpTokenParams) (int64, error)
-	// Hide a specific member's events within a shared calendar for a subscriber.
-	CreateMemberFilter(ctx context.Context, arg CreateMemberFilterParams) error
 	// Insert a mention record after extracting @mentions from markdown.
 	CreateMention(ctx context.Context, arg CreateMentionParams) (int64, error)
 	// Create a single notification entry for a recipient.
@@ -277,8 +272,6 @@ type Querier interface {
 	DisableCalendarEventAttendee(ctx context.Context, arg DisableCalendarEventAttendeeParams) error
 	// Soft-delete a comment (author or calendar owner).
 	DisableCalendarEventComment(ctx context.Context, arg DisableCalendarEventCommentParams) error
-	// Revoke an invite link.
-	DisableCalendarInvite(ctx context.Context, arg DisableCalendarInviteParams) error
 	// Soft-delete a memo.
 	DisableCalendarMemo(ctx context.Context, arg DisableCalendarMemoParams) error
 	// Remove a user from a calendar (soft-delete).
@@ -338,12 +331,10 @@ type Querier interface {
 	FindCalendarEventByPublicId(ctx context.Context, arg FindCalendarEventByPublicIdParams) (FindCalendarEventByPublicIdRow, error)
 	// Resolve a comment by UUID v7.
 	FindCalendarEventCommentByPublicId(ctx context.Context, arg FindCalendarEventCommentByPublicIdParams) (FindCalendarEventCommentByPublicIdRow, error)
+	// ListAllCalendarEvents was consumed only by the deleted ICS export path;
+	// the replacement (R5.14) will query via calendar_public_shares.
 	// Quick lookup for permission checks: who owns this event?
 	FindCalendarEventOwner(ctx context.Context, arg FindCalendarEventOwnerParams) (FindCalendarEventOwnerRow, error)
-	// Resolve an invite by its token hash for the acceptance flow.
-	FindCalendarInviteByTokenHash(ctx context.Context, tokenHash string) (FindCalendarInviteByTokenHashRow, error)
-	// Public-facing invite lookup (for share page preview, no auth required).
-	FindCalendarInviteByTokenHashPublic(ctx context.Context, tokenHash string) (FindCalendarInviteByTokenHashPublicRow, error)
 	// Resolve a memo by UUID v7.
 	FindCalendarMemoByPublicId(ctx context.Context, arg FindCalendarMemoByPublicIdParams) (FindCalendarMemoByPublicIdRow, error)
 	// Look up a user's subscription to a specific calendar.
@@ -523,8 +514,6 @@ type Querier interface {
 	// Check if any events have occurred in the workspace since the given timestamp.
 	// Used by the agent runtime pre-flight check to skip LLM calls when idle.
 	HasRecentEventsForWorkspace(ctx context.Context, arg HasRecentEventsForWorkspaceParams) (bool, error)
-	// Bump the use counter after a successful acceptance.
-	IncrementCalendarInviteUseCount(ctx context.Context, id uint32) error
 	// Bump the use counter after a successful accept.
 	IncrementInviteUseCount(ctx context.Context, id uint32) error
 	// Insert a hashed recovery code for a user.
@@ -551,8 +540,6 @@ type Querier interface {
 	// by the AI activity panel. All columns here are already redacted at
 	// write time by the orchestrator; safe to surface at the API boundary.
 	ListAiInvocationsForWorkspace(ctx context.Context, arg ListAiInvocationsForWorkspaceParams) ([]ListAiInvocationsForWorkspaceRow, error)
-	// List all enabled events in a calendar (no date filter, for export).
-	ListAllCalendarEvents(ctx context.Context, calendarID uint32) ([]ListAllCalendarEventsRow, error)
 	// List archived tasks via v_task_list_archived.
 	ListArchivedTasksForWorkspace(ctx context.Context, arg ListArchivedTasksForWorkspaceParams) ([]ListArchivedTasksForWorkspaceRow, error)
 	// List attachments on a task with uploader display fields.
@@ -578,8 +565,6 @@ type Querier interface {
 	ListCalendarEventsAcrossCalendars(ctx context.Context, arg ListCalendarEventsAcrossCalendarsParams) ([]ListCalendarEventsAcrossCalendarsRow, error)
 	// List non-recurring events in a calendar within a time range.
 	ListCalendarEventsByRange(ctx context.Context, arg ListCalendarEventsByRangeParams) ([]ListCalendarEventsByRangeRow, error)
-	// List active invites for a calendar.
-	ListCalendarInvites(ctx context.Context, arg ListCalendarInvitesParams) ([]ListCalendarInvitesRow, error)
 	// List memos for a calendar in display order.
 	ListCalendarMemos(ctx context.Context, calendarID uint32) ([]ListCalendarMemosRow, error)
 	// List all subscribers of a calendar (for member list, color resolution).
@@ -645,14 +630,24 @@ type Querier interface {
 	ListLensesForProject(ctx context.Context, arg ListLensesForProjectParams) ([]ListLensesForProjectRow, error)
 	// List a user's MCP tokens in a workspace, masked.
 	ListMcpTokensForUser(ctx context.Context, arg ListMcpTokensForUserParams) ([]ListMcpTokensForUserRow, error)
-	// List hidden members for a subscription.
-	ListMemberFilters(ctx context.Context, subscriptionID uint32) ([]uint32, error)
 	// List all mentions within a specific task (description or comments).
 	ListMentionsForTask(ctx context.Context, taskID sql.NullInt32) ([]ListMentionsForTaskRow, error)
 	// List mentions where a user was mentioned, within a workspace.
 	ListMentionsForUser(ctx context.Context, arg ListMentionsForUserParams) ([]ListMentionsForUserRow, error)
 	// List models registered under a provider. Workspace-scoped.
 	ListModelsForProvider(ctx context.Context, arg ListModelsForProviderParams) ([]ListModelsForProviderRow, error)
+	// Cross-workspace variant: list non-recurring events on every calendar
+	// the caller is subscribed to, across every workspace where the caller
+	// is still an active member. workspace_members is joined so that a
+	// subscription row lingering past membership removal cannot leak rows
+	// (belt-and-braces beyond the soft-disable cascade). Backs GET
+	// /me/calendar-events for the unified flow-web calendar so the client
+	// does not fan out one request per workspace.
+	ListMyCalendarEventsAcrossWorkspaces(ctx context.Context, arg ListMyCalendarEventsAcrossWorkspacesParams) ([]ListMyCalendarEventsAcrossWorkspacesRow, error)
+	// Cross-workspace recurring variant. Same membership guard as the
+	// non-recurring query. Clients expand RRULE instances client-side via
+	// the shared recurrence expander.
+	ListMyRecurringCalendarEventsAcrossWorkspaces(ctx context.Context, arg ListMyRecurringCalendarEventsAcrossWorkspacesParams) ([]ListMyRecurringCalendarEventsAcrossWorkspacesRow, error)
 	// Tasks where the given user is attached as an actor, via v_my_tasks.
 	ListMyTasks(ctx context.Context, arg ListMyTasksParams) ([]ListMyTasksRow, error)
 	// Cross-workspace variant: tasks where the given user is attached as an
@@ -661,6 +656,13 @@ type Querier interface {
 	// GET /me/tasks to power the cross-workspace "Today" / Calendar views in
 	// the web client without fanning out one request per workspace.
 	ListMyTasksGlobal(ctx context.Context, arg ListMyTasksGlobalParams) ([]ListMyTasksGlobalRow, error)
+	// Cross-workspace variant scoped to tasks whose event_on OR due_on falls
+	// inside the requested [from, to] inclusive date range. Backs the unified
+	// flow-web calendar: combined with /me/calendar-events it gives a single
+	// round-trip answer for "what is on my plate across every workspace on
+	// these days". Undated tasks are excluded; use ListMyTasksGlobal for the
+	// planning bucket.
+	ListMyTasksWithDates(ctx context.Context, arg ListMyTasksWithDatesParams) ([]ListMyTasksWithDatesRow, error)
 	// List all notification preferences for a user in a workspace.
 	ListNotificationPreferencesForUser(ctx context.Context, arg ListNotificationPreferencesForUserParams) ([]ListNotificationPreferencesForUserRow, error)
 	// List notifications for a user across all their workspaces, ordered newest first.
@@ -813,7 +815,7 @@ type Querier interface {
 	PatchCalendar(ctx context.Context, arg PatchCalendarParams) error
 	// Patch mutable event fields. NULL params leave columns untouched.
 	PatchCalendarEvent(ctx context.Context, arg PatchCalendarEventParams) error
-	// Update a subscriber's role or display preferences.
+	// Update a subscriber's display preferences.
 	PatchCalendarSubscription(ctx context.Context, arg PatchCalendarSubscriptionParams) error
 	// Patch the authenticated user's profile. NULL params leave the column untouched.
 	PatchMe(ctx context.Context, arg PatchMeParams) error
@@ -829,8 +831,6 @@ type Querier interface {
 	RegisterUser(ctx context.Context, arg RegisterUserParams) (int64, error)
 	// Soft-remove an actor from a task.
 	RemoveActor(ctx context.Context, arg RemoveActorParams) error
-	// Unhide a specific member's events.
-	RemoveMemberFilter(ctx context.Context, arg RemoveMemberFilterParams) error
 	// Soft-remove a project member.
 	RemoveProjectMember(ctx context.Context, arg RemoveProjectMemberParams) error
 	// Soft-remove a project member keyed by user_id.

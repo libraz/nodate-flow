@@ -144,6 +144,13 @@ resources:
         description: "Returned when the start or end query parameter cannot be parsed as an RFC 3339 datetime or YYYY-MM-DD date."
         userAction: "Provide dates in YYYY-MM-DD or RFC 3339 format (e.g. 2024-01-15 or 2024-01-15T09:00:00Z)."
 
+      start_end_pair_required:
+        code: CALENDAR.EVENT.START_END_PAIR_REQUIRED
+        status: 422
+        message: "startAt and endAt must be provided together"
+        description: "Returned when a create or patch request supplies one of startAt / endAt without the other. Undated events must omit both."
+        userAction: "Provide both startAt and endAt, or omit both to create a planning-stage (undated) event."
+
   memo:
     breadcrumb: "Calendar > Memo"
     errors:

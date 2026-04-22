@@ -1,7 +1,10 @@
 /**
  * Time-web accessibility e2e tests.
  *
- * Runs axe-core checks on key pages.
+ * Runs axe-core checks on the remaining time-web surfaces (setup +
+ * share). The authenticated /calendar UX moved to flow-web in R5.6;
+ * accessibility coverage for the unified calendar lives in
+ * `apps/flow-web/e2e/` now.
  */
 
 import { test } from '@playwright/test';
@@ -20,12 +23,10 @@ test.describe('time-web accessibility', () => {
     await cleanupTenant(tenant);
   });
 
-  test('calendar page passes a11y checks', async ({ page }) => {
+  test('setup page passes a11y checks', async ({ page }) => {
     await injectAuth(page.context(), tenant);
-    await page.goto('/calendar');
+    await page.goto('/setup');
     await page.waitForLoadState('networkidle');
-    // Allow extra time for calendar to render
-    await page.waitForTimeout(1000);
     await checkA11y(page, ['color-contrast']);
   });
 });

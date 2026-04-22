@@ -68,10 +68,17 @@ const (
 	// workspace. The frontend invalidates dashboard widget lists.
 	KindDashboardChanged Kind = "dashboard.changed"
 
-	// KindCalendarChanged fires on any `calendar.*` append for the
-	// workspace. The frontend invalidates calendar lists, event lists,
-	// and member/memo queries for this workspace.
+	// KindCalendarChanged fires on any `calendar.*` or `share.*` append
+	// for the workspace. The frontend invalidates calendar lists,
+	// event lists, member/memo queries, and public-share management
+	// views for this workspace.
 	KindCalendarChanged Kind = "calendar.changed"
+
+	// KindItemChanged fires on any `item.*` append from itemkit
+	// (R5 unified task+event facade). The frontend invalidates both
+	// task and calendar-event caches because an item change touches
+	// both sides of the link in one transaction.
+	KindItemChanged Kind = "item.changed"
 
 	// KindResync is sent when the server has dropped events for a
 	// slow subscriber. The frontend reacts by invalidating every
@@ -109,8 +116,11 @@ func KindForEventType(eventType string) (Kind, bool) {
 		return KindLensChanged, true
 	case strings.HasPrefix(eventType, "page."):
 		return KindPageChanged, true
-	case strings.HasPrefix(eventType, "calendar."):
+	case strings.HasPrefix(eventType, "calendar."),
+		strings.HasPrefix(eventType, "share."):
 		return KindCalendarChanged, true
+	case strings.HasPrefix(eventType, "item."):
+		return KindItemChanged, true
 	case strings.HasPrefix(eventType, "dashboard."):
 		return KindDashboardChanged, true
 	}

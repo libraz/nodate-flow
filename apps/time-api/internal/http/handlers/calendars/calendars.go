@@ -179,8 +179,6 @@ func CreateCalendar(deps Deps) func(context.Context, *CreateCalendarInput) (*Cre
 			WorkspaceID:  wsID,
 			CalendarID:   uint32(calID),
 			UserID:       actorID,
-			Role:         generated.CalendarSubscriptionsRoleOwner,
-			MemberColor:  input.Body.Color,
 			DisplayColor: input.Body.Color,
 		})
 		if err != nil {
@@ -189,14 +187,17 @@ func CreateCalendar(deps Deps) func(context.Context, *CreateCalendarInput) (*Cre
 
 		out := &CreateCalendarOutput{}
 		out.Body = CalendarResponse{
-			ID:                     calPublicID.String(),
-			Kind:                   input.Body.Kind,
-			Name:                   input.Body.Name,
-			Description:            input.Body.Description,
-			Color:                  input.Body.Color,
-			CoverUrl:               input.Body.CoverUrl,
-			SystemSlug:             input.Body.SystemSlug,
-			Role:                   string(generated.CalendarSubscriptionsRoleOwner),
+			ID:          calPublicID.String(),
+			Kind:        input.Body.Kind,
+			Name:        input.Body.Name,
+			Description: input.Body.Description,
+			Color:       input.Body.Color,
+			CoverUrl:    input.Body.CoverUrl,
+			SystemSlug:  input.Body.SystemSlug,
+			// post-R5.1: calendar_subscriptions.role was dropped. Creator is
+			// the calendar owner (cal.owner_user_id); DTO surfaces "owner" to
+			// preserve SDK shape. Rebuilt properly in R5.2.
+			Role:                   "owner",
 			MemberColor:            input.Body.Color,
 			DisplayColor:           input.Body.Color,
 			Visible:                true,
@@ -304,13 +305,16 @@ func DeleteCalendar(deps Deps) func(context.Context, *DeleteCalendarInput) (*Del
 		if err != nil {
 			return nil, err
 		}
-		_, sub, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
-		if sub.Role != generated.CalendarSubscriptionsRoleOwner {
+		// post-R5.1: subscription role was dropped; fall back to calendar
+		// ownership (cal.owner_user_id). Rebuilt properly in R5.2.
+		if !(cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(actorID)) {
 			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
+		_ = cal
 
 		calUID, _ := uuid.Parse(input.CalId)
 		err = deps.Queries.DisableCalendar(ctx, generated.DisableCalendarParams{
@@ -335,13 +339,20 @@ func DeleteCalendar(deps Deps) func(context.Context, *DeleteCalendarInput) (*Del
 // --- Mapping helpers ---
 
 func calendarFromListRow(r generated.ListCalendarsForUserRow) CalendarResponse {
+	// post-R5.1: subscription role + member_color were dropped. Expose a
+	// stable DTO shape: derive "role" from calendar ownership, and fall back
+	// to display_color for member_color so SDK consumers keep rendering.
+	role := "editor"
+	if r.OwnerUserID.Valid {
+		role = "owner"
+	}
 	resp := CalendarResponse{
 		ID:                     r.PublicID.String(),
 		Kind:                   string(r.Kind),
 		Name:                   r.Name,
 		Color:                  r.Color,
-		Role:                   string(r.Role),
-		MemberColor:            r.MemberColor,
+		Role:                   role,
+		MemberColor:            r.DisplayColor,
 		DisplayColor:           r.DisplayColor,
 		Visible:                r.Visible,
 		SubscriptionSortWeight: r.SubscriptionSortWeight,
@@ -363,13 +374,19 @@ func calendarFromListRow(r generated.ListCalendarsForUserRow) CalendarResponse {
 }
 
 func calendarFromRow(c generated.FindCalendarByPublicIdRow, s generated.FindCalendarSubscriptionRow) CalendarResponse {
+	// post-R5.1: subscription role + member_color were dropped. Derive "role"
+	// from calendar ownership; fall back to display_color for member_color.
+	role := "editor"
+	if c.OwnerUserID.Valid {
+		role = "owner"
+	}
 	resp := CalendarResponse{
 		ID:                     c.PublicID.String(),
 		Kind:                   string(c.Kind),
 		Name:                   c.Name,
 		Color:                  c.Color,
-		Role:                   string(s.Role),
-		MemberColor:            s.MemberColor,
+		Role:                   role,
+		MemberColor:            s.DisplayColor,
 		DisplayColor:           s.DisplayColor,
 		Visible:                s.Visible,
 		SubscriptionSortWeight: s.SortWeight,

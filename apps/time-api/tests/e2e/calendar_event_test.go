@@ -8,18 +8,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	generated "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/time-api/tests/helpers"
 )
 
-// createCalendar is a test helper that creates a shared calendar and returns its public ID.
+// createCalendar is a test helper that creates a personal calendar and returns its public ID.
+// Post-R5.14 the only user-facing calendar kind is "personal"; "system"
+// calendars are provisioned automatically per workspace country.
 func createCalendar(t *testing.T, tt *helpers.TestTenant) string {
 	t.Helper()
 	var cal struct {
 		ID string `json:"id"`
 	}
 	helpers.DoJSON(t, http.MethodPost, tt.WsPath("calendars"), tt.AccessToken, map[string]any{
-		"kind": "shared", "name": "Events Cal " + t.Name(), "color": "#4285F4",
+		"kind": "personal", "name": "Events Cal " + t.Name(), "color": "#4285F4",
 	}, &cal)
 	require.NotEmpty(t, cal.ID)
 	return cal.ID
@@ -204,7 +205,7 @@ func TestEventPermission_EditorCannotEditOthersEvent(t *testing.T) {
 	calID := createCalendar(t, owner)
 
 	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
-	editor := helpers.CreateExtraMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, generated.CalendarSubscriptionsRoleEditor)
+	editor := helpers.CreateExtraMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
 
 	// Owner creates an event.
 	var evt struct {
@@ -233,7 +234,7 @@ func TestEventPermission_ManagerCanEditOthersEvent(t *testing.T) {
 	calID := createCalendar(t, owner)
 
 	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
-	manager := helpers.CreateExtraMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, generated.CalendarSubscriptionsRoleManager)
+	manager := helpers.CreateExtraMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
 
 	// Owner creates an event.
 	var evt struct {
@@ -265,7 +266,7 @@ func TestManagerDelegation_CreateEventOnBehalf(t *testing.T) {
 	calID := createCalendar(t, owner)
 
 	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
-	manager := helpers.CreateExtraMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, generated.CalendarSubscriptionsRoleManager)
+	manager := helpers.CreateExtraMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
 
 	// Manager creates an event with ownerUserId set to the calendar owner.
 	var resp struct {
@@ -291,7 +292,7 @@ func TestEditorCannotSetOtherOwner(t *testing.T) {
 	calID := createCalendar(t, owner)
 
 	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
-	editor := helpers.CreateExtraMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, generated.CalendarSubscriptionsRoleEditor)
+	editor := helpers.CreateExtraMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
 
 	// Editor tries to create an event with ownerUserId set to the calendar owner.
 	status, _ := helpers.DoJSONStatus(t, http.MethodPost, editor.WsPath("calendars", calID, "events"), editor.AccessToken, map[string]any{

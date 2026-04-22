@@ -264,6 +264,29 @@ type ListMyTasksOutput struct {
 	Body ListMyTasksBody
 }
 
+// ListMyTasksWithDatesInput is the query for GET /me/tasks-with-dates.
+// Pairs with time-api's GET /me/calendar-events to power the unified
+// cross-workspace calendar. `from` / `to` are inclusive dates on the
+// server-side clock; the client should send the widest range it plans
+// to render.
+type ListMyTasksWithDatesInput struct {
+	From   string `query:"from" required:"true" doc:"Range start YYYY-MM-DD (inclusive)"`
+	To     string `query:"to" required:"true" doc:"Range end YYYY-MM-DD (inclusive)"`
+	Limit  int32  `query:"limit" minimum:"1" maximum:"1000" default:"500"`
+	Offset int32  `query:"offset" minimum:"0" default:"0"`
+}
+
+// ListMyTasksWithDatesBody is the response payload for GET /me/tasks-with-dates.
+type ListMyTasksWithDatesBody struct {
+	Total int64            `json:"total"`
+	Tasks []MyTaskListItem `json:"tasks"`
+}
+
+// ListMyTasksWithDatesOutput is the response for GET /me/tasks-with-dates.
+type ListMyTasksWithDatesOutput struct {
+	Body ListMyTasksWithDatesBody
+}
+
 // GetTaskInput is the path for GET /tasks/{id}.
 type GetTaskInput struct {
 	ID string `path:"id"`

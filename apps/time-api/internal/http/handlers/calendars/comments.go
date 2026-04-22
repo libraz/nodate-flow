@@ -243,7 +243,7 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteCommentInput) (*Delet
 		if err != nil {
 			return nil, err
 		}
-		cal, sub, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
@@ -271,7 +271,9 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteCommentInput) (*Delet
 		}
 
 		isAuthor := comment.AuthorID == actorID
-		isCalOwner := sub.Role == generated.CalendarSubscriptionsRoleOwner
+		// post-R5.1: subscription role was dropped; fall back to calendar
+		// ownership. Rebuilt properly in R5.2.
+		isCalOwner := cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(actorID)
 		if !isAuthor && !isCalOwner {
 			return nil, httpErr(apierrors.CalendarCommentAuthorOrOwnerRequired)
 		}

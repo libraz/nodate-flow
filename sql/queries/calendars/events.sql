@@ -203,6 +203,107 @@ WHERE ce.workspace_id = ?
 ORDER BY ce.start_at ASC
 LIMIT 1000;
 
+-- name: ListMyCalendarEventsAcrossWorkspaces :many
+-- Cross-workspace variant: list non-recurring events on every calendar
+-- the caller is subscribed to, across every workspace where the caller
+-- is still an active member. workspace_members is joined so that a
+-- subscription row lingering past membership removal cannot leak rows
+-- (belt-and-braces beyond the soft-disable cascade). Backs GET
+-- /me/calendar-events for the unified flow-web calendar so the client
+-- does not fan out one request per workspace.
+SELECT
+  ce.public_id,
+  ce.calendar_id,
+  c.public_id AS calendar_public_id,
+  ce.workspace_id,
+  w.public_id AS workspace_public_id,
+  w.name AS workspace_name,
+  ce.kind,
+  ce.visibility,
+  ce.show_as,
+  ce.title,
+  ce.all_day,
+  ce.start_at,
+  ce.end_at,
+  ce.timezone,
+  ce.location,
+  ce.owner_user_id,
+  ce.block_label,
+  ce.task_id,
+  ce.updated_at,
+  ce.created_at
+FROM calendar_events ce
+INNER JOIN calendars c
+  ON c.id = ce.calendar_id AND c.enabled = TRUE
+INNER JOIN workspaces w
+  ON w.id = ce.workspace_id AND w.enabled = TRUE
+INNER JOIN workspace_members wm
+  ON wm.workspace_id = ce.workspace_id
+  AND wm.user_id = ?
+  AND wm.enabled = TRUE
+INNER JOIN calendar_subscriptions cs
+  ON cs.calendar_id = ce.calendar_id
+  AND cs.user_id = wm.user_id
+  AND cs.visible = TRUE
+  AND cs.enabled = TRUE
+WHERE ce.recurrence_rule IS NULL
+  AND ce.start_at IS NOT NULL
+  AND ce.start_at < ?
+  AND ce.end_at > ?
+  AND ce.enabled = TRUE
+ORDER BY ce.start_at ASC, ce.public_id ASC
+LIMIT 2000;
+
+-- name: ListMyRecurringCalendarEventsAcrossWorkspaces :many
+-- Cross-workspace recurring variant. Same membership guard as the
+-- non-recurring query. Clients expand RRULE instances client-side via
+-- the shared recurrence expander.
+SELECT
+  ce.public_id,
+  ce.calendar_id,
+  c.public_id AS calendar_public_id,
+  ce.workspace_id,
+  w.public_id AS workspace_public_id,
+  w.name AS workspace_name,
+  ce.kind,
+  ce.visibility,
+  ce.show_as,
+  ce.title,
+  ce.all_day,
+  ce.start_at,
+  ce.end_at,
+  ce.timezone,
+  ce.location,
+  ce.owner_user_id,
+  ce.block_label,
+  ce.recurrence_rule,
+  ce.recurrence_end,
+  COALESCE(ce.recurrence_exceptions, CAST('null' AS JSON)) AS recurrence_exceptions,
+  ce.task_id,
+  ce.updated_at,
+  ce.created_at
+FROM calendar_events ce
+INNER JOIN calendars c
+  ON c.id = ce.calendar_id AND c.enabled = TRUE
+INNER JOIN workspaces w
+  ON w.id = ce.workspace_id AND w.enabled = TRUE
+INNER JOIN workspace_members wm
+  ON wm.workspace_id = ce.workspace_id
+  AND wm.user_id = ?
+  AND wm.enabled = TRUE
+INNER JOIN calendar_subscriptions cs
+  ON cs.calendar_id = ce.calendar_id
+  AND cs.user_id = wm.user_id
+  AND cs.visible = TRUE
+  AND cs.enabled = TRUE
+WHERE ce.recurrence_rule IS NOT NULL
+  AND ce.start_at IS NOT NULL
+  AND ce.start_at < ?
+  AND (ce.recurrence_end IS NULL OR ce.recurrence_end > ?)
+  AND ce.enabled = TRUE
+ORDER BY ce.start_at ASC, ce.public_id ASC
+LIMIT 2000;
+
 -- name: PatchCalendarEvent :exec
 -- Patch mutable event fields. NULL params leave columns untouched.
 UPDATE calendar_events
@@ -237,33 +338,8 @@ WHERE public_id = ?
   AND calendar_id = ?
   AND workspace_id = ?;
 
--- name: ListAllCalendarEvents :many
--- List all enabled events in a calendar (no date filter, for export).
-SELECT
-  ce.public_id,
-  ce.kind,
-  ce.visibility,
-  ce.show_as,
-  ce.title,
-  ce.all_day,
-  ce.start_at,
-  ce.end_at,
-  ce.timezone,
-  ce.location,
-  ce.memo,
-  ce.url,
-  ce.block_label,
-  ce.recurrence_rule,
-  ce.recurrence_end,
-  ce.recurrence_exceptions,
-  ce.notification_offset,
-  ce.updated_at,
-  ce.created_at
-FROM calendar_events ce
-WHERE ce.calendar_id = ?
-  AND ce.enabled = TRUE
-ORDER BY ce.start_at ASC, ce.public_id ASC
-LIMIT 10000;
+-- ListAllCalendarEvents was consumed only by the deleted ICS export path;
+-- the replacement (R5.14) will query via calendar_public_shares.
 
 -- name: FindCalendarEventOwner :one
 -- Quick lookup for permission checks: who owns this event?

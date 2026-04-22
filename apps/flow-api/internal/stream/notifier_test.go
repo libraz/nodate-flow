@@ -115,6 +115,11 @@ func TestKindForEventType(t *testing.T) {
 		"task.created":             KindTaskChanged,
 		"task.transition.complete": KindTaskChanged,
 		"ai.suggestion.applied":    KindAiSuggestionChanged,
+		"calendar.event.created":   KindCalendarChanged,
+		"calendar.member.joined":   KindCalendarChanged,
+		"share.token.rotated":      KindCalendarChanged,
+		"item.scheduled":           KindItemChanged,
+		"item.rescheduled":         KindItemChanged,
 		"signal.attached":          "",
 		"comment.added":            "",
 	}

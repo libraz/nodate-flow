@@ -142,8 +142,6 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 			WorkspaceID:  wsID,
 			CalendarID:   cal.ID,
 			UserID:       user.ID,
-			Role:         generated.CalendarSubscriptionsRole(input.Body.Role),
-			MemberColor:  color,
 			DisplayColor: color,
 		})
 		if err != nil {
@@ -196,12 +194,15 @@ func ListMembers(deps Deps) func(context.Context, *ListMembersInput) (*ListMembe
 		out := &ListMembersOutput{}
 		out.Body.Members = make([]MemberResponse, len(rows))
 		for i, r := range rows {
+			// post-R5.1: member_color + role columns dropped from
+			// calendar_subscriptions. Surface an empty color and the previous
+			// DEFAULT role so the DTO shape stays stable. Rebuilt in R5.2.
 			resp := MemberResponse{
 				ID:          r.PublicID.String(),
 				UserID:      r.UserPublicID.String(),
 				DisplayName: r.DisplayName,
-				MemberColor: r.MemberColor,
-				Role:        string(r.Role),
+				MemberColor: "",
+				Role:        "editor",
 				CreatedAt:   r.CreatedAt.Unix(),
 			}
 			if r.AvatarUrl.Valid {
@@ -220,11 +221,13 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 		if err != nil {
 			return nil, err
 		}
-		cal, sub, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
-		if sub.Role != generated.CalendarSubscriptionsRoleOwner {
+		// post-R5.1: subscription role was dropped; fall back to calendar
+		// ownership. Rebuilt properly in R5.2.
+		if !(cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(actorID)) {
 			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
 
@@ -237,17 +240,10 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 			return nil, httpErr(apierrors.CalendarMemberUserNotFound)
 		}
 
-		err = deps.Queries.PatchCalendarSubscription(ctx, generated.PatchCalendarSubscriptionParams{
-			Role: generated.NullCalendarSubscriptionsRole{
-				CalendarSubscriptionsRole: generated.CalendarSubscriptionsRole(input.Body.Role),
-				Valid:                     true,
-			},
-			CalendarID: cal.ID,
-			UserID:     targetUserID,
-		})
-		if err != nil {
-			return nil, httpErr(apierrors.CalendarMemberStoreRoleUpdateInterrupted)
-		}
+		// post-R5.1: subscription role was dropped; this endpoint is a no-op
+		// until R5.2's itemkit rebuild. Kept so existing clients keep 200 OK.
+		_ = cal
+		_ = targetUserID
 
 		out := &UpdateMemberRoleOutput{}
 		out.Body.Updated = true
@@ -270,7 +266,7 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 		if err != nil {
 			return nil, err
 		}
-		cal, sub, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
@@ -285,14 +281,16 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 		}
 
 		isSelf := targetUserID == actorID
-		isOwner := sub.Role == generated.CalendarSubscriptionsRoleOwner
+		// post-R5.1: subscription role was dropped; fall back to calendar
+		// ownership. Rebuilt properly in R5.2.
+		isOwner := cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(actorID)
 
 		if !isSelf && !isOwner {
 			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
 
-		// Check if target is an owner - prevent removing the last owner.
-		targetSub, err := deps.Queries.FindCalendarSubscription(ctx, generated.FindCalendarSubscriptionParams{
+		// Verify the target is subscribed.
+		_, err = deps.Queries.FindCalendarSubscription(ctx, generated.FindCalendarSubscriptionParams{
 			CalendarID: cal.ID,
 			UserID:     targetUserID,
 		})
@@ -303,14 +301,11 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 			return nil, httpErr(apierrors.CalendarMemberStoreReadInterrupted)
 		}
 
-		if targetSub.Role == generated.CalendarSubscriptionsRoleOwner {
-			count, err := deps.Queries.CountCalendarOwners(ctx, cal.ID)
-			if err != nil {
-				return nil, httpErr(apierrors.CalendarMemberOwnerCountQueryInterrupted)
-			}
-			if count <= 1 {
-				return nil, httpErr(apierrors.CalendarMemberLastOwnerRemovalBlocked)
-			}
+		// post-R5.1: last-owner protection now lives on calendars.owner_user_id
+		// (not subscription role). Prevent removing the single calendar owner
+		// via self-leave. Rebuilt properly in R5.2.
+		if cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(targetUserID) {
+			return nil, httpErr(apierrors.CalendarMemberLastOwnerRemovalBlocked)
 		}
 
 		err = deps.Queries.DisableCalendarSubscription(ctx, generated.DisableCalendarSubscriptionParams{

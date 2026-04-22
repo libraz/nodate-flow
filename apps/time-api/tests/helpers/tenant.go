@@ -93,15 +93,16 @@ func CreateTestTenant(t *testing.T, srv *TestServer) *TestTenant {
 }
 
 // CreateExtraMember creates an additional user, adds them to the given workspace
-// with the specified calendar subscription role on the given calendar, and
-// returns the new tenant.
+// and subscribes them to the given calendar. The calSubRole parameter is kept
+// for test call-site compatibility but ignored post-R5.1 (subscription role
+// dropped; event-level visibility is the ACL axis).
 func CreateExtraMember(
 	t *testing.T,
 	srv *TestServer,
 	wsID uint32,
 	wsPub types.PublicID,
 	calendarID uint32,
-	calSubRole generated.CalendarSubscriptionsRole,
+	_ string,
 ) *TestTenant {
 	t.Helper()
 
@@ -139,8 +140,6 @@ func CreateExtraMember(
 		WorkspaceID:  wsID,
 		CalendarID:   calendarID,
 		UserID:       userID,
-		Role:         calSubRole,
-		MemberColor:  "#FF5722",
 		DisplayColor: "#FF5722",
 	})
 	require.NoError(t, err)

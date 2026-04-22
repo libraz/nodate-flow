@@ -78,6 +78,8 @@ var (
 	CalendarEventOwnerUserNotFound = &Spec{Code: "CALENDAR.EVENT.OWNER_USER_NOT_FOUND", Status: 400, Message: "Owner user not found"}
 	// CALENDAR.EVENT.OWNER_USER_RESOLVE_INTERRUPTED — Could not resolve owner user
 	CalendarEventOwnerUserResolveInterrupted = &Spec{Code: "CALENDAR.EVENT.OWNER_USER_RESOLVE_INTERRUPTED", Status: 500, Message: "Could not resolve owner user"}
+	// CALENDAR.EVENT.START_END_PAIR_REQUIRED — startAt and endAt must be provided together
+	CalendarEventStartEndPairRequired = &Spec{Code: "CALENDAR.EVENT.START_END_PAIR_REQUIRED", Status: 422, Message: "startAt and endAt must be provided together"}
 	// CALENDAR.EVENT.STORE_DELETE_INTERRUPTED — Could not delete event
 	CalendarEventStoreDeleteInterrupted = &Spec{Code: "CALENDAR.EVENT.STORE_DELETE_INTERRUPTED", Status: 500, Message: "Could not delete event"}
 	// CALENDAR.EVENT.STORE_READ_INTERRUPTED — Could not read event

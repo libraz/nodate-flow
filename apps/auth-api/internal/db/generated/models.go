@@ -237,9 +237,10 @@ func (ns NullCalendarEventAttendeesRsvp) Value() (driver.Value, error) {
 type CalendarEventsKind string
 
 const (
-	CalendarEventsKindEvent CalendarEventsKind = "event"
-	CalendarEventsKindBlock CalendarEventsKind = "block"
-	CalendarEventsKindFree  CalendarEventsKind = "free"
+	CalendarEventsKindEvent     CalendarEventsKind = "event"
+	CalendarEventsKindBlock     CalendarEventsKind = "block"
+	CalendarEventsKindFree      CalendarEventsKind = "free"
+	CalendarEventsKindMilestone CalendarEventsKind = "milestone"
 )
 
 func (e *CalendarEventsKind) Scan(src interface{}) error {
@@ -321,6 +322,49 @@ func (ns NullCalendarEventsShowAs) Value() (driver.Value, error) {
 	return string(ns.CalendarEventsShowAs), nil
 }
 
+type CalendarEventsTaskRole string
+
+const (
+	CalendarEventsTaskRoleEvent     CalendarEventsTaskRole = "event"
+	CalendarEventsTaskRoleDue       CalendarEventsTaskRole = "due"
+	CalendarEventsTaskRoleScheduled CalendarEventsTaskRole = "scheduled"
+)
+
+func (e *CalendarEventsTaskRole) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = CalendarEventsTaskRole(s)
+	case string:
+		*e = CalendarEventsTaskRole(s)
+	default:
+		return fmt.Errorf("unsupported scan type for CalendarEventsTaskRole: %T", src)
+	}
+	return nil
+}
+
+type NullCalendarEventsTaskRole struct {
+	CalendarEventsTaskRole CalendarEventsTaskRole `json:"calendarEventsTaskRole"`
+	Valid                  bool                   `json:"valid"` // Valid is true if CalendarEventsTaskRole is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullCalendarEventsTaskRole) Scan(value interface{}) error {
+	if value == nil {
+		ns.CalendarEventsTaskRole, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.CalendarEventsTaskRole.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullCalendarEventsTaskRole) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.CalendarEventsTaskRole), nil
+}
+
 type CalendarEventsVisibility string
 
 const (
@@ -365,98 +409,10 @@ func (ns NullCalendarEventsVisibility) Value() (driver.Value, error) {
 	return string(ns.CalendarEventsVisibility), nil
 }
 
-type CalendarInvitesRole string
-
-const (
-	CalendarInvitesRoleManager CalendarInvitesRole = "manager"
-	CalendarInvitesRoleEditor  CalendarInvitesRole = "editor"
-	CalendarInvitesRoleViewer  CalendarInvitesRole = "viewer"
-)
-
-func (e *CalendarInvitesRole) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = CalendarInvitesRole(s)
-	case string:
-		*e = CalendarInvitesRole(s)
-	default:
-		return fmt.Errorf("unsupported scan type for CalendarInvitesRole: %T", src)
-	}
-	return nil
-}
-
-type NullCalendarInvitesRole struct {
-	CalendarInvitesRole CalendarInvitesRole `json:"calendarInvitesRole"`
-	Valid               bool                `json:"valid"` // Valid is true if CalendarInvitesRole is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullCalendarInvitesRole) Scan(value interface{}) error {
-	if value == nil {
-		ns.CalendarInvitesRole, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.CalendarInvitesRole.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullCalendarInvitesRole) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.CalendarInvitesRole), nil
-}
-
-type CalendarSubscriptionsRole string
-
-const (
-	CalendarSubscriptionsRoleOwner   CalendarSubscriptionsRole = "owner"
-	CalendarSubscriptionsRoleManager CalendarSubscriptionsRole = "manager"
-	CalendarSubscriptionsRoleEditor  CalendarSubscriptionsRole = "editor"
-	CalendarSubscriptionsRoleViewer  CalendarSubscriptionsRole = "viewer"
-)
-
-func (e *CalendarSubscriptionsRole) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = CalendarSubscriptionsRole(s)
-	case string:
-		*e = CalendarSubscriptionsRole(s)
-	default:
-		return fmt.Errorf("unsupported scan type for CalendarSubscriptionsRole: %T", src)
-	}
-	return nil
-}
-
-type NullCalendarSubscriptionsRole struct {
-	CalendarSubscriptionsRole CalendarSubscriptionsRole `json:"calendarSubscriptionsRole"`
-	Valid                     bool                      `json:"valid"` // Valid is true if CalendarSubscriptionsRole is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullCalendarSubscriptionsRole) Scan(value interface{}) error {
-	if value == nil {
-		ns.CalendarSubscriptionsRole, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.CalendarSubscriptionsRole.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullCalendarSubscriptionsRole) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.CalendarSubscriptionsRole), nil
-}
-
 type CalendarsKind string
 
 const (
 	CalendarsKindPersonal CalendarsKind = "personal"
-	CalendarsKindShared   CalendarsKind = "shared"
 	CalendarsKindSystem   CalendarsKind = "system"
 )
 
@@ -1329,6 +1285,50 @@ func (ns NullTaskDependenciesKind) Value() (driver.Value, error) {
 	return string(ns.TaskDependenciesKind), nil
 }
 
+type TaskEventLinksRelation string
+
+const (
+	TaskEventLinksRelationContributesTo TaskEventLinksRelation = "contributes_to"
+	TaskEventLinksRelationBlocks        TaskEventLinksRelation = "blocks"
+	TaskEventLinksRelationDependsOn     TaskEventLinksRelation = "depends_on"
+	TaskEventLinksRelationPrepFor       TaskEventLinksRelation = "prep_for"
+)
+
+func (e *TaskEventLinksRelation) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = TaskEventLinksRelation(s)
+	case string:
+		*e = TaskEventLinksRelation(s)
+	default:
+		return fmt.Errorf("unsupported scan type for TaskEventLinksRelation: %T", src)
+	}
+	return nil
+}
+
+type NullTaskEventLinksRelation struct {
+	TaskEventLinksRelation TaskEventLinksRelation `json:"taskEventLinksRelation"`
+	Valid                  bool                   `json:"valid"` // Valid is true if TaskEventLinksRelation is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullTaskEventLinksRelation) Scan(value interface{}) error {
+	if value == nil {
+		ns.TaskEventLinksRelation, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.TaskEventLinksRelation.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullTaskEventLinksRelation) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.TaskEventLinksRelation), nil
+}
+
 type TasksDerivedState string
 
 const (
@@ -1636,6 +1636,49 @@ func (ns NullUserViewPreferencesScopeType) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.UserViewPreferencesScopeType), nil
+}
+
+type UsersSnapToWorkingDay string
+
+const (
+	UsersSnapToWorkingDayOff  UsersSnapToWorkingDay = "off"
+	UsersSnapToWorkingDayWarn UsersSnapToWorkingDay = "warn"
+	UsersSnapToWorkingDayAuto UsersSnapToWorkingDay = "auto"
+)
+
+func (e *UsersSnapToWorkingDay) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = UsersSnapToWorkingDay(s)
+	case string:
+		*e = UsersSnapToWorkingDay(s)
+	default:
+		return fmt.Errorf("unsupported scan type for UsersSnapToWorkingDay: %T", src)
+	}
+	return nil
+}
+
+type NullUsersSnapToWorkingDay struct {
+	UsersSnapToWorkingDay UsersSnapToWorkingDay `json:"usersSnapToWorkingDay"`
+	Valid                 bool                  `json:"valid"` // Valid is true if UsersSnapToWorkingDay is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullUsersSnapToWorkingDay) Scan(value interface{}) error {
+	if value == nil {
+		ns.UsersSnapToWorkingDay, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.UsersSnapToWorkingDay.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullUsersSnapToWorkingDay) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.UsersSnapToWorkingDay), nil
 }
 
 type UsersThemePreference string
@@ -2120,7 +2163,7 @@ type AutoActionRule struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
-// Calendar containers (personal/shared/system)
+// Calendar containers (personal layer or system holiday feed). Workspace members share events through event-level visibility (public/private/confidential), not shared-calendar membership.
 type Calendar struct {
 	// Internal PK, never exposed
 	ID uint32 `json:"-"`
@@ -2128,7 +2171,7 @@ type Calendar struct {
 	PublicID types.PublicID `json:"publicId"`
 	// Internal FK to workspaces.id
 	WorkspaceID uint32 `json:"-"`
-	// Calendar kind: personal (1:1 per user), shared (group), system (holidays)
+	// Calendar kind: personal (user-owned layer, may own many), system (holiday feeds).
 	Kind CalendarsKind `json:"kind"`
 	// Display name
 	Name string `json:"name"`
@@ -2138,7 +2181,7 @@ type Calendar struct {
 	Color string `json:"color"`
 	// Cover image URL
 	CoverUrl sql.NullString `json:"coverUrl"`
-	// For personal calendars: the owning user. NULL for shared/system
+	// For personal calendars: the owning user. NULL for system
 	OwnerUserID sql.NullInt32 `json:"ownerUserId"`
 	// For system calendars: provider identifier (e.g., holidays.jp)
 	SystemSlug sql.NullString `json:"systemSlug"`
@@ -2152,7 +2195,7 @@ type Calendar struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
-// Calendar events with kind/visibility/show_as classification
+// Calendar events with kind/visibility/show_as classification; nullable start/end for planning-stage placeholders; task_role links to task projection (D1).
 type CalendarEvent struct {
 	// Internal PK, never exposed
 	ID uint32 `json:"-"`
@@ -2162,7 +2205,7 @@ type CalendarEvent struct {
 	WorkspaceID uint32 `json:"-"`
 	// Internal FK to calendars.id
 	CalendarID uint32 `json:"calendarId"`
-	// event=regular, block=declarative time frame (work hours, focus), free=available slot
+	// event=regular, block=declarative time frame (work hours, focus), free=available slot, milestone=umbrella/milestone, has no duration semantics
 	Kind CalendarEventsKind `json:"kind"`
 	// Who can see event details: default (calendar setting), public (all), private (time only), confidential (owner only)
 	Visibility CalendarEventsVisibility `json:"visibility"`
@@ -2172,10 +2215,10 @@ type CalendarEvent struct {
 	Title string `json:"title"`
 	// All-day event flag
 	AllDay bool `json:"allDay"`
-	// Start time (UTC or with timezone context)
-	StartAt time.Time `json:"startAt"`
-	// End time
-	EndAt time.Time `json:"endAt"`
+	// Start time (UTC or with timezone context); NULL = undated (planning-stage placeholder)
+	StartAt sql.NullTime `json:"startAt"`
+	// End time; NULL = undated (planning-stage placeholder)
+	EndAt sql.NullTime `json:"endAt"`
 	// IANA timezone identifier; resolved from event > user > workspace > UTC
 	Timezone string `json:"timezone"`
 	// Location text
@@ -2202,10 +2245,14 @@ type CalendarEvent struct {
 	NotifiedAt sql.NullTime `json:"notifiedAt"`
 	// Linked task (optional, for task-calendar sync)
 	TaskID sql.NullInt32 `json:"taskId"`
+	// When task_id IS NOT NULL: which task field this event represents. event=task.event_on (legacy, being removed), due=task.due_on, scheduled=time-blocked (multi-link allowed).
+	TaskRole NullCalendarEventsTaskRole `json:"taskRole"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
 	Notes sql.NullString `json:"notes"`
+	// Structured per-event markers (non_working_day, auto_snapped, etc.); unknown keys preserved.
+	Flags json.RawMessage `json:"flags"`
 	// Enabled flag
 	Enabled   bool         `json:"enabled"`
 	UpdatedAt sql.NullTime `json:"updatedAt"`
@@ -2322,52 +2369,6 @@ type CalendarEventComment struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
-// Calendar invite links
-type CalendarInvite struct {
-	// Internal PK, never exposed
-	ID uint32 `json:"-"`
-	// UUID v7, the only externally visible ID
-	PublicID types.PublicID `json:"publicId"`
-	// Internal FK to workspaces.id
-	WorkspaceID uint32 `json:"-"`
-	// Internal FK to calendars.id
-	CalendarID uint32 `json:"calendarId"`
-	// Internal FK to users.id (invite creator)
-	CreatedByUserID uint32 `json:"-"`
-	// SHA-256 hex of invite token plaintext
-	TokenHash string `json:"tokenHash"`
-	// Role granted on acceptance
-	Role CalendarInvitesRole `json:"role"`
-	// Max number of uses; NULL = unlimited
-	MaxUses sql.NullInt32 `json:"maxUses"`
-	// Current number of uses
-	UseCount uint32 `json:"useCount"`
-	// Expiration time; NULL = never expires
-	ExpiresAt sql.NullTime `json:"expiresAt"`
-	// Display order
-	SortWeight int32 `json:"sortWeight"`
-	// Admin notes
-	Notes sql.NullString `json:"notes"`
-	// Enabled flag
-	Enabled   bool         `json:"enabled"`
-	UpdatedAt sql.NullTime `json:"updatedAt"`
-	CreatedAt time.Time    `json:"createdAt"`
-}
-
-// Per-subscriber member visibility filters for shared calendars
-type CalendarMemberFilter struct {
-	// Internal PK, never exposed
-	ID uint32 `json:"-"`
-	// Internal FK to calendar_subscriptions.id (the viewer)
-	SubscriptionID uint32 `json:"subscriptionId"`
-	// Internal FK to users.id (the member being hidden)
-	TargetUserID uint32 `json:"-"`
-	// Enabled flag
-	Enabled   bool         `json:"enabled"`
-	UpdatedAt sql.NullTime `json:"updatedAt"`
-	CreatedAt time.Time    `json:"createdAt"`
-}
-
 // Calendar-level shared memos / to-do items
 type CalendarMemo struct {
 	// Internal PK, never exposed
@@ -2394,7 +2395,65 @@ type CalendarMemo struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
-// Calendar membership and display preferences
+// Workspace-owned publishable read-only share pages
+type CalendarPublicShare struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Audit trail; ownership is workspace-level so shares survive creator removal
+	CreatedByUserID sql.NullInt32 `json:"-"`
+	// SHA-256 hex of URL token; plaintext returned once at create/rotate
+	TokenHash string `json:"tokenHash"`
+	// Public-facing page title
+	Title string `json:"title"`
+	// Public-facing description (markdown)
+	Description sql.NullString `json:"description"`
+	// Public-facing icon image URL
+	IconUrl sql.NullString `json:"iconUrl"`
+	// Public-facing cover image URL
+	CoverUrl sql.NullString `json:"coverUrl"`
+	// Display tz for the public page; defaults to workspace tz at create
+	Timezone string `json:"timezone"`
+	// ISO 3166-1 alpha-2; NULL = no holiday overlay
+	ShowHolidaysCountry sql.NullString `json:"showHolidaysCountry"`
+	// NULL = never expires
+	ExpiresAt sql.NullTime `json:"expiresAt"`
+	// Display order within workspace admin UI
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag (soft-disable)
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
+// M:N: which events appear on which public share pages
+type CalendarPublicShareEvent struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id; denormalized from share for tenant isolation
+	WorkspaceID uint32 `json:"-"`
+	// Internal FK to calendar_public_shares.id
+	ShareID uint32 `json:"shareId"`
+	// Internal FK to calendar_events.id
+	EventID uint32 `json:"eventId"`
+	// Override display order on the share page
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag (soft-disable)
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
+// Per-user display preferences for a calendar (color, visibility). Not an ACL axis — event-level visibility is the only ws-internal ACL.
 type CalendarSubscription struct {
 	// Internal PK, never exposed
 	ID uint32 `json:"-"`
@@ -2406,11 +2465,7 @@ type CalendarSubscription struct {
 	CalendarID uint32 `json:"calendarId"`
 	// Internal FK to users.id
 	UserID uint32 `json:"-"`
-	// Calendar-level role: owner (full), manager (delegate), editor (own events), viewer (read-only)
-	Role CalendarSubscriptionsRole `json:"role"`
-	// Member color in shared calendars (visible to all)
-	MemberColor string `json:"memberColor"`
-	// Display color for personal/system calendars (private to subscriber)
+	// Per-subscriber private display color
 	DisplayColor string `json:"displayColor"`
 	// Whether this calendar layer is shown in UI
 	Visible bool `json:"visible"`
@@ -3271,7 +3326,7 @@ type Task struct {
 	DueOn sql.NullTime `json:"dueOn"`
 	// Date work began on this task
 	StartedOn sql.NullTime `json:"startedOn"`
-	// External reference date (meeting, launch, milestone) this task relates to; NOT a constraint — use deadline constraint for enforcement
+	// DEPRECATED (R5.3): use calendar_events.task_role='event'. Kept for source compat until flow-api handlers and SDK rewire
 	EventOn sql.NullTime `json:"eventOn"`
 	// Time derived_state transitioned to done
 	CompletedAt sql.NullTime `json:"completedAt"`
@@ -3414,6 +3469,30 @@ type TaskEmbedding struct {
 	UpdatedAt  sql.NullTime `json:"updatedAt"`
 }
 
+// M:N task-to-event relationships (umbrella events, milestones)
+type TaskEventLink struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Internal FK to tasks.id
+	TaskID uint32 `json:"taskId"`
+	// Internal FK to calendar_events.id
+	EventID uint32 `json:"eventId"`
+	// contributes_to = task is work toward an umbrella event; blocks/depends_on/prep_for reserved for future
+	Relation TaskEventLinksRelation `json:"relation"`
+	// Display order within an event's linked-task list
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag (soft-disable)
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
 // Task-label junction
 type TaskLabel struct {
 	// Internal PK, never exposed
@@ -3512,6 +3591,16 @@ type User struct {
 	Timezone string `json:"timezone"`
 	// ISO 3166-1 alpha-2 country (independent of locale); drives default holiday subscription
 	Country sql.NullString `json:"country"`
+	// User override of workspace working_days; NULL = inherit
+	WorkingDays sql.NullString `json:"workingDays"`
+	// User override of workspace working_hours_start; NULL = inherit
+	WorkingHoursStart sql.NullTime `json:"workingHoursStart"`
+	// User override of workspace working_hours_end; NULL = inherit
+	WorkingHoursEnd sql.NullTime `json:"workingHoursEnd"`
+	// What happens when a task/event lands on a non-working day: off=accept silently, warn=save with badge, auto=itemkit snaps forward to next working day
+	SnapToWorkingDay UsersSnapToWorkingDay `json:"snapToWorkingDay"`
+	// If true, subscribed system (holiday) calendar events count as non-working days
+	TreatHolidaysAsNonWorking bool `json:"treatHolidaysAsNonWorking"`
 	// UI theme preference
 	ThemePreference UsersThemePreference `json:"themePreference"`
 	// Last successful login
@@ -3985,6 +4074,12 @@ type Workspace struct {
 	Timezone string `json:"timezone"`
 	// ISO 3166-1 alpha-2 country; drives default holiday subscription
 	Country sql.NullString `json:"country"`
+	// Per-day flag string Mon..Sun; letter = working, underscore = off. Default MTWTF__ = Mon-Fri.
+	WorkingDays string `json:"workingDays"`
+	// Start of workspace working day (local tz)
+	WorkingHoursStart time.Time `json:"workingHoursStart"`
+	// End of workspace working day (local tz)
+	WorkingHoursEnd time.Time `json:"workingHoursEnd"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes

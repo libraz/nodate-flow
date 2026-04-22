@@ -15,6 +15,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/itemkit"
 )
 
 // escapeLike escapes the MySQL LIKE metacharacters %, _, and \ in a
@@ -555,7 +556,25 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			newVisibility = generated.TasksVisibility(*in.Body.Visibility)
 		}
 
-		if err := deps.Queries.UpdateTask(ctx, generated.UpdateTaskParams{
+		titleChanged := in.Body.Title != nil && *in.Body.Title != "" && newTitle != current.Title
+		eventOnChanged := in.Body.EventOn != nil && newEvent != current.EventOn
+		dueOnChanged := in.Body.DueOn != nil && newDue != current.DueOn
+
+		needsItemkit := false
+		if titleChanged || eventOnChanged || dueOnChanged {
+			var linkedCount int
+			if err := deps.DB.QueryRowContext(ctx,
+				`SELECT COUNT(*) FROM calendar_events WHERE task_id = ? AND enabled = TRUE`,
+				task.ID,
+			).Scan(&linkedCount); err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			needsItemkit = linkedCount > 0
+		}
+
+		actorID, _ := middleware.ActorFromContext(ctx)
+
+		updateParams := generated.UpdateTaskParams{
 			Title:       newTitle,
 			Description: newDesc,
 			Priority:    newPriority,
@@ -566,8 +585,65 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			Visibility:  newVisibility,
 			WorkspaceID: ws.ID,
 			PublicID:    types.FromUUID(task.PublicID),
-		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
+		if !needsItemkit {
+			if err := deps.Queries.UpdateTask(ctx, updateParams); err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+		} else {
+			tx, err := deps.DB.BeginTx(ctx, nil)
+			if err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			defer tx.Rollback() //nolint:errcheck
+			qtx := deps.Queries.WithTx(tx)
+			if err := qtx.UpdateTask(ctx, updateParams); err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			if titleChanged {
+				if err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
+					WorkspaceID: ws.ID,
+					ActorUserID: actorID,
+					TaskID:      task.ID,
+					NewTitle:    newTitle,
+				}); err != nil {
+					return nil, translateItemkitTaskError(err)
+				}
+			}
+			if eventOnChanged {
+				var t time.Time
+				if newEvent.Valid {
+					t = newEvent.Time
+				}
+				if err := itemkit.RescheduleTask(ctx, tx, itemkit.RescheduleTaskArgs{
+					WorkspaceID: ws.ID,
+					TaskID:      task.ID,
+					ActorUserID: actorID,
+					SetEventOn:  true,
+					EventOn:     t,
+				}); err != nil {
+					return nil, translateItemkitTaskError(err)
+				}
+			}
+			if dueOnChanged {
+				var t time.Time
+				if newDue.Valid {
+					t = newDue.Time
+				}
+				if err := itemkit.RescheduleTask(ctx, tx, itemkit.RescheduleTaskArgs{
+					WorkspaceID: ws.ID,
+					TaskID:      task.ID,
+					ActorUserID: actorID,
+					SetDueOn:    true,
+					DueOn:       t,
+				}); err != nil {
+					return nil, translateItemkitTaskError(err)
+				}
+			}
+			if err := tx.Commit(); err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
 		}
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -603,7 +679,23 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 	}
 }
 
-// Disable handles DELETE /tasks/{id}.
+// translateItemkitTaskError converts an itemkit invariant into the
+// public error code so PATCH /tasks returns 422 instead of 500 when
+// the call violates a cross-table invariant.
+func translateItemkitTaskError(err error) error {
+	if err == nil {
+		return nil
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "itemkit invariant") {
+		return httpErr(apierrors.ItemItemkitInvariantViolation)
+	}
+	return httpErr(apierrors.InternalUnexpected)
+}
+
+// Disable handles DELETE /tasks/{id}. The write routes through
+// itemkit.DeleteTask so any linked calendar_events cascade
+// soft-disabled in the same transaction.
 func Disable(deps Deps) func(context.Context, *DisableTaskInput) (*DisableTaskOutput, error) {
 	return func(ctx context.Context, in *DisableTaskInput) (*DisableTaskOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
@@ -614,13 +706,19 @@ func Disable(deps Deps) func(context.Context, *DisableTaskInput) (*DisableTaskOu
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
 		}
-		if err := deps.Queries.DisableTask(ctx, generated.DisableTaskParams{
-			WorkspaceID: ws.ID,
-			PublicID:    types.FromUUID(task.PublicID),
-		}); err != nil {
+		actorID, _ := middleware.ActorFromContext(ctx)
+		tx, err := deps.DB.BeginTx(ctx, nil)
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		if actorID, ok := middleware.ActorFromContext(ctx); ok {
+		defer tx.Rollback() //nolint:errcheck
+		if err := itemkit.DeleteTask(ctx, tx, ws.ID, task.ID, actorID); err != nil {
+			return nil, translateItemkitTaskError(err)
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if actorID != 0 {
 			deps.Audit.Record(ctx, audit.Entry{
 				Action:       "task.delete",
 				ActorID:      actorID,

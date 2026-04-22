@@ -58,7 +58,11 @@
     "./primitives/page-skeleton": "./src/primitives/page-skeleton/page-skeleton.tsx",
     "./primitives/auth-card": "./src/primitives/auth-card/auth-card.tsx",
     "./primitives/theme-picker": "./src/primitives/theme-picker/theme-picker.tsx",
-    "./primitives/time-picker": "./src/primitives/time-picker/time-picker.tsx"
+    "./primitives/time-picker": "./src/primitives/time-picker/time-picker.tsx",
+    "./calendar": "./src/calendar/index.ts",
+    "./calendar/recurrence": "./src/calendar/recurrence.ts",
+    "./calendar/event-styles": "./src/calendar/event-styles.ts",
+    "./calendar/types": "./src/calendar/types.ts"
   },
   "scripts": {
     "typecheck": "tsc -b",
@@ -70,7 +74,8 @@
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.13.23",
     "clsx": "2.1.1",
-    "lucide-react": "0.453.0"
+    "lucide-react": "0.453.0",
+    "luxon": "^3.5.0"
   },
   "peerDependencies": {
     "react": "19.0.0",
@@ -85,6 +90,7 @@
   "devDependencies": {
     "@testing-library/react": "16.0.1",
     "@testing-library/user-event": "14.5.2",
+    "@types/luxon": "^3.4.2",
     "@types/react": "19.0.0",
     "@types/react-dom": "19.0.0",
     "happy-dom": "^20.8.9",

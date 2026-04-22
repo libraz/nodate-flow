@@ -82,25 +82,7 @@ func BuildResult(deps Deps) Result {
 		return out, nil
 	})
 
-	// Public share endpoints (no auth).
-	huma.Register(api, huma.Operation{
-		OperationID: "share-get",
-		Method:      http.MethodGet,
-		Path:        "/share/{token}",
-		Summary:     "Get a shared calendar page",
-	}, calendars.GetSharePage(calDeps))
-	huma.Register(api, huma.Operation{
-		OperationID: "share-events",
-		Method:      http.MethodGet,
-		Path:        "/share/{token}/events",
-		Summary:     "Get events from a shared calendar",
-	}, calendars.GetShareEvents(calDeps))
-	huma.Register(api, huma.Operation{
-		OperationID: "share-export-ics",
-		Method:      http.MethodGet,
-		Path:        "/share/{token}/export.ics",
-		Summary:     "Export shared calendar events as iCalendar",
-	}, calendars.ShareExportICS(calDeps))
+	// Public share endpoints are rebuilt in R5.14 against calendar_public_shares.
 
 	// Protected routes (RequireAuth).
 	aclDB := passthroughDB{deps.DB}
@@ -150,13 +132,17 @@ func BuildResult(deps Deps) Result {
 			Summary:     "List events across all calendars in a workspace",
 		}, calendars.ListCalendarEvents(calDeps))
 
-		// Accept invite (no calId, outside calendar member scope).
+		// Cross-workspace: every visible event across every subscribed
+		// calendar in every workspace the caller belongs to. Backs the
+		// unified flow-web calendar alongside flow-api's /me/tasks-with-dates.
 		huma.Register(subAPI, huma.Operation{
-			OperationID: "invites-accept",
-			Method:      http.MethodPost,
-			Path:        "/invites/{token}/accept",
-			Summary:     "Accept a calendar invite",
-		}, calendars.AcceptInvite(calDeps))
+			OperationID: "me-calendar-events-list",
+			Method:      http.MethodGet,
+			Path:        "/me/calendar-events",
+			Summary:     "List events across every workspace the caller belongs to",
+		}, calendars.ListMyCalendarEvents(calDeps))
+
+		// Calendar-invite accept is gone; ws joining uses workspace_invites in R5.9.
 	})
 
 	// Calendar-scoped routes (RequireAuth + RequireCalendarMember).
@@ -232,13 +218,7 @@ func BuildResult(deps Deps) Result {
 			Summary:     "Parse natural language text into an event proposal",
 		}, calendars.SmartCreate(calDeps))
 
-		// iCalendar export.
-		huma.Register(calAPI, huma.Operation{
-			OperationID: "events-export-ics",
-			Method:      http.MethodGet,
-			Path:        "/workspaces/{wsId}/calendars/{calId}/export.ics",
-			Summary:     "Export all calendar events as iCalendar",
-		}, calendars.ExportICS(calDeps))
+		// iCalendar export is rebuilt in R5.14 against calendar_public_shares.
 
 		// Task-to-calendar sync.
 		huma.Register(calAPI, huma.Operation{
@@ -274,25 +254,9 @@ func BuildResult(deps Deps) Result {
 			Summary:     "Remove a member from a calendar",
 		}, calendars.RemoveMember(calDeps))
 
-		// Calendar invites (scoped to a calendar).
-		huma.Register(calAPI, huma.Operation{
-			OperationID: "invites-create",
-			Method:      http.MethodPost,
-			Path:        "/workspaces/{wsId}/calendars/{calId}/invites",
-			Summary:     "Create an invite link for a calendar",
-		}, calendars.CreateInvite(calDeps))
-		huma.Register(calAPI, huma.Operation{
-			OperationID: "invites-list",
-			Method:      http.MethodGet,
-			Path:        "/workspaces/{wsId}/calendars/{calId}/invites",
-			Summary:     "List invite links for a calendar",
-		}, calendars.ListInvites(calDeps))
-		huma.Register(calAPI, huma.Operation{
-			OperationID: "invites-revoke",
-			Method:      http.MethodDelete,
-			Path:        "/workspaces/{wsId}/calendars/{calId}/invites/{invId}",
-			Summary:     "Revoke an invite link",
-		}, calendars.RevokeInvite(calDeps))
+		// Calendar-scoped invite links are gone; public share pages replace
+		// them in R5.14 (calendar_public_shares), and workspace-level
+		// joining uses workspace_invites.
 
 		// Event attendees.
 		huma.Register(calAPI, huma.Operation{

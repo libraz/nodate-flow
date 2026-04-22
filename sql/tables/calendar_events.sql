@@ -1,9 +1,8 @@
 -- ====================================
 -- calendar_events
--- Calendar event with structured kinds (event/block/free), visibility
--- levels, and show_as states. owner_user_id determines whose layer the
--- event appears on; created_by tracks who actually created it (supports
--- manager delegation).
+-- Calendar events with kind/visibility/show_as classification; nullable
+-- start/end for planning-stage placeholders; task_role links to task
+-- projection (D1).
 -- ====================================
 CREATE TABLE calendar_events (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
@@ -12,14 +11,14 @@ CREATE TABLE calendar_events (
   calendar_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to calendars.id',
 
   -- Event classification
-  kind ENUM('event','block','free') NOT NULL DEFAULT 'event' COMMENT 'event=regular, block=declarative time frame (work hours, focus), free=available slot',
+  kind ENUM('event','block','free','milestone') NOT NULL DEFAULT 'event' COMMENT 'event=regular, block=declarative time frame (work hours, focus), free=available slot, milestone=umbrella/milestone, has no duration semantics',
   visibility ENUM('default','public','private','confidential') NOT NULL DEFAULT 'default' COMMENT 'Who can see event details: default (calendar setting), public (all), private (time only), confidential (owner only)',
   show_as ENUM('busy','free','tentative','oof') NOT NULL DEFAULT 'busy' COMMENT 'Availability display: busy, free, tentative, out-of-office',
 
   title VARCHAR(500) NOT NULL COMMENT 'Event title',
   all_day BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'All-day event flag',
-  start_at DATETIME NOT NULL COMMENT 'Start time (UTC or with timezone context)',
-  end_at DATETIME NOT NULL COMMENT 'End time',
+  start_at DATETIME NULL COMMENT 'Start time (UTC or with timezone context); NULL = undated (planning-stage placeholder)',
+  end_at DATETIME NULL COMMENT 'End time; NULL = undated (planning-stage placeholder)',
   timezone VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT 'UTC' COMMENT 'IANA timezone identifier; resolved from event > user > workspace > UTC',
 
   location VARCHAR(500) NULL COMMENT 'Location text',
@@ -43,9 +42,11 @@ CREATE TABLE calendar_events (
 
   -- Cross-module link to nodate-flow tasks
   task_id INT UNSIGNED NULL COMMENT 'Linked task (optional, for task-calendar sync)',
+  task_role ENUM('event','due','scheduled') NULL COMMENT 'When task_id IS NOT NULL: which task field this event represents. event=task.event_on (legacy, being removed), due=task.due_on, scheduled=time-blocked (multi-link allowed).',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
+  flags JSON NULL COMMENT 'Structured per-event markers (non_working_day, auto_snapped, etc.); unknown keys preserved.',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -55,12 +56,25 @@ CREATE TABLE calendar_events (
   KEY idx_calendar_events_workspace_owner (workspace_id, owner_user_id, start_at),
   KEY idx_calendar_events_calendar_recurrence (calendar_id, recurrence_end),
   KEY idx_calendar_events_workspace_range (workspace_id, start_at, end_at),
-  KEY idx_calendar_events_task (task_id),
+  KEY idx_calendar_events_task_role (task_id, task_role, enabled),
   FULLTEXT KEY ft_calendar_events_title_memo (title, memo),
 
   CONSTRAINT fk_calendar_events_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_events_calendar FOREIGN KEY (calendar_id) REFERENCES calendars(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_events_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_events_creator FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_calendar_events_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Calendar events with kind/visibility/show_as classification';
+  CONSTRAINT fk_calendar_events_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
+
+  -- CHECK constraints that do not reference task_id. MySQL 8.4+
+  -- forbids CHECK constraints referencing columns used in FK
+  -- referential actions (task_id has ON DELETE SET NULL), so the
+  -- task_id-related invariants listed below are enforced by itemkit
+  -- and verified by the reconciler instead:
+  --   (task_id IS NULL) = (task_role IS NULL)
+  --   task_id IS NULL OR recurrence_rule IS NULL
+  CONSTRAINT chk_calendar_events_start_end_pair CHECK (start_at IS NULL OR end_at IS NOT NULL),
+  CONSTRAINT chk_calendar_events_recurrence_requires_start CHECK (start_at IS NOT NULL OR recurrence_rule IS NULL),
+  CONSTRAINT chk_calendar_events_notification_requires_start CHECK (start_at IS NOT NULL OR notification_offset IS NULL),
+  CONSTRAINT chk_calendar_events_chronology CHECK (end_at IS NULL OR start_at IS NULL OR end_at >= start_at),
+  CONSTRAINT chk_calendar_events_milestone_no_recurrence CHECK (kind <> 'milestone' OR recurrence_rule IS NULL)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Calendar events with kind/visibility/show_as classification; nullable start/end for planning-stage placeholders; task_role links to task projection (D1).';

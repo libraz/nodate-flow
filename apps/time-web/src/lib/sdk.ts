@@ -48,6 +48,10 @@ export const authApiBaseUrl =
 export const accountsWebUrl =
   (import.meta.env.VITE_ACCOUNTS_WEB_URL as string | undefined) ?? 'http://localhost:5175';
 
+/** Base URL of the flow-web frontend (owns the unified /calendar UX). */
+export const flowWebUrl =
+  (import.meta.env.VITE_FLOW_WEB_URL as string | undefined) ?? 'http://localhost:5173';
+
 /** SDK client targeting the time-api service. */
 export const sdk = createClient({
   baseUrl: apiBaseUrl,

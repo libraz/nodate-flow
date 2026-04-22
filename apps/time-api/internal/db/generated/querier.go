@@ -24,10 +24,8 @@ type Querier interface {
 	ConfirmIdentityMfa(ctx context.Context, id uint32) error
 	// Count unused recovery codes for a user.
 	CountActiveRecoveryCodes(ctx context.Context, userID uint32) (int64, error)
-	// Count how many owners a calendar has (prevent last-owner removal).
-	CountCalendarOwners(ctx context.Context, calendarID uint32) (int64, error)
-	// Insert a new calendar. kind determines behavior: personal (1:1 user),
-	// shared (group), system (holidays).
+	// Insert a new calendar. kind determines behavior: personal (user-owned
+	// layer, may own many) or system (holiday feeds).
 	CreateCalendar(ctx context.Context, arg CreateCalendarParams) (int64, error)
 	// Add a checklist item to a calendar event.
 	CreateCalendarChecklistItem(ctx context.Context, arg CreateCalendarChecklistItemParams) (int64, error)
@@ -39,18 +37,15 @@ type Querier interface {
 	CreateCalendarEventAttendee(ctx context.Context, arg CreateCalendarEventAttendeeParams) (int64, error)
 	// Add a comment to a calendar event.
 	CreateCalendarEventComment(ctx context.Context, arg CreateCalendarEventCommentParams) (int64, error)
-	// Create a shareable invite link for a calendar.
-	CreateCalendarInvite(ctx context.Context, arg CreateCalendarInviteParams) (int64, error)
 	// Add a shared memo/to-do item to a calendar.
 	CreateCalendarMemo(ctx context.Context, arg CreateCalendarMemoParams) (int64, error)
-	// Subscribe a user to a calendar with a role and display preferences.
+	// Subscribe a user to a calendar with display preferences.
+	// Not an ACL axis — event-level visibility governs access.
 	CreateCalendarSubscription(ctx context.Context, arg CreateCalendarSubscriptionParams) (int64, error)
 	// Insert a new identity row (local password or OIDC binding) for a user.
 	CreateIdentity(ctx context.Context, arg CreateIdentityParams) (int64, error)
 	// Insert a new magic link token for passwordless login.
 	CreateMagicLinkToken(ctx context.Context, arg CreateMagicLinkTokenParams) (int64, error)
-	// Hide a specific member's events within a shared calendar for a subscriber.
-	CreateMemberFilter(ctx context.Context, arg CreateMemberFilterParams) error
 	// Insert a new personal access token. Plain token is shown to the user once.
 	CreatePat(ctx context.Context, arg CreatePatParams) (int64, error)
 	// Insert a new refresh-token session for a user.
@@ -79,8 +74,6 @@ type Querier interface {
 	DisableCalendarEventAttendee(ctx context.Context, arg DisableCalendarEventAttendeeParams) error
 	// Soft-delete a comment (author or calendar owner).
 	DisableCalendarEventComment(ctx context.Context, arg DisableCalendarEventCommentParams) error
-	// Revoke an invite link.
-	DisableCalendarInvite(ctx context.Context, arg DisableCalendarInviteParams) error
 	// Soft-delete a memo.
 	DisableCalendarMemo(ctx context.Context, arg DisableCalendarMemoParams) error
 	// Remove a user from a calendar (soft-delete).
@@ -99,12 +92,10 @@ type Querier interface {
 	FindCalendarEventByPublicId(ctx context.Context, arg FindCalendarEventByPublicIdParams) (FindCalendarEventByPublicIdRow, error)
 	// Resolve a comment by UUID v7.
 	FindCalendarEventCommentByPublicId(ctx context.Context, arg FindCalendarEventCommentByPublicIdParams) (FindCalendarEventCommentByPublicIdRow, error)
+	// ListAllCalendarEvents was consumed only by the deleted ICS export path;
+	// the replacement (R5.14) will query via calendar_public_shares.
 	// Quick lookup for permission checks: who owns this event?
 	FindCalendarEventOwner(ctx context.Context, arg FindCalendarEventOwnerParams) (FindCalendarEventOwnerRow, error)
-	// Resolve an invite by its token hash for the acceptance flow.
-	FindCalendarInviteByTokenHash(ctx context.Context, tokenHash string) (FindCalendarInviteByTokenHashRow, error)
-	// Public-facing invite lookup (for share page preview, no auth required).
-	FindCalendarInviteByTokenHashPublic(ctx context.Context, tokenHash string) (FindCalendarInviteByTokenHashPublicRow, error)
 	// Resolve a memo by UUID v7.
 	FindCalendarMemoByPublicId(ctx context.Context, arg FindCalendarMemoByPublicIdParams) (FindCalendarMemoByPublicIdRow, error)
 	// Look up a user's subscription to a specific calendar.
@@ -169,14 +160,10 @@ type Querier interface {
 	// Return the role string for an enabled workspace member. Returns
 	// sql.ErrNoRows when the user is not a member.
 	GetWorkspaceMemberRole(ctx context.Context, arg GetWorkspaceMemberRoleParams) (WorkspaceMembersRole, error)
-	// Bump the use counter after a successful acceptance.
-	IncrementCalendarInviteUseCount(ctx context.Context, id uint32) error
 	// Bump the use counter after a successful accept.
 	IncrementInviteUseCount(ctx context.Context, id uint32) error
 	// Insert a hashed recovery code for a user.
 	InsertRecoveryCode(ctx context.Context, arg InsertRecoveryCodeParams) error
-	// List all enabled events in a calendar (no date filter, for export).
-	ListAllCalendarEvents(ctx context.Context, calendarID uint32) ([]ListAllCalendarEventsRow, error)
 	// List checklist items for an event in display order.
 	ListCalendarChecklistItems(ctx context.Context, eventID uint32) ([]ListCalendarChecklistItemsRow, error)
 	// List active attachments for an event.
@@ -190,16 +177,24 @@ type Querier interface {
 	ListCalendarEventsAcrossCalendars(ctx context.Context, arg ListCalendarEventsAcrossCalendarsParams) ([]ListCalendarEventsAcrossCalendarsRow, error)
 	// List non-recurring events in a calendar within a time range.
 	ListCalendarEventsByRange(ctx context.Context, arg ListCalendarEventsByRangeParams) ([]ListCalendarEventsByRangeRow, error)
-	// List active invites for a calendar.
-	ListCalendarInvites(ctx context.Context, arg ListCalendarInvitesParams) ([]ListCalendarInvitesRow, error)
 	// List memos for a calendar in display order.
 	ListCalendarMemos(ctx context.Context, calendarID uint32) ([]ListCalendarMemosRow, error)
 	// List all subscribers of a calendar (for member list, color resolution).
 	ListCalendarSubscribers(ctx context.Context, arg ListCalendarSubscribersParams) ([]ListCalendarSubscribersRow, error)
 	// List all calendars a user subscribes to within a workspace.
 	ListCalendarsForUser(ctx context.Context, arg ListCalendarsForUserParams) ([]ListCalendarsForUserRow, error)
-	// List hidden members for a subscription.
-	ListMemberFilters(ctx context.Context, subscriptionID uint32) ([]uint32, error)
+	// Cross-workspace variant: list non-recurring events on every calendar
+	// the caller is subscribed to, across every workspace where the caller
+	// is still an active member. workspace_members is joined so that a
+	// subscription row lingering past membership removal cannot leak rows
+	// (belt-and-braces beyond the soft-disable cascade). Backs GET
+	// /me/calendar-events for the unified flow-web calendar so the client
+	// does not fan out one request per workspace.
+	ListMyCalendarEventsAcrossWorkspaces(ctx context.Context, arg ListMyCalendarEventsAcrossWorkspacesParams) ([]ListMyCalendarEventsAcrossWorkspacesRow, error)
+	// Cross-workspace recurring variant. Same membership guard as the
+	// non-recurring query. Clients expand RRULE instances client-side via
+	// the shared recurrence expander.
+	ListMyRecurringCalendarEventsAcrossWorkspaces(ctx context.Context, arg ListMyRecurringCalendarEventsAcrossWorkspacesParams) ([]ListMyRecurringCalendarEventsAcrossWorkspacesRow, error)
 	// List a user's PATs in a workspace, masked (no token_hash).
 	ListPatsForUser(ctx context.Context, arg ListPatsForUserParams) ([]ListPatsForUserRow, error)
 	// Cross-calendar query: list recurring events across multiple calendars
@@ -223,7 +218,7 @@ type Querier interface {
 	PatchCalendar(ctx context.Context, arg PatchCalendarParams) error
 	// Patch mutable event fields. NULL params leave columns untouched.
 	PatchCalendarEvent(ctx context.Context, arg PatchCalendarEventParams) error
-	// Update a subscriber's role or display preferences.
+	// Update a subscriber's display preferences.
 	PatchCalendarSubscription(ctx context.Context, arg PatchCalendarSubscriptionParams) error
 	// Patch the authenticated user's profile. NULL params leave the column untouched.
 	PatchMe(ctx context.Context, arg PatchMeParams) error
@@ -231,8 +226,6 @@ type Querier interface {
 	PatchWorkspace(ctx context.Context, arg PatchWorkspaceParams) error
 	// Insert a new global user account. The caller supplies a UUID v7 public_id.
 	RegisterUser(ctx context.Context, arg RegisterUserParams) (int64, error)
-	// Unhide a specific member's events.
-	RemoveMemberFilter(ctx context.Context, arg RemoveMemberFilterParams) error
 	// Soft-remove a member from a workspace.
 	RemoveWorkspaceMember(ctx context.Context, arg RemoveWorkspaceMemberParams) error
 	// Soft-remove a member keyed by user_id.

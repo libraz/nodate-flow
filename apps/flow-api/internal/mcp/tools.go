@@ -19,7 +19,22 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/itemkit"
 )
+
+// countLinkedEvents returns how many enabled calendar_events are
+// attached to a task. Used to decide when an MCP mutation must route
+// through itemkit to keep the task / event pair consistent.
+func countLinkedEvents(ctx context.Context, deps Deps, taskID uint32) (int, error) {
+	var n int
+	if err := deps.DB.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM calendar_events WHERE task_id = ? AND enabled = TRUE`,
+		taskID,
+	).Scan(&n); err != nil {
+		return 0, err
+	}
+	return n, nil
+}
 
 // tool is the internal descriptor for a registered MCP tool.
 type tool struct {
@@ -955,18 +970,92 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		}
 		evt = p
 	}
-	if err := deps.Queries.UpdateTask(ctx, generated.UpdateTaskParams{
+
+	titleChanged := in.Title != nil && *in.Title != "" && title != current.Title
+	eventOnChanged := in.EventOn != nil && evt != current.EventOn
+	dueOnChanged := in.DueOn != nil && due != current.DueOn
+
+	needsItemkit := false
+	if titleChanged || eventOnChanged || dueOnChanged {
+		n, cerr := countLinkedEvents(ctx, deps, taskInternal)
+		if cerr != nil {
+			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, cerr)
+		}
+		needsItemkit = n > 0
+	}
+
+	updateParams := generated.UpdateTaskParams{
 		Title:       title,
 		Description: desc,
 		Priority:    prio,
 		DueOn:       due,
 		StartedOn:   start,
 		EventOn:     evt,
+		SortWeight:  current.SortWeight,
+		Visibility:  current.Visibility,
 		WorkspaceID: s.workspaceID,
 		PublicID:    pub,
-	}); err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
+
+	if !needsItemkit {
+		if err := deps.Queries.UpdateTask(ctx, updateParams); err != nil {
+			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		}
+	} else {
+		tx, err := deps.DB.BeginTx(ctx, nil)
+		if err != nil {
+			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		}
+		defer tx.Rollback() //nolint:errcheck
+		qtx := deps.Queries.WithTx(tx)
+		if err := qtx.UpdateTask(ctx, updateParams); err != nil {
+			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		}
+		if titleChanged {
+			if err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
+				WorkspaceID: s.workspaceID,
+				ActorUserID: s.userID,
+				TaskID:      taskInternal,
+				NewTitle:    title,
+			}); err != nil {
+				return nil, translateItemkitMCPError(err)
+			}
+		}
+		if eventOnChanged {
+			var t time.Time
+			if evt.Valid {
+				t = evt.Time
+			}
+			if err := itemkit.RescheduleTask(ctx, tx, itemkit.RescheduleTaskArgs{
+				WorkspaceID: s.workspaceID,
+				TaskID:      taskInternal,
+				ActorUserID: s.userID,
+				SetEventOn:  true,
+				EventOn:     t,
+			}); err != nil {
+				return nil, translateItemkitMCPError(err)
+			}
+		}
+		if dueOnChanged {
+			var t time.Time
+			if due.Valid {
+				t = due.Time
+			}
+			if err := itemkit.RescheduleTask(ctx, tx, itemkit.RescheduleTaskArgs{
+				WorkspaceID: s.workspaceID,
+				TaskID:      taskInternal,
+				ActorUserID: s.userID,
+				SetDueOn:    true,
+				DueOn:       t,
+			}); err != nil {
+				return nil, translateItemkitMCPError(err)
+			}
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		}
+	}
+
 	taskID64 := int64(taskInternal)
 	actor := int64(s.userID)
 	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
@@ -977,6 +1066,19 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		Payload:     map[string]any{"taskId": pub.String(), "via": "mcp"},
 	})
 	return map[string]any{"id": pub.String()}, nil
+}
+
+// translateItemkitMCPError maps an itemkit invariant into a stable MCP
+// error code so the tool response is 422-style for recoverable cases
+// and generic for the rest.
+func translateItemkitMCPError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if strings.Contains(err.Error(), "itemkit invariant") {
+		return apierrors.New(apierrors.ItemItemkitInvariantViolation)
+	}
+	return apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 }
 
 // mcpKnownTransitions is the set of transitions accepted by the
@@ -2523,6 +2625,30 @@ func smartCreatePriorityToInt(s string) int32 {
 // Calendar tools
 // ----------------------------------------------------------------------------
 
+// nullTimeFormat renders a nullable time as its layout-formatted string,
+// or an empty string when the time is NULL. Keeps the MCP DTO stable
+// while calendar_events.{start,end}_at are nullable in the schema.
+func nullTimeFormat(t sql.NullTime, layout string) string {
+	if !t.Valid {
+		return ""
+	}
+	return t.Time.Format(layout)
+}
+
+// calendarRoleFor derives the MCP-exposed role string for a calendar
+// row. post-R5.1: calendar_subscriptions.role is gone; we mirror the
+// HTTP handler convention (personal owner -> "owner", system ->
+// "viewer", otherwise "editor" since every ws member has edit access).
+func calendarRoleFor(kind generated.CalendarsKind, ownerUserID sql.NullInt32, actorUserID uint32) string {
+	if ownerUserID.Valid && uint32(ownerUserID.Int32) == actorUserID {
+		return "owner"
+	}
+	if kind == generated.CalendarsKindSystem {
+		return "viewer"
+	}
+	return "editor"
+}
+
 func runListCalendars(ctx context.Context, deps Deps, s *session, _ json.RawMessage) (any, error) {
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
@@ -2537,12 +2663,17 @@ func runListCalendars(ctx context.Context, deps Deps, s *session, _ json.RawMess
 	items := make([]map[string]any, 0, len(rows))
 	for _, r := range rows {
 		items = append(items, map[string]any{
-			"id":          r.PublicID.String(),
-			"kind":        string(r.Kind),
-			"name":        r.Name,
-			"color":       r.Color,
-			"role":        string(r.Role),
-			"memberColor": r.MemberColor,
+			"id":   r.PublicID.String(),
+			"kind": string(r.Kind),
+			"name": r.Name,
+			// post-R5.1: calendar_subscriptions.role was dropped. Derive
+			// the role from ownership so existing MCP clients keep a
+			// stable shape.
+			"role":  calendarRoleFor(r.Kind, r.OwnerUserID, s.userID),
+			"color": r.Color,
+			// post-R5.1: member_color was dropped from
+			// calendar_subscriptions; fall back to display_color.
+			"memberColor": r.DisplayColor,
 			"visible":     r.Visible,
 		})
 	}
@@ -2588,8 +2719,8 @@ func runListCalendarEvents(ctx context.Context, deps Deps, s *session, raw json.
 	rows, err := deps.Queries.ListCalendarEventsAcrossCalendars(ctx, generated.ListCalendarEventsAcrossCalendarsParams{
 		UserID:      s.userID,
 		WorkspaceID: s.workspaceID,
-		StartAt:     endTime,
-		EndAt:       startTime,
+		StartAt:     sql.NullTime{Time: endTime, Valid: true},
+		EndAt:       sql.NullTime{Time: startTime, Valid: true},
 	})
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
@@ -2603,8 +2734,8 @@ func runListCalendarEvents(ctx context.Context, deps Deps, s *session, raw json.
 			"showAs":      string(r.ShowAs),
 			"title":       r.Title,
 			"allDay":      r.AllDay,
-			"startAt":     r.StartAt.Format(time.RFC3339),
-			"endAt":       r.EndAt.Format(time.RFC3339),
+			"startAt":     nullTimeFormat(r.StartAt, time.RFC3339),
+			"endAt":       nullTimeFormat(r.EndAt, time.RFC3339),
 			"ownerUserId": r.OwnerUserID,
 		})
 	}
@@ -2663,25 +2794,25 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 
 	ownerUserID := s.userID
 	if in.OwnerUserID != "" {
-		// Only manager/owner can set a different owner.
-		sub, serr := deps.Queries.FindCalendarSubscription(ctx, generated.FindCalendarSubscriptionParams{
-			CalendarID: calID,
-			UserID:     s.userID,
-		})
-		if serr != nil {
-			return nil, apierrors.Newf(apierrors.McpToolExecutionFailed, "subscription not found")
+		// post-R5.1: calendar_subscriptions.role is gone, so "manager/owner"
+		// tiers no longer exist. Only the personal-calendar owner can
+		// set a different ownerUserId here. System calendars have no
+		// editable owner. post-R5.1: event-level ACL (attendee can_edit) TBD in R5.3.
+		const qCalOwner = `SELECT owner_user_id FROM calendars WHERE id = ? AND enabled = TRUE LIMIT 1`
+		var calOwner sql.NullInt32
+		if serr := deps.DB.QueryRowContext(ctx, qCalOwner, calID).Scan(&calOwner); serr != nil {
+			return nil, apierrors.Newf(apierrors.McpToolExecutionFailed, "calendar not found")
 		}
-		role := string(sub.Role)
-		if role != "manager" && role != "owner" {
-			return nil, apierrors.Newf(apierrors.McpToolExecutionFailed, "only manager/owner can set ownerUserId")
+		if !calOwner.Valid || uint32(calOwner.Int32) != s.userID {
+			return nil, apierrors.Newf(apierrors.McpToolExecutionFailed, "only the calendar owner can set ownerUserId")
 		}
 		// Resolve the target user by public id.
 		ownerPub, perr := types.Parse(in.OwnerUserID)
 		if perr != nil {
 			return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid ownerUserId")
 		}
-		const q = `SELECT id FROM users WHERE public_id = ? AND enabled = TRUE LIMIT 1`
-		if uerr := deps.DB.QueryRowContext(ctx, q, ownerPub).Scan(&ownerUserID); uerr != nil {
+		const qUser = `SELECT id FROM users WHERE public_id = ? AND enabled = TRUE LIMIT 1`
+		if uerr := deps.DB.QueryRowContext(ctx, qUser, ownerPub).Scan(&ownerUserID); uerr != nil {
 			return nil, apierrors.Newf(apierrors.McpToolExecutionFailed, "owner user not found")
 		}
 	}
@@ -2701,8 +2832,8 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		ShowAs:             showAs,
 		Title:              in.Title,
 		AllDay:             allDay,
-		StartAt:            startAt,
-		EndAt:              endAt,
+		StartAt:            sql.NullTime{Time: startAt, Valid: true},
+		EndAt:              sql.NullTime{Time: endAt, Valid: true},
 		Timezone:           "UTC",
 		Location:           sql.NullString{String: in.Location, Valid: in.Location != ""},
 		Memo:               sql.NullString{String: in.Memo, Valid: in.Memo != ""},
@@ -2785,22 +2916,44 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		CalendarID:  owner.CalendarID,
 		WorkspaceID: s.workspaceID,
 	}
-	if in.Title != nil {
-		params.Title = sql.NullString{String: *in.Title, Valid: true}
-	}
+
+	isLinked := evt.TaskID.Valid
+	titleChanged := in.Title != nil && *in.Title != evt.Title
+
+	var newStartAt, newEndAt time.Time
+	timeChanged := false
 	if in.StartAt != nil {
 		t, perr := time.Parse(time.RFC3339, *in.StartAt)
 		if perr != nil {
 			return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid startAt")
 		}
-		params.StartAt = sql.NullTime{Time: t, Valid: true}
+		newStartAt = t
+		timeChanged = true
 	}
 	if in.EndAt != nil {
 		t, perr := time.Parse(time.RFC3339, *in.EndAt)
 		if perr != nil {
 			return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid endAt")
 		}
-		params.EndAt = sql.NullTime{Time: t, Valid: true}
+		newEndAt = t
+		timeChanged = true
+	}
+	// When only one side of the time window arrived, fall back to the
+	// stored value so itemkit / PatchCalendarEvent receive a valid pair.
+	if timeChanged {
+		if newStartAt.IsZero() && evt.StartAt.Valid {
+			newStartAt = evt.StartAt.Time
+		}
+		if newEndAt.IsZero() && evt.EndAt.Valid {
+			newEndAt = evt.EndAt.Time
+		}
+	}
+	if in.Title != nil {
+		params.Title = sql.NullString{String: *in.Title, Valid: true}
+	}
+	if timeChanged {
+		params.StartAt = sql.NullTime{Time: newStartAt, Valid: true}
+		params.EndAt = sql.NullTime{Time: newEndAt, Valid: true}
 	}
 	if in.Kind != nil {
 		params.Kind = generated.NullCalendarEventsKind{
@@ -2830,7 +2983,53 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		params.BlockLabel = sql.NullString{String: *in.BlockLabel, Valid: true}
 	}
 
-	if err := deps.Queries.PatchCalendarEvent(ctx, params); err != nil {
+	if !isLinked || (!titleChanged && !timeChanged) {
+		if err := deps.Queries.PatchCalendarEvent(ctx, params); err != nil {
+			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		}
+		return map[string]any{"success": true}, nil
+	}
+
+	tx, err := deps.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+	qtx := deps.Queries.WithTx(tx)
+
+	if titleChanged {
+		if err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
+			WorkspaceID: s.workspaceID,
+			ActorUserID: s.userID,
+			EventID:     evt.ID,
+			NewTitle:    *in.Title,
+		}); err != nil {
+			return nil, translateItemkitMCPError(err)
+		}
+		params.Title = sql.NullString{}
+	}
+	if timeChanged {
+		if err := itemkit.RescheduleEvent(ctx, tx, itemkit.RescheduleEventArgs{
+			WorkspaceID: s.workspaceID,
+			EventID:     evt.ID,
+			ActorUserID: s.userID,
+			StartAt:     newStartAt,
+			EndAt:       newEndAt,
+		}); err != nil {
+			return nil, translateItemkitMCPError(err)
+		}
+		params.StartAt = sql.NullTime{}
+		params.EndAt = sql.NullTime{}
+	}
+	// Only run the remaining-fields patch if anything is still set.
+	if params.Title.Valid || params.Kind.Valid || params.ShowAs.Valid ||
+		params.Visibility.Valid || params.Location.Valid || params.Memo.Valid ||
+		params.BlockLabel.Valid || params.StartAt.Valid || params.EndAt.Valid {
+		if err := qtx.PatchCalendarEvent(ctx, params); err != nil {
+			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	return map[string]any{"success": true}, nil
@@ -2878,11 +3077,15 @@ func runDeleteCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		return nil, apierrors.Newf(apierrors.McpToolExecutionFailed, "permission denied: cannot delete event")
 	}
 
-	if err := deps.Queries.DisableCalendarEvent(ctx, generated.DisableCalendarEventParams{
-		PublicID:    eventPub,
-		CalendarID:  owner.CalendarID,
-		WorkspaceID: s.workspaceID,
-	}); err != nil {
+	tx, err := deps.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+	if err := itemkit.DeleteEvent(ctx, tx, s.workspaceID, evt.ID, s.userID); err != nil {
+		return nil, translateItemkitMCPError(err)
+	}
+	if err := tx.Commit(); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	return map[string]any{"success": true}, nil
@@ -2930,8 +3133,8 @@ func runListFreeSlots(ctx context.Context, deps Deps, s *session, raw json.RawMe
 	rows, err := deps.Queries.ListCalendarEventsAcrossCalendars(ctx, generated.ListCalendarEventsAcrossCalendarsParams{
 		UserID:      targetUserID,
 		WorkspaceID: s.workspaceID,
-		StartAt:     workEnd,
-		EndAt:       workStart,
+		StartAt:     sql.NullTime{Time: workEnd, Valid: true},
+		EndAt:       sql.NullTime{Time: workStart, Valid: true},
 	})
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
@@ -2947,8 +3150,14 @@ func runListFreeSlots(ctx context.Context, deps Deps, s *session, raw json.RawMe
 		if string(r.ShowAs) == "free" {
 			continue
 		}
-		s := r.StartAt
-		e := r.EndAt
+		// post-R5.1: start_at / end_at are nullable. Undated events
+		// (planning-stage placeholders) don't contribute to busy
+		// intervals, so skip them.
+		if !r.StartAt.Valid || !r.EndAt.Valid {
+			continue
+		}
+		s := r.StartAt.Time
+		e := r.EndAt.Time
 		if s.Before(workStart) {
 			s = workStart
 		}
@@ -3046,8 +3255,8 @@ func runCreateEventFromTask(ctx context.Context, deps Deps, s *session, raw json
 		ShowAs:             generated.CalendarEventsShowAsBusy,
 		Title:              task.Title,
 		AllDay:             false,
-		StartAt:            startAt,
-		EndAt:              endAt,
+		StartAt:            sql.NullTime{Time: startAt, Valid: true},
+		EndAt:              sql.NullTime{Time: endAt, Valid: true},
 		Timezone:           "UTC",
 		Location:           sql.NullString{},
 		Memo:               sql.NullString{},

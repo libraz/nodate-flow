@@ -186,6 +186,11 @@ export const CalendarErrors = {
     status: 500,
     message: "Could not resolve owner user",
   },
+  CALENDAR_EVENT_START_END_PAIR_REQUIRED: {
+    code: "CALENDAR.EVENT.START_END_PAIR_REQUIRED",
+    status: 422,
+    message: "startAt and endAt must be provided together",
+  },
   CALENDAR_EVENT_STORE_DELETE_INTERRUPTED: {
     code: "CALENDAR.EVENT.STORE_DELETE_INTERRUPTED",
     status: 500,

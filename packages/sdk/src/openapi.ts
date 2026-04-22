@@ -759,6 +759,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/tasks-with-dates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List tasks with event_on or due_on in range across every workspace */
+        get: operations["me-tasks-with-dates-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/totp": {
         parameters: {
             query?: never;
@@ -2092,75 +2109,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/workspaces/{wsId}/calendar-events": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List events across all subscribed calendars */
-        get: operations["calendar-events-list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/workspaces/{wsId}/calendars": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List calendars visible to the caller */
-        get: operations["calendars-list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/workspaces/{wsId}/calendars/{calId}/events": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Create a calendar event */
-        post: operations["calendar-events-create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/workspaces/{wsId}/calendars/{calId}/events/{eventId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Delete a calendar event */
-        delete: operations["calendar-events-delete"];
-        options?: never;
-        head?: never;
-        /** Update a calendar event */
-        patch: operations["calendar-events-patch"];
-        trace?: never;
-    };
     "/workspaces/{wsId}/dashboard/widgets": {
         parameters: {
             query?: never;
@@ -3405,23 +3353,6 @@ export interface components {
             /** Format: double */
             threshold: number;
         };
-        CalendarDTO: {
-            color: string;
-            coverUrl?: string;
-            /** Format: int64 */
-            createdAt: number;
-            description?: string;
-            displayColor?: string;
-            /** @description Calendar public id (UUID v7) */
-            id: string;
-            kind: string;
-            memberColor?: string;
-            name: string;
-            role?: string;
-            /** Format: int64 */
-            updatedAt?: number;
-            visible: boolean;
-        };
         CancelImportOutputBody: {
             /**
              * Format: uri
@@ -3602,22 +3533,6 @@ export interface components {
              * @description Sampling temperature x100 (default 100)
              */
             temperature?: number;
-        };
-        CreateEventInputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            allDay: boolean;
-            endAt: string;
-            kind?: string;
-            location?: string;
-            memo?: string;
-            showAs?: string;
-            startAt: string;
-            timezone: string;
-            title: string;
         };
         CreateFavoriteBody: {
             /**
@@ -3884,14 +3799,6 @@ export interface components {
             /** @description Plaintext token (only returned once) */
             token: string;
         };
-        DeleteEventOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            ok: boolean;
-        };
         DeleteFavoriteOutputBody: {
             /**
              * Format: uri
@@ -4121,28 +4028,6 @@ export interface components {
              */
             readonly $schema?: string;
             outcomes: components["schemas"]["EvaluateConstraintsOutcome"][] | null;
-        };
-        EventDTO: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            allDay: boolean;
-            blockLabel?: string;
-            calendarId: string;
-            endAt: string;
-            /** @description Event public id (UUID v7) */
-            id: string;
-            kind: string;
-            location?: string;
-            memo?: string;
-            ownerUserId?: string;
-            showAs: string;
-            startAt: string;
-            timezone: string;
-            title: string;
-            visibility: string;
         };
         ExplainConstraintBody: {
             /**
@@ -4504,14 +4389,6 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
-        ListCalendarsOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            calendars: components["schemas"]["CalendarDTO"][] | null;
-        };
         ListChildPagesBody: {
             /**
              * Format: uri
@@ -4550,14 +4427,6 @@ export interface components {
             candidates: components["schemas"]["DuplicateCandidate"][] | null;
             model: string;
             source: string;
-        };
-        ListEventsOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            events: components["schemas"]["EventDTO"][] | null;
         };
         ListFavoritesBody: {
             /**
@@ -4678,6 +4547,16 @@ export interface components {
             total: number;
         };
         ListMyTasksBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            tasks: components["schemas"]["MyTaskListItem"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
+        ListMyTasksWithDatesBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
@@ -5265,22 +5144,6 @@ export interface components {
             intervalMinutes?: number;
             /** Format: double */
             threshold?: number;
-        };
-        PatchEventInputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            allDay?: boolean;
-            endAt?: string;
-            kind?: string;
-            location?: string;
-            memo?: string;
-            showAs?: string;
-            startAt?: string;
-            timezone?: string;
-            title?: string;
         };
         PatchLabelBody: {
             /**
@@ -8404,6 +8267,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListMyTasksBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "me-tasks-with-dates-list": {
+        parameters: {
+            query: {
+                /** @description Range start YYYY-MM-DD (inclusive) */
+                from: string;
+                /** @description Range end YYYY-MM-DD (inclusive) */
+                to: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListMyTasksWithDatesBody"];
                 };
             };
             /** @description Error */
@@ -11752,179 +11651,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WeeklyDigestOutputBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "calendar-events-list": {
-        parameters: {
-            query?: {
-                /** @description ISO date (YYYY-MM-DD) */
-                start?: string;
-                /** @description ISO date (YYYY-MM-DD) */
-                end?: string;
-            };
-            header?: never;
-            path: {
-                wsId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListEventsOutputBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "calendars-list": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                wsId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListCalendarsOutputBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "calendar-events-create": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                wsId: string;
-                calId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateEventInputBody"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EventDTO"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "calendar-events-delete": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                wsId: string;
-                calId: string;
-                eventId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DeleteEventOutputBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "calendar-events-patch": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                wsId: string;
-                calId: string;
-                eventId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PatchEventInputBody"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EventDTO"];
                 };
             };
             /** @description Error */

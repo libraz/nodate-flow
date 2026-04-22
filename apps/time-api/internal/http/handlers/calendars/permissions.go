@@ -21,10 +21,14 @@ var (
 )
 
 // canEditEvent checks if the actor can modify an event.
+//
+// post-R5.1: calendar_subscriptions.role was dropped; ws members have edit
+// access. event-level visibility plus the event owner / can_edit attendee
+// relationship is the real ACL (rebuilt properly in R5.2 via itemkit).
 func canEditEvent(
 	actorUserID uint32,
 	event generated.FindCalendarEventByPublicIdRow,
-	sub generated.FindCalendarSubscriptionRow,
+	_ generated.FindCalendarSubscriptionRow,
 	attendee *generated.FindCalendarEventAttendeeRow,
 ) bool {
 	if event.OwnerUserID == actorUserID {
@@ -33,30 +37,29 @@ func canEditEvent(
 	if attendee != nil && attendee.CanEdit {
 		return true
 	}
-	if sub.Role == generated.CalendarSubscriptionsRoleOwner ||
-		sub.Role == generated.CalendarSubscriptionsRoleManager {
-		return true
-	}
-	return false
+	return true
 }
 
 // canSetOwner checks if the actor can create events on behalf of another user.
+//
+// post-R5.1: ws members have edit access; rebuilt properly in R5.2.
 func canSetOwner(
 	actorUserID uint32,
 	ownerUserID uint32,
-	sub generated.FindCalendarSubscriptionRow,
+	_ generated.FindCalendarSubscriptionRow,
 ) bool {
 	if actorUserID == ownerUserID {
 		return true
 	}
-	return sub.Role == generated.CalendarSubscriptionsRoleOwner ||
-		sub.Role == generated.CalendarSubscriptionsRoleManager
+	return true
 }
 
-// isOwnerOrManager returns true if the subscription role is owner or manager.
-func isOwnerOrManager(sub generated.FindCalendarSubscriptionRow) bool {
-	return sub.Role == generated.CalendarSubscriptionsRoleOwner ||
-		sub.Role == generated.CalendarSubscriptionsRoleManager
+// isOwnerOrManager previously checked the subscription role.
+//
+// post-R5.1: ws members have edit access; event-level visibility is the real
+// ACL (applied later). Always returns true; rebuilt properly in R5.2.
+func isOwnerOrManager(_ generated.FindCalendarSubscriptionRow) bool {
+	return true
 }
 
 // validateInvite checks that the invite has not expired and has not exceeded its use limit.
