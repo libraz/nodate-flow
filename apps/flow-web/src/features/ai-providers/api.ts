@@ -9,10 +9,10 @@
 import type { components } from '@nodate-flow/sdk';
 import {
   type UseMutationResult,
-  type UseSuspenseQueryResult,
+  type UseQueryResult,
   useMutation,
+  useQuery,
   useQueryClient,
-  useSuspenseQuery,
 } from '@tanstack/react-query';
 
 import { sdk } from '../../lib/sdk';
@@ -32,15 +32,45 @@ import { ApiError, toApiError } from '../../lib/api-error';
 
 export { ApiError as AiProviderApiError };
 
-/** GET /workspaces/{wsId}/ai/providers — masked list. */
-export function useAiProvidersQuery(workspaceId: string): UseSuspenseQueryResult<AiProvider[]> {
-  return useSuspenseQuery({
+/**
+ * ApiError augmented with the originating HTTP status, so consumers can
+ * tell a 403 (member without admin rights) apart from a transient 5xx
+ * without parsing `error.code` strings.
+ */
+export class AiProvidersQueryError extends ApiError {
+  readonly status: number;
+  constructor(status: number, code: string | undefined, message: string) {
+    super(code, message);
+    this.name = 'AiProvidersQueryError';
+    this.status = status;
+  }
+}
+
+/**
+ * GET /workspaces/{wsId}/ai/providers — masked list.
+ *
+ * Non-suspense so callers can render a localized inline error card
+ * (permission denied, transient failure, ...) instead of letting the
+ * thrown ApiError cascade up to the root FatalFallback. The caller is
+ * responsible for handling `isLoading` / `isError` states.
+ */
+export function useAiProvidersQuery(
+  workspaceId: string,
+): UseQueryResult<AiProvider[], AiProvidersQueryError> {
+  return useQuery<AiProvider[], AiProvidersQueryError>({
     queryKey: aiProvidersKeys.list(workspaceId),
+    // Opt out of the SDK-wide `throwOnError: true` default so 403 / 404
+    // from member-role users is handled inline by the consumer rather
+    // than cascading to the root ErrorBoundary.
+    throwOnError: false,
     queryFn: async (): Promise<AiProvider[]> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/ai/providers', {
+      const { data, error, response } = await sdk.GET('/workspaces/{wsId}/ai/providers', {
         params: { path: { wsId: workspaceId } },
       });
-      if (error || !data) throw toApiError(error, 'Failed to load AI providers');
+      if (error || !data) {
+        const base = toApiError(error, 'Failed to load AI providers');
+        throw new AiProvidersQueryError(response.status, base.code, base.message);
+      }
       return data.providers ?? [];
     },
   });

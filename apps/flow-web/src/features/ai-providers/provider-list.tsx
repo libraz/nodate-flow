@@ -5,12 +5,13 @@
 
 import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { confirmAction } from '../../lib/confirm-action';
-import { useAiProvidersQuery, useDeleteAiProvider } from './api';
+import { type AiProvidersQueryError, useAiProvidersQuery, useDeleteAiProvider } from './api';
 import MaskedKey from './masked-key';
 import ProviderAddDialog from './provider-add-dialog';
 import ProviderRotateDialog from './provider-rotate-dialog';
@@ -39,9 +40,22 @@ export interface ProviderListProps {
   workspaceId: string;
 }
 
+/**
+ * errorMessageKey picks a localized copy key based on the HTTP status
+ * of the underlying query failure. 403 gets a gentler "admin only"
+ * message; everything else (404, 5xx, network, ...) gets the generic
+ * "failed to load" copy.
+ */
+function errorMessageKey(
+  error: AiProvidersQueryError,
+): 'providers.error.forbidden' | 'providers.error.load_failed' {
+  if (error.status === 403) return 'providers.error.forbidden';
+  return 'providers.error.load_failed';
+}
+
 export default function ProviderList({ workspaceId }: ProviderListProps): ReactElement {
   const { t } = useTranslation('ai');
-  const { data: providers } = useAiProvidersQuery(workspaceId);
+  const { data: providers, isLoading, isError, error, refetch } = useAiProvidersQuery(workspaceId);
   const del = useDeleteAiProvider(workspaceId);
   const [addOpen, setAddOpen] = useState(false);
   const [rotateId, setRotateId] = useState<string | null>(null);
@@ -74,6 +88,7 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
         </h1>
         <Button
           variant="primary"
+          disabled={isError}
           onClick={() => {
             setAddOpen(true);
           }}
@@ -86,7 +101,36 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
         {t('providers.write_only_notice')}
       </p>
 
-      {providers.length === 0 ? (
+      {isError ? (
+        <Card
+          role="alert"
+          style={{
+            padding: '1.5rem',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '0.75rem',
+            textAlign: 'center',
+          }}
+        >
+          <p style={{ margin: 0, color: 'var(--nf-color-fg)' }}>{t(errorMessageKey(error))}</p>
+          {error.status !== 403 ? (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                void refetch();
+              }}
+            >
+              {t('providers.error.retry')}
+            </Button>
+          ) : null}
+        </Card>
+      ) : isLoading || !providers ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
+          <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
+        </div>
+      ) : providers.length === 0 ? (
         <Card style={{ padding: '2rem', textAlign: 'center', color: 'var(--nf-color-fg-muted)' }}>
           {t('providers.empty')}
         </Card>

@@ -37,6 +37,11 @@
       "deleted": "Provider deleted",
       "rotated": "API key rotated",
       "error": "Action failed"
+    },
+    "error": {
+      "load_failed": "Failed to load AI providers. Please try again.",
+      "forbidden": "Only workspace admins can manage AI providers.",
+      "retry": "Try again"
     }
   }
 }
