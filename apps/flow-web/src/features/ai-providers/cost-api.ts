@@ -31,6 +31,10 @@ export function useAiCostTodayQuery(workspaceId: string | undefined): UseQueryRe
     retry: false,
     refetchInterval: 60_000,
     refetchOnWindowFocus: false,
+    // This panel is decorative; opt out of the SDK-wide `throwOnError: true`
+    // default so a 404 / AI-disabled response never cascades to the route
+    // ErrorBoundary. Callers render nothing on error.
+    throwOnError: false,
     queryFn: async (): Promise<AiCostToday> => {
       const { data, error } = await sdk.GET('/workspaces/{wsId}/ai/cost-today', {
         params: { path: { wsId: workspaceId as string } },

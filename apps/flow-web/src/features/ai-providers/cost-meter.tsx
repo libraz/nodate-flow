@@ -13,6 +13,7 @@ import Icon from '@nodate-flow/ui/icon';
 import { useMatches } from '@tanstack/react-router';
 import { DollarSign } from 'lucide-react';
 import type { ReactElement } from 'react';
+import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 
 import { formatCurrency, formatDateOnly } from '../../lib/format';
@@ -30,7 +31,7 @@ function useActiveWorkspaceId(): string | undefined {
   return undefined;
 }
 
-export default function AiCostMeter(): ReactElement | null {
+function AiCostMeterImpl(): ReactElement | null {
   const { t, i18n } = useTranslation('common');
   const locale = i18n.language;
   const workspaceId = useActiveWorkspaceId();
@@ -54,5 +55,21 @@ export default function AiCostMeter(): ReactElement | null {
       <Icon icon={DollarSign} decorative className={styles.icon} />
       <span className={styles.value}>{formatted}</span>
     </span>
+  );
+}
+
+/**
+ * AiCostMeter — default export wraps the real implementation in a local
+ * ErrorBoundary. The meter is decorative; if anything inside throws
+ * synchronously (a sibling hook blows up, a query escalates past the
+ * per-query `throwOnError: false` opt-out, etc.) the meter silently
+ * disappears instead of collapsing the entire authenticated route to
+ * the root FatalFallback.
+ */
+export default function AiCostMeter(): ReactElement {
+  return (
+    <ErrorBoundary fallback={null}>
+      <AiCostMeterImpl />
+    </ErrorBoundary>
   );
 }

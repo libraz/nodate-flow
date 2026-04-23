@@ -6,6 +6,7 @@
 import Icon from '@nodate-flow/ui/icon';
 import { Bell } from 'lucide-react';
 import { type ReactElement, Suspense, useState } from 'react';
+import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 
 import topBarStyles from '../../components/layout/top-bar.module.css';
@@ -13,7 +14,7 @@ import { useUnreadCountQuery } from './api';
 import NotificationDropdown from './notification-dropdown';
 import styles from './notifications.module.css';
 
-export default function NotificationBell(): ReactElement {
+function NotificationBellImpl(): ReactElement {
   const { t } = useTranslation('notifications');
   const [open, setOpen] = useState(false);
   const { data: unreadCount } = useUnreadCountQuery();
@@ -48,5 +49,21 @@ export default function NotificationBell(): ReactElement {
         </Suspense>
       )}
     </div>
+  );
+}
+
+/**
+ * NotificationBell — default export wraps the real implementation in a
+ * local ErrorBoundary. The bell (and the dropdown rendered inside it) is
+ * decorative; if anything inside throws synchronously (a sibling hook
+ * blows up, a query escalates past the per-query `throwOnError: false`
+ * opt-out, etc.) the bell silently disappears instead of collapsing the
+ * entire authenticated route to the root FatalFallback.
+ */
+export default function NotificationBell(): ReactElement {
+  return (
+    <ErrorBoundary fallback={null}>
+      <NotificationBellImpl />
+    </ErrorBoundary>
   );
 }

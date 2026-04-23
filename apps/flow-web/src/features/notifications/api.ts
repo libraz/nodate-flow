@@ -77,7 +77,16 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
-/** GET /me/notifications — suspense query for the notification list. */
+/**
+ * GET /me/notifications — suspense query for the notification list.
+ *
+ * `useSuspenseQuery` always rethrows on error by design (it has no
+ * `throwOnError` opt-out), so containment for the notifications panel
+ * lives at the call site: NotificationBell wraps the `<Suspense>`
+ * hosting `<NotificationDropdown>` in a local `<ErrorBoundary
+ * fallback={null}>`, which catches anything this query throws before
+ * it can cascade to the route ErrorBoundary.
+ */
 export function useNotificationsQuery(): UseSuspenseQueryResult<NotificationItem[]> {
   return useSuspenseQuery({
     queryKey: notificationKeys.list(),
@@ -105,6 +114,10 @@ export function useUnreadCountQuery(): UseQueryResult<number> {
       return data.unreadCount;
     },
     refetchInterval: 30_000,
+    // This badge is decorative; opt out of the SDK-wide `throwOnError: true`
+    // default so a transient failure never cascades to the route
+    // ErrorBoundary. The bell's local ErrorBoundary swallows it.
+    throwOnError: false,
   });
 }
 
