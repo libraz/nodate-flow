@@ -30,7 +30,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useRouterState } from '@tanstack/react-router';
 import { useEffect, useMemo } from 'react';
 
-import { workspacesKeys } from '../features/workspaces/api';
 import { authSdk, sdk } from './sdk';
 
 /** localStorage key used to persist the last-visited workspace id. */
@@ -119,13 +118,21 @@ export function useCurrentWorkspaceId(): string | null {
     },
   });
 
-  // Non-suspense read of the workspaces list. The top-bar renders the
-  // suspense-variant under a Suspense boundary, so this query will
-  // almost always hit the shared cache rather than issue a network
-  // request. We use it to validate a persisted id against the user's
-  // currently-visible workspaces.
+  // Non-suspense read of the workspaces list projected down to a bare
+  // `string[]` of ids. We deliberately do NOT reuse
+  // `workspacesKeys.list()` here: that key belongs to
+  // `useWorkspacesQuery` which caches the full `Workspace[]` shape. If
+  // this hook's ids-only projection landed at that key first (e.g.
+  // because the sidebar / top-bar mounts before any caller of
+  // `useWorkspacesQuery`), every downstream reader would see
+  // `string[]` where `Workspace[]` is expected — leading to
+  // `w.id === undefined`, `NaN` member counts, and `/workspaces/undefined`
+  // links (see
+  // docs/bugs/2026-04-23-web-workspace-list-cache-shape-collision.md).
+  // Same pattern as the `projects` / `tasks` workspace-id projections
+  // above: keep the ids-only key inline and distinct.
   const workspacesQuery = useQuery({
-    queryKey: workspacesKeys.list(),
+    queryKey: ['workspaces', 'member-ids'] as const,
     staleTime: 60_000,
     queryFn: async (): Promise<string[]> => {
       const { data, error } = await authSdk.GET('/workspaces', {});
