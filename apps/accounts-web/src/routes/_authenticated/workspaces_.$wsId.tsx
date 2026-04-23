@@ -23,17 +23,17 @@ import AuthCard from '../../components/auth-card';
 import { sdk } from '../../lib/sdk';
 
 const schema = z.object({
-  name: z.string().min(1, 'auth.validation.workspace_name_required').max(100),
+  name: z.string().min(1, 'validation.workspace_name_required').max(100),
   slug: z
     .string()
-    .min(1, 'auth.validation.workspace_slug_required')
+    .min(1, 'validation.workspace_slug_required')
     .max(63)
-    .regex(/^[a-z0-9-]+$/, 'auth.validation.workspace_slug_invalid'),
+    .regex(/^[a-z0-9-]+$/, 'validation.workspace_slug_invalid'),
   description: z.string().max(500).or(z.literal('')),
-  timezone: z.string().min(1, 'auth.validation.timezone_required'),
+  timezone: z.string().min(1, 'validation.timezone_required'),
   country: z
     .string()
-    .regex(/^([A-Z]{2})?$/, 'auth.validation.country_invalid')
+    .regex(/^([A-Z]{2})?$/, 'validation.country_invalid')
     .or(z.literal('')),
 });
 

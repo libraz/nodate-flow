@@ -1,4 +1,5 @@
 import ConfirmProvider from '@nodate-flow/ui/primitives/confirm';
+import ToastProvider from '@nodate-flow/ui/primitives/toast';
 import { RouterProvider } from '@tanstack/react-router';
 import { type ReactElement, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -36,6 +37,7 @@ createRoot(container).render(
           <ThemeProvider>
             <RouterProvider router={router} />
             <ConfirmProvider />
+            <ToastProvider />
           </ThemeProvider>
         </QueryProvider>
       </I18nProvider>
