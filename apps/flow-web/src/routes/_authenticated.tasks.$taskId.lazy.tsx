@@ -593,6 +593,8 @@ function Sidebar({
               }}
               weekdayLabels={weekdayLabels}
               formatMonthYear={formatMonthYear}
+              prevLabel={t('calendar.prev')}
+              nextLabel={t('calendar.next')}
               triggerLabel={startOn ? formatDate(startOn, locale) : t('common.date.placeholder')}
             />
           )}
@@ -606,6 +608,8 @@ function Sidebar({
               }}
               weekdayLabels={weekdayLabels}
               formatMonthYear={formatMonthYear}
+              prevLabel={t('calendar.prev')}
+              nextLabel={t('calendar.next')}
               triggerLabel={dueOn ? formatDate(dueOn, locale) : t('common.date.placeholder')}
             />
           )}

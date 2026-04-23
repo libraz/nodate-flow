@@ -18,17 +18,38 @@ export interface DatePickerProps {
   onChange: (date: string) => void;
   /** Minimum selectable date in "YYYY-MM-DD" format. */
   minDate?: string;
-  /** Short weekday labels starting from Sunday (7 items). */
+  /**
+   * Short weekday labels (7 items). The order MUST match `weekStart`:
+   * - `weekStart='monday'` (default) -> `['Mon','Tue','Wed','Thu','Fri','Sat','Sun']`
+   * - `weekStart='sunday'`           -> `['Sun','Mon','Tue','Wed','Thu','Fri','Sat']`
+   */
   weekdayLabels?: string[];
   /** Format function for the month/year header. Receives (year, month 1-12). */
   formatMonthYear?: (year: number, month: number) => string;
+  /**
+   * Localized aria-label (and visible text, if any) for the "previous month"
+   * nav button. Required to keep the primitive free of i18next / locale state.
+   */
+  prevLabel: string;
+  /**
+   * Localized aria-label (and visible text, if any) for the "next month"
+   * nav button. Required to keep the primitive free of i18next / locale state.
+   */
+  nextLabel: string;
+  /**
+   * First day of the week shown in the weekday row and grid layout.
+   * Defaults to `'monday'` to match the main `/calendar` view and the
+   * Japanese / most-of-Europe convention.
+   */
+  weekStart?: 'sunday' | 'monday';
   /** Custom trigger label. Defaults to the value. */
   triggerLabel?: string;
   /** Additional class on the trigger button. */
   className?: string;
 }
 
-const DEFAULT_WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+const DEFAULT_WEEKDAYS_MONDAY = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+const DEFAULT_WEEKDAYS_SUNDAY = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
 const MONTH_NAMES = [
   'January',
@@ -97,11 +118,16 @@ export default function DatePicker({
   value,
   onChange,
   minDate,
-  weekdayLabels = DEFAULT_WEEKDAYS,
+  weekdayLabels,
   formatMonthYear = defaultFormatMonthYear,
+  prevLabel,
+  nextLabel,
+  weekStart = 'monday',
   triggerLabel,
   className,
 }: DatePickerProps): ReactElement {
+  const resolvedWeekdayLabels =
+    weekdayLabels ?? (weekStart === 'monday' ? DEFAULT_WEEKDAYS_MONDAY : DEFAULT_WEEKDAYS_SUNDAY);
   const [open, setOpen] = useState(false);
   // Fall back to today (not a hardcoded year) when value is empty or malformed
   // so the picker always opens on a sensible month/year. See parseIso() docs.
@@ -125,7 +151,10 @@ export default function DatePicker({
   }
 
   const days = useMemo(() => daysInMonth(viewYear, viewMonth), [viewYear, viewMonth]);
-  const startDay = useMemo(() => startDayOfWeek(viewYear, viewMonth), [viewYear, viewMonth]);
+  const rawStartDay = useMemo(() => startDayOfWeek(viewYear, viewMonth), [viewYear, viewMonth]);
+  // Shift the Sun=0..Sat=6 day-of-week into the number of leading empty cells
+  // according to weekStart. Monday-first: Sun=6, Mon=0, ..., Sat=5.
+  const leadingEmpty = weekStart === 'monday' ? (rawStartDay + 6) % 7 : rawStartDay;
   const today = useMemo(todayIso, []);
 
   const goPrev = useCallback(() => {
@@ -167,12 +196,7 @@ export default function DatePicker({
         <div className={styles.panel}>
           {/* Header: prev / month-year / next */}
           <div className={styles.header}>
-            <button
-              type="button"
-              className={styles.navBtn}
-              onClick={goPrev}
-              aria-label="Previous month"
-            >
+            <button type="button" className={styles.navBtn} onClick={goPrev} aria-label={prevLabel}>
               <svg
                 width="16"
                 height="16"
@@ -183,17 +207,12 @@ export default function DatePicker({
                 aria-hidden="true"
                 role="img"
               >
-                <title>Previous</title>
+                <title>{prevLabel}</title>
                 <path d="M15 18l-6-6 6-6" />
               </svg>
             </button>
             <span className={styles.monthYear}>{formatMonthYear(viewYear, viewMonth)}</span>
-            <button
-              type="button"
-              className={styles.navBtn}
-              onClick={goNext}
-              aria-label="Next month"
-            >
+            <button type="button" className={styles.navBtn} onClick={goNext} aria-label={nextLabel}>
               <svg
                 width="16"
                 height="16"
@@ -204,7 +223,7 @@ export default function DatePicker({
                 aria-hidden="true"
                 role="img"
               >
-                <title>Next</title>
+                <title>{nextLabel}</title>
                 <path d="M9 18l6-6-6-6" />
               </svg>
             </button>
@@ -212,8 +231,8 @@ export default function DatePicker({
 
           {/* Weekday labels */}
           <div className={styles.weekdays}>
-            {weekdayLabels.map((wd) => (
-              <div key={wd} className={styles.weekday}>
+            {resolvedWeekdayLabels.map((wd, i) => (
+              <div key={`${i}-${wd}`} className={styles.weekday}>
                 {wd}
               </div>
             ))}
@@ -221,7 +240,7 @@ export default function DatePicker({
 
           {/* Day grid */}
           <div className={styles.dayGrid} role="grid">
-            {startDay > 0 && <div style={{ gridColumn: `span ${startDay}` }} />}
+            {leadingEmpty > 0 && <div style={{ gridColumn: `span ${leadingEmpty}` }} />}
             {Array.from({ length: days }, (_, i) => {
               const day = i + 1;
               const iso = toIso(viewYear, viewMonth, day);

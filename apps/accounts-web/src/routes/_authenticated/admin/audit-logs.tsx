@@ -181,6 +181,8 @@ function AuditLogsPage(): ReactElement {
             onChange={handleFromChange}
             weekdayLabels={weekdayLabels}
             formatMonthYear={formatMonthYear}
+            prevLabel={tCommon('common.date.prev_month')}
+            nextLabel={tCommon('common.date.next_month')}
             triggerLabel={
               fromDate ? formatIsoDate(fromDate, locale) : tCommon('common.date.placeholder')
             }
@@ -202,6 +204,8 @@ function AuditLogsPage(): ReactElement {
             onChange={handleToChange}
             weekdayLabels={weekdayLabels}
             formatMonthYear={formatMonthYear}
+            prevLabel={tCommon('common.date.prev_month')}
+            nextLabel={tCommon('common.date.next_month')}
             triggerLabel={
               toDate ? formatIsoDate(toDate, locale) : tCommon('common.date.placeholder')
             }

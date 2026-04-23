@@ -90,6 +90,8 @@ export default function AddEventsDialog({
                 onChange={setFrom}
                 weekdayLabels={weekdayLabels}
                 formatMonthYear={formatMonthYear}
+                prevLabel={tCommon('calendar.prev')}
+                nextLabel={tCommon('calendar.next')}
                 triggerLabel={from ? formatDate(from, locale) : tCommon('common.date.placeholder')}
               />
             )}
@@ -104,6 +106,8 @@ export default function AddEventsDialog({
                 onChange={setTo}
                 weekdayLabels={weekdayLabels}
                 formatMonthYear={formatMonthYear}
+                prevLabel={tCommon('calendar.prev')}
+                nextLabel={tCommon('calendar.next')}
                 triggerLabel={to ? formatDate(to, locale) : tCommon('common.date.placeholder')}
                 {...(from ? { minDate: from } : {})}
               />

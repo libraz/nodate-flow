@@ -346,6 +346,8 @@ export default function AuditLogView({
               onChange={handleDateFromChange}
               weekdayLabels={weekdayLabels}
               formatMonthYear={formatMonthYear}
+              prevLabel={tCommon('calendar.prev')}
+              nextLabel={tCommon('calendar.next')}
               triggerLabel={
                 filters.dateFrom
                   ? formatDate(filters.dateFrom, locale)
@@ -363,6 +365,8 @@ export default function AuditLogView({
               onChange={handleDateToChange}
               weekdayLabels={weekdayLabels}
               formatMonthYear={formatMonthYear}
+              prevLabel={tCommon('calendar.prev')}
+              nextLabel={tCommon('calendar.next')}
               triggerLabel={
                 filters.dateTo
                   ? formatDate(filters.dateTo, locale)

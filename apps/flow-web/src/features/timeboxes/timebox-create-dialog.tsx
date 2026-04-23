@@ -194,6 +194,8 @@ export default function TimeboxCreateDialog({
                 onChange={setStartsOn}
                 weekdayLabels={weekdayLabels}
                 formatMonthYear={formatMonthYear}
+                prevLabel={tCommon('calendar.prev')}
+                nextLabel={tCommon('calendar.next')}
                 triggerLabel={
                   startsOn ? formatDate(startsOn, locale) : tCommon('common.date.placeholder')
                 }
@@ -212,6 +214,8 @@ export default function TimeboxCreateDialog({
                 onChange={setEndsOn}
                 weekdayLabels={weekdayLabels}
                 formatMonthYear={formatMonthYear}
+                prevLabel={tCommon('calendar.prev')}
+                nextLabel={tCommon('calendar.next')}
                 triggerLabel={
                   endsOn ? formatDate(endsOn, locale) : tCommon('common.date.placeholder')
                 }
