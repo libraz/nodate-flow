@@ -61,7 +61,7 @@ function TasksSectionLayout(): ReactElement {
           flexWrap: 'wrap',
         }}
       >
-        <h1
+        <h2
           style={{
             fontFamily: 'var(--font-display)',
             fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
@@ -69,7 +69,7 @@ function TasksSectionLayout(): ReactElement {
           }}
         >
           {t('tasks.title')}
-        </h1>
+        </h2>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
           <TaskViewSwitcher />
           <Button
