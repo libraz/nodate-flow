@@ -53,6 +53,26 @@
   white-space: nowrap;
 }
 
+/*
+ * Workspace switcher slot — rendered between the brand and the nav so
+ * the drawer on mobile (and the expanded sidebar on desktop) carries a
+ * reachable switcher. The topbar hides its own copy at mobile widths
+ * (see `top-bar.module.css` `@container header (max-width: 767px)`),
+ * so this mount is the only reachable switcher in that viewport.
+ * The child `<select>` stretches to fill the slot via its shared
+ * `.workspaceSelect` rule (see `top-bar.module.css`).
+ */
+.workspaceSwitcherSlot {
+  display: flex;
+  padding-block-end: var(--nf-space-2);
+  padding-inline: var(--nf-space-3);
+}
+
+.workspaceSwitcherSlot > select {
+  inline-size: 100%;
+  max-inline-size: none;
+}
+
 .nav {
   display: flex;
   flex-direction: column;

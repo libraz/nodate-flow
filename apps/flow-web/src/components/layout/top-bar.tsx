@@ -1,7 +1,7 @@
 import Icon from '@nodate-flow/ui/icon';
 import { cx } from '@nodate-flow/ui/lib/cx';
 import Popover from '@nodate-flow/ui/primitives/popover';
-import { useNavigate, useRouterState } from '@tanstack/react-router';
+import { useNavigate } from '@tanstack/react-router';
 
 import { Bell, Globe, LogOut, Moon, Search, Sun } from 'lucide-react';
 import { type ReactElement, Suspense, useState } from 'react';
@@ -11,13 +11,13 @@ import CommandPalette from './command-palette';
 import AiCostMeter from '../../features/ai-providers/cost-meter';
 import { authStore, selectUser, useAuth } from '../../features/auth/auth-store';
 import NotificationBell from '../../features/notifications/notification-bell';
-import { useWorkspacesQuery } from '../../features/workspaces/api';
 import { type SupportedLanguage, setLanguage } from '../../i18n';
 import { apiBaseUrl } from '../../lib/sdk';
-import { clearActiveWorkspaceId, useCurrentWorkspaceId } from '../../lib/use-current-workspace';
+import { clearActiveWorkspaceId } from '../../lib/use-current-workspace';
 import { type ConcreteTheme, concreteThemes, useTheme } from '../../providers/theme-provider';
 import TopBarBreadcrumb from './top-bar-breadcrumb';
 import styles from './top-bar.module.css';
+import WorkspaceSwitcher from './workspace-switcher';
 
 function nextTheme(current: ConcreteTheme): ConcreteTheme {
   const idx = concreteThemes.indexOf(current);
@@ -33,57 +33,6 @@ function initialsFrom(name: string | undefined): string {
   const first = parts[0]?.[0] ?? '';
   const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : '';
   return (first + last).toUpperCase() || '?';
-}
-
-/** Pages where switching workspace should NOT navigate away. */
-const STAY_ON_PAGE_PREFIXES = ['/calendar', '/today', '/inbox', '/settings', '/pages'];
-
-/**
- * WorkspaceSwitcher — native `<select>` dropdown in the topbar left slot.
- * Navigates to the chosen workspace. Highlights the current workspace when
- * the URL is under `/workspaces/{id}`. Suspends on first fetch; wrapped in
- * a Suspense with a tiny label fallback so the rest of the topbar renders
- * immediately.
- */
-function WorkspaceSwitcher(): ReactElement {
-  const { t } = useTranslation('common');
-  const { data: workspaces } = useWorkspacesQuery();
-  const navigate = useNavigate();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const routeWsId = useCurrentWorkspaceId() ?? '';
-  // Auto-select when there is exactly one workspace.
-  const currentId = routeWsId || (workspaces.length === 1 ? (workspaces[0]?.id ?? '') : '');
-
-  return (
-    <select
-      aria-label={t('topbar.workspace.switcher')}
-      className={styles.workspaceSelect}
-      value={currentId}
-      onChange={(e) => {
-        const id = e.target.value;
-        if (!id) return;
-        // On cross-workspace pages, stay on the current page.
-        const stayOnPage = STAY_ON_PAGE_PREFIXES.some((p) => pathname.startsWith(p));
-        if (stayOnPage) {
-          // Just changing the select value is enough — the workspace
-          // context propagates via useCurrentWorkspaceId and queries
-          // will refetch. Navigate to the same page to force re-render.
-          void navigate({ to: pathname as never });
-        } else {
-          void navigate({ to: '/workspaces/$id', params: { id } });
-        }
-      }}
-    >
-      <option value="" disabled>
-        {t('topbar.workspace.none')}
-      </option>
-      {workspaces.map((w) => (
-        <option key={w.id} value={w.id}>
-          {w.name}
-        </option>
-      ))}
-    </select>
-  );
 }
 
 export default function TopBar(): ReactElement {

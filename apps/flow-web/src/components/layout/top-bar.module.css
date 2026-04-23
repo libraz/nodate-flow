@@ -337,17 +337,49 @@
  * hiding it in the breadcrumb at this width is not a loss of affordance.
  */
 @container header (max-width: 767px) {
+  /*
+   * Hide the topbar left slot (workspace switcher) at mobile widths.
+   * The switcher is rendered inside the sidebar drawer header so it
+   * remains reachable via the hamburger menu — preserving the
+   * Linear / Notion / Asana mobile pattern where secondary identity
+   * controls live in the drawer, not the topbar. The leading hamburger
+   * button is rendered by the Sidebar component (fixed-positioned) and
+   * is not affected by this display toggle.
+   */
+  .left {
+    display: none;
+  }
+
   .searchLabel,
   .searchButtonShortcut {
     display: none;
   }
 
+  /*
+   * Boost icon-only controls to a 44x44 touch target at mobile widths.
+   * WCAG 2.5.5 (Target Size AAA) recommends 44 CSS px; the desktop
+   * 2.25rem (36px) is too cramped for touch. Design tokens do not carry
+   * a 44px constant, so exact rem values are used here.
+   */
   .searchButton {
-    inline-size: 2.25rem;
-    block-size: 2.25rem;
+    inline-size: 2.75rem;
+    block-size: 2.75rem;
+    min-inline-size: 2.75rem;
+    min-block-size: 2.75rem;
     padding: 0;
     justify-content: center;
     aspect-ratio: 1;
+  }
+
+  .iconButton,
+  .avatarTrigger {
+    min-inline-size: 2.75rem;
+    min-block-size: 2.75rem;
+  }
+
+  .inlineNotificationBell button {
+    min-inline-size: 2.75rem;
+    min-block-size: 2.75rem;
   }
 
   .search {

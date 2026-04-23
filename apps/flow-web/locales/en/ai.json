@@ -1,4 +1,8 @@
 {
+  "cost_today": {
+    "label": "AI",
+    "tooltip": "Today's AI spend across this workspace"
+  },
   "providers": {
     "title": "AI providers",
     "empty": "No providers configured",

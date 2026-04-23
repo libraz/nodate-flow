@@ -1,4 +1,8 @@
 {
+  "cost_today": {
+    "label": "AI",
+    "tooltip": "このワークスペースの本日の AI 利用額"
+  },
   "providers": {
     "title": "AI プロバイダ",
     "empty": "プロバイダが登録されていません",

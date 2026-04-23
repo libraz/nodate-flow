@@ -7,35 +7,29 @@
  *   - the cost-today query is loading / errored / empty.
  *
  * The query is non-suspense so AI-not-configured tenants degrade silently.
+ *
+ * Presentation: renders as a small "AI · $0.00" chip that links to the
+ * workspace's AI activity settings when an active workspace id is
+ * available, so the meter doubles as an affordance for drilling into
+ * the full spend breakdown. Falls back to a plain `<span>` when no
+ * active workspace id is resolvable (e.g. transient routing state).
  */
 
-import Icon from '@nodate-flow/ui/icon';
-import { useMatches } from '@tanstack/react-router';
-import { DollarSign } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 
 import { formatCurrency, formatDateOnly } from '../../lib/format';
+import { useActiveWorkspaceId } from '../../lib/use-current-workspace';
 import { useAiCostTodayQuery } from './cost-api';
 import styles from './cost-meter.module.css';
 
-function useActiveWorkspaceId(): string | undefined {
-  const matches = useMatches();
-  for (let i = matches.length - 1; i >= 0; i -= 1) {
-    const params = matches[i]?.params as Record<string, string> | undefined;
-    if (!params) continue;
-    const id = params.id ?? params.wsId;
-    if (typeof id === 'string' && id.length > 0) return id;
-  }
-  return undefined;
-}
-
 function AiCostMeterImpl(): ReactElement | null {
-  const { t, i18n } = useTranslation('common');
+  const { t, i18n } = useTranslation(['ai', 'common']);
   const locale = i18n.language;
   const workspaceId = useActiveWorkspaceId();
-  const { data, isError, isLoading } = useAiCostTodayQuery(workspaceId);
+  const { data, isError, isLoading } = useAiCostTodayQuery(workspaceId ?? undefined);
 
   if (!workspaceId) return null;
   if (isLoading || isError) return null;
@@ -43,18 +37,31 @@ function AiCostMeterImpl(): ReactElement | null {
 
   const formatted = formatCurrency(data.costUsd, 'USD', locale);
   const formattedDate = formatDateOnly(data.date, locale);
-  const label = t('topbar.ai.cost_today.label');
-  const title = `${label} — ${formattedDate}`;
+  const label = t('ai:cost_today.label');
+  const tooltip = t('ai:cost_today.tooltip');
+  const title = `${tooltip} — ${formattedDate}`;
+  const ariaLabel = `${label}: ${formatted} (${formattedDate})`;
+
+  const chipContent = (
+    <>
+      <span className={styles.label}>{label}</span>
+      <span className={styles.separator} aria-hidden="true">
+        ·
+      </span>
+      <span className={styles.value}>{formatted}</span>
+    </>
+  );
 
   return (
-    <span
+    <Link
+      to="/workspaces/$id/settings/ai-activity"
+      params={{ id: workspaceId }}
       className={styles.meter}
       title={title}
-      aria-label={`${label}: ${formatted} (${formattedDate})`}
+      aria-label={ariaLabel}
     >
-      <Icon icon={DollarSign} decorative className={styles.icon} />
-      <span className={styles.value}>{formatted}</span>
-    </span>
+      {chipContent}
+    </Link>
   );
 }
 

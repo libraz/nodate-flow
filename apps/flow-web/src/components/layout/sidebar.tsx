@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next';
 import { useProjectsQuery } from '../../features/projects/api';
 import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
 import styles from './sidebar.module.css';
+import WorkspaceSwitcher from './workspace-switcher';
 
 const STORAGE_KEY = 'nf.sidebar-collapsed';
 const LEGACY_STORAGE_KEY = 'nf:sidebar-collapsed';
@@ -194,6 +195,13 @@ export default function Sidebar(): ReactElement {
         <div className={styles.brand}>
           <span className={styles.brandLabel}>nodate-flow</span>
         </div>
+        {!collapsed ? (
+          <div className={styles.workspaceSwitcherSlot}>
+            <Suspense fallback={null}>
+              <WorkspaceSwitcher />
+            </Suspense>
+          </div>
+        ) : null}
         <nav className={styles.nav} aria-label={t('nav.primary')}>
           {NAV_ITEMS.map((item) => {
             const label = t(labelKeyFor(item.key));
