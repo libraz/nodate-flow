@@ -238,8 +238,8 @@
     },
     "not_found": {
       "title": "Workspace not found",
-      "body": "The workspace you tried to open doesn't exist or you no longer have access.",
-      "cta": "Go to your workspaces"
+      "body": "This workspace does not exist or you no longer have access.",
+      "cta": "Back to workspaces"
     },
     "members": {
       "title": "Members",
