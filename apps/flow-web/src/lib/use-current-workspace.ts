@@ -30,7 +30,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useRouterState } from '@tanstack/react-router';
 import { useEffect, useMemo } from 'react';
 
-import { projectsKeys } from '../features/projects/api';
 import { workspacesKeys } from '../features/workspaces/api';
 import { authSdk, sdk } from './sdk';
 
@@ -78,8 +77,20 @@ export function useCurrentWorkspaceId(): string | null {
   const projectId = projectMatch ? (projectMatch[1] ?? null) : null;
   const taskId = taskMatch ? (taskMatch[1] ?? null) : null;
 
+  // NOTE: we deliberately do NOT reuse `projectsKeys.detail(projectId)`
+  // or `tasksKeys.detail(taskId)` here. Those keys belong to the full
+  // `Project` / `Task` shapes fetched by `useProjectQuery` /
+  // `useTaskQuery` in the detail pages. If this hook's stripped
+  // `{ workspaceId }` projection landed at either key first (e.g. because
+  // the sidebar or top-bar mounts earlier than the detail panel after a
+  // client-side navigation), the detail page's `useSuspenseQuery` would
+  // return the partial value straight from the cache and never refetch,
+  // leaving the page rendered with empty title/priority/dates (see
+  // docs/bugs/2026-04-23-web-task-detail-empty-after-spa-nav.md).
   const projectQuery = useQuery({
-    queryKey: projectId ? projectsKeys.detail(projectId) : ['projects', 'detail', 'none'],
+    queryKey: projectId
+      ? (['projects', 'workspace-id', projectId] as const)
+      : (['projects', 'workspace-id', 'none'] as const),
     enabled: projectId !== null,
     staleTime: 60_000,
     queryFn: async (): Promise<{ workspaceId: string } | null> => {
@@ -94,8 +105,8 @@ export function useCurrentWorkspaceId(): string | null {
 
   const taskQuery = useQuery({
     queryKey: taskId
-      ? (['tasks', 'detail', taskId] as const)
-      : (['tasks', 'detail', 'none'] as const),
+      ? (['tasks', 'workspace-id', taskId] as const)
+      : (['tasks', 'workspace-id', 'none'] as const),
     enabled: taskId !== null,
     staleTime: 60_000,
     queryFn: async (): Promise<{ workspaceId: string } | null> => {
