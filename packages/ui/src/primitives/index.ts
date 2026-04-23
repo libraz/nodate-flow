@@ -33,6 +33,20 @@ export type { BadgeProps, BadgeTone } from './badge/badge';
 export { default as Chip } from './chip/chip';
 export type { ChipProps, ChipTone } from './chip/chip';
 
+export { default as ToggleChip, ToggleChipGroup } from './toggle-chip/toggle-chip';
+export type { ToggleChipProps, ToggleChipGroupProps } from './toggle-chip/toggle-chip';
+
+export {
+  default as Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbSeparator,
+} from './breadcrumb/breadcrumb';
+export type {
+  BreadcrumbProps,
+  BreadcrumbItemProps,
+  BreadcrumbSeparatorProps,
+} from './breadcrumb/breadcrumb';
+
 export { default as Avatar } from './avatar/avatar';
 export type { AvatarProps, AvatarSize } from './avatar/avatar';
 

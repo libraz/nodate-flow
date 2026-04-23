@@ -1,0 +1,67 @@
+/*
+ * Breadcrumb — hierarchical navigation trail.
+ *
+ * The visual rhythm matches the two ad-hoc breadcrumb implementations in
+ * flow-web (features/pages/page-detail.tsx and routes/_authenticated.tasks.
+ * $taskId.lazy.tsx). Both render a single-row inline trail with muted links
+ * separated by a small glyph; this module picks the link-color convention
+ * used by the task breadcrumb (muted → fg on hover) because it aligns with
+ * the primary sidebar / topbar link convention in flow-web.
+ *
+ * All colors / spacing / font sizes / transitions resolve to design tokens.
+ */
+
+.root {
+  display: flex;
+  align-items: center;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nf-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--nf-font-sans);
+  line-height: var(--nf-leading-tight);
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  min-inline-size: 0;
+}
+
+.link {
+  color: var(--nf-color-fg-muted);
+  text-decoration: none;
+  border-radius: var(--nf-radius-xs);
+  transition: color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.link:hover {
+  color: var(--nf-color-fg);
+  text-decoration: underline;
+}
+
+.link:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.current {
+  color: var(--nf-color-fg);
+  font-weight: var(--nf-weight-medium);
+}
+
+.separator {
+  display: inline-flex;
+  align-items: center;
+  color: var(--nf-color-fg-subtle);
+  font-size: var(--nf-text-sm);
+  user-select: none;
+}

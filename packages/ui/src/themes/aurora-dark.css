@@ -64,4 +64,12 @@
     oklch(74% 0.18 285) 48%,
     oklch(80% 0.15 25) 100%
   );
+
+  /*
+   * Calendar layer colors — used by toggle-chip swatches and event pills on
+   * cross-workspace calendar views. Lightened for dark-mode contrast.
+   */
+  --nf-cal-task-color: oklch(76% 0.16 175);
+  --nf-cal-event-color: oklch(74% 0.15 240);
+  --nf-cal-block-color: oklch(72% 0.13 60);
 }

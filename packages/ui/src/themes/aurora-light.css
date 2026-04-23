@@ -64,4 +64,13 @@
     oklch(56% 0.19 240) 45%,
     oklch(66% 0.18 355) 100%
   );
+
+  /*
+   * Calendar layer colors — used by toggle-chip swatches and event pills on
+   * cross-workspace calendar views. Domain-specific, not tracked by
+   * check-theme-parity (which only guards semantic.css contract).
+   */
+  --nf-cal-task-color: oklch(64% 0.18 175);
+  --nf-cal-event-color: oklch(62% 0.17 240);
+  --nf-cal-block-color: oklch(60% 0.14 60);
 }

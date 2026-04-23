@@ -64,4 +64,12 @@
     oklch(78% 0 0) 60%,
     oklch(56% 0 0) 100%
   );
+
+  /*
+   * Calendar layer colors — lightened chromatic tones for contrast against
+   * pure black dotline-dark background.
+   */
+  --nf-cal-task-color: oklch(80% 0.16 175);
+  --nf-cal-event-color: oklch(78% 0.16 240);
+  --nf-cal-block-color: oklch(78% 0.14 60);
 }

@@ -78,6 +78,15 @@
   /* motion profile */
   --nf-motion-duration: var(--nf-duration-base);
   --nf-motion-easing: var(--nf-ease-emphasized);
+
+  /*
+   * Calendar layer colors — domain-specific swatches used by the unified
+   * calendar (toggle-chip swatches, event pills). Every theme must define
+   * these so the parity check passes; values track each theme's palette.
+   */
+  --nf-cal-task-color: oklch(64% 0.18 175);
+  --nf-cal-event-color: oklch(62% 0.17 240);
+  --nf-cal-block-color: oklch(60% 0.14 60);
 }
 
 @media (prefers-reduced-motion: reduce) {

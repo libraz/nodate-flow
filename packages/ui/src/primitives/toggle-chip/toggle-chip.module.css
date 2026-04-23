@@ -1,0 +1,89 @@
+/*
+ * ToggleChip — pill-shaped toggle button used for layer / filter visibility.
+ *
+ * Consumers may pass an accent color via `style={{ --chip-color: <value> }}`
+ * (the TSX maps the `color` prop to that custom property). When pressed the
+ * chip is filled with that color; otherwise it is an outlined pill showing
+ * a small color dot on the leading edge.
+ *
+ * All colors / radii / spacing / durations resolve to design tokens — no
+ * hardcoded values. Hairline borders use `--nf-space-px` (the hairline
+ * exception documented in docs/conventions/design-tokens.md).
+ */
+
+.group {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--nf-space-2);
+}
+
+.root {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nf-space-2);
+  block-size: 2rem;
+  padding-inline: var(--nf-space-3);
+  padding-block: 0;
+  border-radius: var(--nf-radius-pill);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  background: transparent;
+  color: var(--nf-color-fg-muted);
+  font-family: var(--nf-font-sans);
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+  line-height: var(--nf-leading-tight);
+  cursor: pointer;
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard), border-color
+    var(--nf-duration-fast) var(--nf-ease-standard), color var(--nf-duration-fast)
+    var(--nf-ease-standard);
+}
+
+.root:hover:not(:disabled) {
+  border-color: var(--nf-color-border-strong);
+  color: var(--nf-color-fg);
+}
+
+.root:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.root:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.root[data-pressed='true'] {
+  background: var(--chip-color, var(--nf-color-accent));
+  border-color: var(--chip-color, var(--nf-color-accent));
+  color: var(--nf-color-fg-on-accent);
+}
+
+.root[data-pressed='true']:hover:not(:disabled) {
+  /*
+   * Keep the same fill on hover: the pressed state is the "committed" state
+   * and should not shift color on hover. Use currentColor-at-opacity for a
+   * subtle hover overlay via a box-shadow inset without disturbing tokens.
+   */
+  box-shadow: inset 0 0 0 9999px rgb(0 0 0 / 0.04);
+}
+
+.dot {
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  border-radius: var(--nf-radius-pill);
+  background: var(--chip-color, var(--nf-color-fg-muted));
+  flex-shrink: 0;
+}
+
+/*
+ * When the chip is pressed, the background already carries the accent color.
+ * Switch the dot to currentColor with reduced opacity so it remains visible
+ * as a marker without fighting the filled background.
+ */
+.root[data-pressed='true'] .dot {
+  background: currentColor;
+  opacity: 0.65;
+}

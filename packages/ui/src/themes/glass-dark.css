@@ -65,4 +65,12 @@
     oklch(66% 0.1 270) 50%,
     oklch(74% 0.07 280) 100%
   );
+
+  /*
+   * Calendar layer colors — muted chromatic tones matching glass-dark's
+   * elegant slate palette.
+   */
+  --nf-cal-task-color: oklch(72% 0.12 175);
+  --nf-cal-event-color: oklch(72% 0.12 250);
+  --nf-cal-block-color: oklch(72% 0.1 60);
 }

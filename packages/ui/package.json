@@ -36,6 +36,8 @@
     "./primitives/card": "./src/primitives/card/card.tsx",
     "./primitives/badge": "./src/primitives/badge/badge.tsx",
     "./primitives/chip": "./src/primitives/chip/chip.tsx",
+    "./primitives/toggle-chip": "./src/primitives/toggle-chip/toggle-chip.tsx",
+    "./primitives/breadcrumb": "./src/primitives/breadcrumb/breadcrumb.tsx",
     "./primitives/avatar": "./src/primitives/avatar/avatar.tsx",
     "./primitives/separator": "./src/primitives/separator/separator.tsx",
     "./primitives/skeleton": "./src/primitives/skeleton/skeleton.tsx",

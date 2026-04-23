@@ -65,4 +65,13 @@
     oklch(32% 0 0) 60%,
     oklch(52% 0 0) 100%
   );
+
+  /*
+   * Calendar layer colors — dotline remains chromatic for data categories
+   * only where needed (semantic status tokens are already chromatic). Kept
+   * slightly darker than aurora-light for higher contrast on pure white.
+   */
+  --nf-cal-task-color: oklch(46% 0.18 175);
+  --nf-cal-event-color: oklch(48% 0.2 240);
+  --nf-cal-block-color: oklch(52% 0.16 60);
 }
