@@ -209,6 +209,8 @@ export default function Sidebar(): ReactElement {
               <Link
                 key={item.key}
                 to={item.to}
+                aria-label={label}
+                title={label}
                 className={cx(styles.item, sectionActive && styles.itemActive)}
                 activeProps={{ className: cx(styles.item, styles.itemActive) }}
               >
