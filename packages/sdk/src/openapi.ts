@@ -3828,12 +3828,23 @@ export interface components {
             readonly $schema?: string;
             emoji: string;
         };
+        CreateTaskActorInput: {
+            /**
+             * @default assignee
+             * @enum {string}
+             */
+            role: "assignee" | "reviewer" | "watcher" | "approver";
+            /** @description User public id (UUID v7) */
+            userId: string;
+        };
         CreateTaskBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
+            /** @description Optional explicit actor list. When omitted or empty, the caller is auto-attached as the sole assignee. */
+            actors?: components["schemas"]["CreateTaskActorInput"][] | null;
             description?: string;
             /** @description YYYY-MM-DD */
             dueOn?: string;

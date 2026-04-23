@@ -1920,6 +1920,22 @@
         "required": ["emoji"],
         "type": "object"
       },
+      "CreateTaskActorInput": {
+        "additionalProperties": false,
+        "properties": {
+          "role": {
+            "default": "assignee",
+            "enum": ["assignee", "reviewer", "watcher", "approver"],
+            "type": "string"
+          },
+          "userId": {
+            "description": "User public id (UUID v7)",
+            "type": "string"
+          }
+        },
+        "required": ["userId", "role"],
+        "type": "object"
+      },
       "CreateTaskBody": {
         "additionalProperties": false,
         "properties": {
@@ -1929,6 +1945,13 @@
             "format": "uri",
             "readOnly": true,
             "type": "string"
+          },
+          "actors": {
+            "description": "Optional explicit actor list. When omitted or empty, the caller is auto-attached as the sole assignee.",
+            "items": {
+              "$ref": "#/components/schemas/CreateTaskActorInput"
+            },
+            "type": ["array", "null"]
           },
           "description": {
             "maxLength": 50000,
