@@ -107,6 +107,10 @@
     "locale": "Language",
     "locale_en": "English",
     "locale_ja": "日本語",
+    "timezone": "Timezone",
+    "country": "Country",
+    "country_help": "Used to show the right public holidays on your calendar. Leave unset for none.",
+    "country_unset": "(none)",
     "theme": "Theme",
     "theme_glass": "Glass",
     "theme_aurora": "Aurora",
@@ -126,7 +130,9 @@
     "saving": "Saving...",
     "saved": "Saved",
     "validation": {
-      "display_name_required": "Display name is required."
+      "display_name_required": "Display name is required.",
+      "timezone_required": "Timezone is required.",
+      "country_invalid": "Country must be a 2-letter ISO code (uppercase) or left empty."
     },
     "errors": {
       "update_failed": "Could not update your profile. Please try again."
@@ -280,7 +286,7 @@
       "rotate": "Rotate",
       "rotate_confirm": "Rotate the URL? The current URL will stop working immediately.",
       "delete": "Delete",
-      "delete_confirm": "Delete \"{{title}}\"? The URL will become invalid and events will no longer be published.",
+      "delete_confirm": "Delete \"{title}\"? The URL will become invalid and events will no longer be published.",
       "deleted": "Share page deleted",
       "never_expires": "—",
       "table": {
@@ -324,7 +330,7 @@
         "empty_events": "No events yet. Add events from this workspace to publish them.",
         "add_events": "Add events",
         "detach": "Remove",
-        "detach_confirm": "Remove \"{{title}}\" from this share page? It will no longer appear on the public page.",
+        "detach_confirm": "Remove \"{title}\" from this share page? It will no longer appear on the public page.",
         "detached": "Event removed",
         "event_undated": "No date",
         "event_all_day": "All day",
@@ -345,7 +351,7 @@
           "confidential": "Confidential",
           "select": "Select",
           "attach": "Attach {count, plural, one {# event} other {# events}}",
-          "attached_toast": "{{attached}} attached, {{skipped}} skipped",
+          "attached_toast": "{attached} attached, {skipped} skipped",
           "cancel": "Cancel",
           "attaching": "Attaching..."
         },
@@ -356,10 +362,10 @@
         },
         "reorder_handle_label": "Drag to reorder event",
         "reorder_a11y": {
-          "lifted": "Picked up event {{id}}. Use the arrow keys to move, space to drop, escape to cancel.",
-          "over": "Event {{active}} is now over event {{over}}.",
-          "dropped": "Event {{active}} was dropped over event {{over}}.",
-          "cancelled": "Drag for event {{id}} was cancelled."
+          "lifted": "Picked up event {id}. Use the arrow keys to move, space to drop, escape to cancel.",
+          "over": "Event {active} is now over event {over}.",
+          "dropped": "Event {active} was dropped over event {over}.",
+          "cancelled": "Drag for event {id} was cancelled."
         }
       }
     },

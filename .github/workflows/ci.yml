@@ -43,6 +43,9 @@ jobs:
       - name: TypeScript typecheck
         run: bun run typecheck
 
+      - name: i18n locale guard (missing ja keys, empty values, '{{var}}' under ICU)
+        run: node scripts/i18n-translate.mjs --check
+
       - name: golangci-lint (flow-api)
         uses: golangci/golangci-lint-action@v8
         with:

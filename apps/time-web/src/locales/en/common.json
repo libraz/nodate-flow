@@ -95,7 +95,7 @@
     "show_as": "Show as",
     "location": "Location",
     "memo": "Memo",
-    "more": "+{{count}} more",
+    "more": "+{count} more",
     "loading_event": "Loading event...",
     "kind_event": "Event",
     "kind_block": "Block",
@@ -137,9 +137,9 @@
     "no_links": "No active invite links",
     "copy_link": "Copy invite link",
     "revoke": "Revoke",
-    "expires": "Expires {{date}}",
-    "use": "{{count}} use",
-    "uses": "{{count}} uses"
+    "expires": "Expires {date}",
+    "use": "{count} use",
+    "uses": "{count} uses"
   },
   "settings": {
     "title": "Settings",
@@ -159,7 +159,7 @@
     "holiday_add_placeholder": "Select a country…",
     "holiday_add": "Add",
     "holiday_add_failed": "Couldn't subscribe to this holiday feed.",
-    "holiday_unsubscribe_aria": "Unsubscribe from {{country}} holidays"
+    "holiday_unsubscribe_aria": "Unsubscribe from {country} holidays"
   },
   "search": {
     "placeholder": "Search events...",
@@ -196,7 +196,7 @@
     "expired": "This shared calendar link has expired.",
     "no_upcoming_events": "No events to display.",
     "event_undated": "Date to be announced",
-    "holidays_country": "Holidays: {{country}}"
+    "holidays_country": "Holidays: {country}"
   },
   "rsvp": {
     "accept": "Accept",

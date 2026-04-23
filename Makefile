@@ -168,7 +168,7 @@ lighthouse: build-web ## Run Lighthouse CI (a11y 95+, perf 70+)
 # ---------- lint / format / typecheck ----------
 
 .PHONY: check lint format typecheck vet
-check: lint typecheck vet ## Lint + typecheck + go vet
+check: lint typecheck vet i18n-check ## Lint + typecheck + go vet + i18n locale guard
 
 lint: ## biome check + golangci-lint
 	$(PKG_RUN) check
@@ -201,7 +201,7 @@ gen-sqlc: ## sqlc generate (requires sqlc installed)
 gen-errors: ## Regenerate Go/TS error modules + locale stubs + docs from errors/*.yaml
 	go -C scripts run gen-errors.go
 
-i18n-check: ## Fail if any apps/*/locales/**/*.json has missing ja keys or empty string values
+i18n-check: ## Fail on missing ja keys, empty string values, or i18next-native '{{var}}' placeholders under the ICU backend
 	node scripts/i18n-translate.mjs --check
 
 gen-openapi: ## Dump merged OpenAPI 3.1 (flow-api + auth-api) to packages/sdk/openapi.json

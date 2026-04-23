@@ -18,6 +18,7 @@ import {
 
 import { sdk } from '../../lib/sdk';
 import { timelineKeys } from '../timeline/api';
+import { replayKeys } from '../timeline/replay-api';
 
 export type Task = components['schemas']['Task'];
 export type TaskListItem = components['schemas']['TaskListItem'];
@@ -516,6 +517,10 @@ export function useTransitionTask(): UseMutationResult<Task, ApiError, Transitio
     onSettled: (_data, _err, vars) => {
       void qc.invalidateQueries({ queryKey: tasksKeys.detail(vars.id) });
       void qc.invalidateQueries({ queryKey: [...timelineKeys.all, 'task', vars.id] });
+      // The replay panel derives state from the event log and must re-run
+      // after every transition; without this, it stays on the pre-transition
+      // result until the user manually clicks Refresh.
+      void qc.invalidateQueries({ queryKey: replayKeys.task(vars.id) });
       if (vars.projectId) {
         void qc.invalidateQueries({
           queryKey: [...tasksKeys.all, 'list', vars.projectId],

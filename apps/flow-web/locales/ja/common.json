@@ -262,7 +262,7 @@
       "pending": "保留中",
       "change_role": "ロールを変更",
       "remove": "削除",
-      "remove_confirm": "{{name}} をこのワークスペースから削除しますか？",
+      "remove_confirm": "{name} をこのワークスペースから削除しますか？",
       "removed": "メンバーを削除しました",
       "role_updated": "ロールを更新しました"
     },
@@ -283,19 +283,19 @@
       "uses_25": "25回",
       "revoke": "無効化",
       "revoked": "招待を無効化しました",
-      "used": "{{count}} 回使用",
-      "uses_display": "{{used}} / {{max}}",
+      "used": "{count} 回使用",
+      "uses_display": "{used} / {max}",
       "label": "ラベル（任意）",
       "active_links": "有効な招待リンク",
       "no_invites": "有効な招待リンクはありません",
       "created_by": "作成者",
-      "accept_title": "{{name}} に参加",
-      "accept_desc": "{{role}} として招待されています",
+      "accept_title": "{name} に参加",
+      "accept_desc": "{role} として招待されています",
       "accept_btn": "ワークスペースに参加",
       "expired": "この招待は期限切れです",
       "invalid": "この招待リンクは無効か、取り消されています",
       "full": "この招待は使用回数の上限に達しました",
-      "join_success": "{{name}} に参加しました！",
+      "join_success": "{name} に参加しました！",
       "create_failed": "招待の作成に失敗しました",
       "email_label": "メールで送信（任意）",
       "email_placeholder": "メールアドレス"
@@ -427,7 +427,7 @@
       "spreadsheet": "スプレッドシート"
     },
     "list": {
-      "select_row": "{{index}} 行目を選択",
+      "select_row": "{index} 行目を選択",
       "select_all": "すべての行を選択"
     },
     "columns": {
@@ -524,7 +524,7 @@
       "edit_title": "タイトルを編集",
       "edit_priority": "優先度を変更",
       "edit_due": "期日を変更",
-      "edit_due_set": "{{date}}、期日を変更",
+      "edit_due_set": "{date}、期日を変更",
       "edit_due_unset": "期日を設定",
       "edit_status": "ステータスを変更",
       "save_failed": "変更を保存できませんでした。もう一度お試しください。"

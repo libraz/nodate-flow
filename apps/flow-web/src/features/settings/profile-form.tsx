@@ -1,10 +1,16 @@
 /**
  * ProfileForm — edit the authenticated user's display name, locale,
- * and theme preference. Parent must wrap this in `<Suspense>` because
- * it consumes `useMeQuery` (Suspense mode).
+ * timezone, country, and theme preference. Parent must wrap this in
+ * `<Suspense>` because it consumes `useMeQuery` (Suspense mode).
  */
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import {
+  SUPPORTED_COUNTRIES,
+  detectTimezone,
+  formatTimezoneLabel,
+  groupTimezonesByRegion,
+} from '@nodate-flow/sdk';
 import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
@@ -35,6 +41,11 @@ const LOCALES: readonly SupportedLanguage[] = ['en', 'ja'] as const;
 const profileSchema = z.object({
   displayName: z.string().min(1, 'profile.validation.display_name_required'),
   locale: z.enum(['en', 'ja']),
+  timezone: z.string().min(1, 'profile.validation.timezone_required'),
+  country: z
+    .string()
+    .regex(/^([A-Z]{2})?$/, 'profile.validation.country_invalid')
+    .or(z.literal('')),
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
@@ -49,6 +60,11 @@ export default function ProfileForm(): ReactElement {
   const update = useUpdateMe();
   const { preference, resolved, setPreference } = useTheme();
 
+  // Timezone list grouped by IANA region for <optgroup> rendering, and
+  // the shared country allowlist sorted alphabetically by display name.
+  const timezoneGroups = groupTimezonesByRegion();
+  const countries = Object.entries(SUPPORTED_COUNTRIES).sort(([, a], [, b]) => a.localeCompare(b));
+
   const {
     register,
     handleSubmit,
@@ -58,6 +74,8 @@ export default function ProfileForm(): ReactElement {
     defaultValues: {
       displayName: me.displayName,
       locale: (me.locale as ProfileFormValues['locale']) ?? 'en',
+      timezone: me.timezone || detectTimezone(),
+      country: me.country ?? '',
     },
   });
 
@@ -101,6 +119,8 @@ export default function ProfileForm(): ReactElement {
     const patch: PatchMeInput = {
       displayName: values.displayName,
       locale: values.locale,
+      timezone: values.timezone,
+      country: values.country,
     };
     try {
       await update.mutateAsync(patch);
@@ -143,6 +163,48 @@ export default function ProfileForm(): ReactElement {
                 {LOCALES.map((l) => (
                   <option key={l} value={l}>
                     {t(localeLabelKey(l))}
+                  </option>
+                ))}
+              </Select>
+            );
+          }}
+        </FormField>
+
+        <FormField
+          label={t('profile.timezone')}
+          {...(errors.timezone?.message ? { error: t(errors.timezone.message) } : {})}
+        >
+          {(control) => {
+            const { ref, ...field } = register('timezone');
+            return (
+              <Select {...control} {...field} ref={ref}>
+                {timezoneGroups.map(({ region, zones }) => (
+                  <optgroup key={region} label={region}>
+                    {zones.map((tz) => (
+                      <option key={tz} value={tz}>
+                        {region === 'Global' ? tz : formatTimezoneLabel(tz)}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </Select>
+            );
+          }}
+        </FormField>
+
+        <FormField
+          label={t('profile.country')}
+          description={t('profile.country_help')}
+          {...(errors.country?.message ? { error: t(errors.country.message) } : {})}
+        >
+          {(control) => {
+            const { ref, ...field } = register('country');
+            return (
+              <Select {...control} {...field} ref={ref}>
+                <option value="">{t('profile.country_unset')}</option>
+                {countries.map(([code, name]) => (
+                  <option key={code} value={code}>
+                    {code} — {name}
                   </option>
                 ))}
               </Select>

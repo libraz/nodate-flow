@@ -107,6 +107,10 @@
     "locale": "言語",
     "locale_en": "English",
     "locale_ja": "日本語",
+    "timezone": "タイムゾーン",
+    "country": "国",
+    "country_help": "カレンダーに表示する祝日の国を指定します。未設定の場合は祝日を表示しません。",
+    "country_unset": "（未設定）",
     "theme": "テーマ",
     "theme_glass": "グラス",
     "theme_aurora": "オーロラ",
@@ -126,7 +130,9 @@
     "saving": "保存中…",
     "saved": "保存しました",
     "validation": {
-      "display_name_required": "表示名は必須です。"
+      "display_name_required": "表示名は必須です。",
+      "timezone_required": "タイムゾーンは必須です。",
+      "country_invalid": "国は 2 文字の ISO コード（大文字）または未設定を指定してください。"
     },
     "errors": {
       "update_failed": "プロフィールを更新できませんでした。もう一度お試しください。"
@@ -280,7 +286,7 @@
       "rotate": "URL を再発行",
       "rotate_confirm": "URL を再発行しますか？ 現在の URL は即座に無効になります。",
       "delete": "削除",
-      "delete_confirm": "「{{title}}」を削除しますか？ URL は無効になり、イベントも公開されなくなります。",
+      "delete_confirm": "「{title}」を削除しますか？ URL は無効になり、イベントも公開されなくなります。",
       "deleted": "シェアページを削除しました",
       "never_expires": "—",
       "table": {
@@ -324,7 +330,7 @@
         "empty_events": "まだイベントが登録されていません。ワークスペースのイベントを追加して公開してください。",
         "add_events": "イベントを追加",
         "detach": "外す",
-        "detach_confirm": "「{{title}}」をこのシェアページから外しますか？ 公開ページには表示されなくなります。",
+        "detach_confirm": "「{title}」をこのシェアページから外しますか？ 公開ページには表示されなくなります。",
         "detached": "イベントを外しました",
         "event_undated": "日付なし",
         "event_all_day": "終日",
@@ -345,7 +351,7 @@
           "confidential": "非公開",
           "select": "選択",
           "attach": "{count} 件を追加",
-          "attached_toast": "{{attached}} 件追加、{{skipped}} 件スキップ",
+          "attached_toast": "{attached} 件追加、{skipped} 件スキップ",
           "cancel": "キャンセル",
           "attaching": "追加中..."
         },
@@ -356,10 +362,10 @@
         },
         "reorder_handle_label": "",
         "reorder_a11y": {
-          "lifted": "",
-          "over": "",
-          "dropped": "",
-          "cancelled": ""
+          "lifted": "イベント {id} をつかみました。矢印キーで移動、スペースでドロップ、Esc でキャンセルできます。",
+          "over": "イベント {active} はイベント {over} の上にあります。",
+          "dropped": "イベント {active} をイベント {over} の位置にドロップしました。",
+          "cancelled": "イベント {id} のドラッグをキャンセルしました。"
         }
       }
     },

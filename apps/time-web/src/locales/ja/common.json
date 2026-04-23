@@ -95,7 +95,7 @@
     "show_as": "表示",
     "location": "場所",
     "memo": "メモ",
-    "more": "+{{count}}件",
+    "more": "+{count}件",
     "loading_event": "予定を読み込み中...",
     "kind_event": "予定",
     "kind_block": "時間枠",
@@ -137,9 +137,9 @@
     "no_links": "有効な招待リンクはありません",
     "copy_link": "招待リンクをコピー",
     "revoke": "取り消し",
-    "expires": "有効期限: {{date}}",
-    "use": "{{count}}回使用",
-    "uses": "{{count}}回使用"
+    "expires": "有効期限: {date}",
+    "use": "{count}回使用",
+    "uses": "{count}回使用"
   },
   "settings": {
     "title": "設定",
@@ -159,7 +159,7 @@
     "holiday_add_placeholder": "国を選択…",
     "holiday_add": "追加",
     "holiday_add_failed": "この祝日フィードに購読できませんでした。",
-    "holiday_unsubscribe_aria": "{{country}}の祝日の購読を解除"
+    "holiday_unsubscribe_aria": "{country}の祝日の購読を解除"
   },
   "search": {
     "placeholder": "予定を検索...",
@@ -196,7 +196,7 @@
     "expired": "この共有リンクは有効期限が切れています。",
     "no_upcoming_events": "表示できる予定はありません。",
     "event_undated": "日程未定",
-    "holidays_country": "祝日: {{country}}"
+    "holidays_country": "祝日: {country}"
   },
   "rsvp": {
     "accept": "参加",

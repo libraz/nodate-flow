@@ -26,7 +26,7 @@ import Spinner from '@nodate-flow/ui/primitives/spinner';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { Link, createLazyFileRoute, getRouteApi } from '@tanstack/react-router';
-import { type FormEvent, type ReactElement, Suspense, useState } from 'react';
+import { type FormEvent, type ReactElement, Suspense, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import Markdown from '@nodate-flow/ui/primitives/markdown';
@@ -84,86 +84,157 @@ interface TaskDetailPanelProps {
   id: string;
 }
 
+/**
+ * TitleEditor renders the task title as a page-level `<h1>` landmark and
+ * swaps to an inline text input for editing. The heading element is
+ * rendered in both states so assistive technology always observes exactly
+ * one `<h1>` on the page — in editing mode the heading is visually hidden
+ * but still reachable as a landmark, and the input carries focus.
+ *
+ * Save is guarded against empty / whitespace-only values and against
+ * unchanged values: the button is disabled in those cases, and a keyboard
+ * Enter submit on an empty value surfaces an inline `role="alert"`
+ * message instead of silently closing the editor. This mirrors the
+ * project rename guard established in commit a8cae17.
+ */
 function TitleEditor({ id, initial }: { id: string; initial: string }): ReactElement {
   const { t } = useTranslation('common');
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(initial);
+  const [showEmptyError, setShowEmptyError] = useState(false);
   const update = useUpdateTask();
+  const errorId = useId();
+
+  const headingStyle = {
+    margin: 0,
+    fontFamily: 'var(--font-display)',
+    fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
+  } as const;
+
+  /**
+   * Applied to the `<h1>` while editing so it disappears visually but
+   * stays a page-level heading landmark for assistive technology. Mirrors
+   * the standard "sr-only" clip pattern used by `<VisuallyHidden>` without
+   * wrapping the heading in a non-semantic `<span>`.
+   */
+  const headingHiddenStyle = {
+    ...headingStyle,
+    position: 'absolute',
+    inlineSize: '1px',
+    blockSize: '1px',
+    padding: 0,
+    overflow: 'hidden',
+    clip: 'rect(0, 0, 0, 0)',
+    whiteSpace: 'nowrap',
+    borderWidth: 0,
+  } as const;
 
   if (!editing) {
+    const enterEdit = (): void => {
+      setValue(initial);
+      setShowEmptyError(false);
+      setEditing(true);
+    };
     return (
-      <h1
-        style={{
-          margin: 0,
-          fontFamily: 'var(--font-display)',
-          fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
-        }}
-      >
-        <button
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <h1 style={{ ...headingStyle, flex: 1, minInlineSize: 0 }}>{initial}</h1>
+        <Button
           type="button"
-          onClick={() => {
-            setValue(initial);
-            setEditing(true);
-          }}
+          variant="ghost"
+          size="sm"
+          onClick={enterEdit}
           aria-label={t('tasks.detail.title_edit_named', { title: initial })}
-          style={{
-            background: 'none',
-            border: 'none',
-            padding: 0,
-            cursor: 'pointer',
-            color: 'var(--nf-color-fg)',
-            font: 'inherit',
-            textAlign: 'start',
-          }}
         >
-          {initial}
-        </button>
-      </h1>
+          {t('tasks.detail.title_edit')}
+        </Button>
+      </div>
     );
   }
 
+  const trimmed = value.trim();
+  const isEmpty = trimmed.length === 0;
+  const isUnchanged = trimmed === initial;
+  const saveDisabled = update.isPending || isEmpty || isUnchanged;
+
   const handleSave = async (): Promise<void> => {
-    const next = value.trim();
-    if (next.length === 0 || next === initial) {
+    if (isEmpty) {
+      setShowEmptyError(true);
+      return;
+    }
+    if (isUnchanged) {
       setEditing(false);
+      setShowEmptyError(false);
       return;
     }
     try {
-      await update.mutateAsync({ id, patch: { title: next } });
+      await update.mutateAsync({ id, patch: { title: trimmed } });
       setEditing(false);
+      setShowEmptyError(false);
     } catch {
       toaster.show({ tone: 'danger', message: t('tasks.errors.update_failed') });
     }
   };
 
   return (
-    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-      <Input
-        value={value}
-        onChange={(e) => {
-          setValue(e.target.value);
-        }}
-        autoFocus
-        aria-label={t('tasks.detail.title_edit')}
-        style={{ flex: 1 }}
-      />
-      <Button
-        type="button"
-        onClick={() => {
-          void handleSave();
-        }}
-      >
-        {t('tasks.detail.save')}
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        onClick={() => {
-          setEditing(false);
-        }}
-      >
-        {t('tasks.detail.cancel')}
-      </Button>
+    <div
+      style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', position: 'relative' }}
+    >
+      {/* Preserve the page-level heading landmark while editing. */}
+      <h1 style={headingHiddenStyle}>{initial}</h1>
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+        <Input
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+            if (showEmptyError && e.target.value.trim().length > 0) {
+              setShowEmptyError(false);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              void handleSave();
+            } else if (e.key === 'Escape') {
+              e.preventDefault();
+              setEditing(false);
+              setShowEmptyError(false);
+            }
+          }}
+          autoFocus
+          aria-label={t('tasks.detail.title_edit')}
+          aria-invalid={showEmptyError ? true : undefined}
+          aria-describedby={showEmptyError ? errorId : undefined}
+          style={{ flex: 1 }}
+        />
+        <Button
+          type="button"
+          disabled={saveDisabled}
+          onClick={() => {
+            void handleSave();
+          }}
+        >
+          {t('tasks.detail.save')}
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => {
+            setEditing(false);
+            setShowEmptyError(false);
+          }}
+        >
+          {t('tasks.detail.cancel')}
+        </Button>
+      </div>
+      {showEmptyError ? (
+        <p
+          id={errorId}
+          role="alert"
+          style={{ margin: 0, color: 'var(--nf-color-danger)', fontSize: '0.875rem' }}
+        >
+          {t('tasks.validation.title_required')}
+        </p>
+      ) : null}
     </div>
   );
 }

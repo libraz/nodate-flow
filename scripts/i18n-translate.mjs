@@ -169,7 +169,104 @@ if (emptyFindings.length > 0) {
   }
 }
 
-if (mode === 'check' && (missingTotal > 0 || emptyFindings.length > 0)) {
+// --- Double-brace placeholder lint --------------------------------------
+//
+// All three web apps register `i18next-icu` as the MessageFormat backend
+// (see apps/flow-web/src/i18n/index.ts, apps/time-web/src/i18n.ts,
+// apps/accounts-web/src/i18n.ts). Under ICU, placeholders use a single
+// brace — `{name}` — while i18next's native interpolator uses a double
+// brace — `{{name}}`. If a locale value mixes the two, ICU treats `{{name}}`
+// as a literal and ships the raw template to the UI (aria-labels,
+// confirmation dialogs, etc.). That's the 2026-04-23 regression.
+//
+// Fail the build if any locale JSON under apps/*/locales/** or
+// apps/*/src/locales/** contains a `{{identifier}}` token. Identifiers are
+// the same subset i18next accepts (letters / digits / underscore, leading
+// letter or underscore) to avoid false positives from CSS-in-JSON or
+// ICU escape sequences that happen to duplicate braces.
+
+const DOUBLE_BRACE = /\{\{[A-Za-z_][A-Za-z0-9_]*\}\}/;
+const doubleBraceFindings = [];
+
+function collectAllLocaleJsonFiles() {
+  const files = [];
+  const appsDir = join(repo, 'apps');
+  let apps = [];
+  try {
+    apps = readdirSync(appsDir);
+  } catch {
+    return files;
+  }
+  for (const app of apps) {
+    const roots = [join(appsDir, app, 'locales'), join(appsDir, app, 'src', 'locales')];
+    for (const root of roots) {
+      let langs = [];
+      try {
+        langs = readdirSync(root);
+      } catch {
+        continue;
+      }
+      for (const lang of langs) {
+        const leaf = join(root, lang);
+        let s;
+        try {
+          s = statSync(leaf);
+        } catch {
+          continue;
+        }
+        if (!s.isDirectory()) continue;
+        let entries = [];
+        try {
+          entries = readdirSync(leaf);
+        } catch {
+          continue;
+        }
+        for (const entry of entries) {
+          if (!entry.endsWith('.json')) continue;
+          files.push(join(leaf, entry));
+        }
+      }
+    }
+  }
+  return files;
+}
+
+function scanForDoubleBrace(full) {
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(full, 'utf8'));
+  } catch {
+    // JSON errors are reported by the errors.json scan above or by
+    // upstream tooling; skip silently here to avoid duplicate noise.
+    return;
+  }
+  const flat = new Map();
+  walk(parsed, '', flat);
+  for (const [path, value] of flat) {
+    if (typeof value !== 'string') continue;
+    const match = value.match(DOUBLE_BRACE);
+    if (match) {
+      doubleBraceFindings.push({ file: full, path, snippet: match[0] });
+    }
+  }
+}
+
+for (const file of collectAllLocaleJsonFiles()) scanForDoubleBrace(file);
+
+if (doubleBraceFindings.length > 0) {
+  console.error(
+    `\n${doubleBraceFindings.length} locale value(s) use i18next-native '{{var}}' under an ICU backend:`,
+  );
+  for (const { file, path, snippet } of doubleBraceFindings) {
+    const rel = file.startsWith(`${repo}/`) ? file.slice(repo.length + 1) : file;
+    console.error(`  ${rel} :: ${path} (found '${snippet}', expected '${snippet.slice(1, -1)}')`);
+  }
+}
+
+if (
+  mode === 'check' &&
+  (missingTotal > 0 || emptyFindings.length > 0 || doubleBraceFindings.length > 0)
+) {
   if (missingTotal > 0) {
     console.error(
       `\n${missingTotal} key(s) missing in ja locales. Run \`node scripts/i18n-translate.mjs --write\` to scaffold placeholders.`,
@@ -178,6 +275,11 @@ if (mode === 'check' && (missingTotal > 0 || emptyFindings.length > 0)) {
   if (emptyFindings.length > 0) {
     console.error(
       `\n${emptyFindings.length} empty string value(s) in locale files. Every leaf must carry a translation (or a "[TODO:ja] ..." placeholder).`,
+    );
+  }
+  if (doubleBraceFindings.length > 0) {
+    console.error(
+      `\n${doubleBraceFindings.length} '{{var}}' placeholder(s) in locale files. The web apps use i18next-icu, so placeholders must be single-brace ICU form ('{var}').`,
     );
   }
   process.exit(1);

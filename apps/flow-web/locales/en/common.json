@@ -262,7 +262,7 @@
       "pending": "Pending",
       "change_role": "Change role",
       "remove": "Remove",
-      "remove_confirm": "Remove {{name}} from this workspace?",
+      "remove_confirm": "Remove {name} from this workspace?",
       "removed": "Member removed",
       "role_updated": "Role updated"
     },
@@ -283,19 +283,19 @@
       "uses_25": "25 uses",
       "revoke": "Revoke",
       "revoked": "Invite revoked",
-      "used": "{{count}} used",
-      "uses_display": "{{used}} / {{max}}",
+      "used": "{count} used",
+      "uses_display": "{used} / {max}",
       "label": "Label (optional)",
       "active_links": "Active invite links",
       "no_invites": "No active invite links",
       "created_by": "Created by",
-      "accept_title": "Join {{name}}",
-      "accept_desc": "You've been invited to join as {{role}}",
+      "accept_title": "Join {name}",
+      "accept_desc": "You've been invited to join as {role}",
       "accept_btn": "Join workspace",
       "expired": "This invite has expired",
       "invalid": "This invite link is invalid or has been revoked",
       "full": "This invite has reached its usage limit",
-      "join_success": "You've joined {{name}}!",
+      "join_success": "You've joined {name}!",
       "create_failed": "Failed to create invite",
       "email_label": "Send via email (optional)",
       "email_placeholder": "Email address"
@@ -427,7 +427,7 @@
       "spreadsheet": "Spreadsheet"
     },
     "list": {
-      "select_row": "Select row {{index}}",
+      "select_row": "Select row {index}",
       "select_all": "Select all rows"
     },
     "columns": {
@@ -524,7 +524,7 @@
       "edit_title": "Edit title",
       "edit_priority": "Change priority",
       "edit_due": "Change due date",
-      "edit_due_set": "{{date}}, change due date",
+      "edit_due_set": "{date}, change due date",
       "edit_due_unset": "Set due date",
       "edit_status": "Change status",
       "save_failed": "Could not save changes. Please try again."
