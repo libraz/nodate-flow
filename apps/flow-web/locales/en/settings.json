@@ -54,6 +54,7 @@
     "title": "Audit log",
     "description": "A read-only log of actions performed in this workspace. Metadata is redacted at write time.",
     "empty": "No audit entries recorded yet.",
+    "empty_filtered": "No entries match your filters. Clear filters to see all entries.",
     "unknown_actor": "System",
     "export_csv": "Export CSV",
     "column": {

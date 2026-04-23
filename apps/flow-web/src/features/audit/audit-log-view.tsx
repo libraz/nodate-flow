@@ -23,30 +23,107 @@ const PAGE_SIZE = 50;
 
 /** Known audit actions for the filter dropdown. */
 const ACTION_OPTIONS: readonly string[] = [
-  'workspace.created',
-  'workspace.updated',
-  'project.created',
-  'project.updated',
-  'task.created',
-  'task.updated',
-  'task.disabled',
+  'ai_agent.create',
+  'ai_agent.pause',
+  'ai_agent.update_schedule',
+  'ai_agent.update_triggers',
+  'ai_command.resolve',
+  'ai_provider.create',
+  'ai_provider.delete',
+  'ai_provider.update',
+  'attachment.create',
+  'attachment.delete',
   'auth.login',
+  'auth.login_failed',
+  'auth.login_oidc',
+  'auth.login_totp',
+  'auth.login_totp_failed',
   'auth.logout',
+  'auth.recovery_code_used',
+  'comment.create',
+  'comment.delete',
+  'comment.update',
+  'description_version.restore',
+  'export.create',
+  'favorite.create',
+  'favorite.delete',
+  'import.cancel',
+  'import.create',
+  'intake.convert',
+  'intake.create',
+  'intake.triage',
+  'label.create',
+  'label.disable',
+  'label.update',
+  'lens.create',
+  'lens.delete',
+  'lens.publish',
+  'lens.unpublish',
+  'lens.update',
+  'mcp_token.create',
+  'mcp_token.delete',
+  'notification.archive',
+  'notification.read',
+  'page.create',
+  'page.delete',
+  'page.update',
+  'project.create',
+  'project.delete',
+  'project.update',
+  'reaction.create',
+  'reaction.delete',
+  'signal.create',
+  'task.apply_steps',
+  'task.archived',
+  'task.create',
+  'task.delete',
+  'task.reorder',
+  'task.smart_create',
+  'task.transition',
+  'task.unarchived',
+  'task.update',
+  'timebox.create',
+  'timebox.delete',
+  'timebox.status',
+  'timebox.update',
+  'user.update',
+  'workspace.create',
+  'workspace.delete',
+  'workspace.update',
 ];
 
 /** Known resource types for the filter dropdown. */
 const RESOURCE_TYPE_OPTIONS: readonly string[] = [
-  'workspace',
+  'ai_agent',
+  'ai_command',
+  'ai_provider',
+  'attachment',
+  'comment',
+  'export',
+  'favorite',
+  'import_job',
+  'intake_item',
+  'label',
+  'lens',
+  'mcp_token',
+  'notification',
+  'page',
   'project',
-  'task',
-  'user',
+  'reaction',
   'session',
+  'signal',
+  'task',
+  'task_dependency',
+  'timebox',
+  'user',
+  'workspace',
 ];
 
 function toneForAction(action: string): 'accent' | 'warning' | 'danger' | 'neutral' {
   if (action.startsWith('auth.')) return 'warning';
-  if (action.includes('disabled') || action.includes('delete')) return 'danger';
-  if (action.includes('created')) return 'accent';
+  if (action.includes('.delete') || action.includes('.disable') || action.includes('.archived'))
+    return 'danger';
+  if (action.includes('.create') || action.includes('.unarchived')) return 'accent';
   return 'neutral';
 }
 
@@ -173,6 +250,13 @@ export default function AuditLogView({
   });
 
   const { data } = useAuditLogsQuery(workspaceId, filters);
+
+  const hasActiveFilter =
+    Boolean(filters.action) ||
+    Boolean(filters.resourceType) ||
+    Boolean(filters.actorSearch) ||
+    Boolean(filters.dateFrom) ||
+    Boolean(filters.dateTo);
 
   const currentPage = Math.floor((filters.offset ?? 0) / PAGE_SIZE);
   const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE));
@@ -395,7 +479,7 @@ export default function AuditLogView({
             fontSize: '0.875rem',
           }}
         >
-          {t('audit_log.empty')}
+          {t(hasActiveFilter ? 'audit_log.empty_filtered' : 'audit_log.empty')}
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
