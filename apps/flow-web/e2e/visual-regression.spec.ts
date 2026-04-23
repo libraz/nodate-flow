@@ -37,7 +37,8 @@ type Language = (typeof LANGUAGES)[number];
 /**
  * Page definitions. Each entry describes a page to capture.
  *   - `name`: used in the snapshot filename.
- *   - `path`: URL path (may contain `{projectId}` placeholder).
+ *   - `path`: URL path (may contain `{workspaceId}` / `{projectId}`
+ *     placeholders, resolved via the shared tenant fixture).
  *   - `auth`: whether the page requires authentication.
  *   - `waitFor`: optional selector to wait for before capturing.
  */
@@ -52,7 +53,7 @@ const PAGES: PageDef[] = [
   // Note: login page lives in accounts-web, not flow-web; skip it here.
   {
     name: 'task-list',
-    path: '/projects/{projectId}/tasks',
+    path: '/workspaces/{workspaceId}/projects/{projectId}/tasks',
     auth: true,
     waitFor: 'main',
   },
@@ -118,11 +119,14 @@ async function setLanguage(page: Page, lang: Language): Promise<void> {
 }
 
 /**
- * Resolve a page path, replacing `{projectId}` with the tenant's project.
+ * Resolve a page path, replacing `{workspaceId}` / `{projectId}`
+ * placeholders with the tenant's ids.
  */
 function resolvePath(pageDef: PageDef, tenant: TestTenant | null): string {
   if (!tenant) return pageDef.path;
-  return pageDef.path.replace('{projectId}', tenant.projectId);
+  return pageDef.path
+    .replace('{workspaceId}', tenant.workspaceId)
+    .replace('{projectId}', tenant.projectId);
 }
 
 /**

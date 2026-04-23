@@ -1,9 +1,12 @@
 /**
- * /projects/$projectId/tasks — route stub. See sibling `.lazy.tsx`.
+ * /projects/$projectId/tasks — legacy redirect stub.
+ * The parent route's `beforeLoad` redirects to the canonical
+ * `/workspaces/$id/projects/$projectId/tasks` URL before this
+ * component would render.
  *
- * Accepts an optional `?new=1` search param so entry points like the
- * command palette and the dock can deep-link into "open the create
- * task dialog immediately on arrival".
+ * Keep the `?new=1` search validator so the router accepts the
+ * incoming URL shape; the param is preserved through the redirect by
+ * TanStack Router.
  */
 
 import { createFileRoute } from '@tanstack/react-router';

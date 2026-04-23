@@ -115,7 +115,7 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
   const applyLensFilter = (lens: {
     filter?: Record<string, Record<string, unknown>>;
   }): void => {
-    if (!projectId) return;
+    if (!projectId || !workspaceId) return;
     const priorityFilter = lens.filter?.priority;
     const statusFilter = lens.filter?.status;
     const priority: TaskPriority[] = [];
@@ -138,8 +138,8 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
     if (states.length > 0) filters.states = states;
     setTaskFilters(projectId, filters);
     void navigate({
-      to: '/projects/$projectId/tasks',
-      params: { projectId },
+      to: '/workspaces/$id/projects/$projectId/tasks',
+      params: { id: workspaceId, projectId },
     });
   };
 

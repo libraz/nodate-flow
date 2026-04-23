@@ -1,5 +1,6 @@
 /**
- * /projects/$projectId/gantt — lightweight self-rendered Gantt view.
+ * /workspaces/$id/projects/$projectId/gantt — lightweight self-rendered
+ * Gantt view.
  *
  * Read-only observation view. Bars are drawn as plain SVG between
  * `started_on` and `due_on`. Tasks missing both dates are listed as
@@ -28,7 +29,7 @@ import { sdk } from '../lib/sdk';
 
 type TaskListItem = components['schemas']['TaskListItem'];
 
-const routeApi = getRouteApi('/_authenticated/projects/$projectId/gantt');
+const routeApi = getRouteApi('/_authenticated/workspaces/$id/projects/$projectId/gantt');
 
 const ROW_HEIGHT = 28;
 const ROW_GAP = 4;
@@ -857,6 +858,8 @@ function GanttView(): ReactElement {
   );
 }
 
-export const Route = createLazyFileRoute('/_authenticated/projects/$projectId/gantt')({
+export const Route = createLazyFileRoute(
+  '/_authenticated/workspaces/$id/projects/$projectId/gantt',
+)({
   component: GanttRoute,
 });

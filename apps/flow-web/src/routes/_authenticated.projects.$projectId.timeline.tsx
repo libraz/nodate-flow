@@ -1,5 +1,6 @@
 /**
- * /projects/$projectId/timeline — route stub. See sibling `.lazy.tsx`.
+ * /projects/$projectId/timeline — legacy redirect stub.
+ * Parent `beforeLoad` redirects to the canonical workspace-scoped URL.
  */
 
 import { createFileRoute } from '@tanstack/react-router';

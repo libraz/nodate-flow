@@ -104,7 +104,7 @@ function CommandModeBody({ prompt, wsId, onSelect }: CommandModeBodyProps): Reac
   const handleExecute = (): void => {
     if (!result) return;
     // Map resolved tool to a navigation action
-    const href = toolToHref(result);
+    const href = toolToHref(result, wsId);
     if (href) {
       onSelect(href);
     }
@@ -194,14 +194,17 @@ function CommandModeBody({ prompt, wsId, onSelect }: CommandModeBodyProps): Reac
 // Tool -> navigation mapping
 // ---------------------------------------------------------------------------
 
-function toolToHref(result: ResolveCommandResult): Pick<CommandItem, 'href' | 'search'> | null {
+function toolToHref(
+  result: ResolveCommandResult,
+  wsId: string | null,
+): Pick<CommandItem, 'href' | 'search'> | null {
   const args = result.args;
   switch (result.tool) {
     case 'create_task': {
       const projectId = typeof args.projectId === 'string' ? args.projectId : null;
-      if (projectId) {
+      if (projectId && wsId) {
         return {
-          href: `/projects/${projectId}/tasks`,
+          href: `/workspaces/${wsId}/projects/${projectId}/tasks`,
           search: { new: true, ...(typeof args.title === 'string' ? { title: args.title } : {}) },
         };
       }
@@ -308,7 +311,7 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
           ? t('dock.command_palette.create_task')
           : `${t('dock.command_palette.create_task')} · ${p.name}`,
       group: actionsGroup,
-      href: `/projects/${p.id}/tasks`,
+      href: `/workspaces/${p.workspaceId}/projects/${p.id}/tasks`,
       search: { new: true },
       icon: Plus,
     }));
@@ -375,7 +378,7 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
       id: `project:${p.id}`,
       label: p.name,
       group: projectGroup,
-      href: `/projects/${p.id}`,
+      href: `/workspaces/${p.workspaceId}/projects/${p.id}`,
       icon: FolderKanban,
     }));
     return [...actions, ...tasks, ...projects, ...nav, ...ws];

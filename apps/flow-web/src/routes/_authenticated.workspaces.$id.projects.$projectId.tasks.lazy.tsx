@@ -1,5 +1,6 @@
 /**
- * /projects/$projectId/tasks — section layout for the tasks views (lazy).
+ * /workspaces/$id/projects/$projectId/tasks — section layout for the
+ * tasks views (lazy).
  *
  * Hosts the view switcher (Board / List), the filters bar, the
  * "New task" button, and an <Outlet /> for the active view.
@@ -16,11 +17,11 @@ import TaskCreateDialog from '../features/tasks/task-create-dialog';
 import TaskFiltersBar from '../features/tasks/task-filters-bar';
 import TaskViewSwitcher from '../features/tasks/task-view-switcher';
 
-const routeApi = getRouteApi('/_authenticated/projects/$projectId/tasks');
+const routeApi = getRouteApi('/_authenticated/workspaces/$id/projects/$projectId/tasks');
 
 function TasksSectionLayout(): ReactElement {
   const { t } = useTranslation('common');
-  const { projectId } = routeApi.useParams();
+  const { id, projectId } = routeApi.useParams();
   const search = routeApi.useSearch();
   const navigate = useNavigate();
   const { data: project } = useProjectQuery(projectId);
@@ -33,13 +34,13 @@ function TasksSectionLayout(): ReactElement {
     if (search.new) {
       setCreateOpen(true);
       void navigate({
-        to: '/projects/$projectId/tasks',
-        params: { projectId },
+        to: '/workspaces/$id/projects/$projectId/tasks',
+        params: { id, projectId },
         search: (prev) => ({ ...prev, new: undefined }),
         replace: true,
       });
     }
-  }, [search.new, navigate, projectId]);
+  }, [search.new, navigate, id, projectId]);
 
   return (
     <section
@@ -107,6 +108,8 @@ function TasksSectionLayout(): ReactElement {
   );
 }
 
-export const Route = createLazyFileRoute('/_authenticated/projects/$projectId/tasks')({
+export const Route = createLazyFileRoute(
+  '/_authenticated/workspaces/$id/projects/$projectId/tasks',
+)({
   component: TasksSectionLayout,
 });

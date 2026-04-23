@@ -1,8 +1,8 @@
 /**
  * ProjectList — renders the workspace's projects in a DataGrid.
  *
- * Rows link to /projects/$projectId. The header hosts a "New project"
- * button which opens the create dialog.
+ * Rows link to /workspaces/$id/projects/$projectId. The header hosts a
+ * "New project" button which opens the create dialog.
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
@@ -34,8 +34,8 @@ export default function ProjectList({ workspaceId }: ProjectListProps): ReactEle
       header: () => t('projects.columns.name'),
       cell: ({ row }) => (
         <Link
-          to="/projects/$projectId"
-          params={{ projectId: row.original.id }}
+          to="/workspaces/$id/projects/$projectId"
+          params={{ id: workspaceId, projectId: row.original.id }}
           style={{
             color: 'var(--nf-color-fg)',
             textDecoration: 'none',

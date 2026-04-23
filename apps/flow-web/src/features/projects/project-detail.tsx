@@ -164,7 +164,13 @@ function SettingsPanel({ id }: { id: string }): ReactElement {
   );
 }
 
-function OverviewPanel({ id }: { id: string }): ReactElement {
+function OverviewPanel({
+  id,
+  workspaceId,
+}: {
+  id: string;
+  workspaceId: string;
+}): ReactElement {
   const { t } = useTranslation('common');
   const { data: tasks } = useTasksQuery(id);
 
@@ -278,8 +284,8 @@ function OverviewPanel({ id }: { id: string }): ReactElement {
         ))}
       </ul>
       <Link
-        to="/projects/$projectId/tasks"
-        params={{ projectId: id }}
+        to="/workspaces/$id/projects/$projectId/tasks"
+        params={{ id: workspaceId, projectId: id }}
         style={{
           alignSelf: 'flex-start',
           fontSize: '0.875rem',
@@ -303,7 +309,7 @@ export default function ProjectDetail({ id }: ProjectDetailProps): ReactElement 
       label: t('projects.detail.tabs.overview'),
       content: (
         <Suspense fallback={null}>
-          <OverviewPanel id={id} />
+          <OverviewPanel id={id} workspaceId={project.workspaceId} />
         </Suspense>
       ),
     },

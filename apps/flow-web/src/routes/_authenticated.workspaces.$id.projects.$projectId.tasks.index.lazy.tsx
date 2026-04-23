@@ -1,6 +1,7 @@
 /**
- * /projects/$projectId/tasks/ — renders the active view (board, list, or graph)
- * driven by the persisted `useTaskView` toggle (lazy).
+ * /workspaces/$id/projects/$projectId/tasks/ — renders the active view
+ * (board, list, or graph) driven by the persisted `useTaskView`
+ * toggle (lazy).
  */
 
 import { createLazyFileRoute, getRouteApi } from '@tanstack/react-router';
@@ -12,7 +13,7 @@ import TaskListView from '../features/tasks/task-list-view';
 import TaskSpreadsheetView from '../features/tasks/task-spreadsheet-view';
 import { useTaskView } from '../features/tasks/use-task-view';
 
-const routeApi = getRouteApi('/_authenticated/projects/$projectId/tasks/');
+const routeApi = getRouteApi('/_authenticated/workspaces/$id/projects/$projectId/tasks/');
 
 function TasksIndex(): ReactElement {
   const { projectId } = routeApi.useParams();
@@ -26,6 +27,8 @@ function TasksIndex(): ReactElement {
   );
 }
 
-export const Route = createLazyFileRoute('/_authenticated/projects/$projectId/tasks/')({
+export const Route = createLazyFileRoute(
+  '/_authenticated/workspaces/$id/projects/$projectId/tasks/',
+)({
   component: TasksIndex,
 });

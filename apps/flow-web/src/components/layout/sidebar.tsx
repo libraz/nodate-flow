@@ -78,8 +78,8 @@ function WorkspaceProjectsSection({ workspaceId }: { workspaceId: string }): Rea
       {visible.map((p) => (
         <Link
           key={p.id}
-          to="/projects/$projectId"
-          params={{ projectId: p.id }}
+          to="/workspaces/$id/projects/$projectId"
+          params={{ id: workspaceId, projectId: p.id }}
           className={cx(styles.item, styles.subItem)}
           activeProps={{ className: cx(styles.item, styles.subItem, styles.itemActive) }}
         >

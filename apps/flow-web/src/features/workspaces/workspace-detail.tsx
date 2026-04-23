@@ -67,8 +67,8 @@ function OverviewPanel({ workspaceId }: { workspaceId: string }): ReactElement {
         {active.slice(0, 8).map((p) => (
           <li key={p.id}>
             <Link
-              to="/projects/$projectId"
-              params={{ projectId: p.id }}
+              to="/workspaces/$id/projects/$projectId"
+              params={{ id: workspaceId, projectId: p.id }}
               style={{
                 display: 'flex',
                 alignItems: 'center',

@@ -1,5 +1,6 @@
 /**
- * /projects/$projectId/gantt — route stub. See sibling `.lazy.tsx`.
+ * /projects/$projectId/gantt — legacy redirect stub.
+ * Parent `beforeLoad` redirects to the canonical workspace-scoped URL.
  */
 
 import { createFileRoute } from '@tanstack/react-router';

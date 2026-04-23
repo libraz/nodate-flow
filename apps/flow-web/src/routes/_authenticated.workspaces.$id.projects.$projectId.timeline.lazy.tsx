@@ -1,5 +1,6 @@
 /**
- * /projects/$projectId/timeline — project activity timeline (lazy).
+ * /workspaces/$id/projects/$projectId/timeline — project activity
+ * timeline (lazy).
  */
 
 import Spinner from '@nodate-flow/ui/primitives/spinner';
@@ -10,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { useProjectQuery } from '../features/projects/api';
 import TimelineView from '../features/timeline/timeline-view';
 
-const routeApi = getRouteApi('/_authenticated/projects/$projectId/timeline');
+const routeApi = getRouteApi('/_authenticated/workspaces/$id/projects/$projectId/timeline');
 
 function ProjectTimelineInner({ projectId }: { projectId: string }): ReactElement {
   const { data: project } = useProjectQuery(projectId);
@@ -35,6 +36,8 @@ function ProjectTimelineRoute(): ReactElement {
   );
 }
 
-export const Route = createLazyFileRoute('/_authenticated/projects/$projectId/timeline')({
+export const Route = createLazyFileRoute(
+  '/_authenticated/workspaces/$id/projects/$projectId/timeline',
+)({
   component: ProjectTimelineRoute,
 });
