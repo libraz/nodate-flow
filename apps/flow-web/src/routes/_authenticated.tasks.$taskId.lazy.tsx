@@ -30,6 +30,7 @@ import { type FormEvent, type ReactElement, Suspense, useId, useState } from 're
 import { useTranslation } from 'react-i18next';
 
 import Markdown from '@nodate-flow/ui/primitives/markdown';
+import { selectUser, useAuth } from '../features/auth/auth-store';
 import ConstraintEditor from '../features/constraints/constraint-editor';
 import StateGraph from '../features/constraints/state-graph';
 import { useProjectQuery } from '../features/projects/api';
@@ -51,6 +52,7 @@ import {
   useTransitionTask,
   useUpdateTask,
 } from '../features/tasks/api';
+import CommentRow from '../features/tasks/comment-row';
 import { PRIORITY_COLOR, PRIORITY_KEY, STATE_KEY, STATE_TONE } from '../features/tasks/constants';
 import DependenciesSection from '../features/tasks/dependencies-section';
 import MarkdownEditor from '../features/tasks/markdown-editor';
@@ -346,6 +348,7 @@ function CommentsFeed({ taskId }: { taskId: string }): ReactElement {
   const { t, i18n } = useTranslation('common');
   const { data: comments } = useTaskCommentsQuery(taskId);
   const add = useAddTaskComment();
+  const currentUser = useAuth(selectUser);
   const [body, setBody] = useState('');
   const locale = i18n.resolvedLanguage ?? 'en';
 
@@ -379,28 +382,12 @@ function CommentsFeed({ taskId }: { taskId: string }): ReactElement {
         >
           {comments.map((c) => (
             <li key={c.id}>
-              <Card style={{ padding: '0.875rem 1rem' }}>
-                <header
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    gap: '0.5rem',
-                    marginBlockEnd: '0.375rem',
-                  }}
-                >
-                  <strong>{c.authorDisplayName}</strong>
-                  <span
-                    style={{
-                      color: 'var(--nf-color-fg-muted)',
-                      fontVariantNumeric: 'tabular-nums',
-                      fontSize: '0.875rem',
-                    }}
-                  >
-                    {formatEpochDateTime(c.createdAt, locale)}
-                  </span>
-                </header>
-                <Markdown>{c.body}</Markdown>
-              </Card>
+              <CommentRow
+                taskId={taskId}
+                comment={c}
+                currentUserId={currentUser?.id}
+                locale={locale}
+              />
             </li>
           ))}
         </ul>

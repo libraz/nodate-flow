@@ -73,7 +73,7 @@ export default function PageList({ activePageId }: PageListProps): ReactElement 
   const { data: workspaces } = useWorkspacesQuery();
   // Fall back to the first workspace on cross-workspace pages (e.g. /pages).
   const workspaceId = routeWsId ?? (workspaces.length === 1 ? (workspaces[0]?.id ?? null) : null);
-  const [mode, setMode] = useState<PageMode>(activePageId ? 'view' : 'create');
+  const [mode, setMode] = useState<PageMode>('view');
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleSearchChange = (e: ChangeEvent<HTMLInputElement>): void => {

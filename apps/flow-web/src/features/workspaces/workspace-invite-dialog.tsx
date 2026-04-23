@@ -28,10 +28,10 @@ interface ExpiryOption {
 }
 
 const EXPIRY_OPTIONS: readonly ExpiryOption[] = [
-  { labelKey: 'workspaces.invites.expiry_1d', seconds: 86400 },
-  { labelKey: 'workspaces.invites.expiry_7d', seconds: 604800 },
-  { labelKey: 'workspaces.invites.expiry_30d', seconds: 2592000 },
-  { labelKey: 'workspaces.invites.expiry_never', seconds: undefined },
+  { labelKey: 'workspaces.invites.1_day', seconds: 86400 },
+  { labelKey: 'workspaces.invites.7_days', seconds: 604800 },
+  { labelKey: 'workspaces.invites.30_days', seconds: 2592000 },
+  { labelKey: 'workspaces.invites.no_expiry', seconds: undefined },
 ];
 
 interface MaxUsesOption {
@@ -43,7 +43,7 @@ const MAX_USES_OPTIONS: readonly MaxUsesOption[] = [
   { labelKey: 'workspaces.invites.uses_1', value: 1 },
   { labelKey: 'workspaces.invites.uses_10', value: 10 },
   { labelKey: 'workspaces.invites.uses_25', value: 25 },
-  { labelKey: 'workspaces.invites.uses_unlimited', value: undefined },
+  { labelKey: 'workspaces.invites.unlimited', value: undefined },
 ];
 
 export interface WorkspaceInviteDialogProps {
@@ -195,7 +195,7 @@ export default function WorkspaceInviteDialog({
           )}
         </FormField>
 
-        <FormField label={t('workspaces.invites.expiry_label')}>
+        <FormField label={t('workspaces.invites.expires')}>
           {(control) => (
             <Select
               {...control}
@@ -213,7 +213,7 @@ export default function WorkspaceInviteDialog({
           )}
         </FormField>
 
-        <FormField label={t('workspaces.invites.max_uses_label')}>
+        <FormField label={t('workspaces.invites.max_uses')}>
           {(control) => (
             <Select
               {...control}
@@ -231,7 +231,7 @@ export default function WorkspaceInviteDialog({
           )}
         </FormField>
 
-        <FormField label={t('workspaces.invites.label_field')}>
+        <FormField label={t('workspaces.invites.label')}>
           {(control) => (
             <Input
               {...control}
@@ -249,7 +249,7 @@ export default function WorkspaceInviteDialog({
             {t('workspaces.form.cancel')}
           </Button>
           <Button type="submit" variant="primary" disabled={submitting}>
-            {t('workspaces.invites.create_submit')}
+            {t('workspaces.invites.create')}
           </Button>
         </div>
       </form>

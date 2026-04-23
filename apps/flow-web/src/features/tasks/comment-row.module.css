@@ -1,0 +1,49 @@
+.menuList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  margin: calc(-1 * var(--nf-space-4, 1rem));
+  padding: var(--nf-space-2, 0.5rem);
+  min-inline-size: 8rem;
+}
+
+.menuItem {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.5rem;
+  border-radius: var(--nf-radius-sm);
+  cursor: pointer;
+  font-size: var(--nf-text-sm);
+  line-height: 1.4;
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.menuItem:hover,
+.menuItem:focus-visible {
+  background: var(--nf-color-bg-hover);
+}
+
+.menuItemDanger {
+  color: var(--nf-color-danger);
+}
+
+.trigger {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  border-radius: var(--nf-radius-sm);
+  color: var(--nf-color-fg-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.trigger:hover,
+.trigger:focus-visible {
+  background: var(--nf-color-bg-hover);
+}

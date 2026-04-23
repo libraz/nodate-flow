@@ -435,6 +435,64 @@ export function useAddTaskComment(): UseMutationResult<TaskComment, ApiError, Ad
   });
 }
 
+export interface EditCommentArgs {
+  taskId: string;
+  commentId: string;
+  body: string;
+}
+
+/**
+ * useEditTaskComment — PATCH /tasks/{id}/comments/{cid}.
+ *
+ * Only the original author may edit; the backend enforces this and surfaces
+ * `FORBIDDEN` otherwise. Invalidates the task's comments list on success so
+ * the `editedAt` timestamp and new body are picked up.
+ */
+export function useEditTaskComment(): UseMutationResult<TaskComment, ApiError, EditCommentArgs> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskId, commentId, body }: EditCommentArgs): Promise<TaskComment> => {
+      const { data, error } = await sdk.PATCH('/tasks/{id}/comments/{cid}', {
+        params: { path: { id: taskId, cid: commentId } },
+        body: { body },
+      });
+      if (error || !data) throw toApiError(error, 'Failed to edit comment');
+      return data;
+    },
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: tasksKeys.comments(vars.taskId) });
+      void qc.invalidateQueries({ queryKey: [...timelineKeys.all, 'task', vars.taskId] });
+    },
+  });
+}
+
+export interface DeleteCommentArgs {
+  taskId: string;
+  commentId: string;
+}
+
+/**
+ * useDeleteTaskComment — DELETE /tasks/{id}/comments/{cid}.
+ *
+ * Author-or-workspace-admin on the backend; the UI gates the affordance to
+ * the author. Invalidates the task's comments list on success.
+ */
+export function useDeleteTaskComment(): UseMutationResult<void, ApiError, DeleteCommentArgs> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskId, commentId }: DeleteCommentArgs): Promise<void> => {
+      const { error } = await sdk.DELETE('/tasks/{id}/comments/{cid}', {
+        params: { path: { id: taskId, cid: commentId } },
+      });
+      if (error) throw toApiError(error, 'Failed to delete comment');
+    },
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: tasksKeys.comments(vars.taskId) });
+      void qc.invalidateQueries({ queryKey: [...timelineKeys.all, 'task', vars.taskId] });
+    },
+  });
+}
+
 export interface TransitionTaskArgs {
   id: string;
   transition: TransitionName;

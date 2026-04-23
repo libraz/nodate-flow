@@ -127,10 +127,10 @@ export function usePagesQuery(wsId: string): UseSuspenseQueryResult<PageItem[]> 
   return useSuspenseQuery({
     queryKey: pageKeys.list(wsId),
     queryFn: async (): Promise<PageItem[]> => {
-      const data = await fetchJson<{ items?: PageItem[] }>(
+      const data = await fetchJson<{ pages?: PageItem[] }>(
         `${apiBaseUrl}/workspaces/${wsId}/pages?limit=200`,
       );
-      return data.items ?? [];
+      return data.pages ?? [];
     },
   });
 }
@@ -143,10 +143,10 @@ export function useChildPagesQuery(
   return useSuspenseQuery({
     queryKey: pageKeys.children(pageId),
     queryFn: async (): Promise<PageItem[]> => {
-      const data = await fetchJson<{ items?: PageItem[] }>(
+      const data = await fetchJson<{ pages?: PageItem[] }>(
         `${apiBaseUrl}/workspaces/${wsId}/pages/${pageId}/children?limit=200`,
       );
-      return data.items ?? [];
+      return data.pages ?? [];
     },
   });
 }
@@ -167,10 +167,10 @@ export function useSearchPages(wsId: string, query: string): UseQueryResult<Page
     queryKey: pageKeys.search(wsId, query),
     enabled: query.length >= 2,
     queryFn: async (): Promise<PageItem[]> => {
-      const data = await fetchJson<{ items?: PageItem[] }>(
+      const data = await fetchJson<{ pages?: PageItem[] }>(
         `${apiBaseUrl}/workspaces/${wsId}/pages/search?q=${encodeURIComponent(query)}&limit=50`,
       );
-      return data.items ?? [];
+      return data.pages ?? [];
     },
   });
 }
@@ -235,8 +235,10 @@ export function useDeletePage(wsId: string): UseMutationResult<void, ApiError, s
         method: 'DELETE',
       });
     },
-    onSuccess: () => {
+    onSuccess: (_data, pageId) => {
       void qc.invalidateQueries({ queryKey: pageKeys.list(wsId) });
+      void qc.invalidateQueries({ queryKey: pageKeys.children(pageId) });
+      qc.removeQueries({ queryKey: pageKeys.detail(pageId) });
     },
   });
 }

@@ -5,7 +5,7 @@
 
 import Icon from '@nodate-flow/ui/icon';
 import { Bell } from 'lucide-react';
-import { type ReactElement, Suspense, useState } from 'react';
+import { type MouseEvent, type ReactElement, Suspense, useId, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 
@@ -19,8 +19,14 @@ function NotificationBellImpl(): ReactElement {
   const [open, setOpen] = useState(false);
   const { data: unreadCount } = useUnreadCountQuery();
   const count = unreadCount ?? 0;
+  const dropdownId = useId();
 
-  const handleToggle = (): void => {
+  const handleToggle = (event: MouseEvent<HTMLButtonElement>): void => {
+    // Defensive stopPropagation: the dropdown's backdrop is a fixed
+    // full-viewport <div> that calls onClose on click. If the backdrop
+    // mounts during the same click cycle, the synthetic event could
+    // bubble to it and immediately close the panel we just opened.
+    event.stopPropagation();
     setOpen((prev) => !prev);
   };
 
@@ -35,6 +41,9 @@ function NotificationBellImpl(): ReactElement {
         className={topBarStyles.iconButton}
         onClick={handleToggle}
         aria-label={count > 0 ? t('badge.unread', { count }) : t('view.title')}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={dropdownId}
       >
         <Icon icon={Bell} decorative />
         {count > 0 && (
@@ -45,7 +54,7 @@ function NotificationBellImpl(): ReactElement {
       </button>
       {open && (
         <Suspense fallback={null}>
-          <NotificationDropdown onClose={handleClose} />
+          <NotificationDropdown id={dropdownId} onClose={handleClose} />
         </Suspense>
       )}
     </div>

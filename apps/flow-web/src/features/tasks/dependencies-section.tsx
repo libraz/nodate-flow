@@ -1,9 +1,11 @@
 /**
  * DependenciesSection — task detail "Dependencies" panel.
  *
- * Renders three groups (Blocked by / Blocks / Relates to) backed by
- * `GET /tasks/{id}/dependencies`. The picker uses `GET /tasks?q=...`
- * scoped to the current workspace; results are debounced client-side.
+ * Renders groups for every TaskDependencyKind (Parent / Subtasks /
+ * Blocked by / Blocks / Relates to / Duplicate of / Duplicated by)
+ * backed by `GET /tasks/{id}/dependencies`. The picker uses
+ * `GET /tasks?q=...` scoped to the current workspace; results are
+ * debounced client-side.
  */
 
 import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
@@ -32,7 +34,7 @@ interface DependenciesSectionProps {
   workspaceId: string;
 }
 
-type AddableKind = Extract<TaskDependencyKind, 'blocks' | 'relates'>;
+type AddableKind = Extract<TaskDependencyKind, 'blocks' | 'relates' | 'subtask_of' | 'duplicates'>;
 
 /**
  * DependenciesSection renders incoming/outgoing dependency edges and
@@ -59,8 +61,31 @@ export default function DependenciesSection({
     ],
     [data.outgoing, data.incoming],
   );
+  const parent = useMemo(
+    () => data.outgoing.filter((e) => e.kind === 'subtask_of'),
+    [data.outgoing],
+  );
+  const subtasks = useMemo(
+    () => data.incoming.filter((e) => e.kind === 'subtask_of'),
+    [data.incoming],
+  );
+  const duplicateOf = useMemo(
+    () => data.outgoing.filter((e) => e.kind === 'duplicates'),
+    [data.outgoing],
+  );
+  const duplicatedBy = useMemo(
+    () => data.incoming.filter((e) => e.kind === 'duplicates'),
+    [data.incoming],
+  );
 
-  const isEmpty = blocks.length === 0 && blockedBy.length === 0 && relates.length === 0;
+  const isEmpty =
+    blocks.length === 0 &&
+    blockedBy.length === 0 &&
+    relates.length === 0 &&
+    parent.length === 0 &&
+    subtasks.length === 0 &&
+    duplicateOf.length === 0 &&
+    duplicatedBy.length === 0;
 
   const handleRemove = async (depId: string): Promise<void> => {
     try {
@@ -115,6 +140,18 @@ export default function DependenciesSection({
       ) : null}
 
       <DependencyGroup
+        label={t('tasks.detail.dependencies.parent')}
+        items={parent}
+        tone="info"
+        onRemove={handleRemove}
+      />
+      <DependencyGroup
+        label={t('tasks.detail.dependencies.subtasks')}
+        items={subtasks}
+        tone="info"
+        onRemove={handleRemove}
+      />
+      <DependencyGroup
         label={t('tasks.detail.dependencies.blockedBy')}
         items={blockedBy}
         tone="danger"
@@ -129,6 +166,18 @@ export default function DependenciesSection({
       <DependencyGroup
         label={t('tasks.detail.dependencies.relates')}
         items={relates}
+        tone="neutral"
+        onRemove={handleRemove}
+      />
+      <DependencyGroup
+        label={t('tasks.detail.dependencies.duplicateOf')}
+        items={duplicateOf}
+        tone="neutral"
+        onRemove={handleRemove}
+      />
+      <DependencyGroup
+        label={t('tasks.detail.dependencies.duplicatedBy')}
+        items={duplicatedBy}
         tone="neutral"
         onRemove={handleRemove}
       />
@@ -286,6 +335,8 @@ function DependencyPicker({
         >
           <option value="blocks">{t('tasks.detail.dependencies.kind.blocks')}</option>
           <option value="relates">{t('tasks.detail.dependencies.kind.relates')}</option>
+          <option value="subtask_of">{t('tasks.detail.dependencies.kind.subtask_of')}</option>
+          <option value="duplicates">{t('tasks.detail.dependencies.kind.duplicates')}</option>
         </Select>
         <Input
           value={input}

@@ -81,6 +81,7 @@
       "title": "コマンドパレット",
       "placeholder": "コマンドを入力または検索…",
       "empty": "結果がありません。",
+      "searching": "検索中…",
       "group_navigation": "ナビゲーション",
       "group_workspaces": "ワークスペース",
       "group_tasks": "タスク",
@@ -192,6 +193,21 @@
       "fri": "金",
       "sat": "土",
       "sun": "日"
+    },
+    "event_detail": {
+      "title": "イベントの詳細",
+      "event": "イベント",
+      "start": "開始",
+      "end": "終了",
+      "all_day": "終日",
+      "workspace": "ワークスペース",
+      "location": "場所",
+      "close": "閉じる",
+      "delete": "削除",
+      "delete_confirm": "このイベントを削除しますか？この操作は取り消せません。",
+      "deleted": "イベントを削除しました",
+      "delete_failed": "イベントを削除できませんでした。もう一度お試しください。",
+      "open_label": "イベントを開く: {title}（{workspace}）"
     }
   },
   "not_found": {
@@ -269,8 +285,11 @@
     "invites": {
       "create": "招待リンクを作成",
       "create_title": "招待リンクの作成",
+      "link_ready_title": "招待リンクの準備ができました",
+      "link_ready_description": "このリンクをワークスペースに招待したい人と共有してください。",
       "copy": "リンクをコピー",
       "copied": "コピーしました！",
+      "copy_failed": "リンクをコピーできませんでした。もう一度お試しください。",
       "expires": "有効期限",
       "max_uses": "最大使用回数",
       "unlimited": "無制限",
@@ -286,6 +305,7 @@
       "used": "{count} 回使用",
       "uses_display": "{used} / {max}",
       "label": "ラベル（任意）",
+      "label_placeholder": "例: Q2営業チーム用",
       "active_links": "有効な招待リンク",
       "no_invites": "有効な招待リンクはありません",
       "created_by": "作成者",
@@ -586,6 +606,10 @@
         "blocks": "ブロックしている",
         "blockedBy": "ブロックされている",
         "relates": "関連",
+        "parent": "親タスク",
+        "subtasks": "サブタスク",
+        "duplicateOf": "重複元",
+        "duplicatedBy": "重複として参照",
         "empty": "依存関係はまだありません。",
         "add": "依存を追加",
         "addCancel": "キャンセル",
@@ -595,7 +619,9 @@
         "kind": {
           "blocks": "ブロックしている",
           "blockedBy": "ブロックされている",
-          "relates": "関連"
+          "relates": "関連",
+          "subtask_of": "サブタスク",
+          "duplicates": "重複"
         },
         "search": "タスクを検索…",
         "searchEmpty": "一致するタスクはありません。",
@@ -679,7 +705,15 @@
       "add": "投稿",
       "empty": "コメントはまだありません。",
       "edit": "編集",
-      "delete": "削除"
+      "delete": "削除",
+      "cancel": "キャンセル",
+      "save": "保存",
+      "edited": "編集済み",
+      "menu_label": "コメントの操作",
+      "edit_placeholder": "コメントを編集…",
+      "delete_confirm": "このコメントを削除しますか？",
+      "edit_failed": "コメントを更新できませんでした。もう一度お試しください。",
+      "delete_failed": "コメントを削除できませんでした。もう一度お試しください。"
     },
     "lens": {
       "title": "保存済みビュー",

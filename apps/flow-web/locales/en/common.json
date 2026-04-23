@@ -81,6 +81,7 @@
       "title": "Command palette",
       "placeholder": "Type a command or search…",
       "empty": "No results.",
+      "searching": "Searching…",
       "group_navigation": "Navigation",
       "group_workspaces": "Workspaces",
       "group_tasks": "Tasks",
@@ -192,6 +193,21 @@
       "fri": "Fri",
       "sat": "Sat",
       "sun": "Sun"
+    },
+    "event_detail": {
+      "title": "Event details",
+      "event": "Event",
+      "start": "Start",
+      "end": "End",
+      "all_day": "All day",
+      "workspace": "Workspace",
+      "location": "Location",
+      "close": "Close",
+      "delete": "Delete",
+      "delete_confirm": "Delete this event? This cannot be undone.",
+      "deleted": "Event deleted",
+      "delete_failed": "Could not delete the event. Please try again.",
+      "open_label": "Open event: {title} in {workspace}"
     }
   },
   "not_found": {
@@ -269,8 +285,11 @@
     "invites": {
       "create": "Create invite link",
       "create_title": "Create Invite Link",
+      "link_ready_title": "Invite link ready",
+      "link_ready_description": "Share this link with people you want to invite to the workspace.",
       "copy": "Copy link",
       "copied": "Link copied!",
+      "copy_failed": "Could not copy the link. Please try again.",
       "expires": "Expires",
       "max_uses": "Max uses",
       "unlimited": "Unlimited",
@@ -286,6 +305,7 @@
       "used": "{count} used",
       "uses_display": "{used} / {max}",
       "label": "Label (optional)",
+      "label_placeholder": "e.g. For Q2 sales team",
       "active_links": "Active invite links",
       "no_invites": "No active invite links",
       "created_by": "Created by",
@@ -586,6 +606,10 @@
         "blocks": "Blocks",
         "blockedBy": "Blocked by",
         "relates": "Relates to",
+        "parent": "Parent task",
+        "subtasks": "Subtasks",
+        "duplicateOf": "Duplicate of",
+        "duplicatedBy": "Duplicated by",
         "empty": "No dependencies yet.",
         "add": "Add dependency",
         "addCancel": "Cancel",
@@ -595,7 +619,9 @@
         "kind": {
           "blocks": "Blocks",
           "blockedBy": "Blocked by",
-          "relates": "Relates to"
+          "relates": "Relates to",
+          "subtask_of": "Subtask of",
+          "duplicates": "Duplicates"
         },
         "search": "Search tasks…",
         "searchEmpty": "No matches.",
@@ -679,7 +705,15 @@
       "add": "Comment",
       "empty": "No comments yet.",
       "edit": "Edit",
-      "delete": "Delete"
+      "delete": "Delete",
+      "cancel": "Cancel",
+      "save": "Save",
+      "edited": "edited",
+      "menu_label": "Comment actions",
+      "edit_placeholder": "Edit your comment…",
+      "delete_confirm": "Delete this comment?",
+      "edit_failed": "Could not update the comment. Please try again.",
+      "delete_failed": "Could not delete the comment. Please try again."
     },
     "lens": {
       "title": "Saved Views",

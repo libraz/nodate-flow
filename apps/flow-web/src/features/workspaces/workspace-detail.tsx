@@ -12,8 +12,15 @@ import { useProjectsQuery } from '../projects/api';
 import { useWorkspaceQuery } from './api';
 import WorkspaceMembersTable from './workspace-members-table';
 
+/** Identifiers for the workspace-detail tab panels. */
+export type WorkspaceDetailTab = 'overview' | 'members';
+
 export interface WorkspaceDetailProps {
   id: string;
+  /** Controlled active tab, typically driven by the `?tab=` search param. */
+  tab: WorkspaceDetailTab;
+  /** Called when the user activates a different tab. Consumers persist the value. */
+  onTabChange: (tab: WorkspaceDetailTab) => void;
 }
 
 function OverviewPanel({ workspaceId }: { workspaceId: string }): ReactElement {
@@ -114,7 +121,11 @@ function OverviewPanel({ workspaceId }: { workspaceId: string }): ReactElement {
   );
 }
 
-export default function WorkspaceDetail({ id }: WorkspaceDetailProps): ReactElement {
+export default function WorkspaceDetail({
+  id,
+  tab,
+  onTabChange,
+}: WorkspaceDetailProps): ReactElement {
   const { t } = useTranslation('common');
   const { data: workspace } = useWorkspaceQuery(id);
 
@@ -171,7 +182,14 @@ export default function WorkspaceDetail({ id }: WorkspaceDetailProps): ReactElem
         ) : null}
       </header>
 
-      <Tabs items={items} defaultValue="overview" aria-label={t('workspaces.detail.tabs.label')} />
+      <Tabs
+        items={items}
+        value={tab}
+        onValueChange={(next) => {
+          onTabChange(next as WorkspaceDetailTab);
+        }}
+        aria-label={t('workspaces.detail.tabs.label')}
+      />
     </article>
   );
 }

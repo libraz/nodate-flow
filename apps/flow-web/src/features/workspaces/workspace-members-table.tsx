@@ -11,6 +11,7 @@ import Select from '@nodate-flow/ui/primitives/select';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import type { ColumnDef } from '@tanstack/react-table';
 import { type ReactElement, Suspense, useState } from 'react';
+import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 
 import { formatEpoch } from '../../lib/format';
@@ -164,26 +165,28 @@ export default function WorkspaceMembersTable({
         >
           {t('workspaces.members.title')}
         </h2>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setInviteOpen(true);
-            }}
-          >
-            {t('workspaces.invites.create')}
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => {
-              setAddOpen(true);
-            }}
-          >
-            {t('workspaces.members.add')}
-          </Button>
-        </div>
+        {isAdmin ? (
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setInviteOpen(true);
+              }}
+            >
+              {t('workspaces.invites.create')}
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => {
+                setAddOpen(true);
+              }}
+            >
+              {t('workspaces.members.add')}
+            </Button>
+          </div>
+        ) : null}
       </header>
 
       <DataGrid<WorkspaceMember>
@@ -193,9 +196,11 @@ export default function WorkspaceMembersTable({
         style={{ minBlockSize: '16rem' }}
       />
 
-      <Suspense fallback={null}>
-        <WorkspaceInvitesList workspaceId={workspaceId} />
-      </Suspense>
+      <ErrorBoundary fallback={null}>
+        <Suspense fallback={null}>
+          <WorkspaceInvitesList workspaceId={workspaceId} />
+        </Suspense>
+      </ErrorBoundary>
 
       <WorkspaceAddMemberDialog
         workspaceId={workspaceId}

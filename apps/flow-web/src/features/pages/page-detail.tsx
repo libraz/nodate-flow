@@ -12,7 +12,7 @@ import {
   BreadcrumbSeparator,
 } from '@nodate-flow/ui/primitives/breadcrumb';
 import Button from '@nodate-flow/ui/primitives/button';
-import { Link } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { FileText, Pencil, Sparkles, Trash2 } from 'lucide-react';
 import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -89,6 +89,7 @@ interface PageDetailProps {
 export default function PageDetail({ workspaceId, pageId, onEdit }: PageDetailProps): ReactElement {
   const { t, i18n } = useTranslation('pages');
   const locale = i18n.resolvedLanguage ?? 'en';
+  const navigate = useNavigate();
   const { data: page } = usePageQuery(workspaceId, pageId);
   const deleteMutation = useDeletePage(workspaceId);
 
@@ -98,7 +99,11 @@ export default function PageDetail({ workspaceId, pageId, onEdit }: PageDetailPr
       tone: 'danger',
     });
     if (!confirmed) return;
-    deleteMutation.mutate(pageId);
+    deleteMutation.mutate(pageId, {
+      onSuccess: () => {
+        void navigate({ to: '/pages' });
+      },
+    });
   };
 
   const updatedLabel = t('updated_at', {

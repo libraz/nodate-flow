@@ -95,10 +95,10 @@ export function useNotificationsQuery(): UseSuspenseQueryResult<NotificationItem
   return useSuspenseQuery({
     queryKey: notificationKeys.list(),
     queryFn: async (): Promise<NotificationItem[]> => {
-      const data = await fetchJson<{ items?: NotificationItem[] }>(
+      const data = await fetchJson<{ notifications?: NotificationItem[] }>(
         `${apiBaseUrl}/me/notifications?limit=50`,
       );
-      return data.items ?? [];
+      return data.notifications ?? [];
     },
   });
 }

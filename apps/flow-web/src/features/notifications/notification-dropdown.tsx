@@ -34,6 +34,8 @@ function formatRelative(unixSec: number, locale: string): string {
 }
 
 interface NotificationDropdownProps {
+  /** DOM id applied to the dialog, matched by the bell's aria-controls. */
+  id: string;
   onClose: () => void;
 }
 
@@ -110,7 +112,10 @@ function NotificationRow({
   );
 }
 
-export default function NotificationDropdown({ onClose }: NotificationDropdownProps): ReactElement {
+export default function NotificationDropdown({
+  id,
+  onClose,
+}: NotificationDropdownProps): ReactElement {
   const { t, i18n } = useTranslation('notifications');
   const locale = i18n.resolvedLanguage ?? 'en';
   const { data: items } = useNotificationsQuery();
@@ -128,7 +133,7 @@ export default function NotificationDropdown({ onClose }: NotificationDropdownPr
       {/* Invisible backdrop to capture outside clicks */}
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss */}
       <div className={styles.backdrop} onClick={onClose} aria-hidden="true" />
-      <div className={styles.dropdown} role="dialog" aria-label={t('view.title')}>
+      <div id={id} className={styles.dropdown} role="dialog" aria-label={t('view.title')}>
         <div className={styles.dropdownHeader}>
           <h2 className={styles.dropdownTitle}>{t('view.title')}</h2>
           <button

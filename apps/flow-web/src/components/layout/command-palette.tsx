@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import {
   type KeyboardEvent,
+  type MutableRefObject,
   type ReactElement,
   Suspense,
   useEffect,
@@ -81,9 +82,20 @@ interface CommandModeBodyProps {
   prompt: string;
   wsId: string | null;
   onSelect: InnerProps['onSelect'];
+  /**
+   * Receives the Enter-key handler so the parent input can invoke the
+   * command-mode submit/execute flow. Keydown events don't bubble from the
+   * input to this sibling wrapper, so routing through a ref is required.
+   */
+  submitHandlerRef: MutableRefObject<(() => void) | null>;
 }
 
-function CommandModeBody({ prompt, wsId, onSelect }: CommandModeBodyProps): ReactElement {
+function CommandModeBody({
+  prompt,
+  wsId,
+  onSelect,
+  submitHandlerRef,
+}: CommandModeBodyProps): ReactElement {
   const { t } = useTranslation('common');
   const resolveCommand = useResolveCommand(wsId);
   const [result, setResult] = useState<ResolveCommandResult | null>(null);
@@ -110,14 +122,13 @@ function CommandModeBody({ prompt, wsId, onSelect }: CommandModeBodyProps): Reac
     }
   };
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>): void => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (result) {
-        handleExecute();
-      } else if (!resolveCommand.isPending) {
-        handleSubmit();
-      }
+  // Expose Enter handling to the parent input. Sync on every render so the
+  // handler closes over the current `result` / `resolveCommand.isPending`.
+  submitHandlerRef.current = (): void => {
+    if (result) {
+      handleExecute();
+    } else if (!resolveCommand.isPending) {
+      handleSubmit();
     }
   };
 
@@ -126,8 +137,7 @@ function CommandModeBody({ prompt, wsId, onSelect }: CommandModeBodyProps): Reac
   }
 
   return (
-    // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard trap for command result
-    <div onKeyDown={handleKeyDown} tabIndex={0} className={css.commandModeBody}>
+    <div className={css.commandModeBody}>
       <div className={css.groupLabel}>{t('dock.command_palette.group_command')}</div>
 
       {resolveCommand.isPending && (
@@ -235,6 +245,9 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
   const [debounced, setDebounced] = useState('');
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  // Populated by CommandModeBody so the input's Enter handler can dispatch
+  // the NL submit/execute flow. See CommandModeBodyProps.submitHandlerRef.
+  const commandSubmitRef = useRef<(() => void) | null>(null);
 
   const mode: PaletteMode = query.startsWith('>') ? 'command' : 'search';
   const commandPrompt = mode === 'command' ? stripCommandPrefix(query) : '';
@@ -395,6 +408,8 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
     return items.filter((it) => normalize(it.label).includes(q));
   }, [items, query, mode]);
 
+  const isSearching = shouldSearchTasks && taskQueries.some((q) => q.isLoading || q.isFetching);
+
   const filteredLen = filtered.length;
   useEffect(() => {
     setActive((prev) => Math.min(prev, Math.max(filteredLen - 1, 0)));
@@ -412,7 +427,13 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>): void => {
     if (mode === 'command') {
-      // In command mode, Enter is handled by CommandModeBody
+      // Keydown events don't bubble from <input> to the sibling
+      // CommandModeBody wrapper, so dispatch the command-mode submit
+      // handler directly via the ref it populates.
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        commandSubmitRef.current?.();
+      }
       return;
     }
     if (e.key === 'ArrowDown') {
@@ -447,10 +468,19 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
       />
 
       {mode === 'command' ? (
-        <CommandModeBody prompt={commandPrompt} wsId={wsId} onSelect={onSelect} />
+        <CommandModeBody
+          prompt={commandPrompt}
+          wsId={wsId}
+          onSelect={onSelect}
+          submitHandlerRef={commandSubmitRef}
+        />
       ) : (
         <>
-          {filtered.length === 0 ? (
+          {isSearching && filtered.length === 0 ? (
+            <p className={css.emptyText} aria-live="polite">
+              {t('dock.command_palette.searching')}
+            </p>
+          ) : filtered.length === 0 ? (
             <p className={css.emptyText}>{t('dock.command_palette.empty')}</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

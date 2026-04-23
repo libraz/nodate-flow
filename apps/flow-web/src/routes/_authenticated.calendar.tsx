@@ -42,7 +42,7 @@ import { PRIORITY_KEY, STATE_COLOR } from '../features/tasks/constants';
 import { useWorkspacesQuery } from '../features/workspaces/api';
 import { type ApiError, toApiError } from '../lib/api-error';
 import { dateKey } from '../lib/date-utils';
-import { formatDate } from '../lib/format';
+import { formatDate, formatEpochDateTime } from '../lib/format';
 import { sdk, timeSdk } from '../lib/sdk';
 import { useActiveWorkspaceId } from '../lib/use-current-workspace';
 
@@ -329,6 +329,178 @@ function QuickCreateDialog({
 }
 
 // ---------------------------------------------------------------------------
+// Event detail dialog
+// ---------------------------------------------------------------------------
+
+interface EventDetailDialogProps {
+  event: CalendarEvent;
+  onClose: () => void;
+  onDeleted: () => void;
+}
+
+/**
+ * Read-only detail dialog for a calendar event. Shows title, start/end
+ * (or "All day"), workspace, and optional location. Exposes a Delete
+ * action that calls `timeSdk.DELETE /workspaces/{ws}/calendars/{cal}/events/{id}`
+ * after a confirmation prompt.
+ */
+function EventDetailDialog({ event, onClose, onDeleted }: EventDetailDialogProps): ReactElement {
+  const { t, i18n } = useTranslation('common');
+  const locale = i18n.resolvedLanguage ?? 'en';
+
+  const deleteMut = useMutation({
+    mutationFn: async () => {
+      const { error } = await timeSdk.DELETE(
+        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}',
+        {
+          params: {
+            path: {
+              wsId: event.workspaceId,
+              calId: event.calendarId,
+              evtId: event.id,
+            },
+          },
+        },
+      );
+      if (error) throw new Error('Failed to delete event');
+    },
+    onSuccess: () => {
+      toaster.show({ tone: 'success', message: t('calendar.event_detail.deleted') });
+      onDeleted();
+    },
+    onError: () => {
+      toaster.show({ tone: 'danger', message: t('calendar.event_detail.delete_failed') });
+    },
+  });
+
+  const handleDelete = (): void => {
+    if (deleteMut.isPending) return;
+    if (!window.confirm(t('calendar.event_detail.delete_confirm'))) return;
+    deleteMut.mutate();
+  };
+
+  const startLabel = event.allDay
+    ? t('calendar.event_detail.all_day')
+    : event.startAt
+      ? formatEpochDateTime(event.startAt, locale)
+      : null;
+  const endLabel = event.allDay
+    ? null
+    : event.endAt
+      ? formatEpochDateTime(event.endAt, locale)
+      : null;
+
+  return (
+    <Dialog
+      open
+      onClose={deleteMut.isPending ? () => undefined : onClose}
+      title={t('calendar.event_detail.title')}
+    >
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.75rem',
+          minInlineSize: '20rem',
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontSize: '0.75rem',
+              color: 'var(--nf-color-fg-muted)',
+              marginBlockEnd: '0.125rem',
+            }}
+          >
+            {t('calendar.event_detail.event')}
+          </div>
+          <div style={{ fontWeight: 600 }}>{event.title}</div>
+        </div>
+
+        {startLabel ? (
+          <div>
+            <div
+              style={{
+                fontSize: '0.75rem',
+                color: 'var(--nf-color-fg-muted)',
+                marginBlockEnd: '0.125rem',
+              }}
+            >
+              {t('calendar.event_detail.start')}
+            </div>
+            <div>{startLabel}</div>
+          </div>
+        ) : null}
+
+        {endLabel ? (
+          <div>
+            <div
+              style={{
+                fontSize: '0.75rem',
+                color: 'var(--nf-color-fg-muted)',
+                marginBlockEnd: '0.125rem',
+              }}
+            >
+              {t('calendar.event_detail.end')}
+            </div>
+            <div>{endLabel}</div>
+          </div>
+        ) : null}
+
+        <div>
+          <div
+            style={{
+              fontSize: '0.75rem',
+              color: 'var(--nf-color-fg-muted)',
+              marginBlockEnd: '0.125rem',
+            }}
+          >
+            {t('calendar.event_detail.workspace')}
+          </div>
+          <div>{event.workspaceName}</div>
+        </div>
+
+        {event.location ? (
+          <div>
+            <div
+              style={{
+                fontSize: '0.75rem',
+                color: 'var(--nf-color-fg-muted)',
+                marginBlockEnd: '0.125rem',
+              }}
+            >
+              {t('calendar.event_detail.location')}
+            </div>
+            <div>{event.location}</div>
+          </div>
+        ) : null}
+
+        <div
+          style={{
+            display: 'flex',
+            gap: '0.5rem',
+            justifyContent: 'space-between',
+            marginBlockStart: '0.5rem',
+          }}
+        >
+          <Button
+            type="button"
+            variant="danger"
+            onClick={handleDelete}
+            disabled={deleteMut.isPending}
+          >
+            {deleteMut.isPending ? t('common.loading') : t('calendar.event_detail.delete')}
+          </Button>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={deleteMut.isPending}>
+            {t('calendar.event_detail.close')}
+          </Button>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main calendar route
 // ---------------------------------------------------------------------------
 
@@ -352,6 +524,7 @@ function CalendarRoute(): ReactElement {
   const enterCountRef = useRef<Record<string, number>>({});
 
   const [createDate, setCreateDate] = useState<string | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [layers, setLayers] = useState<LayerFlags>({ tasksDue: true, events: true, blocks: false });
 
   const { data: workspaces } = useWorkspacesQuery();
@@ -845,9 +1018,21 @@ function CalendarRoute(): ReactElement {
                     const isBlock = ev.kind === 'block';
                     return (
                       <li key={`ev-${ev.id}`}>
-                        <span
+                        <button
+                          type="button"
                           title={`${ev.title} · ${ev.workspaceName}`}
+                          aria-label={t('calendar.event_detail.open_label', {
+                            title: ev.title,
+                            workspace: ev.workspaceName,
+                          })}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedEvent(ev);
+                          }}
                           style={{
+                            all: 'unset',
+                            boxSizing: 'border-box',
+                            inlineSize: '100%',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '0.25rem',
@@ -860,6 +1045,7 @@ function CalendarRoute(): ReactElement {
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
+                            cursor: 'pointer',
                           }}
                         >
                           <span
@@ -883,7 +1069,7 @@ function CalendarRoute(): ReactElement {
                           >
                             {ev.title}
                           </span>
-                        </span>
+                        </button>
                       </li>
                     );
                   })}
@@ -914,6 +1100,17 @@ function CalendarRoute(): ReactElement {
           activeWsId={activeWsId}
           onClose={() => setCreateDate(null)}
           onCreated={handleCreated}
+        />
+      ) : null}
+
+      {selectedEvent !== null ? (
+        <EventDetailDialog
+          event={selectedEvent}
+          onClose={() => setSelectedEvent(null)}
+          onDeleted={() => {
+            setSelectedEvent(null);
+            void qc.invalidateQueries({ queryKey: ['calendar', 'me-events'] });
+          }}
         />
       ) : null}
     </section>

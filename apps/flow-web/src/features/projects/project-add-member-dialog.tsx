@@ -1,18 +1,29 @@
 /**
- * ProjectAddMemberDialog — add a workspace member to a project by user id + role.
+ * ProjectAddMemberDialog — add a workspace member to a project by picking
+ * them from a searchable combobox (workspace member pool) + role.
+ *
+ * The wire shape is unchanged (`POST /projects/{id}/members` with
+ * `{ userId, role }`); only the input control changes. Workspace members
+ * already on the project are filtered out of the picker.
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
+import Combobox from '@nodate-flow/ui/primitives/combobox';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
 import FormField from '@nodate-flow/ui/primitives/form-field';
-import Input from '@nodate-flow/ui/primitives/input';
 import Select from '@nodate-flow/ui/primitives/select';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import { type FormEvent, type ReactElement, useState } from 'react';
+import { type FormEvent, type ReactElement, Suspense, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
-import { type ProjectRole, useAddProjectMember } from './api';
+import { useWorkspaceMembersQuery } from '../workspaces/api';
+import {
+  type ProjectRole,
+  useAddProjectMember,
+  useProjectMembersQuery,
+  useProjectQuery,
+} from './api';
 
 const ROLES: readonly ProjectRole[] = ['lead', 'editor', 'commenter', 'viewer'];
 
@@ -36,12 +47,43 @@ export default function ProjectAddMemberDialog({
   onClose,
 }: ProjectAddMemberDialogProps): ReactElement {
   const { t } = useTranslation('common');
+
+  return (
+    <Dialog open={open} onClose={onClose} title={t('projects.members.add')}>
+      <Suspense fallback={null}>
+        <ProjectAddMemberDialogBody projectId={projectId} onClose={onClose} />
+      </Suspense>
+    </Dialog>
+  );
+}
+
+interface ProjectAddMemberDialogBodyProps {
+  projectId: string;
+  onClose: () => void;
+}
+
+function ProjectAddMemberDialogBody({
+  projectId,
+  onClose,
+}: ProjectAddMemberDialogBodyProps): ReactElement {
+  const { t } = useTranslation('common');
   const addMember = useAddProjectMember();
+
+  const { data: project } = useProjectQuery(projectId);
+  const { data: workspaceMembers } = useWorkspaceMembersQuery(project.workspaceId);
+  const { data: projectMembers } = useProjectMembersQuery(projectId);
 
   const [userId, setUserId] = useState('');
   const [role, setRole] = useState<ProjectRole>('editor');
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
+
+  const availableOptions = useMemo(() => {
+    const existing = new Set(projectMembers.map((m) => m.userId));
+    return workspaceMembers
+      .filter((m) => !existing.has(m.userId))
+      .map((m) => ({ value: m.userId, label: `${m.displayName} (${m.email})` }));
+  }, [workspaceMembers, projectMembers]);
 
   const reset = (): void => {
     setUserId('');
@@ -96,58 +138,58 @@ export default function ProjectAddMemberDialog({
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} title={t('projects.members.add')}>
-      <form
-        onSubmit={(e) => {
-          void handleSubmit(e);
-        }}
-        noValidate
-        style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}
+    <form
+      onSubmit={(e) => {
+        void handleSubmit(e);
+      }}
+      noValidate
+      style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}
+    >
+      <FormField
+        label={t('projects.members.user_id')}
+        required
+        {...(errors.userId ? { error: t(errors.userId) } : {})}
       >
-        <FormField
-          label={t('projects.members.user_id')}
-          required
-          {...(errors.userId ? { error: t(errors.userId) } : {})}
-        >
-          {(control) => (
-            <Input
-              {...control}
-              value={userId}
-              onChange={(e) => {
-                setUserId(e.target.value);
-              }}
-              autoFocus
-            />
-          )}
-        </FormField>
+        {(control) => (
+          <Combobox
+            id={control.id}
+            aria-label={t('projects.members.user_id')}
+            placeholder={t('projects.members.add')}
+            options={availableOptions}
+            value={userId}
+            onChange={(v) => {
+              setUserId(v);
+            }}
+          />
+        )}
+      </FormField>
 
-        <FormField label={t('projects.members.role')}>
-          {(control) => (
-            <Select
-              {...control}
-              value={role}
-              onChange={(e) => {
-                setRole(e.target.value as ProjectRole);
-              }}
-            >
-              {ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {roleLabel(r)}
-                </option>
-              ))}
-            </Select>
-          )}
-        </FormField>
+      <FormField label={t('projects.members.role')}>
+        {(control) => (
+          <Select
+            {...control}
+            value={role}
+            onChange={(e) => {
+              setRole(e.target.value as ProjectRole);
+            }}
+          >
+            {ROLES.map((r) => (
+              <option key={r} value={r}>
+                {roleLabel(r)}
+              </option>
+            ))}
+          </Select>
+        )}
+      </FormField>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-          <Button type="button" variant="ghost" onClick={handleClose} disabled={submitting}>
-            {t('projects.form.cancel')}
-          </Button>
-          <Button type="submit" variant="primary" disabled={submitting}>
-            {t('projects.form.submit')}
-          </Button>
-        </div>
-      </form>
-    </Dialog>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+        <Button type="button" variant="ghost" onClick={handleClose} disabled={submitting}>
+          {t('projects.form.cancel')}
+        </Button>
+        <Button type="submit" variant="primary" disabled={submitting}>
+          {t('projects.form.submit')}
+        </Button>
+      </div>
+    </form>
   );
 }
