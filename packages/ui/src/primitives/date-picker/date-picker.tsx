@@ -53,9 +53,30 @@ function toIso(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
-function parseIso(iso: string): { year: number; month: number; day: number } {
-  const [y, m, d] = iso.split('-').map(Number);
-  return { year: y ?? 2024, month: m ?? 1, day: d ?? 1 };
+/**
+ * Parse a "YYYY-MM-DD" ISO date string into its components.
+ *
+ * @param iso - ISO date string (e.g. "2026-06-15").
+ * @returns The parsed year/month/day, or `null` if the input is empty or not
+ *          a well-formed "YYYY-MM-DD" triple with finite numeric parts.
+ *
+ * @remarks
+ * `""`, `"not-a-date"`, `"2026-"`, `"0-0-0"`, etc. all return `null` so callers
+ * can cleanly fall back to a default (typically today) via `?? fallback`.
+ * Note that nullish coalescing alone does not replace `NaN`, which is why this
+ * helper validates explicitly instead of defaulting numeric parts.
+ */
+function parseIso(iso: string): { year: number; month: number; day: number } | null {
+  const parts = iso.split('-');
+  if (parts.length !== 3) return null;
+  const [ys, ms, ds] = parts;
+  if (ys === undefined || ms === undefined || ds === undefined) return null;
+  const y = Number(ys);
+  const m = Number(ms);
+  const d = Number(ds);
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null;
+  if (y <= 0 || m < 1 || m > 12 || d < 1 || d > 31) return null;
+  return { year: y, month: m, day: d };
 }
 
 function daysInMonth(year: number, month: number): number {
@@ -82,15 +103,22 @@ export default function DatePicker({
   className,
 }: DatePickerProps): ReactElement {
   const [open, setOpen] = useState(false);
-  const parsed = useMemo(() => parseIso(value), [value]);
-  const [viewYear, setViewYear] = useState(parsed.year);
-  const [viewMonth, setViewMonth] = useState(parsed.month);
+  // Fall back to today (not a hardcoded year) when value is empty or malformed
+  // so the picker always opens on a sensible month/year. See parseIso() docs.
+  const initial = useMemo(() => {
+    const p = parseIso(value);
+    if (p) return p;
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };
+  }, [value]);
+  const [viewYear, setViewYear] = useState(initial.year);
+  const [viewMonth, setViewMonth] = useState(initial.month);
 
   // Sync view when value changes externally
   const prevValue = useMemo(() => value, [value]);
   if (prevValue !== value) {
     const p = parseIso(value);
-    if (p.year !== viewYear || p.month !== viewMonth) {
+    if (p && (p.year !== viewYear || p.month !== viewMonth)) {
       setViewYear(p.year);
       setViewMonth(p.month);
     }
