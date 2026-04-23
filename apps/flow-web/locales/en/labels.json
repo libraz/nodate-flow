@@ -95,7 +95,8 @@
     "calendar": "Calendar",
     "calendar_description": "Enable calendar view for this project.",
     "updated": "Feature settings updated.",
-    "update_failed": "Could not update feature settings. Please try again."
+    "update_failed": "Could not update feature settings. Please try again.",
+    "not_editable": "Not yet editable from the project settings."
   },
   "favorites": {
     "title": "Favorites",

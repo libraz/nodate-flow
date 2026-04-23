@@ -9,6 +9,7 @@ import Input from '@nodate-flow/ui/primitives/input';
 import Switch from '@nodate-flow/ui/primitives/switch';
 import Tabs, { type TabItem } from '@nodate-flow/ui/primitives/tabs';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,18 +17,20 @@ import { useTranslation } from 'react-i18next';
 import { confirmAction } from '../../lib/confirm-action';
 import { type TaskDerivedState, useTasksQuery } from '../tasks/api';
 import { STATE_COLOR } from '../tasks/constants';
-import {
-  type PatchProjectInput,
-  useDisableProject,
-  useProjectQuery,
-  useUpdateProject,
-} from './api';
+import { useDisableProject, useProjectQuery, useUpdateProject } from './api';
 import ProjectMembersTable from './project-members-table';
 
 const STATE_ORDER: readonly TaskDerivedState[] = ['open', 'waiting', 'review', 'done', 'cancelled'];
 
+/** Identifiers for the project-detail tab panels. */
+export type ProjectDetailTab = 'overview' | 'members' | 'settings';
+
 export interface ProjectDetailProps {
   id: string;
+  /** Controlled active tab, typically driven by the `?tab=` search param. */
+  tab: ProjectDetailTab;
+  /** Called when the user activates a different tab. Consumers persist the value. */
+  onTabChange: (tab: ProjectDetailTab) => void;
 }
 
 /** Feature flag keys exposed on the project resource. */
@@ -52,12 +55,15 @@ function SettingsPanel({ id }: { id: string }): ReactElement {
   const [name, setName] = useState(project.name);
   const [submitting, setSubmitting] = useState(false);
 
+  const trimmedName = name.trim();
+  const renameDisabled = submitting || trimmedName === '' || trimmedName === project.name;
+
   const handleRename = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
-    if (name.trim() === '' || name === project.name) return;
+    if (renameDisabled) return;
     setSubmitting(true);
     try {
-      await update.mutateAsync({ id, patch: { name } });
+      await update.mutateAsync({ id, patch: { name: trimmedName } });
     } catch {
       toaster.show({ tone: 'danger', message: t('projects.errors.update_failed') });
     } finally {
@@ -75,17 +81,11 @@ function SettingsPanel({ id }: { id: string }): ReactElement {
     }
   };
 
-  const handleToggle = async (flag: FeatureFlag, next: boolean): Promise<void> => {
-    try {
-      await update.mutateAsync({ id, patch: { [flag]: next } as PatchProjectInput });
-      toaster.show({ tone: 'success', message: tLabels('feature_toggles.updated') });
-    } catch {
-      toaster.show({ tone: 'danger', message: tLabels('feature_toggles.update_failed') });
-    }
-  };
-
   /* The project object may carry feature flags that the SDK types haven't
-     picked up yet — cast to a record for safe access. */
+     picked up yet — cast to a record for safe access. The backend's
+     PatchProjectBody does NOT accept these fields, so the switches are
+     rendered read-only with an explanatory tooltip instead of firing a
+     request the server would silently drop. */
   const featureFlags = project as unknown as Record<FeatureFlag, boolean | undefined>;
 
   return (
@@ -109,7 +109,7 @@ function SettingsPanel({ id }: { id: string }): ReactElement {
             )}
           </FormField>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <Button type="submit" variant="primary" disabled={submitting}>
+            <Button type="submit" variant="primary" disabled={renameDisabled}>
               {t('projects.settings.rename')}
             </Button>
           </div>
@@ -135,13 +135,15 @@ function SettingsPanel({ id }: { id: string }): ReactElement {
                     {tLabels(`feature_toggles.${labelKey}_description`)}
                   </p>
                 </div>
-                <Switch
-                  checked={featureFlags[flag] ?? false}
-                  onCheckedChange={(next) => {
-                    void handleToggle(flag, next);
-                  }}
-                  aria-label={tLabels(`feature_toggles.${labelKey}`)}
-                />
+                <Tooltip content={tLabels('feature_toggles.not_editable')}>
+                  <span>
+                    <Switch
+                      checked={featureFlags[flag] ?? false}
+                      disabled
+                      aria-label={tLabels(`feature_toggles.${labelKey}`)}
+                    />
+                  </span>
+                </Tooltip>
               </div>
             ))}
           </div>
@@ -299,7 +301,7 @@ function OverviewPanel({
   );
 }
 
-export default function ProjectDetail({ id }: ProjectDetailProps): ReactElement {
+export default function ProjectDetail({ id, tab, onTabChange }: ProjectDetailProps): ReactElement {
   const { t } = useTranslation('common');
   const { data: project } = useProjectQuery(id);
 
@@ -342,8 +344,11 @@ export default function ProjectDetail({ id }: ProjectDetailProps): ReactElement 
         padding: 'clamp(1.5rem, 4vw, 2.5rem)',
       }}
     >
+      {/* The parent project layout already renders the project name as
+          the page-level <h1>, so this secondary title is an <h2> to
+          keep the document at a single top-level heading. */}
       <header style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <h1
+        <h2
           style={{
             fontFamily: 'var(--font-display)',
             fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
@@ -351,13 +356,20 @@ export default function ProjectDetail({ id }: ProjectDetailProps): ReactElement 
           }}
         >
           {project.name}
-        </h1>
+        </h2>
         {project.description ? (
           <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{project.description}</p>
         ) : null}
       </header>
 
-      <Tabs items={items} defaultValue="overview" aria-label={t('projects.detail.tabs.overview')} />
+      <Tabs
+        items={items}
+        value={tab}
+        onValueChange={(next) => {
+          onTabChange(next as ProjectDetailTab);
+        }}
+        aria-label={t('projects.detail.tabs.overview')}
+      />
     </section>
   );
 }

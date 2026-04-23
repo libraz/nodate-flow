@@ -1,16 +1,30 @@
 /**
  * /workspaces/$id/projects/$projectId/ — project detail
  * (Overview / Members / Settings).
+ *
+ * The active tab is stored in the `?tab=` search param so reloads and
+ * deep links preserve which panel the user was on. Invalid/missing
+ * values fall back to `overview`.
  */
 
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, Suspense } from 'react';
+import { z } from 'zod';
 
-import ProjectDetail from '../features/projects/project-detail';
+import ProjectDetail, { type ProjectDetailTab } from '../features/projects/project-detail';
+
+const TAB_VALUES = ['overview', 'members', 'settings'] as const;
+
+const searchSchema = z.object({
+  tab: z.enum(TAB_VALUES).optional().catch('overview'),
+});
 
 function ProjectDetailRoute(): ReactElement {
-  const { projectId } = Route.useParams();
+  const { id, projectId } = Route.useParams();
+  const { tab } = Route.useSearch();
+  const navigate = useNavigate();
+  const activeTab: ProjectDetailTab = tab ?? 'overview';
   return (
     <Suspense
       fallback={
@@ -20,11 +34,23 @@ function ProjectDetailRoute(): ReactElement {
         </div>
       }
     >
-      <ProjectDetail id={projectId} />
+      <ProjectDetail
+        id={projectId}
+        tab={activeTab}
+        onTabChange={(next) => {
+          void navigate({
+            to: '/workspaces/$id/projects/$projectId',
+            params: { id, projectId },
+            search: (prev) => ({ ...prev, tab: next === 'overview' ? undefined : next }),
+            replace: true,
+          });
+        }}
+      />
     </Suspense>
   );
 }
 
 export const Route = createFileRoute('/_authenticated/workspaces/$id/projects/$projectId/')({
   component: ProjectDetailRoute,
+  validateSearch: (raw) => searchSchema.parse(raw),
 });

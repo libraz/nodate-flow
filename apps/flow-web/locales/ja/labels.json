@@ -95,7 +95,8 @@
     "calendar": "カレンダー",
     "calendar_description": "プロジェクトのカレンダービューを有効にします。",
     "updated": "機能設定を更新しました。",
-    "update_failed": "機能設定を更新できませんでした。もう一度お試しください。"
+    "update_failed": "機能設定を更新できませんでした。もう一度お試しください。",
+    "not_editable": "プロジェクト設定からはまだ変更できません。"
   },
   "favorites": {
     "title": "お気に入り",
