@@ -60,6 +60,7 @@ make seed-flow    # demo admin user + workspace
 
 ```
 make dev-time     # calendar stack instead
+make reload       # stop-dev (kill by port) + dev, for a clean restart
 make test         # Go + TS tests
 make gen          # codegen (sqlc + errors + SDK)
 make help         # all targets

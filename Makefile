@@ -27,11 +27,27 @@ help: ## Show this help
 
 # ---------- dev (yarn dev equivalent) ----------
 
-.PHONY: dev dev-api dev-auth-api dev-web dev-accounts-web dev-time-api dev-time dev-reset up down logs
+.PHONY: dev dev-api dev-auth-api dev-web dev-accounts-web dev-time-api dev-time dev-reset reload stop-dev up down logs
 dev: db-schema .env ## Start MySQL (compose) + auth API + flow API + accounts web + flow web
 	@echo "starting mysql, auth-api, flow-api, accounts-web, flow-web..."
 	@docker compose up -d mysql
 	@$(MAKE) -j4 dev-auth-api dev-api dev-accounts-web dev-web
+
+stop-dev: ## Kill any running dev servers (auth-api + flow-api + accounts-web + flow-web), idempotent
+	@echo "stopping dev servers..."
+	@# Kill the make dev-* wrappers so they don't respawn their Go/Vite children
+	@pkill -f 'make dev-api$$|make dev-auth-api$$|make dev-web$$|make dev-accounts-web$$' 2>/dev/null || true
+	@# Belt-and-braces: close anything still bound to the standard ports
+	@for port in 8080 8082 9090 5173 5175; do \
+	  pids="$$(lsof -nP -iTCP:$$port -sTCP:LISTEN -t 2>/dev/null)"; \
+	  if [ -n "$$pids" ]; then \
+	    echo "  :$$port -> $$pids"; \
+	    kill $$pids 2>/dev/null || true; \
+	  fi; \
+	done
+	@sleep 1
+
+reload: stop-dev dev ## Stop running dev servers and start `make dev` fresh
 
 dev-time: db-schema .env ## Start MySQL (compose) + auth API + time API + time web in parallel
 	@echo "starting mysql, auth-api, time-api..."
