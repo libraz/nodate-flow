@@ -5,13 +5,20 @@
  * - `sdk` targets time-api (calendar/event endpoints)
  * - `authSdk` targets auth-api (login, refresh, /me)
  *
- * Both wire the auth store into the openapi-fetch client via tokenProvider.
- * A response middleware catches 401 responses, attempts a single refresh
- * against auth-api's `POST /auth/refresh`, and replays the original
- * request with the new token.
+ * Both wire the auth store into the openapi-fetch client via tokenProvider
+ * and install two middlewares:
+ *
+ * 1. A **request** middleware (createAuthRequestMiddleware) proactively
+ *    refreshes the access token when it is within ~10s of expiry, so the
+ *    outbound call always carries a fresh bearer and the browser never
+ *    logs a 401 during normal navigation.
+ * 2. A **response** middleware (createRefreshMiddleware) remains as a
+ *    backstop that retries once against `POST /auth/refresh` on an
+ *    unexpected 401 and replays the original request with the new token.
  */
 
 import {
+  createAuthRequestMiddleware,
   createClient,
   createRefreshMiddleware,
   createTokenRefresher,
@@ -81,6 +88,20 @@ export const refreshAccessToken = createTokenRefresher({
   },
 });
 
+// Proactive request-side middleware: awaits a refresh when the current
+// access token is missing or within the expiry buffer. Registered FIRST
+// so it runs before the response-side backstop and before any outbound
+// call fires with a stale bearer.
+const authRequestMiddleware = createAuthRequestMiddleware({
+  getAccessToken: () => authStore.getState().accessToken ?? undefined,
+  refresher: refreshAccessToken,
+});
+sdk.use(authRequestMiddleware);
+authSdk.use(authRequestMiddleware);
+
+// Reactive response-side middleware: retries once on an unexpected 401
+// (e.g. server-side revocation). The proactive middleware above should
+// make this path rare in normal operation.
 const refreshMiddleware = createRefreshMiddleware(refreshAccessToken);
 sdk.use(refreshMiddleware);
 authSdk.use(refreshMiddleware);

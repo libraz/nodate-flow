@@ -1,7 +1,7 @@
 /**
  * Token refresh utilities shared across all frontend apps.
  *
- * Provides two building blocks:
+ * Provides three building blocks:
  *
  * 1. `createTokenRefresher` -- a memoized refresh function with
  *    grace-window deduplication so concurrent 401s collapse into a
@@ -9,7 +9,17 @@
  *
  * 2. `createRefreshMiddleware` -- an openapi-fetch response middleware
  *    that intercepts 401 responses, attempts a token refresh, and
- *    replays the original request with the rotated token.
+ *    replays the original request with the rotated token. Used as a
+ *    reactive backstop for unexpected 401s (e.g. a token revoked mid
+ *    session by the server).
+ *
+ * 3. `createAuthRequestMiddleware` -- an openapi-fetch **request**
+ *    middleware that proactively refreshes the access token when it is
+ *    within {@link EXPIRY_BUFFER_SECONDS} of expiry, BEFORE the request
+ *    is dispatched. This avoids the console-level 401 noise caused by a
+ *    reactive-only refresh (the browser logs a 401 response the instant
+ *    it arrives, even when the fetch middleware transparently replays
+ *    the request with a fresh token).
  */
 
 /** Options for creating a token refresh middleware. */
@@ -38,23 +48,97 @@ export interface RefreshMiddlewareOptions {
 const REFRESH_GRACE_MS = 1500;
 
 /**
+ * How many seconds before a token's `exp` to treat it as "near-expiry"
+ * and trigger a proactive refresh. Tokens whose remaining lifetime is
+ * below this threshold are refreshed BEFORE the next outbound request
+ * instead of waiting for the server to reject them with a 401.
+ */
+const EXPIRY_BUFFER_SECONDS = 10;
+
+/**
+ * Decode the `exp` claim from a JWT access token without verifying the
+ * signature. Returns the expiry as a unix epoch seconds value, or null
+ * if the token is not a well-formed JWT or lacks a numeric `exp`.
+ *
+ * This is intentionally permissive: callers use the result as a hint to
+ * decide whether to refresh proactively, and fall back to the reactive
+ * 401 path if decoding fails (e.g. the backend issues opaque tokens).
+ */
+export function decodeTokenExp(token: string): number | null {
+  const parts = token.split('.');
+  if (parts.length < 2) return null;
+  const payload = parts[1];
+  if (!payload) return null;
+  try {
+    // JWT uses base64url (no padding). Convert to base64 and decode.
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+    const json =
+      typeof atob === 'function'
+        ? atob(padded)
+        : // Fallback for non-browser runtimes (tests, SSR probes).
+          Buffer.from(padded, 'base64').toString('utf8');
+    const claims = JSON.parse(json) as { exp?: unknown };
+    if (typeof claims.exp === 'number' && Number.isFinite(claims.exp)) {
+      return claims.exp;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Token refresher handle with helpers for expiry-aware request gating. */
+export interface TokenRefresher {
+  /** Trigger a refresh (deduped within the grace window). */
+  (): Promise<string | null>;
+  /**
+   * Returns true when the current token is missing or within
+   * {@link EXPIRY_BUFFER_SECONDS} of its `exp` claim.
+   */
+  isExpiringSoon: () => boolean;
+  /**
+   * Returns the cached `exp` claim (unix seconds) for the most recent
+   * token observed by this refresher, or null if unknown.
+   */
+  currentExp: () => number | null;
+}
+
+/**
  * Creates a memoized `refreshAccessToken` function with grace-window
- * deduplication.
+ * deduplication and token-expiry awareness.
  *
  * - Concurrent callers share the same in-flight promise.
  * - After resolution the promise is held for {@link REFRESH_GRACE_MS}
  *   so that 401 responses from requests already in flight with the
  *   pre-rotation token reuse the same new token.
- * - On success: calls `setAccessToken` and returns the new token.
+ * - On success: decodes the new token's `exp` claim for later expiry
+ *   checks, calls `setAccessToken`, and returns the new token.
  * - On failure: calls `clearSession`, then `onSessionExpired` (if
  *   provided), and returns `null`.
+ *
+ * The returned function carries two helper methods (`isExpiringSoon`,
+ * `currentExp`) so request-middleware callers can decide whether to
+ * block on a refresh without reaching back into the store.
  */
-export function createTokenRefresher(
-  options: RefreshMiddlewareOptions,
-): () => Promise<string | null> {
+export function createTokenRefresher(options: RefreshMiddlewareOptions): TokenRefresher {
   let refreshInFlight: Promise<string | null> | null = null;
+  // Cached expiry (unix seconds) for the most recently observed token.
+  // Seeded from `getAccessToken` on first expiry check so an already-
+  // authenticated session (bootstrap's /me raw fetch, restored from a
+  // prior tab) still participates in proactive refresh.
+  let cachedExp: number | null = null;
+  let cachedForToken: string | undefined;
 
-  return function refreshAccessToken(): Promise<string | null> {
+  function syncCachedExpFromStore(): void {
+    const current = options.getAccessToken();
+    if (current !== cachedForToken) {
+      cachedForToken = current;
+      cachedExp = current ? decodeTokenExp(current) : null;
+    }
+  }
+
+  const refreshAccessToken = function refreshAccessToken(): Promise<string | null> {
     if (refreshInFlight) return refreshInFlight;
 
     refreshInFlight = (async () => {
@@ -65,6 +149,8 @@ export function createTokenRefresher(
         });
         if (!res.ok) {
           options.clearSession();
+          cachedExp = null;
+          cachedForToken = undefined;
           options.onSessionExpired?.();
           return null;
         }
@@ -72,13 +158,19 @@ export function createTokenRefresher(
         const token = body.accessToken;
         if (!token) {
           options.clearSession();
+          cachedExp = null;
+          cachedForToken = undefined;
           options.onSessionExpired?.();
           return null;
         }
         options.setAccessToken(token);
+        cachedExp = decodeTokenExp(token);
+        cachedForToken = token;
         return token;
       } catch {
         options.clearSession();
+        cachedExp = null;
+        cachedForToken = undefined;
         options.onSessionExpired?.();
         return null;
       }
@@ -97,7 +189,22 @@ export function createTokenRefresher(
     });
 
     return refreshInFlight;
+  } as TokenRefresher;
+
+  refreshAccessToken.isExpiringSoon = (): boolean => {
+    syncCachedExpFromStore();
+    if (!cachedForToken) return true; // no token => must refresh
+    if (cachedExp === null) return false; // opaque / non-JWT token — don't probe
+    const nowSec = Math.floor(Date.now() / 1000);
+    return cachedExp - nowSec <= EXPIRY_BUFFER_SECONDS;
   };
+
+  refreshAccessToken.currentExp = (): number | null => {
+    syncCachedExpFromStore();
+    return cachedExp;
+  };
+
+  return refreshAccessToken;
 }
 
 /** Auth paths that must never trigger a refresh (prevents loops). */
@@ -108,12 +215,26 @@ const AUTH_SKIP_SUFFIXES = [
   '/auth/logout',
 ] as const;
 
+function isAuthPath(url: string): boolean {
+  try {
+    const path = new URL(url).pathname;
+    return AUTH_SKIP_SUFFIXES.some((suffix) => path.endsWith(suffix));
+  } catch {
+    return AUTH_SKIP_SUFFIXES.some((suffix) => url.endsWith(suffix));
+  }
+}
+
 /**
  * Creates an openapi-fetch response middleware that intercepts 401
  * responses, attempts a token refresh via the provided `refreshFn`,
  * and replays the original request with the new token.
  *
  * Auth-related paths are excluded to prevent infinite loops.
+ *
+ * This middleware is the reactive backstop for unexpected 401s. Pair
+ * it with {@link createAuthRequestMiddleware} to avoid the console
+ * noise caused by letting a stale-token request ever reach the server
+ * in the first place.
  */
 export function createRefreshMiddleware(refreshFn: () => Promise<string | null>): {
   onResponse: (ctx: { request: Request; response: Response }) => Promise<Response>;
@@ -122,10 +243,7 @@ export function createRefreshMiddleware(refreshFn: () => Promise<string | null>)
     async onResponse({ request, response }) {
       if (response.status !== 401) return response;
 
-      const path = new URL(request.url).pathname;
-      if (AUTH_SKIP_SUFFIXES.some((suffix) => path.endsWith(suffix))) {
-        return response;
-      }
+      if (isAuthPath(request.url)) return response;
 
       const newToken = await refreshFn();
       if (!newToken) return response;
@@ -137,6 +255,61 @@ export function createRefreshMiddleware(refreshFn: () => Promise<string | null>)
       });
       replay.headers.set('Authorization', `Bearer ${newToken}`);
       return fetch(replay);
+    },
+  };
+}
+
+/**
+ * Options for {@link createAuthRequestMiddleware}.
+ */
+export interface AuthRequestMiddlewareOptions {
+  /** Returns the current access token (same source as the store). */
+  getAccessToken: () => string | undefined;
+  /**
+   * Refresher handle returned by {@link createTokenRefresher}. The
+   * middleware calls `isExpiringSoon()` to decide whether to await a
+   * refresh before the outbound request.
+   */
+  refresher: TokenRefresher;
+}
+
+/**
+ * Creates an openapi-fetch **request** middleware that proactively
+ * refreshes the access token when it is missing or within
+ * {@link EXPIRY_BUFFER_SECONDS} of expiry, BEFORE the request is sent.
+ *
+ * The goal is to prevent the browser from ever seeing a 401 response
+ * to a routine authenticated request during normal navigation. A
+ * reactive-only refresh path (response middleware) cannot achieve this
+ * because the 401 response is already logged to the DevTools console
+ * by the time the middleware replays the request — the replay
+ * succeeds, but the console stays noisy.
+ *
+ * Auth endpoints (`/auth/refresh`, `/auth/login`, `/auth/register`,
+ * `/auth/logout`) are skipped to avoid recursive refresh loops.
+ */
+export function createAuthRequestMiddleware(options: AuthRequestMiddlewareOptions): {
+  onRequest: (ctx: { request: Request }) => Promise<Request>;
+} {
+  return {
+    async onRequest({ request }) {
+      if (isAuthPath(request.url)) return request;
+
+      // If the current token is missing or about to expire, block the
+      // request on a refresh so the outbound call carries a fresh
+      // bearer. When there is no token at all we still attempt the
+      // refresh — a valid httpOnly refresh cookie will mint one; an
+      // invalid one returns null and we let the call proceed so the
+      // response middleware can surface the terminal 401.
+      if (options.refresher.isExpiringSoon()) {
+        await options.refresher();
+      }
+
+      const token = options.getAccessToken();
+      if (token) {
+        request.headers.set('Authorization', `Bearer ${token}`);
+      }
+      return request;
     },
   };
 }

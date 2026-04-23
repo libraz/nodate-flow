@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   type RefreshMiddlewareOptions,
+  createAuthRequestMiddleware,
   createRefreshMiddleware,
   createTokenRefresher,
+  decodeTokenExp,
 } from '../refresh';
 
 // ---------------------------------------------------------------------------
@@ -268,5 +270,211 @@ describe('createRefreshMiddleware', () => {
     expect(refreshFn).toHaveBeenCalledOnce();
     expect(result).toBe(response);
     expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// decodeTokenExp
+// ---------------------------------------------------------------------------
+
+/** Mint a fake JWT with a given exp (unix seconds). Signature is unused. */
+function makeJwt(exp: number): string {
+  const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify({ exp })).toString('base64url');
+  return `${header}.${payload}.sig`;
+}
+
+describe('decodeTokenExp', () => {
+  it('returns the numeric exp claim from a well-formed JWT', () => {
+    const token = makeJwt(1_700_000_000);
+    expect(decodeTokenExp(token)).toBe(1_700_000_000);
+  });
+
+  it('returns null when the token is not a JWT', () => {
+    expect(decodeTokenExp('opaque-token')).toBeNull();
+  });
+
+  it('returns null when the payload is not valid base64url JSON', () => {
+    expect(decodeTokenExp('aaa.!!!.bbb')).toBeNull();
+  });
+
+  it('returns null when exp is missing or non-numeric', () => {
+    const noExp = `aaa.${Buffer.from(JSON.stringify({ sub: 'x' })).toString('base64url')}.bbb`;
+    expect(decodeTokenExp(noExp)).toBeNull();
+    const stringExp = `aaa.${Buffer.from(JSON.stringify({ exp: 'soon' })).toString('base64url')}.bbb`;
+    expect(decodeTokenExp(stringExp)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createTokenRefresher — expiry helpers
+// ---------------------------------------------------------------------------
+
+describe('createTokenRefresher expiry helpers', () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    globalThis.fetch = vi.fn();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it('isExpiringSoon returns true when no token is present', () => {
+    const opts = makeOptions({ getAccessToken: () => undefined });
+    const refresh = createTokenRefresher(opts);
+    expect(refresh.isExpiringSoon()).toBe(true);
+  });
+
+  it('isExpiringSoon returns false for a fresh JWT far from expiry', () => {
+    const farFuture = Math.floor(Date.now() / 1000) + 3600; // 1 hour
+    const opts = makeOptions({ getAccessToken: () => makeJwt(farFuture) });
+    const refresh = createTokenRefresher(opts);
+    expect(refresh.isExpiringSoon()).toBe(false);
+  });
+
+  it('isExpiringSoon returns true when the JWT is inside the 10s buffer', () => {
+    const nearExpiry = Math.floor(Date.now() / 1000) + 5;
+    const opts = makeOptions({ getAccessToken: () => makeJwt(nearExpiry) });
+    const refresh = createTokenRefresher(opts);
+    expect(refresh.isExpiringSoon()).toBe(true);
+  });
+
+  it('isExpiringSoon returns false for an opaque (non-JWT) token', () => {
+    // Opaque tokens have no decodable exp. The caller opted into opaque
+    // bearers; we should not probe refresh on every request for them,
+    // and rely on the reactive 401 path instead.
+    const opts = makeOptions({ getAccessToken: () => 'opaque' });
+    const refresh = createTokenRefresher(opts);
+    expect(refresh.isExpiringSoon()).toBe(false);
+  });
+
+  it('caches exp for subsequent calls and updates when the token rotates', async () => {
+    const nowSec = Math.floor(Date.now() / 1000);
+    let current: string | undefined = makeJwt(nowSec + 3600);
+    const opts = makeOptions({
+      getAccessToken: () => current,
+      setAccessToken: (t) => {
+        current = t;
+      },
+    });
+    const refresh = createTokenRefresher(opts);
+
+    // First call reads the pre-existing token.
+    expect(refresh.currentExp()).toBe(nowSec + 3600);
+
+    // Simulate a refresh returning a new exp.
+    const newExp = nowSec + 7200;
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ accessToken: makeJwt(newExp) }), { status: 200 }),
+    );
+    await refresh();
+    expect(refresh.currentExp()).toBe(newExp);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createAuthRequestMiddleware
+// ---------------------------------------------------------------------------
+
+describe('createAuthRequestMiddleware', () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    globalThis.fetch = vi.fn();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it('attaches the current Authorization header for non-auth paths', async () => {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const freshToken = makeJwt(nowSec + 3600);
+    const opts = makeOptions({ getAccessToken: () => freshToken });
+    const refresher = createTokenRefresher(opts);
+
+    const mw = createAuthRequestMiddleware({
+      getAccessToken: () => freshToken,
+      refresher,
+    });
+
+    const request = new Request('https://api.example.com/tasks');
+    const result = await mw.onRequest({ request });
+
+    expect(result.headers.get('Authorization')).toBe(`Bearer ${freshToken}`);
+    expect(globalThis.fetch).not.toHaveBeenCalled(); // no refresh needed
+  });
+
+  it('awaits a refresh before dispatching when the token is near-expiry', async () => {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const nearExpiryToken = makeJwt(nowSec + 2); // inside 10s buffer
+    const rotatedExp = nowSec + 900;
+    const rotated = makeJwt(rotatedExp);
+
+    let currentToken: string | undefined = nearExpiryToken;
+    const opts = makeOptions({
+      getAccessToken: () => currentToken,
+      setAccessToken: (t) => {
+        currentToken = t;
+      },
+    });
+    const refresher = createTokenRefresher(opts);
+
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ accessToken: rotated }), { status: 200 }),
+    );
+
+    const mw = createAuthRequestMiddleware({
+      getAccessToken: () => currentToken,
+      refresher,
+    });
+
+    const request = new Request('https://api.example.com/tasks');
+    const result = await mw.onRequest({ request });
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'https://auth.example.com/auth/refresh',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(result.headers.get('Authorization')).toBe(`Bearer ${rotated}`);
+  });
+
+  it('skips refresh for auth paths even when the token is near-expiry', async () => {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const nearExpiry = makeJwt(nowSec + 1);
+    const opts = makeOptions({ getAccessToken: () => nearExpiry });
+    const refresher = createTokenRefresher(opts);
+
+    const mw = createAuthRequestMiddleware({
+      getAccessToken: () => nearExpiry,
+      refresher,
+    });
+
+    const request = new Request('https://auth.example.com/auth/refresh', { method: 'POST' });
+    await mw.onRequest({ request });
+
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('does not set Authorization when no token is available after refresh attempt', async () => {
+    const opts = makeOptions({ getAccessToken: () => undefined });
+    const refresher = createTokenRefresher(opts);
+
+    // Refresh fails (no valid cookie).
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(
+      new Response('unauthorized', { status: 401 }),
+    );
+
+    const mw = createAuthRequestMiddleware({
+      getAccessToken: () => undefined,
+      refresher,
+    });
+
+    const request = new Request('https://api.example.com/tasks');
+    const result = await mw.onRequest({ request });
+
+    expect(result.headers.has('Authorization')).toBe(false);
   });
 });

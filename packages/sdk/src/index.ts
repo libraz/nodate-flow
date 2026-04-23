@@ -11,7 +11,11 @@ export * from './errors/index.js';
 export {
   createTokenRefresher,
   createRefreshMiddleware,
+  createAuthRequestMiddleware,
+  decodeTokenExp,
   type RefreshMiddlewareOptions,
+  type AuthRequestMiddlewareOptions,
+  type TokenRefresher,
 } from './refresh.js';
 
 // Shared auth store (Zustand)
