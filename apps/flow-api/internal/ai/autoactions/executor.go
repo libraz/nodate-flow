@@ -317,13 +317,17 @@ func (e *Executor) applyAction(ctx context.Context, r taskRow, act *Action) {
 }
 
 // escalate bumps priority by 1 (if not already max) and records an event.
+// When the task is already at the priority cap there is nothing new to
+// propose, so we return silently to avoid flooding the activity log
+// with identical `ai.auto_action.proposed` events on every tick.
 func (e *Executor) escalate(ctx context.Context, r taskRow, act *Action) {
 	newPriority := r.priority + 1
 	if newPriority > 4 {
 		newPriority = 4
 	}
 	if newPriority == r.priority {
-		e.recordProposal(ctx, r, act)
+		// Already at cap (priority = 4). Nothing to escalate; skip the
+		// proposal event entirely.
 		return
 	}
 
@@ -401,8 +405,34 @@ func (e *Executor) closeStaleReview(ctx context.Context, r taskRow, act *Action)
 }
 
 // recordProposal writes an event recording the AI proposal without
-// mutating the task.
+// mutating the task. It deduplicates against the most recent
+// `ai.auto_action.proposed` event for this task: if the last proposal
+// had the same kind and no user-driven (non-`ai.%`) event has touched
+// the task since, the new proposal is skipped. This prevents the
+// activity log from filling up with identical rows every tick for
+// tasks stuck in a state the rule keeps matching.
 func (e *Executor) recordProposal(ctx context.Context, r taskRow, act *Action) {
+	var lastKind sql.NullString
+	var lastOccurred sql.NullTime
+	err := e.DB.QueryRowContext(ctx, `
+		SELECT JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.kind')), occurred_at
+		FROM events
+		WHERE task_id = ? AND type = 'ai.auto_action.proposed'
+		ORDER BY occurred_at DESC
+		LIMIT 1`, r.id).Scan(&lastKind, &lastOccurred)
+	if err == nil && lastKind.Valid && lastKind.String == string(act.Kind) && lastOccurred.Valid {
+		var userSince int
+		_ = e.DB.QueryRowContext(ctx, `
+			SELECT COUNT(*) FROM events
+			WHERE task_id = ? AND occurred_at > ? AND type NOT LIKE 'ai.%'`,
+			r.id, lastOccurred.Time).Scan(&userSince)
+		if userSince == 0 {
+			// Same proposal kind is already the latest, and no user
+			// activity since. Nothing new to say.
+			return
+		}
+	}
+
 	payload, _ := json.Marshal(map[string]any{
 		"kind":       string(act.Kind),
 		"confidence": act.Confidence,

@@ -5,11 +5,11 @@ import (
 	"log/slog"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 )
 
 // IMPORTANT: Handlers in this file MUST NOT call
@@ -17,6 +17,35 @@ import (
 // internal/ai/providers/ package family. Decryption is exclusively the
 // Provider abstraction's responsibility; handlers only ever encrypt
 // inbound keys and emit masked DTOs.
+
+// modelDefaults captures the per-kind defaults used when auto-registering
+// an ai_models row alongside a newly created provider. Operators can edit
+// these values later once a standalone model admin surface lands.
+type modelDefaults struct {
+	contextWindow   uint32
+	maxOutputTokens uint32
+	supportsTools   bool
+	supportsVision  bool
+}
+
+// defaultsForKind returns sensible defaults for the flagship model of
+// each provider kind. Numbers are rounded public values and not meant to
+// be exact; they only exist to avoid a zero context window that would
+// confuse downstream components until the operator edits the row.
+func defaultsForKind(kind string) modelDefaults {
+	switch kind {
+	case "anthropic":
+		return modelDefaults{contextWindow: 200000, maxOutputTokens: 8192, supportsTools: true, supportsVision: true}
+	case "openai":
+		return modelDefaults{contextWindow: 128000, maxOutputTokens: 16384, supportsTools: true, supportsVision: true}
+	case "google":
+		return modelDefaults{contextWindow: 1000000, maxOutputTokens: 8192, supportsTools: true, supportsVision: true}
+	default:
+		// ollama / openai_compat / unknown: conservative defaults and no
+		// assumed tool/vision support since the deployed model is unknown.
+		return modelDefaults{contextWindow: 8192, maxOutputTokens: 2048, supportsTools: false, supportsVision: false}
+	}
+}
 
 // CreateProvider handles POST /workspaces/{wsId}/ai/providers.
 func CreateProvider(deps Deps) func(context.Context, *CreateProviderInput) (*CreateProviderOutput, error) {
@@ -57,7 +86,7 @@ func CreateProvider(deps Deps) func(context.Context, *CreateProviderInput) (*Cre
 
 		pub := types.New()
 		var baseURL, defaultModel = nullableString(in.Body.BaseURL), nullableString(in.Body.DefaultModel)
-		if _, err := deps.Queries.CreateProvider(ctx, generated.CreateProviderParams{
+		providerInternalID, err := deps.Queries.CreateProvider(ctx, generated.CreateProviderParams{
 			PublicID:         pub,
 			WorkspaceID:      ws.ID,
 			Kind:             generated.AiProvidersKind(in.Body.Kind),
@@ -67,12 +96,47 @@ func CreateProvider(deps Deps) func(context.Context, *CreateProviderInput) (*Cre
 			ApiKeyPrefix:     prefix,
 			ApiKeySuffix:     suffix,
 			DefaultModel:     defaultModel,
-		}); err != nil {
+		})
+		if err != nil {
 			slog.ErrorContext(ctx, "ai provider create failed",
 				slog.String("workspaceId", ws.PublicID.String()),
 				slog.String("apiKeyPrefix", prefix),
 			)
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
+		// Short-term bridge for the AI-agents create flow: if the operator
+		// supplied a default model, also register a matching ai_models row
+		// with per-kind sensible defaults. Without this row, the agents
+		// create dialog is stuck at the empty state because there is no
+		// standalone model-registration UI yet. See
+		// docs/bugs/2026-04-23-web-ai-agents-cannot-be-created-no-model-registration-path.md
+		if in.Body.DefaultModel != "" && providerInternalID > 0 {
+			d := defaultsForKind(in.Body.Kind)
+			modelPub := types.New()
+			const insertModel = `INSERT INTO ai_models (
+				public_id, workspace_id, provider_id, name, display_name,
+				context_window, max_output_tokens,
+				input_price_micro_usd_per_mtok, output_price_micro_usd_per_mtok,
+				supports_tools, supports_vision, enabled
+			) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, TRUE)`
+			if _, err := deps.DB.ExecContext(ctx, insertModel,
+				modelPub, ws.ID, uint32(providerInternalID),
+				in.Body.DefaultModel, in.Body.DefaultModel,
+				d.contextWindow, d.maxOutputTokens,
+				d.supportsTools, d.supportsVision,
+			); err != nil {
+				// Log but do not fail the provider create; operators can
+				// retry registering a model once a standalone model API
+				// lands. Duplicate-key errors on re-create are expected if
+				// the same (provider_id, model name) already exists.
+				slog.ErrorContext(ctx, "ai model auto-register failed",
+					slog.String("workspaceId", ws.PublicID.String()),
+					slog.String("providerId", pub.String()),
+					slog.String("modelName", in.Body.DefaultModel),
+					slog.Any("error", err),
+				)
+			}
 		}
 
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {

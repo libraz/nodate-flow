@@ -7,7 +7,7 @@
   "agents": {
     "title": "AI agents",
     "subtitle": "Manage trigger mode and kill switch for workspace agents.",
-    "empty": "No AI agents yet. Provision one via MCP or CLI.",
+    "empty": "No AI agents yet. Create an AI provider and set a default model first.",
     "pause": "Pause",
     "resume": "Resume",
     "status": {
