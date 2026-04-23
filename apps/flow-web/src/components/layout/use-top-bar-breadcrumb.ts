@@ -22,7 +22,7 @@ import { useMatches } from '@tanstack/react-router';
 import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
 
 /** One of the nested project views whose label becomes the tail crumb. */
-export type ProjectView = 'overview' | 'tasks' | 'gantt' | 'timeline';
+export type ProjectView = 'overview' | 'tasks' | 'gantt' | 'timeline' | 'members' | 'settings';
 
 /** i18n key mapping for each project view crumb. */
 export const PROJECT_VIEW_KEY: Readonly<Record<ProjectView, string>> = {
@@ -30,6 +30,8 @@ export const PROJECT_VIEW_KEY: Readonly<Record<ProjectView, string>> = {
   tasks: 'projects.nav.tasks',
   gantt: 'projects.nav.gantt',
   timeline: 'projects.nav.timeline',
+  members: 'projects.nav.members',
+  settings: 'projects.nav.settings',
 };
 
 /** Return shape of {@link useTopBarBreadcrumb}. */
@@ -68,9 +70,17 @@ function readMatchChain(matches: ReturnType<typeof useMatches>): {
       }
     }
     const routeId = typeof m.routeId === 'string' ? m.routeId : '';
-    // The project layout route — overview sits on this id itself.
-    if (routeId.endsWith('/projects/$projectId')) {
+    // The project layout route — overview sits on this id itself, but
+    // the index route hosts three tab panels (overview / members /
+    // settings) switched via the `?tab=` search param. Read the search
+    // param here so the breadcrumb tail reflects the active tab rather
+    // than staying hard-wired to "Overview".
+    if (routeId.endsWith('/projects/$projectId') || routeId.endsWith('/projects/$projectId/')) {
       view = 'overview';
+      const search = m.search as { tab?: string } | undefined;
+      if (search?.tab === 'members' || search?.tab === 'settings') {
+        view = search.tab;
+      }
     } else if (routeId.endsWith('/projects/$projectId/tasks')) {
       view = 'tasks';
     } else if (routeId.endsWith('/projects/$projectId/gantt')) {

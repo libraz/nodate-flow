@@ -354,7 +354,9 @@
       "overview": "Overview",
       "tasks": "Tasks",
       "gantt": "Gantt",
-      "timeline": "Timeline"
+      "timeline": "Timeline",
+      "members": "Members",
+      "settings": "Settings"
     },
     "not_found": {
       "title": "Project not found",
