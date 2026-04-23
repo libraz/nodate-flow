@@ -14,30 +14,45 @@ func TestActorRemove(t *testing.T) {
 	t.Parallel()
 	tt := newTenant(t)
 
+	// Create the task with an explicit empty-ish actor slot: pass an
+	// explicit actors entry for the creator so we can grab its public
+	// id on the response path and then exercise RemoveActor. We use
+	// the explicit form to sidestep the auto-attach fallback while
+	// still keeping only the creator on the task.
 	var task struct {
-		ID string `json:"id"`
+		ID         string `json:"id"`
+		ActorCount int    `json:"actorCount"`
 	}
 	doJSON(t, http.MethodPost, testServerURL+"/tasks", tt.AccessToken,
-		map[string]any{"projectId": tt.ProjectPublicID, "title": "Actor remove test"}, &task)
+		map[string]any{
+			"projectId": tt.ProjectPublicID,
+			"title":     "Actor remove test",
+			"actors": []map[string]any{
+				{"userId": tt.UserPublicID, "role": "assignee"},
+			},
+		}, &task)
 
-	// Add self as actor.
-	var actor struct {
-		ID string `json:"id"`
+	// Look up the single actor row so we have a public id to delete.
+	var list struct {
+		Total  int64 `json:"total"`
+		Actors []struct {
+			ID     string `json:"id"`
+			UserID string `json:"userId"`
+			Role   string `json:"role"`
+		} `json:"actors"`
 	}
-	doJSON(t, http.MethodPost,
+	doJSON(t, http.MethodGet,
 		testServerURL+"/tasks/"+task.ID+"/actors",
-		tt.AccessToken, map[string]any{
-			"userId": tt.UserPublicID,
-			"role":   "assignee",
-		}, &actor)
-	require.NotEmpty(t, actor.ID)
+		tt.AccessToken, nil, &list)
+	require.Equal(t, int64(1), list.Total)
+	require.Equal(t, tt.UserPublicID, list.Actors[0].UserID)
 
-	// Remove actor.
+	// Remove the actor.
 	var ok struct {
 		Ok bool `json:"ok"`
 	}
 	doJSON(t, http.MethodDelete,
-		testServerURL+"/tasks/"+task.ID+"/actors/"+actor.ID,
+		testServerURL+"/tasks/"+task.ID+"/actors/"+list.Actors[0].ID,
 		tt.AccessToken, nil, &ok)
 	require.True(t, ok.Ok)
 

@@ -16,18 +16,14 @@ func TestMyTasksListAcrossWorkspaces(t *testing.T) {
 	user := newTenant(t)
 	other := newTenant(t)
 
-	// Create a task in user's own workspace and assign self.
+	// Create a task in user's own workspace. POST /tasks auto-attaches
+	// the caller as the sole `assignee`, so no explicit follow-up
+	// /actors call is required for the task to appear in /me/tasks.
 	var ownTask struct {
 		ID string `json:"id"`
 	}
 	doJSON(t, http.MethodPost, testServerURL+"/tasks", user.AccessToken,
 		map[string]any{"projectId": user.ProjectPublicID, "title": "My own task"}, &ownTask)
-	doJSON(t, http.MethodPost,
-		testServerURL+"/tasks/"+ownTask.ID+"/actors",
-		user.AccessToken, map[string]any{
-			"userId": user.UserPublicID,
-			"role":   "assignee",
-		}, nil)
 
 	// Invite user to other's workspace.
 	var invite struct {
@@ -83,16 +79,25 @@ func TestMyTasksListAcrossWorkspaces(t *testing.T) {
 	require.True(t, foundOther, "must see other workspace task")
 }
 
-// TestMyTasksEmptyWhenNoActorRole verifies that GET /me/tasks
-// returns an empty list when the user is not an actor on any task.
+// TestMyTasksEmptyWhenNoActorRole verifies that GET /me/tasks returns
+// an empty list when the user is not an actor on any task.
+//
+// Note: POST /tasks auto-attaches the caller as the sole `assignee`
+// when the `actors` body field is omitted. To produce a task on which
+// the viewer has no actor row we therefore have another tenant create
+// the task — that tenant's auto-attach doesn't touch our viewer's
+// /me/tasks feed because v_my_tasks is actor-scoped per user.
 func TestMyTasksEmptyWhenNoActorRole(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
-	tt := newTenant(t)
+	viewer := newTenant(t)
+	creator := newTenant(t)
 
-	// Create a task but don't assign self as actor.
-	doJSON(t, http.MethodPost, testServerURL+"/tasks", tt.AccessToken,
-		map[string]any{"projectId": tt.ProjectPublicID, "title": "Unassigned task"}, nil)
+	// Creator makes a task in their own workspace; viewer is not a
+	// member and is not attached as an actor, so it must not surface
+	// on viewer's /me/tasks.
+	doJSON(t, http.MethodPost, testServerURL+"/tasks", creator.AccessToken,
+		map[string]any{"projectId": creator.ProjectPublicID, "title": "Not viewer's task"}, nil)
 
 	var myTasks struct {
 		Total int64 `json:"total"`
@@ -101,7 +106,7 @@ func TestMyTasksEmptyWhenNoActorRole(t *testing.T) {
 		} `json:"tasks"`
 	}
 	doJSON(t, http.MethodGet, testServerURL+"/me/tasks",
-		tt.AccessToken, nil, &myTasks)
+		viewer.AccessToken, nil, &myTasks)
 	require.Equal(t, int64(0), myTasks.Total,
-		"tasks where user is not actor must not appear")
+		"tasks where viewer is not actor must not appear")
 }

@@ -84,9 +84,9 @@ func TestTaskFilterByAssignee(t *testing.T) {
 	doJSON(t, http.MethodPost, testServerURL+"/tasks", owner.AccessToken,
 		map[string]any{"projectId": owner.ProjectPublicID, "title": "Member task"}, &memberTask)
 
-	// Assign owner to ownerTask, member to memberTask.
-	doJSON(t, http.MethodPost, testServerURL+"/tasks/"+ownerTask.ID+"/actors",
-		owner.AccessToken, map[string]any{"userId": owner.UserPublicID, "role": "assignee"}, nil)
+	// POST /tasks already auto-attaches the creator (owner) as the
+	// sole assignee on both tasks, so we only need to add `member` as
+	// an extra assignee on memberTask.
 	doJSON(t, http.MethodPost, testServerURL+"/tasks/"+memberTask.ID+"/actors",
 		owner.AccessToken, map[string]any{"userId": member.UserPublicID, "role": "assignee"}, nil)
 

@@ -95,7 +95,10 @@ func TestTaskLifecycle(t *testing.T) {
 	require.Equal(t, other.ID, dep.ToTaskID)
 	require.Equal(t, "blocks", dep.Kind)
 
-	// Add the tenant user as an actor.
+	// Add the tenant user as an actor under a non-assignee role. The
+	// creator is already auto-attached as the default `assignee` by
+	// POST /tasks, so re-adding the same (task, user, assignee) tuple
+	// would hit the UNIQUE key uniq_task_actors_task_id_user_id_role.
 	var actor struct {
 		ID     string `json:"id"`
 		UserID string `json:"userId"`
@@ -104,10 +107,10 @@ func TestTaskLifecycle(t *testing.T) {
 	doJSON(t, http.MethodPost, testServerURL+"/tasks/"+task.ID+"/actors",
 		tt.AccessToken, map[string]any{
 			"userId": tt.UserPublicID,
-			"role":   "assignee",
+			"role":   "reviewer",
 		}, &actor)
 	require.Equal(t, tt.UserPublicID, actor.UserID)
-	require.Equal(t, "assignee", actor.Role)
+	require.Equal(t, "reviewer", actor.Role)
 
 	// Disable the task.
 	status, _ := doJSONStatus(t, http.MethodDelete, testServerURL+"/tasks/"+task.ID, tt.AccessToken, nil)

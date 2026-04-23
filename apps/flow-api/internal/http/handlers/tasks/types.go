@@ -180,15 +180,29 @@ type TaskAttachment struct {
 
 // ---- Task CRUD I/O ---------------------------------------------------------
 
+// CreateTaskActorInput is one entry in the optional `actors` array on
+// CreateTaskBody. UserID is a user public id (UUID v7).
+type CreateTaskActorInput struct {
+	UserID string `json:"userId" doc:"User public id (UUID v7)"`
+	Role   string `json:"role" enum:"assignee,reviewer,watcher,approver" default:"assignee"`
+}
+
 // CreateTaskBody is the JSON body for POST /tasks.
+//
+// If Actors is omitted or empty, the authenticated caller is attached as
+// the sole assignee automatically — matching the "event you create
+// appears on your calendar" mental model used by the calendar
+// quick-create flow. Pass an explicit non-empty Actors array (including
+// the caller if desired) to opt out of the auto-attach.
 type CreateTaskBody struct {
-	ProjectID   string `json:"projectId" doc:"Project public id (UUID v7)"`
-	Title       string `json:"title" minLength:"1" maxLength:"500"`
-	Description string `json:"description,omitempty" maxLength:"50000"`
-	Priority    int32  `json:"priority,omitempty" minimum:"0" maximum:"4"`
-	DueOn       string `json:"dueOn,omitempty" doc:"YYYY-MM-DD"`
-	StartOn     string `json:"startOn,omitempty" doc:"YYYY-MM-DD"`
-	Visibility  string `json:"visibility,omitempty" enum:"public,project,private" default:"public" doc:"Task visibility: public (workspace), project (project members), or private (task actors only)"`
+	ProjectID   string                 `json:"projectId" doc:"Project public id (UUID v7)"`
+	Title       string                 `json:"title" minLength:"1" maxLength:"500"`
+	Description string                 `json:"description,omitempty" maxLength:"50000"`
+	Priority    int32                  `json:"priority,omitempty" minimum:"0" maximum:"4"`
+	DueOn       string                 `json:"dueOn,omitempty" doc:"YYYY-MM-DD"`
+	StartOn     string                 `json:"startOn,omitempty" doc:"YYYY-MM-DD"`
+	Visibility  string                 `json:"visibility,omitempty" enum:"public,project,private" default:"public" doc:"Task visibility: public (workspace), project (project members), or private (task actors only)"`
+	Actors      []CreateTaskActorInput `json:"actors,omitempty" doc:"Optional explicit actor list. When omitted or empty, the caller is auto-attached as the sole assignee."`
 }
 
 // CreateTaskInput is the request for POST /tasks.

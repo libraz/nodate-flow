@@ -291,6 +291,56 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+
+		// Attach actors. When the caller passed no explicit actor list we
+		// auto-attach them as the sole `assignee` so the task shows up on
+		// their /me/tasks and /me/tasks-with-dates feeds (calendar quick-
+		// create UX). An explicit non-empty list is treated as
+		// authoritative — the creator is NOT merged in. See the bug at
+		// docs/bugs/2026-04-23-web-calendar-quick-create-task-invisible.md
+		// for the motivating flow.
+		if len(in.Body.Actors) == 0 {
+			actorPub := types.New()
+			if _, err := qtx.AddActor(ctx, generated.AddActorParams{
+				PublicID:    actorPub,
+				WorkspaceID: prj.WorkspaceID,
+				TaskID:      uint32(taskID),
+				UserID:      sql.NullInt32{Int32: int32(actorID), Valid: true},
+				Role:        generated.TaskActorsRoleAssignee,
+			}); err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+		} else {
+			for _, a := range in.Body.Actors {
+				userPub, perr := types.Parse(a.UserID)
+				if perr != nil {
+					return nil, httpErr(apierrors.WsMemberNotFound)
+				}
+				const userLookup = `SELECT id FROM users WHERE public_id = ? AND enabled = TRUE LIMIT 1`
+				var uid uint32
+				if lerr := tx.QueryRowContext(ctx, userLookup, userPub).Scan(&uid); lerr != nil {
+					if errors.Is(lerr, sql.ErrNoRows) {
+						return nil, httpErr(apierrors.WsMemberNotFound)
+					}
+					return nil, httpErr(apierrors.InternalUnexpected)
+				}
+				role := generated.TaskActorsRoleAssignee
+				if a.Role != "" {
+					role = generated.TaskActorsRole(a.Role)
+				}
+				actorPub := types.New()
+				if _, aerr := qtx.AddActor(ctx, generated.AddActorParams{
+					PublicID:    actorPub,
+					WorkspaceID: prj.WorkspaceID,
+					TaskID:      uint32(taskID),
+					UserID:      sql.NullInt32{Int32: int32(uid), Valid: true},
+					Role:        role,
+				}); aerr != nil {
+					return nil, httpErr(apierrors.InternalUnexpected)
+				}
+			}
+		}
+
 		if err := tx.Commit(); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
