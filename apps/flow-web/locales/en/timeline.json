@@ -124,5 +124,19 @@
     "workspace_member_added": "Member",
     "workspace_member_removed": "Member",
     "workspace_updated": "Workspace"
+  },
+  "payload": {
+    "auto_action_label": "auto action",
+    "field": {
+      "assignee_id": "Assignee",
+      "description": "Description",
+      "due_at": "Due",
+      "estimate_minutes": "Estimate",
+      "priority": "Priority",
+      "start_at": "Start",
+      "status": "Status",
+      "title": "Title"
+    },
+    "unassigned": "—"
   }
 }

@@ -5,7 +5,8 @@
  */
 
 import Avatar from '@nodate-flow/ui/primitives/avatar';
-import type { ReactElement } from 'react';
+import type { TFunction } from 'i18next';
+import type { ReactElement, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { TimelineEvent } from './api';
@@ -82,6 +83,163 @@ function hasPayload(payload: unknown): boolean {
   if (payload === null || payload === undefined) return false;
   if (typeof payload === 'object') return Object.keys(payload as object).length > 0;
   return true;
+}
+
+/** Known `task.updated` field keys that have first-class i18n labels and
+ * value formatters. Any field outside this list falls through to
+ * capitalize-underscore rendering and `String(value)`. */
+const KNOWN_UPDATED_FIELDS = [
+  'priority',
+  'status',
+  'due_at',
+  'start_at',
+  'assignee_id',
+  'estimate_minutes',
+  'title',
+  'description',
+] as const;
+
+type KnownUpdatedField = (typeof KNOWN_UPDATED_FIELDS)[number];
+
+function isKnownUpdatedField(field: string): field is KnownUpdatedField {
+  return (KNOWN_UPDATED_FIELDS as readonly string[]).includes(field);
+}
+
+/** Capitalize a snake_case identifier into "Snake Case" as a last-resort
+ * label when no i18n key is registered for the field. */
+function capitalizeSnakeCase(input: string): string {
+  return input
+    .split('_')
+    .filter((part) => part.length > 0)
+    .map((part) => {
+      const first = part[0] ?? '';
+      return first.toUpperCase() + part.slice(1);
+    })
+    .join(' ');
+}
+
+function fieldLabel(field: string, t: TFunction): string {
+  if (isKnownUpdatedField(field)) {
+    return t(`payload.field.${field}`, { defaultValue: capitalizeSnakeCase(field) });
+  }
+  return capitalizeSnakeCase(field);
+}
+
+/** Format a unix-seconds timestamp as a locale-aware medium date.
+ * Returns em-dash for null/undefined and raw `String(value)` when the
+ * value can't be coerced to a finite number. */
+function formatUnixDate(value: unknown, locale: string, unassigned: string): string {
+  if (value === null || value === undefined) return unassigned;
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n)) return String(value);
+  try {
+    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(n * 1000));
+  } catch {
+    return new Date(n * 1000).toISOString();
+  }
+}
+
+function formatFieldValue(
+  field: string,
+  value: unknown,
+  locale: string,
+  unassigned: string,
+): string {
+  if (value === null || value === undefined) return unassigned;
+  switch (field) {
+    case 'priority':
+    case 'estimate_minutes':
+      return String(value);
+    case 'due_at':
+    case 'start_at':
+      return formatUnixDate(value, locale, unassigned);
+    // TODO: resolve assignee_id to a member display name once a
+    // workspace-member DTO is wired into the timeline feature.
+    case 'assignee_id':
+      return String(value);
+    case 'title':
+    case 'description':
+    case 'status':
+      return `"${String(value)}"`;
+    default:
+      return String(value);
+  }
+}
+
+/** Shared raw-JSON fallback block. Used both for unknown event types
+ * and for `task.updated` payloads that don't declare a `field`. */
+function renderRawPayload(payload: unknown): ReactNode {
+  return (
+    <pre
+      style={{
+        marginBlockStart: '0.25rem',
+        padding: '0.5rem',
+        background: 'var(--nf-color-surface))',
+        borderRadius: '0.25rem',
+        fontSize: '0.7rem',
+        overflowX: 'auto',
+      }}
+    >
+      {JSON.stringify(payload, null, 2)}
+    </pre>
+  );
+}
+
+/** humanizePayload renders a structured summary for payload shapes the
+ * timeline knows about, and otherwise falls back to the raw JSON block.
+ *
+ * Currently covers `task.updated` (and any `task.*_updated` event) which
+ * carries `{ field, from?, to?, reason?, auto_action? }`. */
+function humanizePayload(type: string, payload: unknown, t: TFunction, locale: string): ReactNode {
+  const isTaskUpdated = type.startsWith('task.') && type.endsWith('.updated');
+  if (!isTaskUpdated) return renderRawPayload(payload);
+  if (!payload || typeof payload !== 'object') return renderRawPayload(payload);
+
+  const p = payload as {
+    field?: unknown;
+    from?: unknown;
+    to?: unknown;
+    reason?: unknown;
+    // biome-ignore lint/style/useNamingConvention: event payload key from backend
+    auto_action?: unknown;
+  };
+  if (typeof p.field !== 'string' || p.field.length === 0) {
+    return renderRawPayload(payload);
+  }
+
+  const unassigned = t('payload.unassigned', { defaultValue: '—' });
+  const label = fieldLabel(p.field, t);
+  const fromStr = formatFieldValue(p.field, p.from, locale, unassigned);
+  const toStr = formatFieldValue(p.field, p.to, locale, unassigned);
+  const reason = typeof p.reason === 'string' && p.reason.length > 0 ? p.reason : null;
+  const autoAction =
+    typeof p.auto_action === 'string' && p.auto_action.length > 0 ? p.auto_action : null;
+  const autoActionLabel = t('payload.auto_action_label', { defaultValue: 'auto action' });
+
+  return (
+    <div
+      style={{
+        marginBlockStart: '0.25rem',
+        padding: '0.5rem',
+        background: 'var(--nf-color-surface))',
+        borderRadius: '0.25rem',
+        fontSize: '0.75rem',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.125rem',
+      }}
+    >
+      <div style={{ color: 'var(--nf-color-fg)' }}>
+        {label}: {fromStr} → {toStr}
+      </div>
+      {reason !== null ? <div style={{ color: 'var(--nf-color-fg-muted)' }}>{reason}</div> : null}
+      {autoAction !== null ? (
+        <div style={{ color: 'var(--nf-color-fg-muted)', fontStyle: 'italic' }}>
+          {autoActionLabel}: {autoAction}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export default function EventCard({ event }: EventCardProps): ReactElement {
@@ -204,18 +362,7 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
             >
               {kindLabel}
             </summary>
-            <pre
-              style={{
-                marginBlockStart: '0.25rem',
-                padding: '0.5rem',
-                background: 'var(--nf-color-surface))',
-                borderRadius: '0.25rem',
-                fontSize: '0.7rem',
-                overflowX: 'auto',
-              }}
-            >
-              {JSON.stringify(event.payload, null, 2)}
-            </pre>
+            {humanizePayload(event.type, event.payload, t, locale)}
           </details>
         ) : null}
       </div>
