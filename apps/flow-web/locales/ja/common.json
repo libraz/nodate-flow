@@ -31,6 +31,7 @@
   },
   "nav": {
     "theme": "テーマ",
+    "mode": "モード",
     "language": "言語",
     "primary": "メインナビゲーション",
     "inbox": "受信トレイ",
@@ -112,11 +113,22 @@
     "dotline-dark": "ドットライン ダーク",
     "glass-light": "グラス ライト",
     "glass-dark": "グラス ダーク",
-    "system": "システム"
+    "system": "システム",
+    "family": {
+      "aurora": "オーロラ",
+      "dotline": "ドットライン",
+      "glass": "グラス"
+    },
+    "mode": {
+      "light": "ライト",
+      "dark": "ダーク"
+    }
   },
   "lang": {
     "en": "英語",
-    "ja": "日本語"
+    "ja": "日本語",
+    "native_en": "English",
+    "native_ja": "日本語"
   },
   "a11y": {
     "skipToContent": "本文へスキップ"
@@ -439,6 +451,10 @@
       "due": "期日",
       "submit": "作成",
       "cancel": "キャンセル"
+    },
+    "quick_capture": {
+      "title": "クイックキャプチャ",
+      "submit_label": "キャプチャ"
     },
     "status": {
       "open": "オープン",

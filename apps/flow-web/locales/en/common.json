@@ -31,6 +31,7 @@
   },
   "nav": {
     "theme": "Theme",
+    "mode": "Mode",
     "language": "Language",
     "primary": "Primary navigation",
     "inbox": "Inbox",
@@ -112,11 +113,22 @@
     "dotline-dark": "Dotline Dark",
     "glass-light": "Glass Light",
     "glass-dark": "Glass Dark",
-    "system": "System"
+    "system": "System",
+    "family": {
+      "aurora": "Aurora",
+      "dotline": "Dotline",
+      "glass": "Glass"
+    },
+    "mode": {
+      "light": "Light",
+      "dark": "Dark"
+    }
   },
   "lang": {
     "en": "English",
-    "ja": "Japanese"
+    "ja": "Japanese",
+    "native_en": "English",
+    "native_ja": "日本語"
   },
   "a11y": {
     "skipToContent": "Skip to content"
@@ -439,6 +451,10 @@
       "due": "Due date",
       "submit": "Create",
       "cancel": "Cancel"
+    },
+    "quick_capture": {
+      "title": "Quick capture",
+      "submit_label": "Capture"
     },
     "status": {
       "open": "Open",

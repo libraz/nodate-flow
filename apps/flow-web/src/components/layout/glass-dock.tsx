@@ -12,7 +12,8 @@ type DockActionKey = 'new_task' | 'quick_capture' | 'ai_assist';
 type DockActionTarget =
   | { kind: 'navigate'; href: string }
   | { kind: 'palette' }
-  | { kind: 'palette_command' };
+  | { kind: 'palette_command' }
+  | { kind: 'event'; name: string };
 
 interface DockAction {
   key: DockActionKey;
@@ -20,18 +21,35 @@ interface DockAction {
   target: DockActionTarget;
 }
 
-// Each dock button has a distinct behavior:
-// - `new_task` (Plus): opens the command palette (search / create actions)
-// - `quick_capture` (Zap): opens the command palette for quick search
-// - `ai_assist` (Sparkles): opens the palette in NL command mode ("> ")
-const ACTIONS: readonly DockAction[] = [
-  { key: 'new_task', icon: Plus, target: { kind: 'palette' } },
-  { key: 'quick_capture', icon: Zap, target: { kind: 'palette' } },
-  { key: 'ai_assist', icon: Sparkles, target: { kind: 'palette_command' } },
-];
-
 /** Event name other components can dispatch to open the palette. */
 export const OPEN_COMMAND_PALETTE_EVENT = 'nf:open-command-palette';
+
+/**
+ * Event name dispatched by the `new_task` dock button. The authenticated
+ * layout listens for this and opens the shared TaskCreateDialog with the
+ * resolved default project.
+ */
+export const OPEN_CREATE_TASK_EVENT = 'nf:open-create-task';
+
+/**
+ * Event name dispatched by the `quick_capture` dock button. The
+ * authenticated layout listens for this and opens the QuickCaptureDialog.
+ */
+export const OPEN_QUICK_CAPTURE_EVENT = 'nf:open-quick-capture';
+
+// Each dock button has a distinct behavior:
+// - `new_task` (Plus): opens TaskCreateDialog directly for a smart default project
+// - `quick_capture` (Zap): opens the lightweight QuickCaptureDialog
+// - `ai_assist` (Sparkles): opens the palette in NL command mode ("> ")
+const ACTIONS: readonly DockAction[] = [
+  { key: 'new_task', icon: Plus, target: { kind: 'event', name: OPEN_CREATE_TASK_EVENT } },
+  {
+    key: 'quick_capture',
+    icon: Zap,
+    target: { kind: 'event', name: OPEN_QUICK_CAPTURE_EVENT },
+  },
+  { key: 'ai_assist', icon: Sparkles, target: { kind: 'palette_command' } },
+];
 
 function actionLabelKey(
   key: DockAction['key'],
@@ -89,6 +107,10 @@ export default function GlassDock(): ReactElement {
             if (action.target.kind === 'palette') {
               setPaletteCommandMode(false);
               setPaletteOpen(true);
+              return;
+            }
+            if (action.target.kind === 'event') {
+              window.dispatchEvent(new CustomEvent(action.target.name));
               return;
             }
             void navigate({ to: action.target.href });
