@@ -196,7 +196,14 @@
     "expired": "この共有リンクは有効期限が切れています。",
     "no_upcoming_events": "表示できる予定はありません。",
     "event_undated": "日程未定",
-    "holidays_country": "祝日: {country}"
+    "holidays_country": "祝日: {country}",
+    "error": {
+      "title_invalid": "この共有リンクは無効です。",
+      "title_expired": "この共有リンクは有効期限が切れています。",
+      "body": "このリンクは期限切れか削除された可能性があります。",
+      "back": "nodate-flow に戻る"
+    },
+    "brand": "nodate-flow"
   },
   "rsvp": {
     "accept": "参加",

@@ -9,7 +9,7 @@ import Card from '@nodate-flow/ui/primitives/card';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 
 import { ApiError, toApiError } from '../../../lib/api-error';
-import { sdk } from '../../../lib/sdk';
+import { flowWebUrl, sdk } from '../../../lib/sdk';
 
 interface SharePageDTO {
   title: string;
@@ -107,23 +107,102 @@ function SharePage(): ReactElement {
 
   if (error || !data) {
     const isExpired = error instanceof ApiError && error.code === 'SHARE.SHARE.EXPIRED';
+    const titleKey = isExpired ? 'share.error.title_expired' : 'share.error.title_invalid';
     return (
-      <main
+      <div
         style={{
+          minHeight: '100vh',
           display: 'flex',
-          minHeight: '60vh',
           flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 'var(--nf-space-4)',
-          padding: 'var(--nf-space-6)',
+          backgroundColor: 'var(--nf-color-bg)',
         }}
       >
-        <CalendarIcon size={48} style={{ color: 'var(--nf-color-fg-subtle)' }} />
-        <p style={{ color: 'var(--nf-color-fg-muted)', textAlign: 'center' }}>
-          {isExpired ? t('share.expired') : t('share.invalid_or_expired')}
-        </p>
-      </main>
+        <header
+          style={{
+            maxWidth: '48rem',
+            width: '100%',
+            marginInline: 'auto',
+            padding: 'var(--nf-space-4)',
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          <a
+            href={flowWebUrl}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 'var(--nf-space-2)',
+              color: 'var(--nf-color-fg)',
+              fontWeight: 'var(--nf-weight-semibold)',
+              fontSize: 'var(--nf-text-base)',
+              textDecoration: 'none',
+            }}
+          >
+            <CalendarIcon
+              size={20}
+              style={{ color: 'var(--nf-color-accent)' }}
+              aria-hidden="true"
+            />
+            {t('share.brand')}
+          </a>
+        </header>
+        <main
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 'var(--nf-space-4)',
+            padding: 'var(--nf-space-6) var(--nf-space-4)',
+            textAlign: 'center',
+          }}
+        >
+          <CalendarIcon
+            size={48}
+            style={{ color: 'var(--nf-color-fg-subtle)' }}
+            aria-hidden="true"
+          />
+          <h1
+            style={{
+              fontSize: 'var(--nf-text-xl)',
+              fontWeight: 'var(--nf-weight-semibold)',
+              color: 'var(--nf-color-fg)',
+              margin: 0,
+            }}
+          >
+            {t(titleKey)}
+          </h1>
+          <p
+            style={{
+              color: 'var(--nf-color-fg-muted)',
+              margin: 0,
+              maxWidth: '32rem',
+            }}
+          >
+            {t('share.error.body')}
+          </p>
+          <a
+            href={flowWebUrl}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              marginBlockStart: 'var(--nf-space-2)',
+              paddingInline: 'var(--nf-space-4)',
+              paddingBlock: 'var(--nf-space-2)',
+              borderRadius: 'var(--nf-radius-md)',
+              backgroundColor: 'var(--nf-color-accent)',
+              color: 'var(--nf-color-accent-fg)',
+              textDecoration: 'none',
+              fontWeight: 'var(--nf-weight-medium)',
+              fontSize: 'var(--nf-text-sm)',
+            }}
+          >
+            {t('share.error.back')}
+          </a>
+        </main>
+      </div>
     );
   }
 

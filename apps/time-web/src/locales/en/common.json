@@ -196,7 +196,14 @@
     "expired": "This shared calendar link has expired.",
     "no_upcoming_events": "No events to display.",
     "event_undated": "Date to be announced",
-    "holidays_country": "Holidays: {country}"
+    "holidays_country": "Holidays: {country}",
+    "error": {
+      "title_invalid": "This share link is invalid.",
+      "title_expired": "This share link has expired.",
+      "body": "This link may have expired or been removed.",
+      "back": "Back to nodate-flow"
+    },
+    "brand": "nodate-flow"
   },
   "rsvp": {
     "accept": "Accept",
