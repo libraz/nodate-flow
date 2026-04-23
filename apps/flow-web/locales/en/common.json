@@ -456,6 +456,12 @@
       "title": "Quick capture",
       "submit_label": "Capture"
     },
+    "quick_create": {
+      "no_projects": {
+        "title": "Create a project first",
+        "cta": "Go to projects"
+      }
+    },
     "status": {
       "open": "Open",
       "waiting": "In progress",

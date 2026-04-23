@@ -43,6 +43,7 @@ import { useWorkspacesQuery } from '../features/workspaces/api';
 import { dateKey } from '../lib/date-utils';
 import { formatDate } from '../lib/format';
 import { sdk, timeSdk } from '../lib/sdk';
+import { useActiveWorkspaceId } from '../lib/use-current-workspace';
 
 type CalendarTask = components['schemas']['MyTaskListItem'];
 type CalendarEvent = timeComponents['schemas']['MyCalendarEventResponse'];
@@ -102,6 +103,7 @@ interface QuickCreateDialogProps {
   dateLabel: string;
   dueOn: string;
   projects: Project[];
+  activeWsId: string | null;
   onClose: () => void;
   onCreated: () => void;
 }
@@ -111,6 +113,7 @@ function QuickCreateDialog({
   dateLabel,
   dueOn,
   projects,
+  activeWsId,
   onClose,
   onCreated,
 }: QuickCreateDialogProps): ReactElement {
@@ -216,6 +219,8 @@ function QuickCreateDialog({
                 onChange={setStartOn}
                 weekdayLabels={weekdayLabels}
                 formatMonthYear={formatMonthYear}
+                prevLabel={t('calendar.prev')}
+                nextLabel={t('calendar.next')}
                 triggerLabel={startOn ? formatDate(startOn, locale) : t('common.date.placeholder')}
               />
             )}
@@ -227,6 +232,8 @@ function QuickCreateDialog({
                 onChange={setEndOn}
                 weekdayLabels={weekdayLabels}
                 formatMonthYear={formatMonthYear}
+                prevLabel={t('calendar.prev')}
+                nextLabel={t('calendar.next')}
                 triggerLabel={endOn ? formatDate(endOn, locale) : t('common.date.placeholder')}
                 {...(startOn ? { minDate: startOn } : {})}
               />
@@ -270,6 +277,36 @@ function QuickCreateDialog({
           </FormField>
         </div>
 
+        {projects.length === 0 ? (
+          <div
+            role="note"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '0.75rem',
+              padding: '0.75rem',
+              borderRadius: 'var(--nf-radius-md)',
+              background: 'var(--nf-color-bg-subtle)',
+              border: '1px solid var(--nf-color-border-subtle)',
+              fontSize: '0.875rem',
+            }}
+          >
+            <span style={{ color: 'var(--nf-color-fg-muted)' }}>
+              {t('tasks.quick_create.no_projects.title')}
+            </span>
+            {activeWsId ? (
+              <Link
+                to="/workspaces/$id/projects"
+                params={{ id: activeWsId }}
+                style={{ color: 'var(--nf-color-accent)', textDecoration: 'underline' }}
+              >
+                {t('tasks.quick_create.no_projects.cta')}
+              </Link>
+            ) : null}
+          </div>
+        ) : null}
+
         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
           <Button type="button" variant="ghost" onClick={handleClose}>
             {t('tasks.form.cancel')}
@@ -310,6 +347,7 @@ function CalendarRoute(): ReactElement {
   const [layers, setLayers] = useState<LayerFlags>({ tasksDue: true, events: true, blocks: false });
 
   const { data: workspaces } = useWorkspacesQuery();
+  const activeWsId = useActiveWorkspaceId();
 
   // Range that covers the full 42-cell month grid (may span adjacent months).
   const { fromDate, toDate, fromIso, toIso } = useMemo(() => {
@@ -847,6 +885,7 @@ function CalendarRoute(): ReactElement {
           dateLabel={createDateLabel}
           dueOn={createDate}
           projects={allProjects}
+          activeWsId={activeWsId}
           onClose={() => setCreateDate(null)}
           onCreated={handleCreated}
         />

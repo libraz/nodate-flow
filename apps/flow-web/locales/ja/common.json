@@ -456,6 +456,12 @@
       "title": "クイックキャプチャ",
       "submit_label": "キャプチャ"
     },
+    "quick_create": {
+      "no_projects": {
+        "title": "まずプロジェクトを作成してください",
+        "cta": "プロジェクト一覧へ"
+      }
+    },
     "status": {
       "open": "オープン",
       "waiting": "進行中",
