@@ -142,6 +142,31 @@ export function formatEpochDateTime(
   }
 }
 
+/**
+ * Format a numeric amount as a localised currency string via `Intl.NumberFormat`.
+ *
+ * Uses `currencyDisplay: 'narrowSymbol'` so non-home-currency locales still
+ * render a concise sign (e.g. `$` for USD in ja) rather than `US$`.
+ *
+ * @example formatCurrency(0, 'USD', 'en') // '$0.00'
+ * @example formatCurrency(12.5, 'USD', 'ja') // '$12.50'
+ * @param amount - Numeric amount.
+ * @param currency - ISO 4217 currency code (e.g. `'USD'`).
+ * @param locale - BCP 47 language tag.
+ * @returns Formatted currency string, or a plain fixed-decimal fallback when Intl throws.
+ */
+export function formatCurrency(amount: number, currency: string, locale: string): string {
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency,
+      currencyDisplay: 'narrowSymbol',
+    }).format(amount);
+  } catch {
+    return amount.toFixed(2);
+  }
+}
+
 export function isOverdue(dueOn: string | null | undefined): boolean {
   if (!dueOn) return false;
   const now = new Date();

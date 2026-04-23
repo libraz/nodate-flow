@@ -414,6 +414,10 @@
       "graph": "グラフ",
       "spreadsheet": "スプレッドシート"
     },
+    "list": {
+      "select_row": "{{index}} 行目を選択",
+      "select_all": "すべての行を選択"
+    },
     "columns": {
       "title": "タイトル",
       "status": "ステータス",

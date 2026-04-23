@@ -68,6 +68,19 @@ export interface DataGridProps<TData> {
   onColumnPinningChange?: (next: ColumnPinningState) => void;
   /** Optional accessible label. */
   'aria-label'?: string;
+  /**
+   * Accessible label for the header "select all rows" checkbox.
+   * Defaults to `"Select all rows"` so consumers without i18n still get a
+   * label; localised consumers should pass a translated string.
+   */
+  selectAllRowsLabel?: string;
+  /**
+   * Accessible label factory for per-row selection checkboxes.
+   * Receives the 1-based row index. Defaults to `` `Select row ${index}` ``
+   * so consumers without i18n still get a label; localised consumers should
+   * pass a translated formatter (e.g. `t('tasks.list.select_row', { index })`).
+   */
+  selectRowLabel?: (index: number) => string;
   /** Optional class on the scroll container. */
   className?: string;
   /** Optional inline style on the scroll container. */
@@ -98,6 +111,8 @@ function DataGridInner<TData>(
     enableColumnPinning = false,
     columnPinning: controlledPinning,
     onColumnPinningChange,
+    selectAllRowsLabel = 'Select all rows',
+    selectRowLabel = (index: number) => `Select row ${index}`,
     className,
     style,
   } = props;
@@ -138,7 +153,7 @@ function DataGridInner<TData>(
       header: ({ table }) => (
         <input
           type="checkbox"
-          aria-label="Select all rows"
+          aria-label={selectAllRowsLabel}
           checked={table.getIsAllRowsSelected()}
           ref={(el) => {
             if (el) el.indeterminate = table.getIsSomeRowsSelected();
@@ -149,7 +164,7 @@ function DataGridInner<TData>(
       cell: ({ row }) => (
         <input
           type="checkbox"
-          aria-label={`Select row ${row.index + 1}`}
+          aria-label={selectRowLabel(row.index + 1)}
           checked={row.getIsSelected()}
           onChange={row.getToggleSelectedHandler()}
         />
@@ -157,7 +172,7 @@ function DataGridInner<TData>(
       enableSorting: false,
     };
     return [selectCol, ...columns];
-  }, [columns, enableRowSelection]);
+  }, [columns, enableRowSelection, selectAllRowsLabel, selectRowLabel]);
 
   const table = useReactTable<TData>({
     data,

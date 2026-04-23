@@ -728,6 +728,8 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
         enableRowSelection
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
+        selectAllRowsLabel={t('tasks.list.select_all')}
+        selectRowLabel={(index) => t('tasks.list.select_row', { index })}
         style={{ minBlockSize: '20rem' }}
       />
     </>

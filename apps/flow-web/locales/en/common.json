@@ -414,6 +414,10 @@
       "graph": "Graph",
       "spreadsheet": "Spreadsheet"
     },
+    "list": {
+      "select_row": "Select row {{index}}",
+      "select_all": "Select all rows"
+    },
     "columns": {
       "title": "Title",
       "status": "Status",

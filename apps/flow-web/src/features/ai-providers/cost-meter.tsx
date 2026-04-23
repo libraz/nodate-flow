@@ -15,6 +15,7 @@ import { DollarSign } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatCurrency, formatDateOnly } from '../../lib/format';
 import { useAiCostTodayQuery } from './cost-api';
 import styles from './cost-meter.module.css';
 
@@ -30,7 +31,8 @@ function useActiveWorkspaceId(): string | undefined {
 }
 
 export default function AiCostMeter(): ReactElement | null {
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
+  const locale = i18n.language;
   const workspaceId = useActiveWorkspaceId();
   const { data, isError, isLoading } = useAiCostTodayQuery(workspaceId);
 
@@ -38,14 +40,16 @@ export default function AiCostMeter(): ReactElement | null {
   if (isLoading || isError) return null;
   if (!data) return null;
 
-  const formatted = `$${data.costUsd.toFixed(2)}`;
-  const title = `${t('topbar.ai.cost_today.label')} — ${data.date}`;
+  const formatted = formatCurrency(data.costUsd, 'USD', locale);
+  const formattedDate = formatDateOnly(data.date, locale);
+  const label = t('topbar.ai.cost_today.label');
+  const title = `${label} — ${formattedDate}`;
 
   return (
     <span
       className={styles.meter}
       title={title}
-      aria-label={`${t('topbar.ai.cost_today.label')}: ${formatted}`}
+      aria-label={`${label}: ${formatted} (${formattedDate})`}
     >
       <Icon icon={DollarSign} decorative className={styles.icon} />
       <span className={styles.value}>{formatted}</span>
