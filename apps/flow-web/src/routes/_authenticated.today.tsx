@@ -15,7 +15,7 @@ import { CheckCircle } from 'lucide-react';
 import { type ReactElement, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { OPEN_COMMAND_PALETTE_EVENT } from '../components/layout/glass-dock';
+import { OPEN_CREATE_TASK_EVENT } from '../components/layout/glass-dock';
 import type { TaskDerivedState, TaskPriority } from '../features/tasks/api';
 import { PRIORITY_COLOR, PRIORITY_KEY, STATE_COLOR } from '../features/tasks/constants';
 import { dateKey } from '../lib/date-utils';
@@ -147,7 +147,7 @@ function TodayRoute(): ReactElement {
           <button
             type="button"
             onClick={() => {
-              window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT));
+              window.dispatchEvent(new Event(OPEN_CREATE_TASK_EVENT));
             }}
             style={{
               display: 'inline-flex',
