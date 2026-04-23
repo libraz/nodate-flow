@@ -6,15 +6,14 @@
  */
 
 import { isSafeRedirect } from '@nodate-flow/sdk';
-import { Outlet, createFileRoute } from '@tanstack/react-router';
+import Button from '@nodate-flow/ui/primitives/button';
+import Dialog from '@nodate-flow/ui/primitives/dialog';
+import { Link, Outlet, createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import AppShell from '../components/layout/app-shell';
-import {
-  OPEN_COMMAND_PALETTE_EVENT,
-  OPEN_CREATE_TASK_EVENT,
-  OPEN_QUICK_CAPTURE_EVENT,
-} from '../components/layout/glass-dock';
+import { OPEN_CREATE_TASK_EVENT, OPEN_QUICK_CAPTURE_EVENT } from '../components/layout/glass-dock';
 import NotFound from '../components/not-found';
 import ShortcutsHelpDialog from '../components/shortcuts-help-dialog';
 import { selectIsAuthenticated, useAuth } from '../features/auth/auth-store';
@@ -26,6 +25,7 @@ import { useDefaultProjectId } from '../lib/use-default-project';
 import { useKeyboardShortcuts } from '../lib/use-keyboard-shortcuts';
 
 function AuthenticatedLayout(): ReactElement | null {
+  const { t } = useTranslation('common');
   const { status } = useAuthBootstrap();
   const isAuthenticated = useAuth(selectIsAuthenticated);
 
@@ -37,16 +37,21 @@ function AuthenticatedLayout(): ReactElement | null {
   const [helpOpen, setHelpOpen] = useState(false);
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [quickCaptureOpen, setQuickCaptureOpen] = useState(false);
+  // Shown when the user triggers task creation from a FAB/shortcut while
+  // no project is reachable in the active workspace. Mirrors the calendar
+  // quick-create flow's inline "create a project first" guidance so that
+  // the CTA is never a dead button.
+  const [noProjectHintOpen, setNoProjectHintOpen] = useState(false);
 
   // Open the full task-creation dialog. When no project is reachable we
-  // fall back to the command palette so the user sees the "create a
-  // project first" UX rather than a dead button.
+  // instead prompt the user to create a project first so the CTA is never
+  // a dead button.
   const handleCreateTask = useCallback(() => {
     if (defaultProjectId) {
       setTaskDialogOpen(true);
       return;
     }
-    window.dispatchEvent(new CustomEvent(OPEN_COMMAND_PALETTE_EVENT));
+    setNoProjectHintOpen(true);
   }, [defaultProjectId]);
 
   const handleQuickCapture = useCallback(() => {
@@ -54,7 +59,7 @@ function AuthenticatedLayout(): ReactElement | null {
       setQuickCaptureOpen(true);
       return;
     }
-    window.dispatchEvent(new CustomEvent(OPEN_COMMAND_PALETTE_EVENT));
+    setNoProjectHintOpen(true);
   }, [defaultProjectId]);
 
   const handleShowHelp = useCallback(() => {
@@ -118,6 +123,49 @@ function AuthenticatedLayout(): ReactElement | null {
           />
         </>
       )}
+      <Dialog
+        open={noProjectHintOpen}
+        onClose={() => setNoProjectHintOpen(false)}
+        title={t('tasks.new')}
+      >
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1rem',
+            minInlineSize: '20rem',
+          }}
+        >
+          <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
+            {t('tasks.quick_create.no_projects.title')}
+          </p>
+          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+            <Button type="button" variant="ghost" onClick={() => setNoProjectHintOpen(false)}>
+              {t('tasks.form.cancel')}
+            </Button>
+            {defaultWorkspaceId ? (
+              <Link
+                to="/workspaces/$id/projects"
+                params={{ id: defaultWorkspaceId }}
+                onClick={() => setNoProjectHintOpen(false)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  paddingInline: '0.75rem',
+                  paddingBlock: '0.375rem',
+                  borderRadius: 'var(--nf-radius-md)',
+                  background: 'var(--nf-color-accent)',
+                  color: 'var(--nf-color-fg-on-accent)',
+                  textDecoration: 'none',
+                  fontSize: '0.875rem',
+                }}
+              >
+                {t('tasks.quick_create.no_projects.cta')}
+              </Link>
+            ) : null}
+          </div>
+        </div>
+      </Dialog>
     </AppShell>
   );
 }
