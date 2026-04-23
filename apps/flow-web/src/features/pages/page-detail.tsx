@@ -99,11 +99,8 @@ export default function PageDetail({ workspaceId, pageId, onEdit }: PageDetailPr
       tone: 'danger',
     });
     if (!confirmed) return;
-    deleteMutation.mutate(pageId, {
-      onSuccess: () => {
-        void navigate({ to: '/pages' });
-      },
-    });
+    void navigate({ to: '/pages' });
+    deleteMutation.mutate(pageId);
   };
 
   const updatedLabel = t('updated_at', {

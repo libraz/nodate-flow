@@ -237,7 +237,7 @@ export function useDeletePage(wsId: string): UseMutationResult<void, ApiError, s
     },
     onSuccess: (_data, pageId) => {
       void qc.invalidateQueries({ queryKey: pageKeys.list(wsId) });
-      void qc.invalidateQueries({ queryKey: pageKeys.children(pageId) });
+      qc.removeQueries({ queryKey: pageKeys.children(pageId) });
       qc.removeQueries({ queryKey: pageKeys.detail(pageId) });
     },
   });
