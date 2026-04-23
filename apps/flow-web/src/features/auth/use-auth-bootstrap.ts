@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from 'react';
 
+import { type SupportedLanguage, i18n, setLanguage, supportedLanguages } from '../../i18n';
 import { authApiBaseUrl, refreshAccessToken } from '../../lib/sdk';
 import { queryClient } from '../../providers/query-client';
 import { type AuthUser, authStore } from './auth-store';
@@ -59,6 +60,15 @@ async function runBootstrap(): Promise<AuthBootstrapStatus> {
   // preference immediately on login, instead of waiting for the first
   // settings page visit.
   queryClient.setQueryData(['me'], data);
+  // Sync i18next to the server-side profile locale so the authenticated UI
+  // renders in the user's preferred language on first paint. localStorage
+  // `nf.lang` is a client-side cache; `profile.locale` is authoritative.
+  if (
+    (supportedLanguages as readonly string[]).includes(user.locale) &&
+    i18n.language !== user.locale
+  ) {
+    setLanguage(user.locale as SupportedLanguage);
+  }
   return 'authenticated';
 }
 
