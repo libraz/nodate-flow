@@ -9,6 +9,7 @@ import Dialog from '@nodate-flow/ui/primitives/dialog';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   BarChart3,
@@ -21,7 +22,7 @@ import {
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { type WidgetType, useCreateWidget } from './api';
+import { type WidgetItem, type WidgetType, dashboardKeys, useCreateWidget } from './api';
 import styles from './dashboard.module.css';
 
 // ---------------------------------------------------------------------------
@@ -78,6 +79,7 @@ export default function AddWidgetDialog({
 }: AddWidgetDialogProps): ReactElement {
   const { t } = useTranslation('dashboard');
   const create = useCreateWidget(workspaceId);
+  const queryClient = useQueryClient();
 
   const [selectedType, setSelectedType] = useState<WidgetType | null>(null);
   const [title, setTitle] = useState('');
@@ -104,6 +106,17 @@ export default function AddWidgetDialog({
     const finalTitle =
       title.trim() || t(widgetTypeI18nKey.get(selectedType) ?? 'widget_type.task_summary');
 
+    // Compute next open row from the cached widget list (populated by the
+    // parent's useSuspenseQuery). We stack new widgets below the existing
+    // ones at column 0; the server is free to repack. Falling back to 0/0
+    // is safe when the cache is empty.
+    const cachedWidgets =
+      queryClient.getQueryData<WidgetItem[]>(dashboardKeys.list(workspaceId)) ?? [];
+    const nextRow = cachedWidgets.reduce(
+      (maxBottom, w) => Math.max(maxBottom, w.positionY + w.height),
+      0,
+    );
+
     setSubmitting(true);
     try {
       await create.mutateAsync({
@@ -112,13 +125,15 @@ export default function AddWidgetDialog({
           title: finalTitle,
           width: meta.defaultWidth,
           height: meta.defaultHeight,
+          positionX: 0,
+          positionY: nextRow,
         },
       });
       reset();
       onClose();
-      toaster.show({ tone: 'success', message: t('add_widget') });
+      toaster.show({ tone: 'success', message: t('add_widget_success') });
     } catch {
-      toaster.show({ tone: 'danger', message: t('add_widget') });
+      toaster.show({ tone: 'danger', message: t('add_widget_error') });
     } finally {
       setSubmitting(false);
     }

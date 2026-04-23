@@ -1,6 +1,10 @@
 {
   "title": "Dashboard",
   "add_widget": "Add widget",
+  "add_widget_success": "Widget added",
+  "add_widget_error": "Failed to add widget",
+  "update_position_error": "Failed to update widget position",
+  "delete_widget_error": "Failed to remove widget",
   "edit_layout": "Edit layout",
   "done_editing": "Done",
   "remove_widget": "Remove widget",

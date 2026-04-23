@@ -1,6 +1,10 @@
 {
   "title": "ダッシュボード",
   "add_widget": "ウィジェットを追加",
+  "add_widget_success": "ウィジェットを追加しました",
+  "add_widget_error": "ウィジェットの追加に失敗しました",
+  "update_position_error": "ウィジェットの位置の更新に失敗しました",
+  "delete_widget_error": "ウィジェットの削除に失敗しました",
   "edit_layout": "レイアウトを編集",
   "done_editing": "完了",
   "remove_widget": "ウィジェットを削除",

@@ -89,7 +89,7 @@ function WidgetGrid({ wsId, editing }: WidgetGridProps): ReactElement {
             positionY: newY,
           })
           .catch(() => {
-            toaster.show({ tone: 'danger', message: t('widget.position_failed') });
+            toaster.show({ tone: 'danger', message: t('update_position_error') });
           });
       }
 
@@ -103,7 +103,7 @@ function WidgetGrid({ wsId, editing }: WidgetGridProps): ReactElement {
 
   const handleRemove = (widgetId: string): void => {
     void deleteWidget.mutateAsync(widgetId).catch(() => {
-      toaster.show({ tone: 'danger', message: t('widget.delete_failed') });
+      toaster.show({ tone: 'danger', message: t('delete_widget_error') });
     });
   };
 
