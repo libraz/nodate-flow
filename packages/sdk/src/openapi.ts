@@ -3277,7 +3277,7 @@ export interface components {
             readonly $schema?: string;
             /** Format: double */
             costUsd: number;
-            /** @description UTC date (YYYY-MM-DD) */
+            /** @description Local date in the requested timezone (YYYY-MM-DD). Falls back to UTC if tz is absent or invalid. */
             date: string;
             /** Format: double */
             monthlyCapUsd?: number;
@@ -11533,7 +11533,10 @@ export interface operations {
     };
     "ai-cost-today": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description IANA timezone name (e.g. Asia/Tokyo). Defaults to UTC when absent or invalid. */
+                tz?: string;
+            };
             header?: never;
             path: {
                 wsId: string;

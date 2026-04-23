@@ -542,7 +542,7 @@
             "type": "number"
           },
           "date": {
-            "description": "UTC date (YYYY-MM-DD)",
+            "description": "Local date in the requested timezone (YYYY-MM-DD). Falls back to UTC if tz is absent or invalid.",
             "type": "string"
           },
           "monthlyCapUsd": {
@@ -15629,6 +15629,16 @@
             "name": "wsId",
             "required": true,
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "IANA timezone name (e.g. Asia/Tokyo). Defaults to UTC when absent or invalid.",
+            "explode": false,
+            "in": "query",
+            "name": "tz",
+            "schema": {
+              "description": "IANA timezone name (e.g. Asia/Tokyo). Defaults to UTC when absent or invalid.",
               "type": "string"
             }
           }

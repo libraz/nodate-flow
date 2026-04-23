@@ -15,7 +15,8 @@ export type AiCostToday = components['schemas']['AiCostTodayOutputBody'];
 /** Query key factory for AI cost endpoints. */
 export const aiCostKeys = {
   all: ['ai-cost'] as const,
-  today: (workspaceId: string) => [...aiCostKeys.all, 'today', workspaceId] as const,
+  today: (workspaceId: string, tz: string) =>
+    [...aiCostKeys.all, 'today', workspaceId, tz] as const,
 };
 
 /**
@@ -23,10 +24,16 @@ export const aiCostKeys = {
  *
  * Non-suspense: returns `data: undefined` on error so callers can render
  * nothing without surfacing an error boundary. Refetches every 60 seconds.
+ *
+ * The browser's resolved IANA timezone is forwarded to the backend so the
+ * day window (and returned `date`) matches the viewer's local calendar day
+ * instead of UTC. The tz is included in the query key so the cache busts
+ * when the browser tz changes (travel, VM clock fix, etc.).
  */
 export function useAiCostTodayQuery(workspaceId: string | undefined): UseQueryResult<AiCostToday> {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   return useQuery({
-    queryKey: aiCostKeys.today(workspaceId ?? ''),
+    queryKey: aiCostKeys.today(workspaceId ?? '', tz),
     enabled: Boolean(workspaceId),
     retry: false,
     refetchInterval: 60_000,
@@ -37,7 +44,7 @@ export function useAiCostTodayQuery(workspaceId: string | undefined): UseQueryRe
     throwOnError: false,
     queryFn: async (): Promise<AiCostToday> => {
       const { data, error } = await sdk.GET('/workspaces/{wsId}/ai/cost-today', {
-        params: { path: { wsId: workspaceId as string } },
+        params: { path: { wsId: workspaceId as string }, query: { tz } },
       });
       if (error || !data) throw new Error('ai cost unavailable');
       return data;
