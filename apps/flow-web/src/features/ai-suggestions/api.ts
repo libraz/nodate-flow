@@ -45,6 +45,10 @@ export function useAiSuggestionsQuery(
     refetchInterval: streamHealthy ? false : POLL_INTERVAL_MS,
     staleTime: POLL_INTERVAL_MS,
     retry: false,
+    // This panel is decorative; opt out of the SDK-wide `throwOnError: true`
+    // default so a 404 / AI-disabled response never cascades to the route
+    // ErrorBoundary. Callers render the error state inline.
+    throwOnError: false,
     queryFn: async (): Promise<AiSuggestion[]> => {
       if (!workspaceId) return [];
       const { data, error } = await sdk.GET('/workspaces/{wsId}/ai/suggestions', {

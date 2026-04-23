@@ -16,6 +16,7 @@ import { useMatches, useNavigate } from '@tanstack/react-router';
 import type { TFunction } from 'i18next';
 import { Sparkles, X } from 'lucide-react';
 import { type ReactElement, useRef, useState } from 'react';
+import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
 
@@ -553,14 +554,15 @@ function AutoActionsPanel({
   );
 }
 
-export default function GlassDock(): ReactElement {
+function GlassDockImpl(): ReactElement {
   const { t } = useTranslation('ai-suggestions');
+  const { t: tCommon } = useTranslation('common');
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
   const workspaceId = useCurrentWorkspaceId() ?? undefined;
   useWorkspaceStream(workspaceId);
-  const { data } = useAiSuggestionsQuery(workspaceId);
+  const { data, isError: suggestionsFailed } = useAiSuggestionsQuery(workspaceId);
   const suggestions: AiSuggestion[] = data ?? [];
   const applyMutation = useApplyAiSuggestion(workspaceId ?? '');
   const dismissMutation = useDismissAiSuggestion(workspaceId ?? '');
@@ -680,7 +682,20 @@ export default function GlassDock(): ReactElement {
           gap: '0.5rem',
         }}
       >
-        {suggestions.length === 0 ? (
+        {suggestionsFailed ? (
+          <p
+            role="status"
+            style={{
+              margin: 0,
+              color: 'var(--nf-color-fg-muted)',
+              fontSize: '0.8125rem',
+              textAlign: 'center',
+              padding: '1rem',
+            }}
+          >
+            {tCommon('glass_dock.unavailable')}
+          </p>
+        ) : suggestions.length === 0 ? (
           <p
             style={{
               margin: 0,
@@ -704,5 +719,21 @@ export default function GlassDock(): ReactElement {
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * GlassDock — default export wraps the real implementation in a local
+ * ErrorBoundary. The dock is decorative; if anything inside throws
+ * synchronously (a sibling hook blows up, a query escalates past the
+ * per-query `throwOnError: false` opt-out, etc.) the dock silently
+ * disappears instead of collapsing the entire authenticated route to
+ * the root FatalFallback.
+ */
+export default function GlassDock(): ReactElement {
+  return (
+    <ErrorBoundary fallback={null}>
+      <GlassDockImpl />
+    </ErrorBoundary>
   );
 }

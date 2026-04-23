@@ -35,6 +35,9 @@ export function useStateSuggestionsQuery(
     refetchInterval: streamHealthy ? false : POLL_INTERVAL_MS,
     staleTime: POLL_INTERVAL_MS,
     retry: false,
+    // Decorative glass-dock panel — opt out of the SDK-wide `throwOnError: true`
+    // default so transient AI/workspace errors never crash the route.
+    throwOnError: false,
     queryFn: async (): Promise<StateSuggestion[]> => {
       if (!workspaceId) return [];
       const { data, error } = await sdk.GET('/workspaces/{wsId}/ai/state-suggestions', {

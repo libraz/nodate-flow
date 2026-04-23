@@ -102,6 +102,9 @@
       "initial_command": "> "
     }
   },
+  "glass_dock": {
+    "unavailable": "AI 提案は利用できません"
+  },
   "theme": {
     "aurora-light": "オーロラ ライト",
     "aurora-dark": "オーロラ ダーク",

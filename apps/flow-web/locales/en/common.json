@@ -102,6 +102,9 @@
       "initial_command": "> "
     }
   },
+  "glass_dock": {
+    "unavailable": "AI suggestions unavailable"
+  },
   "theme": {
     "aurora-light": "Aurora Light",
     "aurora-dark": "Aurora Dark",
