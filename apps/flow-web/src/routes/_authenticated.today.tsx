@@ -19,6 +19,7 @@ import { OPEN_COMMAND_PALETTE_EVENT } from '../components/layout/glass-dock';
 import type { TaskDerivedState, TaskPriority } from '../features/tasks/api';
 import { PRIORITY_COLOR, PRIORITY_KEY, STATE_COLOR } from '../features/tasks/constants';
 import { dateKey } from '../lib/date-utils';
+import { formatDueDate } from '../lib/format-date';
 import { sdk } from '../lib/sdk';
 
 type AssignedTask = components['schemas']['MyTaskListItem'];
@@ -50,7 +51,8 @@ function classifyDue(dueOn: string | undefined, todayKey: string): SectionKey {
 }
 
 function TodayRoute(): ReactElement {
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
+  const locale = i18n.resolvedLanguage ?? 'en';
 
   const { data: tasks } = useSuspenseQuery({
     queryKey: ['me', 'tasks'] as const,
@@ -278,7 +280,7 @@ function TodayRoute(): ReactElement {
                         textAlign: 'right',
                       }}
                     >
-                      {task.dueOn ?? t('today.no_due_label')}
+                      {task.dueOn ? formatDueDate(task.dueOn, locale) : t('today.no_due_label')}
                     </span>
                   </li>
                 );

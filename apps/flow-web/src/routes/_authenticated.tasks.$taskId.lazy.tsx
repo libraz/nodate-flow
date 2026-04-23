@@ -61,6 +61,7 @@ import ReplayPanel from '../features/timeline/replay-panel';
 import TaskMiniTimeline from '../features/timeline/task-mini-timeline';
 import { useWorkspaceMembersQuery, useWorkspaceQuery } from '../features/workspaces/api';
 import { formatDate, formatEpochDateTime } from '../lib/format';
+import { formatDueDate } from '../lib/format-date';
 
 const routeApi = getRouteApi('/_authenticated/tasks/$taskId');
 
@@ -610,7 +611,7 @@ function Sidebar({
               formatMonthYear={formatMonthYear}
               prevLabel={t('calendar.prev')}
               nextLabel={t('calendar.next')}
-              triggerLabel={dueOn ? formatDate(dueOn, locale) : t('common.date.placeholder')}
+              triggerLabel={dueOn ? formatDueDate(dueOn, locale) : t('common.date.placeholder')}
             />
           )}
         </FormField>
