@@ -22,6 +22,8 @@ import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
+import { formatDate } from '../../lib/format';
+
 import { TASK_PRIORITIES, type TaskPriority, useCreateTask } from './api';
 import { PRIORITY_KEY } from './constants';
 import {
@@ -71,7 +73,8 @@ export default function TaskCreateDialog({
   open,
   onClose,
 }: TaskCreateDialogProps): ReactElement {
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
+  const locale = i18n.resolvedLanguage ?? 'en';
   const weekdayLabels = t('common.date.weekdays', { returnObjects: true }) as string[];
   const formatMonthYear = (year: number, month: number): string =>
     t('common.date.monthYear', { year, month });
@@ -303,7 +306,7 @@ export default function TaskCreateDialog({
               onChange={setDueOn}
               weekdayLabels={weekdayLabels}
               formatMonthYear={formatMonthYear}
-              triggerLabel={dueOn || t('common.date.placeholder')}
+              triggerLabel={dueOn ? formatDate(dueOn, locale) : t('common.date.placeholder')}
             />
           )}
         </FormField>

@@ -464,7 +464,7 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
             }}
             weekdayLabels={weekdayLabels}
             formatMonthYear={formatMonthYear}
-            triggerLabel={editDraft || t('common.date.placeholder')}
+            triggerLabel={editDraft ? formatDate(editDraft, locale) : t('common.date.placeholder')}
             {...(css.cellDateTrigger ? { className: css.cellDateTrigger } : {})}
           />
         </div>

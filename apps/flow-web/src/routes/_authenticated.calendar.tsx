@@ -14,7 +14,6 @@
 import type { components } from '@nodate-flow/sdk';
 import type { components as timeComponents } from '@nodate-flow/time-sdk';
 import Button from '@nodate-flow/ui/primitives/button';
-import Checkbox from '@nodate-flow/ui/primitives/checkbox';
 import DatePicker from '@nodate-flow/ui/primitives/date-picker';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
 import FormField from '@nodate-flow/ui/primitives/form-field';
@@ -22,6 +21,7 @@ import Input from '@nodate-flow/ui/primitives/input';
 import Select from '@nodate-flow/ui/primitives/select';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import { ToggleChip, ToggleChipGroup } from '@nodate-flow/ui/primitives/toggle-chip';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -30,7 +30,6 @@ import {
   type FormEvent,
   type ReactElement,
   useCallback,
-  useId,
   useMemo,
   useRef,
   useState,
@@ -42,6 +41,7 @@ import { TASK_PRIORITIES, type TaskDerivedState, type TaskPriority } from '../fe
 import { PRIORITY_KEY, STATE_COLOR } from '../features/tasks/constants';
 import { useWorkspacesQuery } from '../features/workspaces/api';
 import { dateKey } from '../lib/date-utils';
+import { formatDate } from '../lib/format';
 import { sdk, timeSdk } from '../lib/sdk';
 
 type CalendarTask = components['schemas']['MyTaskListItem'];
@@ -114,7 +114,8 @@ function QuickCreateDialog({
   onClose,
   onCreated,
 }: QuickCreateDialogProps): ReactElement {
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
+  const locale = i18n.resolvedLanguage ?? 'en';
   const weekdayLabels = t('common.date.weekdays', { returnObjects: true }) as string[];
   const formatMonthYear = (year: number, month: number): string =>
     t('common.date.monthYear', { year, month });
@@ -215,7 +216,7 @@ function QuickCreateDialog({
                 onChange={setStartOn}
                 weekdayLabels={weekdayLabels}
                 formatMonthYear={formatMonthYear}
-                triggerLabel={startOn || t('common.date.placeholder')}
+                triggerLabel={startOn ? formatDate(startOn, locale) : t('common.date.placeholder')}
               />
             )}
           </FormField>
@@ -226,7 +227,7 @@ function QuickCreateDialog({
                 onChange={setEndOn}
                 weekdayLabels={weekdayLabels}
                 formatMonthYear={formatMonthYear}
-                triggerLabel={endOn || t('common.date.placeholder')}
+                triggerLabel={endOn ? formatDate(endOn, locale) : t('common.date.placeholder')}
                 {...(startOn ? { minDate: startOn } : {})}
               />
             )}
@@ -307,9 +308,6 @@ function CalendarRoute(): ReactElement {
 
   const [createDate, setCreateDate] = useState<string | null>(null);
   const [layers, setLayers] = useState<LayerFlags>({ tasksDue: true, events: true, blocks: false });
-  const tasksDueCheckboxId = useId();
-  const eventsCheckboxId = useId();
-  const blocksCheckboxId = useId();
 
   const { data: workspaces } = useWorkspacesQuery();
 
@@ -578,54 +576,29 @@ function CalendarRoute(): ReactElement {
           </Button>
         </div>
 
-        <fieldset
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-            border: 'none',
-            margin: 0,
-            padding: 0,
-            fontSize: '0.8125rem',
-          }}
-        >
-          <legend style={{ position: 'absolute', inlineSize: 1, blockSize: 1, overflow: 'hidden' }}>
-            {t('calendar.layers')}
-          </legend>
-          <label
-            htmlFor={tasksDueCheckboxId}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+        <ToggleChipGroup label={t('calendar.layers')}>
+          <ToggleChip
+            pressed={layers.tasksDue}
+            onPressedChange={(v) => setLayers((s) => ({ ...s, tasksDue: v }))}
+            color="var(--nf-cal-task-color)"
           >
-            <Checkbox
-              id={tasksDueCheckboxId}
-              checked={layers.tasksDue}
-              onChange={(e) => setLayers((s) => ({ ...s, tasksDue: e.currentTarget.checked }))}
-            />
             {t('calendar.layer.tasks_due')}
-          </label>
-          <label
-            htmlFor={eventsCheckboxId}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+          </ToggleChip>
+          <ToggleChip
+            pressed={layers.events}
+            onPressedChange={(v) => setLayers((s) => ({ ...s, events: v }))}
+            color="var(--nf-cal-event-color)"
           >
-            <Checkbox
-              id={eventsCheckboxId}
-              checked={layers.events}
-              onChange={(e) => setLayers((s) => ({ ...s, events: e.currentTarget.checked }))}
-            />
             {t('calendar.layer.events')}
-          </label>
-          <label
-            htmlFor={blocksCheckboxId}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+          </ToggleChip>
+          <ToggleChip
+            pressed={layers.blocks}
+            onPressedChange={(v) => setLayers((s) => ({ ...s, blocks: v }))}
+            color="var(--nf-cal-block-color)"
           >
-            <Checkbox
-              id={blocksCheckboxId}
-              checked={layers.blocks}
-              onChange={(e) => setLayers((s) => ({ ...s, blocks: e.currentTarget.checked }))}
-            />
             {t('calendar.layer.blocks')}
-          </label>
-        </fieldset>
+          </ToggleChip>
+        </ToggleChipGroup>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -868,14 +841,16 @@ function CalendarRoute(): ReactElement {
         </div>
       </div>
 
-      <QuickCreateDialog
-        open={createDate !== null}
-        dateLabel={createDateLabel}
-        dueOn={createDate ?? ''}
-        projects={allProjects}
-        onClose={() => setCreateDate(null)}
-        onCreated={handleCreated}
-      />
+      {createDate !== null ? (
+        <QuickCreateDialog
+          open
+          dateLabel={createDateLabel}
+          dueOn={createDate}
+          projects={allProjects}
+          onClose={() => setCreateDate(null)}
+          onCreated={handleCreated}
+        />
+      ) : null}
     </section>
   );
 }

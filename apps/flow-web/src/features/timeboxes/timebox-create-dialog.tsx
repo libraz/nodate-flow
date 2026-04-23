@@ -16,6 +16,8 @@ import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
+import { formatDate } from '../../lib/format';
+
 import { useCreateTimebox } from './api';
 
 export interface TimeboxCreateDialogProps {
@@ -51,7 +53,8 @@ export default function TimeboxCreateDialog({
   onClose,
 }: TimeboxCreateDialogProps): ReactElement {
   const { t } = useTranslation('timeboxes');
-  const { t: tCommon } = useTranslation('common');
+  const { t: tCommon, i18n } = useTranslation('common');
+  const locale = i18n.resolvedLanguage ?? 'en';
   const weekdayLabels = tCommon('common.date.weekdays', { returnObjects: true }) as string[];
   const formatMonthYear = (year: number, month: number): string =>
     tCommon('common.date.monthYear', { year, month });
@@ -191,7 +194,9 @@ export default function TimeboxCreateDialog({
                 onChange={setStartsOn}
                 weekdayLabels={weekdayLabels}
                 formatMonthYear={formatMonthYear}
-                triggerLabel={startsOn || tCommon('common.date.placeholder')}
+                triggerLabel={
+                  startsOn ? formatDate(startsOn, locale) : tCommon('common.date.placeholder')
+                }
               />
             )}
           </FormField>
@@ -207,7 +212,9 @@ export default function TimeboxCreateDialog({
                 onChange={setEndsOn}
                 weekdayLabels={weekdayLabels}
                 formatMonthYear={formatMonthYear}
-                triggerLabel={endsOn || tCommon('common.date.placeholder')}
+                triggerLabel={
+                  endsOn ? formatDate(endsOn, locale) : tCommon('common.date.placeholder')
+                }
                 {...(startsOn ? { minDate: startsOn } : {})}
               />
             )}

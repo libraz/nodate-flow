@@ -401,18 +401,21 @@ function InlineDueCell({
         }}
         weekdayLabels={weekdayLabels}
         formatMonthYear={formatMonthYear}
-        triggerLabel={dueOn ?? t('common.date.placeholder')}
+        triggerLabel={dueOn ? formatDate(dueOn, locale) : t('common.date.placeholder')}
       />
     );
   }
 
   const displayDate = dueOn ? formatDate(dueOn, locale) : '—';
+  const ariaLabel = dueOn
+    ? t('tasks.inline.edit_due_set', { date: formatDate(dueOn, locale) })
+    : t('tasks.inline.edit_due_unset');
   return (
     <span
       role="button"
       tabIndex={0}
       title={t('tasks.inline.edit_due')}
-      aria-label={`${displayDate} — ${t('tasks.inline.edit_due')}`}
+      aria-label={ariaLabel}
       onClick={onStartEdit}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {

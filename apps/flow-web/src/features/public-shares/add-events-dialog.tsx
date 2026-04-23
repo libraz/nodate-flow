@@ -17,6 +17,8 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ReactElement, Suspense, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatDate } from '../../lib/format';
+
 import {
   type CrossCalendarEvent,
   useAttachEventsToShare,
@@ -63,7 +65,8 @@ export default function AddEventsDialog({
   onClose,
 }: AddEventsDialogProps): ReactElement {
   const { t } = useTranslation('settings');
-  const { t: tCommon } = useTranslation('common');
+  const { t: tCommon, i18n } = useTranslation('common');
+  const locale = i18n.resolvedLanguage ?? 'en';
   const weekdayLabels = tCommon('common.date.weekdays', { returnObjects: true }) as string[];
   const formatMonthYear = (year: number, month: number): string =>
     tCommon('common.date.monthYear', { year, month });
@@ -87,7 +90,7 @@ export default function AddEventsDialog({
                 onChange={setFrom}
                 weekdayLabels={weekdayLabels}
                 formatMonthYear={formatMonthYear}
-                triggerLabel={from || tCommon('common.date.placeholder')}
+                triggerLabel={from ? formatDate(from, locale) : tCommon('common.date.placeholder')}
               />
             )}
           </FormField>
@@ -101,7 +104,7 @@ export default function AddEventsDialog({
                 onChange={setTo}
                 weekdayLabels={weekdayLabels}
                 formatMonthYear={formatMonthYear}
-                triggerLabel={to || tCommon('common.date.placeholder')}
+                triggerLabel={to ? formatDate(to, locale) : tCommon('common.date.placeholder')}
                 {...(from ? { minDate: from } : {})}
               />
             )}

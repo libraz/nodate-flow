@@ -50,9 +50,21 @@ function formatTimestamp(ts: number): string {
   return new Date(ts * 1000).toLocaleString();
 }
 
+/** Format an ISO `YYYY-MM-DD` string using the given BCP 47 locale. */
+function formatIsoDate(iso: string, locale: string): string {
+  try {
+    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(
+      new Date(`${iso}T00:00`),
+    );
+  } catch {
+    return iso;
+  }
+}
+
 function AuditLogsPage(): ReactElement {
   const { t } = useTranslation('admin');
-  const { t: tCommon } = useTranslation('common');
+  const { t: tCommon, i18n } = useTranslation('common');
+  const locale = i18n.resolvedLanguage ?? 'en';
   const weekdayLabels = tCommon('common.date.weekdays', { returnObjects: true }) as string[];
   const formatMonthYear = (year: number, month: number): string =>
     tCommon('common.date.monthYear', { year, month });
@@ -169,7 +181,9 @@ function AuditLogsPage(): ReactElement {
             onChange={handleFromChange}
             weekdayLabels={weekdayLabels}
             formatMonthYear={formatMonthYear}
-            triggerLabel={fromDate || tCommon('common.date.placeholder')}
+            triggerLabel={
+              fromDate ? formatIsoDate(fromDate, locale) : tCommon('common.date.placeholder')
+            }
           />
         </div>
         <div
@@ -188,7 +202,9 @@ function AuditLogsPage(): ReactElement {
             onChange={handleToChange}
             weekdayLabels={weekdayLabels}
             formatMonthYear={formatMonthYear}
-            triggerLabel={toDate || tCommon('common.date.placeholder')}
+            triggerLabel={
+              toDate ? formatIsoDate(toDate, locale) : tCommon('common.date.placeholder')
+            }
             {...(fromDate ? { minDate: fromDate } : {})}
           />
         </div>

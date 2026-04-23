@@ -15,6 +15,8 @@ import Select from '@nodate-flow/ui/primitives/select';
 import { type ChangeEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatDate } from '../../lib/format';
+
 import { type AuditLogEntry, type AuditLogFilters, useAuditLogsQuery } from './api';
 
 const PAGE_SIZE = 50;
@@ -159,7 +161,8 @@ export default function AuditLogView({
   workspaceId: string;
 }): ReactElement {
   const { t } = useTranslation('settings');
-  const { t: tCommon } = useTranslation('common');
+  const { t: tCommon, i18n } = useTranslation('common');
+  const locale = i18n.resolvedLanguage ?? 'en';
   const weekdayLabels = tCommon('common.date.weekdays', { returnObjects: true }) as string[];
   const formatMonthYear = (year: number, month: number): string =>
     tCommon('common.date.monthYear', { year, month });
@@ -343,7 +346,11 @@ export default function AuditLogView({
               onChange={handleDateFromChange}
               weekdayLabels={weekdayLabels}
               formatMonthYear={formatMonthYear}
-              triggerLabel={filters.dateFrom || tCommon('common.date.placeholder')}
+              triggerLabel={
+                filters.dateFrom
+                  ? formatDate(filters.dateFrom, locale)
+                  : tCommon('common.date.placeholder')
+              }
             />
           </div>
 
@@ -356,7 +363,11 @@ export default function AuditLogView({
               onChange={handleDateToChange}
               weekdayLabels={weekdayLabels}
               formatMonthYear={formatMonthYear}
-              triggerLabel={filters.dateTo || tCommon('common.date.placeholder')}
+              triggerLabel={
+                filters.dateTo
+                  ? formatDate(filters.dateTo, locale)
+                  : tCommon('common.date.placeholder')
+              }
               {...(filters.dateFrom ? { minDate: filters.dateFrom } : {})}
             />
           </div>
