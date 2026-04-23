@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -70,8 +71,8 @@ type CreateEventInput struct {
 		ShowAs             string           `json:"showAs,omitempty" required:"false" enum:"busy,free,tentative,oof" doc:"Show-as status"`
 		Title              string           `json:"title" minLength:"1" maxLength:"500" doc:"Event title"`
 		AllDay             bool             `json:"allDay" required:"false" doc:"All-day event flag"`
-		StartAt            *time.Time       `json:"startAt,omitempty" required:"false" doc:"Start time; omit for a planning-stage (undated) event"`
-		EndAt              *time.Time       `json:"endAt,omitempty" required:"false" doc:"End time; omit for a planning-stage (undated) event"`
+		StartAt            *int64           `json:"startAt,omitempty" required:"false" doc:"Start time as unix seconds (UTC); omit for a planning-stage (undated) event"`
+		EndAt              *int64           `json:"endAt,omitempty" required:"false" doc:"End time as unix seconds (UTC); omit for a planning-stage (undated) event"`
 		Timezone           string           `json:"timezone" doc:"IANA timezone"`
 		Location           *string          `json:"location,omitempty" required:"false" doc:"Location"`
 		Memo               *string          `json:"memo,omitempty" required:"false" doc:"Memo / notes"`
@@ -79,7 +80,7 @@ type CreateEventInput struct {
 		OwnerUserID        *string          `json:"ownerUserId,omitempty" required:"false" doc:"Owner user public ID (defaults to actor)"`
 		BlockLabel         *string          `json:"blockLabel,omitempty" required:"false" doc:"Block label"`
 		RecurrenceRule     *json.RawMessage `json:"recurrenceRule,omitempty" required:"false" doc:"RFC 5545 recurrence rule as JSON"`
-		RecurrenceEnd      *time.Time       `json:"recurrenceEnd,omitempty" required:"false" doc:"Recurrence end date"`
+		RecurrenceEnd      *int64           `json:"recurrenceEnd,omitempty" required:"false" doc:"Recurrence end as unix seconds (UTC)"`
 		NotificationOffset *int32           `json:"notificationOffset,omitempty" required:"false" doc:"Notification offset in minutes"`
 	}
 }
@@ -112,15 +113,15 @@ type PatchEventInput struct {
 		ShowAs               *string          `json:"showAs,omitempty" required:"false" doc:"Show-as status"`
 		Title                *string          `json:"title,omitempty" required:"false" doc:"Event title"`
 		AllDay               *bool            `json:"allDay,omitempty" required:"false" doc:"All-day flag"`
-		StartAt              *time.Time       `json:"startAt,omitempty" required:"false" doc:"Start time"`
-		EndAt                *time.Time       `json:"endAt,omitempty" required:"false" doc:"End time"`
+		StartAt              *int64           `json:"startAt,omitempty" required:"false" doc:"Start time as unix seconds (UTC)"`
+		EndAt                *int64           `json:"endAt,omitempty" required:"false" doc:"End time as unix seconds (UTC)"`
 		Timezone             *string          `json:"timezone,omitempty" required:"false" doc:"IANA timezone"`
 		Location             *string          `json:"location,omitempty" required:"false" doc:"Location"`
 		Memo                 *string          `json:"memo,omitempty" required:"false" doc:"Memo"`
 		Url                  *string          `json:"url,omitempty" required:"false" doc:"Related URL"`
 		BlockLabel           *string          `json:"blockLabel,omitempty" required:"false" doc:"Block label"`
 		RecurrenceRule       *json.RawMessage `json:"recurrenceRule,omitempty" required:"false" doc:"Recurrence rule"`
-		RecurrenceEnd        *time.Time       `json:"recurrenceEnd,omitempty" required:"false" doc:"Recurrence end"`
+		RecurrenceEnd        *int64           `json:"recurrenceEnd,omitempty" required:"false" doc:"Recurrence end as unix seconds (UTC)"`
 		RecurrenceExceptions *json.RawMessage `json:"recurrenceExceptions,omitempty" required:"false" doc:"Array of ISO 8601 dates/times to exclude from recurrence"`
 		NotificationOffset   *int32           `json:"notificationOffset,omitempty" required:"false" doc:"Notification offset"`
 	}
@@ -284,8 +285,8 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 		}
 		var startAtNT, endAtNT sql.NullTime
 		if input.Body.StartAt != nil {
-			startAtNT = sql.NullTime{Time: *input.Body.StartAt, Valid: true}
-			endAtNT = sql.NullTime{Time: *input.Body.EndAt, Valid: true}
+			startAtNT = sql.NullTime{Time: time.Unix(*input.Body.StartAt, 0).UTC(), Valid: true}
+			endAtNT = sql.NullTime{Time: time.Unix(*input.Body.EndAt, 0).UTC(), Valid: true}
 		}
 		params := generated.CreateCalendarEventParams{
 			PublicID:        eventPublicID,
@@ -318,7 +319,7 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 			params.RecurrenceRule = json.RawMessage(*input.Body.RecurrenceRule)
 		}
 		if input.Body.RecurrenceEnd != nil {
-			params.RecurrenceEnd = sql.NullTime{Time: *input.Body.RecurrenceEnd, Valid: true}
+			params.RecurrenceEnd = sql.NullTime{Time: time.Unix(*input.Body.RecurrenceEnd, 0).UTC(), Valid: true}
 		}
 		if input.Body.NotificationOffset != nil {
 			params.NotificationOffset = sql.NullInt32{Int32: *input.Body.NotificationOffset, Valid: true}
@@ -350,7 +351,7 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 			out.Body.RecurrenceRule = input.Body.RecurrenceRule
 		}
 		if input.Body.RecurrenceEnd != nil {
-			out.Body.RecurrenceEnd = int64Ptr(input.Body.RecurrenceEnd.Unix())
+			out.Body.RecurrenceEnd = input.Body.RecurrenceEnd
 		}
 		if input.Body.NotificationOffset != nil {
 			out.Body.NotificationOffset = input.Body.NotificationOffset
@@ -488,7 +489,7 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 				NewTitle:    *input.Body.Title,
 				EventID:     evt.ID,
 			}); err != nil {
-				return nil, translateItemkitError(err)
+				return nil, translateItemkitError(ctx, "itemkit.RenameItem", err)
 			}
 			// Prevent the sqlc PATCH below from redundantly touching title.
 			input.Body.Title = nil
@@ -499,10 +500,10 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 				WorkspaceID: wsID,
 				EventID:     evt.ID,
 				ActorUserID: actorID,
-				StartAt:     *input.Body.StartAt,
-				EndAt:       *input.Body.EndAt,
+				StartAt:     time.Unix(*input.Body.StartAt, 0).UTC(),
+				EndAt:       time.Unix(*input.Body.EndAt, 0).UTC(),
 			}); err != nil {
-				return nil, translateItemkitError(err)
+				return nil, translateItemkitError(ctx, "itemkit.RescheduleEvent", err)
 			}
 			input.Body.StartAt = nil
 			input.Body.EndAt = nil
@@ -538,10 +539,10 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 			params.AllDay = sql.NullBool{Bool: *input.Body.AllDay, Valid: true}
 		}
 		if input.Body.StartAt != nil {
-			params.StartAt = sql.NullTime{Time: *input.Body.StartAt, Valid: true}
+			params.StartAt = sql.NullTime{Time: time.Unix(*input.Body.StartAt, 0).UTC(), Valid: true}
 		}
 		if input.Body.EndAt != nil {
-			params.EndAt = sql.NullTime{Time: *input.Body.EndAt, Valid: true}
+			params.EndAt = sql.NullTime{Time: time.Unix(*input.Body.EndAt, 0).UTC(), Valid: true}
 		}
 		if input.Body.Timezone != nil {
 			params.Timezone = sql.NullString{String: *input.Body.Timezone, Valid: true}
@@ -568,7 +569,7 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 			params.RecurrenceRule = json.RawMessage(*input.Body.RecurrenceRule)
 		}
 		if input.Body.RecurrenceEnd != nil {
-			params.RecurrenceEnd = sql.NullTime{Time: *input.Body.RecurrenceEnd, Valid: true}
+			params.RecurrenceEnd = sql.NullTime{Time: time.Unix(*input.Body.RecurrenceEnd, 0).UTC(), Valid: true}
 		}
 		if input.Body.RecurrenceExceptions != nil {
 			params.RecurrenceExceptions = json.RawMessage(*input.Body.RecurrenceExceptions)
@@ -616,17 +617,37 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 }
 
 // translateItemkitError maps itemkit invariant / generic errors to
-// time-api's apierrors spec set. Unknown errors surface as 500.
-func translateItemkitError(err error) error {
+// time-api's apierrors spec set. The original error is logged at
+// ErrorContext level so schema drift or other low-level failures do
+// not disappear into a generic 500. Known sentinels (sql.ErrNoRows)
+// are surfaced as 404. Invariant / recurrence messages are mapped to
+// their dedicated 4xx codes. Anything else falls through to the
+// generic store-write / store-delete 500 decided by the caller via
+// fallback.
+func translateItemkitError(ctx context.Context, op string, err error) error {
 	if err == nil {
 		return nil
 	}
+	slog.ErrorContext(ctx, "itemkit error", "op", op, "error", err.Error())
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return httpErr(apierrors.CalendarEventNotFound)
+	}
+
 	msg := err.Error()
 	switch {
+	case strings.Contains(msg, "not found"):
+		return httpErr(apierrors.CalendarEventNotFound)
 	case strings.Contains(msg, "recurrence"):
 		return httpErr(apierrors.ItemItemkitRecurrenceWithTaskLink)
 	case strings.Contains(msg, "itemkit invariant"):
 		return httpErr(apierrors.ItemItemkitInvariantViolation)
+	}
+
+	// Pick the fallback status based on the op so DELETE reports a
+	// delete-failure and PATCH/POST reports a write-failure.
+	if strings.Contains(op, "DeleteEvent") {
+		return httpErr(apierrors.CalendarEventStoreDeleteInterrupted)
 	}
 	return httpErr(apierrors.CalendarEventStoreWriteInterrupted)
 }
@@ -681,7 +702,7 @@ func DeleteEvent(deps Deps) func(context.Context, *DeleteEventInput) (*DeleteEve
 		defer func() { _ = tx.Rollback() }()
 
 		if err := itemkit.DeleteEvent(ctx, tx, wsID, evt.ID, actorID); err != nil {
-			return nil, translateItemkitError(err)
+			return nil, translateItemkitError(ctx, "itemkit.DeleteEvent", fmt.Errorf("itemkit: delete event: %w", err))
 		}
 		if err := tx.Commit(); err != nil {
 			return nil, httpErr(apierrors.CalendarEventStoreDeleteInterrupted)

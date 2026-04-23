@@ -562,9 +562,9 @@
             "type": "string"
           },
           "endAt": {
-            "description": "End time; omit for a planning-stage (undated) event",
-            "format": "date-time",
-            "type": "string"
+            "description": "End time as unix seconds (UTC); omit for a planning-stage (undated) event",
+            "format": "int64",
+            "type": "integer"
           },
           "kind": {
             "description": "Event kind",
@@ -589,9 +589,9 @@
             "type": "string"
           },
           "recurrenceEnd": {
-            "description": "Recurrence end date",
-            "format": "date-time",
-            "type": "string"
+            "description": "Recurrence end as unix seconds (UTC)",
+            "format": "int64",
+            "type": "integer"
           },
           "recurrenceRule": {
             "description": "RFC 5545 recurrence rule as JSON"
@@ -602,9 +602,9 @@
             "type": "string"
           },
           "startAt": {
-            "description": "Start time; omit for a planning-stage (undated) event",
-            "format": "date-time",
-            "type": "string"
+            "description": "Start time as unix seconds (UTC); omit for a planning-stage (undated) event",
+            "format": "int64",
+            "type": "integer"
           },
           "timezone": {
             "description": "IANA timezone",
@@ -1764,9 +1764,9 @@
             "type": "string"
           },
           "endAt": {
-            "description": "End time",
-            "format": "date-time",
-            "type": "string"
+            "description": "End time as unix seconds (UTC)",
+            "format": "int64",
+            "type": "integer"
           },
           "kind": {
             "description": "Event kind",
@@ -1786,9 +1786,9 @@
             "type": "integer"
           },
           "recurrenceEnd": {
-            "description": "Recurrence end",
-            "format": "date-time",
-            "type": "string"
+            "description": "Recurrence end as unix seconds (UTC)",
+            "format": "int64",
+            "type": "integer"
           },
           "recurrenceExceptions": {
             "description": "Array of ISO 8601 dates/times to exclude from recurrence"
@@ -1801,9 +1801,9 @@
             "type": "string"
           },
           "startAt": {
-            "description": "Start time",
-            "format": "date-time",
-            "type": "string"
+            "description": "Start time as unix seconds (UTC)",
+            "format": "int64",
+            "type": "integer"
           },
           "timezone": {
             "description": "IANA timezone",

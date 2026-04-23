@@ -904,10 +904,10 @@ export interface components {
             /** @description Block label */
             blockLabel?: string;
             /**
-             * Format: date-time
-             * @description End time; omit for a planning-stage (undated) event
+             * Format: int64
+             * @description End time as unix seconds (UTC); omit for a planning-stage (undated) event
              */
-            endAt?: string;
+            endAt?: number;
             /**
              * @description Event kind
              * @enum {string}
@@ -925,10 +925,10 @@ export interface components {
             /** @description Owner user public ID (defaults to actor) */
             ownerUserId?: string;
             /**
-             * Format: date-time
-             * @description Recurrence end date
+             * Format: int64
+             * @description Recurrence end as unix seconds (UTC)
              */
-            recurrenceEnd?: string;
+            recurrenceEnd?: number;
             /** @description RFC 5545 recurrence rule as JSON */
             recurrenceRule?: unknown;
             /**
@@ -937,10 +937,10 @@ export interface components {
              */
             showAs?: "busy" | "free" | "tentative" | "oof";
             /**
-             * Format: date-time
-             * @description Start time; omit for a planning-stage (undated) event
+             * Format: int64
+             * @description Start time as unix seconds (UTC); omit for a planning-stage (undated) event
              */
-            startAt?: string;
+            startAt?: number;
             /** @description IANA timezone */
             timezone: string;
             /** @description Event title */
@@ -1435,10 +1435,10 @@ export interface components {
             /** @description Block label */
             blockLabel?: string;
             /**
-             * Format: date-time
-             * @description End time
+             * Format: int64
+             * @description End time as unix seconds (UTC)
              */
-            endAt?: string;
+            endAt?: number;
             /** @description Event kind */
             kind?: string;
             /** @description Location */
@@ -1451,10 +1451,10 @@ export interface components {
              */
             notificationOffset?: number;
             /**
-             * Format: date-time
-             * @description Recurrence end
+             * Format: int64
+             * @description Recurrence end as unix seconds (UTC)
              */
-            recurrenceEnd?: string;
+            recurrenceEnd?: number;
             /** @description Array of ISO 8601 dates/times to exclude from recurrence */
             recurrenceExceptions?: unknown;
             /** @description Recurrence rule */
@@ -1462,10 +1462,10 @@ export interface components {
             /** @description Show-as status */
             showAs?: string;
             /**
-             * Format: date-time
-             * @description Start time
+             * Format: int64
+             * @description Start time as unix seconds (UTC)
              */
-            startAt?: string;
+            startAt?: number;
             /** @description IANA timezone */
             timezone?: string;
             /** @description Event title */
