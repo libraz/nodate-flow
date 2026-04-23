@@ -47,7 +47,14 @@
   overflow-y: auto;
   min-inline-size: 0;
   min-block-size: 0;
-  padding-block-end: 6rem;
+  /*
+   * Reserve vertical room for the fixed glass-dock / FAB bar pinned to
+   * `inset-block-end: var(--nf-space-6)` (see `glass-dock.module.css`).
+   * Without this padding the dock overlaps trailing content (e.g. the
+   * dashboard section heading) on narrow viewports where the dock spans
+   * the full inline axis.
+   */
+  padding-block-end: var(--nf-space-24);
 }
 
 .main:focus-visible {

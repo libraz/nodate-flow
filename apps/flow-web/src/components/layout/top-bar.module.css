@@ -15,12 +15,27 @@
 .topBarShell {
   container-type: inline-size;
   container-name: header;
+  inline-size: 100%;
   min-inline-size: 0;
 }
 
+/*
+ * Grid tracks:
+ *  - left : `minmax(0, auto)` so the workspace switcher can shrink below its
+ *    max-content. Native <select> has an intrinsic max-content driven by
+ *    its widest <option> label which (in Chromium) ignores `max-inline-size`
+ *    under grid track sizing — without the explicit 0 lower bound the left
+ *    track swallowed the row and pushed the right track off-screen.
+ *  - center: `minmax(0, 1fr)` flexes the search / breadcrumb slot and
+ *    collapses to zero under pressure.
+ *  - right: `max-content` pins the action cluster at the sum of its
+ *    children so the avatar trigger is always fully visible. Shrinking
+ *    would cause `justify-content: flex-end` to render the first icon
+ *    at a negative x-offset.
+ */
 .topBar {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) max-content;
   align-items: center;
   gap: var(--nf-space-3);
   padding-block: var(--nf-space-3);
@@ -28,6 +43,7 @@
   background: var(--nf-color-bg-elevated);
   border-block-end: var(--nf-space-px) solid var(--nf-color-border);
   min-block-size: 3.5rem;
+  inline-size: 100%;
   min-inline-size: 0;
 }
 
@@ -151,12 +167,29 @@
   color: var(--nf-color-fg-muted);
 }
 
+/*
+ * The action cluster lives in the trailing grid track (`max-content`),
+ * so the track is pinned at the sum of the visible flex children and
+ * the avatar trigger stays fully on-screen. The flex children all carry
+ * `flex: 0 0 auto` (see `.iconButton`, `.avatarTrigger`) so they never
+ * shrink below their 2.25rem tap target.
+ */
 .right {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: var(--nf-space-2);
-  min-inline-size: 0;
+}
+
+/*
+ * The notification-bell slot is a plain <div> wrapper around the
+ * suspense boundary. Explicit `flex: 0 0 auto` keeps it from being
+ * collapsed to zero width by the flex container's default shrink when
+ * a sibling demands more space.
+ */
+.inlineNotificationBell {
+  display: inline-flex;
+  flex: 0 0 auto;
 }
 
 .iconButton {
@@ -342,6 +375,15 @@
   .inlineSignOut {
     display: none;
   }
+
+  /*
+   * Cap the workspace switcher at the compact breakpoint. Long workspace
+   * names would otherwise push the native <select> toward its 14rem max
+   * and squeeze the action cluster in the right grid track.
+   */
+  .workspaceSelect {
+    max-inline-size: 10rem;
+  }
 }
 
 /*
@@ -356,5 +398,15 @@
   .topBar {
     padding-inline: var(--nf-space-3);
     gap: var(--nf-space-2);
+  }
+
+  /*
+   * At ultra widths the workspace switcher must shrink aggressively to
+   * leave room for the search button and the avatar trigger. Native
+   * <select> still renders an ellipsis for the selected option when the
+   * element is narrower than the label.
+   */
+  .workspaceSelect {
+    max-inline-size: 7rem;
   }
 }
