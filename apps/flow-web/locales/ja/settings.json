@@ -305,7 +305,8 @@
           "description": "説明",
           "description_help": "Markdown はまだ描画されません。プレーンテキストのみです。",
           "holidays_country": "祝日オーバーレイの国",
-          "holidays_country_help": "ISO 3166-1 alpha-2 コード (例: JP、US)。空欄の場合は祝日を表示しません。"
+          "holidays_country_help": "シェアページに祝日を重ねて表示する国を選んでください。未選択の場合は祝日を表示しません。",
+          "holidays_country_unset": "祝日を表示しない"
         },
         "reveal_warning": "この URL をいま必ずコピーしてください。トークンはハッシュ化されて保管されるため、再表示はできません。",
         "rotate_warning": "以前の URL は無効になりました。新しい URL を必要な相手に共有してください。",

@@ -305,7 +305,8 @@
           "description": "Description",
           "description_help": "Markdown is not rendered yet; plain text only.",
           "holidays_country": "Holiday overlay country",
-          "holidays_country_help": "ISO 3166-1 alpha-2 code (e.g. JP, US). Leave blank for no holiday overlay."
+          "holidays_country_help": "Choose a country to overlay its public holidays on the share page. Leave unset for no holiday overlay.",
+          "holidays_country_unset": "No holiday overlay"
         },
         "reveal_warning": "Copy this URL now. The token is stored hashed — you will not be able to see it again.",
         "rotate_warning": "The previous URL has been invalidated. Share this new URL with anyone who still needs access.",

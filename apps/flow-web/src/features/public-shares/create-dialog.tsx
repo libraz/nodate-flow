@@ -11,6 +11,7 @@
  * GETs omit the `token` field.
  */
 
+import { SUPPORTED_COUNTRIES } from '@nodate-flow/sdk';
 import Button from '@nodate-flow/ui/primitives/button';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
 import FormField from '@nodate-flow/ui/primitives/form-field';
@@ -69,8 +70,7 @@ export default function PublicShareCreateDialog({
     setSubmitting(true);
     const body: CreatePublicShareInput = { title: title.trim() };
     if (description.trim() !== '') body.description = description.trim();
-    const country = holidaysCountry.trim().toUpperCase();
-    if (country.length === 2) body.showHolidaysCountry = country;
+    if (holidaysCountry !== '') body.showHolidaysCountry = holidaysCountry;
     try {
       const result = await create.mutateAsync(body);
       if (typeof result.token === 'string' && result.token !== '') {
@@ -149,17 +149,32 @@ export default function PublicShareCreateDialog({
             description={t('workspace.public_shares.dialog.field.holidays_country_help')}
           >
             {(control) => (
-              <Input
+              <select
                 {...control}
                 value={holidaysCountry}
-                maxLength={2}
-                autoCapitalize="characters"
-                autoComplete="off"
-                spellCheck={false}
                 onChange={(e) => {
                   setHolidaysCountry(e.target.value);
                 }}
-              />
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: 'var(--nf-radius-md, 0.375rem)',
+                  border: 'var(--nf-space-px, 1px) solid var(--nf-color-border)',
+                  background: 'var(--nf-color-bg)',
+                  color: 'var(--nf-color-fg)',
+                  fontSize: 'var(--nf-text-sm, 0.875rem)',
+                }}
+              >
+                <option value="">
+                  {t('workspace.public_shares.dialog.field.holidays_country_unset')}
+                </option>
+                {Object.entries(SUPPORTED_COUNTRIES)
+                  .sort(([, a], [, b]) => a.localeCompare(b))
+                  .map(([code, name]) => (
+                    <option key={code} value={code}>
+                      {code} — {name}
+                    </option>
+                  ))}
+              </select>
             )}
           </FormField>
 
