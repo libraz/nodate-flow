@@ -107,8 +107,55 @@ function formatDevice(ua: string): string {
   return `${browser} · ${os}`;
 }
 
+/** Seconds in a day — shared between relative and absolute branches. */
+const SECONDS_PER_DAY = 86_400;
+/** Window within which we prefer a relative (e.g. "2 hours ago") label. */
+const RELATIVE_WINDOW_SECONDS = 7 * SECONDS_PER_DAY;
+
+/**
+ * @brief Render a unix-seconds timestamp as a locale-aware string.
+ * @param ts Unix seconds.
+ * @param locale BCP 47 locale (e.g. "ja" / "en").
+ * @return Relative phrase (e.g. "2 時間前") within 7 days, otherwise a
+ *         locale-formatted absolute date.
+ *
+ * Intentionally local to this file: the audit-logs page renders absolute
+ * timestamps only, so the two use cases do not share a util yet. Uses
+ * `Intl.RelativeTimeFormat` and `Intl.DateTimeFormat` — no date library.
+ */
+function formatRelative(ts: number, locale: string): string {
+  const nowSec = Math.floor(Date.now() / 1000);
+  const diffSec = ts - nowSec; // negative = past, positive = future
+  const absDiff = Math.abs(diffSec);
+
+  if (absDiff < RELATIVE_WINDOW_SECONDS) {
+    try {
+      const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+      if (absDiff < 60) {
+        return rtf.format(Math.round(diffSec), 'second');
+      }
+      if (absDiff < 3_600) {
+        return rtf.format(Math.round(diffSec / 60), 'minute');
+      }
+      if (absDiff < SECONDS_PER_DAY) {
+        return rtf.format(Math.round(diffSec / 3_600), 'hour');
+      }
+      return rtf.format(Math.round(diffSec / SECONDS_PER_DAY), 'day');
+    } catch {
+      // Fall through to absolute format on environments lacking RTF.
+    }
+  }
+
+  try {
+    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(ts * 1000));
+  } catch {
+    return new Date(ts * 1000).toISOString();
+  }
+}
+
 function SecurityPage(): ReactElement {
-  const { t } = useTranslation('auth');
+  const { t, i18n } = useTranslation('auth');
+  const locale = i18n.resolvedLanguage ?? 'en';
 
   // -- Password change --
   const [passwordError, setPasswordError] = useState<AuthErrorI18nKey | null>(null);
@@ -385,6 +432,20 @@ function SecurityPage(): ReactElement {
                     }}
                   >
                     {session.ipAddress}
+                  </p>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 'var(--nf-text-xs, 0.75rem)',
+                      color: 'var(--nf-color-fg-muted)',
+                    }}
+                  >
+                    {t('security.session_created')}: {formatRelative(session.createdAt, locale)}
+                    {' · '}
+                    {t('security.session_last_active')}:{' '}
+                    {session.lastUsedAt !== undefined && session.lastUsedAt !== null
+                      ? formatRelative(session.lastUsedAt, locale)
+                      : t('security.session_last_active_unknown')}
                   </p>
                 </div>
                 {!session.current ? (
