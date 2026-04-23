@@ -33,7 +33,7 @@
     "@nodate-flow/ui": "workspace:*",
     "@playwright/test": "1.48.2",
     "@tailwindcss/vite": "^4.1.0",
-    "@tanstack/router-devtools": "1.166.11",
+    "@tanstack/react-router-devtools": "1.166.11",
     "@tanstack/router-plugin": "1.167.12",
     "@testing-library/react": "16.0.1",
     "@types/qrcode": "^1.5.6",

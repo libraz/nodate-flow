@@ -32,7 +32,7 @@
   "devDependencies": {
     "@nodate-flow/ui": "workspace:*",
     "@nodate-flow/holidays": "workspace:*",
-    "@tanstack/router-devtools": "1.166.11",
+    "@tanstack/react-router-devtools": "1.166.11",
     "@tanstack/router-plugin": "1.167.12",
     "@types/luxon": "^3.4.2",
     "@types/react": "19.0.0",

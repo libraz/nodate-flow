@@ -26,7 +26,7 @@ function NotFound(): ReactElement {
 
 const TanStackRouterDevtools = import.meta.env.DEV
   ? lazy(() =>
-      import('@tanstack/router-devtools').then((m) => ({
+      import('@tanstack/react-router-devtools').then((m) => ({
         default: m.TanStackRouterDevtools,
       })),
     )
