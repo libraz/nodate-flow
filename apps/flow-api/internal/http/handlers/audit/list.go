@@ -3,6 +3,7 @@ package audit
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
@@ -49,6 +50,7 @@ func List(deps Deps) func(context.Context, *ListAuditLogsInput) (*ListAuditLogsO
 
 		rows, err := deps.Queries.ListWorkspaceAuditLogs(ctx, params)
 		if err != nil {
+			slog.ErrorContext(ctx, "audit list query failed", "err", err.Error(), "workspace_id", ws.ID)
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 

@@ -195,7 +195,7 @@ SELECT
   al.resource_public_id,
   al.ip_address,
   al.user_agent,
-  al.metadata_json,
+  COALESCE(al.metadata_json, CAST('null' AS JSON)) AS metadata_json,
   al.occurred_at,
   COUNT(*) OVER() AS total
 FROM audit_logs al
