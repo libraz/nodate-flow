@@ -102,8 +102,13 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
         .join('') || (displayName[0] ?? '').toUpperCase()
     : t('actor.initials_fallback');
 
-  const messageKey = `event.${event.type.replace(/\./g, '_')}`;
+  const normalizedType = event.type.replace(/\./g, '_');
+  const messageKey = `event.${normalizedType}`;
   const translated = t(messageKey, { actor: actorLabel, defaultValue: event.type });
+  // Short kind label for the payload disclosure summary. Falls back to
+  // the raw identifier so newly-added backend events still render (as
+  // the raw dotted string) instead of a broken translation key.
+  const kindLabel = t(`event_kind.${normalizedType}`, { defaultValue: event.type });
 
   const payloadVisible = hasPayload(event.payload);
   const tag = eventSourceTag(event.type, event.payload);
@@ -197,7 +202,7 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
             <summary
               style={{ cursor: 'pointer', color: 'var(--nf-color-fg-muted)', fontSize: '0.75rem' }}
             >
-              {event.type}
+              {kindLabel}
             </summary>
             <pre
               style={{
