@@ -29,6 +29,14 @@ resources:
         description: "Returned when a date field fails to parse as an ISO 8601 calendar date (YYYY-MM-DD)."
         userAction: "Send the date as a YYYY-MM-DD string (for example 2026-04-08)."
 
+      due_before_start:
+        code: VALIDATION.BODY.DUE_BEFORE_START
+        status: 400
+        message: "Due date must be on or after start date."
+        message_ja: "期限日は開始日以降にしてください。"
+        description: "Returned when a task update would leave dueOn strictly earlier than startedOn, either because the incoming dueOn precedes an existing startedOn or both fields are supplied in the body and inverted."
+        userAction: "Choose a due date on or after the start date, or update the start date to be on or before the due date."
+
       unparseable:
         code: VALIDATION.BODY.UNPARSEABLE
         status: 400

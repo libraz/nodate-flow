@@ -6,6 +6,8 @@ package errors
 var (
 	// VALIDATION.BODY.DATE_FORMAT_INVALID — Date must be in YYYY-MM-DD format
 	ValidationBodyDateFormatInvalid = &Spec{Code: "VALIDATION.BODY.DATE_FORMAT_INVALID", Status: 400, Message: "Date must be in YYYY-MM-DD format"}
+	// VALIDATION.BODY.DUE_BEFORE_START — Due date must be on or after start date.
+	ValidationBodyDueBeforeStart = &Spec{Code: "VALIDATION.BODY.DUE_BEFORE_START", Status: 400, Message: "Due date must be on or after start date."}
 	// VALIDATION.BODY.FIELD_INVALID — A field in the request body is invalid
 	ValidationBodyFieldInvalid = &Spec{Code: "VALIDATION.BODY.FIELD_INVALID", Status: 422, Message: "A field in the request body is invalid"}
 	// VALIDATION.BODY.FIELD_MISSING — A required field is missing in the request body

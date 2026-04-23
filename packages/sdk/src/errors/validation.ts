@@ -6,6 +6,11 @@ export const ValidationErrors = {
     status: 400,
     message: "Date must be in YYYY-MM-DD format",
   },
+  VALIDATION_BODY_DUE_BEFORE_START: {
+    code: "VALIDATION.BODY.DUE_BEFORE_START",
+    status: 400,
+    message: "Due date must be on or after start date.",
+  },
   VALIDATION_BODY_FIELD_INVALID: {
     code: "VALIDATION.BODY.FIELD_INVALID",
     status: 422,

@@ -198,6 +198,7 @@
   "TIMEBOX.TIMEBOX.NAME_TAKEN": "このワークスペースに同名のタイムボックスが既に存在します",
   "TIMEBOX.TIMEBOX.NOT_FOUND": "タイムボックスが見つかりません",
   "VALIDATION.BODY.DATE_FORMAT_INVALID": "日付は YYYY-MM-DD 形式で指定してください",
+  "VALIDATION.BODY.DUE_BEFORE_START": "期限日は開始日以降にしてください。",
   "VALIDATION.BODY.FIELD_INVALID": "リクエストボディのフィールドが不正です",
   "VALIDATION.BODY.FIELD_MISSING": "リクエストボディに必須フィールドがありません",
   "VALIDATION.BODY.UNPARSEABLE": "リクエストボディを解析できませんでした",

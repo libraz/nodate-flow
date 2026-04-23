@@ -198,6 +198,7 @@
   "TIMEBOX.TIMEBOX.NAME_TAKEN": "A timebox with this name already exists in the workspace",
   "TIMEBOX.TIMEBOX.NOT_FOUND": "Timebox not found",
   "VALIDATION.BODY.DATE_FORMAT_INVALID": "Date must be in YYYY-MM-DD format",
+  "VALIDATION.BODY.DUE_BEFORE_START": "Due date must be on or after start date.",
   "VALIDATION.BODY.FIELD_INVALID": "A field in the request body is invalid",
   "VALIDATION.BODY.FIELD_MISSING": "A required field is missing in the request body",
   "VALIDATION.BODY.UNPARSEABLE": "Request body could not be parsed",
