@@ -87,10 +87,11 @@ function WorkspaceDetailRoute(): ReactElement {
   const hasChildRoute = childMatches.length > 0;
   const insideProject = useInsideProjectRoute();
   // WorkspaceDetail renders its own <h1> on the overview. On child
-  // routes (projects / timeline / settings) nothing carries the
-  // workspace name, so show it here for context — except when the
-  // active child is a project-detail route, which renders its own
-  // header.
+  // routes (projects / timeline / settings) the active child owns the
+  // page <h1> (section title), so the workspace name here is demoted
+  // to <h2> to keep the document at a single top-level heading.
+  // Project-detail routes render their own chrome, so the layout bails
+  // out entirely (see `insideProject` branch below).
   const { data: workspace } = useWorkspaceQuery(id);
 
   if (insideProject) {
@@ -118,7 +119,7 @@ function WorkspaceDetailRoute(): ReactElement {
       }}
     >
       {hasChildRoute ? (
-        <h1
+        <h2
           style={{
             fontFamily: 'var(--font-display)',
             fontSize: 'clamp(1.5rem, 2.5vw, 2rem)',
@@ -126,7 +127,7 @@ function WorkspaceDetailRoute(): ReactElement {
           }}
         >
           {workspace.name}
-        </h1>
+        </h2>
       ) : null}
       <nav
         aria-label={t('workspaces.nav.label')}
