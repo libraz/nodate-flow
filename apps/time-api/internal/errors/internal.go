@@ -6,6 +6,8 @@ package errors
 var (
 	// INTERNAL.DB.UNAVAILABLE — Database is temporarily unavailable
 	InternalDbUnavailable = &Spec{Code: "INTERNAL.DB.UNAVAILABLE", Status: 503, Message: "Database is temporarily unavailable"}
+	// INTERNAL.STORAGE.NOT_CONFIGURED — Storage not configured
+	InternalStorageNotConfigured = &Spec{Code: "INTERNAL.STORAGE.NOT_CONFIGURED", Status: 503, Message: "Storage not configured"}
 	// INTERNAL.UNEXPECTED — An unexpected internal error occurred
 	InternalUnexpected = &Spec{Code: "INTERNAL.UNEXPECTED", Status: 500, Message: "An unexpected internal error occurred"}
 )

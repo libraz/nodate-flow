@@ -157,6 +157,7 @@
   "INTEGRATION.SLACK.WEBHOOK_PAYLOAD_UNPARSEABLE": "Slack Webhook のペイロードを解析できませんでした",
   "INTEGRATION.SLACK.WEBHOOK_SIGNING_FAILED": "Slack リクエストの署名検証に失敗しました",
   "INTERNAL.DB.UNAVAILABLE": "データベースに一時的にアクセスできません",
+  "INTERNAL.STORAGE.NOT_CONFIGURED": "ストレージが未設定です",
   "INTERNAL.UNEXPECTED": "予期しない内部エラーが発生しました",
   "ITEM.ITEMKIT.INVARIANT_VIOLATION": "アイテムの整合性制約に違反しました",
   "ITEM.ITEMKIT.OPTIMISTIC_LOCK": "このアイテムは他のユーザーに更新されました",

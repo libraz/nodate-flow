@@ -73,7 +73,7 @@ func hasBlockedExtension(filename string) bool {
 func PresignUpload(deps Deps) func(context.Context, *PresignUploadInput) (*PresignUploadOutput, error) {
 	return func(ctx context.Context, in *PresignUploadInput) (*PresignUploadOutput, error) {
 		if deps.Storage == nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierrors.InternalStorageNotConfigured)
 		}
 		if !isAllowedContentType(in.Body.ContentType) {
 			return nil, httpErr(apierrors.ValidationFileTypeNotAllowed)
@@ -146,7 +146,7 @@ func PresignUpload(deps Deps) func(context.Context, *PresignUploadInput) (*Presi
 func DownloadAttachment(deps Deps) func(context.Context, *DownloadAttachmentInput) (*DownloadAttachmentOutput, error) {
 	return func(ctx context.Context, in *DownloadAttachmentInput) (*DownloadAttachmentOutput, error) {
 		if deps.Storage == nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierrors.InternalStorageNotConfigured)
 		}
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {

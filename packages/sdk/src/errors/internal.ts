@@ -6,6 +6,11 @@ export const InternalErrors = {
     status: 503,
     message: "Database is temporarily unavailable",
   },
+  INTERNAL_STORAGE_NOT_CONFIGURED: {
+    code: "INTERNAL.STORAGE.NOT_CONFIGURED",
+    status: 503,
+    message: "Storage not configured",
+  },
   INTERNAL_UNEXPECTED: {
     code: "INTERNAL.UNEXPECTED",
     status: 500,

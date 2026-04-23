@@ -23,3 +23,14 @@ resources:
         message_ja: "データベースに一時的にアクセスできません"
         description: "Returned when the API cannot reach the database (connection refused, timeout, failover in progress)."
         userAction: "Retry shortly; contact your administrator if the problem persists."
+
+  storage:
+    breadcrumb: "Internal > Storage"
+    errors:
+      not_configured:
+        code: INTERNAL.STORAGE.NOT_CONFIGURED
+        status: 503
+        message: "Storage not configured"
+        message_ja: "ストレージが未設定です"
+        description: "File storage is not configured on this instance. Uploads and downloads of attachments are disabled."
+        userAction: "Ask your instance administrator to configure object storage (S3-compatible endpoint, bucket, and credentials)."

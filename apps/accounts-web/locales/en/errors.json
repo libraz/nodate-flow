@@ -157,6 +157,7 @@
   "INTEGRATION.SLACK.WEBHOOK_PAYLOAD_UNPARSEABLE": "Slack webhook payload could not be parsed",
   "INTEGRATION.SLACK.WEBHOOK_SIGNING_FAILED": "Slack request signature verification failed",
   "INTERNAL.DB.UNAVAILABLE": "Database is temporarily unavailable",
+  "INTERNAL.STORAGE.NOT_CONFIGURED": "Storage not configured",
   "INTERNAL.UNEXPECTED": "An unexpected internal error occurred",
   "ITEM.ITEMKIT.INVARIANT_VIOLATION": "Item invariant violated",
   "ITEM.ITEMKIT.OPTIMISTIC_LOCK": "Item was modified by another actor",
