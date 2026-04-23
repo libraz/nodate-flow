@@ -5,6 +5,8 @@
   "delete": "ページを削除",
   "empty": "ページがありません",
   "empty_description": "ページを作成してプロジェクトのドキュメントを整理しましょう。",
+  "no_selection": "ページを選択してください",
+  "no_selection_description": "左の一覧からページを選ぶか、新しいページを作成してください。",
   "page_title_label": "タイトル",
   "page_body_label": "コンテンツ",
   "parent_label": "親ページ",

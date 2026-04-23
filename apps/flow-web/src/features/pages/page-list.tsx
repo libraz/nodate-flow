@@ -169,8 +169,8 @@ export default function PageList({ activePageId }: PageListProps): ReactElement 
           )}
           {mode === 'view' && !activePageId && (
             <div className={styles.empty}>
-              <p className={styles.emptyTitle}>{t('empty')}</p>
-              <p className={styles.emptyDescription}>{t('empty_description')}</p>
+              <p className={styles.emptyTitle}>{t('no_selection')}</p>
+              <p className={styles.emptyDescription}>{t('no_selection_description')}</p>
             </div>
           )}
         </div>

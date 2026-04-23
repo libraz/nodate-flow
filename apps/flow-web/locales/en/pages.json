@@ -5,6 +5,8 @@
   "delete": "Delete page",
   "empty": "No pages yet",
   "empty_description": "Create a page to document your project.",
+  "no_selection": "Select a page",
+  "no_selection_description": "Choose a page from the list, or create a new one to get started.",
   "page_title_label": "Title",
   "page_body_label": "Content",
   "parent_label": "Parent page",
