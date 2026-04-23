@@ -3,8 +3,17 @@
  *
  * Implements the WAI-ARIA tabs pattern: `role="tablist"` + `role="tab"` +
  * `role="tabpanel"`, Left/Right/Home/End keyboard navigation, and a roving
- * tabindex so only the active tab is in the tab sequence. Supports both
- * controlled (`value` + `onChange`) and uncontrolled (`defaultValue`) usage.
+ * tabindex so only the active tab is in the tab sequence.
+ *
+ * Controlled vs uncontrolled:
+ * - Pass `value` + `onValueChange` (or the legacy `onChange` alias) to run
+ *   in controlled mode — the consumer owns the active value and is
+ *   responsible for persisting it (e.g. URL query params, global state).
+ * - Pass `defaultValue` only to run in uncontrolled mode — the component
+ *   tracks the active value internally.
+ * - When `value` is provided, it takes precedence over `defaultValue`.
+ * - When both `onValueChange` and `onChange` are provided, `onValueChange`
+ *   takes precedence; `onChange` is retained for backward compatibility.
  */
 
 import {
@@ -36,11 +45,29 @@ export interface TabsProps
   extends Omit<HTMLAttributes<HTMLDivElement>, 'onChange' | 'defaultValue'> {
   /** Tab items in display order. */
   items: TabItem[];
-  /** Controlled active value. */
+  /**
+   * Controlled active value. When provided, the component renders whichever
+   * tab matches this value and delegates persistence of state changes to
+   * `onValueChange` (or the legacy `onChange` alias). Takes precedence over
+   * `defaultValue`.
+   */
   value?: string;
-  /** Default active value (uncontrolled). */
+  /**
+   * Default active value for uncontrolled usage. Ignored when `value` is
+   * provided. Retained for backward compatibility with existing call sites.
+   */
   defaultValue?: string;
-  /** Called when the active value changes. */
+  /**
+   * Fired when the user activates a tab (click or keyboard). In controlled
+   * mode (`value` provided), the consumer is responsible for persisting the
+   * new value — e.g. writing it to URL search params. Takes precedence over
+   * `onChange` when both are supplied.
+   */
+  onValueChange?: (value: string) => void;
+  /**
+   * Legacy change handler. Prefer `onValueChange` for new code; this alias
+   * is preserved for backward compatibility with existing consumers.
+   */
   onChange?: (value: string) => void;
   /** Already-translated accessible label for the tablist. */
   'aria-label'?: string;
@@ -49,14 +76,26 @@ export interface TabsProps
 /** Tabs renders an accessible tablist with roving tabindex. */
 const Tabs = forwardRef<HTMLDivElement, TabsProps>(
   (
-    { items, value, defaultValue, onChange, className, 'aria-label': ariaLabel, ...rest },
+    {
+      items,
+      value,
+      defaultValue,
+      onValueChange,
+      onChange,
+      className,
+      'aria-label': ariaLabel,
+      ...rest
+    },
     ref,
   ): ReactElement => {
     const fallback = items[0]?.value ?? '';
+    // `onValueChange` takes precedence; `onChange` is preserved for backward
+    // compatibility with existing consumers.
+    const handleChange = onValueChange ?? onChange;
     const [active, setActive] = useControllableState<string>({
       value,
       defaultValue: defaultValue ?? fallback,
-      onChange,
+      onChange: handleChange,
     });
     const current = active ?? fallback;
     const baseId = useId();
