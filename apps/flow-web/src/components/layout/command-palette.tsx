@@ -226,7 +226,11 @@ function toolToHref(
 function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement {
   const { t } = useTranslation('common');
   const { data: workspaces } = useWorkspacesQuery();
-  const wsId = useCurrentWorkspaceId();
+  // Fall back to the sole workspace when the route carries no active
+  // workspace id (e.g. on `/`, `/today`, `/inbox` with a fresh session).
+  // Matches the top-bar switcher's single-workspace auto-select pattern.
+  const wsId =
+    useCurrentWorkspaceId() ?? (workspaces.length === 1 ? (workspaces[0]?.id ?? null) : null);
   const [query, setQuery] = useState(initialCommandMode ? '> ' : '');
   const [debounced, setDebounced] = useState('');
   const [active, setActive] = useState(0);
