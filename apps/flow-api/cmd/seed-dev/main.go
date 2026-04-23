@@ -669,6 +669,33 @@ func ensureUndatedEvent(ctx context.Context, db *sql.DB, q *generated.Queries, w
 		logger.Info("undated event exists", "id", existing, "title", title)
 		return existing, nil
 	}
+	// Probe whether calendar_events.start_at is nullable in the currently
+	// connected MySQL instance. Older local containers were booted against
+	// an earlier schema that declared start_at as NOT NULL, and compose
+	// only seeds schema.sql on an empty data volume — so stale DBs survive
+	// schema edits silently. Rather than hard-failing the entire seed run,
+	// warn the operator and skip this single fixture; a fresh
+	// `make db-reset` (or `make db-apply` for self-hosted MySQL) picks up
+	// the nullable column and restores the undated-event fixture on the
+	// next run.
+	var isNullable string
+	probeErr := db.QueryRowContext(ctx, `
+		SELECT IS_NULLABLE
+		FROM information_schema.columns
+		WHERE TABLE_SCHEMA = DATABASE()
+		  AND TABLE_NAME = 'calendar_events'
+		  AND COLUMN_NAME = 'start_at'
+	`).Scan(&isNullable)
+	if probeErr != nil {
+		return 0, fmt.Errorf("probe calendar_events.start_at nullability: %w", probeErr)
+	}
+	if isNullable != "YES" {
+		logger.Warn(
+			"skipping undated event: calendar_events.start_at is NOT NULL in this DB; run `make db-reset` (or `make db-apply` for self-hosted MySQL) to pick up the nullable schema",
+			"title", title,
+		)
+		return 0, nil
+	}
 	id, err := q.CreateCalendarEvent(ctx, generated.CreateCalendarEventParams{
 		PublicID:        types.New(),
 		WorkspaceID:     wsID,
