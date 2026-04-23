@@ -63,6 +63,12 @@ function useShareRenderQuery(token: string) {
       }
       return count < 2;
     },
+    // The shared SDK queryClient defaults to `throwOnError: true`, which would
+    // bypass the branded invalid/expired fallback below and surface the root
+    // FatalFallback to anonymous visitors. Opt out locally so the route owns
+    // its own error rendering. TODO(simplify): revisit once the global default
+    // is flipped to opt-in (see bug 2026-04-23-web-share-route-throw-on-error-bypass).
+    throwOnError: false,
   });
 }
 
