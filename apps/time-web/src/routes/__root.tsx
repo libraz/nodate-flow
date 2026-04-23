@@ -6,11 +6,21 @@ import { useTranslation } from 'react-i18next';
 import PageSkeleton from '@nodate-flow/ui/primitives/page-skeleton';
 
 import ThemeInitializer from '../components/theme-initializer';
+import { flowWebUrl } from '../lib/sdk';
 import type { RouterContext } from '../router/router';
 import styles from './__root.module.css';
 
 function NotFound(): ReactElement {
   const { t } = useTranslation();
+  // time-web is deprecated in favor of flow-web's /calendar route. Any
+  // unknown URL should bounce to flow-web so recipients of stale links
+  // don't hit a dead 404. We use `location.replace` so the 5174 entry
+  // is not pushed onto the history stack. The i18n'd body below renders
+  // for the brief window before the browser navigates, and as a fallback
+  // if the browser blocks programmatic navigation.
+  useEffect(() => {
+    window.location.replace(`${flowWebUrl}/calendar`);
+  }, []);
   return (
     <main
       style={{
