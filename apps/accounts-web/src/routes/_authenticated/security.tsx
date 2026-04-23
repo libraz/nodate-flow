@@ -38,6 +38,75 @@ type TotpConfirmOutputBody = components['schemas']['TotpConfirmOutputBody'];
 type TotpRegenerateRecoveryCodesOutputBody =
   components['schemas']['TotpRegenerateRecoveryCodesOutputBody'];
 
+interface ParsedUA {
+  browser: string;
+  os: string;
+}
+
+/**
+ * @brief Extract the numeric version token that follows a product marker.
+ * @param ua User-Agent string.
+ * @param marker Product marker including trailing slash (e.g. "Chrome/").
+ * @return Numeric major version as a string, or empty string when not found.
+ *
+ * Avoids regex per project convention: locates the marker via indexOf, then
+ * consumes leading digits until a non-digit byte.
+ */
+function extractVersion(ua: string, marker: string): string {
+  const idx = ua.indexOf(marker);
+  if (idx === -1) return '';
+  let i = idx + marker.length;
+  let version = '';
+  while (i < ua.length) {
+    const ch = ua.charCodeAt(i);
+    if (ch < 48 || ch > 57) break; // not 0-9
+    version += ua[i];
+    i += 1;
+  }
+  return version;
+}
+
+/**
+ * @brief Parse a User-Agent string into a glanceable browser + OS label.
+ * @param ua Raw User-Agent header value.
+ * @return Browser and OS labels, each defaulting to "Unknown".
+ *
+ * Hand-rolled, regex-free parser covering common desktop and mobile agents.
+ * Order matters for browsers: Edge UA embeds "Chrome/" and Chrome UA embeds
+ * "Safari/", so detection runs Edge -> Firefox -> Chrome -> Safari.
+ */
+function parseUserAgent(ua: string): ParsedUA {
+  let browser = 'Unknown';
+  const edgeVer = extractVersion(ua, 'Edg/');
+  const firefoxVer = extractVersion(ua, 'Firefox/');
+  const chromeVer = extractVersion(ua, 'Chrome/');
+  const safariVer = extractVersion(ua, 'Version/');
+  if (edgeVer) browser = `Edge ${edgeVer}`;
+  else if (firefoxVer) browser = `Firefox ${firefoxVer}`;
+  else if (chromeVer) browser = `Chrome ${chromeVer}`;
+  else if (safariVer && ua.indexOf('Safari/') !== -1) browser = `Safari ${safariVer}`;
+
+  let os = 'Unknown';
+  if (ua.indexOf('Windows NT') !== -1) os = 'Windows';
+  else if (ua.indexOf('Mac OS X') !== -1 || ua.indexOf('Macintosh') !== -1) os = 'macOS';
+  else if (ua.indexOf('Android') !== -1) os = 'Android';
+  else if (ua.indexOf('iPhone') !== -1 || ua.indexOf('iPad') !== -1 || ua.indexOf('iOS') !== -1)
+    os = 'iOS';
+  else if (ua.indexOf('Linux') !== -1) os = 'Linux';
+
+  return { browser, os };
+}
+
+/**
+ * @brief Format a User-Agent string for display in the sessions list.
+ * @param ua Raw User-Agent header value.
+ * @return "Browser · OS" style label (middle dot separator).
+ */
+function formatDevice(ua: string): string {
+  const { browser, os } = parseUserAgent(ua);
+  return `${browser} · ${os}`;
+}
+
 function SecurityPage(): ReactElement {
   const { t } = useTranslation('auth');
 
@@ -59,7 +128,12 @@ function SecurityPage(): ReactElement {
     setPasswordError(null);
     setPasswordSuccess(false);
     try {
-      const { error } = await sdk.PUT('/me/password', {
+      // IMPORTANT: backend registers POST /me/password. Using PUT returns 405
+      // and openapi-fetch does not populate `error` for unmapped status codes,
+      // which previously caused the UI to display a false-success toast even
+      // though the password was not rotated. Always guard on response.ok as
+      // defense-in-depth for any non-2xx that escapes typed-error mapping.
+      const { error, response } = await sdk.POST('/me/password', {
         body: {
           currentPassword: values.currentPassword,
           newPassword: values.newPassword,
@@ -67,6 +141,10 @@ function SecurityPage(): ReactElement {
       });
       if (error) {
         setPasswordError(mapAuthError(error as ProblemJson | undefined));
+        return;
+      }
+      if (!response.ok) {
+        setPasswordError(mapAuthError(undefined));
         return;
       }
       setPasswordSuccess(true);
@@ -292,8 +370,11 @@ function SecurityPage(): ReactElement {
                       fontSize: 'var(--nf-text-sm, 0.875rem)',
                       fontWeight: session.current ? 600 : 400,
                     }}
+                    title={session.userAgent || undefined}
                   >
-                    {session.userAgent || t('security.session_unknown_agent')}
+                    {session.userAgent
+                      ? formatDevice(session.userAgent)
+                      : t('security.session_unknown_agent')}
                     {session.current ? ` (${t('security.session_current')})` : ''}
                   </p>
                   <p
