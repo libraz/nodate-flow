@@ -95,10 +95,10 @@ export default function ProjectCreateDialog({
       const next: FieldErrors = {};
       for (const issue of parsed.error.issues) {
         const field = issue.path[0];
-        if (field === 'name') next.name = issue.message;
-        if (field === 'slug') next.slug = issue.message;
-        if (field === 'identifier') next.identifier = issue.message;
-        if (field === 'description') next.description = issue.message;
+        if (field === 'name') next.name ??= issue.message;
+        if (field === 'slug') next.slug ??= issue.message;
+        if (field === 'identifier') next.identifier ??= issue.message;
+        if (field === 'description') next.description ??= issue.message;
       }
       setErrors(next);
       return;
