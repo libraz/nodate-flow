@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"encoding/json"
 	"net/http"
 	"testing"
 	"time"
@@ -125,8 +126,25 @@ func TestRenderPublicShare_InvalidToken(t *testing.T) {
 
 	tt := newTenant(t)
 
-	status, _ := helpers.DoJSONStatus(t, http.MethodGet, tt.BaseURL+"/share/cal/nonexistent-token-abc", "", nil)
+	status, body := helpers.DoJSONStatus(t, http.MethodGet, tt.BaseURL+"/share/cal/nonexistent-token-abc", "", nil)
 	assert.Equal(t, http.StatusNotFound, status)
+
+	// Verify the problem+json envelope shape: `type` carries the machine
+	// code, `detail` carries the human message with NO code prefix.
+	// Regression guard for the envelope bug where the code was concatenated
+	// into `detail` and `type` was never set.
+	var envelope struct {
+		Type   string `json:"type"`
+		Title  string `json:"title"`
+		Detail string `json:"detail"`
+		Status int    `json:"status"`
+	}
+	require.NoError(t, json.Unmarshal(body, &envelope), "decode envelope body=%s", string(body))
+	assert.Equal(t, "SHARE.SHARE.TOKEN_INVALID", envelope.Type, "type must carry the machine code")
+	assert.Equal(t, "Share token is invalid", envelope.Detail, "detail must be the human message only (no code prefix)")
+	assert.NotContains(t, envelope.Detail, ":", "detail must not contain the legacy 'CODE: msg' prefix")
+	assert.Equal(t, http.StatusNotFound, envelope.Status)
+	assert.NotEmpty(t, envelope.Title)
 }
 
 func TestRenderPublicShare_Expired(t *testing.T) {

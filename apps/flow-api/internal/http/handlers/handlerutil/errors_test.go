@@ -37,7 +37,12 @@ func TestHTTPErr_ReturnsHumaStatusError(t *testing.T) {
 	}
 }
 
-func TestHTTPErr_MessageContainsCodeAndMessage(t *testing.T) {
+// TestHTTPErr_EnvelopeShape verifies that the returned error carries the
+// problem+json fields described in RFC 9457: the machine-readable code in
+// `type`, the HTTP status text in `title`, and the human-readable message
+// in `detail` with NO code prefix. Regression guard for the envelope bug
+// where the code was concatenated into `detail` and `type` was never set.
+func TestHTTPErr_EnvelopeShape(t *testing.T) {
 	t.Parallel()
 
 	spec := &apierrors.Spec{
@@ -47,12 +52,23 @@ func TestHTTPErr_MessageContainsCodeAndMessage(t *testing.T) {
 	}
 
 	err := HTTPErr(spec)
-	msg := err.Error()
 
-	// The implementation formats as "CODE: Message".
-	want := "RATE.LIMIT_EXCEEDED: Too many requests"
-	if msg != want {
-		t.Errorf("message: got %q, want %q", msg, want)
+	model, ok := err.(*huma.ErrorModel)
+	if !ok {
+		t.Fatalf("expected *huma.ErrorModel, got %T", err)
+	}
+
+	if model.Type != "RATE.LIMIT_EXCEEDED" {
+		t.Errorf("type: got %q, want %q", model.Type, "RATE.LIMIT_EXCEEDED")
+	}
+	if model.Title != "Too Many Requests" {
+		t.Errorf("title: got %q, want %q", model.Title, "Too Many Requests")
+	}
+	if model.Detail != "Too many requests" {
+		t.Errorf("detail: got %q, want %q (must NOT include code prefix)", model.Detail, "Too many requests")
+	}
+	if model.Status != 429 {
+		t.Errorf("status: got %d, want 429", model.Status)
 	}
 }
 

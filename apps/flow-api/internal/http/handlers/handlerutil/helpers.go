@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"net/http"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -19,10 +20,25 @@ import (
 )
 
 // HTTPErr converts an apierrors.Spec into a Huma status error so the
-// canonical error envelope is emitted by the framework. All handler
-// packages should call this instead of defining a local httpErr.
+// canonical problem+json envelope is emitted by the framework. All
+// handler packages should call this instead of defining a local httpErr.
+//
+// The envelope is RFC 9457-compliant:
+//
+//   - type:   the machine-readable error code (e.g. "WS.TASK.NOT_FOUND").
+//     Clients should branch on this field.
+//   - title:  the HTTP status text (e.g. "Not Found"). Populated by Huma
+//     from the status when omitted, set explicitly here for determinism.
+//   - detail: the human-readable message from the Spec. Must NOT be
+//     prefixed with the code — clients read `type` for that.
+//   - status: the HTTP status code.
 func HTTPErr(spec *apierrors.Spec) error {
-	return huma.NewError(spec.Status, spec.Code+": "+spec.Message)
+	return &huma.ErrorModel{
+		Type:   spec.Code,
+		Title:  http.StatusText(spec.Status),
+		Status: spec.Status,
+		Detail: spec.Message,
+	}
 }
 
 // mysqlErrDuplicateEntry is the MySQL error number for a unique-constraint
