@@ -4,6 +4,7 @@
     "confirm": "Confirm",
     "cancel": "Cancel",
     "confirm_title": "Are you sure?",
+    "breadcrumb": "Breadcrumb",
     "date": {
       "weekdays": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
       "monthYear": "{month, plural, =1 {January} =2 {February} =3 {March} =4 {April} =5 {May} =6 {June} =7 {July} =8 {August} =9 {September} =10 {October} =11 {November} =12 {December} other {}} {year}",
@@ -56,6 +57,12 @@
     },
     "language": {
       "toggle": "Toggle language"
+    },
+    "user_menu": {
+      "open": "Open account menu"
+    },
+    "notifications": {
+      "label": "Notifications"
     },
     "ai": {
       "cost_today": {
@@ -176,6 +183,12 @@
     "code": "404",
     "title": "Page not found",
     "description": "The page you're looking for doesn't exist or has been moved.",
+    "back_home": "Back to home"
+  },
+  "forbidden": {
+    "code": "403",
+    "title": "Access denied",
+    "description": "You don't have permission to view this page. Ask an administrator to grant access.",
     "back_home": "Back to home"
   },
   "fatal": {
@@ -472,6 +485,8 @@
       "edit_title": "Edit title",
       "edit_priority": "Change priority",
       "edit_due": "Change due date",
+      "edit_due_set": "{{date}}, change due date",
+      "edit_due_unset": "Set due date",
       "edit_status": "Change status",
       "save_failed": "Could not save changes. Please try again."
     },

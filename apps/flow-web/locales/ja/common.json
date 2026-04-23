@@ -4,6 +4,7 @@
     "confirm": "実行",
     "cancel": "キャンセル",
     "confirm_title": "本当に実行しますか？",
+    "breadcrumb": "パンくずリスト",
     "date": {
       "weekdays": ["日", "月", "火", "水", "木", "金", "土"],
       "monthYear": "{year}年{month}月",
@@ -56,6 +57,12 @@
     },
     "language": {
       "toggle": "言語を切り替え"
+    },
+    "user_menu": {
+      "open": "アカウントメニューを開く"
+    },
+    "notifications": {
+      "label": "通知"
     },
     "ai": {
       "cost_today": {
@@ -176,6 +183,12 @@
     "code": "404",
     "title": "ページが見つかりません",
     "description": "お探しのページは存在しないか、移動された可能性があります。",
+    "back_home": "ホームに戻る"
+  },
+  "forbidden": {
+    "code": "403",
+    "title": "アクセスできません",
+    "description": "このページを表示する権限がありません。管理者にアクセス権の付与を依頼してください。",
     "back_home": "ホームに戻る"
   },
   "fatal": {
@@ -472,6 +485,8 @@
       "edit_title": "タイトルを編集",
       "edit_priority": "優先度を変更",
       "edit_due": "期日を変更",
+      "edit_due_set": "{{date}}、期日を変更",
+      "edit_due_unset": "期日を設定",
       "edit_status": "ステータスを変更",
       "save_failed": "変更を保存できませんでした。もう一度お試しください。"
     },

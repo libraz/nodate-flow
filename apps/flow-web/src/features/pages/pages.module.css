@@ -170,27 +170,6 @@
   gap: var(--nf-space-2);
 }
 
-.breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: var(--nf-space-1);
-  font-size: var(--nf-text-sm);
-  color: var(--nf-color-fg-muted);
-}
-
-.breadcrumbLink {
-  color: var(--nf-color-link, var(--nf-color-accent));
-  text-decoration: none;
-}
-
-.breadcrumbLink:hover {
-  text-decoration: underline;
-}
-
-.breadcrumbSeparator {
-  color: var(--nf-color-fg-muted);
-}
-
 .detailBody {
   line-height: 1.6;
 }

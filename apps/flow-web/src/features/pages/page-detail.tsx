@@ -6,9 +6,14 @@
  * Provides Edit and Delete action buttons.
  */
 
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbSeparator,
+} from '@nodate-flow/ui/primitives/breadcrumb';
 import Button from '@nodate-flow/ui/primitives/button';
 import { Link } from '@tanstack/react-router';
-import { ChevronRight, FileText, Pencil, Sparkles, Trash2 } from 'lucide-react';
+import { FileText, Pencil, Sparkles, Trash2 } from 'lucide-react';
 import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -54,22 +59,20 @@ function ChildPagesSection({
 // Breadcrumb
 // ---------------------------------------------------------------------------
 
-function Breadcrumb({ page }: { page: PageItem }): ReactElement | null {
+function PageBreadcrumb({ page }: { page: PageItem }): ReactElement | null {
   const { t } = useTranslation('pages');
   if (!page.parentPageId || !page.parentPageTitle) return null;
 
   return (
-    <nav className={styles.breadcrumb} aria-label={t('breadcrumb_label')}>
-      <Link
-        to="/pages/$pageId"
-        params={{ pageId: page.parentPageId }}
-        className={styles.breadcrumbLink}
-      >
-        {page.parentPageTitle}
-      </Link>
-      <ChevronRight size={12} aria-hidden className={styles.breadcrumbSeparator} />
-      <span>{page.title}</span>
-    </nav>
+    <Breadcrumb label={t('breadcrumb_label')}>
+      <BreadcrumbItem asChild>
+        <Link to="/pages/$pageId" params={{ pageId: page.parentPageId }}>
+          {page.parentPageTitle}
+        </Link>
+      </BreadcrumbItem>
+      <BreadcrumbSeparator />
+      <BreadcrumbItem>{page.title}</BreadcrumbItem>
+    </Breadcrumb>
   );
 }
 
@@ -109,7 +112,7 @@ export default function PageDetail({ workspaceId, pageId, onEdit }: PageDetailPr
 
   return (
     <article className={styles.detailContainer}>
-      <Breadcrumb page={page} />
+      <PageBreadcrumb page={page} />
 
       <header className={styles.detailHeader}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>

@@ -8,6 +8,11 @@
  */
 
 import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbSeparator,
+} from '@nodate-flow/ui/primitives/breadcrumb';
 import Button, { type ButtonVariant } from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
 import Combobox from '@nodate-flow/ui/primitives/combobox';
@@ -55,7 +60,7 @@ import { useTaskTimelineQuery } from '../features/timeline/api';
 import ReplayPanel from '../features/timeline/replay-panel';
 import TaskMiniTimeline from '../features/timeline/task-mini-timeline';
 import { useWorkspaceMembersQuery, useWorkspaceQuery } from '../features/workspaces/api';
-import { formatEpochDateTime } from '../lib/format';
+import { formatDate, formatEpochDateTime } from '../lib/format';
 
 const routeApi = getRouteApi('/_authenticated/tasks/$taskId');
 
@@ -481,7 +486,8 @@ function Sidebar({
   startOn,
   dueOn,
 }: SidebarProps): ReactElement {
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
+  const locale = i18n.resolvedLanguage ?? 'en';
   const weekdayLabels = t('common.date.weekdays', { returnObjects: true }) as string[];
   const formatMonthYear = (year: number, month: number): string =>
     t('common.date.monthYear', { year, month });
@@ -587,7 +593,7 @@ function Sidebar({
               }}
               weekdayLabels={weekdayLabels}
               formatMonthYear={formatMonthYear}
-              triggerLabel={startOn ?? t('common.date.placeholder')}
+              triggerLabel={startOn ? formatDate(startOn, locale) : t('common.date.placeholder')}
             />
           )}
         </FormField>
@@ -600,7 +606,7 @@ function Sidebar({
               }}
               weekdayLabels={weekdayLabels}
               formatMonthYear={formatMonthYear}
-              triggerLabel={dueOn ?? t('common.date.placeholder')}
+              triggerLabel={dueOn ? formatDate(dueOn, locale) : t('common.date.placeholder')}
             />
           )}
         </FormField>
@@ -933,36 +939,26 @@ function TaskBreadcrumbInner({
   workspaceId: string;
   projectId: string;
 }): ReactElement {
+  const { t } = useTranslation('common');
   const { data: workspace } = useWorkspaceQuery(workspaceId);
   const { data: project } = useProjectQuery(projectId);
   return (
-    <nav
-      aria-label="breadcrumb"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.375rem',
-        fontSize: '0.8125rem',
-        color: 'var(--nf-color-fg-muted)',
-        flexWrap: 'wrap',
-      }}
-    >
-      <Link
-        to="/workspaces/$id"
-        params={{ id: workspaceId }}
-        style={{ color: 'inherit', textDecoration: 'none' }}
-      >
-        {workspace.name}
-      </Link>
-      <span aria-hidden>›</span>
-      <Link
-        to="/projects/$projectId/tasks"
-        params={{ projectId }}
-        style={{ color: 'inherit', textDecoration: 'none' }}
-      >
-        {project.name}
-      </Link>
-    </nav>
+    <Breadcrumb label={t('common.breadcrumb')}>
+      <BreadcrumbItem asChild>
+        <Link to="/workspaces/$id" params={{ id: workspaceId }}>
+          {workspace.name}
+        </Link>
+      </BreadcrumbItem>
+      <BreadcrumbSeparator />
+      <BreadcrumbItem asChild>
+        <Link
+          to="/workspaces/$id/projects/$projectId/tasks"
+          params={{ id: workspaceId, projectId }}
+        >
+          {project.name}
+        </Link>
+      </BreadcrumbItem>
+    </Breadcrumb>
   );
 }
 
