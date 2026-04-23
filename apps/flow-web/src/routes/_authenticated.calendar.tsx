@@ -40,10 +40,18 @@ import type { Project } from '../features/projects/api';
 import { TASK_PRIORITIES, type TaskDerivedState, type TaskPriority } from '../features/tasks/api';
 import { PRIORITY_KEY, STATE_COLOR } from '../features/tasks/constants';
 import { useWorkspacesQuery } from '../features/workspaces/api';
+import { type ApiError, toApiError } from '../lib/api-error';
 import { dateKey } from '../lib/date-utils';
 import { formatDate } from '../lib/format';
 import { sdk, timeSdk } from '../lib/sdk';
 import { useActiveWorkspaceId } from '../lib/use-current-workspace';
+
+/**
+ * Error code emitted by the backend when a PATCH /tasks request would
+ * leave `dueOn < startedOn`. Matched against `ApiError.code` to surface
+ * a targeted toast instead of a generic failure message.
+ */
+const DUE_BEFORE_START_CODE = 'VALIDATION.BODY.DUE_BEFORE_START';
 
 type CalendarTask = components['schemas']['MyTaskListItem'];
 type CalendarEvent = timeComponents['schemas']['MyCalendarEventResponse'];
@@ -396,13 +404,17 @@ function CalendarRoute(): ReactElement {
 
   const events = eventsQuery.data ?? [];
 
-  const rescheduleMut = useMutation({
-    mutationFn: async ({ taskId, dueOn }: { taskId: string; dueOn: string }) => {
+  const rescheduleMut = useMutation<
+    components['schemas']['Task'],
+    ApiError,
+    { taskId: string; dueOn: string }
+  >({
+    mutationFn: async ({ taskId, dueOn }) => {
       const { data, error } = await sdk.PATCH('/tasks/{id}', {
         params: { path: { id: taskId } },
         body: { dueOn },
       });
-      if (error || !data) throw new Error('Failed to reschedule');
+      if (error || !data) throw toApiError(error, 'Failed to reschedule');
       return data;
     },
     onSuccess: () => {
@@ -410,8 +422,22 @@ function CalendarRoute(): ReactElement {
       void qc.invalidateQueries({ queryKey: ['calendar', 'me-events'] });
       toaster.show({ tone: 'success', message: t('calendar.reschedule_success') });
     },
-    onError: () => {
+    onError: (err) => {
+      // Pessimistic update: the calendar pill only moves once the
+      // mutation succeeds (no optimistic `onMutate`). The subsequent
+      // refetch on settle brings the original data back, so no manual
+      // rollback is needed — a toast is sufficient.
+      if (err.code === DUE_BEFORE_START_CODE) {
+        toaster.show({
+          tone: 'danger',
+          message: t(`errors:${DUE_BEFORE_START_CODE}`, { keySeparator: false }),
+        });
+        return;
+      }
       toaster.show({ tone: 'danger', message: t('calendar.reschedule_error') });
+      // Refetch to make sure the pill reflects server state in case any
+      // optimistic UI ever gets added to this path.
+      void qc.invalidateQueries({ queryKey: ['calendar', 'me-tasks'] });
     },
   });
 

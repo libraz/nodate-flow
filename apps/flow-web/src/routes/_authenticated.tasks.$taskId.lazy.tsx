@@ -503,19 +503,37 @@ function Sidebar({
     }
   };
 
+  /**
+   * Renders a toast for a failed date change, mapping the
+   * `VALIDATION.BODY.DUE_BEFORE_START` backend invariant violation to a
+   * targeted translated message and falling back to the generic
+   * `tasks.errors.update_failed` otherwise.
+   */
+  const toastDateUpdateError = (err: unknown): void => {
+    const code = (err as { code?: string } | null)?.code;
+    if (code === 'VALIDATION.BODY.DUE_BEFORE_START') {
+      toaster.show({
+        tone: 'danger',
+        message: t('errors:VALIDATION.BODY.DUE_BEFORE_START', { keySeparator: false }),
+      });
+      return;
+    }
+    toaster.show({ tone: 'danger', message: t('tasks.errors.update_failed') });
+  };
+
   const handleStartChange = async (next: string): Promise<void> => {
     try {
       await update.mutateAsync({ id, patch: { startOn: next } });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('tasks.errors.update_failed') });
+    } catch (err) {
+      toastDateUpdateError(err);
     }
   };
 
   const handleDueChange = async (next: string): Promise<void> => {
     try {
       await update.mutateAsync({ id, patch: { dueOn: next } });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('tasks.errors.update_failed') });
+    } catch (err) {
+      toastDateUpdateError(err);
     }
   };
 
