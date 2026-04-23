@@ -184,3 +184,115 @@ func (q *Queries) ListRecentAudit(ctx context.Context, arg ListRecentAuditParams
 	}
 	return items, nil
 }
+
+const listWorkspaceAuditLogs = `-- name: ListWorkspaceAuditLogs :many
+SELECT
+  al.public_id,
+  actor.public_id AS actor_user_public_id,
+  actor.display_name AS actor_display_name,
+  al.action,
+  al.resource_type,
+  al.resource_public_id,
+  al.ip_address,
+  al.user_agent,
+  al.metadata_json,
+  al.occurred_at,
+  COUNT(*) OVER() AS total
+FROM audit_logs al
+LEFT JOIN users actor
+  ON actor.id = al.actor_user_id AND actor.enabled = TRUE
+WHERE al.workspace_id = ?
+  AND al.enabled = TRUE
+  AND (? = '' OR al.action = ?)
+  AND (? = '' OR al.resource_type = ?)
+  AND (? = ''
+       OR actor.display_name LIKE CONCAT('%', ?, '%')
+       OR actor.email LIKE CONCAT('%', ?, '%'))
+  AND (? IS NULL OR al.occurred_at >= ?)
+  AND (? IS NULL OR al.occurred_at <= ?)
+ORDER BY al.occurred_at DESC, al.public_id DESC
+LIMIT ? OFFSET ?
+`
+
+type ListWorkspaceAuditLogsParams struct {
+	WorkspaceID        uint32       `json:"-"`
+	FilterAction       string       `json:"filterAction"`
+	FilterResourceType string       `json:"filterResourceType"`
+	FilterActorSearch  interface{}  `json:"filterActorSearch"`
+	FilterFrom         sql.NullTime `json:"filterFrom"`
+	FilterTo           sql.NullTime `json:"filterTo"`
+	Limit              int32        `json:"limit"`
+	Offset             int32        `json:"offset"`
+}
+
+type ListWorkspaceAuditLogsRow struct {
+	PublicID          types.PublicID  `json:"publicId"`
+	ActorUserPublicID types.PublicID  `json:"actorUserPublicId"`
+	ActorDisplayName  sql.NullString  `json:"actorDisplayName"`
+	Action            string          `json:"action"`
+	ResourceType      string          `json:"resourceType"`
+	ResourcePublicID  types.PublicID  `json:"resourcePublicId"`
+	IpAddress         sql.NullString  `json:"ipAddress"`
+	UserAgent         sql.NullString  `json:"userAgent"`
+	MetadataJson      json.RawMessage `json:"metadataJson"`
+	OccurredAt        time.Time       `json:"occurredAt"`
+	Total             interface{}     `json:"total"`
+}
+
+// Paginated workspace audit log with optional action / resource_type /
+// actor-search / date-range filters for the workspace-admin UI.
+//
+//	filter_action: pass '' to skip, otherwise exact match on al.action.
+//	filter_resource_type: pass '' to skip, otherwise exact match on al.resource_type.
+//	filter_actor_search: pass '' to skip, otherwise substring match against
+//	  the actor user's display_name or email.
+//	filter_from / filter_to: pass NULL to skip each bound (inclusive).
+func (q *Queries) ListWorkspaceAuditLogs(ctx context.Context, arg ListWorkspaceAuditLogsParams) ([]ListWorkspaceAuditLogsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listWorkspaceAuditLogs,
+		arg.WorkspaceID,
+		arg.FilterAction,
+		arg.FilterAction,
+		arg.FilterResourceType,
+		arg.FilterResourceType,
+		arg.FilterActorSearch,
+		arg.FilterActorSearch,
+		arg.FilterActorSearch,
+		arg.FilterFrom,
+		arg.FilterFrom,
+		arg.FilterTo,
+		arg.FilterTo,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListWorkspaceAuditLogsRow{}
+	for rows.Next() {
+		var i ListWorkspaceAuditLogsRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.ActorUserPublicID,
+			&i.ActorDisplayName,
+			&i.Action,
+			&i.ResourceType,
+			&i.ResourcePublicID,
+			&i.IpAddress,
+			&i.UserAgent,
+			&i.MetadataJson,
+			&i.OccurredAt,
+			&i.Total,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

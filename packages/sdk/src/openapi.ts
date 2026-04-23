@@ -2160,6 +2160,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{wsId}/audit-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List recent audit log entries for a workspace */
+        get: operations["audit-logs-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{wsId}/calendar-events/{evtId}/apply-shift": {
         parameters: {
             query?: never;
@@ -3448,6 +3465,20 @@ export interface components {
             targetWorkspaceName?: string;
             userAgent?: string;
         };
+        AuditLogEntryDTO: {
+            action: string;
+            actorDisplayName: string | null;
+            actorUserPublicId: string | null;
+            ipAddress: string | null;
+            metadataJson: unknown;
+            /** Format: int64 */
+            occurredAt: number;
+            /** @description Audit entry public id (UUID v7) */
+            publicId: string;
+            resourcePublicId: string | null;
+            resourceType: string;
+            userAgent: string | null;
+        };
         AuthTokens: {
             /**
              * Format: uri
@@ -4532,6 +4563,16 @@ export interface components {
              */
             readonly $schema?: string;
             tasks: components["schemas"]["TaskListItem"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
+        ListAuditLogsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            entries: components["schemas"]["AuditLogEntryDTO"][] | null;
             /** Format: int64 */
             total: number;
         };
@@ -11997,6 +12038,51 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WeeklyDigestOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "audit-logs-list": {
+        parameters: {
+            query?: {
+                /** @description Exact match on action (e.g. 'task.create') */
+                action?: string;
+                /** @description Exact match on resource_type (e.g. 'task') */
+                resourceType?: string;
+                /** @description Substring match against actor display_name or email */
+                actorSearch?: string;
+                /** @description Inclusive lower bound on occurred_at (YYYY-MM-DD, UTC) */
+                dateFrom?: string;
+                /** @description Inclusive upper bound on occurred_at (YYYY-MM-DD, UTC) */
+                dateTo?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Workspace public id (UUID v7) */
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListAuditLogsBody"];
                 };
             };
             /** @description Error */

@@ -193,6 +193,14 @@ type Querier interface {
 	// List every active integration owned by a user. Tokens are NOT
 	// selected; only metadata used by the /me/integrations list view.
 	ListUserIntegrations(ctx context.Context, userID uint32) ([]ListUserIntegrationsRow, error)
+	// Paginated workspace audit log with optional action / resource_type /
+	// actor-search / date-range filters for the workspace-admin UI.
+	//   filter_action: pass '' to skip, otherwise exact match on al.action.
+	//   filter_resource_type: pass '' to skip, otherwise exact match on al.resource_type.
+	//   filter_actor_search: pass '' to skip, otherwise substring match against
+	//     the actor user's display_name or email.
+	//   filter_from / filter_to: pass NULL to skip each bound (inclusive).
+	ListWorkspaceAuditLogs(ctx context.Context, arg ListWorkspaceAuditLogsParams) ([]ListWorkspaceAuditLogsRow, error)
 	// List active invites for a workspace, most recent first.
 	ListWorkspaceInvites(ctx context.Context, arg ListWorkspaceInvitesParams) ([]ListWorkspaceInvitesRow, error)
 	// List members of a workspace via v_workspace_members.

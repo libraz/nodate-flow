@@ -35,11 +35,12 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	aihandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/ai"
+	audithandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/dashboard"
 	exporthandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/export"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/favorites"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/inbox"
 	importhandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/imports"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/inbox"
 	intakehandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/intake"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/labels"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/lenses"
@@ -515,6 +516,8 @@ func BuildResult(deps Deps) Result {
 		aihandlers.RegisterAutoActionRules(subAPI, aiDeps)
 		webhookDeps := webhooks.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec}
 		webhooks.Register(subAPI, webhookDeps)
+		auditHandlerDeps := audithandlers.Deps{DB: deps.DB, Queries: deps.Queries}
+		audithandlers.Register(subAPI, auditHandlerDeps)
 	})
 
 	// /projects/{prjId}.
