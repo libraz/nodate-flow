@@ -147,28 +147,54 @@ export function useCurrentWorkspaceId(): string | null {
     (projectQuery.data ? projectQuery.data.workspaceId : null) ??
     (taskQuery.data ? taskQuery.data.workspaceId : null);
 
-  // Persist the URL-derived id whenever it changes. Kept in an effect
-  // because persistence is an external-system sync; running it during
-  // render would violate React's purity contract and misbehave under
-  // StrictMode double-invoke.
+  // Resolve the fallback id in render so the return value is pure.
+  // Precedence after urlWsId: a still-visible stored id wins; otherwise
+  // auto-select the first visible workspace on cold start so FAB / task
+  // creation flows resolve a default project without requiring the user
+  // to navigate to a workspace manually first.
+  const visibleList = workspacesQuery.data;
+  const stored = readStoredWsId();
+  let fallbackWsId: string | null = null;
+  let storedInvalid = false;
+  let autoSelected: string | null = null;
+  if (stored) {
+    if (visibleList === undefined) {
+      // List not yet loaded: optimistically use the stored id. A later
+      // render will correct or purge it once the list arrives.
+      fallbackWsId = stored;
+    } else if (visibleList.includes(stored)) {
+      fallbackWsId = stored;
+    } else {
+      // Stored id is no longer reachable — flag for purge below.
+      storedInvalid = true;
+    }
+  }
+  if (fallbackWsId === null && visibleList && visibleList.length > 0) {
+    autoSelected = visibleList[0] ?? null;
+    fallbackWsId = autoSelected;
+  }
+
+  // Persist the URL-derived id whenever it changes, and mirror the
+  // auto-selected fallback so subsequent renders take the stored-id
+  // fast path. Kept in an effect because persistence is an
+  // external-system sync; running it during render would violate
+  // React's purity contract and misbehave under StrictMode
+  // double-invoke.
   useEffect(() => {
-    if (urlWsId) writeStoredWsId(urlWsId);
-  }, [urlWsId]);
+    if (urlWsId) {
+      writeStoredWsId(urlWsId);
+      return;
+    }
+    if (storedInvalid) {
+      clearActiveWorkspaceId();
+    }
+    if (autoSelected) {
+      writeStoredWsId(autoSelected);
+    }
+  }, [urlWsId, storedInvalid, autoSelected]);
 
   if (urlWsId) return urlWsId;
-
-  // Fall back to the persisted id, gated by the user's visible
-  // workspaces if we have that list cached. When the list is not yet
-  // loaded, return the stored id optimistically; a later render will
-  // correct it if the validation fails.
-  const stored = readStoredWsId();
-  if (!stored) return null;
-  const visible = workspacesQuery.data;
-  if (visible === undefined) return stored;
-  if (visible.includes(stored)) return stored;
-  // Stored id is no longer reachable — purge it so we stop returning it.
-  clearActiveWorkspaceId();
-  return null;
+  return fallbackWsId;
 }
 
 /**
