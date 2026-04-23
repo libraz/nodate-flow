@@ -29,6 +29,7 @@ import {
   type Ref,
   type SyntheticEvent,
   forwardRef,
+  useEffect,
   useId,
   useMemo,
   useRef,
@@ -93,6 +94,25 @@ function ComboboxImpl(
   const [query, setQuery] = useState(initialLabel);
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+
+  /**
+   * Re-sync `query` to the derived `initialLabel` when the resolved label
+   * changes out from under us — typically a locale switch rebuilding the
+   * `options` prop with freshly translated `label` strings, or a controlled
+   * `value` swap. We only overwrite when the user has not typed anything
+   * since the previous sync: `query === prevInitialLabelRef.current`
+   * distinguishes "untouched placeholder/selected label" from "in-progress
+   * filter query". First-mount `useState(initialLabel)` still handles the
+   * initial render.
+   */
+  const prevInitialLabelRef = useRef(initialLabel);
+  useEffect(() => {
+    if (prevInitialLabelRef.current === initialLabel) return;
+    if (query === prevInitialLabelRef.current) {
+      setQuery(initialLabel);
+    }
+    prevInitialLabelRef.current = initialLabel;
+  }, [initialLabel, query]);
   const baseId = useId();
   const inputId = idProp ?? `${baseId}-input`;
   const listId = `${baseId}-list`;
