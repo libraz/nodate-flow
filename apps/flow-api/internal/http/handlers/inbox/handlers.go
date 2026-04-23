@@ -2,6 +2,7 @@ package inbox
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
@@ -47,7 +48,7 @@ func List(deps Deps) func(context.Context, *ListInboxInput) (*ListInboxOutput, e
 				out.Body.Items = append(out.Body.Items, InboxItem{
 					ID:          r.PublicID.String(),
 					WorkspaceID: bytesToUUIDString(r.WorkspacePublicID),
-					TaskID:      nullStr(r.TaskPublicID),
+					TaskID:      nullBytesToUUIDString(r.TaskPublicID),
 					TaskTitle:   nullStr(r.TaskTitle),
 					Source:      string(r.Source),
 					Kind:        r.Kind,
@@ -75,7 +76,7 @@ func List(deps Deps) func(context.Context, *ListInboxInput) (*ListInboxOutput, e
 			out.Body.Items = append(out.Body.Items, InboxItem{
 				ID:          r.PublicID.String(),
 				WorkspaceID: bytesToUUIDString(r.WorkspacePublicID),
-				TaskID:      nullStr(r.TaskPublicID),
+				TaskID:      nullBytesToUUIDString(r.TaskPublicID),
 				TaskTitle:   nullStr(r.TaskTitle),
 				Source:      string(r.Source),
 				Kind:        r.Kind,
@@ -159,5 +160,23 @@ func bytesToUUIDString(b []byte) string {
 	}
 	var u uuid.UUID
 	copy(u[:], b)
+	return u.String()
+}
+
+// nullBytesToUUIDString converts a sql.NullString whose underlying string
+// is a raw BINARY(16) UUID (as returned by sqlc for nullable BINARY(16)
+// columns, e.g. v_inbox.task_public_id) into a canonical hyphenated
+// UUID v7 string. Returns "" when NULL or when the value is not exactly
+// 16 bytes.
+//
+// Prefer this over handlerutil.NullStr for public_id columns: NullStr
+// assigns the raw bytes straight into the DTO field, which leaks the
+// internal binary representation through JSON.
+func nullBytesToUUIDString(s sql.NullString) string {
+	if !s.Valid || len(s.String) != 16 {
+		return ""
+	}
+	var u uuid.UUID
+	copy(u[:], s.String)
 	return u.String()
 }

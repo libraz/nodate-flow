@@ -136,7 +136,7 @@ func mapArchivedTaskListItem(r generated.ListArchivedTasksForWorkspaceRow) TaskL
 		ProjectName:       r.ProjectName,
 		ProjectIdentifier: r.ProjectIdentifier,
 		TaskNumber:        int32(r.TaskNumber),
-		ParentTaskID:      nullStr(r.ParentTaskPublicID),
+		ParentTaskID:      nullBytesToUUIDString(r.ParentTaskPublicID),
 		Title:             r.Title,
 		Visibility:        string(r.Visibility),
 		DerivedState:      string(r.DerivedState),

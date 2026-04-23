@@ -17,14 +17,31 @@ func bytesToUUIDString(b []byte) string {
 	return u.String()
 }
 
+// nullBytesToUUIDString converts a sql.NullString whose underlying string
+// is a raw BINARY(16) UUID (as returned by sqlc for nullable BINARY(16)
+// columns) into a canonical hyphenated UUID v7 string. Returns "" when
+// NULL or when the value is not exactly 16 bytes.
+//
+// Without this helper, handlers that assign the NullString directly into
+// a string DTO field (e.g. via handlerutil.NullStr) leak the raw binary
+// bytes through the JSON boundary, violating docs/requirements.md §11.9.
+func nullBytesToUUIDString(s sql.NullString) string {
+	if !s.Valid || len(s.String) != 16 {
+		return ""
+	}
+	var u uuid.UUID
+	copy(u[:], s.String)
+	return u.String()
+}
+
 func rowToTaskFromFind(r generated.FindTaskByPublicIdRow) Task {
 	return Task{
 		ID:                       r.PublicID.String(),
 		WorkspaceID:              bytesToUUIDString(r.WorkspacePublicID),
 		ProjectID:                bytesToUUIDString(r.ProjectPublicID),
 		ProjectName:              r.ProjectName,
-		ParentTaskID:             nullStr(r.ParentTaskPublicID),
-		CreatedByUserID:          nullStr(r.CreatedByUserPublicID),
+		ParentTaskID:             nullBytesToUUIDString(r.ParentTaskPublicID),
+		CreatedByUserID:          nullBytesToUUIDString(r.CreatedByUserPublicID),
 		Title:                    r.Title,
 		Description:              nullStr(r.Description),
 		Visibility:               string(r.Visibility),
@@ -84,7 +101,7 @@ func rowToTaskListItemFromProject(r generated.ListTasksForProjectRow) TaskListIt
 		ProjectName:       r.ProjectName,
 		ProjectIdentifier: r.ProjectIdentifier,
 		TaskNumber:        int32(r.TaskNumber),
-		ParentTaskID:      nullStr(r.ParentTaskPublicID),
+		ParentTaskID:      nullBytesToUUIDString(r.ParentTaskPublicID),
 		Title:             r.Title,
 		Visibility:        string(r.Visibility),
 		DerivedState:      string(r.DerivedState),
@@ -109,7 +126,7 @@ func rowToTaskListItemFromWorkspace(r generated.ListTasksForWorkspaceRow) TaskLi
 		ProjectName:       r.ProjectName,
 		ProjectIdentifier: r.ProjectIdentifier,
 		TaskNumber:        int32(r.TaskNumber),
-		ParentTaskID:      nullStr(r.ParentTaskPublicID),
+		ParentTaskID:      nullBytesToUUIDString(r.ParentTaskPublicID),
 		Title:             r.Title,
 		Visibility:        string(r.Visibility),
 		DerivedState:      string(r.DerivedState),
