@@ -1,9 +1,17 @@
 /**
  * /workspaces/$id — workspace detail layout.
  *
- * Renders a horizontal sub-nav (Overview / Timeline / Settings) so the
- * nested routes are reachable from the UI without typing URLs. When no
- * child route is matched, the workspace overview is rendered inline.
+ * Renders a horizontal sub-nav (Overview / Projects / Timeline /
+ * Settings) so the nested routes are reachable from the UI without
+ * typing URLs. When no child route is matched, the workspace overview
+ * is rendered inline.
+ *
+ * When the active child route is under `projects/$projectId/*`, the
+ * workspace-level header and tab strip are suppressed entirely. The
+ * nested project route already renders its own h1 + tab strip, and the
+ * top-bar breadcrumb carries the "Workspace › Project" context, so
+ * repeating the workspace chrome would stack three nav layers above
+ * page content and generate multiple h1 elements on the same document.
  *
  * Loader + errorComponent intercept WS.WORKSPACE.NOT_FOUND so
  * fabricated or stale workspace UUIDs land on a branded "Workspace not
@@ -58,15 +66,47 @@ function labelKeyFor(
   }
 }
 
+/**
+ * True when any child match is the project-detail subtree
+ * (`/workspaces/$id/projects/$projectId/*`). The project layout owns
+ * its own h1 + tab strip, so the workspace chrome is hidden there to
+ * avoid stacking two header blocks above the same page.
+ */
+function useInsideProjectRoute(): boolean {
+  const childMatches = useChildMatches();
+  return childMatches.some((m) => {
+    const routeId = typeof m.routeId === 'string' ? m.routeId : '';
+    return routeId.includes('/projects/$projectId');
+  });
+}
+
 function WorkspaceDetailRoute(): ReactElement {
   const { t } = useTranslation('common');
   const { id } = Route.useParams();
   const childMatches = useChildMatches();
   const hasChildRoute = childMatches.length > 0;
+  const insideProject = useInsideProjectRoute();
   // WorkspaceDetail renders its own <h1> on the overview. On child
   // routes (projects / timeline / settings) nothing carries the
-  // workspace name, so show it here for context.
+  // workspace name, so show it here for context — except when the
+  // active child is a project-detail route, which renders its own
+  // header.
   const { data: workspace } = useWorkspaceQuery(id);
+
+  if (insideProject) {
+    return (
+      <Suspense
+        fallback={
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.5rem' }}>
+            <Skeleton style={{ blockSize: '2rem', inlineSize: '16rem' }} />
+            <Skeleton style={{ blockSize: '12rem', inlineSize: '100%' }} />
+          </div>
+        }
+      >
+        <Outlet />
+      </Suspense>
+    );
+  }
 
   return (
     <section
