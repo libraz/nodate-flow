@@ -1,5 +1,5 @@
 import { Link, Outlet, createRootRouteWithContext, useRouterState } from '@tanstack/react-router';
-import { type ReactElement, Suspense, lazy } from 'react';
+import { type ReactElement, Suspense, lazy, useEffect, useRef } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 
@@ -64,6 +64,19 @@ function FatalFallback({
 }): ReactElement {
   const { t } = useTranslation('auth');
   const message = error instanceof Error ? error.message : String(error);
+  // Subscribe to pathname inside the fallback so the router store forces
+  // this component to re-render on navigation. `resetKeys` on the parent
+  // ErrorBoundary is unreliable because the parent subtree is frozen
+  // while the fallback is active, so the new keys never reach the
+  // boundary. Resetting from a navigation-scoped effect runs outside the
+  // frozen subtree and recovers the app on Link clicks.
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const errorPathnameRef = useRef(pathname);
+  useEffect(() => {
+    if (pathname !== errorPathnameRef.current) {
+      resetErrorBoundary();
+    }
+  }, [pathname, resetErrorBoundary]);
   return (
     <main
       style={{
@@ -134,14 +147,13 @@ function FatalFallback({
 }
 
 function RootLayout(): ReactElement {
-  // Reset the root ErrorBoundary whenever the pathname changes so a single
-  // failing route does not permanently wedge the entire app. Without this,
-  // react-error-boundary keeps rendering the fallback across navigations
-  // until the user explicitly clicks the retry button.
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  // The root ErrorBoundary resets when the user navigates. The reset is
+  // driven from inside `FatalFallback` via `useRouterState` — the
+  // subtree under the boundary is frozen while the fallback is active,
+  // so `resetKeys` on this element never propagates the new pathname.
   return (
     <>
-      <ErrorBoundary FallbackComponent={FatalFallback} resetKeys={[pathname]}>
+      <ErrorBoundary FallbackComponent={FatalFallback}>
         <Suspense fallback={null}>
           <Outlet />
         </Suspense>
