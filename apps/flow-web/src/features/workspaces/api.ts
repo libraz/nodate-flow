@@ -44,12 +44,25 @@ function extractCode(detail: string): string | undefined {
 
 function toError(err: unknown, fallback: string): ApiError {
   if (err && typeof err === 'object') {
-    const obj = err as { detail?: unknown; title?: unknown; type?: unknown };
+    const obj = err as {
+      detail?: unknown;
+      title?: unknown;
+      type?: unknown;
+      code?: unknown;
+      message?: unknown;
+    };
     const message =
       (typeof obj.detail === 'string' && obj.detail) ||
       (typeof obj.title === 'string' && obj.title) ||
+      (typeof obj.message === 'string' && obj.message) ||
       fallback;
+    // The backend emits two error envelope shapes today. The newer
+    // handlers use RFC 7807 (`{type, title, detail, status}`) where
+    // `type` carries the error code. The ACL middleware that raises
+    // WS.WORKSPACE.NOT_FOUND still uses the older `{code, message}`
+    // shape. Accept both so route-level fallbacks can branch on code.
     const code =
+      (typeof obj.code === 'string' && obj.code) ||
       (typeof obj.type === 'string' && obj.type) ||
       (typeof obj.detail === 'string' && extractCode(obj.detail)) ||
       undefined;

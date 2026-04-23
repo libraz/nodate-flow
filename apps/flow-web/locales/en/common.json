@@ -236,6 +236,11 @@
       "settings": "Settings",
       "label": "Workspace sections"
     },
+    "not_found": {
+      "title": "Workspace not found",
+      "body": "The workspace you tried to open doesn't exist or you no longer have access.",
+      "cta": "Go to your workspaces"
+    },
     "members": {
       "title": "Members",
       "add": "Add member",
@@ -318,6 +323,11 @@
       "tasks": "Tasks",
       "gantt": "Gantt",
       "timeline": "Timeline"
+    },
+    "not_found": {
+      "title": "Project not found",
+      "body": "The project you tried to open doesn't exist or you no longer have access.",
+      "cta": "Back to workspace"
     },
     "empty": "No projects yet. Create your first one to get started.",
     "columns": {

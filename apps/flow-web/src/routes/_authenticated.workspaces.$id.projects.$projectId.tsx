@@ -5,20 +5,21 @@
  * sibling `*.index.tsx`.
  *
  * The loader probes the project so deep-link 404s land on the branded
- * NotFound rendered inside the authenticated AppShell, and 403s land on
- * the branded Forbidden state, instead of crashing the route into the
- * root ErrorBoundary. It also verifies that the project's workspace
- * matches the `$id` path segment; visiting
+ * "Project not found" screen rendered by `errorComponent`, and 403s
+ * land on the branded Forbidden state, instead of crashing the route
+ * into the root ErrorBoundary. It also verifies that the project's
+ * workspace matches the `$id` path segment; visiting
  * `/workspaces/WRONG/projects/X` must not silently render project X
  * under the wrong workspace.
  */
 
-import { Link, Outlet, createFileRoute, notFound, useChildMatches } from '@tanstack/react-router';
+import { Link, Outlet, createFileRoute, useChildMatches } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import Forbidden from '../components/forbidden';
 import { useProjectQuery } from '../features/projects/api';
+import { ApiError } from '../lib/api-error';
 import { sdk } from '../lib/sdk';
 
 /** Sentinel thrown by the route loader to distinguish 403 from generic errors. */
@@ -141,25 +142,128 @@ function ProjectLayout(): ReactElement {
   );
 }
 
+/**
+ * Branded fallback for WS.PROJECT.NOT_FOUND. CTA takes the user back
+ * to the parent workspace rather than all the way to /workspaces, so
+ * the natural "oops, wrong project" recovery path is one click.
+ */
+function ProjectNotFound({ workspaceId }: { workspaceId: string }): ReactElement {
+  const { t } = useTranslation('common');
+  return (
+    <section
+      style={{
+        minBlockSize: '60vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '1.25rem',
+        padding: '3rem 2rem',
+        textAlign: 'center',
+      }}
+    >
+      <div
+        aria-hidden
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 'clamp(5rem, 14vw, 9rem)',
+          lineHeight: 1,
+          fontWeight: 700,
+          backgroundImage: 'var(--nf-gradient-wordmark)',
+          backgroundClip: 'text',
+          // biome-ignore lint/style/useNamingConvention: vendor prefix
+          WebkitBackgroundClip: 'text',
+          color: 'transparent',
+          // biome-ignore lint/style/useNamingConvention: vendor prefix
+          WebkitTextFillColor: 'transparent',
+        }}
+      >
+        {t('not_found.code', { defaultValue: '404' })}
+      </div>
+      <h1
+        style={{
+          fontFamily: 'var(--font-display)',
+          margin: 0,
+          fontSize: '1.5rem',
+          color: 'var(--nf-color-fg)',
+        }}
+      >
+        {t('projects.not_found.title')}
+      </h1>
+      <p
+        style={{
+          margin: 0,
+          maxInlineSize: '28rem',
+          color: 'var(--nf-color-fg-muted)',
+        }}
+      >
+        {t('projects.not_found.body')}
+      </p>
+      <Link
+        to="/workspaces/$id"
+        params={{ id: workspaceId }}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          padding: '0.5rem 1.25rem',
+          borderRadius: '0.5rem',
+          background: 'var(--nf-color-accent, var(--nf-color-accent))',
+          color: 'var(--nf-color-fg-on-accent, white)',
+          textDecoration: 'none',
+          fontWeight: 500,
+        }}
+      >
+        {t('projects.not_found.cta')}
+      </Link>
+    </section>
+  );
+}
+
+/**
+ * Extract the API error code from an unknown thrown value. Accepts
+ * both the newer `{type, detail, title}` RFC 7807 shape and the older
+ * `{code, message}` envelope still emitted by the ACL middleware for
+ * WS.WORKSPACE.NOT_FOUND / WS.PROJECT.NOT_FOUND.
+ */
+function errorCodeOf(err: unknown): string | undefined {
+  if (err instanceof ApiError) return err.code;
+  if (err && typeof err === 'object') {
+    const obj = err as { code?: unknown; type?: unknown };
+    if (typeof obj.code === 'string') return obj.code;
+    if (typeof obj.type === 'string') return obj.type;
+  }
+  return undefined;
+}
+
+function ProjectErrorComponent({ error }: { error: unknown }): ReactElement {
+  const { id } = Route.useParams();
+  if (error instanceof ForbiddenError) {
+    return <Forbidden />;
+  }
+  if (errorCodeOf(error) === 'WS.PROJECT.NOT_FOUND') {
+    return <ProjectNotFound workspaceId={id} />;
+  }
+  throw error;
+}
+
 export const Route = createFileRoute('/_authenticated/workspaces/$id/projects/$projectId')({
   component: ProjectLayout,
-  errorComponent: ({ error }) => {
-    if (error instanceof ForbiddenError) {
-      return <Forbidden />;
-    }
-    throw error;
-  },
+  errorComponent: ProjectErrorComponent,
   loader: async ({ params }) => {
     const { data, response } = await sdk.GET('/projects/{prjId}', {
       params: { path: { prjId: params.projectId } },
     });
-    if (response.status === 404) throw notFound();
+    if (response.status === 404) {
+      throw new ApiError('WS.PROJECT.NOT_FOUND', 'Project not found');
+    }
     if (response.status === 403) throw new ForbiddenError();
     // Cross-workspace protection: the project exists and the caller has
     // access, but the URL claims a different workspace. Treat it as a
     // 404 so we never render project data under the wrong workspace
     // breadcrumb.
-    if (data && data.workspaceId !== params.id) throw notFound();
+    if (data && data.workspaceId !== params.id) {
+      throw new ApiError('WS.PROJECT.NOT_FOUND', 'Project not found');
+    }
     return null;
   },
 });
