@@ -72,7 +72,11 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as unknown;
-    throw toApiError(body, `Request failed with status ${String(res.status)}`);
+    // Thread `res.status` into the error so the global QueryCache 401
+    // handler in the shared SDK QueryClient can detect a terminal auth
+    // failure on polling endpoints (notifications unread-count) and
+    // stop the poll / bounce the user to /login.
+    throw toApiError(body, `Request failed with status ${String(res.status)}`, res.status);
   }
   return (await res.json()) as T;
 }
@@ -103,6 +107,14 @@ export function useNotificationsQuery(): UseSuspenseQueryResult<NotificationItem
  * GET /me/notifications/unread-count — non-suspense query for the
  * badge count. Polls every 30 seconds as a fallback for missed SSE
  * events.
+ *
+ * If the most recent fetch failed with a 401 (terminal auth error,
+ * the SDK refresh middleware has already given up and the session
+ * has been cleared) we stop polling — the global QueryCache handler
+ * in the shared SDK QueryClient will bounce the user to /login, and
+ * a dead badge firing once every 30 s against an unauthenticated API
+ * is both noisy and pointless. `refetchInterval` accepts a function
+ * that returns `false` to disable the interval.
  */
 export function useUnreadCountQuery(): UseQueryResult<number> {
   return useQuery({
@@ -113,7 +125,11 @@ export function useUnreadCountQuery(): UseQueryResult<number> {
       );
       return data.unreadCount;
     },
-    refetchInterval: 30_000,
+    refetchInterval: (query): number | false => {
+      const err = query.state.error;
+      if (err instanceof ApiError && err.httpStatus === 401) return false;
+      return 30_000;
+    },
     // This badge is decorative; opt out of the SDK-wide `throwOnError: true`
     // default so a transient failure never cascades to the route
     // ErrorBoundary. The bell's local ErrorBoundary swallows it.

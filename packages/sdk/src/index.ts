@@ -29,7 +29,12 @@ export {
 export { ApiError, toApiError, type ProblemJson } from './api-error.js';
 
 // Shared TanStack Query client + provider
-export { createQueryClient, queryClient } from './query-client.js';
+export {
+  createQueryClient,
+  queryClient,
+  setAuthErrorHandler,
+  resetAuthErrorHandler,
+} from './query-client.js';
 export { QueryProvider } from './query-provider.js';
 
 // Shared i18n provider
