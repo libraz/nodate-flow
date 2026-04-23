@@ -54,7 +54,7 @@
    * dashboard section heading) on narrow viewports where the dock spans
    * the full inline axis.
    */
-  padding-block-end: var(--nf-space-24);
+  padding-block-end: var(--nf-space-28);
 }
 
 .main:focus-visible {
