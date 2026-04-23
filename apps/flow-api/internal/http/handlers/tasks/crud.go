@@ -254,6 +254,12 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 		if err != nil {
 			return nil, httpErr(apierrors.ValidationBodyDateFormatInvalid)
 		}
+		// Cross-field invariant: when both dueOn and startedOn are
+		// provided, dueOn must not be earlier than startedOn. Same-day
+		// (equal) is allowed; NULL on either side means "unconstrained".
+		if due.Valid && start.Valid && due.Time.Before(start.Time) {
+			return nil, httpErr(apierrors.ValidationBodyDueBeforeStart)
+		}
 
 		pub := types.New()
 		desc := sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""}
@@ -581,6 +587,16 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 				return nil, httpErr(apierrors.ValidationBodyDateFormatInvalid)
 			}
 			newStart = parsed
+		}
+		// Cross-field invariant: after applying the patch, dueOn must not
+		// be earlier than startedOn. Same-day (equal) is allowed. We only
+		// run the check when BOTH values would be present after the patch;
+		// NULL on either side means "unconstrained" and is always valid.
+		// The inputs merge the request body with the existing persisted
+		// task, so the check also catches a body that touches only one
+		// side but inverts the pair against the other side's stored value.
+		if newDue.Valid && newStart.Valid && newDue.Time.Before(newStart.Time) {
+			return nil, httpErr(apierrors.ValidationBodyDueBeforeStart)
 		}
 		newSortWeight := current.SortWeight
 		if in.Body.SortWeight != nil {
