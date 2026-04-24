@@ -13,7 +13,6 @@ import { useTranslation } from 'react-i18next';
 
 import { confirmAction } from '../../lib/confirm-action';
 import { formatEpochDateTime } from '../../lib/format';
-import { timeWebUrl } from '../../lib/sdk';
 import {
   type PublicShare,
   useDeletePublicShare,
@@ -199,7 +198,7 @@ export default function ShareList({ workspaceId }: ShareListProps): ReactElement
       />
       <RotateTokenDialog
         share={rotatedShare}
-        webUrl={timeWebUrl}
+        webUrl={window.location.origin}
         onClose={() => {
           setRotatedShare(null);
         }}

@@ -250,6 +250,7 @@ services:
       NF_TIME_LOG_LEVEL: ${NF_TIME_LOG_LEVEL:-info}
       NF_DB_DSN: ${NF_DB_DSN:-nodate:nodatepw@tcp(mysql:3306)/nodate_flow?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci}
       NF_TIME_CORS: ${NF_TIME_CORS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174}
+      NF_FLOW_WEB_URL: ${NF_FLOW_WEB_URL:-http://localhost:5173}
       NF_COOKIE_SECURE: "false"
       NF_S3_ENDPOINT: ${NF_S3_ENDPOINT:-minio:9000}
       NF_S3_ACCESS_KEY: ${NF_S3_ACCESS_KEY:-minioadmin}

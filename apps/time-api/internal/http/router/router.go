@@ -29,9 +29,9 @@ type Deps struct {
 	// when dispatching email. Must align with the SMTP transport
 	// configuration.
 	EmailFrom string
-	// WebBaseURL is the time-web origin used to build magic-link
-	// accept-page URLs in outbound invite emails.
-	WebBaseURL string
+	// FlowWebURL is the flow-web origin used to build magic-link
+	// accept-page URLs (/invites/accept) in outbound invite emails.
+	FlowWebURL string
 }
 
 type healthOutput struct {
@@ -80,7 +80,7 @@ func BuildResult(deps Deps) Result {
 		DB:          deps.DB,
 		EmailSender: emailSender,
 		EmailFrom:   deps.EmailFrom,
-		WebBaseURL:  deps.WebBaseURL,
+		FlowWebURL:  deps.FlowWebURL,
 	}
 
 	// Build workspace handler dependencies.

@@ -322,9 +322,9 @@ func dispatchInviteEmail(
 		return
 	}
 
-	base := deps.WebBaseURL
+	base := deps.FlowWebURL
 	if base == "" {
-		base = "http://localhost:5174"
+		base = "http://localhost:5173"
 	}
 	acceptURL := base + "/invites/accept?token=" + token
 

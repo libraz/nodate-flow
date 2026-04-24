@@ -101,7 +101,7 @@ func main() {
 		JWT:         jwtIssuer,
 		EmailSender: emailSender,
 		EmailFrom:   cfg.SmtpFrom,
-		WebBaseURL:  cfg.WebBaseURL,
+		FlowWebURL:  cfg.FlowWebURL,
 	})
 
 	outer := chi.NewRouter()

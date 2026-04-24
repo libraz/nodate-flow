@@ -47,13 +47,6 @@ export const authApiBaseUrl =
 export const timeApiBaseUrl =
   (import.meta.env.VITE_TIME_API_BASE_URL as string | undefined) ?? 'http://localhost:8081';
 
-/**
- * Base URL of the time-web frontend, used to construct public-share URLs
- * (`${timeWebUrl}/share/cal/{token}`) for copy-to-clipboard.
- */
-export const timeWebUrl =
-  (import.meta.env.VITE_TIME_WEB_URL as string | undefined) ?? 'http://localhost:5174';
-
 export const sdk: NodateFlowClient = createClient({
   baseUrl,
   tokenProvider: () => authStore.getState().accessToken ?? undefined,

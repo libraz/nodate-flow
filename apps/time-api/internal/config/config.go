@@ -68,12 +68,15 @@ type Config struct {
 	// SmtpFrom is the envelope sender address used on outbound mail.
 	SmtpFrom string `env:"NF_TIME_SMTP_FROM" envDefault:"noreply@nodate-flow.local"`
 
-	// WebBaseURL is the origin of the time-web (calendar) frontend.
-	// Used to build /invites/accept magic-link URLs embedded in
-	// outbound invite emails. NF_WEB_BASE_URL is preferred; the legacy
-	// NF_TIME_WEB_URL also works via envExpand elsewhere. Defaults to
-	// http://localhost:5174 for local development.
-	WebBaseURL string `env:"NF_WEB_BASE_URL" envDefault:"http://localhost:5174"`
+	// FlowWebURL is the origin of the flow-web frontend, which hosts the
+	// public /invites/accept RSVP page. Used to build magic-link URLs
+	// embedded in outbound invite emails. Defaults to
+	// http://localhost:5173 for local development. Named to match
+	// flow-api / auth-api, which already use NF_FLOW_WEB_URL /
+	// NF_AUTH_FLOW_WEB_URL for the same concept (previously
+	// NF_WEB_BASE_URL when the public invite screen lived in the
+	// standalone time-web app).
+	FlowWebURL string `env:"NF_FLOW_WEB_URL" envDefault:"http://localhost:5173"`
 }
 
 // Load parses NF_* environment variables into a Config and validates

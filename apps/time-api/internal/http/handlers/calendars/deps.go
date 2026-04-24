@@ -21,11 +21,11 @@ type Deps struct {
 	// EmailFrom is the envelope sender address used when a [email.Message]
 	// does not specify one. Sourced from NF_TIME_SMTP_FROM.
 	EmailFrom string
-	// WebBaseURL is the origin of the time-web (calendar) frontend, used
-	// to build accept-page URLs for magic-link invites. Sourced from
-	// NF_WEB_BASE_URL or NF_TIME_WEB_URL; defaults to
-	// http://localhost:5174 in development.
-	WebBaseURL string
+	// FlowWebURL is the origin of the flow-web frontend that hosts the
+	// public /invites/accept RSVP page, used to build magic-link URLs
+	// for outbound invite emails. Sourced from NF_FLOW_WEB_URL; defaults
+	// to http://localhost:5173 in development.
+	FlowWebURL string
 }
 
 // httpErr delegates to handlerutil.HTTPErr.

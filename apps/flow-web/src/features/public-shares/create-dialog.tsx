@@ -20,7 +20,6 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { timeWebUrl } from '../../lib/sdk';
 import { type CreatePublicShareInput, useCreatePublicShare } from './api';
 
 export interface PublicShareCreateDialogProps {
@@ -47,7 +46,7 @@ export default function PublicShareCreateDialog({
   const [plaintext, setPlaintext] = useState('');
   const [copied, setCopied] = useState(false);
 
-  const shareUrl = plaintext === '' ? '' : `${timeWebUrl}/share/cal/${plaintext}`;
+  const shareUrl = plaintext === '' ? '' : `${window.location.origin}/share/cal/${plaintext}`;
 
   const reset = (): void => {
     setStage('form');
