@@ -13,7 +13,7 @@
  * under the wrong workspace.
  */
 
-import { Link, Outlet, createFileRoute, useChildMatches } from '@tanstack/react-router';
+import { Link, Outlet, createFileRoute } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -68,12 +68,9 @@ function ProjectLayout(): ReactElement {
   const { t } = useTranslation('common');
   const { id, projectId } = Route.useParams();
   const { data: project } = useProjectQuery(projectId);
-  // On /workspaces/$id/projects/$projectId/ (overview) the detail
-  // component renders its own project-name heading. On the nested child
-  // routes (tasks/gantt/timeline) nothing else carries the project
-  // name, so show it here to keep context.
-  const childMatches = useChildMatches();
-  const onOverview = childMatches.length === 0;
+  // ProjectLayout always renders the project name as the page-level h1;
+  // child routes (overview / tasks / gantt / timeline) do not re-emit
+  // their own name heading.
   // Defence in depth: the loader already converts 404/403 into branded
   // states, but if the query somehow resolves to a nullish value (stale
   // cache, race condition), render the access-denied state rather than
@@ -90,17 +87,18 @@ function ProjectLayout(): ReactElement {
         padding: 'clamp(1rem, 3vw, 2rem) clamp(1rem, 3vw, 2rem) 0',
       }}
     >
-      {onOverview ? null : (
-        <h1
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 'clamp(1.5rem, 2.5vw, 2rem)',
-            margin: 0,
-          }}
-        >
-          {project.name}
-        </h1>
-      )}
+      <h1
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 'clamp(1.5rem, 2.5vw, 2rem)',
+          margin: 0,
+        }}
+      >
+        {project.name}
+      </h1>
+      {project.description ? (
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{project.description}</p>
+      ) : null}
       <nav
         aria-label={t('projects.nav.label')}
         style={{

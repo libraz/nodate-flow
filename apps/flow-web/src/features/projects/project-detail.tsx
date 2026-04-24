@@ -345,24 +345,6 @@ export default function ProjectDetail({ id, tab, onTabChange }: ProjectDetailPro
         padding: 'clamp(1.5rem, 4vw, 2.5rem)',
       }}
     >
-      {/* The parent project layout already renders the project name as
-          the page-level <h1>, so this secondary title is an <h2> to
-          keep the document at a single top-level heading. */}
-      <header style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <h2
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
-            margin: 0,
-          }}
-        >
-          {project.name}
-        </h2>
-        {project.description ? (
-          <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{project.description}</p>
-        ) : null}
-      </header>
-
       <Tabs
         items={items}
         value={tab}

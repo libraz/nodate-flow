@@ -1050,10 +1050,12 @@ function InferStateSection({ taskId }: { taskId: string }): ReactElement {
     );
   }
   const { transition, confidence, reason } = data.proposal;
+  const transitionKey = TRANSITION_KEY[transition as TransitionName];
+  const transitionLabel = transitionKey ? t(transitionKey) : transition;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <Badge tone="accent">{transition}</Badge>
+        <Badge tone="accent">{transitionLabel}</Badge>
         <span
           style={{
             fontFamily: 'var(--font-mono)',
@@ -1064,7 +1066,19 @@ function InferStateSection({ taskId }: { taskId: string }): ReactElement {
           {confidence.toFixed(2)}
         </span>
       </div>
-      <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--nf-color-fg)' }}>{reason}</p>
+      <p
+        style={{
+          margin: 0,
+          fontSize: '0.8125rem',
+          color: 'var(--nf-color-fg)',
+          display: 'flex',
+          gap: '0.375rem',
+          flexWrap: 'wrap',
+        }}
+      >
+        <strong>{t('tasks.detail.infer_state.reason_label')}</strong>
+        <span>{reason}</span>
+      </p>
     </div>
   );
 }

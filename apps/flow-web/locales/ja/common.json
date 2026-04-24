@@ -645,7 +645,8 @@
       },
       "infer_state": {
         "title": "次の推奨アクション",
-        "empty": "現時点で推奨はありません。"
+        "empty": "現時点で推奨はありません。",
+        "reason_label": "理由 (English):"
       },
       "ai_activity": {
         "title": "AI の判断履歴",

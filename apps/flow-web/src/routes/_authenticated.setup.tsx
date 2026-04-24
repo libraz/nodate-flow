@@ -17,7 +17,7 @@ import type { ReactElement } from 'react';
 
 import { workspacesKeys } from '../features/workspaces/api';
 import SetupPage from '../features/workspaces/setup-page';
-import { sdk } from '../lib/sdk';
+import { authSdk } from '../lib/sdk';
 
 type Workspace = components['schemas']['Workspace'];
 
@@ -28,7 +28,7 @@ type Workspace = components['schemas']['Workspace'];
  * cached shape stays compatible.
  */
 async function fetchWorkspaceList(): Promise<Workspace[]> {
-  const { data, error } = await sdk.GET('/workspaces', {});
+  const { data, error } = await authSdk.GET('/workspaces', {});
   if (error || !data) return [];
   return data.workspaces ?? [];
 }

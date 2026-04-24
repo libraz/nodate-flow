@@ -645,7 +645,8 @@
       },
       "infer_state": {
         "title": "Suggested next step",
-        "empty": "No suggestion right now."
+        "empty": "No suggestion right now.",
+        "reason_label": "Reason (English):"
       },
       "ai_activity": {
         "title": "AI reasoning",

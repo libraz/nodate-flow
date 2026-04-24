@@ -11,6 +11,25 @@ import { ThemeProvider } from './providers/theme-provider';
 import { router } from './router/router';
 import './styles/main.css';
 
+// One-shot cleanup of localStorage keys left over from the retired
+// time-web app (decommissioned in commit 4dbfd58). Runs on every boot;
+// removeItem on a missing key is a no-op so there is no cost after the
+// first load that finds nothing to delete. Leave this in for one or
+// two releases, then retire.
+const LEGACY_LOCALSTORAGE_KEYS = [
+  'tt_theme',
+  'tt_activeCalendarIds',
+  'tt_colorMode',
+  'tt_token',
+  'lastExternalReferrerTime',
+  'lastExternalReferrer',
+];
+try {
+  for (const k of LEGACY_LOCALSTORAGE_KEYS) localStorage.removeItem(k);
+} catch {
+  // SSR / restricted storage; safe to ignore
+}
+
 /**
  * Pre-i18n bootstrap error fallback. This text is intentionally hardcoded
  * English because the i18n provider has not been initialized when this
