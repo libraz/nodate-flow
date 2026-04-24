@@ -1,0 +1,115 @@
+# Scenario — log in, open /settings/profile, change the display name, save,
+# and assert PATCH /me returned 200 with a clean console.
+
+version: 1
+app: flow-web
+base_url: http://localhost:5173
+
+suites:
+  - id: settings_profile_edit
+    area: settings
+    severity_on_fail: medium
+    description: >
+      Log in, navigate to flow-web /settings/profile, update the display
+      name to a unique value, submit the form, and assert PATCH /me
+      returned 200.
+    cases:
+      - id: happy_ja
+        vars:
+          locale: ja
+          accounts_url: http://localhost:5175
+          flow_url: http://localhost:5173
+          email: admin@example.com
+          password: password123
+          new_display_name: ui-verify smoke admin
+
+    steps:
+      - id: open_accounts_login
+        action:
+          tool: new_page
+          args:
+            url: "${accounts_url}/login"
+
+      - id: resize_desktop
+        action:
+          tool: resize_page
+          args: { width: 1280, height: 800 }
+
+      - id: snapshot_login
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: fill_email
+        action:
+          tool: fill
+          resolve: { by: name, match: email }
+          args:
+            value: "${email}"
+
+      - id: fill_password
+        action:
+          tool: fill
+          resolve: { by: name, match: password }
+          args:
+            value: "${password}"
+
+      - id: submit_login
+        action:
+          tool: click
+          resolve: { by: role_name, role: button, match: "(Sign in|サインイン)" }
+
+      - id: wait_workspaces
+        action:
+          tool: wait_for
+          args:
+            text: ["Workspaces", "ワークスペース"]
+
+      - id: goto_profile
+        action:
+          tool: navigate_page
+          args:
+            url: "${flow_url}/settings/profile"
+
+      - id: wait_profile_title
+        action:
+          tool: wait_for
+          args:
+            text: ["Profile", "プロフィール"]
+
+      - id: snapshot_profile
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: fill_display_name
+        action:
+          tool: fill
+          resolve: { by: name, match: "^(Display name|表示名)$" }
+          args:
+            value: "${new_display_name}"
+
+      - id: submit_save
+        action:
+          tool: click
+          resolve: { by: role_name, role: button, match: "^(Save|保存|Save changes|変更を保存)$" }
+
+      - kind: check
+        id: me_patch_200
+        note: The last PATCH to /me should have returned 200.
+        action:
+          tool: list_network_requests
+          args: { resourceTypes: ["xhr", "fetch"] }
+        assert:
+          type: status
+          method: PATCH
+          path: /me
+          status: 200
+
+      - kind: check
+        id: console_clean
+        action:
+          tool: list_console_messages
+          args: { types: ["error", "warn"] }
+        assert:
+          type: empty_array

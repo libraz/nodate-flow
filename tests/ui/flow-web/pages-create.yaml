@@ -1,0 +1,153 @@
+# Scenario — log in, prime Demo Workspace, visit /pages, open the create-page
+# surface, fill the title, submit, and assert POST /workspaces/{wsId}/pages
+# returned 200.
+#
+# Leaves one page behind in the target workspace — acceptable artifact until a
+# teardown step lands later.
+
+version: 1
+app: flow-web
+base_url: http://localhost:5173
+
+suites:
+  - id: pages_create
+    area: pages
+    severity_on_fail: medium
+    description: >
+      Log in, land on flow-web /pages, open the create-page surface,
+      submit a page, and assert POST /workspaces/{wsId}/pages returned
+      200 with a clean console.
+    cases:
+      - id: happy_ja
+        vars:
+          locale: ja
+          accounts_url: http://localhost:5175
+          flow_url: http://localhost:5173
+          email: admin@example.com
+          password: password123
+          workspace_name: Demo Workspace
+          page_title: ui-verify smoke page
+
+    steps:
+      - id: open_accounts_login
+        action:
+          tool: new_page
+          args:
+            url: "${accounts_url}/login"
+
+      - id: resize_desktop
+        action:
+          tool: resize_page
+          args: { width: 1280, height: 800 }
+
+      - id: snapshot_login
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: fill_email
+        action:
+          tool: fill
+          resolve: { by: name, match: email }
+          args:
+            value: "${email}"
+
+      - id: fill_password
+        action:
+          tool: fill
+          resolve: { by: name, match: password }
+          args:
+            value: "${password}"
+
+      - id: submit_login
+        action:
+          tool: click
+          resolve: { by: role_name, role: button, match: "(Sign in|サインイン)" }
+
+      - id: wait_workspaces
+        action:
+          tool: wait_for
+          args:
+            text: ["Workspaces", "ワークスペース"]
+
+      - id: goto_workspaces
+        action:
+          tool: navigate_page
+          args:
+            url: "${flow_url}/workspaces"
+
+      - id: snapshot_workspaces
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: click_target_workspace
+        note: Prime the active workspace so /pages has context.
+        action:
+          tool: click
+          resolve: { by: role_name, role: link, match: "^${workspace_name}$" }
+
+      - id: wait_workspace_landed
+        action:
+          tool: wait_for
+          args:
+            text: ["${workspace_name}"]
+
+      - id: goto_pages
+        action:
+          tool: navigate_page
+          args:
+            url: "${flow_url}/pages"
+
+      - id: wait_pages_title
+        action:
+          tool: wait_for
+          args:
+            text: ["Pages", "ページ"]
+
+      - id: snapshot_pages
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: click_new_page
+        action:
+          tool: click
+          resolve: { by: role_name, role: button, match: "^(New page|新しいページ)$" }
+
+      - id: snapshot_page_editor
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: fill_page_title
+        action:
+          tool: fill
+          resolve: { by: name, match: "^(Title|タイトル)$" }
+          args:
+            value: "${page_title}"
+
+      - id: submit_page
+        action:
+          tool: click
+          resolve: { by: role_name, role: button, match: "^(Save|保存|Create|作成|New page|新しいページ)$" }
+
+      - kind: check
+        id: pages_create_200
+        note: The last POST to /workspaces/{wsId}/pages should have returned 200.
+        action:
+          tool: list_network_requests
+          args: { resourceTypes: ["xhr", "fetch"] }
+        assert:
+          type: status
+          method: POST
+          path: /pages
+          status: 200
+
+      - kind: check
+        id: console_clean
+        action:
+          tool: list_console_messages
+          args: { types: ["error", "warn"] }
+        assert:
+          type: empty_array

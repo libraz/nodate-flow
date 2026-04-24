@@ -1,0 +1,164 @@
+# Scenario — log in, prime a workspace that has at least one project, visit /today,
+# open the create-task dialog via the dock FAB, submit a task, and assert
+# POST /tasks returned 200 with a clean console.
+#
+# Leaves one task behind in the target workspace — acceptable artifact until a
+# teardown step lands later.
+
+version: 1
+app: flow-web
+base_url: http://localhost:5173
+
+suites:
+  - id: task_create_from_today
+    area: tasks
+    severity_on_fail: high
+    description: >
+      Log in, prime a workspace that has at least one project, visit
+      /today, open the create-task dialog via the dock FAB, submit a
+      task, and assert POST /tasks returned 200 with a clean console.
+    cases:
+      - id: happy_ja
+        vars:
+          locale: ja
+          accounts_url: http://localhost:5175
+          flow_url: http://localhost:5173
+          email: admin@example.com
+          password: password123
+          workspace_name: Demo Workspace
+          task_title: ui-verify smoke task
+
+    steps:
+      - id: open_accounts_login
+        note: Open the accounts-web login page.
+        action:
+          tool: new_page
+          args:
+            url: "${accounts_url}/login"
+
+      - id: resize_desktop
+        note: Desktop viewport — 1280x800.
+        action:
+          tool: resize_page
+          args: { width: 1280, height: 800 }
+
+      - id: snapshot_login
+        note: Capture a11y snapshot to find the email/password inputs.
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: fill_email
+        note: Fill the email field. Resolve uid from the latest snapshot.
+        action:
+          tool: fill
+          resolve: { by: name, match: email }
+          args:
+            value: "${email}"
+
+      - id: fill_password
+        note: Fill the password field. Resolve uid from the latest snapshot.
+        action:
+          tool: fill
+          resolve: { by: name, match: password }
+          args:
+            value: "${password}"
+
+      - id: submit_login
+        note: Submit the form. Resolve uid via the submit button.
+        action:
+          tool: click
+          resolve: { by: role_name, role: button, match: "(Sign in|サインイン)" }
+
+      - id: wait_workspaces
+        note: Wait until the workspace picker is visible.
+        action:
+          tool: wait_for
+          args:
+            text: ["Workspaces", "ワークスペース"]
+
+      - id: goto_workspaces
+        note: Navigate to flow-web /workspaces so we can prime the active workspace.
+        action:
+          tool: navigate_page
+          args:
+            url: "${flow_url}/workspaces"
+
+      - id: snapshot_workspaces
+        note: Snapshot the list to resolve the target workspace link.
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: click_target_workspace
+        note: Visit the workspace so the active-workspace pointer stores it for /today.
+        action:
+          tool: click
+          resolve: { by: role_name, role: link, match: "^${workspace_name}$" }
+
+      - id: wait_workspace_landed
+        note: Wait for the workspace overview tab to render.
+        action:
+          tool: wait_for
+          args:
+            text: ["${workspace_name}"]
+
+      - id: goto_today
+        note: Navigate to /today with the primed workspace.
+        action:
+          tool: navigate_page
+          args:
+            url: "${flow_url}/today"
+
+      - id: snapshot_today
+        note: Snapshot /today to resolve the dock FAB.
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: click_new_task_fab
+        note: Open the create-task dialog via the dock FAB.
+        action:
+          tool: click
+          resolve: { by: role_name, role: button, match: "^(New task|新しいタスク)$" }
+
+      - id: snapshot_task_dialog
+        note: Snapshot the dialog to resolve the title input and submit button.
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: fill_task_title
+        note: Fill the task title input.
+        action:
+          tool: fill
+          resolve: { by: name, match: "^(Title|タイトル)$" }
+          args:
+            value: "${task_title}"
+
+      - id: submit_task
+        note: Submit the create-task form.
+        action:
+          tool: click
+          resolve: { by: role_name, role: button, match: "^(Create|作成)$" }
+
+      - kind: check
+        id: task_create_200
+        note: The last POST to /tasks should have returned 200. (Huma defaults POST to 200 unless DefaultStatus is set; the flow-api create handler does not override.)
+        action:
+          tool: list_network_requests
+          args: { resourceTypes: ["xhr", "fetch"] }
+        assert:
+          type: status
+          method: POST
+          path: /tasks
+          status: 200
+
+      - kind: check
+        id: console_clean
+        note: No runtime errors or warnings across the full flow.
+        action:
+          tool: list_console_messages
+          args: { types: ["error", "warn"] }
+        assert:
+          type: empty_array

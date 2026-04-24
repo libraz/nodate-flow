@@ -1,0 +1,171 @@
+# Scenario — log in, enter Demo Workspace AI providers settings, register a new
+# provider, and assert POST /workspaces/{wsId}/ai/providers returned 200 with a
+# clean console.
+#
+# Uses a placeholder API key so no real secret leaks. The key will fail the first
+# actual LLM call but is sufficient to exercise the create path.
+
+version: 1
+app: flow-web
+base_url: http://localhost:5173
+
+suites:
+  - id: ai_provider_configure
+    area: settings
+    severity_on_fail: medium
+    description: >
+      Log in, land on the Demo Workspace AI providers settings, open
+      the add-provider surface, fill in a placeholder key, submit, and
+      assert the create endpoint returned 200.
+    cases:
+      - id: happy_ja
+        vars:
+          locale: ja
+          accounts_url: http://localhost:5175
+          flow_url: http://localhost:5173
+          email: admin@example.com
+          password: password123
+          workspace_name: Demo Workspace
+          provider_name: ui-verify smoke provider
+          # Placeholder, not a real key. Must look shaped like one to pass any
+          # client-side length validation; this is not a secret.
+          api_key: sk-ui-verify-smoke-placeholder-0000000000
+
+    steps:
+      - id: open_accounts_login
+        action:
+          tool: new_page
+          args:
+            url: "${accounts_url}/login"
+
+      - id: resize_desktop
+        action:
+          tool: resize_page
+          args: { width: 1280, height: 800 }
+
+      - id: snapshot_login
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: fill_email
+        action:
+          tool: fill
+          resolve: { by: name, match: email }
+          args:
+            value: "${email}"
+
+      - id: fill_password
+        action:
+          tool: fill
+          resolve: { by: name, match: password }
+          args:
+            value: "${password}"
+
+      - id: submit_login
+        action:
+          tool: click
+          resolve: { by: role_name, role: button, match: "(Sign in|サインイン)" }
+
+      - id: wait_workspaces
+        action:
+          tool: wait_for
+          args:
+            text: ["Workspaces", "ワークスペース"]
+
+      - id: goto_workspaces
+        action:
+          tool: navigate_page
+          args:
+            url: "${flow_url}/workspaces"
+
+      - id: snapshot_workspaces
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: click_target_workspace
+        action:
+          tool: click
+          resolve: { by: role_name, role: link, match: "^${workspace_name}$" }
+
+      - id: wait_workspace_landed
+        action:
+          tool: wait_for
+          args:
+            text: ["${workspace_name}"]
+
+      - id: click_settings_tab
+        action:
+          tool: click
+          resolve: { by: role_name, role: link, match: "^(Settings|設定)$" }
+
+      - id: snapshot_settings
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: click_ai_providers_nav
+        action:
+          tool: click
+          resolve: { by: role_name, role: link, match: "^(AI providers|AI プロバイダ)$" }
+
+      - id: wait_providers_title
+        action:
+          tool: wait_for
+          args:
+            text: ["AI providers", "AI プロバイダ"]
+
+      - id: snapshot_providers
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: click_add_provider
+        action:
+          tool: click
+          resolve: { by: role_name, role: button, match: "^(Add provider|プロバイダを追加|New provider|新しいプロバイダ)$" }
+
+      - id: snapshot_add_dialog
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: fill_provider_name
+        action:
+          tool: fill
+          resolve: { by: name, match: "^(Name|名前|Display name|表示名)$" }
+          args:
+            value: "${provider_name}"
+
+      - id: fill_api_key
+        action:
+          tool: fill
+          resolve: { by: name, match: "^(API key|API キー)$" }
+          args:
+            value: "${api_key}"
+
+      - id: submit_provider
+        action:
+          tool: click
+          resolve: { by: role_name, role: button, match: "^(Save|保存|Create|作成|Add|追加)$" }
+
+      - kind: check
+        id: ai_provider_create_200
+        note: The last POST to /ai/providers should have returned 200.
+        action:
+          tool: list_network_requests
+          args: { resourceTypes: ["xhr", "fetch"] }
+        assert:
+          type: status
+          method: POST
+          path: /ai/providers
+          status: 200
+
+      - kind: check
+        id: console_clean
+        action:
+          tool: list_console_messages
+          args: { types: ["error", "warn"] }
+        assert:
+          type: empty_array

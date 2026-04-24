@@ -1,0 +1,125 @@
+# Scenario — log in to accounts-web, open /security, start the TOTP enrollment
+# flow, and assert POST /me/totp/enroll returned 200 with the secret+QR
+# surface visible.
+#
+# The final confirm step requires a real 6-digit code from an authenticator
+# app keyed with the returned secret. This is out of scope for an unattended
+# smoke test, so we stop after the enroll call and verify only that the
+# enrollment surface appeared.
+
+version: 1
+app: accounts-web
+base_url: http://localhost:5175
+
+suites:
+  - id: totp_enable_start
+    area: auth
+    severity_on_fail: medium
+    description: >
+      Log in to accounts-web, visit /security, click Start setup on the
+      TOTP section, and assert POST /me/totp/enroll returned 200 with
+      the secret + code input surface visible.
+    cases:
+      - id: happy_ja
+        vars:
+          locale: ja
+          accounts_url: http://localhost:5175
+          email: admin@example.com
+          password: password123
+
+    steps:
+      - id: open_login
+        action:
+          tool: new_page
+          args:
+            url: "${accounts_url}/login"
+
+      - id: resize_desktop
+        action:
+          tool: resize_page
+          args: { width: 1280, height: 800 }
+
+      - id: snapshot_login
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: fill_email
+        action:
+          tool: fill
+          resolve: { by: name, match: email }
+          args:
+            value: "${email}"
+
+      - id: fill_password
+        action:
+          tool: fill
+          resolve: { by: name, match: password }
+          args:
+            value: "${password}"
+
+      - id: submit_login
+        action:
+          tool: click
+          resolve: { by: role_name, role: button, match: "(Sign in|サインイン)" }
+
+      - id: wait_post_login
+        action:
+          tool: wait_for
+          args:
+            text: ["Workspaces", "ワークスペース", "Profile", "プロフィール"]
+
+      - id: goto_security
+        action:
+          tool: navigate_page
+          args:
+            url: "${accounts_url}/security"
+
+      - id: wait_security_title
+        action:
+          tool: wait_for
+          args:
+            text: ["Two-factor authentication", "二要素認証"]
+
+      - id: snapshot_security
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: click_start_totp
+        note: Trigger the POST /me/totp/enroll call via the Start setup CTA.
+        action:
+          tool: click
+          resolve: { by: role_name, role: button, match: "^(Start setup|設定を開始|Enable two-factor authentication|二要素認証を有効にする)$" }
+
+      - kind: check
+        id: totp_enroll_200
+        note: The last POST to /me/totp/enroll should have returned 200.
+        action:
+          tool: list_network_requests
+          args: { resourceTypes: ["xhr", "fetch"] }
+        assert:
+          type: status
+          method: POST
+          path: /me/totp/enroll
+          status: 200
+
+      - id: wait_enroll_surface
+        note: After enroll, the secret + code input should render. Stop here — confirming the code requires a real authenticator out of band.
+        action:
+          tool: wait_for
+          args:
+            text: ["Secret", "シークレット", "6-digit code", "6桁のコード"]
+
+      - id: snapshot_enroll
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - kind: check
+        id: console_clean
+        action:
+          tool: list_console_messages
+          args: { types: ["error", "warn"] }
+        assert:
+          type: empty_array

@@ -1,0 +1,258 @@
+# Scenario — admin creates a workspace invite link, the test captures the URL
+# from the reveal dialog, signs out, signs in as alice (a seeded user who is
+# not yet a member), follows the invite URL, accepts, and asserts
+# POST /invites/{token}/accept returned 200.
+#
+# Relies on the seed pairing: admin@example.com (owner of Demo Workspace) and
+# alice@example.com (not a member of Demo Workspace). If alice is already a
+# member the accept call will fail — adjust seed state before re-running.
+
+version: 1
+app: flow-web
+base_url: http://localhost:5173
+
+suites:
+  - id: invite_accept
+    area: workspaces
+    severity_on_fail: high
+    description: >
+      Admin creates a workspace invite, captures the revealed URL,
+      signs out, signs in as alice, follows the URL, clicks Accept,
+      and asserts POST /invites/{token}/accept returned 200.
+    cases:
+      - id: happy_ja
+        vars:
+          locale: ja
+          accounts_url: http://localhost:5175
+          flow_url: http://localhost:5173
+          admin_email: admin@example.com
+          admin_password: password123
+          invitee_email: alice@example.com
+          invitee_password: password123
+          workspace_name: Demo Workspace
+
+    steps:
+      - id: open_accounts_login
+        action:
+          tool: new_page
+          args:
+            url: "${accounts_url}/login"
+
+      - id: resize_desktop
+        action:
+          tool: resize_page
+          args: { width: 1280, height: 800 }
+
+      - id: snapshot_login
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: fill_admin_email
+        action:
+          tool: fill
+          resolve: { by: name, match: email }
+          args:
+            value: "${admin_email}"
+
+      - id: fill_admin_password
+        action:
+          tool: fill
+          resolve: { by: name, match: password }
+          args:
+            value: "${admin_password}"
+
+      - id: submit_admin_login
+        action:
+          tool: click
+          resolve: { by: role_name, role: button, match: "(Sign in|サインイン)" }
+
+      - id: wait_workspaces
+        action:
+          tool: wait_for
+          args:
+            text: ["Workspaces", "ワークスペース"]
+
+      - id: goto_workspaces
+        action:
+          tool: navigate_page
+          args:
+            url: "${flow_url}/workspaces"
+
+      - id: snapshot_workspaces
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: click_target_workspace
+        action:
+          tool: click
+          resolve: { by: role_name, role: link, match: "^${workspace_name}$" }
+
+      - id: wait_workspace_landed
+        action:
+          tool: wait_for
+          args:
+            text: ["${workspace_name}"]
+
+      - id: click_members_tab
+        action:
+          tool: click
+          resolve: { by: role_name, role: tab, match: "^(Members|メンバー)$" }
+
+      - id: snapshot_members
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: click_create_invite
+        action:
+          tool: click
+          resolve: { by: role_name, role: button, match: "^(Create invite link|招待リンクを作成)$" }
+
+      - id: snapshot_invite_dialog
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: submit_invite
+        note: Submit the invite dialog. Match is long enough to exclude the "Create invite link" trigger (toggled off once the dialog is open).
+        action:
+          tool: click
+          resolve: { by: role_name, role: button, match: "^(Create invite link|招待リンクを作成)$" }
+
+      - kind: check
+        id: invite_create_200
+        note: The last POST to /workspaces/{wsId}/invites should have returned 200.
+        action:
+          tool: list_network_requests
+          args: { resourceTypes: ["xhr", "fetch"] }
+        assert:
+          type: status
+          method: POST
+          path: /invites
+          status: 200
+
+      - id: snapshot_reveal_dialog
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: extract_invite_url
+        note: >
+          Capture the revealed invite URL from the reveal dialog input. The
+          product URL path is `/invite/{token}` (singular) — see
+          `apps/flow-web/src/features/workspaces/workspace-invite-dialog.tsx`.
+        action:
+          tool: evaluate_script
+          args:
+            function: |
+              () => {
+                const inputs = Array.from(document.querySelectorAll('input'));
+                const match = inputs.find((el) => typeof el.value === 'string' && /\/invite\/[^/]+$/.test(el.value));
+                if (!match) return null;
+                window.__inviteUrl = match.value;
+                return match.value;
+              }
+
+      - id: logout_admin
+        note: Sign out the admin session before logging in as the invitee.
+        action:
+          tool: evaluate_script
+          args:
+            function: |
+              async () => {
+                await fetch('http://localhost:8082/auth/logout', {
+                  method: 'POST',
+                  credentials: 'include',
+                });
+                return true;
+              }
+
+      - id: goto_invitee_login
+        action:
+          tool: navigate_page
+          args:
+            url: "${accounts_url}/login"
+
+      - id: snapshot_invitee_login
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: fill_invitee_email
+        action:
+          tool: fill
+          resolve: { by: name, match: email }
+          args:
+            value: "${invitee_email}"
+
+      - id: fill_invitee_password
+        action:
+          tool: fill
+          resolve: { by: name, match: password }
+          args:
+            value: "${invitee_password}"
+
+      - id: submit_invitee_login
+        action:
+          tool: click
+          resolve: { by: role_name, role: button, match: "(Sign in|サインイン)" }
+
+      - id: wait_invitee_landed
+        action:
+          tool: wait_for
+          args:
+            text: ["Workspaces", "ワークスペース"]
+
+      - id: open_invite_url
+        note: Visit the captured invite URL under the invitee session.
+        action:
+          tool: evaluate_script
+          args:
+            function: |
+              () => {
+                if (!window.__inviteUrl) return null;
+                const url = window.__inviteUrl;
+                // Rewrite to the flow-web host — the copied link from the
+                // reveal dialog already points there, but accept when the
+                // seeded WebURL differs.
+                location.href = url;
+                return url;
+              }
+
+      - id: wait_invite_page
+        action:
+          tool: wait_for
+          args:
+            text: ["Join", "参加", "${workspace_name}"]
+
+      - id: snapshot_invite_page
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: click_accept_invite
+        action:
+          tool: click
+          resolve: { by: role_name, role: button, match: "^(Join workspace|ワークスペースに参加|Accept|参加)$" }
+
+      - kind: check
+        id: invite_accept_200
+        note: The last POST to /invites/{token}/accept should have returned 200.
+        action:
+          tool: list_network_requests
+          args: { resourceTypes: ["xhr", "fetch"] }
+        assert:
+          type: status
+          method: POST
+          path: /accept
+          status: 200
+
+      - kind: check
+        id: console_clean
+        action:
+          tool: list_console_messages
+          args: { types: ["error", "warn"] }
+        assert:
+          type: empty_array

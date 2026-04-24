@@ -1,0 +1,205 @@
+# Scenario — log in, create a disposable workspace, navigate to its Danger zone,
+# delete it via the confirm dialog, and assert DELETE /workspaces/{wsId}
+# returned 200 with a clean console.
+#
+# Only owners see the Danger zone; admin@example.com is the seeded owner of every
+# workspace they create.
+
+version: 1
+app: flow-web
+base_url: http://localhost:5173
+
+suites:
+  - id: workspace_delete
+    area: workspaces
+    severity_on_fail: high
+    description: >
+      Log in, create a throwaway workspace via the New workspace flow,
+      enter its General settings, click Delete workspace, confirm in
+      the dialog, and assert DELETE /workspaces/{wsId} returned 200.
+    cases:
+      - id: happy_ja
+        vars:
+          locale: ja
+          accounts_url: http://localhost:5175
+          flow_url: http://localhost:5173
+          email: admin@example.com
+          password: password123
+          ws_name: ui-verify disposable ws v3
+          ws_slug: ui-verify-disposable-v3
+
+    steps:
+      - id: open_accounts_login
+        action:
+          tool: new_page
+          args:
+            url: "${accounts_url}/login"
+
+      - id: resize_desktop
+        action:
+          tool: resize_page
+          args: { width: 1280, height: 800 }
+
+      - id: snapshot_login
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: fill_email
+        action:
+          tool: fill
+          resolve: { by: name, match: email }
+          args:
+            value: "${email}"
+
+      - id: fill_password
+        action:
+          tool: fill
+          resolve: { by: name, match: password }
+          args:
+            value: "${password}"
+
+      - id: submit_login
+        action:
+          tool: click
+          resolve: { by: role_name, role: button, match: "(Sign in|サインイン)" }
+
+      - id: wait_workspaces
+        action:
+          tool: wait_for
+          args:
+            text: ["Workspaces", "ワークスペース"]
+
+      - id: goto_workspaces
+        action:
+          tool: navigate_page
+          args:
+            url: "${flow_url}/workspaces"
+
+      - id: snapshot_workspaces
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: click_new_workspace
+        note: Open the create-workspace dialog.
+        action:
+          tool: click
+          resolve: { by: role_name, role: button, match: "^(New workspace|ワークスペースを作成)$" }
+
+      - id: snapshot_new_ws_dialog
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: fill_ws_name
+        action:
+          tool: fill
+          resolve: { by: name, match: "^(Name|名前)$" }
+          args:
+            value: "${ws_name}"
+
+      - id: fill_ws_slug
+        action:
+          tool: fill
+          resolve: { by: name, match: "^(Slug|スラッグ)$" }
+          args:
+            value: "${ws_slug}"
+
+      - id: submit_new_ws
+        action:
+          tool: click
+          resolve: { by: role_name, role: button, match: "^(Save|保存|Create workspace|ワークスペースを作成)$" }
+
+      - id: wait_ws_created
+        action:
+          tool: wait_for
+          args:
+            text: ["${ws_name}"]
+
+      - id: snapshot_after_create
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: open_new_ws
+        note: Visit the new workspace's detail page.
+        action:
+          tool: click
+          resolve: { by: role_name, role: link, match: "^${ws_name}$" }
+
+      - id: wait_workspace_landed
+        action:
+          tool: wait_for
+          args:
+            text: ["${ws_name}"]
+
+      - id: snapshot_workspace_detail
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: click_settings_tab
+        note: Enter the Settings area so the General tab is reachable.
+        action:
+          tool: click
+          resolve: { by: role_name, role: link, match: "^(Settings|設定)$" }
+
+      - id: snapshot_settings
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: click_general_tab
+        note: Land on the General settings tab where the Danger zone renders.
+        action:
+          tool: click
+          resolve: { by: role_name, role: link, match: "^(General|一般)$" }
+
+      - id: wait_danger_zone
+        action:
+          tool: wait_for
+          args:
+            text: ["Danger zone", "危険な操作"]
+
+      - id: snapshot_danger_zone
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: click_delete_workspace
+        note: Open the confirm dialog via the Danger zone CTA.
+        action:
+          tool: click
+          resolve: { by: role_name, role: button, match: "^(Delete workspace|ワークスペースを削除)$" }
+
+      - id: snapshot_confirm_dialog
+        action:
+          tool: take_snapshot
+          args: {}
+
+      - id: confirm_delete
+        note: Accept the confirm.ask dialog. Submit label differs per locale.
+        action:
+          tool: click
+          resolve: { by: role_name, role: button, match: "^(Delete workspace|削除する)$" }
+
+      - kind: check
+        id: workspace_delete_200
+        note: The DELETE should return 200 (auth-api handler returns an OK body, not 204).
+        action:
+          tool: list_network_requests
+          args: { resourceTypes: ["xhr", "fetch"] }
+        assert:
+          type: status
+          method: DELETE
+          path: /workspaces/
+          status: 200
+
+      - kind: check
+        id: console_clean
+        action:
+          tool: list_console_messages
+          args: { types: ["error", "warn"] }
+        assert:
+          type: empty_array
