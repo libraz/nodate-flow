@@ -18,11 +18,12 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/config"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/router"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/integrations"
+	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/storage"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/httputil"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
@@ -154,17 +155,44 @@ func main() {
 		logger.Warn("microsoft OIDC login disabled (NF_AUTH_MICROSOFT_OIDC_CLIENT_ID / NF_AUTH_MICROSOFT_OIDC_CLIENT_SECRET not set)")
 	}
 
+	// S3-compatible object storage for avatar uploads. When
+	// NF_S3_ENDPOINT is empty, the avatar endpoints return
+	// AUTH.AVATAR.STORAGE_UNAVAILABLE but the rest of the API still
+	// boots normally — useful for local dev without a MinIO container.
+	var storageClient *storage.Client
+	if cfg.S3Endpoint != "" {
+		sc, serr := storage.NewClient(storage.Config{
+			Endpoint:  cfg.S3Endpoint,
+			AccessKey: cfg.S3AccessKey,
+			SecretKey: cfg.S3SecretKey,
+			Bucket:    cfg.S3Bucket,
+			UseSSL:    cfg.S3UseSSL,
+		})
+		if serr != nil {
+			logger.Error("storage client init failed", "err", serr)
+			os.Exit(1)
+		}
+		if berr := sc.EnsureBucket(context.Background()); berr != nil {
+			logger.Error("storage bucket init failed", "err", berr)
+			os.Exit(1)
+		}
+		storageClient = sc
+		logger.Info("s3 storage enabled", "endpoint", cfg.S3Endpoint, "bucket", cfg.S3Bucket)
+	} else {
+		logger.Warn("s3 storage disabled: NF_S3_ENDPOINT is not set")
+	}
+
 	inner := router.Build(router.Deps{
-		DB:               db,
-		Queries:          queries,
-		JWT:              jwtIssuer,
-		OIDC:             oidcClient,
-		OIDCGithub:       githubOAuth,
-		OIDCMicrosoft:    microsoftOIDC,
-		Cipher:           cipher,
-		CookieSecure:     cfg.CookieSecure,
-		RegistrationOpen:  cfg.RegistrationOpen,
-		MinPasswordLength: cfg.MinPasswordLength,
+		DB:                        db,
+		Queries:                   queries,
+		JWT:                       jwtIssuer,
+		OIDC:                      oidcClient,
+		OIDCGithub:                githubOAuth,
+		OIDCMicrosoft:             microsoftOIDC,
+		Cipher:                    cipher,
+		CookieSecure:              cfg.CookieSecure,
+		RegistrationOpen:          cfg.RegistrationOpen,
+		MinPasswordLength:         cfg.MinPasswordLength,
 		DisableRateLimit:          cfg.DisableRateLimit,
 		RateLimitGlobalMax:        cfg.RateLimitGlobalMax,
 		RateLimitGlobalWindowSec:  cfg.RateLimitGlobalWindowSec,
@@ -172,12 +200,13 @@ func main() {
 		RateLimitAuthWindowSec:    cfg.RateLimitAuthWindowSec,
 		RateLimitSessionMax:       cfg.RateLimitSessionMax,
 		RateLimitSessionWindowSec: cfg.RateLimitSessionWindowSec,
-		EmailSender:      emailSender,
-		FlowWebURL:       cfg.FlowWebURL,
-		AccountsWebURL:   cfg.AccountsWebURL,
-		Integrations:     integrationsRegistry,
-		PublicBaseURL:     cfg.PublicBaseURL,
-		WebBaseURL:        cfg.FlowWebURL,
+		EmailSender:               emailSender,
+		FlowWebURL:                cfg.FlowWebURL,
+		AccountsWebURL:            cfg.AccountsWebURL,
+		Integrations:              integrationsRegistry,
+		PublicBaseURL:             cfg.PublicBaseURL,
+		WebBaseURL:                cfg.FlowWebURL,
+		Storage:                   storageClient,
 	})
 
 	if cfg.DisableRateLimit {
@@ -225,4 +254,3 @@ func main() {
 	}
 	logger.Info("auth-api shutdown complete")
 }
-

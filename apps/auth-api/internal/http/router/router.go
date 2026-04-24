@@ -16,28 +16,29 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth/sessadapter"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/sessionstore"
 	adminhandlers "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/admin"
 	authhandlers "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/auth"
 	inthandlers "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/integrations"
 	wshandlers "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/workspace"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/middleware"
 	integrationspkg "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/integrations"
+	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/storage"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/sessionstore"
 )
 
 // Deps is the dependency bundle Build needs.
 type Deps struct {
-	DB               *sql.DB
-	Queries          *generated.Queries
-	JWT              *auth.JWTIssuer
-	OIDC             *auth.OIDCClient
-	OIDCGithub       *auth.GithubOAuthClient
-	OIDCMicrosoft    *auth.MicrosoftOIDCClient
-	Sessions         sessionstore.Store
-	Cipher           *crypto.Cipher
+	DB                *sql.DB
+	Queries           *generated.Queries
+	JWT               *auth.JWTIssuer
+	OIDC              *auth.OIDCClient
+	OIDCGithub        *auth.GithubOAuthClient
+	OIDCMicrosoft     *auth.MicrosoftOIDCClient
+	Sessions          sessionstore.Store
+	Cipher            *crypto.Cipher
 	CookieSecure      bool
 	RegistrationOpen  bool
 	MinPasswordLength int
@@ -50,9 +51,9 @@ type Deps struct {
 	RateLimitAuthWindowSec    int
 	RateLimitSessionMax       int
 	RateLimitSessionWindowSec int
-	EmailSender      email.Sender
-	FlowWebURL       string
-	AccountsWebURL   string
+	EmailSender               email.Sender
+	FlowWebURL                string
+	AccountsWebURL            string
 
 	// Integrations is the personal-OAuth provider registry (GitHub /
 	// Slack / Google Calendar). Nil in tests; the handlers degrade
@@ -64,6 +65,10 @@ type Deps struct {
 	// WebBaseURL is where the OAuth callback handler bounces the user
 	// back to after writing the user_integrations row.
 	WebBaseURL string
+	// Storage is the S3-compatible object store client used by the
+	// avatar upload/download handlers. Nil when NF_S3_ENDPOINT is
+	// unset; handlers degrade to AUTH.AVATAR.STORAGE_UNAVAILABLE.
+	Storage *storage.Client
 }
 
 // Result is what BuildResult returns: the composed chi router plus the
@@ -125,27 +130,28 @@ func BuildResult(deps Deps) Result {
 		return out, nil
 	})
 
-
 	sessionStore := deps.Sessions
 	if sessionStore == nil {
 		sessionStore = sessadapter.NewMySQLStore(deps.DB, deps.Queries)
 	}
 	auditRec := audit.New(deps.Queries)
 	authDeps := authhandlers.Deps{
-		DB:               deps.DB,
-		Queries:          deps.Queries,
-		Sessions:         sessionStore,
-		JWT:              deps.JWT,
-		OIDC:             deps.OIDC,
-		OIDCGithub:       deps.OIDCGithub,
-		OIDCMicrosoft:    deps.OIDCMicrosoft,
-		Cipher:           deps.Cipher,
-		CookieSecure:     deps.CookieSecure,
+		DB:                deps.DB,
+		Queries:           deps.Queries,
+		Sessions:          sessionStore,
+		JWT:               deps.JWT,
+		OIDC:              deps.OIDC,
+		OIDCGithub:        deps.OIDCGithub,
+		OIDCMicrosoft:     deps.OIDCMicrosoft,
+		Cipher:            deps.Cipher,
+		CookieSecure:      deps.CookieSecure,
 		RegistrationOpen:  deps.RegistrationOpen,
 		MinPasswordLength: deps.MinPasswordLength,
-		Audit:            auditRec,
-		EmailSender:      deps.EmailSender,
-		AccountsWebURL:   deps.AccountsWebURL,
+		Audit:             auditRec,
+		EmailSender:       deps.EmailSender,
+		AccountsWebURL:    deps.AccountsWebURL,
+		Storage:           deps.Storage,
+		PublicBaseURL:     deps.PublicBaseURL,
 	}
 
 	// Auth capabilities — public, no rate limit, cacheable.
@@ -155,6 +161,14 @@ func BuildResult(deps Deps) Result {
 		Path:        "/auth/capabilities",
 		Summary:     "List available authentication methods",
 	}, authhandlers.Capabilities(authDeps))
+
+	// Avatar proxy — public (see note above the health endpoint).
+	huma.Register(api, huma.Operation{
+		OperationID: "me-avatar-proxy",
+		Method:      http.MethodGet,
+		Path:        "/avatars/{userId}",
+		Summary:     "Stream a user's avatar image",
+	}, authhandlers.AvatarProxy(authDeps))
 
 	// Public auth endpoints (login / register) behind per-IP rate limiter.
 	r.Group(func(sub chi.Router) {
@@ -285,6 +299,21 @@ func BuildResult(deps Deps) Result {
 			Path:        "/me",
 			Summary:     "Patch the authenticated user's profile",
 		}, authhandlers.PatchMe(authDeps))
+
+		// Avatar upload / delete. The public GET counterpart is
+		// registered outside this group, next to /auth/capabilities.
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "me-avatar-upload",
+			Method:      http.MethodPost,
+			Path:        "/me/avatar",
+			Summary:     "Upload a new avatar image for the authenticated user",
+		}, authhandlers.AvatarUpload(authDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "me-avatar-delete",
+			Method:      http.MethodDelete,
+			Path:        "/me/avatar",
+			Summary:     "Remove the authenticated user's avatar",
+		}, authhandlers.AvatarDelete(authDeps))
 
 		// Sessions
 		huma.Register(subAPI, huma.Operation{

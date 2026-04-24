@@ -113,6 +113,24 @@ type Config struct {
 	SmtpPassword string `env:"NF_AUTH_SMTP_PASSWORD" envDefault:""`
 	// SmtpFrom is the envelope sender address.
 	SmtpFrom string `env:"NF_AUTH_SMTP_FROM" envDefault:"noreply@nodate-flow.local"`
+
+	// S3Endpoint is the host:port of the S3-compatible object store
+	// (e.g. "minio:9000" or "s3.amazonaws.com") used for avatar
+	// uploads. When empty, avatar upload/proxy endpoints return
+	// AUTH.AVATAR.STORAGE_UNAVAILABLE but the rest of the API still
+	// boots normally.
+	S3Endpoint string `env:"NF_S3_ENDPOINT" envDefault:""`
+	// S3AccessKey is the access key for the S3-compatible store.
+	S3AccessKey string `env:"NF_S3_ACCESS_KEY" envDefault:""`
+	// S3SecretKey is the secret key for the S3-compatible store.
+	S3SecretKey string `env:"NF_S3_SECRET_KEY" envDefault:""`
+	// S3Bucket is the bucket name used for all uploads. Shared with
+	// flow-api so storage keys are resolvable by either service.
+	S3Bucket string `env:"NF_S3_BUCKET" envDefault:"nodate"`
+	// S3UseSSL enables TLS for the S3 connection. Defaults to false
+	// to match local MinIO development; production deployments should
+	// set NF_S3_USE_SSL=true.
+	S3UseSSL bool `env:"NF_S3_USE_SSL" envDefault:"false"`
 }
 
 // Load parses NF_* environment variables into a Config and validates

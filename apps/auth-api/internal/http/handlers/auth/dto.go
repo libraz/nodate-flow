@@ -9,6 +9,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/storage"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/sessionstore"
@@ -50,6 +51,15 @@ type Deps struct {
 	// MinPasswordLength is the minimum password length for registration
 	// and password changes. Defaults to 8 when zero.
 	MinPasswordLength int
+	// Storage is the S3-compatible object store client used by the
+	// avatar upload/download handlers. Nil when NF_S3_ENDPOINT is
+	// unset; the handlers return AUTH.AVATAR.STORAGE_UNAVAILABLE in
+	// that case so the rest of the api still boots.
+	Storage *storage.Client
+	// PublicBaseURL is the externally-visible origin of the auth-api,
+	// used to build proxy URLs returned by /me (e.g.
+	// "https://auth.example.com/avatars/{userPublicId}?v=...").
+	PublicBaseURL string
 }
 
 // minPwLen returns the effective minimum password length.
@@ -217,10 +227,10 @@ type OIDCCallbackOutput struct {
 // MeBody is the public DTO for the authenticated user profile, shared
 // by GET /me and PATCH /me.
 type MeBody struct {
-	ID              string  `json:"id"`
-	Email           string  `json:"email"`
-	DisplayName     string  `json:"displayName"`
-	Locale          string  `json:"locale"`
+	ID          string `json:"id"`
+	Email       string `json:"email"`
+	DisplayName string `json:"displayName"`
+	Locale      string `json:"locale"`
 	// Timezone is the user-level IANA timezone preference. May be "UTC"
 	// when the user has not customized it; the client should fall back to
 	// the workspace timezone for presentation if desired.
@@ -256,8 +266,8 @@ type PatchMeInput struct {
 
 // PatchMeInputBody carries the optional fields for PATCH /me.
 type PatchMeInputBody struct {
-	DisplayName     *string `json:"displayName,omitempty" minLength:"1" maxLength:"100"`
-	Locale          *string `json:"locale,omitempty" maxLength:"10"`
+	DisplayName *string `json:"displayName,omitempty" minLength:"1" maxLength:"100"`
+	Locale      *string `json:"locale,omitempty" maxLength:"10"`
 	// Timezone is an optional IANA timezone. Validated via time.LoadLocation;
 	// invalid values return AUTH.VALIDATION.
 	Timezone *string `json:"timezone,omitempty" maxLength:"64"`
@@ -284,13 +294,13 @@ type PatchMeOutput struct {
 // by the /settings/security sessions panel. It intentionally omits
 // the refresh hash and internal id.
 type SessionSummary struct {
-	ID         string  `json:"id" doc:"Session public id (UUID v7)"`
-	UserAgent  string  `json:"userAgent"`
-	IPAddress  string  `json:"ipAddress"`
-	Current    bool    `json:"current" doc:"True if this matches the refresh cookie on the current request"`
-	CreatedAt  int64   `json:"createdAt" doc:"Session creation time, unix seconds"`
-	LastUsedAt *int64  `json:"lastUsedAt,omitempty" doc:"Last activity time, unix seconds"`
-	ExpiresAt  int64   `json:"expiresAt" doc:"Expiry time, unix seconds"`
+	ID         string `json:"id" doc:"Session public id (UUID v7)"`
+	UserAgent  string `json:"userAgent"`
+	IPAddress  string `json:"ipAddress"`
+	Current    bool   `json:"current" doc:"True if this matches the refresh cookie on the current request"`
+	CreatedAt  int64  `json:"createdAt" doc:"Session creation time, unix seconds"`
+	LastUsedAt *int64 `json:"lastUsedAt,omitempty" doc:"Last activity time, unix seconds"`
+	ExpiresAt  int64  `json:"expiresAt" doc:"Expiry time, unix seconds"`
 }
 
 // ListSessionsInput binds the refresh cookie so the handler can mark
@@ -420,8 +430,8 @@ type TotpDisableOutput struct {
 // other devices".
 type ChangePasswordOutput struct {
 	Body struct {
-		Ok                    bool `json:"ok"`
-		OtherSessionsRevoked  int  `json:"otherSessionsRevoked"`
+		Ok                   bool `json:"ok"`
+		OtherSessionsRevoked int  `json:"otherSessionsRevoked"`
 	}
 }
 

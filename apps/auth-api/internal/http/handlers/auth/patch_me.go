@@ -79,6 +79,6 @@ func PatchMe(deps Deps) func(context.Context, *PatchMeInput) (*PatchMeOutput, er
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		return &PatchMeOutput{Body: rowToMe(row)}, nil
+		return &PatchMeOutput{Body: rowToMe(row, deps.PublicBaseURL)}, nil
 	}
 }

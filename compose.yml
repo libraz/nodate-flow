@@ -198,6 +198,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      minio:
+        condition: service_healthy
       mailpit:
         condition: service_healthy
     environment:
@@ -213,6 +215,11 @@ services:
       NF_AUTH_WEB_URL: ${NF_AUTH_WEB_URL:-http://localhost:5175}
       NF_AUTH_FLOW_WEB_URL: ${NF_AUTH_FLOW_WEB_URL:-http://localhost:5173}
       NF_SECRET_KEY: ${NF_SECRET_KEY:-}
+      NF_S3_ENDPOINT: ${NF_S3_ENDPOINT:-minio:9000}
+      NF_S3_ACCESS_KEY: ${NF_S3_ACCESS_KEY:-minioadmin}
+      NF_S3_SECRET_KEY: ${NF_S3_SECRET_KEY:-minioadmin}
+      NF_S3_BUCKET: ${NF_S3_BUCKET:-nodate}
+      NF_S3_USE_SSL: "false"
       NF_AUTH_GOOGLE_CLIENT_ID: ${NF_AUTH_GOOGLE_CLIENT_ID:-}
       NF_AUTH_GOOGLE_CLIENT_SECRET: ${NF_AUTH_GOOGLE_CLIENT_SECRET:-}
       NF_AUTH_GITHUB_CLIENT_ID: ${NF_AUTH_GITHUB_CLIENT_ID:-}
