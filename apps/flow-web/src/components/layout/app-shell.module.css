@@ -21,26 +21,17 @@
   min-inline-size: 0;
 }
 
-/* Mobile: sidebar leaves grid flow (becomes fixed overlay via sidebar.module.css) */
-@media (max-width: 767px) {
-  .shell {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .sidebarSlot {
-    grid-column: unset;
-    grid-row: unset;
-  }
-
-  .topBarSlot {
-    grid-column: 1;
-  }
-
-  .main {
-    grid-column: 1;
-  }
-}
-
+/*
+ * IMPORTANT: `.main`'s base rules must be declared BEFORE the
+ * `@media (max-width: 767px)` block below — the mobile override only wins
+ * when the desktop baseline has already been cascaded. Moving this block
+ * after the media query silently re-pins `<main>` to `grid-column: 2` at
+ * every viewport because tied-specificity rules resolve by source order,
+ * which in turn forces the grid to synthesise an implicit second column,
+ * collapses the topBarSlot track to 0, and leaves the mobile header with
+ * three zero-width tracks. See the regression fixed in this commit for
+ * the full symptom trail.
+ */
 .main {
   grid-column: 2;
   grid-row: 2;
@@ -60,4 +51,24 @@
 .main:focus-visible {
   outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
   outline-offset: calc(var(--nf-focus-ring-offset) * -1);
+}
+
+/* Mobile: sidebar leaves grid flow (becomes fixed overlay via sidebar.module.css) */
+@media (max-width: 767px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sidebarSlot {
+    grid-column: unset;
+    grid-row: unset;
+  }
+
+  .topBarSlot {
+    grid-column: 1;
+  }
+
+  .main {
+    grid-column: 1;
+  }
 }

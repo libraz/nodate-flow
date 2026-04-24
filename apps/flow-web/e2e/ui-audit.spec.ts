@@ -112,6 +112,78 @@ test.describe('authenticated home page', () => {
   });
 });
 
+test.describe('mobile top-bar layout regression', () => {
+  const { user: tenant } = loadTenants();
+
+  /**
+   * Regression guard for the mobile top-bar collapsing to ~24px wide.
+   *
+   * Root cause (fixed in app-shell.module.css): the base `.main` rule was
+   * declared *after* the `@media (max-width: 767px)` block, so the mobile
+   * `grid-column: 1` override was silently shadowed by the same-specificity
+   * `grid-column: 2` declaration below the media query. That forced `<main>`
+   * into an implicit second grid column at mobile, collapsed the topBarSlot
+   * track to 0px, and pushed the AI cost meter / avatar / notification bell
+   * off the left edge with negative `left` coordinates.
+   *
+   * This test asserts the `<header>` occupies essentially the full viewport
+   * width at a mobile viewport (500x812) and that every action-cluster child
+   * stays on-screen (left >= 0).
+   *
+   * Re-regressions this has caught:
+   *  - 482e11f ("restore mobile top-bar grid overflow")
+   *  - 7a3a4ca ("restructure mobile topbar and label ai cost chip")
+   */
+  test('top-bar spans the viewport width and keeps actions on-screen at 500px', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 500, height: 812 });
+    await injectAuth(page.context(), tenant);
+    await page.goto('/today');
+    await expect(page.getByRole('main')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('banner')).toBeVisible({ timeout: 10_000 });
+    // Small settle so the topbar children (AI cost meter, notification bell,
+    // avatar) finish mounting from their Suspense boundaries.
+    await page.waitForTimeout(400);
+
+    // The <main> element must resolve to the first grid column at mobile
+    // viewports. If the base `.main { grid-column: 2 }` rule ever moves
+    // back below the mobile `@media` block in app-shell.module.css, the
+    // same-specificity declaration wins by source order and <main> ends
+    // up in an implicit second column — which is the literal fingerprint
+    // of this regression.
+    const mainGridColumn = await page
+      .getByRole('main')
+      .evaluate((node) => getComputedStyle(node).gridColumnStart);
+    expect(mainGridColumn).toBe('1');
+
+    // The <header> must span ~the full content width. 500px viewport minus
+    // a small hamburger-clearance pad (var(--nf-space-16) = 64px inline
+    // start) still leaves >= 468px of header width when both sides count.
+    const headerBox = await page.getByRole('banner').boundingBox();
+    expect(headerBox).not.toBeNull();
+    expect(headerBox?.width ?? 0).toBeGreaterThanOrEqual(468);
+
+    // Every direct interactive child of the action cluster (AI cost meter
+    // link, inline notification bell button, avatar trigger) must sit at
+    // left >= 0. Hidden-at-mobile siblings (theme / lang / sign-out) are
+    // not visible and are excluded by the :visible filter.
+    const actionChildren = await page
+      .locator('header button:visible, header a:visible')
+      .evaluateAll((nodes) =>
+        nodes.map((node) => {
+          const rect = (node as HTMLElement).getBoundingClientRect();
+          return { left: rect.left, right: rect.right, width: rect.width };
+        }),
+      );
+    expect(actionChildren.length).toBeGreaterThan(0);
+    for (const child of actionChildren) {
+      expect(child.left).toBeGreaterThanOrEqual(0);
+      expect(child.right).toBeLessThanOrEqual(500);
+    }
+  });
+});
+
 test.describe('i18n key exposure sweep', () => {
   const { user: tenant } = loadTenants();
 

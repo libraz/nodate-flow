@@ -428,7 +428,14 @@
   }
 
   .topBar {
-    padding-inline: var(--nf-space-3);
+    /*
+     * Keep the inline-start hamburger clearance from the mobile media
+     * query below; only tighten the inline-end padding at ultra widths.
+     * Using `padding-inline` (shorthand) here would overwrite the
+     * `padding-inline-start: var(--nf-space-16)` set in the mobile media
+     * query and slide the breadcrumb back under the fixed hamburger.
+     */
+    padding-inline-end: var(--nf-space-3);
     gap: var(--nf-space-2);
   }
 
@@ -440,5 +447,30 @@
    */
   .workspaceSelect {
     max-inline-size: 7rem;
+  }
+}
+
+/*
+ * Viewport-driven (not container-driven) hamburger clearance.
+ *
+ * The Sidebar component renders a `position: fixed` hamburger button at
+ * `inset-inline-start: var(--nf-space-3)` when `useIsMobile()` returns
+ * true — which is strictly viewport-based (`window.innerWidth < 768`).
+ * Its right edge sits around x=50.
+ *
+ * The topbar's other responsive rules use container queries keyed on
+ * `.topBarShell`'s inline-size, which is narrower than the viewport
+ * because the desktop sidebar occupies a 256px rail. Using a container
+ * query for the hamburger clearance would pad the topbar at viewports
+ * where no hamburger is rendered (e.g. 768px with a visible sidebar
+ * making the topbar container ~512px — mobile-compact styles fire but
+ * there is no hamburger to clear).
+ *
+ * Gating this rule on the viewport media query keeps the padding in
+ * lockstep with the hamburger's actual visibility.
+ */
+@media (max-width: 767px) {
+  .topBar {
+    padding-inline-start: var(--nf-space-16);
   }
 }
