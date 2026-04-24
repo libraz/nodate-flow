@@ -18,6 +18,12 @@ export interface AuthUser {
   country: string;
   themePreference: string;
   isInstanceAdmin: boolean;
+  /**
+   * Public avatar URL served by the auth-api proxy
+   * ({@code /avatars/<userId>?v=<hash>}) or an external OIDC URL.
+   * Undefined when the user has not uploaded a picture.
+   */
+  avatarUrl?: string | null;
 }
 
 export interface AuthState {
