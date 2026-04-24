@@ -116,7 +116,7 @@ export default function PageTree({
   return (
     <div className={styles.treeSidebar}>
       <div className={styles.treeHeader}>
-        <h3 className={styles.treeTitle}>{t('tree.root')}</h3>
+        <h2 className={styles.treeTitle}>{t('tree.root')}</h2>
         <Button
           type="button"
           variant="ghost"
