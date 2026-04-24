@@ -11,11 +11,15 @@ import {
   groupTimezonesByRegion,
 } from '@nodate-flow/sdk';
 import Button from '@nodate-flow/ui/primitives/button';
+import Combobox, { type ComboboxOption } from '@nodate-flow/ui/primitives/combobox';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
+import SegmentedControl, {
+  type SegmentedControlOption,
+} from '@nodate-flow/ui/primitives/segmented-control';
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useMemo, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
 import AuthCard from '../../components/auth-card';
@@ -24,6 +28,15 @@ import { type AuthUser, authStore, selectUser, useAuth } from '../../features/au
 import { type SupportedLanguage, setLanguage } from '../../i18n';
 import { sdk } from '../../lib/sdk';
 import { type ThemePreference, useTheme } from '../../providers/theme-provider';
+
+// Sensible default country per UI language. Used to gently cascade the
+// country field when the user switches language and the country is empty.
+// These are ISO 3166-1 alpha-2 codes, not user-facing strings, so they live
+// in code rather than locale files.
+const LANGUAGE_DEFAULT_COUNTRY: Record<SupportedLanguage, string> = {
+  en: 'US',
+  ja: 'JP',
+};
 
 interface MeResponse {
   id: string;
@@ -36,24 +49,80 @@ interface MeResponse {
   isInstanceAdmin: boolean;
 }
 
+/**
+ * Convert a 2-letter ISO 3166-1 alpha-2 country code into its regional
+ * indicator emoji sequence (e.g. `JP` → `🇯🇵`). Returns an empty string for
+ * malformed codes so callers can safely concatenate the result.
+ */
+function countryFlag(code: string): string {
+  if (!/^[A-Z]{2}$/.test(code)) return '';
+  const A = 0x1f1e6;
+  const base = 'A'.charCodeAt(0);
+  return String.fromCodePoint(A + code.charCodeAt(0) - base, A + code.charCodeAt(1) - base);
+}
+
 function ProfilePage(): ReactElement {
-  const { t } = useTranslation('auth');
+  const { t, i18n } = useTranslation('auth');
   const user = useAuth(selectUser);
   const { setPreference } = useTheme();
   const [serverError, setServerError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const timezoneGroups = useMemo(() => groupTimezonesByRegion(), []);
-  const countries = useMemo(
-    () => Object.entries(SUPPORTED_COUNTRIES).sort(([, a], [, b]) => a.localeCompare(b)),
-    [],
-  );
+  // Flatten the IANA-region-grouped timezone list into Combobox options so
+  // users can search by region (`Asia`), city (`Tokyo`), or full id
+  // (`Asia/Tokyo`) — all match the same label substring.
+  const timezoneOptions = useMemo<ComboboxOption[]>(() => {
+    const groups = groupTimezonesByRegion();
+    const out: ComboboxOption[] = [];
+    for (const { region, zones } of groups) {
+      for (const tz of zones) {
+        out.push({
+          value: tz,
+          label: region === 'Global' ? tz : `${region} / ${formatTimezoneLabel(tz)}`,
+        });
+      }
+    }
+    return out;
+  }, []);
+
+  // Country options carry a flag emoji + localized name so users can scan
+  // visually and type either the localized name, the English fallback, or
+  // the alpha-2 code (which is appended in parentheses) to filter.
+  const countryOptions = useMemo<ComboboxOption[]>(() => {
+    let displayNames: Intl.DisplayNames | undefined;
+    try {
+      displayNames = new Intl.DisplayNames([i18n.language], { type: 'region' });
+    } catch {
+      displayNames = undefined;
+    }
+    const entries = Object.keys(SUPPORTED_COUNTRIES).map((code) => {
+      const localName = displayNames?.of(code) ?? SUPPORTED_COUNTRIES[code] ?? code;
+      const flag = countryFlag(code);
+      return {
+        value: code,
+        label: `${flag} ${localName} (${code})`,
+        sortKey: localName,
+      };
+    });
+    entries.sort((a, b) => a.sortKey.localeCompare(b.sortKey, i18n.language));
+    const list: ComboboxOption[] = [{ value: '', label: t('profile.country_unset') }];
+    for (const e of entries) list.push({ value: e.value, label: e.label });
+    return list;
+  }, [i18n.language, t]);
+
+  const localeOptions: SegmentedControlOption<'en' | 'ja'>[] = [
+    { value: 'en', label: 'English' },
+    { value: 'ja', label: '日本語' },
+  ];
 
   // `values` keeps the form in sync with the auth store; essential because
   // the user profile may populate asynchronously after the form mounts.
   const {
     register,
+    control,
     handleSubmit,
+    getValues,
+    setValue,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -65,6 +134,26 @@ function ProfilePage(): ReactElement {
       themePreference: (user?.themePreference as ProfileFormValues['themePreference']) ?? 'system',
     },
   });
+
+  // Apply a locale change immediately so the rest of the form (country
+  // names via Intl.DisplayNames, validation messages, etc.) reflects the
+  // new UI language without waiting for save. Also cascades the country
+  // default when the country field is still empty -- if the user has
+  // explicitly chosen a country, we leave it alone.
+  const handleLocaleChange = (next: SupportedLanguage): void => {
+    setValue('locale', next, { shouldDirty: true });
+    setLanguage(next);
+    if (!getValues('country')) {
+      setValue('country', LANGUAGE_DEFAULT_COUNTRY[next], {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    }
+    if (getValues('timezone') === 'UTC') {
+      const nextTz = next === 'ja' ? 'Asia/Tokyo' : detectTimezone();
+      setValue('timezone', nextTz, { shouldDirty: true, shouldValidate: true });
+    }
+  };
 
   const onSubmit = async (values: ProfileFormValues): Promise<void> => {
     setServerError(null);
@@ -134,92 +223,63 @@ function ProfilePage(): ReactElement {
         </FormField>
 
         <FormField label={t('profile.locale')}>
-          {(control) => {
-            const { ref, ...field } = register('locale');
-            return (
-              <select
-                {...control}
-                {...field}
-                ref={ref}
-                style={{
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: 'var(--nf-radius-md, 0.375rem)',
-                  border: 'var(--nf-space-px, 1px) solid var(--nf-color-border)',
-                  background: 'var(--nf-color-bg)',
-                  color: 'var(--nf-color-fg)',
-                  fontSize: 'var(--nf-text-sm, 0.875rem)',
-                }}
-              >
-                <option value="en">{t('profile.locale_en')}</option>
-                <option value="ja">{t('profile.locale_ja')}</option>
-              </select>
-            );
-          }}
+          {() => (
+            <Controller
+              name="locale"
+              control={control}
+              render={({ field }) => (
+                <SegmentedControl<'en' | 'ja'>
+                  fullWidth
+                  value={field.value}
+                  onChange={handleLocaleChange}
+                  options={localeOptions}
+                  ariaLabel={t('profile.locale')}
+                />
+              )}
+            />
+          )}
         </FormField>
 
         <FormField
           label={t('profile.timezone')}
           {...(errors.timezone?.message ? { error: t(errors.timezone.message) } : {})}
         >
-          {(control) => {
-            const { ref, ...field } = register('timezone');
-            return (
-              <select
-                {...control}
-                {...field}
-                ref={ref}
-                style={{
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: 'var(--nf-radius-md, 0.375rem)',
-                  border: 'var(--nf-space-px, 1px) solid var(--nf-color-border)',
-                  background: 'var(--nf-color-bg)',
-                  color: 'var(--nf-color-fg)',
-                  fontSize: 'var(--nf-text-sm, 0.875rem)',
-                }}
-              >
-                {timezoneGroups.map(({ region, zones }) => (
-                  <optgroup key={region} label={region}>
-                    {zones.map((tz) => (
-                      <option key={tz} value={tz}>
-                        {region === 'Global' ? tz : formatTimezoneLabel(tz)}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            );
-          }}
+          {(control2) => (
+            <Controller
+              name="timezone"
+              control={control}
+              render={({ field }) => (
+                <Combobox
+                  id={control2.id}
+                  options={timezoneOptions}
+                  value={field.value}
+                  onChange={field.onChange}
+                  aria-label={t('profile.timezone')}
+                />
+              )}
+            />
+          )}
         </FormField>
 
         <FormField
           label={t('profile.country')}
           {...(errors.country?.message ? { error: t(errors.country.message) } : {})}
         >
-          {(control) => {
-            const { ref, ...field } = register('country');
-            return (
-              <select
-                {...control}
-                {...field}
-                ref={ref}
-                style={{
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: 'var(--nf-radius-md, 0.375rem)',
-                  border: 'var(--nf-space-px, 1px) solid var(--nf-color-border)',
-                  background: 'var(--nf-color-bg)',
-                  color: 'var(--nf-color-fg)',
-                  fontSize: 'var(--nf-text-sm, 0.875rem)',
-                }}
-              >
-                <option value="">{t('profile.country_unset')}</option>
-                {countries.map(([code, name]) => (
-                  <option key={code} value={code}>
-                    {code} — {name}
-                  </option>
-                ))}
-              </select>
-            );
-          }}
+          {(control2) => (
+            <Controller
+              name="country"
+              control={control}
+              render={({ field }) => (
+                <Combobox
+                  id={control2.id}
+                  options={countryOptions}
+                  value={field.value}
+                  onChange={field.onChange}
+                  aria-label={t('profile.country')}
+                />
+              )}
+            />
+          )}
         </FormField>
 
         <FormField label={t('profile.theme')}>
