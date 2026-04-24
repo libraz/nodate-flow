@@ -281,6 +281,22 @@
       },
       "errors": {
         "update_failed": "Could not update the workspace. Please try again."
+      },
+      "danger": {
+        "title": "Danger zone",
+        "description": "Irreversible actions. Deleting a workspace hides it from your list along with its projects and tasks.",
+        "delete": "Delete workspace",
+        "deleting": "Deleting...",
+        "confirm": {
+          "title": "Delete this workspace?",
+          "body": "This will delete {name} and hide all of its projects and tasks. This action cannot be undone from the UI.",
+          "submit": "Delete workspace",
+          "cancel": "Cancel"
+        },
+        "deleted": "Workspace deleted",
+        "errors": {
+          "delete_failed": "Could not delete the workspace. Please try again."
+        }
       }
     },
     "public_shares": {

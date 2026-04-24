@@ -176,7 +176,12 @@ export function useDisableWorkspace(): UseMutationResult<void, ApiError, string>
     },
     onSuccess: (_data, id) => {
       void qc.invalidateQueries({ queryKey: workspacesKeys.list() });
-      void qc.invalidateQueries({ queryKey: workspacesKeys.detail(id) });
+      // Remove — not invalidate — the disabled workspace's cache. The
+      // subtree of the deleted workspace will 404 on refetch, and any
+      // detail/members queries still mounted would otherwise retry
+      // three times and log to the console before the navigating
+      // consumer unmounts.
+      qc.removeQueries({ queryKey: workspacesKeys.detail(id) });
     },
   });
 }
