@@ -69,9 +69,18 @@
   /*
    * Calendar layer colors — dotline remains chromatic for data categories
    * only where needed (semantic status tokens are already chromatic). Kept
-   * slightly darker than aurora-light for higher contrast on pure white.
+   * slightly darker than aurora-light for higher contrast on pure white;
+   * `-subtle` companions mirror the status-token subtle pattern for
+   * inactive segmented backgrounds.
    */
   --nf-cal-task-color: oklch(46% 0.18 175);
+  --nf-cal-task-subtle: oklch(94% 0.03 175);
   --nf-cal-event-color: oklch(48% 0.2 240);
+  --nf-cal-event-subtle: oklch(94% 0.03 240);
   --nf-cal-block-color: oklch(52% 0.16 60);
+  --nf-cal-block-subtle: oklch(94% 0.03 60);
+  --nf-cal-free-color: oklch(50% 0.15 145);
+  --nf-cal-free-subtle: oklch(94% 0.03 145);
+  --nf-cal-milestone-color: oklch(46% 0.2 290);
+  --nf-cal-milestone-subtle: oklch(94% 0.03 290);
 }

@@ -36,6 +36,19 @@
   --sc-inactive-fg: var(--nf-color-fg-muted);
 }
 
+/*
+ * Opt-in full-width mode. The default `.root` stays `inline-flex` (hugs
+ * content) for back-compat with existing inline-toggle call sites; callers
+ * that want an equal-width picker (top-level kind / mode / view tabs)
+ * pass `fullWidth` to get `display: flex` + `inline-size: 100%` here, which
+ * pairs with `.segmentFullWidth` below to make every segment share the
+ * available inline size equally (`flex: 1 1 0`).
+ */
+.rootFullWidth {
+  display: flex;
+  inline-size: 100%;
+}
+
 .size-md {
   min-block-size: var(--nf-space-10);
 }
@@ -101,6 +114,20 @@
 }
 
 /*
+ * Paired with `.rootFullWidth` on the group. Each segment gets an equal
+ * share of the available inline size (`flex: 1 1 0`); `min-inline-size: 0`
+ * is required so labels that exceed the share truncate via ellipsis rather
+ * than pushing siblings wider and undoing the balancing.
+ */
+.segmentFullWidth {
+  flex: 1 1 0;
+  min-inline-size: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/*
  * Colourful mode: inactive segments get the tone's `-subtle` fill so the
  * ordinal colour ramp is visible at rest. Active segment uses the full
  * tone as fill and `--nf-color-fg-on-accent` for contrast-safe text.
@@ -152,6 +179,48 @@
   --sc-inactive-bg: var(--nf-color-danger-subtle);
   --sc-inactive-fg: var(--nf-color-danger);
   --sc-active-bg: var(--nf-color-danger);
+  --sc-active-fg: var(--nf-color-fg-on-accent);
+}
+
+/*
+ * Calendar-kind tones — bind the segmented control to the domain-specific
+ * `--nf-cal-<kind>-color` / `-subtle` tokens. Intended for the unified
+ * calendar event create/edit dialog's kind picker; the inactive backdrop
+ * mirrors the calendar grid pill tint and the active fill matches the
+ * event pill colour so the selector reads as "what this will render as".
+ */
+.toneTask {
+  --sc-inactive-bg: var(--nf-cal-task-subtle);
+  --sc-inactive-fg: var(--nf-cal-task-color);
+  --sc-active-bg: var(--nf-cal-task-color);
+  --sc-active-fg: var(--nf-color-fg-on-accent);
+}
+
+.toneEvent {
+  --sc-inactive-bg: var(--nf-cal-event-subtle);
+  --sc-inactive-fg: var(--nf-cal-event-color);
+  --sc-active-bg: var(--nf-cal-event-color);
+  --sc-active-fg: var(--nf-color-fg-on-accent);
+}
+
+.toneBlock {
+  --sc-inactive-bg: var(--nf-cal-block-subtle);
+  --sc-inactive-fg: var(--nf-cal-block-color);
+  --sc-active-bg: var(--nf-cal-block-color);
+  --sc-active-fg: var(--nf-color-fg-on-accent);
+}
+
+.toneFree {
+  --sc-inactive-bg: var(--nf-cal-free-subtle);
+  --sc-inactive-fg: var(--nf-cal-free-color);
+  --sc-active-bg: var(--nf-cal-free-color);
+  --sc-active-fg: var(--nf-color-fg-on-accent);
+}
+
+.toneMilestone {
+  --sc-inactive-bg: var(--nf-cal-milestone-subtle);
+  --sc-inactive-fg: var(--nf-cal-milestone-color);
+  --sc-active-bg: var(--nf-cal-milestone-color);
   --sc-active-fg: var(--nf-color-fg-on-accent);
 }
 

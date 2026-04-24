@@ -81,12 +81,24 @@
 
   /*
    * Calendar layer colors — domain-specific swatches used by the unified
-   * calendar (toggle-chip swatches, event pills). Every theme must define
-   * these so the parity check passes; values track each theme's palette.
+   * calendar (toggle-chip swatches, event pills, segmented control kind
+   * pickers, grid pill backgrounds). Every theme must define these so the
+   * parity check passes; values track each theme's palette.
+   *
+   * Each kind has a saturated `-color` (used for the active segmented state
+   * and for event pill fills) plus a `-subtle` companion (used for the
+   * inactive segmented background and for the calendar grid pill backdrop).
    */
   --nf-cal-task-color: oklch(64% 0.18 175);
+  --nf-cal-task-subtle: oklch(94% 0.04 175);
   --nf-cal-event-color: oklch(62% 0.17 240);
+  --nf-cal-event-subtle: oklch(94% 0.04 240);
   --nf-cal-block-color: oklch(60% 0.14 60);
+  --nf-cal-block-subtle: oklch(94% 0.04 60);
+  --nf-cal-free-color: oklch(70% 0.12 145);
+  --nf-cal-free-subtle: oklch(94% 0.04 145);
+  --nf-cal-milestone-color: oklch(60% 0.18 290);
+  --nf-cal-milestone-subtle: oklch(94% 0.04 290);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -31,8 +31,30 @@ import {
 import { cx } from '../../lib/cx';
 import styles from './segmented-control.module.css';
 
-/** Visual / semantic tone for a single segment. */
-export type SegmentedControlTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger';
+/**
+ * Visual / semantic tone for a single segment.
+ *
+ * Tone families:
+ * - Status tones (`'info' | 'success' | 'warning' | 'danger'`) map to the
+ *   generic `--nf-color-<status>` / `-subtle` tokens and are intended for
+ *   ordinal severity or state selectors.
+ * - Calendar-kind tones (`'task' | 'event' | 'block' | 'free' | 'milestone'`)
+ *   map to the domain-specific `--nf-cal-<kind>-color` / `-subtle` tokens
+ *   and are intended for the unified calendar event create/edit dialog's
+ *   kind picker.
+ * - `'neutral'` is the default fallback and uses the group accent tokens.
+ */
+export type SegmentedControlTone =
+  | 'neutral'
+  | 'info'
+  | 'success'
+  | 'warning'
+  | 'danger'
+  | 'task'
+  | 'event'
+  | 'block'
+  | 'free'
+  | 'milestone';
 
 /** Size variant for the whole group. */
 export type SegmentedControlSize = 'sm' | 'md';
@@ -81,6 +103,15 @@ export interface SegmentedControlProps<T extends string> {
   colourful?: boolean;
   /** Disables the entire group. */
   disabled?: boolean;
+  /**
+   * When true, the control fills the parent's inline size and each segment
+   * gets equal width (`flex: 1 1 0`). Use for top-level pickers (kind / mode /
+   * view tabs) where intrinsic-width segments would otherwise produce a
+   * visibly uneven row due to label length variance (notably in Japanese,
+   * where a single row can mix 2-char and 7-char labels). Leave false
+   * (default) for inline toggles whose intrinsic width should hug content.
+   */
+  fullWidth?: boolean;
   /** Root className pass-through for layout / alignment customisation. */
   className?: string;
   /** Root inline style pass-through. */
@@ -113,6 +144,16 @@ function toneClass(tone: SegmentedControlTone | undefined): string | undefined {
       return styles.toneWarning;
     case 'danger':
       return styles.toneDanger;
+    case 'task':
+      return styles.toneTask;
+    case 'event':
+      return styles.toneEvent;
+    case 'block':
+      return styles.toneBlock;
+    case 'free':
+      return styles.toneFree;
+    case 'milestone':
+      return styles.toneMilestone;
     case 'neutral':
     case undefined:
       return styles.toneNeutral;
@@ -137,6 +178,7 @@ function SegmentedControl<T extends string>({
   size = 'md',
   colourful = false,
   disabled = false,
+  fullWidth = false,
   className,
   style,
 }: SegmentedControlProps<T>): ReactElement {
@@ -220,7 +262,13 @@ function SegmentedControl<T extends string>({
       aria-disabled={disabled || undefined}
       data-size={size}
       data-colourful={colourful ? 'true' : undefined}
-      className={cx(styles.root, styles[`size-${size}`], className)}
+      data-full-width={fullWidth ? 'true' : undefined}
+      className={cx(
+        styles.root,
+        styles[`size-${size}`],
+        fullWidth && styles.rootFullWidth,
+        className,
+      )}
       style={style}
     >
       {options.map((option) => {
@@ -252,6 +300,7 @@ function SegmentedControl<T extends string>({
               selected && styles.segmentActive,
               colourful && styles.segmentColourful,
               colourful && toneClass(option.tone),
+              fullWidth && styles.segmentFullWidth,
             )}
             onClick={() => activate(option.value)}
             onKeyDown={(e) => onKeyDown(e, option.value)}

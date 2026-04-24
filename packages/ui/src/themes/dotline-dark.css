@@ -67,9 +67,18 @@
 
   /*
    * Calendar layer colors — lightened chromatic tones for contrast against
-   * pure black dotline-dark background.
+   * pure black dotline-dark background. `-subtle` companions are deep
+   * mid-tones (L~25) matching the status-token subtle pattern so inactive
+   * segmented backgrounds remain legibly tinted on black.
    */
   --nf-cal-task-color: oklch(80% 0.16 175);
+  --nf-cal-task-subtle: oklch(25% 0.04 175);
   --nf-cal-event-color: oklch(78% 0.16 240);
+  --nf-cal-event-subtle: oklch(25% 0.04 240);
   --nf-cal-block-color: oklch(78% 0.14 60);
+  --nf-cal-block-subtle: oklch(25% 0.04 60);
+  --nf-cal-free-color: oklch(80% 0.14 145);
+  --nf-cal-free-subtle: oklch(25% 0.04 145);
+  --nf-cal-milestone-color: oklch(74% 0.17 290);
+  --nf-cal-milestone-subtle: oklch(25% 0.04 290);
 }

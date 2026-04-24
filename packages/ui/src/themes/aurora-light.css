@@ -66,11 +66,19 @@
   );
 
   /*
-   * Calendar layer colors — used by toggle-chip swatches and event pills on
-   * cross-workspace calendar views. Domain-specific, not tracked by
-   * check-theme-parity (which only guards semantic.css contract).
+   * Calendar layer colors — used by toggle-chip swatches, event pills, and
+   * segmented kind pickers on cross-workspace calendar views. Each hue has a
+   * saturated `-color` and a desaturated near-white `-subtle` companion for
+   * inactive/backdrop usage. Domain-specific but still parity-checked.
    */
   --nf-cal-task-color: oklch(64% 0.18 175);
+  --nf-cal-task-subtle: oklch(94% 0.04 175);
   --nf-cal-event-color: oklch(62% 0.17 240);
+  --nf-cal-event-subtle: oklch(94% 0.04 240);
   --nf-cal-block-color: oklch(60% 0.14 60);
+  --nf-cal-block-subtle: oklch(94% 0.04 60);
+  --nf-cal-free-color: oklch(70% 0.12 145);
+  --nf-cal-free-subtle: oklch(94% 0.04 145);
+  --nf-cal-milestone-color: oklch(60% 0.18 290);
+  --nf-cal-milestone-subtle: oklch(94% 0.04 290);
 }

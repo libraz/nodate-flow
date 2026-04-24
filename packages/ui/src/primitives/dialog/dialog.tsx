@@ -53,6 +53,25 @@ export interface DialogProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title
   dismissOnOverlayClick?: boolean;
   /** When true, renders as bottom sheet on mobile (< 768px). Defaults to `false`. */
   fullScreenOnMobile?: boolean;
+  /**
+   * Maximum inline size of the dialog body. Mobile bottom-sheet variant
+   * (< 768px) ignores this and uses 100% width regardless.
+   * - 'md' (default): 32rem — the current width, fits short forms.
+   * - 'lg': 36rem — content-heavy dialogs (unified pickers, multi-column).
+   * - 'xl': 40rem — very dense dialogs (settings panels, data inspectors).
+   */
+  size?: 'md' | 'lg' | 'xl';
+}
+
+function sizeClass(size: 'md' | 'lg' | 'xl'): string | undefined {
+  switch (size) {
+    case 'lg':
+      return styles.sizeLg;
+    case 'xl':
+      return styles.sizeXl;
+    default:
+      return styles.sizeMd;
+  }
 }
 
 function DialogImpl(
@@ -64,6 +83,7 @@ function DialogImpl(
     className,
     dismissOnOverlayClick = true,
     fullScreenOnMobile = false,
+    size = 'md',
     ...rest
   }: DialogProps,
   ref: Ref<HTMLDivElement>,
@@ -110,7 +130,13 @@ function DialogImpl(
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={cx(styles.dialog, fullScreenOnMobile && styles.dialogMobile, className)}
+        data-size={size}
+        className={cx(
+          styles.dialog,
+          sizeClass(size),
+          fullScreenOnMobile && styles.dialogMobile,
+          className,
+        )}
         onClick={(e) => e.stopPropagation()}
         {...rest}
       >

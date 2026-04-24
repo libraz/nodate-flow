@@ -68,9 +68,18 @@
 
   /*
    * Calendar layer colors — muted chromatic tones matching glass-dark's
-   * elegant slate palette.
+   * elegant slate palette. `-subtle` companions are deep mid-tones (L~25)
+   * matching the status-token subtle cadence so inactive segmented
+   * backgrounds stay legibly tinted on the dark canvas.
    */
   --nf-cal-task-color: oklch(72% 0.12 175);
+  --nf-cal-task-subtle: oklch(25% 0.04 175);
   --nf-cal-event-color: oklch(72% 0.12 250);
+  --nf-cal-event-subtle: oklch(25% 0.04 250);
   --nf-cal-block-color: oklch(72% 0.1 60);
+  --nf-cal-block-subtle: oklch(25% 0.04 60);
+  --nf-cal-free-color: oklch(72% 0.1 150);
+  --nf-cal-free-subtle: oklch(25% 0.04 150);
+  --nf-cal-milestone-color: oklch(70% 0.13 285);
+  --nf-cal-milestone-subtle: oklch(25% 0.04 285);
 }

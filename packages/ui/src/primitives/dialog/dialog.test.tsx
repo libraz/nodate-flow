@@ -60,4 +60,39 @@ describe.each(THEMES)('Dialog [%s]', (theme) => {
     );
     expect(screen.queryByRole('dialog')).toBeNull();
   });
+
+  it('defaults to size="md" with data-size and sizeMd class', () => {
+    render(<Harness />);
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.getAttribute('data-size')).toBe('md');
+    expect(dialog.className).toMatch(/sizeMd/);
+    expect(dialog.className).not.toMatch(/sizeLg/);
+    expect(dialog.className).not.toMatch(/sizeXl/);
+  });
+
+  it('applies size="lg" via data-size and sizeLg class', () => {
+    render(
+      <Dialog open={true} onClose={() => {}} title="t" size="lg">
+        <button type="button">OK</button>
+      </Dialog>,
+    );
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.getAttribute('data-size')).toBe('lg');
+    expect(dialog.className).toMatch(/sizeLg/);
+    expect(dialog.className).not.toMatch(/sizeMd/);
+    expect(dialog.className).not.toMatch(/sizeXl/);
+  });
+
+  it('applies size="xl" via data-size and sizeXl class', () => {
+    render(
+      <Dialog open={true} onClose={() => {}} title="t" size="xl">
+        <button type="button">OK</button>
+      </Dialog>,
+    );
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.getAttribute('data-size')).toBe('xl');
+    expect(dialog.className).toMatch(/sizeXl/);
+    expect(dialog.className).not.toMatch(/sizeMd/);
+    expect(dialog.className).not.toMatch(/sizeLg/);
+  });
 });

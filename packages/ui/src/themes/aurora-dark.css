@@ -66,10 +66,20 @@
   );
 
   /*
-   * Calendar layer colors — used by toggle-chip swatches and event pills on
-   * cross-workspace calendar views. Lightened for dark-mode contrast.
+   * Calendar layer colors — used by toggle-chip swatches, event pills, and
+   * segmented kind pickers on cross-workspace calendar views. Saturated
+   * `-color` variants are lightened for dark-mode contrast; `-subtle`
+   * variants are desaturated mid-tones (L~28) suitable as card / inactive
+   * segmented backgrounds on a dark canvas.
    */
   --nf-cal-task-color: oklch(76% 0.16 175);
+  --nf-cal-task-subtle: oklch(28% 0.05 175);
   --nf-cal-event-color: oklch(74% 0.15 240);
+  --nf-cal-event-subtle: oklch(28% 0.05 240);
   --nf-cal-block-color: oklch(72% 0.13 60);
+  --nf-cal-block-subtle: oklch(28% 0.05 60);
+  --nf-cal-free-color: oklch(78% 0.13 145);
+  --nf-cal-free-subtle: oklch(28% 0.05 145);
+  --nf-cal-milestone-color: oklch(72% 0.16 290);
+  --nf-cal-milestone-subtle: oklch(28% 0.05 290);
 }

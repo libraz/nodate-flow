@@ -26,6 +26,21 @@ const VIEW_OPTIONS: SegmentedControlOption<View>[] = [
 ];
 
 /**
+ * Calendar event-kind picker — the canonical consumer of the calendar-kind
+ * tones (`task` / `event` / `block` / `free` / `milestone`). Used by the
+ * unified calendar event create/edit dialog.
+ */
+type CalKind = 'task' | 'event' | 'block' | 'free' | 'milestone';
+
+const CAL_KIND_OPTIONS: SegmentedControlOption<CalKind>[] = [
+  { value: 'task', label: 'Task', tone: 'task' },
+  { value: 'event', label: 'Event', tone: 'event' },
+  { value: 'block', label: 'Block', tone: 'block' },
+  { value: 'free', label: 'Free', tone: 'free' },
+  { value: 'milestone', label: 'Milestone', tone: 'milestone' },
+];
+
+/**
  * Controlled wrapper used by the click / keyboard tests so state actually
  * updates between events.
  */
@@ -327,6 +342,133 @@ describe.each(THEMES)('SegmentedControl [%s]', (theme) => {
     expect(root).not.toBeNull();
     expect(root?.className).toMatch(/custom-sc/);
     expect(root?.style.inlineSize).toBe('320px');
+  });
+
+  it('applies calendar-kind tone classes in colourful mode (task, event, block, free, milestone)', () => {
+    render(
+      <SegmentedControl<CalKind>
+        value="event"
+        onChange={() => undefined}
+        options={CAL_KIND_OPTIONS}
+        ariaLabel="Calendar kind"
+        colourful
+      />,
+    );
+    const task = screen.getByRole('radio', { name: 'Task' });
+    const event = screen.getByRole('radio', { name: 'Event' });
+    const block = screen.getByRole('radio', { name: 'Block' });
+    const free = screen.getByRole('radio', { name: 'Free' });
+    const milestone = screen.getByRole('radio', { name: 'Milestone' });
+
+    // data-tone attributes propagate regardless of colourful mode and are
+    // the stable, class-name-hash-independent surface for assertions.
+    expect(task.getAttribute('data-tone')).toBe('task');
+    expect(event.getAttribute('data-tone')).toBe('event');
+    expect(block.getAttribute('data-tone')).toBe('block');
+    expect(free.getAttribute('data-tone')).toBe('free');
+    expect(milestone.getAttribute('data-tone')).toBe('milestone');
+
+    // Each segment should carry a non-trivial tone-specific class (the exact
+    // CSS-module hash is environment-dependent, so we assert counts and
+    // that the class sets for different tones are NOT identical).
+    const classSet = (el: Element): Set<string> =>
+      new Set(el.className.split(/\s+/).filter(Boolean));
+    const taskClasses = classSet(task);
+    const eventClasses = classSet(event);
+    const blockClasses = classSet(block);
+    const freeClasses = classSet(free);
+    const milestoneClasses = classSet(milestone);
+
+    for (const set of [taskClasses, eventClasses, blockClasses, freeClasses, milestoneClasses]) {
+      // base .segment + .segmentColourful + one .toneX (active adds .segmentActive).
+      expect(set.size).toBeGreaterThanOrEqual(3);
+    }
+
+    // Every calendar-kind tone maps to a distinct CSS class — this catches
+    // a regression where toneClass() would fall through to toneNeutral.
+    const stableClasses = [taskClasses, eventClasses, blockClasses, freeClasses, milestoneClasses]
+      .map((set) => [...set].sort().join(' '))
+      .map((s) => s.replace(/segmentActive/g, '').trim());
+    expect(new Set(stableClasses).size).toBe(5);
+  });
+
+  it('renders an active calendar-kind segment with correct radiogroup semantics', () => {
+    render(
+      <SegmentedControl<CalKind>
+        value="milestone"
+        onChange={() => undefined}
+        options={CAL_KIND_OPTIONS}
+        ariaLabel="Calendar kind"
+        colourful
+      />,
+    );
+    const milestone = screen.getByRole('radio', { name: 'Milestone' });
+    // WAI-ARIA radiogroup: the active option has aria-checked=true and is
+    // the roving tabindex focal point (tabindex=0); the rest are -1.
+    expect(milestone.getAttribute('aria-checked')).toBe('true');
+    expect(milestone.getAttribute('tabindex')).toBe('0');
+
+    for (const name of ['Task', 'Event', 'Block', 'Free']) {
+      const node = screen.getByRole('radio', { name });
+      expect(node.getAttribute('aria-checked')).toBe('false');
+      expect(node.getAttribute('tabindex')).toBe('-1');
+    }
+  });
+
+  it('preserves radiogroup semantics when switching to tone="task"', async () => {
+    const user = userEvent.setup();
+    render(<Controlled initial="event" options={CAL_KIND_OPTIONS} colourful />);
+    const task = screen.getByRole('radio', { name: 'Task' });
+    const event = screen.getByRole('radio', { name: 'Event' });
+    await user.click(task);
+    expect(task.getAttribute('aria-checked')).toBe('true');
+    expect(task.getAttribute('tabindex')).toBe('0');
+    expect(event.getAttribute('aria-checked')).toBe('false');
+    expect(event.getAttribute('tabindex')).toBe('-1');
+  });
+
+  it('applies fullWidth classes and data attribute on root and every segment', () => {
+    const { container } = render(
+      <SegmentedControl<CalKind>
+        value="event"
+        onChange={() => undefined}
+        options={CAL_KIND_OPTIONS}
+        ariaLabel="Calendar kind"
+        fullWidth
+      />,
+    );
+    const root = container.querySelector('[role="radiogroup"]') as HTMLElement | null;
+    expect(root).not.toBeNull();
+    expect(root?.getAttribute('data-full-width')).toBe('true');
+    // The exact CSS-module hash is environment-dependent, so we match on
+    // the stable base-name prefix that css-modules derives from the source
+    // class name (`rootFullWidth` / `segmentFullWidth`).
+    expect(root?.className).toMatch(/rootFullWidth/);
+
+    for (const name of ['Task', 'Event', 'Block', 'Free', 'Milestone']) {
+      const node = screen.getByRole('radio', { name });
+      expect(node.className).toMatch(/segmentFullWidth/);
+    }
+  });
+
+  it('does not apply fullWidth classes or data attribute by default', () => {
+    const { container } = render(
+      <SegmentedControl<CalKind>
+        value="event"
+        onChange={() => undefined}
+        options={CAL_KIND_OPTIONS}
+        ariaLabel="Calendar kind"
+      />,
+    );
+    const root = container.querySelector('[role="radiogroup"]') as HTMLElement | null;
+    expect(root).not.toBeNull();
+    expect(root?.getAttribute('data-full-width')).toBeNull();
+    expect(root?.className).not.toMatch(/rootFullWidth/);
+
+    for (const name of ['Task', 'Event', 'Block', 'Free', 'Milestone']) {
+      const node = screen.getByRole('radio', { name });
+      expect(node.className).not.toMatch(/segmentFullWidth/);
+    }
   });
 
   it('has no a11y violations (plain, colourful, disabled)', async () => {
