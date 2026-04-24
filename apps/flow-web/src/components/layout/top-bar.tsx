@@ -1,9 +1,8 @@
 import Icon from '@nodate-flow/ui/icon';
-import { cx } from '@nodate-flow/ui/lib/cx';
 import Popover from '@nodate-flow/ui/primitives/popover';
 import { useNavigate } from '@tanstack/react-router';
 
-import { Bell, Globe, LogOut, Moon, Search, Sun } from 'lucide-react';
+import { Bell, LogOut, Search, Settings } from 'lucide-react';
 import { type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import CommandPalette from './command-palette';
@@ -11,19 +10,11 @@ import CommandPalette from './command-palette';
 import AiCostMeter from '../../features/ai-providers/cost-meter';
 import { authStore, selectUser, useAuth } from '../../features/auth/auth-store';
 import NotificationBell from '../../features/notifications/notification-bell';
-import { type SupportedLanguage, setLanguage } from '../../i18n';
 import { apiBaseUrl } from '../../lib/sdk';
 import { clearActiveWorkspaceId } from '../../lib/use-current-workspace';
-import { type ConcreteTheme, concreteThemes, useTheme } from '../../providers/theme-provider';
 import TopBarBreadcrumb from './top-bar-breadcrumb';
 import styles from './top-bar.module.css';
 import WorkspaceSwitcher from './workspace-switcher';
-
-function nextTheme(current: ConcreteTheme): ConcreteTheme {
-  const idx = concreteThemes.indexOf(current);
-  const next = concreteThemes[(idx + 1) % concreteThemes.length];
-  return next ?? 'aurora-light';
-}
 
 /** Two-letter initials from a display name (falls back to "?"). */
 function initialsFrom(name: string | undefined): string {
@@ -36,23 +27,28 @@ function initialsFrom(name: string | undefined): string {
 }
 
 export default function TopBar(): ReactElement {
-  const { t, i18n } = useTranslation('common');
-  const { resolved, setPreference } = useTheme();
+  const { t } = useTranslation('common');
   const navigate = useNavigate();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const isDark = resolved === 'aurora-dark' || resolved === 'dotline-dark';
   const user = useAuth(selectUser);
   const initials = initialsFrom(user?.displayName);
-
-  const handleThemeToggle = (): void => {
-    setPreference(nextTheme(resolved));
-  };
-
-  const handleLanguageToggle = (): void => {
-    const current = (i18n.resolvedLanguage ?? 'en') as SupportedLanguage;
-    setLanguage(current === 'en' ? 'ja' : 'en');
-  };
+  // Fall back to initials when the image fails to load (e.g. the proxy
+  // 404s after a stale `?v=` token, or an external OIDC URL is down).
+  // Reset whenever the avatarUrl itself changes so a new upload is
+  // given a fresh shot at loading.
+  const avatarUrl = user?.avatarUrl ?? null;
+  const [trackedAvatarUrl, setTrackedAvatarUrl] = useState<string | null>(avatarUrl);
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  // Derived-state reset: when the avatarUrl changes (new upload,
+  // removal, or user switch), clear the cached failure flag so the
+  // new URL gets a fresh load attempt. Setting state during render
+  // is explicitly allowed for this "reset on prop change" pattern.
+  if (avatarUrl !== trackedAvatarUrl) {
+    setTrackedAvatarUrl(avatarUrl);
+    setAvatarFailed(false);
+  }
+  const showAvatarImage = Boolean(avatarUrl) && !avatarFailed;
 
   const handleLogout = async (): Promise<void> => {
     try {
@@ -71,8 +67,6 @@ export default function TopBar(): ReactElement {
     void navigate({ to: '/login', replace: true });
   };
 
-  const currentLang = (i18n.resolvedLanguage ?? 'en').toUpperCase();
-
   const userMenuContent = (
     <div className={styles.userMenu}>
       {user ? (
@@ -89,6 +83,20 @@ export default function TopBar(): ReactElement {
             className={styles.userMenuItem}
             onClick={() => {
               setUserMenuOpen(false);
+              void navigate({ to: '/settings/profile' });
+            }}
+          >
+            <Icon icon={Settings} decorative />
+            <span>{t('topbar.user_menu.settings')}</span>
+          </button>
+        </li>
+        <li role="presentation">
+          <button
+            role="menuitem"
+            type="button"
+            className={styles.userMenuItem}
+            onClick={() => {
+              setUserMenuOpen(false);
               void navigate({ to: '/settings/notifications' });
             }}
           >
@@ -96,37 +104,7 @@ export default function TopBar(): ReactElement {
             <span>{t('topbar.notifications.label')}</span>
           </button>
         </li>
-        <li role="presentation">
-          <button
-            role="menuitem"
-            type="button"
-            className={styles.userMenuItem}
-            onClick={() => {
-              setUserMenuOpen(false);
-              handleThemeToggle();
-            }}
-          >
-            <Icon icon={isDark ? Moon : Sun} decorative />
-            <span>{t('topbar.theme.toggle')}</span>
-          </button>
-        </li>
-        <li role="presentation">
-          <button
-            role="menuitem"
-            type="button"
-            className={styles.userMenuItem}
-            onClick={() => {
-              setUserMenuOpen(false);
-              handleLanguageToggle();
-            }}
-          >
-            <Icon icon={Globe} decorative />
-            <span>{t('topbar.language.toggle')}</span>
-            <span className={styles.userMenuItemMeta} aria-hidden="true">
-              {currentLang}
-            </span>
-          </button>
-        </li>
+        <li aria-hidden="true" className={styles.userMenuDivider} />
         <li role="presentation">
           <button
             role="menuitem"
@@ -187,32 +165,6 @@ export default function TopBar(): ReactElement {
                 <NotificationBell />
               </Suspense>
             </div>
-            <button
-              type="button"
-              className={cx(styles.iconButton, styles.inlineThemeToggle)}
-              onClick={handleThemeToggle}
-              aria-label={t('topbar.theme.toggle')}
-            >
-              <Icon icon={isDark ? Moon : Sun} decorative />
-            </button>
-            <button
-              type="button"
-              className={cx(styles.iconButton, styles.langToggle, styles.inlineLangToggle)}
-              onClick={handleLanguageToggle}
-              aria-label={t('topbar.language.toggle')}
-            >
-              {currentLang}
-            </button>
-            <button
-              type="button"
-              className={cx(styles.iconButton, styles.inlineSignOut)}
-              onClick={() => {
-                void handleLogout();
-              }}
-              aria-label={t('auth.logout')}
-            >
-              <Icon icon={LogOut} decorative />
-            </button>
             <Popover
               open={userMenuOpen}
               onOpenChange={setUserMenuOpen}
@@ -226,7 +178,16 @@ export default function TopBar(): ReactElement {
                 aria-haspopup="menu"
                 title={user?.displayName ?? ''}
               >
-                {initials}
+                {showAvatarImage && avatarUrl ? (
+                  <img
+                    className={styles.avatarImage}
+                    src={avatarUrl}
+                    alt={t('topbar.user_menu.avatar_alt', { name: user?.displayName ?? '' })}
+                    onError={() => setAvatarFailed(true)}
+                  />
+                ) : (
+                  <span aria-hidden="true">{initials}</span>
+                )}
               </button>
             </Popover>
           </div>

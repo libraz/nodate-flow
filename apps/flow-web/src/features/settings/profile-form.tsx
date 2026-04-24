@@ -35,6 +35,7 @@ import { z } from 'zod';
 import { type SupportedLanguage, setLanguage } from '../../i18n';
 import { useTheme } from '../../providers/theme-provider';
 import { type PatchMeInput, useMeQuery, useUpdateMe } from './api';
+import AvatarUpload from './avatar-upload';
 
 const LOCALES: readonly SupportedLanguage[] = ['en', 'ja'] as const;
 
@@ -137,6 +138,7 @@ export default function ProfileForm(): ReactElement {
     <div
       style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxInlineSize: '32rem' }}
     >
+      <AvatarUpload user={me} />
       <form
         onSubmit={(e) => {
           void handleSubmit(onSubmit)(e);

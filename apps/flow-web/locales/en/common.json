@@ -53,14 +53,10 @@
     "search": {
       "placeholder": "Search tasks, projects, people..."
     },
-    "theme": {
-      "toggle": "Toggle theme"
-    },
-    "language": {
-      "toggle": "Toggle language"
-    },
     "user_menu": {
-      "open": "Open account menu"
+      "open": "Open account menu",
+      "settings": "Settings",
+      "avatar_alt": "{name}'s profile picture"
     },
     "notifications": {
       "label": "Notifications"
@@ -176,7 +172,7 @@
     "empty": "No scheduled tasks this month.",
     "noDue": "No due date",
     "more": "+{count} more",
-    "click_to_add": "Click to add task",
+    "click_to_add": "Click to add",
     "drag_to_reschedule": "Drag to reschedule",
     "reschedule_success": "Due date updated",
     "reschedule_error": "Failed to update due date",
@@ -184,7 +180,9 @@
     "layer": {
       "tasks_due": "Tasks (due)",
       "events": "Events",
-      "blocks": "Blocks"
+      "blocks": "Blocks",
+      "free": "Free",
+      "milestone": "Milestones"
     },
     "weekday": {
       "mon": "Mon",

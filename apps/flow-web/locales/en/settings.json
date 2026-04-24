@@ -134,6 +134,18 @@
     "save": "Save",
     "saving": "Saving...",
     "saved": "Saved",
+    "avatar": {
+      "label": "Profile picture",
+      "description": "JPEG, PNG, WebP, or GIF. Max 5 MB.",
+      "upload": "Upload image",
+      "change": "Change image",
+      "remove": "Remove",
+      "uploading": "Uploading…",
+      "removed": "Profile picture removed.",
+      "updated": "Profile picture updated.",
+      "alt": "{name}'s profile picture",
+      "empty_alt": "No profile picture"
+    },
     "validation": {
       "display_name_required": "Display name is required.",
       "timezone_required": "Timezone is required.",

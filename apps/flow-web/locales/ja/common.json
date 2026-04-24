@@ -53,14 +53,10 @@
     "search": {
       "placeholder": "タスク・プロジェクト・メンバーを検索…"
     },
-    "theme": {
-      "toggle": "テーマを切り替え"
-    },
-    "language": {
-      "toggle": "言語を切り替え"
-    },
     "user_menu": {
-      "open": "アカウントメニューを開く"
+      "open": "アカウントメニューを開く",
+      "settings": "設定",
+      "avatar_alt": "{name} のプロフィール画像"
     },
     "notifications": {
       "label": "通知"
@@ -176,7 +172,7 @@
     "empty": "今月に予定されているタスクはありません。",
     "noDue": "期日なし",
     "more": "+{count} 件",
-    "click_to_add": "クリックしてタスクを追加",
+    "click_to_add": "クリックして追加",
     "drag_to_reschedule": "ドラッグで日付変更",
     "reschedule_success": "期日を更新しました",
     "reschedule_error": "期日の更新に失敗しました",
@@ -184,7 +180,9 @@
     "layer": {
       "tasks_due": "タスク（期日）",
       "events": "予定",
-      "blocks": "ブロック"
+      "blocks": "ブロック",
+      "free": "空き",
+      "milestone": "マイルストーン"
     },
     "weekday": {
       "mon": "月",

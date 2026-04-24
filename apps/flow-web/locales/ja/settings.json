@@ -134,6 +134,18 @@
     "save": "保存",
     "saving": "保存中…",
     "saved": "保存しました",
+    "avatar": {
+      "label": "プロフィール画像",
+      "description": "JPEG / PNG / WebP / GIF (5 MB まで)",
+      "upload": "画像をアップロード",
+      "change": "画像を変更",
+      "remove": "削除",
+      "uploading": "アップロード中…",
+      "removed": "プロフィール画像を削除しました。",
+      "updated": "プロフィール画像を更新しました。",
+      "alt": "{name} のプロフィール画像",
+      "empty_alt": "プロフィール画像なし"
+    },
     "validation": {
       "display_name_required": "表示名は必須です。",
       "timezone_required": "タイムゾーンは必須です。",

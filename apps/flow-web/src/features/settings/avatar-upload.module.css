@@ -1,0 +1,164 @@
+/**
+ * Avatar upload section for /settings/profile.
+ *
+ * Refined-minimalism visual language matching ProfileForm's flat
+ * vertical rhythm: no card chrome, no borders — depth comes from a
+ * subtle shadow on the circular preview and a composited overlay that
+ * fades in on hover (signalling "click me to change"). Busy state
+ * layers the themed {@code --nf-color-overlay} scrim + a centered
+ * spinner so the preview behaves like it is "developing" the new
+ * image.
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.label {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
+}
+
+.description {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.previewRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-4);
+  flex-wrap: wrap;
+}
+
+.preview {
+  position: relative;
+  inline-size: 7.5rem;
+  block-size: 7.5rem;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: var(--nf-radius-pill);
+  background: var(--nf-color-accent-subtle);
+  overflow: hidden;
+  cursor: pointer;
+  isolation: isolate;
+  box-shadow: var(--nf-shadow-sm);
+  transition: transform var(--nf-duration-fast) ease, box-shadow var(--nf-duration-fast) ease;
+  flex: 0 0 auto;
+}
+
+.preview:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--nf-shadow-md);
+}
+
+.preview:focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: var(--nf-focus-ring-offset);
+}
+
+.preview:disabled {
+  cursor: progress;
+}
+
+.previewImage {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+.previewInitials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 100%;
+  block-size: 100%;
+  font-family: var(--nf-font-sans);
+  font-size: 2.5rem;
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+
+/*
+ * The hover overlay reuses the theme-scoped `--nf-color-overlay` scrim
+ * (which already encodes the right dark/light/transparency balance per
+ * theme) and fades it in purely via opacity — no hardcoded colors.
+ */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--nf-color-overlay);
+  color: var(--nf-color-bg);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--nf-duration-fast) ease;
+  z-index: 1;
+}
+
+.preview:hover:not(:disabled) .overlay,
+.preview:focus-visible:not(:disabled) .overlay {
+  opacity: 1;
+}
+
+.overlayIcon {
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  stroke-width: 1.5;
+}
+
+/*
+ * Busy overlay is always visible while a mutation is in flight. Uses
+ * the same scrim token as the hover overlay so the theme-aware
+ * contrast carries through.
+ */
+.busy {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--nf-color-overlay);
+  z-index: 2;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  flex-wrap: wrap;
+}
+
+/*
+ * Visually-hidden file input. Using the standard sr-only recipe
+ * instead of {@code display: none} so assistive tech still reaches
+ * it via label association if a future iteration exposes one.
+ */
+.hiddenInput {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip: rect(0 0 0 0);
+  overflow: hidden;
+  white-space: nowrap;
+}

@@ -4,12 +4,13 @@
  * amount of inline-size, so viewport-based media queries are unreliable.
  *
  * Breakpoints (measured on .topBarShell inline-size):
- *  - >= 768px (full):    workspace / search(label) / notifications / theme / lang / sign-out / avatar
- *  -  480-767px (compact): workspace / search(icon)  / notifications / avatar(+overflow)
- *  - <  480px (ultra):    workspace / search(icon)  / avatar(+overflow)
+ *  - >= 768px (full):    workspace / search(label) / notifications / avatar
+ *  -  480-767px (compact): workspace / search(icon)  / notifications / avatar
+ *  - <  480px (ultra):    workspace / search(icon)  / avatar
  *
- * The avatar trigger also opens a dropdown menu; at compact/ultra widths the
- * overflow items (theme/lang/sign-out/notifications) are reachable there.
+ * The avatar trigger opens a dropdown menu carrying settings / notifications /
+ * sign-out. Theme and language are configured from /settings/profile and are
+ * not duplicated as top-bar shortcuts.
  */
 
 .topBarShell {
@@ -218,11 +219,6 @@
   outline-offset: var(--nf-focus-ring-offset);
 }
 
-.langToggle {
-  inline-size: auto;
-  padding-inline: var(--nf-space-3);
-}
-
 .avatarTrigger {
   display: inline-flex;
   align-items: center;
@@ -249,6 +245,20 @@
 .avatarTrigger:focus-visible {
   outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
   outline-offset: var(--nf-focus-ring-offset);
+}
+
+/*
+ * When the user has a profile picture the trigger renders an <img>
+ * that fills the pill. `object-fit: cover` crops non-square source
+ * images to a clean circle; the surrounding button keeps its pill
+ * radius + focus ring behaviour unchanged.
+ */
+.avatarImage {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+  border-radius: inherit;
 }
 
 .userMenu {
@@ -327,8 +337,24 @@
 }
 
 /*
- * Compact (480-767px): hide inline theme / language / sign-out. They remain
- * reachable from the avatar dropdown. Search collapses to an icon-only button.
+ * Thin separator between navigational items and the destructive sign-out
+ * action. Rendered as an <li aria-hidden="true"> so it is purely visual —
+ * screen readers already announce the destination labels ("Settings",
+ * "Notifications", "Sign out"); an extra "separator" announcement would
+ * be noise. The list item itself carries the visible border.
+ */
+.userMenuDivider {
+  block-size: 0;
+  margin-block: var(--nf-space-1);
+  border-block-start: var(--nf-space-px) solid var(--nf-color-border);
+  list-style: none;
+}
+
+/*
+ * Compact (480-767px): collapse search to an icon-only button and hide the
+ * workspace switcher from the top bar (still reachable via the sidebar
+ * drawer). The avatar dropdown keeps settings / notifications / sign-out
+ * one tap away.
  *
  * The breadcrumb also compacts: its list hides every item except the
  * last two (project link + current view) so the trail stays useful
@@ -400,12 +426,6 @@
 
   .breadcrumbProject {
     max-inline-size: 10rem;
-  }
-
-  .inlineThemeToggle,
-  .inlineLangToggle,
-  .inlineSignOut {
-    display: none;
   }
 
   /*

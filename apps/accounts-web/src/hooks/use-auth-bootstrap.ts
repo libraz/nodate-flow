@@ -31,6 +31,7 @@ interface MeResponse {
   country: string;
   themePreference: string;
   isInstanceAdmin: boolean;
+  avatarUrl?: string | null;
 }
 
 let bootstrapPromise: Promise<AuthBootstrapStatus> | null = null;
@@ -53,6 +54,7 @@ async function runBootstrap(): Promise<AuthBootstrapStatus> {
     country: me.country,
     themePreference: me.themePreference,
     isInstanceAdmin: me.isInstanceAdmin,
+    avatarUrl: me.avatarUrl ?? null,
   };
   authStore.getState().setSession(token, user);
   return 'authenticated';
