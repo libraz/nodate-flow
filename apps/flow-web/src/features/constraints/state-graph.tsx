@@ -46,10 +46,10 @@ const BRAND_COLOR = {
   google: '#4285f4',
 } as const;
 
-const EXTERNAL_SOURCES: { id: string; label: string; color: string; y: number }[] = [
-  { id: 'github', label: 'github', color: BRAND_COLOR.github, y: 30 },
-  { id: 'slack', label: 'slack', color: BRAND_COLOR.slack, y: 120 },
-  { id: 'google', label: 'google', color: BRAND_COLOR.google, y: 210 },
+const EXTERNAL_SOURCES: { id: string; color: string; y: number }[] = [
+  { id: 'github', color: BRAND_COLOR.github, y: 30 },
+  { id: 'slack', color: BRAND_COLOR.slack, y: 120 },
+  { id: 'google', color: BRAND_COLOR.google, y: 210 },
 ];
 
 export interface StateGraphProps {
@@ -64,7 +64,7 @@ export interface StateGraphProps {
 }
 
 export default function StateGraph({ current, activeSources }: StateGraphProps): ReactElement {
-  const { t } = useTranslation('constraints');
+  const { t } = useTranslation(['constraints', 'common']);
   const openPos = POSITIONS.open;
   return (
     <figure aria-label={t('stateGraph.title')}>
@@ -101,7 +101,7 @@ export default function StateGraph({ current, activeSources }: StateGraphProps):
                 strokeWidth={1}
               />
               <text x={x + 28} y={src.y + 4} fontSize="10" textAnchor="middle" fill={src.color}>
-                {src.label}
+                {t(`constraints:stateGraph.external.${src.id}`)}
               </text>
             </g>
           );
@@ -120,7 +120,7 @@ export default function StateGraph({ current, activeSources }: StateGraphProps):
                 stroke="none"
                 textAnchor="middle"
               >
-                {e.label}
+                {t(`common:tasks.detail.transitions.${e.label}`)}
               </text>
             </g>
           );
@@ -145,7 +145,7 @@ export default function StateGraph({ current, activeSources }: StateGraphProps):
                 textAnchor="middle"
                 fill={active ? 'var(--nf-bg, white)' : 'currentColor'}
               >
-                {s}
+                {t(`common:tasks.status.${s}`)}
               </text>
             </g>
           );

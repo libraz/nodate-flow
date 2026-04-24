@@ -48,6 +48,11 @@
     "legend": "Current state highlighted",
     "projectTitle": "Task Dependency Graph",
     "noTasks": "No tasks in this project",
-    "noDependencies": "No dependencies defined"
+    "noDependencies": "No dependencies defined",
+    "external": {
+      "github": "GitHub",
+      "slack": "Slack",
+      "google": "Google"
+    }
   }
 }

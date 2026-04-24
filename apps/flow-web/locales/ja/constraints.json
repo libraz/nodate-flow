@@ -48,6 +48,11 @@
     "legend": "現在の状態をハイライト",
     "projectTitle": "タスク依存関係グラフ",
     "noTasks": "このプロジェクトにタスクはありません",
-    "noDependencies": "依存関係は定義されていません"
+    "noDependencies": "依存関係は定義されていません",
+    "external": {
+      "github": "GitHub",
+      "slack": "Slack",
+      "google": "Google"
+    }
   }
 }
