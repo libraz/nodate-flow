@@ -25,8 +25,9 @@ import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import Spinner from '@nodate-flow/ui/primitives/spinner';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import { BP } from '@nodate-flow/ui/tokens/breakpoints';
 import { Link, createLazyFileRoute, getRouteApi } from '@tanstack/react-router';
-import { type FormEvent, type ReactElement, Suspense, useId, useState } from 'react';
+import { type FormEvent, type ReactElement, Suspense, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import Markdown from '@nodate-flow/ui/primitives/markdown';
@@ -1124,17 +1125,39 @@ function TaskBreadcrumb({
   return <TaskBreadcrumbInner workspaceId={workspaceId} projectId={projectId} />;
 }
 
+/**
+ * Tracks whether the viewport is narrower than the `sm` breakpoint.
+ *
+ * Mirrors the `useIsMobile` pattern from
+ * `apps/flow-web/src/components/layout/sidebar.tsx` so the detail panel can
+ * flip an inline grid-template from two columns to one. An inline style cannot
+ * be targeted with `@media`, so the decision is made in JS.
+ */
+function useIsNarrow(): boolean {
+  const [narrow, setNarrow] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < BP.sm,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${BP.sm - 1}px)`);
+    const onChange = (e: MediaQueryListEvent): void => setNarrow(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return narrow;
+}
+
 function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
   const { data: task } = useTaskQuery(id);
   const state = task.derivedState as TaskDerivedState;
   const priority = (task.priority as TaskPriority) ?? 0;
+  const isNarrow = useIsNarrow();
 
   return (
     <section
       style={{
         padding: 'clamp(1.5rem, 4vw, 2.5rem)',
         display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr) minmax(16rem, 22rem)',
+        gridTemplateColumns: isNarrow ? '1fr' : 'minmax(0, 1fr) minmax(16rem, 22rem)',
         gap: '1.5rem',
       }}
     >
