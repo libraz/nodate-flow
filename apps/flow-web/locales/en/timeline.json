@@ -137,6 +137,16 @@
       "status": "Status",
       "title": "Title"
     },
+    "auto_action": {
+      "escalate_overdue": "Escalate for overdue",
+      "assign_owner": "Assign owner",
+      "nudge_assignee": "Nudge assignee",
+      "close_stale_review": "Close stale review"
+    },
+    "reasons": {
+      "past_due_date_escalate_to_an_owner": "Past due date — escalate to an owner",
+      "past_due_date_likely_ready_for_review": "Past due date — likely ready for review"
+    },
     "unassigned": "—"
   }
 }

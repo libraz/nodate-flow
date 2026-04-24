@@ -139,15 +139,33 @@ function formatUnixDate(value: unknown, locale: string, unassigned: string): str
   }
 }
 
+/** Map task priority integer (0..4) to the `common:tasks.priority.<name>`
+ * i18n key suffix. Mirrors the priority enum shared across the tasks
+ * feature (see task-spreadsheet-view priority select options). */
+const PRIORITY_NAMES = ['none', 'low', 'medium', 'high', 'urgent'] as const;
+
+function formatPriorityValue(value: unknown, t: TFunction): string {
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n)) return String(value);
+  const idx = Math.trunc(n);
+  const name = PRIORITY_NAMES[idx];
+  if (name === undefined) return String(value);
+  // Priority labels are maintained under the `common` namespace alongside
+  // the task detail/spreadsheet pickers; reuse them rather than duplicating.
+  return t(`tasks.priority.${name}`, { ns: 'common', defaultValue: String(value) });
+}
+
 function formatFieldValue(
   field: string,
   value: unknown,
   locale: string,
   unassigned: string,
+  t: TFunction,
 ): string {
   if (value === null || value === undefined) return unassigned;
   switch (field) {
     case 'priority':
+      return formatPriorityValue(value, t);
     case 'estimate_minutes':
       return String(value);
     case 'due_at':
@@ -185,6 +203,28 @@ function renderRawPayload(payload: unknown): ReactNode {
   );
 }
 
+/** Normalize a free-form reason string into a slug that can be looked up
+ * under `timeline:payload.reasons.<slug>`. Lowercases ASCII letters and
+ * collapses any run of non-alphanumeric characters into a single
+ * underscore so the em-dash, en-dash, or plain hyphen variants all hash
+ * to the same bucket. Reasons outside the catalog fall through to the
+ * raw text rendered by the caller. */
+function reasonSlug(reason: string): string {
+  return reason
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+/** Translate a reason string against the fixed catalog at
+ * `timeline:payload.reasons.*`. Returns the original string if no
+ * catalog entry matches so free-form reasons still render. */
+function translateReason(reason: string, t: TFunction): string {
+  const slug = reasonSlug(reason);
+  if (slug.length === 0) return reason;
+  return t(`payload.reasons.${slug}`, { defaultValue: reason });
+}
+
 /** humanizePayload renders a structured summary for payload shapes the
  * timeline knows about, and otherwise falls back to the raw JSON block.
  *
@@ -209,12 +249,22 @@ function humanizePayload(type: string, payload: unknown, t: TFunction, locale: s
 
   const unassigned = t('payload.unassigned', { defaultValue: '—' });
   const label = fieldLabel(p.field, t);
-  const fromStr = formatFieldValue(p.field, p.from, locale, unassigned);
-  const toStr = formatFieldValue(p.field, p.to, locale, unassigned);
+  const fromStr = formatFieldValue(p.field, p.from, locale, unassigned, t);
+  const toStr = formatFieldValue(p.field, p.to, locale, unassigned, t);
   const reason = typeof p.reason === 'string' && p.reason.length > 0 ? p.reason : null;
   const autoAction =
     typeof p.auto_action === 'string' && p.auto_action.length > 0 ? p.auto_action : null;
   const autoActionLabel = t('payload.auto_action_label', { defaultValue: 'auto action' });
+  // Reason strings flow through translateReason which consults the fixed
+  // catalog at `timeline:payload.reasons.*` and falls back to the raw
+  // text for unknown entries. Auto actions map through
+  // `timeline:payload.auto_action.*` with the same defaultValue fallback
+  // so new enum values degrade to the raw key rather than breaking.
+  const reasonTranslated = reason !== null ? translateReason(reason, t) : null;
+  const autoActionTranslated =
+    autoAction !== null
+      ? t(`payload.auto_action.${autoAction}`, { defaultValue: autoAction })
+      : null;
 
   return (
     <div
@@ -232,10 +282,12 @@ function humanizePayload(type: string, payload: unknown, t: TFunction, locale: s
       <div style={{ color: 'var(--nf-color-fg)' }}>
         {label}: {fromStr} → {toStr}
       </div>
-      {reason !== null ? <div style={{ color: 'var(--nf-color-fg-muted)' }}>{reason}</div> : null}
-      {autoAction !== null ? (
+      {reasonTranslated !== null ? (
+        <div style={{ color: 'var(--nf-color-fg-muted)' }}>{reasonTranslated}</div>
+      ) : null}
+      {autoActionTranslated !== null ? (
         <div style={{ color: 'var(--nf-color-fg-muted)', fontStyle: 'italic' }}>
-          {autoActionLabel}: {autoAction}
+          {autoActionLabel}: {autoActionTranslated}
         </div>
       ) : null}
     </div>

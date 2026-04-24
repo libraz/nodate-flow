@@ -163,6 +163,7 @@
     "zoom_day": "Day",
     "zoom_week": "Week",
     "zoom_month": "Month",
+    "zoom_preset_aria": "Zoom preset",
     "critical_path": "Critical path",
     "critical_path_none": "No critical path found."
   },
@@ -344,6 +345,15 @@
       "update_failed": "Could not update the workspace. Please try again.",
       "disable_failed": "Could not disable the workspace. Please try again.",
       "add_member_failed": "Could not add the member. Please try again."
+    },
+    "setup": {
+      "title": "Create your workspace",
+      "description": "Set up your first workspace to start capturing tasks, events, and pages.",
+      "name_placeholder": "Acme, Personal, Team Nova...",
+      "slug_placeholder": "acme",
+      "slug_hint": "Lowercase letters, numbers, and hyphens only.",
+      "submit": "Create workspace",
+      "submitting": "Creating…"
     }
   },
   "projects": {
@@ -407,7 +417,8 @@
       "email": "Email",
       "user_id": "User ID",
       "role": "Role",
-      "added_at": "Added"
+      "added_at": "Added",
+      "empty": "No members yet."
     },
     "roles": {
       "lead": "Lead",
@@ -496,7 +507,8 @@
       "low": "Low",
       "medium": "Medium",
       "high": "High",
-      "urgent": "Urgent"
+      "urgent": "Urgent",
+      "aria_label": "Priority"
     },
     "filters": {
       "search_placeholder": "Search tasks…",
@@ -804,6 +816,47 @@
     "ai_suggestion": "New AI suggestion available",
     "ai_invocation": "AI analysis completed",
     "resync": "Connection restored — data refreshed"
+  },
+  "invites": {
+    "accept": {
+      "title": "You've been invited",
+      "prompt": "How would you like to respond?",
+      "action_accept": "Accept",
+      "action_tentative": "Tentative",
+      "action_decline": "Decline",
+      "submitting": "Recording your response...",
+      "success_title": "Your RSVP has been recorded",
+      "success_accepted": "You accepted this invite.",
+      "success_tentative": "You marked this invite as tentative.",
+      "success_declined": "You declined this invite.",
+      "invalid_link": "Invalid invite link.",
+      "not_found": "Invite not found or expired.",
+      "error_generic": "Something went wrong. Please try again."
+    },
+    "inbox": {
+      "title": "Pending invites",
+      "count_badge": "{count}",
+      "empty": "No pending invites.",
+      "rsvp_hint": "To RSVP, click the link in the invite email.",
+      "load_error": "Failed to load invites.",
+      "calendar_workspace": "{calendar} · {workspace}",
+      "undated": "Date to be announced",
+      "expired": "Expired",
+      "expires_in_hours": "{count, plural, one {# hour remaining} other {# hours remaining}}",
+      "expires_at": "Expires {date}"
+    }
+  },
+  "share": {
+    "brand": "nodate-flow",
+    "no_upcoming_events": "No events to display.",
+    "event_undated": "Date to be announced",
+    "holidays_country": "Holidays: {country}",
+    "error": {
+      "title_invalid": "This share link is invalid.",
+      "title_expired": "This share link has expired.",
+      "body": "This link may have expired or been removed.",
+      "back": "Back to nodate-flow"
+    }
   },
   "shortcuts": {
     "title": "Keyboard shortcuts",

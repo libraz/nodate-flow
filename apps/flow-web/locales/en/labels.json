@@ -85,6 +85,7 @@
   },
   "feature_toggles": {
     "title": "Features",
+    "coming_soon_subtitle": "Coming soon",
     "description": "Enable or disable features for this project.",
     "pages": "Pages",
     "pages_description": "Enable document pages within this project.",

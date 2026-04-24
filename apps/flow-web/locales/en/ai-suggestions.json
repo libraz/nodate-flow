@@ -105,6 +105,15 @@
       "close_stale_review": "Close review"
     }
   },
+  "transition_label": {
+    "start": "Start",
+    "block": "Block",
+    "unblock": "Unblock",
+    "submit": "Submit",
+    "complete": "Complete",
+    "reopen": "Reopen",
+    "cancel": "Cancel"
+  },
   "confidence": {
     "high": "High",
     "medium": "Medium",

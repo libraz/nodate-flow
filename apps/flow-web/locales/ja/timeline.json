@@ -137,6 +137,16 @@
       "status": "ステータス",
       "title": "タイトル"
     },
+    "auto_action": {
+      "escalate_overdue": "期限超過によるエスカレーション",
+      "assign_owner": "担当者を割当",
+      "nudge_assignee": "担当者にリマインド",
+      "close_stale_review": "停滞したレビューを閉じる"
+    },
+    "reasons": {
+      "past_due_date_escalate_to_an_owner": "期限を過ぎたため担当者にエスカレーションしました",
+      "past_due_date_likely_ready_for_review": "期限を過ぎており、レビュー準備ができている可能性があります"
+    },
     "unassigned": "—"
   }
 }

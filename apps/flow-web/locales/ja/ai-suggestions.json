@@ -105,6 +105,15 @@
       "close_stale_review": "レビューを閉じる"
     }
   },
+  "transition_label": {
+    "start": "開始",
+    "block": "ブロック",
+    "unblock": "ブロック解除",
+    "submit": "レビュー依頼",
+    "complete": "完了",
+    "reopen": "再オープン",
+    "cancel": "キャンセル"
+  },
   "confidence": {
     "high": "確度 高",
     "medium": "確度 中",

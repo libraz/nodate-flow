@@ -85,6 +85,7 @@
   },
   "feature_toggles": {
     "title": "機能",
+    "coming_soon_subtitle": "準備中",
     "description": "このプロジェクトの機能を有効・無効にします。",
     "pages": "ページ",
     "pages_description": "プロジェクト内のドキュメントページを有効にします。",

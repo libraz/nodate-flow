@@ -3,10 +3,21 @@
  *
  * Shows the recomputed derived_state next to the stored value and
  * flags drift. Uses {@link useTaskReplayQuery} under the hood.
+ *
+ * Visual layout:
+ * - Two label-value rows (Replayed / Stored) rendered as a 2-column grid
+ *   with hairline separators. Each value is a {@link Chip} so the two
+ *   states can be compared at a glance even when their labels match.
+ * - When drift is detected, the stored chip switches to a warning tone
+ *   so the row signals disagreement without relying on the label alone.
+ * - A third row surfaces the match / drift summary as a chip with an
+ *   inline glyph ("✓" for match, "⚠" for drift) and stays
+ *   announced via `aria-live="polite"` when it updates.
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
-import type { ReactElement } from 'react';
+import Chip from '@nodate-flow/ui/primitives/chip';
+import type { CSSProperties, ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { TaskDerivedState } from '../tasks/api';
@@ -31,33 +42,109 @@ function useStateLabel(): (raw: string) => string {
   };
 }
 
+/**
+ * Style for a single label/value row. Uses a CSS grid so the two chips
+ * align vertically regardless of label width, and a top hairline so the
+ * rows read as a list.
+ */
+const rowStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(5rem, max-content) 1fr',
+  alignItems: 'center',
+  gap: '0.75rem',
+  paddingBlock: '0.5rem',
+  borderBlockStart: '1px solid var(--nf-color-border)',
+};
+
+const labelStyle: CSSProperties = {
+  margin: 0,
+  fontSize: '0.75rem',
+  fontWeight: 500,
+  color: 'var(--nf-color-fg-muted)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.02em',
+};
+
+const valueStyle: CSSProperties = {
+  margin: 0,
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.375rem',
+};
+
 export default function ReplayPanel({ taskId }: ReplayPanelProps): ReactElement {
   const { t } = useTranslation('constraints');
   const labelFor = useStateLabel();
   const q = useTaskReplayQuery(taskId);
+  const drift = q.data != null && !q.data.equivalent;
 
   return (
-    <section aria-label={t('replay.title')}>
-      <h3>{t('replay.title')}</h3>
-      {q.isLoading ? <p>{t('replay.loading')}</p> : null}
-      {q.error ? <p role="alert">{t('replay.error')}</p> : null}
+    <section
+      aria-label={t('replay.title')}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.75rem',
+        padding: '0.875rem 1rem',
+        borderRadius: '0.5rem',
+        border: '1px solid var(--nf-color-border)',
+        background: 'var(--nf-color-surface)',
+      }}
+    >
+      <header
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.75rem',
+        }}
+      >
+        <h3 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 600 }}>{t('replay.title')}</h3>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => void q.refetch()}
+          disabled={q.isFetching}
+        >
+          {t('replay.refresh')}
+        </Button>
+      </header>
+      {q.isLoading ? (
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{t('replay.loading')}</p>
+      ) : null}
+      {q.error ? (
+        <p role="alert" style={{ margin: 0, color: 'var(--nf-color-danger)' }}>
+          {t('replay.error')}
+        </p>
+      ) : null}
       {q.data ? (
-        <dl>
-          <dt>{t('replay.derived')}</dt>
-          <dd>
-            <code>{labelFor(q.data.derivedState)}</code>
-          </dd>
-          <dt>{t('replay.stored')}</dt>
-          <dd>
-            <code>{labelFor(q.data.stored)}</code>
-          </dd>
-          <dt>{q.data.equivalent ? t('replay.equivalent') : t('replay.drift')}</dt>
-          <dd aria-live="polite">{q.data.equivalent ? '✓' : '⚠'}</dd>
+        <dl style={{ margin: 0, display: 'flex', flexDirection: 'column' }}>
+          <div style={rowStyle}>
+            <dt style={labelStyle}>{t('replay.derived')}</dt>
+            <dd style={valueStyle}>
+              <Chip tone="neutral">{labelFor(q.data.derivedState)}</Chip>
+            </dd>
+          </div>
+          <div style={rowStyle}>
+            <dt style={labelStyle}>{t('replay.stored')}</dt>
+            <dd style={valueStyle}>
+              <Chip tone={drift ? 'warning' : 'neutral'}>{labelFor(q.data.stored)}</Chip>
+            </dd>
+          </div>
+          <div style={rowStyle}>
+            <dt style={labelStyle}>
+              {q.data.equivalent ? t('replay.equivalent') : t('replay.drift')}
+            </dt>
+            <dd style={valueStyle} aria-live="polite">
+              <Chip tone={q.data.equivalent ? 'success' : 'danger'}>
+                <span aria-hidden="true">{q.data.equivalent ? '✓' : '⚠'}</span>
+                <span>{q.data.equivalent ? t('replay.equivalent') : t('replay.drift')}</span>
+              </Chip>
+            </dd>
+          </div>
         </dl>
       ) : null}
-      <Button type="button" onClick={() => void q.refetch()} disabled={q.isFetching}>
-        {t('replay.refresh')}
-      </Button>
     </section>
   );
 }

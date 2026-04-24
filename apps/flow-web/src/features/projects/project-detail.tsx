@@ -9,7 +9,6 @@ import Input from '@nodate-flow/ui/primitives/input';
 import Switch from '@nodate-flow/ui/primitives/switch';
 import Tabs, { type TabItem } from '@nodate-flow/ui/primitives/tabs';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -84,8 +83,9 @@ function SettingsPanel({ id }: { id: string }): ReactElement {
   /* The project object may carry feature flags that the SDK types haven't
      picked up yet — cast to a record for safe access. The backend's
      PatchProjectBody does NOT accept these fields, so the switches are
-     rendered read-only with an explanatory tooltip instead of firing a
-     request the server would silently drop. */
+     rendered read-only. A "coming soon" subtitle on the section header
+     signals the intent instead of firing a request the server would
+     silently drop. */
   const featureFlags = project as unknown as Record<FeatureFlag, boolean | undefined>;
 
   return (
@@ -118,9 +118,14 @@ function SettingsPanel({ id }: { id: string }): ReactElement {
 
       <Card style={{ padding: '1.25rem' }}>
         <section>
-          <h3 className="text-base font-semibold text-[var(--nf-color-fg)]">
-            {tLabels('feature_toggles.title')}
-          </h3>
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <h3 className="text-base font-semibold text-[var(--nf-color-fg)]">
+              {tLabels('feature_toggles.title')}
+            </h3>
+            <small className="text-xs text-[var(--nf-color-fg-muted)]">
+              {tLabels('feature_toggles.coming_soon_subtitle')}
+            </small>
+          </div>
           <p className="text-sm text-[var(--nf-color-fg-muted)] mb-4">
             {tLabels('feature_toggles.description')}
           </p>
@@ -135,15 +140,11 @@ function SettingsPanel({ id }: { id: string }): ReactElement {
                     {tLabels(`feature_toggles.${labelKey}_description`)}
                   </p>
                 </div>
-                <Tooltip content={tLabels('feature_toggles.not_editable')}>
-                  <span>
-                    <Switch
-                      checked={featureFlags[flag] ?? false}
-                      disabled
-                      aria-label={tLabels(`feature_toggles.${labelKey}`)}
-                    />
-                  </span>
-                </Tooltip>
+                <Switch
+                  checked={featureFlags[flag] ?? false}
+                  disabled
+                  aria-label={tLabels(`feature_toggles.${labelKey}`)}
+                />
               </div>
             ))}
           </div>

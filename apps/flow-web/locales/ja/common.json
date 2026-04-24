@@ -163,6 +163,7 @@
     "zoom_day": "日",
     "zoom_week": "週",
     "zoom_month": "月",
+    "zoom_preset_aria": "表示単位",
     "critical_path": "クリティカルパス",
     "critical_path_none": "クリティカルパスが見つかりません。"
   },
@@ -344,6 +345,15 @@
       "update_failed": "ワークスペースを更新できませんでした。もう一度お試しください。",
       "disable_failed": "ワークスペースを無効化できませんでした。もう一度お試しください。",
       "add_member_failed": "メンバーを追加できませんでした。もう一度お試しください。"
+    },
+    "setup": {
+      "title": "ワークスペースを作成",
+      "description": "最初のワークスペースを作成して、タスク・予定・ページの記録を始めましょう。",
+      "name_placeholder": "Acme、Personal、Team Nova など",
+      "slug_placeholder": "acme",
+      "slug_hint": "小文字・数字・ハイフンのみ使用できます。",
+      "submit": "ワークスペースを作成",
+      "submitting": "作成中…"
     }
   },
   "projects": {
@@ -407,7 +417,8 @@
       "email": "メールアドレス",
       "user_id": "ユーザー ID",
       "role": "ロール",
-      "added_at": "追加日"
+      "added_at": "追加日",
+      "empty": "メンバーはまだいません。"
     },
     "roles": {
       "lead": "リード",
@@ -496,7 +507,8 @@
       "low": "低",
       "medium": "中",
       "high": "高",
-      "urgent": "緊急"
+      "urgent": "緊急",
+      "aria_label": "優先度"
     },
     "filters": {
       "search_placeholder": "タスクを検索…",
@@ -804,6 +816,47 @@
     "ai_suggestion": "新しい AI 提案があります",
     "ai_invocation": "AI 分析が完了しました",
     "resync": "接続が復旧しました — データを更新しました"
+  },
+  "invites": {
+    "accept": {
+      "title": "招待が届いています",
+      "prompt": "どのように返信しますか？",
+      "action_accept": "参加",
+      "action_tentative": "仮参加",
+      "action_decline": "不参加",
+      "submitting": "返信を記録しています...",
+      "success_title": "返信を記録しました",
+      "success_accepted": "この招待に「参加」で返信しました。",
+      "success_tentative": "この招待に「仮参加」で返信しました。",
+      "success_declined": "この招待に「不参加」で返信しました。",
+      "invalid_link": "招待リンクが無効です。",
+      "not_found": "招待が見つからないか、有効期限が切れています。",
+      "error_generic": "エラーが発生しました。もう一度お試しください。"
+    },
+    "inbox": {
+      "title": "保留中の招待",
+      "count_badge": "{count}",
+      "empty": "保留中の招待はありません。",
+      "rsvp_hint": "返信は招待メール内のリンクからお願いします。",
+      "load_error": "招待の取得に失敗しました。",
+      "calendar_workspace": "{calendar}・{workspace}",
+      "undated": "日程未定",
+      "expired": "期限切れ",
+      "expires_in_hours": "{count, plural, other {残り # 時間}}",
+      "expires_at": "有効期限: {date}"
+    }
+  },
+  "share": {
+    "brand": "nodate-flow",
+    "no_upcoming_events": "表示できる予定はありません。",
+    "event_undated": "日程未定",
+    "holidays_country": "祝日: {country}",
+    "error": {
+      "title_invalid": "この共有リンクは無効です。",
+      "title_expired": "この共有リンクは有効期限が切れています。",
+      "body": "このリンクは期限切れか削除された可能性があります。",
+      "back": "nodate-flow に戻る"
+    }
   },
   "shortcuts": {
     "title": "キーボードショートカット",

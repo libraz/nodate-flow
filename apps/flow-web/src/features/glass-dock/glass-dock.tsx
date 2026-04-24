@@ -396,7 +396,9 @@ function StateSuggestionsPanel({
                 fontSize: '0.75rem',
               }}
             >
-              <Badge tone="accent">{s.transition}</Badge>
+              <Badge tone="accent">
+                {t(`transition_label.${s.transition}`, { defaultValue: s.transition })}
+              </Badge>
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {s.title}
               </span>

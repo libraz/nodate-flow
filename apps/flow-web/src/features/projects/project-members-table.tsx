@@ -71,6 +71,21 @@ export default function ProjectMembersTable({ projectId }: ProjectMembersTablePr
         aria-label={t('projects.members.title')}
         columns={columns}
         data={members}
+        emptyContent={
+          <span
+            style={{
+              display: 'block',
+              padding: '2rem 1rem',
+              textAlign: 'center',
+              color: 'var(--nf-color-fg-muted)',
+              border: '1px dashed var(--nf-color-border)',
+              borderRadius: '0.5rem',
+              background: 'var(--nf-color-bg-sunken, transparent)',
+            }}
+          >
+            {t('projects.members.empty')}
+          </span>
+        }
         style={{ minBlockSize: '16rem' }}
       />
 
