@@ -560,7 +560,7 @@ func (q *Queries) FindUserByEmailIncludingDisabled(ctx context.Context, email st
 }
 
 const findUserByPublicId = `-- name: FindUserByPublicId :one
-SELECT workspace_id, public_id, email, display_name, avatar_url, locale, timezone, country, theme_preference, workspace_role, last_login_at, updated_at, created_at
+SELECT workspace_id, public_id, email, display_name, avatar_url, locale, timezone, country, week_start, theme_preference, workspace_role, last_login_at, updated_at, created_at
 FROM v_users
 WHERE public_id = ?
 LIMIT 1
@@ -579,6 +579,7 @@ func (q *Queries) FindUserByPublicId(ctx context.Context, publicID types.PublicI
 		&i.Locale,
 		&i.Timezone,
 		&i.Country,
+		&i.WeekStart,
 		&i.ThemePreference,
 		&i.WorkspaceRole,
 		&i.LastLoginAt,
@@ -605,7 +606,7 @@ func (q *Queries) FindUserInternalIdByPublicId(ctx context.Context, publicID typ
 }
 
 const findUserProfileById = `-- name: FindUserProfileById :one
-SELECT public_id, email, display_name, locale, timezone, country, theme_preference, avatar_url,
+SELECT public_id, email, display_name, locale, timezone, country, week_start, theme_preference, avatar_url,
        notif_email_digest_enabled, notif_email_mention_enabled,
        notif_email_assignment_enabled, notif_email_due_soon_enabled,
        notif_web_push_enabled
@@ -622,6 +623,7 @@ type FindUserProfileByIdRow struct {
 	Locale                      string               `json:"locale"`
 	Timezone                    string               `json:"timezone"`
 	Country                     sql.NullString       `json:"country"`
+	WeekStart                   UsersWeekStart       `json:"weekStart"`
 	ThemePreference             UsersThemePreference `json:"themePreference"`
 	AvatarUrl                   sql.NullString       `json:"avatarUrl"`
 	NotifEmailDigestEnabled     bool                 `json:"notifEmailDigestEnabled"`
@@ -642,6 +644,7 @@ func (q *Queries) FindUserProfileById(ctx context.Context, id uint32) (FindUserP
 		&i.Locale,
 		&i.Timezone,
 		&i.Country,
+		&i.WeekStart,
 		&i.ThemePreference,
 		&i.AvatarUrl,
 		&i.NotifEmailDigestEnabled,
@@ -675,6 +678,7 @@ SET display_name                   = COALESCE(?, display_name),
     locale                         = COALESCE(?, locale),
     timezone                       = COALESCE(?, timezone),
     country                        = COALESCE(?, country),
+    week_start                     = COALESCE(?, week_start),
     theme_preference               = COALESCE(?, theme_preference),
     avatar_url                     = COALESCE(?, avatar_url),
     notif_email_digest_enabled     = COALESCE(?, notif_email_digest_enabled),
@@ -691,6 +695,7 @@ type PatchMeParams struct {
 	Locale                      sql.NullString           `json:"locale"`
 	Timezone                    sql.NullString           `json:"timezone"`
 	Country                     sql.NullString           `json:"country"`
+	WeekStart                   NullUsersWeekStart       `json:"weekStart"`
 	ThemePreference             NullUsersThemePreference `json:"themePreference"`
 	AvatarUrl                   sql.NullString           `json:"avatarUrl"`
 	NotifEmailDigestEnabled     sql.NullBool             `json:"notifEmailDigestEnabled"`
@@ -708,6 +713,7 @@ func (q *Queries) PatchMe(ctx context.Context, arg PatchMeParams) error {
 		arg.Locale,
 		arg.Timezone,
 		arg.Country,
+		arg.WeekStart,
 		arg.ThemePreference,
 		arg.AvatarUrl,
 		arg.NotifEmailDigestEnabled,

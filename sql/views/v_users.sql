@@ -11,6 +11,7 @@ SELECT
   u.locale,
   u.timezone,
   u.country,
+  u.week_start,
   u.theme_preference,
   wm.role AS workspace_role,
   u.last_login_at,

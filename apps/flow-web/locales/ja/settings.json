@@ -116,6 +116,13 @@
     "country": "国",
     "country_help": "カレンダーに表示する祝日の国を指定します。未設定の場合は祝日を表示しません。",
     "country_unset": "（未設定）",
+    "week_start": {
+      "label": "週の初めの曜日",
+      "help": "カレンダーの曜日順に反映されます",
+      "mon": "月曜",
+      "sun": "日曜",
+      "sat": "土曜"
+    },
     "theme": "テーマ",
     "theme_glass": "グラス",
     "theme_aurora": "オーロラ",

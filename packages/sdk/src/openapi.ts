@@ -5252,6 +5252,8 @@ export interface components {
             /** @enum {string} */
             themePreference: "aurora-light" | "aurora-dark" | "dotline-light" | "dotline-dark" | "glass-light" | "glass-dark" | "system";
             timezone: string;
+            /** @enum {string} */
+            weekStart: "mon" | "sun" | "sat";
         };
         ModelSummary: {
             displayName: string;
@@ -5450,6 +5452,8 @@ export interface components {
             /** @enum {string} */
             themePreference?: "aurora-light" | "aurora-dark" | "dotline-light" | "dotline-dark" | "glass-light" | "glass-dark" | "system";
             timezone?: string;
+            /** @enum {string} */
+            weekStart?: "mon" | "sun" | "sat";
         };
         PatchProjectBody: {
             /**

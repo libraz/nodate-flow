@@ -237,7 +237,10 @@ type MeBody struct {
 	Timezone string `json:"timezone"`
 	// Country is the user-level ISO 3166-1 alpha-2 country, or empty
 	// string when unset.
-	Country         string  `json:"country"`
+	Country string `json:"country"`
+	// WeekStart is the user's preferred first day of the week for calendar grids.
+	// One of "mon" (default), "sun", "sat".
+	WeekStart       string  `json:"weekStart" enum:"mon,sun,sat"`
 	ThemePreference string  `json:"themePreference" enum:"aurora-light,aurora-dark,dotline-light,dotline-dark,glass-light,glass-dark,system"`
 	AvatarURL       *string `json:"avatarUrl,omitempty"`
 
@@ -272,7 +275,10 @@ type PatchMeInputBody struct {
 	// invalid values return AUTH.VALIDATION.
 	Timezone *string `json:"timezone,omitempty" maxLength:"64"`
 	// Country is an optional ISO 3166-1 alpha-2 code. Empty string clears it.
-	Country         *string `json:"country,omitempty" pattern:"^$|^[A-Z]{2}$"`
+	Country *string `json:"country,omitempty" pattern:"^$|^[A-Z]{2}$"`
+	// WeekStart is the user's preferred first day of the week for calendar grids.
+	// One of "mon", "sun", "sat".
+	WeekStart       *string `json:"weekStart,omitempty" enum:"mon,sun,sat"`
 	ThemePreference *string `json:"themePreference,omitempty" enum:"aurora-light,aurora-dark,dotline-light,dotline-dark,glass-light,glass-dark,system"`
 	AvatarURL       *string `json:"avatarUrl,omitempty" maxLength:"1024"`
 

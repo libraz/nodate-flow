@@ -52,6 +52,8 @@ export const profileSchema = z.object({
     'glass-dark',
     'system',
   ]),
+  // Mirrors the `MeBody.weekStart` enum from the auth-api OpenAPI spec.
+  weekStart: z.enum(['mon', 'sun', 'sat']),
 });
 
 export type ProfileFormValues = z.infer<typeof profileSchema>;

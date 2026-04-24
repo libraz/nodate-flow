@@ -37,10 +37,17 @@ import { z } from 'zod';
 
 import { type SupportedLanguage, setLanguage } from '../../i18n';
 import { useTheme } from '../../providers/theme-provider';
-import { type PatchMeInput, useMeQuery, useUpdateMe } from './api';
+import { type Me, type PatchMeInput, useMeQuery, useUpdateMe } from './api';
 import AvatarUpload from './avatar-upload';
 
 const LOCALES: readonly SupportedLanguage[] = ['en', 'ja'] as const;
+
+/**
+ * Allowed `weekStart` values, mirrored from the SDK `MeBody.weekStart` enum.
+ * The form accepts these three plus the empty string (untouched / not yet
+ * loaded), and the empty case is filtered out before PATCH.
+ */
+type WeekStart = NonNullable<Me['weekStart']>;
 
 // Sensible default country per UI language. Used to gently cascade the
 // country field when the user switches language and the country is empty.
@@ -59,9 +66,22 @@ const profileSchema = z.object({
     .string()
     .regex(/^([A-Z]{2})?$/, 'profile.validation.country_invalid')
     .or(z.literal('')),
+  // Mirrors `MeBody.weekStart`. Asserted via the `WeekStart` alias above so a
+  // future SDK enum widening surfaces here as a type error.
+  weekStart: z.enum(['mon', 'sun', 'sat']),
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
+
+// Compile-time assertion: keep the form's `weekStart` enum aligned with the
+// SDK `MeBody.weekStart` enum. If the OpenAPI source widens or narrows the
+// union, this line fails first.
+const WeekStartCheck: ProfileFormValues['weekStart'] extends WeekStart
+  ? WeekStart extends ProfileFormValues['weekStart']
+    ? true
+    : false
+  : false = true;
+void WeekStartCheck;
 
 /**
  * Convert a 2-letter ISO 3166-1 alpha-2 country code into its regional
@@ -128,6 +148,12 @@ export default function ProfileForm(): ReactElement {
     { value: 'ja', label: '日本語' },
   ];
 
+  const weekStartOptions: SegmentedControlOption<WeekStart>[] = [
+    { value: 'mon', label: t('profile.week_start.mon') },
+    { value: 'sun', label: t('profile.week_start.sun') },
+    { value: 'sat', label: t('profile.week_start.sat') },
+  ];
+
   const {
     register,
     control,
@@ -142,6 +168,7 @@ export default function ProfileForm(): ReactElement {
       locale: (me.locale as ProfileFormValues['locale']) ?? 'en',
       timezone: me.timezone || detectTimezone(),
       country: me.country ?? '',
+      weekStart: (me.weekStart as WeekStart) ?? (me.locale === 'ja' ? 'mon' : 'sun'),
     },
   });
 
@@ -162,6 +189,17 @@ export default function ProfileForm(): ReactElement {
     if (getValues('timezone') === 'UTC') {
       const nextTz = next === 'ja' ? 'Asia/Tokyo' : detectTimezone();
       setValue('timezone', nextTz, { shouldDirty: true, shouldValidate: true });
+    }
+    // Cascade the week-start preference only when the user has not made an
+    // explicit pick. We treat the server's persisted value as "explicit" so
+    // round-tripping `me` data does not silently override their choice.
+    const currentWeekStart = getValues('weekStart');
+    const persistedWeekStart = me.weekStart as WeekStart | undefined;
+    if (!currentWeekStart || currentWeekStart === persistedWeekStart) {
+      const nextWeekStart: WeekStart = next === 'ja' ? 'mon' : 'sun';
+      if (currentWeekStart !== nextWeekStart) {
+        setValue('weekStart', nextWeekStart, { shouldDirty: true, shouldValidate: true });
+      }
     }
   };
 
@@ -207,6 +245,7 @@ export default function ProfileForm(): ReactElement {
       locale: values.locale,
       timezone: values.timezone,
       country: values.country,
+      weekStart: values.weekStart,
     };
     try {
       await update.mutateAsync(patch);
@@ -254,6 +293,24 @@ export default function ProfileForm(): ReactElement {
                   onChange={handleLocaleChange}
                   options={localeOptions}
                   ariaLabel={t('profile.locale')}
+                />
+              )}
+            />
+          )}
+        </FormField>
+
+        <FormField label={t('profile.week_start.label')} description={t('profile.week_start.help')}>
+          {() => (
+            <Controller
+              name="weekStart"
+              control={control}
+              render={({ field }) => (
+                <SegmentedControl<WeekStart>
+                  fullWidth
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={weekStartOptions}
+                  ariaLabel={t('profile.week_start.label')}
                 />
               )}
             />

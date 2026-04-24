@@ -41,6 +41,18 @@ func PatchMe(deps Deps) func(context.Context, *PatchMeInput) (*PatchMeOutput, er
 			// Empty string clears the column; NULL in DB.
 			params.Country = sql.NullString{String: *in.Body.Country, Valid: *in.Body.Country != ""}
 		}
+		if in.Body.WeekStart != nil {
+			switch *in.Body.WeekStart {
+			case "mon", "sun", "sat":
+				// ok
+			default:
+				return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+			}
+			params.WeekStart = generated.NullUsersWeekStart{
+				UsersWeekStart: generated.UsersWeekStart(*in.Body.WeekStart),
+				Valid:          true,
+			}
+		}
 		if in.Body.ThemePreference != nil {
 			params.ThemePreference = generated.NullUsersThemePreference{
 				UsersThemePreference: generated.UsersThemePreference(*in.Body.ThemePreference),

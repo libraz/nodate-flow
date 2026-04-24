@@ -13,10 +13,18 @@
  * the same dialog in edit mode for that row; clicking a task pill
  * navigates to the task detail route (editing a task is out of scope
  * for the calendar dialog).
+ *
+ * The grid honours the user's `me.weekStart` preference — Monday,
+ * Sunday, or Saturday — for both the header order and the leading
+ * blank cells. Weekend tints follow the actual weekday key at each
+ * column index, so a Sunday-first or Saturday-first grid still paints
+ * Sun-red / Sat-blue in the right place.
  */
 
 import type { components } from '@nodate-flow/sdk';
 import type { components as timeComponents } from '@nodate-flow/time-sdk';
+import { cx } from '@nodate-flow/ui/lib/cx';
+import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { ToggleChip, ToggleChipGroup } from '@nodate-flow/ui/primitives/toggle-chip';
@@ -26,6 +34,8 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { type DragEvent, type ReactElement, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { type HolidayEntry, getOrCreateProvider } from '@nodate-flow/holidays';
+
 import EventDialog, {
   type EventDialogMode,
   type ItemKind,
@@ -33,6 +43,7 @@ import EventDialog, {
 import PendingInvitesPanel from '../features/calendar-invites/pending-invites-panel';
 import calendarLayoutStyles from '../features/calendar-invites/pending-invites-panel.module.css';
 import type { Project } from '../features/projects/api';
+import { useMeQuery } from '../features/settings/api';
 import type { TaskDerivedState } from '../features/tasks/api';
 import { STATE_COLOR } from '../features/tasks/constants';
 import { useWorkspacesQuery } from '../features/workspaces/api';
@@ -40,6 +51,7 @@ import { type ApiError, toApiError } from '../lib/api-error';
 import { dateKey } from '../lib/date-utils';
 import { sdk, timeSdk } from '../lib/sdk';
 import { useActiveWorkspaceId } from '../lib/use-current-workspace';
+import styles from './_authenticated.calendar.module.css';
 
 /**
  * Error code emitted by the backend when a PATCH /tasks request would
@@ -50,17 +62,61 @@ const DUE_BEFORE_START_CODE = 'VALIDATION.BODY.DUE_BEFORE_START';
 
 type CalendarTask = components['schemas']['MyTaskListItem'];
 type CalendarEvent = timeComponents['schemas']['MyCalendarEventResponse'];
+type WeekStart = 'mon' | 'sun' | 'sat';
+type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 
-const WEEKDAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
+/**
+ * Weekday-key order indexed by the user's `weekStart` preference. The
+ * column at index 0 is whichever day the user marked as the start of
+ * their week; indexes 1..6 follow in calendar order.
+ */
+const WEEKDAY_KEYS_BY_START: Record<WeekStart, readonly Weekday[]> = {
+  mon: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'],
+  sun: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'],
+  sat: ['sat', 'sun', 'mon', 'tue', 'wed', 'thu', 'fri'],
+};
+
+/** JS `Date.getDay()` value (Sun=0..Sat=6) for the weekStart anchor. */
+const WEEKSTART_TO_DOW: Record<WeekStart, number> = { sun: 0, mon: 1, sat: 6 };
+
+/**
+ * Day of week as 0..6 with the user's chosen start day as 0.
+ * E.g. when `weekStart === 'sun'`, Sunday → 0, Monday → 1, …, Saturday → 6.
+ */
+function dowFromStart(date: Date, weekStart: WeekStart): number {
+  const anchor = WEEKSTART_TO_DOW[weekStart];
+  return (date.getDay() - anchor + 7) % 7;
+}
+
+/**
+ * Optional CSS class for the weekday header at column `index`. Looks at
+ * the actual weekday key (sun → danger, sat → info), so the tint moves
+ * with the user's start-of-week preference.
+ */
+function weekdayHeaderClass(keys: readonly Weekday[], index: number): string | undefined {
+  const key = keys[index];
+  if (key === 'sun') return styles['weekday--sun'];
+  if (key === 'sat') return styles['weekday--sat'];
+  return undefined;
+}
+
+/**
+ * Date-number CSS class for a calendar cell. Holidays take precedence
+ * over the Saturday "info" tint so a Saturday-holiday reads as red,
+ * matching the inline holiday label. Sundays and weekday-holidays
+ * both resolve to danger; weekdays return `undefined` (caller keeps
+ * default colour from `.dateNumber`).
+ */
+function dateNumberClass(date: Date, hasHoliday: boolean): string | undefined {
+  const dow = date.getDay();
+  if (dow === 0 || hasHoliday) return styles['dateNumber--holiday'];
+  if (dow === 6) return styles['dateNumber--sat'];
+  return undefined;
+}
 
 /** Number of days in a given (year, monthIndex). */
 function daysInMonth(year: number, monthIndex: number): number {
   return new Date(year, monthIndex + 1, 0).getDate();
-}
-
-/** 0..6 with Monday = 0. */
-function mondayBasedDow(d: Date): number {
-  return (d.getDay() + 6) % 7;
 }
 
 interface MonthCell {
@@ -69,9 +125,14 @@ interface MonthCell {
   inMonth: boolean;
 }
 
-function buildMonthGrid(year: number, monthIndex: number): MonthCell[] {
+/**
+ * Build a 6×7 month grid whose first column matches the user's
+ * `weekStart`. Leading and trailing cells from adjacent months pad the
+ * grid to a multiple of 7.
+ */
+function buildMonthGrid(year: number, monthIndex: number, weekStart: WeekStart): MonthCell[] {
   const first = new Date(year, monthIndex, 1);
-  const lead = mondayBasedDow(first);
+  const lead = dowFromStart(first, weekStart);
   const cells: MonthCell[] = [];
   for (let i = lead; i > 0; i--) {
     const d = new Date(year, monthIndex, 1 - i);
@@ -152,6 +213,7 @@ interface LayerFlags {
   blocks: boolean;
   free: boolean;
   milestone: boolean;
+  holidays: boolean;
 }
 
 /**
@@ -184,14 +246,30 @@ function CalendarRoute(): ReactElement {
     blocks: false,
     free: false,
     milestone: true,
+    holidays: true,
   });
 
   const { data: workspaces } = useWorkspacesQuery();
   const activeWsId = useActiveWorkspaceId();
+  const { data: me } = useMeQuery();
+  const country = me.country;
+  // `weekStart` may be undefined when the running auth-api binary predates
+  // the column rollout; fall back to the schema default so the grid keeps
+  // rendering against an older backend until the binary is restarted.
+  const weekStart: WeekStart = me.weekStart ?? 'mon';
+  const weekdayKeys = WEEKDAY_KEYS_BY_START[weekStart];
+
+  // Memoize provider by country code so identity is stable until country
+  // changes. Returns `null` when the user has not picked a country —
+  // holidays are opt-in via the profile setting.
+  const holidayProvider = useMemo(() => {
+    if (!country) return null;
+    return getOrCreateProvider(country);
+  }, [country]);
 
   // Range that covers the full 42-cell month grid (may span adjacent months).
-  const { fromDate, toDate, fromIso, toIso } = useMemo(() => {
-    const cells = buildMonthGrid(cursor.year, cursor.month);
+  const { fromDate, toDate, fromIso, toIso, rangeStart, rangeEnd } = useMemo(() => {
+    const cells = buildMonthGrid(cursor.year, cursor.month, weekStart);
     const first = cells[0]?.date ?? new Date(cursor.year, cursor.month, 1);
     const last = cells[cells.length - 1]?.date ?? new Date(cursor.year, cursor.month, 1);
     const start = new Date(first);
@@ -203,8 +281,10 @@ function CalendarRoute(): ReactElement {
       toDate: dateKey(last),
       fromIso: start.toISOString(),
       toIso: end.toISOString(),
+      rangeStart: start,
+      rangeEnd: end,
     };
-  }, [cursor]);
+  }, [cursor, weekStart]);
 
   // Single cross-workspace task query (flow-api /me/tasks-with-dates).
   const tasksQuery = useQuery({
@@ -343,7 +423,10 @@ function CalendarRoute(): ReactElement {
     void qc.invalidateQueries({ queryKey: ['calendar', 'me-events'] });
   }, [qc]);
 
-  const cells = useMemo(() => buildMonthGrid(cursor.year, cursor.month), [cursor]);
+  const cells = useMemo(
+    () => buildMonthGrid(cursor.year, cursor.month, weekStart),
+    [cursor, weekStart],
+  );
 
   /** dueOn → tasks for the current grid (after layer filtering). */
   const byDate = useMemo(() => {
@@ -385,6 +468,22 @@ function CalendarRoute(): ReactElement {
     return map;
   }, [events, layers.events, layers.blocks, layers.free, layers.milestone]);
 
+  /**
+   * dateKey → public holidays for the visible grid range. Empty when the
+   * user has no country set or when the holidays layer is disabled.
+   */
+  const holidaysByDate = useMemo(() => {
+    const map = new Map<string, HolidayEntry[]>();
+    if (!holidayProvider || !layers.holidays) return map;
+    const entries = holidayProvider.holidaysBetween(rangeStart, rangeEnd, i18n.language);
+    for (const entry of entries) {
+      const arr = map.get(entry.date);
+      if (arr) arr.push(entry);
+      else map.set(entry.date, [entry]);
+    }
+    return map;
+  }, [holidayProvider, rangeStart, rangeEnd, i18n.language, layers.holidays]);
+
   const todayKey = dateKey(today);
   const monthLabel = useMemo(
     () =>
@@ -411,40 +510,14 @@ function CalendarRoute(): ReactElement {
   };
 
   return (
-    <section
-      style={{
-        padding: 'clamp(1.5rem, 4vw, 2.5rem)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '1.5rem',
-        maxInlineSize: '78rem',
-        marginInline: 'auto',
-        inlineSize: '100%',
-      }}
-    >
-      <header style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <h1
-          style={{
-            margin: 0,
-            fontFamily: 'var(--font-display)',
-            fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
-          }}
-        >
-          {t('calendar.title')}
-        </h1>
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{t('calendar.subtitle')}</p>
+    <section className={styles.section}>
+      <header className={styles.header}>
+        <h1 className={styles.title}>{t('calendar.title')}</h1>
+        <p className={styles.subtitle}>{t('calendar.subtitle')}</p>
       </header>
 
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '0.75rem',
-          flexWrap: 'wrap',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <div className={styles.toolbar}>
+        <div className={styles.monthNav}>
           <Button
             type="button"
             variant="ghost"
@@ -454,7 +527,7 @@ function CalendarRoute(): ReactElement {
           >
             <ChevronLeft size={16} aria-hidden />
           </Button>
-          <h2 style={{ margin: 0, fontSize: '1.125rem', minInlineSize: '10rem' }}>{monthLabel}</h2>
+          <h2 className={styles.monthLabel}>{monthLabel}</h2>
           <Button
             type="button"
             variant="ghost"
@@ -505,47 +578,42 @@ function CalendarRoute(): ReactElement {
           >
             {t('calendar.layer.milestone')}
           </ToggleChip>
+          {country ? (
+            <ToggleChip
+              pressed={layers.holidays}
+              onPressedChange={(v) => setLayers((s) => ({ ...s, holidays: v }))}
+              color="var(--nf-color-danger)"
+            >
+              {t('calendar.layer.holidays')}
+            </ToggleChip>
+          ) : null}
         </ToggleChipGroup>
       </div>
 
       <div className={calendarLayoutStyles.layout}>
-        <div style={{ display: 'flex', flexDirection: 'column', minInlineSize: 0 }}>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
-              gap: '0.25rem',
-              marginBlockEnd: '0.25rem',
-            }}
-          >
-            {WEEKDAY_KEYS.map((wk) => (
-              <div
-                key={wk}
-                style={{
-                  fontSize: '0.75rem',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  color: 'var(--nf-color-fg-muted)',
-                  paddingInline: '0.5rem',
-                }}
-              >
+        <div className={styles.gridColumn}>
+          <div className={styles.weekdayRow}>
+            {weekdayKeys.map((wk, idx) => (
+              <div key={wk} className={cx(styles.weekday, weekdayHeaderClass(weekdayKeys, idx))}>
                 {t(`calendar.weekday.${wk}`)}
               </div>
             ))}
           </div>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
-              gap: '0.25rem',
-            }}
-          >
+          <div className={styles.grid}>
             {cells.map((cell) => {
               const dayTasks = byDate.get(cell.key) ?? [];
               const dayEvents = eventsByDate.get(cell.key) ?? [];
+              const dayHolidays = holidaysByDate.get(cell.key) ?? [];
               const totalCount = dayTasks.length + dayEvents.length;
               const isToday = cell.key === todayKey;
               const isDragOver = dragOverKey === cell.key;
+              // Render only the first holiday label on the cell (rare
+              // multi-holiday days append "+N" — full list lives in the
+              // `title` so it stays accessible on hover).
+              const primaryHoliday = dayHolidays[0] ?? null;
+              const extraHolidayCount = Math.max(0, dayHolidays.length - 1);
+              const holidayTitle = dayHolidays.map((h) => h.name).join(', ');
+              const dateNumberCls = dateNumberClass(cell.date, dayHolidays.length > 0);
               return (
                 <div
                   key={cell.key}
@@ -571,55 +639,36 @@ function CalendarRoute(): ReactElement {
                   }}
                   role={cell.inMonth ? 'button' : undefined}
                   tabIndex={cell.inMonth ? 0 : undefined}
-                  style={{
-                    minBlockSize: '7rem',
-                    padding: '0.5rem',
-                    borderRadius: '0.5rem',
-                    background: isDragOver
-                      ? 'var(--nf-color-accent-subtle)'
-                      : cell.inMonth
-                        ? 'var(--nf-color-surface)'
-                        : 'transparent',
-                    border: isDragOver
-                      ? '2px dashed var(--nf-color-accent)'
-                      : isToday
-                        ? '1px solid var(--nf-color-accent)'
-                        : '1px solid transparent',
-                    opacity: cell.inMonth ? 1 : 0.4,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.25rem',
-                    overflow: 'hidden',
-                    cursor: cell.inMonth ? 'pointer' : 'default',
-                    transition: 'background 0.15s, border 0.15s',
-                  }}
+                  className={cx(
+                    styles.cell,
+                    cell.inMonth && styles['cell--inMonth'],
+                    isToday && styles['cell--today'],
+                    isDragOver && styles['cell--dragOver'],
+                  )}
                   title={cell.inMonth ? t('calendar.click_to_add') : undefined}
                 >
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      fontSize: '0.75rem',
-                      fontVariantNumeric: 'tabular-nums',
-                      color: isToday ? 'var(--nf-color-accent)' : 'var(--nf-color-fg-muted)',
-                      fontWeight: isToday ? 600 : 400,
-                    }}
-                  >
-                    <span>{cell.date.getDate()}</span>
-                    {totalCount > 0 ? <span>{totalCount}</span> : null}
+                  <div className={styles.cellHeader}>
+                    <span
+                      className={cx(styles.dateNumber, dateNumberCls, isToday && styles.todayPill)}
+                    >
+                      {cell.date.getDate()}
+                    </span>
+                    {primaryHoliday ? (
+                      <span className={styles.holidayLabel} title={holidayTitle}>
+                        {extraHolidayCount > 0
+                          ? t('calendar.holiday_more', {
+                              name: primaryHoliday.name,
+                              count: extraHolidayCount,
+                            })
+                          : primaryHoliday.name}
+                      </span>
+                    ) : totalCount > 0 ? (
+                      <Badge tone="neutral" className={styles.countBadge}>
+                        {totalCount}
+                      </Badge>
+                    ) : null}
                   </div>
-                  <ul
-                    style={{
-                      listStyle: 'none',
-                      margin: 0,
-                      padding: 0,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.125rem',
-                      overflow: 'hidden',
-                    }}
-                  >
+                  <ul className={styles.pillList}>
                     {dayTasks.slice(0, 3).map((task) => (
                       <li key={task.id}>
                         <Link
@@ -631,57 +680,26 @@ function CalendarRoute(): ReactElement {
                             e.dataTransfer.effectAllowed = 'move';
                             handleDragStart(task.id, cell.key);
                           }}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.25rem',
-                            fontSize: '0.75rem',
-                            color: 'inherit',
-                            textDecoration: 'none',
-                            padding: '0.125rem 0.25rem',
-                            borderRadius: '0.25rem',
-                            background: 'var(--nf-color-bg)',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            cursor: 'grab',
-                          }}
+                          className={styles.taskPill}
                           onClick={(e) => {
                             e.stopPropagation();
                           }}
                         >
                           <span
                             aria-hidden
+                            className={styles.taskPill__dot}
                             style={{
-                              inlineSize: '0.5rem',
-                              blockSize: '0.5rem',
-                              borderRadius: '999px',
                               background:
                                 STATE_COLOR[task.derivedState as TaskDerivedState] ??
                                 'var(--nf-color-fg-muted)',
-                              flexShrink: 0,
                             }}
                           />
-                          <span
-                            style={{
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {task.title}
-                          </span>
+                          <span className={styles.taskPill__title}>{task.title}</span>
                         </Link>
                       </li>
                     ))}
                     {dayTasks.length > 3 ? (
-                      <li
-                        style={{
-                          fontSize: '0.6875rem',
-                          color: 'var(--nf-color-fg-muted)',
-                          paddingInline: '0.25rem',
-                        }}
-                      >
+                      <li className={styles.morePill}>
                         {t('calendar.more', { count: dayTasks.length - 3 })}
                       </li>
                     ) : null}
@@ -700,54 +718,21 @@ function CalendarRoute(): ReactElement {
                               e.stopPropagation();
                               setEditTarget({ mode: 'edit', event: ev });
                             }}
-                            style={{
-                              all: 'unset',
-                              boxSizing: 'border-box',
-                              inlineSize: '100%',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.25rem',
-                              fontSize: '0.75rem',
-                              padding: '0.125rem 0.25rem',
-                              borderRadius: '0.25rem',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              cursor: 'pointer',
-                              ...pill,
-                            }}
+                            className={styles.eventPill}
+                            style={pill}
                           >
                             <span
                               aria-hidden
-                              style={{
-                                inlineSize: '0.5rem',
-                                blockSize: '0.5rem',
-                                transform: 'rotate(45deg)',
-                                background: pill.markerColor,
-                                flexShrink: 0,
-                              }}
+                              className={styles.eventPill__marker}
+                              style={{ background: pill.markerColor }}
                             />
-                            <span
-                              style={{
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              {ev.title}
-                            </span>
+                            <span className={styles.eventPill__title}>{ev.title}</span>
                           </button>
                         </li>
                       );
                     })}
                     {dayEvents.length > 2 ? (
-                      <li
-                        style={{
-                          fontSize: '0.6875rem',
-                          color: 'var(--nf-color-fg-muted)',
-                          paddingInline: '0.25rem',
-                        }}
-                      >
+                      <li className={styles.morePill}>
                         {t('calendar.more', { count: dayEvents.length - 2 })}
                       </li>
                     ) : null}

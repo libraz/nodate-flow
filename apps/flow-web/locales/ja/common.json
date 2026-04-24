@@ -182,8 +182,10 @@
       "events": "予定",
       "blocks": "ブロック",
       "free": "空き",
-      "milestone": "マイルストーン"
+      "milestone": "マイルストーン",
+      "holidays": "祝日"
     },
+    "holiday_more": "{name} 他{count}件",
     "weekday": {
       "mon": "月",
       "tue": "火",

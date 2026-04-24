@@ -116,6 +116,13 @@
     "country": "Country",
     "country_help": "Used to show the right public holidays on your calendar. Leave unset for none.",
     "country_unset": "(none)",
+    "week_start": {
+      "label": "First day of the week",
+      "help": "Used by the calendar grid",
+      "mon": "Monday",
+      "sun": "Sunday",
+      "sat": "Saturday"
+    },
     "theme": "Theme",
     "theme_glass": "Glass",
     "theme_aurora": "Aurora",

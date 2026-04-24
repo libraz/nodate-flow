@@ -1727,6 +1727,49 @@ func (ns NullUsersThemePreference) Value() (driver.Value, error) {
 	return string(ns.UsersThemePreference), nil
 }
 
+type UsersWeekStart string
+
+const (
+	UsersWeekStartMon UsersWeekStart = "mon"
+	UsersWeekStartSun UsersWeekStart = "sun"
+	UsersWeekStartSat UsersWeekStart = "sat"
+)
+
+func (e *UsersWeekStart) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = UsersWeekStart(s)
+	case string:
+		*e = UsersWeekStart(s)
+	default:
+		return fmt.Errorf("unsupported scan type for UsersWeekStart: %T", src)
+	}
+	return nil
+}
+
+type NullUsersWeekStart struct {
+	UsersWeekStart UsersWeekStart `json:"usersWeekStart"`
+	Valid          bool           `json:"valid"` // Valid is true if UsersWeekStart is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullUsersWeekStart) Scan(value interface{}) error {
+	if value == nil {
+		ns.UsersWeekStart, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.UsersWeekStart.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullUsersWeekStart) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.UsersWeekStart), nil
+}
+
 type WebhookDeliveriesStatus string
 
 const (
@@ -3620,6 +3663,8 @@ type User struct {
 	Timezone string `json:"timezone"`
 	// ISO 3166-1 alpha-2 country (independent of locale); drives default holiday subscription
 	Country sql.NullString `json:"country"`
+	// Preferred first day of the week for calendar grids
+	WeekStart UsersWeekStart `json:"weekStart"`
 	// User override of workspace working_days; NULL = inherit
 	WorkingDays sql.NullString `json:"workingDays"`
 	// User override of workspace working_hours_start; NULL = inherit
@@ -3988,6 +4033,7 @@ type VUser struct {
 	Locale          string               `json:"locale"`
 	Timezone        string               `json:"timezone"`
 	Country         sql.NullString       `json:"country"`
+	WeekStart       UsersWeekStart       `json:"weekStart"`
 	ThemePreference UsersThemePreference `json:"themePreference"`
 	WorkspaceRole   WorkspaceMembersRole `json:"workspaceRole"`
 	LastLoginAt     sql.NullTime         `json:"lastLoginAt"`

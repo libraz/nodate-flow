@@ -1,0 +1,254 @@
+/**
+ * /calendar — month grid layout, weekday header, and per-cell decoration.
+ *
+ * All visual values resolve from design tokens (`--nf-color-*`,
+ * `--nf-space-*`, `--nf-radius-*`, `--nf-shadow-*`, `--nf-text-*`,
+ * `--nf-cal-*`). Avoid hardcoded colors here so the four-theme
+ * switcher keeps working.
+ */
+
+.section {
+  padding: clamp(1.5rem, 4vw, 2.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-6);
+  max-inline-size: min(120rem, 100%);
+  margin-inline: auto;
+  inline-size: 100%;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nf-space-3);
+  flex-wrap: wrap;
+}
+
+.monthNav {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+}
+
+.monthLabel {
+  margin: 0;
+  font-size: var(--nf-text-lg);
+  min-inline-size: 10rem;
+}
+
+.gridColumn {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+
+.weekdayRow {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--nf-space-1);
+  margin-block-end: var(--nf-space-1);
+}
+
+.weekday {
+  font-size: var(--nf-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--nf-color-fg-muted);
+  padding-inline: var(--nf-space-2);
+}
+
+.weekday--sun {
+  color: var(--nf-color-danger);
+}
+
+.weekday--sat {
+  color: var(--nf-color-info);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--nf-space-1);
+}
+
+.cell {
+  min-block-size: clamp(7rem, 14vh, 11rem);
+  padding: var(--nf-space-2);
+  border-radius: var(--nf-radius-md);
+  background: transparent;
+  border: 1px solid transparent;
+  opacity: 0.4;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  overflow: hidden;
+  cursor: default;
+  transition: background var(--nf-duration-fast), border-color var(--nf-duration-fast),
+    outline-color var(--nf-duration-fast);
+}
+
+.cell--inMonth {
+  background: var(--nf-color-surface);
+  border-color: var(--nf-color-border);
+  opacity: 1;
+  cursor: pointer;
+}
+
+.cell--inMonth:hover {
+  outline: 1px solid var(--nf-color-border);
+  outline-offset: -1px;
+}
+
+.cell--today {
+  /* Today highlight is carried by the date pill (see .todayPill). The
+     cell border stays neutral so the row stays calm. */
+}
+
+.cell--dragOver {
+  background: var(--nf-color-accent-subtle);
+  border: 2px dashed var(--nf-color-accent);
+}
+
+.cellHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--nf-space-2);
+  font-size: var(--nf-text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--nf-color-fg-muted);
+  min-block-size: 1.25rem;
+}
+
+.dateNumber {
+  display: inline-flex;
+  align-items: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--nf-color-fg-muted);
+}
+
+.dateNumber--sun {
+  color: var(--nf-color-danger);
+}
+
+.dateNumber--sat {
+  color: var(--nf-color-info);
+}
+
+.dateNumber--holiday {
+  color: var(--nf-color-danger);
+}
+
+.todayPill {
+  background: var(--nf-color-accent-subtle);
+  color: var(--nf-color-accent);
+  border-radius: var(--nf-radius-pill);
+  padding-inline: var(--nf-space-2);
+  font-weight: var(--nf-weight-semibold);
+}
+
+.holidayLabel {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-danger);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: var(--nf-leading-tight);
+  max-inline-size: 70%;
+}
+
+.countBadge {
+  font-variant-numeric: tabular-nums;
+}
+
+.pillList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-px);
+  overflow: hidden;
+}
+
+.taskPill {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  font-size: var(--nf-text-xs);
+  color: inherit;
+  text-decoration: none;
+  padding: var(--nf-space-px) var(--nf-space-1);
+  border-radius: var(--nf-radius-sm);
+  background: var(--nf-color-bg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: grab;
+}
+
+.taskPill__dot {
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  border-radius: var(--nf-radius-pill);
+  flex-shrink: 0;
+}
+
+.taskPill__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eventPill {
+  all: unset;
+  box-sizing: border-box;
+  inline-size: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  font-size: var(--nf-text-xs);
+  padding: var(--nf-space-px) var(--nf-space-1);
+  border-radius: var(--nf-radius-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.eventPill__marker {
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  transform: rotate(45deg);
+  flex-shrink: 0;
+}
+
+.eventPill__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.morePill {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  padding-inline: var(--nf-space-1);
+}
