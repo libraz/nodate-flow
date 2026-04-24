@@ -24,6 +24,7 @@ import {
 } from '@floating-ui/react';
 import {
   type ChangeEvent,
+  type FocusEvent,
   type KeyboardEvent,
   type ReactElement,
   type Ref,
@@ -118,10 +119,10 @@ function ComboboxImpl(
   const listId = `${baseId}-list`;
 
   const filtered = useMemo(() => {
-    if (!query) return options;
+    if (!query || query === initialLabel) return options;
     const q = query.toLowerCase();
     return options.filter((o) => o.label.toLowerCase().includes(q));
-  }, [options, query]);
+  }, [options, query, initialLabel]);
 
   const { refs, floatingStyles, context } = useFloating({
     open,
@@ -171,6 +172,17 @@ function ComboboxImpl(
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
+    /**
+     * IME composition guard. While an input method (kana/pinyin/etc.) owns
+     * the keystroke, the resulting Enter / arrow keys belong to the
+     * composition itself — committing kana, cycling candidates — not to the
+     * listbox. Acting on them would (a) auto-select the top filtered option
+     * on the Enter that commits the composition, and (b) then concatenate
+     * the IME-committed text after the chosen label. `keyCode === 229` is
+     * the legacy sentinel some browsers still emit alongside `isComposing`.
+     */
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       if (!open) {
@@ -233,6 +245,9 @@ function ComboboxImpl(
           onChange: (event: SyntheticEvent) => handleChange(event as ChangeEvent<HTMLInputElement>),
           onKeyDown: (event: SyntheticEvent) =>
             handleKeyDown(event as KeyboardEvent<HTMLInputElement>),
+          onFocus: (event: SyntheticEvent) => {
+            (event as FocusEvent<HTMLInputElement>).currentTarget.select();
+          },
         })}
       />
       {open && filtered.length > 0 ? (
