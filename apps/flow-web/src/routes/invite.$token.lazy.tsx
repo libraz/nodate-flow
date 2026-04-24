@@ -16,11 +16,12 @@ import { useTranslation } from 'react-i18next';
 import AuthCard from '../components/auth/auth-card';
 import { selectIsAuthenticated, useAuth } from '../features/auth/auth-store';
 import { useAcceptInvite, useInviteInfoQuery } from '../features/workspaces/invite-api';
+import { formatEpochDateTime } from '../lib/format';
 
 const routeApi = getRouteApi('/invite/$token');
 
 function InviteAcceptPage(): ReactElement {
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
   const navigate = useNavigate();
   const { token } = routeApi.useParams();
   const isAuthenticated = useAuth(selectIsAuthenticated);
@@ -122,10 +123,7 @@ function InviteAcceptPage(): ReactElement {
             }}
           >
             {t('workspaces.invites.expires_at', {
-              date: new Intl.DateTimeFormat(undefined, {
-                dateStyle: 'medium',
-                timeStyle: 'short',
-              }).format(new Date(info.expiresAt)),
+              date: formatEpochDateTime(info.expiresAt, i18n.resolvedLanguage ?? 'en'),
             })}
           </p>
         ) : null}

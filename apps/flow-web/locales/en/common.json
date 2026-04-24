@@ -246,7 +246,8 @@
       "description": "Description",
       "submit": "Save",
       "submitting": "Saving…",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "close": "Close"
     },
     "detail": {
       "tabs": {
@@ -319,7 +320,24 @@
       "join_success": "You've joined {name}!",
       "create_failed": "Failed to create invite",
       "email_label": "Send via email (optional)",
-      "email_placeholder": "Email address"
+      "email_placeholder": "Email address",
+      "list_title": "Invite links",
+      "col_label": "Label",
+      "col_role": "Role",
+      "col_expires": "Expires",
+      "col_uses": "Uses",
+      "col_created_by": "Created by",
+      "untitled": "Untitled",
+      "never": "Never",
+      "revoke_failed": "Could not revoke the invite. Please try again.",
+      "join_title": "Join {workspace}",
+      "join_description": "You've been invited to join {workspace} as {role}.",
+      "join_button": "Join workspace",
+      "joining": "Joining…",
+      "expires_at": "This invite expires on {date}.",
+      "accept_failed": "Could not accept the invite. Please try again.",
+      "login_required": "You need to sign in to accept this invite.",
+      "go_to_login": "Go to sign in"
     },
     "roles": {
       "owner": "Owner",

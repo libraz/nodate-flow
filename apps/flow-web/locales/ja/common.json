@@ -246,7 +246,8 @@
       "description": "説明",
       "submit": "保存",
       "submitting": "保存中…",
-      "cancel": "キャンセル"
+      "cancel": "キャンセル",
+      "close": "閉じる"
     },
     "detail": {
       "tabs": {
@@ -319,7 +320,24 @@
       "join_success": "{name} に参加しました！",
       "create_failed": "招待の作成に失敗しました",
       "email_label": "メールで送信（任意）",
-      "email_placeholder": "メールアドレス"
+      "email_placeholder": "メールアドレス",
+      "list_title": "招待リンク",
+      "col_label": "ラベル",
+      "col_role": "ロール",
+      "col_expires": "有効期限",
+      "col_uses": "使用回数",
+      "col_created_by": "作成者",
+      "untitled": "未設定",
+      "never": "なし",
+      "revoke_failed": "招待の取り消しに失敗しました。もう一度お試しください。",
+      "join_title": "{workspace} に参加",
+      "join_description": "{workspace} に {role} として招待されています。",
+      "join_button": "ワークスペースに参加",
+      "joining": "参加中…",
+      "expires_at": "この招待は {date} に期限切れになります。",
+      "accept_failed": "招待の承諾に失敗しました。もう一度お試しください。",
+      "login_required": "招待を承諾するにはサインインしてください。",
+      "go_to_login": "サインインへ"
     },
     "roles": {
       "owner": "オーナー",
