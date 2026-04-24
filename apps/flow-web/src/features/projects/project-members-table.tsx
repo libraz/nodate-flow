@@ -22,6 +22,21 @@ export default function ProjectMembersTable({ projectId }: ProjectMembersTablePr
   const [addOpen, setAddOpen] = useState(false);
   const locale = i18n.resolvedLanguage ?? 'en';
 
+  const roleLabel = (r: string): string => {
+    switch (r) {
+      case 'lead':
+        return t('projects.roles.lead');
+      case 'editor':
+        return t('projects.roles.editor');
+      case 'commenter':
+        return t('projects.roles.commenter');
+      case 'viewer':
+        return t('projects.roles.viewer');
+      default:
+        return r;
+    }
+  };
+
   const columns: ColumnDef<ProjectMember, unknown>[] = [
     {
       id: 'email',
@@ -33,7 +48,7 @@ export default function ProjectMembersTable({ projectId }: ProjectMembersTablePr
       id: 'role',
       accessorKey: 'role',
       header: () => t('projects.members.role'),
-      cell: ({ row }) => <span>{row.original.role}</span>,
+      cell: ({ row }) => <span>{roleLabel(row.original.role)}</span>,
     },
     {
       id: 'added_at',
