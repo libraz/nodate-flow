@@ -80,6 +80,14 @@ export type { DrawerProps, DrawerSide } from './drawer/drawer';
 export { default as Tabs } from './tabs/tabs';
 export type { TabItem, TabsProps } from './tabs/tabs';
 
+export { default as SegmentedControl } from './segmented-control/segmented-control';
+export type {
+  SegmentedControlOption,
+  SegmentedControlProps,
+  SegmentedControlSize,
+  SegmentedControlTone,
+} from './segmented-control/segmented-control';
+
 export { default as ScrollArea } from './scroll-area/scroll-area';
 export type { ScrollAreaProps } from './scroll-area/scroll-area';
 

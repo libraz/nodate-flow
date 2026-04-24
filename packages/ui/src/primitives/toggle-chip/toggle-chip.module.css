@@ -55,13 +55,13 @@
   cursor: not-allowed;
 }
 
-.root[data-pressed='true'] {
+.root[data-pressed="true"] {
   background: var(--chip-color, var(--nf-color-accent));
   border-color: var(--chip-color, var(--nf-color-accent));
   color: var(--nf-color-fg-on-accent);
 }
 
-.root[data-pressed='true']:hover:not(:disabled) {
+.root[data-pressed="true"]:hover:not(:disabled) {
   /*
    * Keep the same fill on hover: the pressed state is the "committed" state
    * and should not shift color on hover. Use currentColor-at-opacity for a
@@ -83,7 +83,7 @@
  * Switch the dot to currentColor with reduced opacity so it remains visible
  * as a marker without fighting the filled background.
  */
-.root[data-pressed='true'] .dot {
+.root[data-pressed="true"] .dot {
   background: currentColor;
   opacity: 0.65;
 }

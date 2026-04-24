@@ -51,6 +51,7 @@
     "./primitives/toast": "./src/primitives/toast/toast.tsx",
     "./primitives/confirm": "./src/primitives/confirm/confirm.tsx",
     "./primitives/tabs": "./src/primitives/tabs/tabs.tsx",
+    "./primitives/segmented-control": "./src/primitives/segmented-control/segmented-control.tsx",
     "./primitives/scroll-area": "./src/primitives/scroll-area/scroll-area.tsx",
     "./primitives/date-picker": "./src/primitives/date-picker/date-picker.tsx",
     "./primitives/data-grid": "./src/primitives/data-grid/data-grid.tsx",

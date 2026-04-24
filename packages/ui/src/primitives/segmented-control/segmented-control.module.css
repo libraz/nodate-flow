@@ -1,0 +1,163 @@
+/*
+ * SegmentedControl — tokens-only styles.
+ *
+ * The component is a radiogroup with a visible active segment. We lean on
+ * the same visual hierarchy as the flow-web project sub-nav (see
+ * apps/flow-web/src/routes/_authenticated.workspaces.$id.projects.$projectId.tsx):
+ * the active segment uses `--nf-color-accent-subtle` as the background and
+ * `--nf-color-accent` as the foreground — no border change, just a fill +
+ * colour swap.
+ *
+ * When the parent enables `colourful`, each segment's inactive state uses
+ * the tone's `-subtle` variant and the active state uses the full-saturation
+ * tone token. The tone-specific blocks below only override the two CSS
+ * custom properties `--sc-active-bg` / `--sc-active-fg` /
+ * `--sc-inactive-bg` / `--sc-inactive-fg`, which the base `.segment` rules
+ * consume — no hardcoded colours anywhere.
+ *
+ * Sizing: md meets the 40×40 min tap target (`--nf-space-10`), sm meets 32×32
+ * (`--nf-space-8`). Hairline borders use `--nf-space-px` (the hairline
+ * exception documented in docs/conventions/design-tokens.md).
+ */
+
+.root {
+  display: inline-flex;
+  align-items: stretch;
+  gap: var(--nf-space-1);
+  padding: var(--nf-space-1);
+  border-radius: var(--nf-radius-md);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  background: transparent;
+
+  /* Defaults consumed by `.segment` — overridden per-tone for colourful mode. */
+  --sc-active-bg: var(--nf-color-accent-subtle);
+  --sc-active-fg: var(--nf-color-accent);
+  --sc-inactive-bg: transparent;
+  --sc-inactive-fg: var(--nf-color-fg-muted);
+}
+
+.size-md {
+  min-block-size: var(--nf-space-10);
+}
+
+.size-sm {
+  min-block-size: var(--nf-space-8);
+}
+
+.segment {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nf-space-2);
+  appearance: none;
+  border: none;
+  background: var(--sc-inactive-bg);
+  color: var(--sc-inactive-fg);
+  cursor: pointer;
+  font-family: var(--nf-font-sans);
+  font-weight: var(--nf-weight-medium);
+  line-height: var(--nf-leading-tight);
+  border-radius: var(--nf-radius-sm);
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard), color
+    var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+/* md size: 40px tap target, sm text, comfortable inline padding. */
+.size-md .segment {
+  min-block-size: var(--nf-space-10);
+  min-inline-size: var(--nf-space-10);
+  padding-inline: var(--nf-space-3);
+  padding-block: var(--nf-space-2);
+  font-size: var(--nf-text-sm);
+}
+
+/* sm size: 32px tap target, xs text, tighter inline padding. */
+.size-sm .segment {
+  min-block-size: var(--nf-space-8);
+  min-inline-size: var(--nf-space-8);
+  padding-inline: var(--nf-space-2);
+  padding-block: var(--nf-space-1);
+  font-size: var(--nf-text-xs);
+}
+
+.segment:hover:not(:disabled):not([data-selected="true"]) {
+  color: var(--nf-color-fg);
+}
+
+.segment:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.segment:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.segmentActive {
+  background: var(--sc-active-bg);
+  color: var(--sc-active-fg);
+  font-weight: var(--nf-weight-semibold);
+}
+
+/*
+ * Colourful mode: inactive segments get the tone's `-subtle` fill so the
+ * ordinal colour ramp is visible at rest. Active segment uses the full
+ * tone as fill and `--nf-color-fg-on-accent` for contrast-safe text.
+ */
+.segmentColourful {
+  /* Applied in addition to the per-tone class below; shared rules live here. */
+}
+
+.segmentColourful.segmentActive {
+  color: var(--nf-color-fg-on-accent);
+}
+
+/* Neutral tone — falls back to the group's accent (same as non-colourful). */
+.toneNeutral {
+  --sc-inactive-bg: transparent;
+  --sc-inactive-fg: var(--nf-color-fg-muted);
+  --sc-active-bg: var(--nf-color-accent-subtle);
+  --sc-active-fg: var(--nf-color-accent);
+}
+
+.toneNeutral.segmentActive {
+  /* Neutral active keeps the accent foreground (not fg-on-accent) because the
+     fill is the subtle tint, not the saturated accent. */
+  color: var(--nf-color-accent);
+}
+
+.toneInfo {
+  --sc-inactive-bg: var(--nf-color-info-subtle);
+  --sc-inactive-fg: var(--nf-color-info);
+  --sc-active-bg: var(--nf-color-info);
+  --sc-active-fg: var(--nf-color-fg-on-accent);
+}
+
+.toneSuccess {
+  --sc-inactive-bg: var(--nf-color-success-subtle);
+  --sc-inactive-fg: var(--nf-color-success);
+  --sc-active-bg: var(--nf-color-success);
+  --sc-active-fg: var(--nf-color-fg-on-accent);
+}
+
+.toneWarning {
+  --sc-inactive-bg: var(--nf-color-warning-subtle);
+  --sc-inactive-fg: var(--nf-color-warning);
+  --sc-active-bg: var(--nf-color-warning);
+  --sc-active-fg: var(--nf-color-fg-on-accent);
+}
+
+.toneDanger {
+  --sc-inactive-bg: var(--nf-color-danger-subtle);
+  --sc-inactive-fg: var(--nf-color-danger);
+  --sc-active-bg: var(--nf-color-danger);
+  --sc-active-fg: var(--nf-color-fg-on-accent);
+}
+
+/* Respect reduced-motion. */
+@media (prefers-reduced-motion: reduce) {
+  .segment {
+    transition: none;
+  }
+}
