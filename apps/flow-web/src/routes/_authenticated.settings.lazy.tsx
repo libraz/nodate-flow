@@ -1,12 +1,15 @@
 /**
- * /settings — pathless layout for the settings area (lazy). Renders a left
- * sub-nav and an outlet for the active settings page.
+ * /settings — pathless layout for the settings area (lazy). Renders a
+ * sub-nav and an outlet for the active settings page. On viewports
+ * < 768px the sub-nav collapses into a horizontally scrollable tab strip
+ * stacked above the outlet (see `_authenticated.settings.module.css`).
  */
 
-import { cx } from '@nodate-flow/ui/lib/cx';
 import { Link, Outlet, createLazyFileRoute } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import styles from './_authenticated.settings.module.css';
 
 interface SubNavItem {
   key: 'profile' | 'notifications' | 'security' | 'integrations';
@@ -43,41 +46,14 @@ function SettingsLayout(): ReactElement {
   };
 
   return (
-    <section
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '16rem 1fr',
-        gap: '2rem',
-        padding: 'clamp(1.5rem, 4vw, 2.5rem)',
-        maxInlineSize: '72rem',
-        marginInline: 'auto',
-        inlineSize: '100%',
-      }}
-    >
-      <nav
-        aria-label={t('settings_sections_label')}
-        style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}
-      >
+    <section className={styles.layout}>
+      <nav aria-label={t('settings_sections_label')} className={styles.nav}>
         {SUB_NAV.map((item) => (
           <Link
             key={item.key}
             to={item.to}
-            className={cx('settings-subnav-link')}
-            activeProps={{
-              'aria-current': 'page',
-              style: {
-                background: 'var(--nf-color-accent-subtle, rgba(155,89,182,0.12))',
-                color: 'var(--nf-color-accent, var(--nf-color-accent))',
-                fontWeight: 500,
-              },
-            }}
-            style={{
-              display: 'block',
-              padding: '0.5rem 0.75rem',
-              borderRadius: '0.5rem',
-              color: 'var(--nf-color-fg)',
-              textDecoration: 'none',
-            }}
+            className={styles.link}
+            activeProps={{ 'aria-current': 'page' }}
           >
             {t(labelKeyFor(item.key))}
           </Link>

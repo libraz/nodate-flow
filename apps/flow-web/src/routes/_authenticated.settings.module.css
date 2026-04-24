@@ -1,0 +1,71 @@
+/*
+ * Layout for /settings: a desktop two-column shell (sub-nav + outlet) that
+ * collapses into a horizontally scrollable tab strip stacked above the form
+ * on viewports < 768px. The mobile breakpoint matches the convention used
+ * elsewhere in the app (see `app-shell.module.css`, `sidebar.module.css`).
+ */
+
+.layout {
+  display: grid;
+  grid-template-columns: 16rem 1fr;
+  gap: var(--nf-space-8);
+  padding: clamp(1.5rem, 4vw, 2.5rem);
+  max-inline-size: 72rem;
+  margin-inline: auto;
+  inline-size: 100%;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.link {
+  display: block;
+  padding-block: var(--nf-space-2);
+  padding-inline: var(--nf-space-3);
+  border-radius: var(--nf-radius-sm);
+  color: var(--nf-color-fg);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.link[aria-current='page'] {
+  background: var(--nf-color-accent-subtle);
+  color: var(--nf-color-accent);
+  font-weight: var(--nf-weight-medium);
+}
+
+@media (max-width: 767px) {
+  .layout {
+    grid-template-columns: 1fr;
+    gap: var(--nf-space-3);
+  }
+
+  /*
+   * Mobile: the sub-nav becomes a horizontal, scrollable tab strip pinned
+   * above the outlet. `overflow-x: auto` keeps long label sets reachable
+   * without forcing wrap; each link freezes its intrinsic width via
+   * `flex: 0 0 auto`. The bottom border separates the strip from the
+   * outlet content underneath it.
+   */
+  .nav {
+    flex-direction: row;
+    gap: var(--nf-space-1);
+    overflow-x: auto;
+    padding-block: var(--nf-space-1);
+    border-block-end: var(--nf-space-px) solid var(--nf-color-border);
+    margin-block-end: var(--nf-space-2);
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .link {
+    flex: 0 0 auto;
+  }
+}
