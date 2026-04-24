@@ -1,0 +1,137 @@
+{
+  "kind": {
+    "task": "Task",
+    "event": "Event",
+    "block": "Block",
+    "free": "Free",
+    "milestone": "Milestone"
+  },
+  "dialog": {
+    "title": {
+      "create": {
+        "task": "New task",
+        "event": "New event",
+        "block": "New block",
+        "free": "Mark free time",
+        "milestone": "New milestone"
+      },
+      "edit": {
+        "task": "Edit task",
+        "event": "Edit event",
+        "block": "Edit block",
+        "free": "Edit free time",
+        "milestone": "Edit milestone"
+      }
+    }
+  },
+  "field": {
+    "title": "Title",
+    "calendar": "Calendar",
+    "start": "Start",
+    "end": "End",
+    "allDay": "All day",
+    "location": "Location",
+    "memo": "Memo",
+    "blockLabel": "Block label",
+    "showAs": "Show as",
+    "recurrence": "Recurrence",
+    "notification": "Notification",
+    "project": "Project",
+    "priority": "Priority",
+    "description": "Description",
+    "date": "Date"
+  },
+  "placeholder": {
+    "title": {
+      "task": "What needs to get done?",
+      "event": "Meeting, appointment, …",
+      "block": "Working, focus, …",
+      "free": "Available for …",
+      "milestone": "Release, deadline, …"
+    }
+  },
+  "showAs": {
+    "busy": "Busy",
+    "free": "Free",
+    "tentative": "Tentative",
+    "oof": "Out of office"
+  },
+  "blockLabel": {
+    "preset": {
+      "working": "Working",
+      "focus": "Focus time",
+      "oof": "Out of office",
+      "custom": "Custom…"
+    }
+  },
+  "recurrence": {
+    "preset": {
+      "none": "Does not repeat",
+      "daily": "Daily",
+      "weekdays": "Every weekday",
+      "weekly": "Weekly on {day}",
+      "monthly": "Monthly",
+      "yearly": "Yearly",
+      "custom": "Custom…"
+    }
+  },
+  "notification": {
+    "preset": {
+      "none": "No notification",
+      "at_time": "At time of event",
+      "5min": "5 minutes before",
+      "10min": "10 minutes before",
+      "15min": "15 minutes before",
+      "30min": "30 minutes before",
+      "1hour": "1 hour before",
+      "1day": "1 day before"
+    }
+  },
+  "validation": {
+    "titleRequired": "Title is required",
+    "endBeforeStart": "End time must be after start time",
+    "calendarRequired": "Choose a calendar",
+    "projectRequired": "Choose a project"
+  },
+  "action": {
+    "submit": {
+      "create": "Create",
+      "edit": "Save changes"
+    },
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "deleteConfirm": "Delete this {kind}?",
+    "moreOptions": "More options"
+  },
+  "toast": {
+    "created": {
+      "task": "Task created",
+      "event": "Event created",
+      "block": "Block created",
+      "free": "Free time created",
+      "milestone": "Milestone created"
+    },
+    "updated": {
+      "task": "Task updated",
+      "event": "Event updated",
+      "block": "Block updated",
+      "free": "Free time updated",
+      "milestone": "Milestone updated"
+    },
+    "deleted": {
+      "task": "Task deleted",
+      "event": "Event deleted",
+      "block": "Block deleted",
+      "free": "Free time deleted",
+      "milestone": "Milestone deleted"
+    },
+    "createFailed": "Failed to create",
+    "updateFailed": "Failed to save",
+    "deleteFailed": "Failed to delete"
+  },
+  "a11y": {
+    "kind_picker": "Item kind",
+    "close": "Close dialog",
+    "delete_button": "Delete this item"
+  }
+}

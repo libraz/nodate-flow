@@ -1,0 +1,137 @@
+/**
+ * EventDialog layout.
+ *
+ * The form is a flex column with two regions: a scrolling body that holds
+ * every kind-specific field block, and an anchored footer that never
+ * scrolls. Fixing the form's block-size prevents the parent dialog from
+ * reflowing when the user flips between item kinds in the SegmentedControl
+ * (each kind renders a different set of fields, so the intrinsic height
+ * varies wildly). The frame stays put; the content scrolls inside.
+ */
+.body {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 28rem;
+  block-size: min(36rem, 75vh);
+}
+
+.bodyScroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+  flex: 1 1 auto;
+  min-block-size: 0;
+  overflow-y: auto;
+  /* Small inset so the scrollbar does not crowd field controls. */
+  padding-inline-end: var(--nf-space-1);
+}
+
+.kindBlock {
+  animation: morphIn var(--nf-duration-base) var(--nf-ease-emphasized);
+}
+
+@keyframes morphIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kindBlock {
+    animation: none;
+  }
+}
+
+.timeRow {
+  display: grid;
+  /* start | arrow | end | all-day */
+  grid-template-columns: 1fr auto 1fr auto;
+  align-items: end;
+  column-gap: var(--nf-space-3);
+  row-gap: var(--nf-space-2);
+  padding: var(--nf-space-3);
+  background: var(--nf-color-bg-sunken);
+  border-radius: var(--nf-radius-md);
+}
+
+.timeRowAllDay {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  align-self: end;
+  padding-block-end: var(--nf-space-2);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.arrow {
+  color: var(--nf-color-fg-muted);
+  align-self: center;
+  padding-block-end: var(--nf-space-2);
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--nf-space-2);
+  flex: 0 0 auto;
+  padding-block-start: var(--nf-space-4);
+}
+
+.footerActions {
+  display: flex;
+  gap: var(--nf-space-2);
+  margin-inline-start: auto;
+}
+
+.inlineRow {
+  display: flex;
+  gap: var(--nf-space-2);
+  align-items: end;
+}
+
+.inlineGrow {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.disclosureToggle {
+  align-self: flex-start;
+}
+
+.disclosurePanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+@media (max-width: 640px) {
+  .body {
+    /* Let the Dialog primitive's mobile sheet (or overlay padding) size
+       us; intrinsic height avoids double-scroll when the viewport is
+       already short. */
+    block-size: auto;
+  }
+  .bodyScroll {
+    overflow-y: visible;
+    padding-inline-end: 0;
+  }
+  .timeRow {
+    grid-template-columns: 1fr;
+  }
+  .arrow {
+    display: none;
+  }
+  .timeRowAllDay {
+    justify-self: start;
+    padding-block-end: 0;
+  }
+}

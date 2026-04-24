@@ -5,46 +5,39 @@
  *   - `GET /me/tasks-with-dates?from=&to=` (flow-api)   — tasks with due_on
  *   - `GET /me/calendar-events?start=&end=` (time-api)  — calendar events
  *
- * The month grid overlays three toggleable layers: task-due,
- * calendar events, and blocks (`kind='block'`). Dragging a task cell
- * reschedules it through itemkit (PATCH /tasks), and clicking a cell
- * opens the quick-create task dialog.
+ * The month grid overlays five toggleable layers: task-due, calendar
+ * events, blocks, free, and milestones. Dragging a task cell
+ * reschedules it through itemkit (PATCH /tasks). Clicking a cell
+ * opens the unified {@link EventDialog} in create mode (default kind:
+ * event; shift-click shortcuts to block). Clicking an event pill opens
+ * the same dialog in edit mode for that row; clicking a task pill
+ * navigates to the task detail route (editing a task is out of scope
+ * for the calendar dialog).
  */
 
 import type { components } from '@nodate-flow/sdk';
 import type { components as timeComponents } from '@nodate-flow/time-sdk';
 import Button from '@nodate-flow/ui/primitives/button';
-import DatePicker from '@nodate-flow/ui/primitives/date-picker';
-import Dialog from '@nodate-flow/ui/primitives/dialog';
-import FormField from '@nodate-flow/ui/primitives/form-field';
-import Input from '@nodate-flow/ui/primitives/input';
-import Select from '@nodate-flow/ui/primitives/select';
-import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { ToggleChip, ToggleChipGroup } from '@nodate-flow/ui/primitives/toggle-chip';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import {
-  type DragEvent,
-  type FormEvent,
-  type ReactElement,
-  useCallback,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { type DragEvent, type ReactElement, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import EventDialog, {
+  type EventDialogMode,
+  type ItemKind,
+} from '../features/calendar-events/event-dialog';
 import PendingInvitesPanel from '../features/calendar-invites/pending-invites-panel';
 import calendarLayoutStyles from '../features/calendar-invites/pending-invites-panel.module.css';
 import type { Project } from '../features/projects/api';
-import { TASK_PRIORITIES, type TaskDerivedState, type TaskPriority } from '../features/tasks/api';
-import { PRIORITY_KEY, STATE_COLOR } from '../features/tasks/constants';
+import type { TaskDerivedState } from '../features/tasks/api';
+import { STATE_COLOR } from '../features/tasks/constants';
 import { useWorkspacesQuery } from '../features/workspaces/api';
 import { type ApiError, toApiError } from '../lib/api-error';
 import { dateKey } from '../lib/date-utils';
-import { formatDate, formatEpochDateTime } from '../lib/format';
 import { sdk, timeSdk } from '../lib/sdk';
 import { useActiveWorkspaceId } from '../lib/use-current-workspace';
 
@@ -104,402 +97,49 @@ function dateKeyFromUnix(unixSeconds: number): string {
   return dateKey(new Date(unixSeconds * 1000));
 }
 
-// ---------------------------------------------------------------------------
-// Quick-create dialog
-// ---------------------------------------------------------------------------
-
-interface QuickCreateDialogProps {
-  open: boolean;
-  dateLabel: string;
-  dueOn: string;
-  projects: Project[];
-  activeWsId: string | null;
-  onClose: () => void;
-  onCreated: () => void;
-}
-
-function QuickCreateDialog({
-  open,
-  dateLabel,
-  dueOn,
-  projects,
-  activeWsId,
-  onClose,
-  onCreated,
-}: QuickCreateDialogProps): ReactElement {
-  const { t, i18n } = useTranslation('common');
-  const locale = i18n.resolvedLanguage ?? 'en';
-  const weekdayLabels = t('common.date.weekdays', { returnObjects: true }) as string[];
-  const formatMonthYear = (year: number, month: number): string =>
-    t('common.date.monthYear', { year, month });
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState<TaskPriority>(2);
-  const [projectId, setProjectId] = useState<string>(projects[0]?.id ?? '');
-  const [startOn, setStartOn] = useState(dueOn);
-  const [endOn, setEndOn] = useState(dueOn);
-
-  const prevDueOn = useRef(dueOn);
-  if (dueOn !== prevDueOn.current) {
-    prevDueOn.current = dueOn;
-    setStartOn(dueOn);
-    setEndOn(dueOn);
-  }
-
-  const createMut = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await sdk.POST('/tasks', {
-        body: {
-          projectId,
-          title: title.trim(),
-          ...(description.trim() ? { description: description.trim() } : {}),
-          ...(startOn ? { startOn } : {}),
-          dueOn: endOn || dueOn,
-          priority,
-          visibility: 'project',
-        },
-      });
-      if (error || !data) throw new Error('Failed to create');
-      return data;
-    },
-    onSuccess: () => {
-      toaster.show({ tone: 'success', message: t('tasks.created') });
-      setTitle('');
-      setDescription('');
-      setPriority(2);
-      setStartOn(dueOn);
-      setEndOn(dueOn);
-      onCreated();
-    },
-    onError: () => {
-      toaster.show({ tone: 'danger', message: t('tasks.create_error') });
-    },
-  });
-
-  const handleSubmit = (ev: FormEvent<HTMLFormElement>): void => {
-    ev.preventDefault();
-    if (!title.trim() || !projectId) return;
-    createMut.mutate();
-  };
-
-  const handleClose = (): void => {
-    if (createMut.isPending) return;
-    setTitle('');
-    setDescription('');
-    setPriority(2);
-    setStartOn(dueOn);
-    setEndOn(dueOn);
-    onClose();
-  };
-
-  return (
-    <Dialog open={open} onClose={handleClose} title={`${t('tasks.new')} — ${dateLabel}`}>
-      <form
-        onSubmit={handleSubmit}
-        style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', minInlineSize: '20rem' }}
-      >
-        <FormField label={t('tasks.form.title')}>
-          {(control) => (
-            <Input
-              {...control}
-              value={title}
-              onChange={(e) => setTitle(e.currentTarget.value)}
-              placeholder={t('tasks.title_placeholder')}
-              autoFocus
-            />
-          )}
-        </FormField>
-
-        <FormField label={t('tasks.form.description')}>
-          {(control) => (
-            <Textarea
-              {...control}
-              value={description}
-              onChange={(e) => setDescription(e.currentTarget.value)}
-              rows={2}
-            />
-          )}
-        </FormField>
-
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <FormField label={t('tasks.form.start')} style={{ flex: 1 }}>
-            {() => (
-              <DatePicker
-                value={startOn}
-                onChange={setStartOn}
-                weekdayLabels={weekdayLabels}
-                formatMonthYear={formatMonthYear}
-                prevLabel={t('calendar.prev')}
-                nextLabel={t('calendar.next')}
-                triggerLabel={startOn ? formatDate(startOn, locale) : t('common.date.placeholder')}
-              />
-            )}
-          </FormField>
-          <FormField label={t('tasks.form.due')} style={{ flex: 1 }}>
-            {() => (
-              <DatePicker
-                value={endOn}
-                onChange={setEndOn}
-                weekdayLabels={weekdayLabels}
-                formatMonthYear={formatMonthYear}
-                prevLabel={t('calendar.prev')}
-                nextLabel={t('calendar.next')}
-                triggerLabel={endOn ? formatDate(endOn, locale) : t('common.date.placeholder')}
-                {...(startOn ? { minDate: startOn } : {})}
-              />
-            )}
-          </FormField>
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          {projects.length > 1 ? (
-            <FormField label={t('tasks.select_project')} style={{ flex: 1 }}>
-              {(control) => (
-                <Select
-                  {...control}
-                  value={projectId}
-                  onChange={(e) => setProjectId(e.currentTarget.value)}
-                >
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </FormField>
-          ) : null}
-
-          <FormField label={t('tasks.form.priority')} style={{ flex: 1 }}>
-            {(control) => (
-              <Select
-                {...control}
-                value={String(priority)}
-                onChange={(e) => setPriority(Number(e.currentTarget.value) as TaskPriority)}
-              >
-                {TASK_PRIORITIES.map((p) => (
-                  <option key={p} value={String(p)}>
-                    {t(PRIORITY_KEY[p])}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </FormField>
-        </div>
-
-        {projects.length === 0 ? (
-          <div
-            role="note"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '0.75rem',
-              padding: '0.75rem',
-              borderRadius: 'var(--nf-radius-md)',
-              background: 'var(--nf-color-bg-subtle)',
-              border: '1px solid var(--nf-color-border-subtle)',
-              fontSize: '0.875rem',
-            }}
-          >
-            <span style={{ color: 'var(--nf-color-fg-muted)' }}>
-              {t('tasks.quick_create.no_projects.title')}
-            </span>
-            {activeWsId ? (
-              <Link
-                to="/workspaces/$id/projects"
-                params={{ id: activeWsId }}
-                style={{ color: 'var(--nf-color-accent)', textDecoration: 'underline' }}
-              >
-                {t('tasks.quick_create.no_projects.cta')}
-              </Link>
-            ) : null}
-          </div>
-        ) : null}
-
-        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-          <Button type="button" variant="ghost" onClick={handleClose}>
-            {t('tasks.form.cancel')}
-          </Button>
-          <Button type="submit" disabled={createMut.isPending || !title.trim() || !projectId}>
-            {createMut.isPending ? t('common.loading') : t('tasks.form.submit')}
-          </Button>
-        </div>
-      </form>
-    </Dialog>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Event detail dialog
-// ---------------------------------------------------------------------------
-
-interface EventDetailDialogProps {
-  event: CalendarEvent;
-  onClose: () => void;
-  onDeleted: () => void;
-}
-
 /**
- * Read-only detail dialog for a calendar event. Shows title, start/end
- * (or "All day"), workspace, and optional location. Exposes a Delete
- * action that calls `timeSdk.DELETE /workspaces/{ws}/calendars/{cal}/events/{id}`
- * after a confirmation prompt.
+ * Differentiate calendar-event pills by kind. Returns inline style
+ * fragments merged into the pill button, plus the 45-degree marker
+ * colour rendered inside it.
+ *
+ * - event: flat subtle fill.
+ * - block: subtle fill + diagonal stripe (via repeating gradient).
+ * - free: subtle fill + dashed border.
+ * - milestone: transparent background + bottom border only.
  */
-function EventDetailDialog({ event, onClose, onDeleted }: EventDetailDialogProps): ReactElement {
-  const { t, i18n } = useTranslation('common');
-  const locale = i18n.resolvedLanguage ?? 'en';
-
-  const deleteMut = useMutation({
-    mutationFn: async () => {
-      const { error } = await timeSdk.DELETE(
-        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}',
-        {
-          params: {
-            path: {
-              wsId: event.workspaceId,
-              calId: event.calendarId,
-              evtId: event.id,
-            },
-          },
-        },
-      );
-      if (error) throw new Error('Failed to delete event');
-    },
-    onSuccess: () => {
-      toaster.show({ tone: 'success', message: t('calendar.event_detail.deleted') });
-      onDeleted();
-    },
-    onError: () => {
-      toaster.show({ tone: 'danger', message: t('calendar.event_detail.delete_failed') });
-    },
-  });
-
-  const handleDelete = (): void => {
-    if (deleteMut.isPending) return;
-    if (!window.confirm(t('calendar.event_detail.delete_confirm'))) return;
-    deleteMut.mutate();
-  };
-
-  const startLabel = event.allDay
-    ? t('calendar.event_detail.all_day')
-    : event.startAt
-      ? formatEpochDateTime(event.startAt, locale)
-      : null;
-  const endLabel = event.allDay
-    ? null
-    : event.endAt
-      ? formatEpochDateTime(event.endAt, locale)
-      : null;
-
-  return (
-    <Dialog
-      open
-      onClose={deleteMut.isPending ? () => undefined : onClose}
-      title={t('calendar.event_detail.title')}
-    >
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.75rem',
-          minInlineSize: '20rem',
-        }}
-      >
-        <div>
-          <div
-            style={{
-              fontSize: '0.75rem',
-              color: 'var(--nf-color-fg-muted)',
-              marginBlockEnd: '0.125rem',
-            }}
-          >
-            {t('calendar.event_detail.event')}
-          </div>
-          <div style={{ fontWeight: 600 }}>{event.title}</div>
-        </div>
-
-        {startLabel ? (
-          <div>
-            <div
-              style={{
-                fontSize: '0.75rem',
-                color: 'var(--nf-color-fg-muted)',
-                marginBlockEnd: '0.125rem',
-              }}
-            >
-              {t('calendar.event_detail.start')}
-            </div>
-            <div>{startLabel}</div>
-          </div>
-        ) : null}
-
-        {endLabel ? (
-          <div>
-            <div
-              style={{
-                fontSize: '0.75rem',
-                color: 'var(--nf-color-fg-muted)',
-                marginBlockEnd: '0.125rem',
-              }}
-            >
-              {t('calendar.event_detail.end')}
-            </div>
-            <div>{endLabel}</div>
-          </div>
-        ) : null}
-
-        <div>
-          <div
-            style={{
-              fontSize: '0.75rem',
-              color: 'var(--nf-color-fg-muted)',
-              marginBlockEnd: '0.125rem',
-            }}
-          >
-            {t('calendar.event_detail.workspace')}
-          </div>
-          <div>{event.workspaceName}</div>
-        </div>
-
-        {event.location ? (
-          <div>
-            <div
-              style={{
-                fontSize: '0.75rem',
-                color: 'var(--nf-color-fg-muted)',
-                marginBlockEnd: '0.125rem',
-              }}
-            >
-              {t('calendar.event_detail.location')}
-            </div>
-            <div>{event.location}</div>
-          </div>
-        ) : null}
-
-        <div
-          style={{
-            display: 'flex',
-            gap: '0.5rem',
-            justifyContent: 'space-between',
-            marginBlockStart: '0.5rem',
-          }}
-        >
-          <Button
-            type="button"
-            variant="danger"
-            onClick={handleDelete}
-            disabled={deleteMut.isPending}
-          >
-            {deleteMut.isPending ? t('common.loading') : t('calendar.event_detail.delete')}
-          </Button>
-          <Button type="button" variant="ghost" onClick={onClose} disabled={deleteMut.isPending}>
-            {t('calendar.event_detail.close')}
-          </Button>
-        </div>
-      </div>
-    </Dialog>
-  );
+function pillStyleForKind(kind: string): {
+  background?: string;
+  border?: string;
+  borderBlockEnd?: string;
+  backgroundImage?: string;
+  markerColor: string;
+} {
+  switch (kind) {
+    case 'block':
+      return {
+        background: 'var(--nf-cal-block-subtle)',
+        backgroundImage:
+          'repeating-linear-gradient(135deg, transparent 0 6px, rgba(0,0,0,0.04) 6px 8px)',
+        markerColor: 'var(--nf-cal-block-color)',
+      };
+    case 'free':
+      return {
+        background: 'var(--nf-cal-free-subtle)',
+        border: '1px dashed var(--nf-cal-free-color)',
+        markerColor: 'var(--nf-cal-free-color)',
+      };
+    case 'milestone':
+      return {
+        background: 'transparent',
+        borderBlockEnd: '2px solid var(--nf-cal-milestone-color)',
+        markerColor: 'var(--nf-cal-milestone-color)',
+      };
+    default:
+      return {
+        background: 'var(--nf-cal-event-subtle)',
+        markerColor: 'var(--nf-cal-event-color)',
+      };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -510,7 +150,19 @@ interface LayerFlags {
   tasksDue: boolean;
   events: boolean;
   blocks: boolean;
+  free: boolean;
+  milestone: boolean;
 }
+
+/**
+ * Open-state of the unified event dialog. Create mode carries the
+ * clicked cell's date + the kind the picker should land on; edit mode
+ * carries the full event row so the dialog can hydrate without a
+ * second fetch.
+ */
+type EditTarget =
+  | { mode: 'create'; date: string; initialItemKind: ItemKind }
+  | { mode: 'edit'; event: CalendarEvent };
 
 function CalendarRoute(): ReactElement {
   const { t, i18n } = useTranslation('common');
@@ -525,9 +177,14 @@ function CalendarRoute(): ReactElement {
   const dragDataRef = useRef<{ taskId: string; fromDate: string } | null>(null);
   const enterCountRef = useRef<Record<string, number>>({});
 
-  const [createDate, setCreateDate] = useState<string | null>(null);
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
-  const [layers, setLayers] = useState<LayerFlags>({ tasksDue: true, events: true, blocks: false });
+  const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
+  const [layers, setLayers] = useState<LayerFlags>({
+    tasksDue: true,
+    events: true,
+    blocks: false,
+    free: false,
+    milestone: true,
+  });
 
   const { data: workspaces } = useWorkspacesQuery();
   const activeWsId = useActiveWorkspaceId();
@@ -673,12 +330,15 @@ function CalendarRoute(): ReactElement {
     return out;
   }, [projectQueries]);
 
-  const handleCellClick = useCallback((cellKey: string) => {
-    setCreateDate(cellKey);
+  const handleCellClick = useCallback((cellKey: string, shiftKey: boolean) => {
+    // Shift+click on a cell is a power-user quick path to the Block kind;
+    // the dialog segmented control still lets the user switch.
+    const initialItemKind: ItemKind = shiftKey ? 'block' : 'event';
+    setEditTarget({ mode: 'create', date: cellKey, initialItemKind });
   }, []);
 
-  const handleCreated = useCallback(() => {
-    setCreateDate(null);
+  const handleSaved = useCallback(() => {
+    setEditTarget(null);
     void qc.invalidateQueries({ queryKey: ['calendar', 'me-tasks'] });
     void qc.invalidateQueries({ queryKey: ['calendar', 'me-events'] });
   }, [qc]);
@@ -707,19 +367,23 @@ function CalendarRoute(): ReactElement {
     const map = new Map<string, CalendarEvent[]>();
     for (const ev of events) {
       if (!ev.startAt) continue;
-      const isBlock = ev.kind === 'block';
-      if (isBlock && !layers.blocks) continue;
-      if (!isBlock && !layers.events) continue;
-      const k = dateKeyFromUnix(ev.startAt);
-      const arr = map.get(k);
+      // Each kind gates on its own layer flag; unknown kinds fall through
+      // to the generic `events` flag so the UI never silently hides them.
+      const k = ev.kind;
+      if (k === 'block' && !layers.blocks) continue;
+      if (k === 'free' && !layers.free) continue;
+      if (k === 'milestone' && !layers.milestone) continue;
+      if (k !== 'block' && k !== 'free' && k !== 'milestone' && !layers.events) continue;
+      const key = dateKeyFromUnix(ev.startAt);
+      const arr = map.get(key);
       if (arr) arr.push(ev);
-      else map.set(k, [ev]);
+      else map.set(key, [ev]);
     }
     for (const arr of map.values()) {
       arr.sort((a, b) => (a.startAt ?? 0) - (b.startAt ?? 0));
     }
     return map;
-  }, [events, layers.events, layers.blocks]);
+  }, [events, layers.events, layers.blocks, layers.free, layers.milestone]);
 
   const todayKey = dateKey(today);
   const monthLabel = useMemo(
@@ -729,16 +393,6 @@ function CalendarRoute(): ReactElement {
       ),
     [locale, cursor],
   );
-
-  const createDateLabel = useMemo(() => {
-    if (!createDate) return '';
-    const d = new Date(`${createDate}T00:00:00`);
-    return new Intl.DateTimeFormat(locale, {
-      month: 'long',
-      day: 'numeric',
-      weekday: 'short',
-    }).format(d);
-  }, [createDate, locale]);
 
   const goPrev = (): void => {
     setCursor((c) => {
@@ -837,6 +491,20 @@ function CalendarRoute(): ReactElement {
           >
             {t('calendar.layer.blocks')}
           </ToggleChip>
+          <ToggleChip
+            pressed={layers.free}
+            onPressedChange={(v) => setLayers((s) => ({ ...s, free: v }))}
+            color="var(--nf-cal-free-color)"
+          >
+            {t('calendar.layer.free')}
+          </ToggleChip>
+          <ToggleChip
+            pressed={layers.milestone}
+            onPressedChange={(v) => setLayers((s) => ({ ...s, milestone: v }))}
+            color="var(--nf-cal-milestone-color)"
+          >
+            {t('calendar.layer.milestone')}
+          </ToggleChip>
         </ToggleChipGroup>
       </div>
 
@@ -893,12 +561,12 @@ function CalendarRoute(): ReactElement {
                   }}
                   onClick={(e) => {
                     if ((e.target as HTMLElement).closest('a, button')) return;
-                    if (cell.inMonth) handleCellClick(cell.key);
+                    if (cell.inMonth) handleCellClick(cell.key, e.shiftKey);
                   }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      if (cell.inMonth) handleCellClick(cell.key);
+                      if (cell.inMonth) handleCellClick(cell.key, e.shiftKey);
                     }
                   }}
                   role={cell.inMonth ? 'button' : undefined}
@@ -1018,7 +686,7 @@ function CalendarRoute(): ReactElement {
                       </li>
                     ) : null}
                     {dayEvents.slice(0, 2).map((ev) => {
-                      const isBlock = ev.kind === 'block';
+                      const pill = pillStyleForKind(ev.kind);
                       return (
                         <li key={`ev-${ev.id}`}>
                           <button
@@ -1030,7 +698,7 @@ function CalendarRoute(): ReactElement {
                             })}
                             onClick={(e) => {
                               e.stopPropagation();
-                              setSelectedEvent(ev);
+                              setEditTarget({ mode: 'edit', event: ev });
                             }}
                             style={{
                               all: 'unset',
@@ -1042,13 +710,11 @@ function CalendarRoute(): ReactElement {
                               fontSize: '0.75rem',
                               padding: '0.125rem 0.25rem',
                               borderRadius: '0.25rem',
-                              background: isBlock
-                                ? 'var(--nf-color-bg-subtle)'
-                                : 'var(--nf-color-accent-subtle)',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
                               cursor: 'pointer',
+                              ...pill,
                             }}
                           >
                             <span
@@ -1057,9 +723,7 @@ function CalendarRoute(): ReactElement {
                                 inlineSize: '0.5rem',
                                 blockSize: '0.5rem',
                                 transform: 'rotate(45deg)',
-                                background: isBlock
-                                  ? 'var(--nf-color-fg-muted)'
-                                  : 'var(--nf-color-accent)',
+                                background: pill.markerColor,
                                 flexShrink: 0,
                               }}
                             />
@@ -1097,30 +761,44 @@ function CalendarRoute(): ReactElement {
         <PendingInvitesPanel />
       </div>
 
-      {createDate !== null ? (
-        <QuickCreateDialog
+      {editTarget !== null ? (
+        <EventDialog
           open
-          dateLabel={createDateLabel}
-          dueOn={createDate}
+          workspaceId={
+            editTarget.mode === 'edit' ? editTarget.event.workspaceId : (activeWsId ?? '')
+          }
           projects={allProjects}
-          activeWsId={activeWsId}
-          onClose={() => setCreateDate(null)}
-          onCreated={handleCreated}
-        />
-      ) : null}
-
-      {selectedEvent !== null ? (
-        <EventDetailDialog
-          event={selectedEvent}
-          onClose={() => setSelectedEvent(null)}
-          onDeleted={() => {
-            setSelectedEvent(null);
-            void qc.invalidateQueries({ queryKey: ['calendar', 'me-events'] });
-          }}
+          mode={toDialogMode(editTarget)}
+          onClose={() => setEditTarget(null)}
+          onSaved={handleSaved}
         />
       ) : null}
     </section>
   );
+}
+
+/** Convert the route-local EditTarget shape to EventDialog's mode prop. */
+function toDialogMode(target: EditTarget): EventDialogMode {
+  if (target.mode === 'create') {
+    return {
+      kind: 'create',
+      date: target.date,
+      initialItemKind: target.initialItemKind,
+    };
+  }
+  const ev = target.event;
+  // Task kind is out of scope for edit-mode; the `/calendar` route
+  // pills only open this dialog for calendar event rows. Unknown
+  // kinds fall through to 'event' so the UI never crashes.
+  const kind =
+    ev.kind === 'block' || ev.kind === 'free' || ev.kind === 'milestone' ? ev.kind : 'event';
+  return {
+    kind: 'edit',
+    eventId: ev.id,
+    calendarId: ev.calendarId,
+    initialKind: kind,
+    event: ev,
+  };
 }
 
 export const Route = createFileRoute('/_authenticated/calendar')({

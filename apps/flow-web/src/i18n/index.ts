@@ -5,6 +5,7 @@ import { initReactI18next } from 'react-i18next';
 import enAiSuggestions from '../../locales/en/ai-suggestions.json';
 import enAi from '../../locales/en/ai.json';
 import enAuth from '../../locales/en/auth.json';
+import enCalendarEvents from '../../locales/en/calendar-events.json';
 import enCommon from '../../locales/en/common.json';
 import enConstraints from '../../locales/en/constraints.json';
 import enDashboard from '../../locales/en/dashboard.json';
@@ -20,6 +21,7 @@ import enTimeline from '../../locales/en/timeline.json';
 import jaAiSuggestions from '../../locales/ja/ai-suggestions.json';
 import jaAi from '../../locales/ja/ai.json';
 import jaAuth from '../../locales/ja/auth.json';
+import jaCalendarEvents from '../../locales/ja/calendar-events.json';
 import jaCommon from '../../locales/ja/common.json';
 import jaConstraints from '../../locales/ja/constraints.json';
 import jaDashboard from '../../locales/ja/dashboard.json';
@@ -72,6 +74,7 @@ export function initI18n(): typeof i18n {
         'settings',
         'inbox',
         'timeline',
+        'calendar-events',
         'ai',
         'ai-suggestions',
         'constraints',
@@ -90,6 +93,7 @@ export function initI18n(): typeof i18n {
           settings: enSettings,
           inbox: enInbox,
           timeline: enTimeline,
+          'calendar-events': enCalendarEvents,
           ai: enAi,
           'ai-suggestions': enAiSuggestions,
           constraints: enConstraints,
@@ -107,6 +111,7 @@ export function initI18n(): typeof i18n {
           settings: jaSettings,
           inbox: jaInbox,
           timeline: jaTimeline,
+          'calendar-events': jaCalendarEvents,
           ai: jaAi,
           'ai-suggestions': jaAiSuggestions,
           constraints: jaConstraints,

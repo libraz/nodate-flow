@@ -10,6 +10,7 @@ export const namespaces = [
   'tasks',
   'comments',
   'timeline',
+  'calendar-events',
   'inbox',
   'settings',
   'ai',

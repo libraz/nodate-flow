@@ -21,6 +21,7 @@ import type { BrowserContext } from '@playwright/test';
 
 export const API_BASE_URL = process.env.NF_API_URL ?? 'http://localhost:8080';
 export const AUTH_API_URL = process.env.NF_AUTH_API_URL ?? 'http://localhost:8082';
+export const TIME_API_URL = process.env.NF_TIME_API_URL ?? 'http://localhost:8081';
 
 export interface TestTenant {
   email: string;
@@ -100,11 +101,23 @@ function extractRefreshToken(res: Response): string {
   return match[1] as string;
 }
 
+/** Options accepted by {@link createTestTenant}. */
+export interface CreateTestTenantOptions {
+  /**
+   * Locale persisted in the user profile. The web app's auth bootstrap
+   * calls `setLanguage(user.locale)` after login, so passing 'ja' here
+   * makes every subsequent UI render in Japanese without further setup.
+   * Defaults to 'en'.
+   */
+  locale?: 'en' | 'ja';
+}
+
 /**
  * Creates a fresh tenant via the public REST API and returns the
  * credentials + identifiers needed by the test.
  */
-export async function createTestTenant(): Promise<TestTenant> {
+export async function createTestTenant(opts: CreateTestTenantOptions = {}): Promise<TestTenant> {
+  const locale = opts.locale ?? 'en';
   const suffix = randomUUID().slice(0, 12);
   const email = `e2e+${suffix}@example.test`;
   const password = 'correct horse battery staple';
@@ -117,7 +130,7 @@ export async function createTestTenant(): Promise<TestTenant> {
       const res = await fetch(`${AUTH_API_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', accept: 'application/json' },
-        body: JSON.stringify({ email, password, displayName, locale: 'en' }),
+        body: JSON.stringify({ email, password, displayName, locale }),
       });
       if (res.status === 429 && attempt < 4) {
         await new Promise((r) => setTimeout(r, 5000 * (attempt + 1)));
@@ -200,6 +213,87 @@ export async function createTask(
     tenant.accessToken,
   );
   return res;
+}
+
+/**
+ * Fetches the tenant's calendar list on time-api. The GET triggers the
+ * lazy auto-creation of the personal + system calendars, so after this
+ * call the workspace is guaranteed to have at least one writable
+ * personal calendar the user owns.
+ *
+ * Returns the first calendar whose role is `owner` so the caller can
+ * POST events into it. Throws if the list is empty or the call fails —
+ * both are regressions we want to surface loudly rather than mask.
+ */
+export async function ensurePersonalCalendar(
+  tenant: TestTenant,
+): Promise<{ id: string; name: string; role: string }> {
+  const res = await fetch(`${TIME_API_URL}/workspaces/${tenant.workspaceId}/calendars`, {
+    method: 'GET',
+    headers: {
+      accept: 'application/json',
+      authorization: `Bearer ${tenant.accessToken}`,
+    },
+  });
+  if (!res.ok) {
+    throw new Error(`GET /workspaces/{wsId}/calendars -> ${res.status} ${await res.text()}`);
+  }
+  const body = (await res.json()) as {
+    calendars: Array<{ id: string; name: string; role: string }>;
+  };
+  const owned = body.calendars.find((c) => c.role === 'owner');
+  if (!owned) {
+    throw new Error(
+      `no owner-role calendar auto-created for ws=${tenant.workspaceId} (got ${body.calendars.length} calendars)`,
+    );
+  }
+  return owned;
+}
+
+/** Args for {@link createCalendarEvent}. Unix times are seconds (UTC). */
+export interface CreateCalendarEventArgs {
+  title: string;
+  startAt: number;
+  endAt: number;
+  kind?: 'event' | 'block' | 'free' | 'milestone';
+  allDay?: boolean;
+  timezone?: string;
+}
+
+/**
+ * Seeds a calendar event directly via time-api REST. Used by edit/
+ * delete tests that need a pre-existing row to click on without going
+ * through the create UI path first.
+ */
+export async function createCalendarEvent(
+  tenant: TestTenant,
+  calendarId: string,
+  args: CreateCalendarEventArgs,
+): Promise<{ id: string; title: string; kind: string }> {
+  const body = {
+    kind: args.kind ?? 'event',
+    title: args.title,
+    startAt: args.startAt,
+    endAt: args.endAt,
+    allDay: args.allDay ?? false,
+    timezone: args.timezone ?? 'UTC',
+  };
+  const res = await fetch(
+    `${TIME_API_URL}/workspaces/${tenant.workspaceId}/calendars/${calendarId}/events`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        accept: 'application/json',
+        authorization: `Bearer ${tenant.accessToken}`,
+      },
+      body: JSON.stringify(body),
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`POST /calendars/{calId}/events -> ${res.status} ${await res.text()}`);
+  }
+  return (await res.json()) as { id: string; title: string; kind: string };
 }
 
 /**

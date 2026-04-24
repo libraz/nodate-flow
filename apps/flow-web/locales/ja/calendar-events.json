@@ -1,0 +1,137 @@
+{
+  "kind": {
+    "task": "タスク",
+    "event": "予定",
+    "block": "ブロック",
+    "free": "空き",
+    "milestone": "マイルストーン"
+  },
+  "dialog": {
+    "title": {
+      "create": {
+        "task": "新しいタスク",
+        "event": "新しい予定",
+        "block": "新しいブロック",
+        "free": "空き時間を登録",
+        "milestone": "新しいマイルストーン"
+      },
+      "edit": {
+        "task": "タスクを編集",
+        "event": "予定を編集",
+        "block": "ブロックを編集",
+        "free": "空き時間を編集",
+        "milestone": "マイルストーンを編集"
+      }
+    }
+  },
+  "field": {
+    "title": "タイトル",
+    "calendar": "カレンダー",
+    "start": "開始",
+    "end": "終了",
+    "allDay": "終日",
+    "location": "場所",
+    "memo": "メモ",
+    "blockLabel": "ブロックの種別",
+    "showAs": "表示",
+    "recurrence": "繰り返し",
+    "notification": "通知",
+    "project": "プロジェクト",
+    "priority": "優先度",
+    "description": "説明",
+    "date": "日付"
+  },
+  "placeholder": {
+    "title": {
+      "task": "やることを書いてください",
+      "event": "ミーティング、予定など",
+      "block": "仕事中、集中など",
+      "free": "対応可能な時間",
+      "milestone": "リリース、締切など"
+    }
+  },
+  "showAs": {
+    "busy": "予定あり",
+    "free": "空き",
+    "tentative": "仮",
+    "oof": "不在"
+  },
+  "blockLabel": {
+    "preset": {
+      "working": "仕事中",
+      "focus": "集中時間",
+      "oof": "不在",
+      "custom": "カスタム…"
+    }
+  },
+  "recurrence": {
+    "preset": {
+      "none": "繰り返しなし",
+      "daily": "毎日",
+      "weekdays": "毎平日",
+      "weekly": "毎週 {day}",
+      "monthly": "毎月",
+      "yearly": "毎年",
+      "custom": "カスタム…"
+    }
+  },
+  "notification": {
+    "preset": {
+      "none": "通知なし",
+      "at_time": "予定の開始時刻",
+      "5min": "5 分前",
+      "10min": "10 分前",
+      "15min": "15 分前",
+      "30min": "30 分前",
+      "1hour": "1 時間前",
+      "1day": "1 日前"
+    }
+  },
+  "validation": {
+    "titleRequired": "タイトルを入力してください",
+    "endBeforeStart": "終了時刻は開始時刻より後にしてください",
+    "calendarRequired": "カレンダーを選択してください",
+    "projectRequired": "プロジェクトを選択してください"
+  },
+  "action": {
+    "submit": {
+      "create": "作成",
+      "edit": "変更を保存"
+    },
+    "cancel": "キャンセル",
+    "delete": "削除",
+    "deleteConfirm": "この{kind}を削除しますか？",
+    "moreOptions": "詳細オプション"
+  },
+  "toast": {
+    "created": {
+      "task": "タスクを作成しました",
+      "event": "予定を作成しました",
+      "block": "ブロックを作成しました",
+      "free": "空き時間を登録しました",
+      "milestone": "マイルストーンを作成しました"
+    },
+    "updated": {
+      "task": "タスクを更新しました",
+      "event": "予定を更新しました",
+      "block": "ブロックを更新しました",
+      "free": "空き時間を更新しました",
+      "milestone": "マイルストーンを更新しました"
+    },
+    "deleted": {
+      "task": "タスクを削除しました",
+      "event": "予定を削除しました",
+      "block": "ブロックを削除しました",
+      "free": "空き時間を削除しました",
+      "milestone": "マイルストーンを削除しました"
+    },
+    "createFailed": "作成できませんでした",
+    "updateFailed": "保存できませんでした",
+    "deleteFailed": "削除できませんでした"
+  },
+  "a11y": {
+    "kind_picker": "種別",
+    "close": "ダイアログを閉じる",
+    "delete_button": "このアイテムを削除"
+  }
+}
