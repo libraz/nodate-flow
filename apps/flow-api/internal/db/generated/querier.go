@@ -16,8 +16,12 @@ type Querier interface {
 	// Worker finished successfully.
 	AckAgentRun(ctx context.Context, arg AckAgentRunParams) error
 	// Attach a user to a task in the given role.
+	// Idempotent: if a soft-deleted row already exists for this (task, user, role),
+	// re-enable it and adopt the newly supplied public_id.
 	AddActor(ctx context.Context, arg AddActorParams) (int64, error)
 	// Attach an AI agent to a task in the given role.
+	// Idempotent: if a soft-deleted row already exists for this (task, agent, role),
+	// re-enable it and adopt the newly supplied public_id.
 	AddAgentActor(ctx context.Context, arg AddAgentActorParams) (int64, error)
 	// Insert metadata for a newly uploaded attachment.
 	AddAttachment(ctx context.Context, arg AddAttachmentParams) (int64, error)

@@ -21,6 +21,9 @@ INSERT INTO task_actors (
   user_id,
   role
 ) VALUES (?, ?, ?, ?, ?)
+ON DUPLICATE KEY UPDATE
+  enabled = TRUE,
+  public_id = VALUES(public_id)
 `
 
 type AddActorParams struct {
@@ -32,6 +35,8 @@ type AddActorParams struct {
 }
 
 // Attach a user to a task in the given role.
+// Idempotent: if a soft-deleted row already exists for this (task, user, role),
+// re-enable it and adopt the newly supplied public_id.
 func (q *Queries) AddActor(ctx context.Context, arg AddActorParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, addActor,
 		arg.PublicID,
@@ -55,6 +60,9 @@ INSERT INTO task_actors (
   kind,
   role
 ) VALUES (?, ?, ?, ?, 'agent', ?)
+ON DUPLICATE KEY UPDATE
+  enabled = TRUE,
+  public_id = VALUES(public_id)
 `
 
 type AddAgentActorParams struct {
@@ -66,6 +74,8 @@ type AddAgentActorParams struct {
 }
 
 // Attach an AI agent to a task in the given role.
+// Idempotent: if a soft-deleted row already exists for this (task, agent, role),
+// re-enable it and adopt the newly supplied public_id.
 func (q *Queries) AddAgentActor(ctx context.Context, arg AddAgentActorParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, addAgentActor,
 		arg.PublicID,

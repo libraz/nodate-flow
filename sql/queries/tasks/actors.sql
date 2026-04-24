@@ -1,12 +1,17 @@
 -- name: AddActor :execlastid
 -- Attach a user to a task in the given role.
+-- Idempotent: if a soft-deleted row already exists for this (task, user, role),
+-- re-enable it and adopt the newly supplied public_id.
 INSERT INTO task_actors (
   public_id,
   workspace_id,
   task_id,
   user_id,
   role
-) VALUES (?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?)
+ON DUPLICATE KEY UPDATE
+  enabled = TRUE,
+  public_id = VALUES(public_id);
 
 -- name: ListActorsForTask :many
 -- List actors on a task joined with user display fields.
@@ -31,6 +36,8 @@ LIMIT ? OFFSET ?;
 
 -- name: AddAgentActor :execlastid
 -- Attach an AI agent to a task in the given role.
+-- Idempotent: if a soft-deleted row already exists for this (task, agent, role),
+-- re-enable it and adopt the newly supplied public_id.
 INSERT INTO task_actors (
   public_id,
   workspace_id,
@@ -38,7 +45,10 @@ INSERT INTO task_actors (
   agent_id,
   kind,
   role
-) VALUES (?, ?, ?, ?, 'agent', ?);
+) VALUES (?, ?, ?, ?, 'agent', ?)
+ON DUPLICATE KEY UPDATE
+  enabled = TRUE,
+  public_id = VALUES(public_id);
 
 -- name: ListAgentActorsForTask :many
 -- List AI agent actors on a task joined with the agent definition.
