@@ -69,7 +69,10 @@ test.describe('authenticated home page', () => {
   test('renders dashboard with greeting and widgets', async ({ page }) => {
     await injectAuth(page.context(), tenant);
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    // networkidle is unusable here: the authenticated shell mounts a
+    // long-lived SSE workspace stream that keeps the network busy forever.
+    // Wait for the <main> shell + greeting heading instead.
+    await expect(page.getByRole('main')).toBeVisible({ timeout: 10_000 });
 
     // Should show a greeting (personalized or generic)
     const heading = page.getByRole('heading', { level: 1 });
@@ -84,10 +87,12 @@ test.describe('authenticated home page', () => {
   test('today view renders without i18n key leaks', async ({ page }) => {
     await injectAuth(page.context(), tenant);
     await page.goto('/today');
-    await page.waitForLoadState('networkidle');
-
-    // Wait for content to load
-    await page.waitForTimeout(1000);
+    // SSE stream prevents networkidle; wait for the /today h1 + shell instead.
+    await expect(page.getByRole('main')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 10_000 });
+    // Small settle so any async-loaded section labels (overdue/today/upcoming)
+    // finish translating before we scrape the body text.
+    await page.waitForTimeout(300);
 
     const body = await page.locator('body').textContent();
     // Section keys like "today.section_overdue" should be translated
@@ -97,8 +102,12 @@ test.describe('authenticated home page', () => {
   test('accessibility check on home page', async ({ page }) => {
     await injectAuth(page.context(), tenant);
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    // SSE stream prevents networkidle; wait for <main> + h1 to render.
+    await expect(page.getByRole('main')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 10_000 });
+    // Small settle so interactive widgets (dock, sidebar) finish mounting
+    // before axe walks the tree.
+    await page.waitForTimeout(300);
     await checkA11y(page, ['color-contrast', 'region']);
   });
 });
@@ -116,8 +125,15 @@ test.describe('i18n key exposure sweep', () => {
     test(`no i18n keys on ${route}`, async ({ page }) => {
       await injectAuth(page.context(), tenant);
       await page.goto(route);
-      await page.waitForLoadState('networkidle');
-      await page.waitForTimeout(500);
+      // networkidle never fires here because the authenticated shell holds an
+      // SSE connection open. Wait for <main> + some rendered text instead.
+      await expect(page.getByRole('main')).toBeVisible({ timeout: 10_000 });
+      await expect
+        .poll(async () => ((await page.locator('body').textContent()) ?? '').trim().length, {
+          timeout: 10_000,
+        })
+        .toBeGreaterThan(0);
+      await page.waitForTimeout(300);
 
       const body = await page.locator('body').textContent();
       // Common i18n key patterns: "namespace.key" with dots

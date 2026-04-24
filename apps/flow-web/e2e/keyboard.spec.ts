@@ -22,8 +22,13 @@ test.describe('keyboard shortcuts', () => {
     await page.goto('/');
     await expect(page).toHaveURL(/\//, { timeout: 10_000 });
 
-    // Wait for the app to fully hydrate
-    await page.waitForLoadState('networkidle');
+    // Wait for the dashboard shell + greeting heading to render. We cannot use
+    // networkidle here because the authenticated shell mounts a long-lived
+    // SSE workspace stream, so the network is never idle.
+    await expect(page.getByRole('main')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 10_000 });
+    // Short settle for React to finish hydrating event handlers (Cmd+K listener).
+    await page.waitForTimeout(300);
 
     // Accessibility check on the main authenticated view
     await checkA11y(page, ['color-contrast', 'region']);

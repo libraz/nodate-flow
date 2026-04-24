@@ -40,7 +40,7 @@ test.describe('security page interactions', () => {
     await expect(submitButtons.first()).toBeVisible({ timeout: 10_000 });
   });
 
-  test('TOTP section shows enable or disable button', async ({ page }) => {
+  test('TOTP section shows an action button for the current status', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
     await page.goto('/security');
@@ -51,13 +51,19 @@ test.describe('security page interactions', () => {
       timeout: 10_000,
     });
 
-    // Wait for TOTP status to load (loading text disappears, button appears)
-    const totpButton = page.getByRole('button', { name: /enable|disable/i });
-    await expect(totpButton).toBeVisible({ timeout: 10_000 });
+    // The TOTP section renders one of three action buttons depending on the
+    // server-side status: `security.totp.start_setup` ("Start setup" / "設定を開始")
+    // when disabled, `security.totp.resume_restart` ("Restart setup" /
+    // "最初からやり直す") when a pending enrollment exists, or
+    // `security.totp.disable` ("Disable 2FA" / "2FAを無効化") when enabled. Match
+    // any of them to stay resilient against the tenant's initial state.
+    const totpButton = page.getByRole('button', {
+      name: /Start setup|Restart setup|Disable 2FA|設定を開始|最初からやり直す|2FAを無効化/,
+    });
+    await expect(totpButton.first()).toBeVisible({ timeout: 10_000 });
 
-    // The button text should be one of "Enable" or "Disable"
-    const text = await totpButton.textContent();
-    expect(text).toMatch(/enable|disable/i);
+    const text = (await totpButton.first().textContent())?.trim() ?? '';
+    expect(text.length).toBeGreaterThan(0);
   });
 
   test('active sessions section shows at least one session', async ({ page }) => {
@@ -82,8 +88,15 @@ test.describe('security page interactions', () => {
     await page.goto('/security');
     await page.waitForLoadState('networkidle');
 
-    // Wait for all sections to finish loading
-    await page.getByRole('button', { name: /enable|disable/i }).waitFor({ timeout: 10_000 });
+    // Wait for all sections to finish loading. The TOTP action button is the
+    // last piece of async content to render; see the TOTP test above for the
+    // three possible button labels (en + ja).
+    await page
+      .getByRole('button', {
+        name: /Start setup|Restart setup|Disable 2FA|設定を開始|最初からやり直す|2FAを無効化/,
+      })
+      .first()
+      .waitFor({ timeout: 10_000 });
 
     const body = await page.locator('body').textContent();
     expect(body).not.toMatch(/\bsecurity\.\w+\b/);
@@ -95,8 +108,14 @@ test.describe('security page interactions', () => {
     await page.goto('/security');
     await page.waitForLoadState('networkidle');
 
-    // Wait for async content to settle
-    await page.getByRole('button', { name: /enable|disable/i }).waitFor({ timeout: 10_000 });
+    // Wait for async content to settle. See the TOTP test above for why
+    // we match three possible button labels across en + ja.
+    await page
+      .getByRole('button', {
+        name: /Start setup|Restart setup|Disable 2FA|設定を開始|最初からやり直す|2FAを無効化/,
+      })
+      .first()
+      .waitFor({ timeout: 10_000 });
 
     await checkA11y(page, ['color-contrast', 'region']);
   });

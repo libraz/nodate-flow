@@ -37,8 +37,13 @@ test.describe('profile save', () => {
     // Click save
     await saveButton.click();
 
-    // Wait for success feedback
-    await expect(page.locator('output')).toBeVisible({ timeout: 10_000 });
+    // Wait for success feedback. Scope to the form's live-region output: a
+    // separate empty <output> exists inside #nf-toast-root as the toast
+    // viewport, which would otherwise trigger a strict-mode violation.
+    const successMessage = page
+      .locator('output')
+      .filter({ hasText: /Profile updated successfully\.|プロフィールを更新しました。/ });
+    await expect(successMessage).toBeVisible({ timeout: 10_000 });
 
     // Reload the page to verify persistence
     await page.reload();
