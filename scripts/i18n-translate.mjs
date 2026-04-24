@@ -9,8 +9,8 @@
 //
 // The --check mode also scans every apps/*/locales/*/*.json (and
 // apps/*/src/locales/*/*.json for apps that co-locate locales with the
-// source tree, e.g. time-web) for string values that are empty, so a
-// regressed codegen pipeline — like the one that previously shipped
+// source tree) for string values that are empty, so a regressed codegen
+// pipeline — like the one that previously shipped
 // apps/flow-web/locales/ja/errors.json as 253 empty strings — fails CI
 // instead of silently surfacing English copy inside the JA UI.
 //
@@ -171,10 +171,10 @@ if (emptyFindings.length > 0) {
 
 // --- Double-brace placeholder lint --------------------------------------
 //
-// All three web apps register `i18next-icu` as the MessageFormat backend
-// (see apps/flow-web/src/i18n/index.ts, apps/time-web/src/i18n.ts,
-// apps/accounts-web/src/i18n.ts). Under ICU, placeholders use a single
-// brace — `{name}` — while i18next's native interpolator uses a double
+// Both web apps register `i18next-icu` as the MessageFormat backend
+// (see apps/flow-web/src/i18n/index.ts and apps/accounts-web/src/i18n.ts).
+// Under ICU, placeholders use a single brace — `{name}` — while
+// i18next's native interpolator uses a double
 // brace — `{{name}}`. If a locale value mixes the two, ICU treats `{{name}}`
 // as a literal and ships the raw template to the UI (aria-labels,
 // confirmation dialogs, etc.). That's the 2026-04-23 regression.

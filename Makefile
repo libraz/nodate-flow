@@ -49,7 +49,7 @@ stop-dev: ## Kill any running dev servers (auth-api + flow-api + accounts-web + 
 
 reload: stop-dev dev ## Stop running dev servers and start `make dev` fresh
 
-dev-time: db-schema .env ## Start MySQL (compose) + auth API + time API + time web in parallel
+dev-time: db-schema .env ## Start MySQL (compose) + auth API + time API in parallel
 	@echo "starting mysql, auth-api, time-api..."
 	@docker compose up -d mysql
 	@$(MAKE) -j2 dev-auth-api dev-time-api
@@ -103,8 +103,8 @@ logs: ## Tail compose logs
 
 # ---------- build ----------
 
-.PHONY: build build-api build-web build-accounts-web build-time-web
-build: build-api build-auth-api build-time-api build-web build-accounts-web build-time-web ## Build all apps
+.PHONY: build build-api build-web build-accounts-web
+build: build-api build-auth-api build-time-api build-web build-accounts-web ## Build all apps
 
 build-api:
 	cd apps/flow-api && go build -o ../../bin/flow-api ./cmd/api
@@ -121,13 +121,10 @@ build-web:
 build-accounts-web:
 	cd apps/accounts-web && $(PKG_RUN) build
 
-build-time-web:
-	cd apps/time-web && $(PKG_RUN) build
-
 # ---------- test ----------
 
-.PHONY: test test-api test-web test-accounts-web test-time-web test-ui test-sdk test-e2e test-contract lighthouse
-test: test-api test-auth-api test-time-api test-web test-accounts-web test-time-web test-ui test-sdk ## Run unit/integration tests (Go + TS)
+.PHONY: test test-api test-web test-accounts-web test-ui test-sdk test-e2e test-contract lighthouse
+test: test-api test-auth-api test-time-api test-web test-accounts-web test-ui test-sdk ## Run unit/integration tests (Go + TS)
 
 test-api: ## Go tests (flow)
 	cd apps/flow-api && go test ./...
@@ -143,9 +140,6 @@ test-web: ## Vitest (flow-web)
 
 test-accounts-web: ## Vitest (accounts-web)
 	cd apps/accounts-web && $(PKG_RUN) test
-
-test-time-web: ## Vitest (time-web)
-	cd apps/time-web && $(PKG_RUN) test
 
 test-ui: ## Vitest (packages/ui)
 	cd packages/ui && $(PKG_RUN) test

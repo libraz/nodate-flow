@@ -64,11 +64,10 @@ make help         # 全ターゲット一覧
 ```
 apps/
   flow-api/       # Go バックエンド — タスク, AI, MCP (Huma + chi + sqlc)
-  flow-web/       # React 19 フロントエンド (Vite + TanStack)
+  flow-web/       # React 19 フロントエンド — タスク、カレンダー、/share/cal、/invites/accept、/setup
   auth-api/       # Go — 認証・セッション (JWT, OIDC, TOTP)
   accounts-web/   # React 19 — ログイン / サインアップ / アカウント UI
   time-api/       # Go — カレンダーバックエンド
-  time-web/       # React 19 — カレンダーフロントエンド
   cli/            # CLI (バイナリ名: tnk)
 packages/
   sdk/            # flow-api 用 TS SDK (OpenAPI から生成)

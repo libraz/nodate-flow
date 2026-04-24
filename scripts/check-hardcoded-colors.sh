@@ -11,7 +11,7 @@
 # Allowed locations (excluded from scan):
 #   - packages/ui/src/themes/    (theme definitions must use raw colors)
 #   - packages/ui/src/tokens/    (token definitions)
-#   - apps/time-web/src/styles/main.css (calendar token definitions --nf-cal-*)
+#   - packages/ui/src/calendar/**/*.module.css (calendar token definitions --nf-cal-*)
 #   - *.test.* / *.spec.*        (test files)
 #   - node_modules/
 
@@ -28,7 +28,6 @@ COLOR_PATTERN='(#[0-9a-fA-F]{3,8}\b|rgba?\s*\(|hsla?\s*\(|oklch\s*\()'
 # Files to scan
 SCAN_DIRS=(
   "$ROOT/apps/flow-web/src"
-  "$ROOT/apps/time-web/src"
   "$ROOT/apps/accounts-web/src"
   "$ROOT/packages/ui/src/primitives"
 )

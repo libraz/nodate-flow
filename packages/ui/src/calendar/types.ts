@@ -2,10 +2,10 @@
  * Shared calendar type contracts for @nodate-flow/ui/calendar.
  *
  * These types describe the presentational shape a calendar component
- * needs to render an event — detached from any particular SDK so both
- * flow-web and time-web can import them without pulling each other's
- * generated clients. Apps should map their SDK responses to these types
- * at the boundary.
+ * needs to render an event — detached from any particular SDK so app
+ * callers (currently flow-web) can import them without pulling a
+ * specific generated client. Apps should map their SDK responses to
+ * these types at the boundary.
  *
  * The enums below track the live MySQL schema (unified calendar + task
  * integration). A follow-up drops `shared` from CalendarKind; keeping

@@ -29,7 +29,6 @@ STRICT=false
 # Files to scan
 SCAN_DIRS=(
   "$ROOT/apps/flow-web/src"
-  "$ROOT/apps/time-web/src"
   "$ROOT/apps/accounts-web/src"
   "$ROOT/packages/ui/src/primitives"
   "$ROOT/packages/ui/src/providers"

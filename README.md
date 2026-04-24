@@ -71,11 +71,10 @@ make help         # all targets
 ```
 apps/
   flow-api/       # Go backend — tasks, AI, MCP (Huma + chi + sqlc)
-  flow-web/       # React 19 frontend (Vite + TanStack)
+  flow-web/       # React 19 frontend — tasks, calendar, /share/cal, /invites/accept, /setup
   auth-api/       # Go — auth & sessions (JWT, OIDC, TOTP)
   accounts-web/   # React 19 — login / signup / account UI
   time-api/       # Go — calendar backend
-  time-web/       # React 19 — calendar frontend
   cli/            # CLI (binary: tnk)
 packages/
   sdk/            # TS SDK for flow-api (generated from OpenAPI)

@@ -15,7 +15,6 @@
       "apps/flow-api/internal/errors/**",
       "packages/sdk/src/errors/**",
       "apps/flow-web/src/routeTree.gen.ts",
-      "apps/time-web/src/routeTree.gen.ts",
       "apps/accounts-web/src/routeTree.gen.ts",
       "packages/sdk/src/openapi.ts",
       "packages/sdk/src/schema.d.ts",

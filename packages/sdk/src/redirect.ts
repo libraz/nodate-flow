@@ -19,8 +19,8 @@ export function isSafeRedirect(url: string): boolean {
     const parsed = new URL(url);
     if (parsed.origin === window.location.origin) return true;
     // Allow cross-port redirects on the same hostname (e.g. multi-app
-    // local dev where accounts-web, flow-web, and time-web each run on
-    // a different port of localhost).
+    // local dev where accounts-web and flow-web each run on a
+    // different port of localhost).
     return (
       parsed.protocol === window.location.protocol && parsed.hostname === window.location.hostname
     );

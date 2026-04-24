@@ -59,9 +59,9 @@ type Config struct {
 	RateLimitSessionWindowSec int `env:"NF_AUTH_RATE_LIMIT_SESSION_WINDOW" envDefault:"900"`
 
 	// CorsAllowedOrigins is the comma-separated list of origins allowed to
-	// call the auth API with credentials. Must include accounts-web,
-	// flow-web, and time-web origins.
-	CorsAllowedOrigins []string `env:"NF_AUTH_CORS" envSeparator:"," envDefault:"http://localhost:5173,http://localhost:5174,http://localhost:5175,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:5175"`
+	// call the auth API with credentials. Must include accounts-web
+	// (:5175) and flow-web (:5173) origins.
+	CorsAllowedOrigins []string `env:"NF_AUTH_CORS" envSeparator:"," envDefault:"http://localhost:5173,http://localhost:5175,http://127.0.0.1:5173,http://127.0.0.1:5175"`
 
 	// SessionStore selects the refresh-token session driver: mysql or redis.
 	SessionStore string `env:"NF_AUTH_SESSION_STORE" envDefault:"mysql"`
