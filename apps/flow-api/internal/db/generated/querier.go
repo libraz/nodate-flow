@@ -124,6 +124,10 @@ type Querier interface {
 	CleanupExpiredMagicLinks(ctx context.Context) error
 	// Disable TOTP on a local identity.
 	ClearIdentityMfa(ctx context.Context, id uint32) error
+	// Null out the authenticated user's avatar_url column. Used by
+	// DELETE /me/avatar after the object has been removed from storage.
+	// PatchMe cannot be used because NULL narg means "leave alone" there.
+	ClearMyAvatarURL(ctx context.Context, id uint32) error
 	// Dedicated setter that clears expires_at (COALESCE-based patch cannot
 	// distinguish "leave unchanged" from "clear" for nullable columns).
 	ClearPublicShareExpiresAt(ctx context.Context, arg ClearPublicShareExpiresAtParams) error
@@ -990,6 +994,11 @@ type Querier interface {
 	// Enable public sharing on a lens. Generates a share URL token.
 	// No-op if the lens is already public (WHERE is_public = FALSE guard).
 	SetLensPublic(ctx context.Context, arg SetLensPublicParams) error
+	// Replace the authenticated user's avatar_url column with a non-NULL value.
+	// Used by POST /me/avatar after a successful upload. The COALESCE-style
+	// PatchMe query cannot be reused because it treats NULL as "leave alone"
+	// rather than "overwrite with this value".
+	SetMyAvatarURL(ctx context.Context, arg SetMyAvatarURLParams) error
 	// Set the task_number after allocation.
 	SetTaskNumber(ctx context.Context, arg SetTaskNumberParams) error
 	// Snooze a signal by pushing its received_at forward. Minimal impl;

@@ -226,3 +226,22 @@ WHERE id = ?
 UPDATE users
 SET last_login_at = NOW()
 WHERE id = ?;
+
+-- name: SetMyAvatarURL :exec
+-- Replace the authenticated user's avatar_url column with a non-NULL value.
+-- Used by POST /me/avatar after a successful upload. The COALESCE-style
+-- PatchMe query cannot be reused because it treats NULL as "leave alone"
+-- rather than "overwrite with this value".
+UPDATE users
+SET avatar_url = ?
+WHERE id = ?
+  AND enabled = TRUE;
+
+-- name: ClearMyAvatarURL :exec
+-- Null out the authenticated user's avatar_url column. Used by
+-- DELETE /me/avatar after the object has been removed from storage.
+-- PatchMe cannot be used because NULL narg means "leave alone" there.
+UPDATE users
+SET avatar_url = NULL
+WHERE id = ?
+  AND enabled = TRUE;

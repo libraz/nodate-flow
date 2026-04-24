@@ -74,6 +74,10 @@ type Querier interface {
 	CleanupExpiredMagicLinks(ctx context.Context) error
 	// Disable TOTP on a local identity.
 	ClearIdentityMfa(ctx context.Context, id uint32) error
+	// Null out the authenticated user's avatar_url column. Used by
+	// DELETE /me/avatar after the object has been removed from storage.
+	// PatchMe cannot be used because NULL narg means "leave alone" there.
+	ClearMyAvatarURL(ctx context.Context, id uint32) error
 	// Mark a pending TOTP enrollment as confirmed by stamping
 	// mfa_confirmed_at. The caller must have already validated a code
 	// against the stored secret.
@@ -240,6 +244,11 @@ type Querier interface {
 	// Begin (or restart) TOTP enrollment by writing a fresh encrypted
 	// secret and clearing any previous confirmation timestamp.
 	SetIdentityMfaSecret(ctx context.Context, arg SetIdentityMfaSecretParams) error
+	// Replace the authenticated user's avatar_url column with a non-NULL value.
+	// Used by POST /me/avatar after a successful upload. The COALESCE-style
+	// PatchMe query cannot be reused because it treats NULL as "leave alone"
+	// rather than "overwrite with this value".
+	SetMyAvatarURL(ctx context.Context, arg SetMyAvatarURLParams) error
 	// Replace stored tokens after a successful refresh.
 	UpdateConnectionTokens(ctx context.Context, arg UpdateConnectionTokensParams) error
 	// Bump failed login counter and optionally apply a lockout deadline.

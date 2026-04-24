@@ -211,6 +211,21 @@ func (q *Queries) ClearIdentityMfa(ctx context.Context, id uint32) error {
 	return err
 }
 
+const clearMyAvatarURL = `-- name: ClearMyAvatarURL :exec
+UPDATE users
+SET avatar_url = NULL
+WHERE id = ?
+  AND enabled = TRUE
+`
+
+// Null out the authenticated user's avatar_url column. Used by
+// DELETE /me/avatar after the object has been removed from storage.
+// PatchMe cannot be used because NULL narg means "leave alone" there.
+func (q *Queries) ClearMyAvatarURL(ctx context.Context, id uint32) error {
+	_, err := q.db.ExecContext(ctx, clearMyAvatarURL, id)
+	return err
+}
+
 const confirmIdentityMfa = `-- name: ConfirmIdentityMfa :exec
 UPDATE identities
 SET mfa_confirmed_at = CURRENT_TIMESTAMP
@@ -773,6 +788,27 @@ type SetIdentityMfaSecretParams struct {
 // secret and clearing any previous confirmation timestamp.
 func (q *Queries) SetIdentityMfaSecret(ctx context.Context, arg SetIdentityMfaSecretParams) error {
 	_, err := q.db.ExecContext(ctx, setIdentityMfaSecret, arg.MfaSecretCiphertext, arg.ID)
+	return err
+}
+
+const setMyAvatarURL = `-- name: SetMyAvatarURL :exec
+UPDATE users
+SET avatar_url = ?
+WHERE id = ?
+  AND enabled = TRUE
+`
+
+type SetMyAvatarURLParams struct {
+	AvatarUrl sql.NullString `json:"avatarUrl"`
+	ID        uint32         `json:"-"`
+}
+
+// Replace the authenticated user's avatar_url column with a non-NULL value.
+// Used by POST /me/avatar after a successful upload. The COALESCE-style
+// PatchMe query cannot be reused because it treats NULL as "leave alone"
+// rather than "overwrite with this value".
+func (q *Queries) SetMyAvatarURL(ctx context.Context, arg SetMyAvatarURLParams) error {
+	_, err := q.db.ExecContext(ctx, setMyAvatarURL, arg.AvatarUrl, arg.ID)
 	return err
 }
 
