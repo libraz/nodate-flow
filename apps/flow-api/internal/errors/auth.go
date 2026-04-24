@@ -4,6 +4,16 @@ package errors
 
 // Error codes and specs.
 var (
+	// AUTH.AVATAR.NOT_FOUND — Avatar not found.
+	AuthAvatarNotFound = &Spec{Code: "AUTH.AVATAR.NOT_FOUND", Status: 404, Message: "Avatar not found."}
+	// AUTH.AVATAR.STORAGE_UNAVAILABLE — Avatar storage is temporarily unavailable. Please try again.
+	AuthAvatarStorageUnavailable = &Spec{Code: "AUTH.AVATAR.STORAGE_UNAVAILABLE", Status: 503, Message: "Avatar storage is temporarily unavailable. Please try again."}
+	// AUTH.AVATAR.UPLOAD_INVALID_IMAGE — The uploaded file is not a valid image.
+	AuthAvatarUploadInvalidImage = &Spec{Code: "AUTH.AVATAR.UPLOAD_INVALID_IMAGE", Status: 400, Message: "The uploaded file is not a valid image."}
+	// AUTH.AVATAR.UPLOAD_TOO_LARGE — The uploaded image is too large. Maximum size is 5 MB.
+	AuthAvatarUploadTooLarge = &Spec{Code: "AUTH.AVATAR.UPLOAD_TOO_LARGE", Status: 413, Message: "The uploaded image is too large. Maximum size is 5 MB."}
+	// AUTH.AVATAR.UPLOAD_UNSUPPORTED_TYPE — Unsupported image type. Use JPEG, PNG, WebP, or GIF.
+	AuthAvatarUploadUnsupportedType = &Spec{Code: "AUTH.AVATAR.UPLOAD_UNSUPPORTED_TYPE", Status: 415, Message: "Unsupported image type. Use JPEG, PNG, WebP, or GIF."}
 	// AUTH.LOGIN.ACCOUNT_LOCKED — Account is temporarily locked
 	AuthLoginAccountLocked = &Spec{Code: "AUTH.LOGIN.ACCOUNT_LOCKED", Status: 423, Message: "Account is temporarily locked"}
 	// AUTH.LOGIN.INVALID_CREDENTIALS — Invalid email or password

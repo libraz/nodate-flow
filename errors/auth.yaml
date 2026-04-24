@@ -300,3 +300,46 @@ resources:
         message_ja: "パーソナルアクセストークンの有効期限が切れました"
         description: "Returned when the PAT's expiration timestamp has passed."
         userAction: "Create a new personal access token."
+
+  avatar:
+    breadcrumb: "Auth > Avatar"
+    errors:
+      upload_too_large:
+        code: AUTH.AVATAR.UPLOAD_TOO_LARGE
+        status: 413
+        message: "The uploaded image is too large. Maximum size is 5 MB."
+        message_ja: "画像サイズが大きすぎます。上限は 5 MB です。"
+        description: "Returned when the avatar upload request body exceeds the 5 MB size limit enforced by the server."
+        userAction: "Choose a smaller image (under 5 MB) and try uploading again."
+
+      upload_invalid_image:
+        code: AUTH.AVATAR.UPLOAD_INVALID_IMAGE
+        status: 400
+        message: "The uploaded file is not a valid image."
+        message_ja: "画像ファイルとして読み込めませんでした。"
+        description: "Returned when the uploaded file cannot be decoded as an image, or its bytes do not match any supported image format."
+        userAction: "Re-export the file as a valid JPEG, PNG, WebP, or GIF image and try again."
+
+      upload_unsupported_type:
+        code: AUTH.AVATAR.UPLOAD_UNSUPPORTED_TYPE
+        status: 415
+        message: "Unsupported image type. Use JPEG, PNG, WebP, or GIF."
+        message_ja: "対応していない画像形式です。JPEG / PNG / WebP / GIF のいずれかを指定してください。"
+        description: "Returned when the uploaded avatar's MIME type is not one of the accepted values (image/jpeg, image/png, image/webp, image/gif)."
+        userAction: "Convert the image to JPEG, PNG, WebP, or GIF and upload it again."
+
+      not_found:
+        code: AUTH.AVATAR.NOT_FOUND
+        status: 404
+        message: "Avatar not found."
+        message_ja: "プロフィール画像が見つかりませんでした。"
+        description: "Returned by the avatar proxy endpoint when the target user does not exist or has no avatar stored."
+        userAction: "Upload an avatar first, or verify that the user identifier is correct."
+
+      storage_unavailable:
+        code: AUTH.AVATAR.STORAGE_UNAVAILABLE
+        status: 503
+        message: "Avatar storage is temporarily unavailable. Please try again."
+        message_ja: "プロフィール画像ストレージに一時的に接続できません。時間をおいて再度お試しください。"
+        description: "Returned when the avatar object store (S3 or MinIO) is unreachable or fails to read/write the avatar object."
+        userAction: "Wait a moment and retry the request. If the problem persists, contact your instance administrator."
