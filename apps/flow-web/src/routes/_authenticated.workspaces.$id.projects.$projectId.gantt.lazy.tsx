@@ -15,7 +15,9 @@
 
 import type { components } from '@nodate-flow/sdk';
 import Button from '@nodate-flow/ui/primitives/button';
+import SegmentedControl from '@nodate-flow/ui/primitives/segmented-control';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
+import { ToggleChip } from '@nodate-flow/ui/primitives/toggle-chip';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { Link, createLazyFileRoute, getRouteApi, useNavigate } from '@tanstack/react-router';
 import { ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react';
@@ -36,6 +38,13 @@ const ROW_GAP = 4;
 const BAR_HEIGHT = 14;
 const HEADER_HEIGHT = 36;
 const LABEL_WIDTH = 220;
+
+/**
+ * Shared accent color for the critical-path bar stroke, dependency arrows
+ * and the `ToggleChip` legend. Kept as a single source of truth so the
+ * toggle visually doubles as a legend for the chart highlight.
+ */
+const CRITICAL_PATH_COLOR = 'var(--nf-color-danger, #c0392b)';
 
 /** Zoom presets: pixel width per day. */
 const ZOOM_LEVELS = [4, 6, 8, 12, 18, 24, 36, 48, 64] as const;
@@ -163,6 +172,24 @@ function computeCriticalPath(
   }
   if (path.size < 2) return new Set();
   return path;
+}
+
+/** Symbolic identifier for each zoom preset used by the segmented control. */
+type ZoomPreset = 'month' | 'week' | 'day';
+
+/** Map a preset identifier to its `ZOOM_LEVELS` index. */
+const ZOOM_PRESET_INDEX: Record<ZoomPreset, number> = {
+  month: ZOOM_PRESET_MONTH,
+  week: ZOOM_PRESET_WEEK,
+  day: ZOOM_PRESET_DAY,
+};
+
+/** Inverse of {@link ZOOM_PRESET_INDEX}: map a zoom index back to a preset. */
+function zoomPresetFromIndex(idx: number): ZoomPreset | undefined {
+  if (idx === ZOOM_PRESET_MONTH) return 'month';
+  if (idx === ZOOM_PRESET_WEEK) return 'week';
+  if (idx === ZOOM_PRESET_DAY) return 'day';
+  return undefined;
 }
 
 function GanttRoute(): ReactElement {
@@ -426,30 +453,27 @@ function GanttView(): ReactElement {
             >
               <Minus size={14} aria-hidden />
             </Button>
-            <Button
-              type="button"
-              variant={zoomIdx === ZOOM_PRESET_MONTH ? 'default' : 'ghost'}
+            {/*
+             * View selector: Month / Week / Day as a segmented control.
+             * Delegates to the shared `SegmentedControl` primitive which
+             * implements the WAI-ARIA APG radiogroup pattern (roving
+             * tabindex, arrow / Home / End nav, space / enter activation).
+             * When the current zoom index doesn't match any preset (the
+             * user has stepped in/out) the control renders with no segment
+             * selected, which the primitive handles by parking roving
+             * focus on the first enabled option.
+             */}
+            <SegmentedControl<ZoomPreset>
+              ariaLabel={t('gantt.zoom_preset_aria')}
               size="sm"
-              onClick={() => setZoomIdx(ZOOM_PRESET_MONTH)}
-            >
-              {t('gantt.zoom_month')}
-            </Button>
-            <Button
-              type="button"
-              variant={zoomIdx === ZOOM_PRESET_WEEK ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setZoomIdx(ZOOM_PRESET_WEEK)}
-            >
-              {t('gantt.zoom_week')}
-            </Button>
-            <Button
-              type="button"
-              variant={zoomIdx === ZOOM_PRESET_DAY ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setZoomIdx(ZOOM_PRESET_DAY)}
-            >
-              {t('gantt.zoom_day')}
-            </Button>
+              value={zoomPresetFromIndex(zoomIdx) ?? 'week'}
+              onChange={(next) => setZoomIdx(ZOOM_PRESET_INDEX[next])}
+              options={[
+                { value: 'month', label: t('gantt.zoom_month') },
+                { value: 'week', label: t('gantt.zoom_week') },
+                { value: 'day', label: t('gantt.zoom_day') },
+              ]}
+            />
             <Button
               type="button"
               variant="ghost"
@@ -462,28 +486,23 @@ function GanttView(): ReactElement {
             </Button>
           </div>
 
-          {/* Critical path toggle */}
-          <label
+          {/* Critical path toggle (doubles as a legend: accent matches bar stroke). */}
+          <div
             style={{
               display: 'flex',
-              gap: '0.375rem',
               alignItems: 'center',
-              fontSize: '0.8125rem',
-              color: 'var(--nf-color-fg-muted)',
-              cursor: 'pointer',
               borderInlineStart: '1px solid var(--nf-color-border)',
               paddingInlineStart: '0.5rem',
-              userSelect: 'none',
             }}
           >
-            <input
-              type="checkbox"
-              checked={showCriticalPath}
-              onChange={(e) => setShowCriticalPath(e.target.checked)}
-              style={{ accentColor: 'var(--nf-color-danger, #c0392b)' }}
-            />
-            {t('gantt.critical_path')}
-          </label>
+            <ToggleChip
+              pressed={showCriticalPath}
+              onPressedChange={setShowCriticalPath}
+              color={CRITICAL_PATH_COLOR}
+            >
+              {t('gantt.critical_path')}
+            </ToggleChip>
+          </div>
         </div>
       </header>
 
@@ -589,7 +608,7 @@ function GanttView(): ReactElement {
                   markerHeight="4"
                   orient="auto-start-reverse"
                 >
-                  <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--nf-color-danger, #c0392b)" />
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill={CRITICAL_PATH_COLOR} />
                 </marker>
                 <marker
                   id="gantt-arrow-done"
@@ -685,9 +704,9 @@ function GanttView(): ReactElement {
                   fill="none"
                   stroke={
                     arrow.critical
-                      ? 'var(--nf-color-danger, #c0392b)'
+                      ? CRITICAL_PATH_COLOR
                       : arrow.danger
-                        ? 'var(--nf-color-danger, #c0392b)'
+                        ? CRITICAL_PATH_COLOR
                         : 'var(--nf-color-fg-muted, var(--nf-color-fg-muted))'
                   }
                   strokeWidth={arrow.critical ? 1.5 : 0.75}
@@ -747,7 +766,7 @@ function GanttView(): ReactElement {
                         rx={6}
                         ry={6}
                         fill="none"
-                        stroke="var(--nf-color-danger, #c0392b)"
+                        stroke={CRITICAL_PATH_COLOR}
                         strokeWidth={2}
                         strokeDasharray="4 2"
                         opacity={0.7}

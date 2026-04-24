@@ -19,7 +19,7 @@ import Combobox from '@nodate-flow/ui/primitives/combobox';
 import DatePicker from '@nodate-flow/ui/primitives/date-picker';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
-import Select from '@nodate-flow/ui/primitives/select';
+import SegmentedControl from '@nodate-flow/ui/primitives/segmented-control';
 import Separator from '@nodate-flow/ui/primitives/separator';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import Spinner from '@nodate-flow/ui/primitives/spinner';
@@ -75,6 +75,47 @@ const TRANSITION_KEY: Record<TransitionName, string> = {
   complete: 'tasks.detail.transitions.complete',
   reopen: 'tasks.detail.transitions.reopen',
   cancel: 'tasks.detail.transitions.cancel',
+};
+
+/**
+ * String token for each task priority rank. The underlying API model stores
+ * priority as an integer 0–4 but the `SegmentedControl` primitive is generic
+ * over `T extends string`; these tokens provide a typesafe bridge.
+ */
+type PriorityToken = 'none' | 'low' | 'medium' | 'high' | 'urgent';
+
+/** Map numeric priority to its segmented-control token. */
+const PRIORITY_TO_TOKEN: Record<TaskPriority, PriorityToken> = {
+  0: 'none',
+  1: 'low',
+  2: 'medium',
+  3: 'high',
+  4: 'urgent',
+};
+
+/** Inverse of {@link PRIORITY_TO_TOKEN}. */
+const TOKEN_TO_PRIORITY: Record<PriorityToken, TaskPriority> = {
+  none: 0,
+  low: 1,
+  medium: 2,
+  high: 3,
+  urgent: 4,
+};
+
+/**
+ * Per-rank tone used by the `colourful` segmented control. Mirrors the
+ * ordinal colour ramp of `PRIORITY_COLOR` (neutral → info → success →
+ * warning → danger) but maps onto the primitive's tone vocabulary.
+ */
+const PRIORITY_SEGMENT_TONE: Record<
+  TaskPriority,
+  'neutral' | 'info' | 'success' | 'warning' | 'danger'
+> = {
+  0: 'neutral',
+  1: 'info',
+  2: 'success',
+  3: 'warning',
+  4: 'danger',
 };
 
 const TRANSITION_VARIANT: Partial<Record<TransitionName, ButtonVariant>> = {
@@ -627,40 +668,55 @@ function Sidebar({
           <Badge tone={STATE_TONE[state]}>{t(STATE_KEY[state])}</Badge>
         </div>
         <Separator />
-        <FormField
-          label={
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}>
-              {t('tasks.detail.priority_label')}
-              <span
-                aria-hidden
-                style={{
-                  display: 'inline-block',
-                  width: '0.5rem',
-                  height: '0.5rem',
-                  borderRadius: '0.125rem',
-                  background: PRIORITY_COLOR[priority],
-                }}
-              />
-            </span>
-          }
-        >
-          {(control) => (
-            <Select
-              {...control}
-              value={String(priority)}
-              onChange={(e) => {
-                const next = Number.parseInt(e.target.value, 10) as TaskPriority;
-                void handlePriorityChange(next);
+        {/*
+         * Priority picker — rendered as a segmented control (radiogroup) so
+         * the five ordinal ranks are visible at once and the active rank is
+         * one click away. We do not use `FormField` here because
+         * `radiogroup` uses `aria-label` for its accessible name rather than
+         * `<label htmlFor>`, so we compose the visible label + colour dot
+         * manually to match the surrounding sidebar rhythm.
+         */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.375rem',
+              fontSize: 'var(--nf-text-sm)',
+              fontWeight: 'var(--nf-weight-medium)',
+              color: 'var(--nf-color-fg)',
+            }}
+          >
+            {t('tasks.detail.priority_label')}
+            <span
+              aria-hidden
+              style={{
+                display: 'inline-block',
+                width: '0.5rem',
+                height: '0.5rem',
+                borderRadius: '0.125rem',
+                background: PRIORITY_COLOR[priority],
               }}
-            >
-              {TASK_PRIORITIES.map((p) => (
-                <option key={p} value={String(p)}>
-                  {t(PRIORITY_KEY[p])}
-                </option>
-              ))}
-            </Select>
-          )}
-        </FormField>
+            />
+          </span>
+          <SegmentedControl<PriorityToken>
+            ariaLabel={t('tasks.priority.aria_label')}
+            colourful
+            size="sm"
+            value={PRIORITY_TO_TOKEN[priority]}
+            onChange={(next) => {
+              void handlePriorityChange(TOKEN_TO_PRIORITY[next]);
+            }}
+            options={TASK_PRIORITIES.map((p) => {
+              const token = PRIORITY_TO_TOKEN[p];
+              return {
+                value: token,
+                label: t(PRIORITY_KEY[p]),
+                tone: PRIORITY_SEGMENT_TONE[p],
+              };
+            })}
+          />
+        </div>
         <FormField label={t('tasks.form.start')}>
           {() => (
             <DatePicker
