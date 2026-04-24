@@ -1,0 +1,19 @@
+/**
+ * Layout for the /calendar page grid + pending invites side widget.
+ *
+ * On narrow viewports the side panel collapses below the month grid so
+ * the calendar retains full inline size.
+ */
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 18rem);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 64rem) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

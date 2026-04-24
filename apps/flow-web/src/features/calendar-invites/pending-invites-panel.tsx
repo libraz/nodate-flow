@@ -1,0 +1,361 @@
+/**
+ * PendingInvitesPanel — side widget for the /calendar page that lists
+ * pending event invites addressed to the authenticated caller.
+ *
+ * Read-only: the canonical RSVP flow is via the magic-link email, whose
+ * plaintext token is required by the public accept endpoint. The listing
+ * API only exposes a public id, so this panel surfaces the invites as a
+ * summary inbox with a hint to check email for the RSVP link.
+ *
+ * Ported from the legacy time-web page at
+ * `apps/time-web/src/routes/me/invites.tsx` as part of the time-web
+ * decommissioning effort (Phase 2). Differences from the original:
+ *   - Rendered as a side widget, not a full page
+ *   - Uses `timeSdk` against time-api (flow-web splits clients by backend)
+ *   - Uses `Intl` helpers in `lib/format` instead of luxon, since flow-web
+ *     does not depend on luxon
+ *   - Surfaces the "check email" RSVP hint as a header subtitle instead
+ *     of per-page explainer
+ *   - Omits the standalone page header/heading; the panel sits beside the
+ *     month grid rather than owning the viewport
+ */
+
+import type { components as timeComponents } from '@nodate-flow/time-sdk';
+import Card from '@nodate-flow/ui/primitives/card';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
+import { useQuery } from '@tanstack/react-query';
+import { Calendar as CalendarIcon, Clock, MapPin } from 'lucide-react';
+import type { ReactElement } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import { ApiError, toApiError } from '../../lib/api-error';
+import { formatEpochDateTime } from '../../lib/format';
+import { timeSdk } from '../../lib/sdk';
+
+type MyInvite = timeComponents['schemas']['MyInviteResponse'];
+
+/**
+ * Non-suspense query hook for listing the caller's pending invites.
+ * Uses a non-suspense query so the panel renders its own loading state
+ * alongside the calendar grid rather than blocking the whole route.
+ */
+function useMyInvitesQuery() {
+  return useQuery({
+    queryKey: ['me', 'invites'] as const,
+    staleTime: 30_000,
+    queryFn: async (): Promise<MyInvite[]> => {
+      const result = await timeSdk.GET('/me/invites');
+      if (result.error || !result.data) {
+        throw toApiError(result.error, 'Failed to load invites');
+      }
+      return result.data.invites ?? [];
+    },
+  });
+}
+
+/**
+ * Format the event when-range from unix-seconds start/end and all-day flag.
+ *
+ * Matches the legacy time-web behaviour: all-day collapses to a date,
+ * same-day ranges collapse to "start – endTime", cross-day ranges keep
+ * both datetimes.
+ */
+function formatWhen(invite: MyInvite, locale: string): string | null {
+  if (!invite.eventStartAt) return null;
+  const startMs = invite.eventStartAt * 1000;
+  const endMs = invite.eventEndAt ? invite.eventEndAt * 1000 : null;
+
+  if (invite.eventAllDay) {
+    try {
+      return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(startMs));
+    } catch {
+      return null;
+    }
+  }
+
+  const start = formatEpochDateTime(invite.eventStartAt, locale);
+  if (!start) return null;
+
+  if (endMs === null || !invite.eventEndAt) return start;
+
+  // Same calendar day → start datetime + end time only.
+  const startDate = new Date(startMs);
+  const endDate = new Date(endMs);
+  const sameDay =
+    startDate.getFullYear() === endDate.getFullYear() &&
+    startDate.getMonth() === endDate.getMonth() &&
+    startDate.getDate() === endDate.getDate();
+
+  if (sameDay) {
+    try {
+      const endTime = new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(endDate);
+      return `${start} – ${endTime}`;
+    } catch {
+      return start;
+    }
+  }
+
+  const end = formatEpochDateTime(invite.eventEndAt, locale);
+  return end ? `${start} – ${end}` : start;
+}
+
+interface InviteCardProps {
+  invite: MyInvite;
+}
+
+function InviteRow({ invite }: InviteCardProps): ReactElement {
+  const { t, i18n } = useTranslation('common');
+  const locale = i18n.resolvedLanguage ?? 'en';
+
+  const whenLabel = formatWhen(invite, locale) ?? t('invites.inbox.undated');
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  const secondsLeft = invite.expiresAt - nowSec;
+  let expiresLabel: string;
+  if (secondsLeft <= 0) {
+    expiresLabel = t('invites.inbox.expired');
+  } else if (secondsLeft < 24 * 60 * 60) {
+    expiresLabel = t('invites.inbox.expires_in_hours', {
+      count: Math.max(1, Math.round(secondsLeft / 3600)),
+    });
+  } else {
+    const formatted = formatEpochDateTime(invite.expiresAt, locale) ?? '';
+    expiresLabel = t('invites.inbox.expires_at', { date: formatted });
+  }
+
+  return (
+    <li style={{ listStyle: 'none' }}>
+      <Card>
+        <p
+          style={{
+            margin: 0,
+            fontWeight: 'var(--nf-weight-semibold)',
+            color: 'var(--nf-color-fg)',
+            fontSize: 'var(--nf-text-sm)',
+            lineHeight: 'var(--nf-leading-snug)',
+          }}
+        >
+          {invite.eventTitle}
+        </p>
+
+        <p
+          style={{
+            marginBlockStart: 'var(--nf-space-1)',
+            marginBlockEnd: 0,
+            fontSize: 'var(--nf-text-xs)',
+            color: 'var(--nf-color-fg-muted)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--nf-space-1)',
+          }}
+        >
+          <Clock size={12} aria-hidden="true" />
+          <span>{whenLabel}</span>
+        </p>
+
+        {invite.eventLocation ? (
+          <p
+            style={{
+              marginBlockStart: 'var(--nf-space-1)',
+              marginBlockEnd: 0,
+              fontSize: 'var(--nf-text-xs)',
+              color: 'var(--nf-color-fg-muted)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--nf-space-1)',
+            }}
+          >
+            <MapPin size={12} aria-hidden="true" />
+            <span>{invite.eventLocation}</span>
+          </p>
+        ) : null}
+
+        <p
+          style={{
+            marginBlockStart: 'var(--nf-space-2)',
+            marginBlockEnd: 0,
+            fontSize: 'var(--nf-text-xs)',
+            color: 'var(--nf-color-fg-subtle)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--nf-space-1)',
+          }}
+        >
+          <CalendarIcon size={12} aria-hidden="true" />
+          <span>
+            {t('invites.inbox.calendar_workspace', {
+              calendar: invite.calendarName,
+              workspace: invite.workspaceName,
+            })}
+          </span>
+        </p>
+
+        <p
+          style={{
+            marginBlockStart: 'var(--nf-space-1)',
+            marginBlockEnd: 0,
+            fontSize: 'var(--nf-text-xs)',
+            color: 'var(--nf-color-fg-subtle)',
+          }}
+        >
+          {expiresLabel}
+        </p>
+      </Card>
+    </li>
+  );
+}
+
+function PanelHeader({ count }: { count: number | null }): ReactElement {
+  const { t } = useTranslation('common');
+  return (
+    <header
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 'var(--nf-space-2)',
+        marginBlockEnd: 'var(--nf-space-2)',
+      }}
+    >
+      <h2
+        style={{
+          margin: 0,
+          fontSize: 'var(--nf-text-base)',
+          fontWeight: 'var(--nf-weight-semibold)',
+          color: 'var(--nf-color-fg)',
+        }}
+      >
+        {t('invites.inbox.title')}
+      </h2>
+      {count !== null && count > 0 ? (
+        <span
+          aria-label={t('invites.inbox.count_badge', { count })}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minInlineSize: '1.25rem',
+            paddingInline: 'var(--nf-space-1)',
+            blockSize: '1.25rem',
+            borderRadius: '999px',
+            background: 'var(--nf-color-accent-subtle)',
+            color: 'var(--nf-color-accent)',
+            fontSize: 'var(--nf-text-xs)',
+            fontWeight: 'var(--nf-weight-semibold)',
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          {count}
+        </span>
+      ) : null}
+    </header>
+  );
+}
+
+/**
+ * PendingInvitesPanel renders the caller's pending event invites as a
+ * compact vertical list. Intended to sit beside the month grid on the
+ * /calendar route.
+ */
+export default function PendingInvitesPanel(): ReactElement {
+  const { t } = useTranslation('common');
+  const { data, isLoading, error } = useMyInvitesQuery();
+
+  if (isLoading) {
+    return (
+      <aside
+        aria-label={t('invites.inbox.title')}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--nf-space-2)',
+          minInlineSize: 0,
+        }}
+      >
+        <PanelHeader count={null} />
+        <Skeleton style={{ blockSize: '4rem' }} />
+        <Skeleton style={{ blockSize: '4rem' }} />
+      </aside>
+    );
+  }
+
+  if (error) {
+    const message = error instanceof ApiError ? error.message : t('invites.inbox.load_error');
+    return (
+      <aside
+        aria-label={t('invites.inbox.title')}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--nf-space-2)',
+          minInlineSize: 0,
+        }}
+      >
+        <PanelHeader count={null} />
+        <Card>
+          <p style={{ margin: 0, color: 'var(--nf-color-danger)' }} role="alert">
+            {message}
+          </p>
+        </Card>
+      </aside>
+    );
+  }
+
+  const invites = data ?? [];
+
+  return (
+    <aside
+      aria-label={t('invites.inbox.title')}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--nf-space-2)',
+        minInlineSize: 0,
+      }}
+    >
+      <PanelHeader count={invites.length} />
+
+      {invites.length === 0 ? (
+        <Card>
+          <p
+            style={{
+              margin: 0,
+              textAlign: 'center',
+              color: 'var(--nf-color-fg-muted)',
+              padding: 'var(--nf-space-3) 0',
+              fontSize: 'var(--nf-text-sm)',
+            }}
+          >
+            {t('invites.inbox.empty')}
+          </p>
+        </Card>
+      ) : (
+        <>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 'var(--nf-text-xs)',
+              color: 'var(--nf-color-fg-muted)',
+            }}
+          >
+            {t('invites.inbox.rsvp_hint')}
+          </p>
+          <ul
+            style={{
+              listStyle: 'none',
+              margin: 0,
+              padding: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'var(--nf-space-2)',
+            }}
+          >
+            {invites.map((invite) => (
+              <InviteRow key={invite.id} invite={invite} />
+            ))}
+          </ul>
+        </>
+      )}
+    </aside>
+  );
+}

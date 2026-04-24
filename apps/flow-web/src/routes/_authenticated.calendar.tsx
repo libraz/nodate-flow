@@ -36,6 +36,8 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import PendingInvitesPanel from '../features/calendar-invites/pending-invites-panel';
+import calendarLayoutStyles from '../features/calendar-invites/pending-invites-panel.module.css';
 import type { Project } from '../features/projects/api';
 import { TASK_PRIORITIES, type TaskDerivedState, type TaskPriority } from '../features/tasks/api';
 import { PRIORITY_KEY, STATE_COLOR } from '../features/tasks/constants';
@@ -838,214 +840,146 @@ function CalendarRoute(): ReactElement {
         </ToggleChipGroup>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
-            gap: '0.25rem',
-            marginBlockEnd: '0.25rem',
-          }}
-        >
-          {WEEKDAY_KEYS.map((wk) => (
-            <div
-              key={wk}
-              style={{
-                fontSize: '0.75rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                color: 'var(--nf-color-fg-muted)',
-                paddingInline: '0.5rem',
-              }}
-            >
-              {t(`calendar.weekday.${wk}`)}
-            </div>
-          ))}
-        </div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
-            gap: '0.25rem',
-          }}
-        >
-          {cells.map((cell) => {
-            const dayTasks = byDate.get(cell.key) ?? [];
-            const dayEvents = eventsByDate.get(cell.key) ?? [];
-            const totalCount = dayTasks.length + dayEvents.length;
-            const isToday = cell.key === todayKey;
-            const isDragOver = dragOverKey === cell.key;
-            return (
+      <div className={calendarLayoutStyles.layout}>
+        <div style={{ display: 'flex', flexDirection: 'column', minInlineSize: 0 }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
+              gap: '0.25rem',
+              marginBlockEnd: '0.25rem',
+            }}
+          >
+            {WEEKDAY_KEYS.map((wk) => (
               <div
-                key={cell.key}
-                onDragEnter={(e) => {
-                  handleDragEnter(e, cell.key);
-                }}
-                onDragOver={handleDragOver}
-                onDragLeave={() => {
-                  handleDragLeave(cell.key);
-                }}
-                onDrop={(e) => {
-                  handleDrop(e, cell.key);
-                }}
-                onClick={(e) => {
-                  if ((e.target as HTMLElement).closest('a, button')) return;
-                  if (cell.inMonth) handleCellClick(cell.key);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    if (cell.inMonth) handleCellClick(cell.key);
-                  }
-                }}
-                role={cell.inMonth ? 'button' : undefined}
-                tabIndex={cell.inMonth ? 0 : undefined}
+                key={wk}
                 style={{
-                  minBlockSize: '7rem',
-                  padding: '0.5rem',
-                  borderRadius: '0.5rem',
-                  background: isDragOver
-                    ? 'var(--nf-color-accent-subtle)'
-                    : cell.inMonth
-                      ? 'var(--nf-color-surface)'
-                      : 'transparent',
-                  border: isDragOver
-                    ? '2px dashed var(--nf-color-accent)'
-                    : isToday
-                      ? '1px solid var(--nf-color-accent)'
-                      : '1px solid transparent',
-                  opacity: cell.inMonth ? 1 : 0.4,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.25rem',
-                  overflow: 'hidden',
-                  cursor: cell.inMonth ? 'pointer' : 'default',
-                  transition: 'background 0.15s, border 0.15s',
+                  fontSize: '0.75rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  color: 'var(--nf-color-fg-muted)',
+                  paddingInline: '0.5rem',
                 }}
-                title={cell.inMonth ? t('calendar.click_to_add') : undefined}
               >
+                {t(`calendar.weekday.${wk}`)}
+              </div>
+            ))}
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
+              gap: '0.25rem',
+            }}
+          >
+            {cells.map((cell) => {
+              const dayTasks = byDate.get(cell.key) ?? [];
+              const dayEvents = eventsByDate.get(cell.key) ?? [];
+              const totalCount = dayTasks.length + dayEvents.length;
+              const isToday = cell.key === todayKey;
+              const isDragOver = dragOverKey === cell.key;
+              return (
                 <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    fontSize: '0.75rem',
-                    fontVariantNumeric: 'tabular-nums',
-                    color: isToday ? 'var(--nf-color-accent)' : 'var(--nf-color-fg-muted)',
-                    fontWeight: isToday ? 600 : 400,
+                  key={cell.key}
+                  onDragEnter={(e) => {
+                    handleDragEnter(e, cell.key);
                   }}
-                >
-                  <span>{cell.date.getDate()}</span>
-                  {totalCount > 0 ? <span>{totalCount}</span> : null}
-                </div>
-                <ul
+                  onDragOver={handleDragOver}
+                  onDragLeave={() => {
+                    handleDragLeave(cell.key);
+                  }}
+                  onDrop={(e) => {
+                    handleDrop(e, cell.key);
+                  }}
+                  onClick={(e) => {
+                    if ((e.target as HTMLElement).closest('a, button')) return;
+                    if (cell.inMonth) handleCellClick(cell.key);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      if (cell.inMonth) handleCellClick(cell.key);
+                    }
+                  }}
+                  role={cell.inMonth ? 'button' : undefined}
+                  tabIndex={cell.inMonth ? 0 : undefined}
                   style={{
-                    listStyle: 'none',
-                    margin: 0,
-                    padding: 0,
+                    minBlockSize: '7rem',
+                    padding: '0.5rem',
+                    borderRadius: '0.5rem',
+                    background: isDragOver
+                      ? 'var(--nf-color-accent-subtle)'
+                      : cell.inMonth
+                        ? 'var(--nf-color-surface)'
+                        : 'transparent',
+                    border: isDragOver
+                      ? '2px dashed var(--nf-color-accent)'
+                      : isToday
+                        ? '1px solid var(--nf-color-accent)'
+                        : '1px solid transparent',
+                    opacity: cell.inMonth ? 1 : 0.4,
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '0.125rem',
+                    gap: '0.25rem',
                     overflow: 'hidden',
+                    cursor: cell.inMonth ? 'pointer' : 'default',
+                    transition: 'background 0.15s, border 0.15s',
                   }}
+                  title={cell.inMonth ? t('calendar.click_to_add') : undefined}
                 >
-                  {dayTasks.slice(0, 3).map((task) => (
-                    <li key={task.id}>
-                      <Link
-                        to="/tasks/$taskId"
-                        params={{ taskId: task.id }}
-                        title={`${task.title} · ${task.workspaceName}`}
-                        draggable
-                        onDragStart={(e) => {
-                          e.dataTransfer.effectAllowed = 'move';
-                          handleDragStart(task.id, cell.key);
-                        }}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.25rem',
-                          fontSize: '0.75rem',
-                          color: 'inherit',
-                          textDecoration: 'none',
-                          padding: '0.125rem 0.25rem',
-                          borderRadius: '0.25rem',
-                          background: 'var(--nf-color-bg)',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          cursor: 'grab',
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                        }}
-                      >
-                        <span
-                          aria-hidden
-                          style={{
-                            inlineSize: '0.5rem',
-                            blockSize: '0.5rem',
-                            borderRadius: '999px',
-                            background:
-                              STATE_COLOR[task.derivedState as TaskDerivedState] ??
-                              'var(--nf-color-fg-muted)',
-                            flexShrink: 0,
-                          }}
-                        />
-                        <span
-                          style={{
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {task.title}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                  {dayTasks.length > 3 ? (
-                    <li
-                      style={{
-                        fontSize: '0.6875rem',
-                        color: 'var(--nf-color-fg-muted)',
-                        paddingInline: '0.25rem',
-                      }}
-                    >
-                      {t('calendar.more', { count: dayTasks.length - 3 })}
-                    </li>
-                  ) : null}
-                  {dayEvents.slice(0, 2).map((ev) => {
-                    const isBlock = ev.kind === 'block';
-                    return (
-                      <li key={`ev-${ev.id}`}>
-                        <button
-                          type="button"
-                          title={`${ev.title} · ${ev.workspaceName}`}
-                          aria-label={t('calendar.event_detail.open_label', {
-                            title: ev.title,
-                            workspace: ev.workspaceName,
-                          })}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedEvent(ev);
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      fontSize: '0.75rem',
+                      fontVariantNumeric: 'tabular-nums',
+                      color: isToday ? 'var(--nf-color-accent)' : 'var(--nf-color-fg-muted)',
+                      fontWeight: isToday ? 600 : 400,
+                    }}
+                  >
+                    <span>{cell.date.getDate()}</span>
+                    {totalCount > 0 ? <span>{totalCount}</span> : null}
+                  </div>
+                  <ul
+                    style={{
+                      listStyle: 'none',
+                      margin: 0,
+                      padding: 0,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.125rem',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {dayTasks.slice(0, 3).map((task) => (
+                      <li key={task.id}>
+                        <Link
+                          to="/tasks/$taskId"
+                          params={{ taskId: task.id }}
+                          title={`${task.title} · ${task.workspaceName}`}
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.effectAllowed = 'move';
+                            handleDragStart(task.id, cell.key);
                           }}
                           style={{
-                            all: 'unset',
-                            boxSizing: 'border-box',
-                            inlineSize: '100%',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '0.25rem',
                             fontSize: '0.75rem',
+                            color: 'inherit',
+                            textDecoration: 'none',
                             padding: '0.125rem 0.25rem',
                             borderRadius: '0.25rem',
-                            background: isBlock
-                              ? 'var(--nf-color-bg-subtle)'
-                              : 'var(--nf-color-accent-subtle)',
+                            background: 'var(--nf-color-bg)',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
-                            cursor: 'pointer',
+                            cursor: 'grab',
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
                           }}
                         >
                           <span
@@ -1053,10 +987,10 @@ function CalendarRoute(): ReactElement {
                             style={{
                               inlineSize: '0.5rem',
                               blockSize: '0.5rem',
-                              transform: 'rotate(45deg)',
-                              background: isBlock
-                                ? 'var(--nf-color-fg-muted)'
-                                : 'var(--nf-color-accent)',
+                              borderRadius: '999px',
+                              background:
+                                STATE_COLOR[task.derivedState as TaskDerivedState] ??
+                                'var(--nf-color-fg-muted)',
                               flexShrink: 0,
                             }}
                           />
@@ -1067,28 +1001,100 @@ function CalendarRoute(): ReactElement {
                               whiteSpace: 'nowrap',
                             }}
                           >
-                            {ev.title}
+                            {task.title}
                           </span>
-                        </button>
+                        </Link>
                       </li>
-                    );
-                  })}
-                  {dayEvents.length > 2 ? (
-                    <li
-                      style={{
-                        fontSize: '0.6875rem',
-                        color: 'var(--nf-color-fg-muted)',
-                        paddingInline: '0.25rem',
-                      }}
-                    >
-                      {t('calendar.more', { count: dayEvents.length - 2 })}
-                    </li>
-                  ) : null}
-                </ul>
-              </div>
-            );
-          })}
+                    ))}
+                    {dayTasks.length > 3 ? (
+                      <li
+                        style={{
+                          fontSize: '0.6875rem',
+                          color: 'var(--nf-color-fg-muted)',
+                          paddingInline: '0.25rem',
+                        }}
+                      >
+                        {t('calendar.more', { count: dayTasks.length - 3 })}
+                      </li>
+                    ) : null}
+                    {dayEvents.slice(0, 2).map((ev) => {
+                      const isBlock = ev.kind === 'block';
+                      return (
+                        <li key={`ev-${ev.id}`}>
+                          <button
+                            type="button"
+                            title={`${ev.title} · ${ev.workspaceName}`}
+                            aria-label={t('calendar.event_detail.open_label', {
+                              title: ev.title,
+                              workspace: ev.workspaceName,
+                            })}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedEvent(ev);
+                            }}
+                            style={{
+                              all: 'unset',
+                              boxSizing: 'border-box',
+                              inlineSize: '100%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              fontSize: '0.75rem',
+                              padding: '0.125rem 0.25rem',
+                              borderRadius: '0.25rem',
+                              background: isBlock
+                                ? 'var(--nf-color-bg-subtle)'
+                                : 'var(--nf-color-accent-subtle)',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <span
+                              aria-hidden
+                              style={{
+                                inlineSize: '0.5rem',
+                                blockSize: '0.5rem',
+                                transform: 'rotate(45deg)',
+                                background: isBlock
+                                  ? 'var(--nf-color-fg-muted)'
+                                  : 'var(--nf-color-accent)',
+                                flexShrink: 0,
+                              }}
+                            />
+                            <span
+                              style={{
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {ev.title}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                    {dayEvents.length > 2 ? (
+                      <li
+                        style={{
+                          fontSize: '0.6875rem',
+                          color: 'var(--nf-color-fg-muted)',
+                          paddingInline: '0.25rem',
+                        }}
+                      >
+                        {t('calendar.more', { count: dayEvents.length - 2 })}
+                      </li>
+                    ) : null}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
         </div>
+
+        <PendingInvitesPanel />
       </div>
 
       {createDate !== null ? (
