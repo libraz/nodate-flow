@@ -42,7 +42,6 @@ import EventDialog, {
 } from '../features/calendar-events/event-dialog';
 import PendingInvitesPanel from '../features/calendar-invites/pending-invites-panel';
 import calendarLayoutStyles from '../features/calendar-invites/pending-invites-panel.module.css';
-import AddTeammateDrawer from '../features/calendars-rail/add-teammate-drawer';
 import CalendarsRail from '../features/calendars-rail/calendars-rail';
 import type { Project } from '../features/projects/api';
 import { useMeQuery } from '../features/settings/api';
@@ -242,10 +241,6 @@ function CalendarRoute(): ReactElement {
   const enterCountRef = useRef<Record<string, number>>({});
 
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
-  // Right-rail "Add teammate calendar" drawer state. `null` keeps the
-  // drawer closed; setting a workspace id opens the drawer scoped to
-  // that workspace's discoverable list.
-  const [addTeammateWsId, setAddTeammateWsId] = useState<string | null>(null);
   const [layers, setLayers] = useState<LayerFlags>({
     tasksDue: true,
     events: true,
@@ -604,11 +599,7 @@ function CalendarRoute(): ReactElement {
       </div>
 
       <div className={calendarLayoutStyles.layout}>
-        <CalendarsRail
-          workspaces={railWorkspaces}
-          selfUserId={selfUserId}
-          onAddTeammate={setAddTeammateWsId}
-        />
+        <CalendarsRail workspaces={railWorkspaces} selfUserId={selfUserId} />
         <div className={styles.gridColumn}>
           <div className={styles.weekdayRow}>
             {weekdayKeys.map((wk, idx) => (
@@ -774,14 +765,6 @@ function CalendarRoute(): ReactElement {
 
         <PendingInvitesPanel />
       </div>
-
-      {addTeammateWsId !== null ? (
-        <AddTeammateDrawer
-          open
-          workspaceId={addTeammateWsId}
-          onClose={() => setAddTeammateWsId(null)}
-        />
-      ) : null}
 
       {editTarget !== null ? (
         <EventDialog

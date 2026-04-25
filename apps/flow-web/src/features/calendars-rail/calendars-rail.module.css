@@ -169,3 +169,144 @@
   font-size: var(--nf-text-xs);
   color: var(--nf-color-fg-muted);
 }
+
+/* ---------------------------------------------------------------------------
+ * Discover-mode header — back arrow + title row that replaces the
+ * default workspace header when the section is morphing into the
+ * teammate-calendar discovery view.
+ * ------------------------------------------------------------------------- */
+
+.sectionHeaderDiscover {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  padding-block-end: var(--nf-space-1);
+  min-block-size: 1.75rem;
+}
+
+.backButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--nf-color-fg-muted);
+  border-radius: var(--nf-radius-sm);
+  cursor: pointer;
+  transition: background var(--nf-duration-fast), color var(--nf-duration-fast);
+}
+
+.backButton:hover {
+  background: var(--nf-color-surface);
+  color: var(--nf-color-fg);
+}
+
+.backButton:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.discoverTitle {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+  line-height: var(--nf-leading-tight);
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------
+ * Discover list — search input, scrollable result list, and per-row
+ * subscribe affordance. Rendered inline by the rail when a section
+ * is in discover mode (no drawer chrome).
+ * ------------------------------------------------------------------------- */
+
+.discoverBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  min-block-size: 0;
+}
+
+.discoverSearch {
+  inline-size: 100%;
+}
+
+.discoverSkeletons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.discoverList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  overflow-y: auto;
+  max-block-size: 60vh;
+}
+
+.discoverRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-2);
+  border-radius: var(--nf-radius-md);
+  border: 1px solid var(--nf-color-border);
+  background: var(--nf-color-surface);
+}
+
+.discoverIdentity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-px);
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.discoverDisplayName {
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.discoverCalendarMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  min-inline-size: 0;
+}
+
+.discoverCalendarName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.discoverDot {
+  flex-shrink: 0;
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  border-radius: var(--nf-radius-pill);
+  border: 1px solid var(--nf-color-border);
+}
+
+.discoverError {
+  margin: 0;
+  color: var(--nf-color-danger);
+  font-size: var(--nf-text-sm);
+}

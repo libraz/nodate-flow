@@ -18,22 +18,26 @@
  * has a single workspace the per-section header is suppressed so the
  * rail reads as a flat list.
  *
- * The component does not own the drawer state — it emits an
- * `onAddTeammate(workspaceId)` callback so the surrounding route can
- * mount {@link AddTeammateDrawer} and pass the active workspace
- * through.
+ * The "Add teammate calendar" affordance now morphs the section
+ * itself into a discovery view: clicking the trigger flips the
+ * section's mode to `discover`, swapping the header for a back-arrow
+ * + "Add teammate calendar" title and replacing the body with
+ * {@link DiscoverList}. This keeps the action visually scoped to the
+ * calendar rail (rather than reading as a global app-shell drawer)
+ * and removes one layer of mounted chrome from the route.
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
 import Popover from '@nodate-flow/ui/primitives/popover';
 import { useQueries } from '@tanstack/react-query';
-import { Eye, EyeOff, MoreVertical } from 'lucide-react';
+import { ChevronLeft, Eye, EyeOff, MoreVertical } from 'lucide-react';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { timeSdk } from '../../lib/sdk';
 import { type RailCalendar, usePatchOwnSubscriptionMutation, useUnsubscribeMutation } from './api';
 import styles from './calendars-rail.module.css';
+import DiscoverList from './discover-list';
 
 interface CalendarsRailProps {
   /**
@@ -47,11 +51,6 @@ interface CalendarsRailProps {
    * leaving a calendar via `members-remove`.
    */
   selfUserId: string;
-  /**
-   * Invoked when the user clicks "Add teammate calendar..." in any
-   * workspace section. The route opens the drawer scoped to `wsId`.
-   */
-  onAddTeammate: (wsId: string) => void;
 }
 
 /**
@@ -63,7 +62,6 @@ interface CalendarsRailProps {
 export default function CalendarsRail({
   workspaces,
   selfUserId,
-  onAddTeammate,
 }: CalendarsRailProps): ReactElement {
   const { t } = useTranslation('common');
 
@@ -98,7 +96,6 @@ export default function CalendarsRail({
             calendars={calendars}
             selfUserId={selfUserId}
             showHeader={showHeaders}
-            onAddTeammate={onAddTeammate}
           />
         );
       })}
@@ -111,24 +108,55 @@ interface CalendarsSectionProps {
   calendars: RailCalendar[];
   selfUserId: string;
   showHeader: boolean;
-  onAddTeammate: (wsId: string) => void;
 }
 
+type SectionMode = 'list' | 'discover';
+
 /**
- * Single workspace section: optional header, calendar rows, and the
- * "Add teammate calendar..." trigger.
+ * Single workspace section. Owns a per-section morph state:
+ *   - `list` (default): optional workspace header, subscribed calendar
+ *     rows, and the "Add teammate calendar..." trigger.
+ *   - `discover`: back-arrow header + {@link DiscoverList} body.
+ *
+ * The trigger and the back button are the only transitions between
+ * the two modes — the section keeps its own state because every
+ * workspace section renders independently and the route should not
+ * have to coordinate which one is in discover mode.
  */
 function CalendarsSection({
   workspace,
   calendars,
   selfUserId,
   showHeader,
-  onAddTeammate,
 }: CalendarsSectionProps): ReactElement {
   const { t } = useTranslation('common');
+  const [mode, setMode] = useState<SectionMode>('list');
+
   const sortedCalendars = [...calendars].sort(
     (a, b) => a.subscriptionSortWeight - b.subscriptionSortWeight,
   );
+
+  if (mode === 'discover') {
+    const titleId = `calendars-rail-discover-title-${workspace.id}`;
+    return (
+      <section className={styles.section} aria-labelledby={titleId}>
+        <header className={styles.sectionHeaderDiscover}>
+          <button
+            type="button"
+            className={styles.backButton}
+            onClick={() => setMode('list')}
+            aria-label={t('calendars_rail.title')}
+          >
+            <ChevronLeft size={16} aria-hidden />
+          </button>
+          <h3 id={titleId} className={styles.discoverTitle}>
+            {t('calendars_rail.discover.title')}
+          </h3>
+        </header>
+        <DiscoverList workspaceId={workspace.id} onClose={() => setMode('list')} />
+      </section>
+    );
+  }
 
   return (
     <section className={styles.section}>
@@ -152,7 +180,7 @@ function CalendarsSection({
         variant="ghost"
         size="sm"
         className={styles.addButton}
-        onClick={() => onAddTeammate(workspace.id)}
+        onClick={() => setMode('discover')}
       >
         {t('calendars_rail.add_teammate')}
       </Button>
