@@ -3,6 +3,7 @@ package obs
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -16,6 +17,23 @@ import (
 )
 
 const tracerName = "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/obs"
+
+// domainForRoute returns the logical sub-domain a route belongs to, for
+// use as an OTel span attribute. After the time-api → flow-api merge the
+// process serves both task and calendar surfaces; tagging spans with
+// domain=calendar lets trace queries continue to slice the calendar
+// surface by itself without needing service.name to differ.
+func domainForRoute(routePattern string) string {
+	switch {
+	case strings.Contains(routePattern, "/calendars"),
+		strings.HasPrefix(routePattern, "/share/cal"),
+		strings.HasPrefix(routePattern, "/invites/"),
+		strings.HasPrefix(routePattern, "/me/invites"):
+		return "calendar"
+	default:
+		return "task"
+	}
+}
 
 // TraceMiddleware returns a chi-compatible HTTP middleware that starts an OTel
 // span for every inbound request. The span name follows the convention
@@ -46,7 +64,9 @@ func TraceMiddleware() func(http.Handler) http.Handler {
 			defer span.End()
 
 			// Attach structured identifiers as span attributes.
-			var attrs []attribute.KeyValue
+			attrs := []attribute.KeyValue{
+				attribute.String("domain", domainForRoute(routePattern)),
+			}
 			if reqID := nflog.RequestIDFromContext(ctx); reqID != "" {
 				attrs = append(attrs, attribute.String("request_id", reqID))
 			}
