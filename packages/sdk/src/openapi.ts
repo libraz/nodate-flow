@@ -605,6 +605,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/calendar-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List events across every workspace the caller belongs to */
+        get: operations["me-calendar-events-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/favorites": {
         parameters: {
             query?: never;
@@ -685,6 +702,23 @@ export interface paths {
         put?: never;
         /** Start a personal OAuth connect flow */
         post: operations["me-integrations-connect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List pending event invites addressed to the caller */
+        get: operations["me-invites-list"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1020,6 +1054,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/public/invites/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept a calendar event invite via magic-link token */
+        post: operations["event-invites-accept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/public/lenses/{token}": {
         parameters: {
             query?: never;
@@ -1048,6 +1099,23 @@ export interface paths {
         put?: never;
         /** Accept or dismiss a relation suggestion */
         post: operations["relation-suggestions-resolve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/share/cal/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Render a public calendar share by URL token */
+        get: operations["public-shares-render"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2212,6 +2280,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{wsId}/calendar-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List events across all calendars in a workspace */
+        get: operations["calendar-events-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{wsId}/calendar-events/{evtId}/apply-shift": {
         parameters: {
             query?: never;
@@ -2263,6 +2348,464 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{wsId}/calendars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List calendars in a workspace */
+        get: operations["calendars-list"];
+        put?: never;
+        /** Create a calendar */
+        post: operations["calendars-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/subscribe-system": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Subscribe the caller to the holiday feed for a country */
+        post: operations["calendars-subscribe-system"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a calendar */
+        get: operations["calendars-get"];
+        put?: never;
+        post?: never;
+        /** Delete a calendar */
+        delete: operations["calendars-delete"];
+        options?: never;
+        head?: never;
+        /** Update a calendar */
+        patch: operations["calendars-patch"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List events in a calendar */
+        get: operations["events-list"];
+        put?: never;
+        /** Create an event */
+        post: operations["events-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/events/from-task": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a calendar event from a task */
+        post: operations["events-from-task"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/events/smart-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Parse natural language text into an event proposal */
+        post: operations["events-smart-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get an event */
+        get: operations["events-get"];
+        put?: never;
+        post?: never;
+        /** Delete an event */
+        delete: operations["events-delete"];
+        options?: never;
+        head?: never;
+        /** Update an event */
+        patch: operations["events-patch"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List attachments on an event */
+        get: operations["attachments-list"];
+        put?: never;
+        /** Record attachment metadata for an event */
+        post: operations["attachments-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete an attachment from an event */
+        delete: operations["attachments-delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List attendees on an event */
+        get: operations["attendees-list"];
+        put?: never;
+        /** Add attendees to an event */
+        post: operations["attendees-add"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/rsvp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update own RSVP for an event */
+        patch: operations["attendees-rsvp"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{attendeeId}/invite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create (or rotate) a magic-link invite for an attendee */
+        post: operations["event-invites-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove an attendee from an event */
+        delete: operations["attendees-remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{userId}/can-edit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Toggle can_edit for an attendee */
+        patch: operations["attendees-can-edit"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/checklist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List checklist items for an event */
+        get: operations["checklist-list"];
+        put?: never;
+        /** Add a checklist item to an event */
+        post: operations["checklist-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/checklist/{itemId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a checklist item */
+        delete: operations["checklist-delete"];
+        options?: never;
+        head?: never;
+        /** Update a checklist item */
+        patch: operations["checklist-update"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List comments on an event */
+        get: operations["comments-list"];
+        put?: never;
+        /** Add a comment to an event */
+        post: operations["comments-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/comments/{cId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a comment */
+        delete: operations["comments-delete"];
+        options?: never;
+        head?: never;
+        /** Edit a comment */
+        patch: operations["comments-edit"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List active magic-link invites for an event */
+        get: operations["event-invites-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/invites/{inviteId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke a magic-link invite */
+        delete: operations["event-invites-revoke"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List members of a calendar */
+        get: operations["members-list"];
+        put?: never;
+        /** Add a member to a calendar */
+        post: operations["members-add"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a member from a calendar */
+        delete: operations["members-remove"];
+        options?: never;
+        head?: never;
+        /** Update a member's role */
+        patch: operations["members-update-role"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/memos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List memos in a calendar */
+        get: operations["memos-list"];
+        put?: never;
+        /** Create a memo */
+        post: operations["memos-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/memos/{memoId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a memo */
+        delete: operations["memos-delete"];
+        options?: never;
+        head?: never;
+        /** Update a memo */
+        patch: operations["memos-update"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/subscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Subscribe the caller to a calendar visible in the workspace */
+        post: operations["calendars-self-subscribe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/subscription": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update the caller's own subscription preferences for a calendar */
+        patch: operations["calendars-self-subscription-patch"];
+        trace?: never;
+    };
     "/workspaces/{wsId}/dashboard/widgets": {
         parameters: {
             query?: never;
@@ -2310,6 +2853,23 @@ export interface paths {
         get?: never;
         /** Update widget position and size */
         put: operations["dashboard-widgets-update-position"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/discoverable-calendars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List teammate personal calendars the caller can subscribe to */
+        get: operations["discoverable-calendars-list"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -2796,6 +3356,111 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{wsId}/public-shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List public share pages in a workspace */
+        get: operations["public-shares-list"];
+        put?: never;
+        /** Create a public share page (returns plaintext token once) */
+        post: operations["public-shares-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/public-shares/{shareId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a public share page with its published events */
+        get: operations["public-shares-get"];
+        put?: never;
+        post?: never;
+        /** Delete a public share page (admin or owner only) */
+        delete: operations["public-shares-delete"];
+        options?: never;
+        head?: never;
+        /** Update public share page metadata */
+        patch: operations["public-shares-patch"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/public-shares/{shareId}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Attach events to a public share page */
+        post: operations["public-shares-events-attach"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/public-shares/{shareId}/events/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Batch-reorder the events published on a public share page */
+        patch: operations["public-shares-events-reorder"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/public-shares/{shareId}/events/{evtId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Detach an event from a public share page */
+        delete: operations["public-shares-events-detach"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/public-shares/{shareId}/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rotate the URL token for a public share page */
+        post: operations["public-shares-rotate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{wsId}/relation-suggestions": {
         parameters: {
             query?: never;
@@ -3078,6 +3743,36 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AcceptEventInviteInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * @description RSVP response to record for the attendee
+             * @enum {string}
+             */
+            rsvp: "accepted" | "declined" | "tentative";
+            /** @description Plaintext magic-link token from the invite email */
+            token: string;
+        };
+        AcceptEventInviteResponse: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            calendarName?: string;
+            /** Format: int64 */
+            eventEndAt?: number;
+            eventId?: string;
+            /** Format: int64 */
+            eventStartAt?: number;
+            eventTitle?: string;
+            inviteId: string;
+            rsvp: string;
+        };
         AcceptWorkspaceInviteOutputBody: {
             /**
              * Format: uri
@@ -3088,6 +3783,37 @@ export interface components {
             /** @description Workspace public id for client redirect */
             workspaceId: string;
             workspaceName: string;
+        };
+        AddAttendeesInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description List of user public IDs to add */
+            userIds: string[] | null;
+        };
+        AddAttendeesOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            attendees: components["schemas"]["AttendeeResponse"][] | null;
+        };
+        AddMemberInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Email of the user to add */
+            email: string;
+            /**
+             * @description Role to assign
+             * @enum {string}
+             */
+            role: "manager" | "editor" | "viewer";
         };
         AddProjectMemberBody: {
             /**
@@ -3219,6 +3945,14 @@ export interface components {
             enabled: boolean | null;
         };
         AdminPatchWorkspaceOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        AdminRevokeSessionOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
@@ -3485,6 +4219,53 @@ export interface components {
             reason: string;
             userPublicId: string;
         };
+        AttachEventsToShareInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Event public IDs to attach; confidential events are rejected */
+            eventIds: string[] | null;
+        };
+        AttachEventsToShareOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            attached: number;
+            /** Format: int64 */
+            skipped: number;
+        };
+        AttachmentResponse: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            byteSize: number;
+            contentType: string;
+            /** Format: int64 */
+            createdAt: number;
+            filename: string;
+            id: string;
+            storageKey: string;
+            uploaderId: string;
+            uploaderName: string;
+        };
+        AttendeeResponse: {
+            avatarUrl?: string;
+            canEdit: boolean;
+            /** Format: int64 */
+            createdAt: number;
+            displayName: string;
+            id: string;
+            rsvp: string;
+            userId: string;
+        };
         AuditEntry: {
             action: string;
             actorDisplayName?: string;
@@ -3549,6 +4330,30 @@ export interface components {
             /** Format: double */
             threshold: number;
         };
+        CalendarResponse: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            color: string;
+            coverUrl?: string;
+            /** Format: int64 */
+            createdAt: number;
+            description?: string;
+            displayColor: string;
+            id: string;
+            kind: string;
+            memberColor: string;
+            name: string;
+            role: string;
+            /** Format: int32 */
+            subscriptionSortWeight: number;
+            systemSlug?: string;
+            /** Format: int64 */
+            updatedAt?: number;
+            visible: boolean;
+        };
         CancelImportOutputBody: {
             /**
              * Format: uri
@@ -3589,6 +4394,36 @@ export interface components {
             ok: boolean;
             /** Format: int64 */
             otherSessionsRevoked: number;
+        };
+        ChecklistItemResponse: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            createdAt: number;
+            done: boolean;
+            id: string;
+            /** Format: int32 */
+            sortWeight: number;
+            title: string;
+        };
+        CommentResponse: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            avatarUrl?: string;
+            body: string;
+            /** Format: int64 */
+            createdAt: number;
+            displayName: string;
+            /** Format: int64 */
+            editedAt?: number;
+            id: string;
+            userId: string;
         };
         CompileConstraintBody: {
             /**
@@ -3730,6 +4565,154 @@ export interface components {
              */
             temperature?: number;
         };
+        CreateAttachmentInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description File size in bytes
+             */
+            byteSize: number;
+            /** @description SHA-256 checksum */
+            checksumSha256?: string;
+            /** @description MIME content type */
+            contentType: string;
+            /** @description Original filename */
+            filename: string;
+            /** @description S3 object key */
+            storageKey: string;
+        };
+        CreateCalendarInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Display color (hex) */
+            color: string;
+            /** @description Cover image URL */
+            coverUrl?: string;
+            /** @description Calendar description */
+            description?: string;
+            /**
+             * @description Calendar kind
+             * @enum {string}
+             */
+            kind: "personal" | "shared" | "system";
+            /** @description Calendar name */
+            name: string;
+            /** @description System calendar slug */
+            systemSlug?: string;
+        };
+        CreateChecklistItemInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int32
+             * @description Sort weight for ordering
+             */
+            sortWeight?: number;
+            /** @description Item title */
+            title: string;
+        };
+        CreateCommentInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Comment text */
+            body: string;
+        };
+        CreateEventFromTaskInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Task public ID (UUID) */
+            taskId: string;
+            /** @description IANA timezone (e.g. America/New_York). Defaults to the caller's user or workspace timezone when omitted, falling back to UTC. */
+            timezone?: string;
+        };
+        CreateEventInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description All-day event flag */
+            allDay?: boolean;
+            /** @description Block label */
+            blockLabel?: string;
+            /**
+             * Format: int64
+             * @description End time as unix seconds (UTC); omit for a planning-stage (undated) event
+             */
+            endAt?: number;
+            /**
+             * @description Event kind
+             * @enum {string}
+             */
+            kind: "event" | "block" | "free" | "milestone";
+            /** @description Location */
+            location?: string;
+            /** @description Memo / notes */
+            memo?: string;
+            /**
+             * Format: int32
+             * @description Notification offset in minutes
+             */
+            notificationOffset?: number;
+            /** @description Owner user public ID (defaults to actor) */
+            ownerUserId?: string;
+            /**
+             * Format: int64
+             * @description Recurrence end as unix seconds (UTC)
+             */
+            recurrenceEnd?: number;
+            /** @description RFC 5545 recurrence rule as JSON */
+            recurrenceRule?: unknown;
+            /**
+             * @description Show-as status
+             * @enum {string}
+             */
+            showAs?: "busy" | "free" | "tentative" | "oof";
+            /**
+             * Format: int64
+             * @description Start time as unix seconds (UTC); omit for a planning-stage (undated) event
+             */
+            startAt?: number;
+            /** @description IANA timezone */
+            timezone: string;
+            /** @description Event title */
+            title: string;
+            /** @description Related URL */
+            url?: string;
+            /**
+             * @description Visibility
+             * @enum {string}
+             */
+            visibility?: "default" | "public" | "private" | "confidential";
+        };
+        CreateEventInviteInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description Token lifetime in hours; default 168, cap 720
+             */
+            expiresInHours?: number;
+        };
         CreateFavoriteBody: {
             /**
              * Format: uri
@@ -3838,6 +4821,20 @@ export interface components {
             token: string;
             tokenPrefix: string;
         };
+        CreateMemoInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int32
+             * @description Sort weight for ordering
+             */
+            sortWeight?: number;
+            /** @description Memo title */
+            title: string;
+        };
         CreateOutputBody: {
             /**
              * Format: uri
@@ -3885,6 +4882,30 @@ export interface components {
             /** @enum {string} */
             kind: "anthropic" | "openai" | "google" | "ollama" | "openai_compat";
             name: string;
+        };
+        CreatePublicShareInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Cover image URL */
+            coverUrl?: string;
+            /** @description Markdown description */
+            description?: string;
+            /**
+             * Format: int64
+             * @description Unix seconds; omit for no expiry
+             */
+            expiresAt?: number;
+            /** @description Icon image URL */
+            iconUrl?: string;
+            /** @description ISO 3166-1 alpha-2 country code; enables holiday overlay */
+            showHolidaysCountry?: string;
+            /** @description IANA timezone; defaults to workspace tz */
+            timezone?: string;
+            /** @description Public-facing title */
+            title: string;
         };
         CreateReactionBody: {
             /**
@@ -4023,6 +5044,70 @@ export interface components {
             /** @description Plaintext token (only returned once) */
             token: string;
         };
+        CrossCalendarEventResponse: {
+            allDay: boolean;
+            blockLabel?: string;
+            calendarId: string;
+            /** Format: int64 */
+            createdAt: number;
+            /** Format: int64 */
+            endAt?: number;
+            id: string;
+            kind: string;
+            location?: string;
+            /** Format: int64 */
+            recurrenceEnd?: number;
+            recurrenceExceptions?: unknown;
+            recurrenceRule?: unknown;
+            showAs: string;
+            /** Format: int64 */
+            startAt?: number;
+            timezone: string;
+            title: string;
+            /** Format: int64 */
+            updatedAt?: number;
+            visibility: string;
+        };
+        DeleteAttachmentOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            deleted: boolean;
+        };
+        DeleteCalendarOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            deleted: boolean;
+        };
+        DeleteChecklistItemOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            deleted: boolean;
+        };
+        DeleteCommentOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            deleted: boolean;
+        };
+        DeleteEventOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            deleted: boolean;
+        };
         DeleteFavoriteOutputBody: {
             /**
              * Format: uri
@@ -4047,6 +5132,14 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        DeleteMemoOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            deleted: boolean;
+        };
         DeleteOutputBody: {
             /**
              * Format: uri
@@ -4070,6 +5163,14 @@ export interface components {
              */
             readonly $schema?: string;
             ok: boolean;
+        };
+        DeletePublicShareOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            deleted: boolean;
         };
         DeleteReactionOutputBody: {
             /**
@@ -4147,6 +5248,14 @@ export interface components {
             /** Format: int64 */
             versionNumber: number;
         };
+        DetachEventFromShareOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            removed: boolean;
+        };
         DisableLabelOutputBody: {
             /**
              * Format: uri
@@ -4187,6 +5296,18 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        DiscoverableCalendarResponse: {
+            color: string;
+            /** Format: int64 */
+            createdAt: number;
+            description?: string;
+            id: string;
+            kind: string;
+            name: string;
+            ownerAvatarUrl?: string;
+            ownerDisplayName: string;
+            ownerUserId: string;
+        };
         DownloadAttachmentOutputBody: {
             /**
              * Format: uri
@@ -4202,6 +5323,23 @@ export interface components {
             score: number;
             taskId: string;
             title: string;
+        };
+        EditCommentInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Updated comment text */
+            body: string;
+        };
+        EditCommentOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            updated: boolean;
         };
         EditTaskCommentBody: {
             /**
@@ -4260,6 +5398,58 @@ export interface components {
              */
             readonly $schema?: string;
             outcomes: components["schemas"]["EvaluateConstraintsOutcome"][] | null;
+        };
+        EventInviteCreateResponse: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            expiresAt: number;
+            id: string;
+            token: string;
+        };
+        EventProposal: {
+            /** Format: int64 */
+            endAt: number;
+            kind: string;
+            showAs: string;
+            /** Format: int64 */
+            startAt: number;
+            title: string;
+        };
+        EventResponse: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            allDay: boolean;
+            blockLabel?: string;
+            /** Format: int64 */
+            createdAt: number;
+            /** Format: int64 */
+            endAt?: number;
+            id: string;
+            kind: string;
+            location?: string;
+            memo?: string;
+            /** Format: int32 */
+            notificationOffset?: number;
+            /** Format: int64 */
+            recurrenceEnd?: number;
+            recurrenceExceptions?: unknown;
+            recurrenceRule?: unknown;
+            showAs: string;
+            /** Format: int64 */
+            startAt?: number;
+            timezone: string;
+            title: string;
+            /** Format: int64 */
+            updatedAt?: number;
+            url?: string;
+            visibility: string;
         };
         ExplainConstraintBody: {
             /**
@@ -4380,6 +5570,15 @@ export interface components {
              */
             readonly $schema?: string;
             webhook: components["schemas"]["WebhookSubscriptionDetailDTO"];
+        };
+        GetPublicShareOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            events: components["schemas"]["ShareEventResponse"][] | null;
+            share: components["schemas"]["PublicShareResponse"];
         };
         GrantAdminInputBody: {
             /**
@@ -4549,6 +5748,19 @@ export interface components {
             role: string;
             workspaceName: string;
         };
+        InviteSummaryResponse: {
+            /** Format: int64 */
+            acceptedAt?: number;
+            attendeePublicId: string;
+            /** Format: int64 */
+            createdAt: number;
+            email: string;
+            /** Format: int64 */
+            expiresAt: number;
+            id: string;
+            /** Format: int64 */
+            sentAt?: number;
+        };
         Label: {
             /**
              * Format: uri
@@ -4608,6 +5820,22 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ListAttachmentsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            attachments: components["schemas"]["AttachmentResponse"][] | null;
+        };
+        ListAttendeesOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            attendees: components["schemas"]["AttendeeResponse"][] | null;
+        };
         ListAuditLogsBody: {
             /**
              * Format: uri
@@ -4638,6 +5866,30 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ListCalendarEventsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            events: components["schemas"]["CrossCalendarEventResponse"][] | null;
+        };
+        ListCalendarsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            calendars: components["schemas"]["CalendarResponse"][] | null;
+        };
+        ListChecklistOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["ChecklistItemResponse"][] | null;
+        };
         ListChildPagesBody: {
             /**
              * Format: uri
@@ -4647,6 +5899,14 @@ export interface components {
             pages: components["schemas"]["PageSummaryDTO"][] | null;
             /** Format: int64 */
             total: number;
+        };
+        ListCommentsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            comments: components["schemas"]["CommentResponse"][] | null;
         };
         ListDeliveriesOutputBody: {
             /**
@@ -4667,6 +5927,14 @@ export interface components {
             readonly $schema?: string;
             versions: components["schemas"]["DescriptionVersion"][] | null;
         };
+        ListDiscoverableCalendarsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            calendars: components["schemas"]["DiscoverableCalendarResponse"][] | null;
+        };
         ListDuplicatesOutputBody: {
             /**
              * Format: uri
@@ -4676,6 +5944,22 @@ export interface components {
             candidates: components["schemas"]["DuplicateCandidate"][] | null;
             model: string;
             source: string;
+        };
+        ListEventInvitesOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            invites: components["schemas"]["InviteSummaryResponse"][] | null;
+        };
+        ListEventsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            events: components["schemas"]["EventResponse"][] | null;
         };
         ListFavoritesBody: {
             /**
@@ -4805,6 +6089,22 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ListMembersOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            members: components["schemas"]["MemberResponse"][] | null;
+        };
+        ListMemosOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            memos: components["schemas"]["MemoResponse"][] | null;
+        };
         ListModelsOutputBody: {
             /**
              * Format: uri
@@ -4814,6 +6114,22 @@ export interface components {
             models: components["schemas"]["ModelSummary"][] | null;
             /** Format: int64 */
             total: number;
+        };
+        ListMyCalendarEventsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            events: components["schemas"]["MyCalendarEventResponse"][] | null;
+        };
+        ListMyInvitesOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            invites: components["schemas"]["MyInviteResponse"][] | null;
         };
         ListMyTasksBody: {
             /**
@@ -4834,17 +6150,6 @@ export interface components {
             tasks: components["schemas"]["MyTaskListItem"][] | null;
             /** Format: int64 */
             total: number;
-        };
-        ListOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            nextCursor: string | null;
-            /** Format: int64 */
-            total: number;
-            webhooks: components["schemas"]["WebhookSubscriptionDTO"][] | null;
         };
         ListPagesBody: {
             /**
@@ -4905,6 +6210,14 @@ export interface components {
             providers: components["schemas"]["Provider"][] | null;
             /** Format: int64 */
             total: number;
+        };
+        ListPublicSharesOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            shares: components["schemas"]["PublicShareResponse"][] | null;
         };
         ListReactionsBody: {
             /**
@@ -5255,6 +6568,39 @@ export interface components {
             /** @enum {string} */
             weekStart: "mon" | "sun" | "sat";
         };
+        MemberResponse: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            avatarUrl?: string;
+            /** Format: int64 */
+            createdAt: number;
+            displayName: string;
+            id: string;
+            memberColor: string;
+            role: string;
+            userId: string;
+        };
+        MemoResponse: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            createdAt: number;
+            done: boolean;
+            id: string;
+            /** Format: int32 */
+            sortWeight: number;
+            title: string;
+            /** Format: int64 */
+            updatedAt?: number;
+            userDisplayName: string;
+            userPublicId: string;
+        };
         ModelSummary: {
             displayName: string;
             /** @description Model public id (UUID v7) */
@@ -5262,6 +6608,55 @@ export interface components {
             name: string;
             providerId: string;
             providerKind: string;
+        };
+        MyCalendarEventResponse: {
+            allDay: boolean;
+            /** Format: int64 */
+            attendeeCount: number;
+            blockLabel?: string;
+            calendarId: string;
+            /** Format: int64 */
+            createdAt: number;
+            /** Format: int64 */
+            endAt?: number;
+            id: string;
+            kind: string;
+            location?: string;
+            ownerUserId: string;
+            /** Format: int64 */
+            recurrenceEnd?: number;
+            recurrenceExceptions?: unknown;
+            recurrenceRule?: unknown;
+            showAs: string;
+            /** Format: int64 */
+            startAt?: number;
+            timezone: string;
+            title: string;
+            /** Format: int64 */
+            updatedAt?: number;
+            viewerAttending: boolean;
+            visibility: string;
+            workspaceId: string;
+            workspaceName: string;
+        };
+        MyInviteResponse: {
+            calendarName: string;
+            calendarPublicId: string;
+            /** Format: int64 */
+            createdAt: number;
+            eventAllDay: boolean;
+            /** Format: int64 */
+            eventEndAt?: number;
+            eventLocation?: string;
+            eventPublicId: string;
+            /** Format: int64 */
+            eventStartAt?: number;
+            eventTitle: string;
+            /** Format: int64 */
+            expiresAt: number;
+            id: string;
+            workspaceName: string;
+            workspacePublicId: string;
         };
         MyTaskListItem: {
             actorRole: string;
@@ -5299,6 +6694,17 @@ export interface components {
             severity: string;
             title: string;
             workspaceId: string;
+        };
+        NotificationsListOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            nextCursor: string | null;
+            notifications: components["schemas"]["NotificationDTO"][] | null;
+            /** Format: int64 */
+            total: number;
         };
         OIDCStartOutputBody: {
             /**
@@ -5421,6 +6827,72 @@ export interface components {
             /** Format: double */
             threshold?: number;
         };
+        PatchCalendarInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Display color */
+            color?: string;
+            /** @description Cover image URL */
+            coverUrl?: string;
+            /** @description Calendar description */
+            description?: string;
+            /** @description Calendar name */
+            name?: string;
+        };
+        PatchEventInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description All-day flag */
+            allDay?: boolean;
+            /** @description Block label */
+            blockLabel?: string;
+            /**
+             * Format: int64
+             * @description End time as unix seconds (UTC)
+             */
+            endAt?: number;
+            /** @description Event kind */
+            kind?: string;
+            /** @description Location */
+            location?: string;
+            /** @description Memo */
+            memo?: string;
+            /**
+             * Format: int32
+             * @description Notification offset
+             */
+            notificationOffset?: number;
+            /**
+             * Format: int64
+             * @description Recurrence end as unix seconds (UTC)
+             */
+            recurrenceEnd?: number;
+            /** @description Array of ISO 8601 dates/times to exclude from recurrence */
+            recurrenceExceptions?: unknown;
+            /** @description Recurrence rule */
+            recurrenceRule?: unknown;
+            /** @description Show-as status */
+            showAs?: string;
+            /**
+             * Format: int64
+             * @description Start time as unix seconds (UTC)
+             */
+            startAt?: number;
+            /** @description IANA timezone */
+            timezone?: string;
+            /** @description Event title */
+            title?: string;
+            /** @description Related URL */
+            url?: string;
+            /** @description Visibility */
+            visibility?: string;
+        };
         PatchLabelBody: {
             /**
              * Format: uri
@@ -5455,6 +6927,30 @@ export interface components {
             /** @enum {string} */
             weekStart?: "mon" | "sun" | "sat";
         };
+        PatchOwnSubscriptionInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Caller-specific display color (hex) */
+            displayColor?: string;
+            /**
+             * Format: int64
+             * @description Caller-specific sort weight in the right-rail list
+             */
+            sortWeight?: number;
+            /** @description Whether events from this calendar are rendered for the caller */
+            visible?: boolean;
+        };
+        PatchOwnSubscriptionOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            updated: boolean;
+        };
         PatchProjectBody: {
             /**
              * Format: uri
@@ -5481,6 +6977,25 @@ export interface components {
              */
             readonly $schema?: string;
             ok: boolean;
+        };
+        PatchPublicShareInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            clearExpiresAt?: boolean;
+            clearShowHolidaysCountry?: boolean;
+            coverUrl?: string;
+            description?: string;
+            /** Format: int64 */
+            expiresAt?: number;
+            iconUrl?: string;
+            showHolidaysCountry?: string;
+            /** Format: int32 */
+            sortWeight?: number;
+            timezone?: string;
+            title?: string;
         };
         PatchSettingsInputBody: {
             /**
@@ -5753,6 +7268,64 @@ export interface components {
             name: string;
             sort: unknown;
         };
+        PublicShareRenderEvent: {
+            allDay: boolean;
+            blockLabel?: string;
+            /** Format: int64 */
+            endAt?: number;
+            id: string;
+            kind: string;
+            location?: string;
+            memo?: string;
+            /** Format: int64 */
+            recurrenceEnd?: number;
+            recurrenceRule?: string;
+            showAs: string;
+            /** Format: int64 */
+            startAt?: number;
+            timezone: string;
+            title: string;
+            url?: string;
+        };
+        PublicShareRenderPage: {
+            coverUrl?: string;
+            /** Format: int64 */
+            createdAt: number;
+            description?: string;
+            iconUrl?: string;
+            showHolidaysCountry?: string;
+            timezone: string;
+            title: string;
+            workspaceId: string;
+            workspaceName: string;
+        };
+        PublicShareResponse: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            coverUrl?: string;
+            /** Format: int64 */
+            createdAt: number;
+            creatorDisplayName?: string;
+            creatorId?: string;
+            description?: string;
+            /** Format: int64 */
+            eventCount: number;
+            /** Format: int64 */
+            expiresAt?: number;
+            iconUrl?: string;
+            id: string;
+            showHolidaysCountry?: string;
+            /** Format: int32 */
+            sortWeight: number;
+            timezone: string;
+            title: string;
+            token?: string;
+            /** Format: int64 */
+            updatedAt?: number;
+        };
         PublishLensBody: {
             /**
              * Format: uri
@@ -5789,6 +7362,22 @@ export interface components {
             locale?: string;
             password: string;
             timezone?: string;
+        };
+        RemoveAttendeeOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            removed: boolean;
+        };
+        RemoveMemberOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            removed: boolean;
         };
         RemoveProjectMemberBody: {
             /**
@@ -5846,6 +7435,15 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        RenderPublicShareOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            events: components["schemas"]["PublicShareRenderEvent"][] | null;
+            page: components["schemas"]["PublicShareRenderPage"];
+        };
         ReorderItem: {
             /** @description Task public ID (UUID v7) */
             id: string;
@@ -5854,6 +7452,23 @@ export interface components {
              * @description New display order weight
              */
             sortWeight: number;
+        };
+        ReorderShareEventsInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Complete new ordering of share-event link public IDs; must be a permutation of the share's current links */
+            linkPublicIds: string[] | null;
+        };
+        ReorderShareEventsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            reordered: boolean;
         };
         ReorderTasksBody: {
             /**
@@ -5960,6 +7575,14 @@ export interface components {
              */
             revoked: number;
         };
+        RevokeEventInviteOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            revoked: boolean;
+        };
         RevokeSessionOutputBody: {
             /**
              * Format: uri
@@ -6021,6 +7644,15 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        SelfSubscribeOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            alreadySubscribed: boolean;
+            subscribed: boolean;
+        };
         SessionSummary: {
             /**
              * Format: int64
@@ -6052,6 +7684,25 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        ShareEventResponse: {
+            allDay: boolean;
+            calendarId: string;
+            calendarName: string;
+            /** Format: int64 */
+            endAt?: number;
+            eventId: string;
+            /** Format: int64 */
+            linkCreatedAt: number;
+            linkId: string;
+            /** Format: int32 */
+            linkSortWeight: number;
+            location?: string;
+            /** Format: int64 */
+            startAt?: number;
+            timezone: string;
+            title: string;
+            visibility: string;
+        };
         ShiftCandidateDTO: {
             linkId: string;
             otherLinks?: components["schemas"]["OtherEventLinkDTO"][] | null;
@@ -6075,6 +7726,25 @@ export interface components {
             receivedAt: number;
             source: string;
             taskId?: string;
+        };
+        SmartCreateInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Natural language event description */
+            text: string;
+            /** @description IANA timezone (e.g. America/New_York). Defaults to the caller's user or workspace timezone when omitted, falling back to UTC. */
+            timezone?: string;
+        };
+        SmartCreateOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            proposal: components["schemas"]["EventProposal"];
         };
         SmartProposal: {
             /**
@@ -6117,6 +7787,22 @@ export interface components {
             taskId: string;
             title: string;
             transition: string;
+        };
+        SubscribeSystemCalendarInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            country: string;
+        };
+        SubscribeSystemCalendarOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
         };
         SubtaskProposal: {
             assignee?: components["schemas"]["AssigneeSuggestion"];
@@ -6486,6 +8172,23 @@ export interface components {
             taskId?: string;
             type: string;
         };
+        ToggleCanEditInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Whether the attendee can edit the event */
+            canEdit: boolean;
+        };
+        ToggleCanEditOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            updated: boolean;
+        };
         ToggleInputBody: {
             /**
              * Format: uri
@@ -6675,6 +8378,30 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        UpdateChecklistItemInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Done flag */
+            done?: boolean;
+            /**
+             * Format: int32
+             * @description Sort weight
+             */
+            sortWeight?: number;
+            /** @description Item title */
+            title?: string;
+        };
+        UpdateChecklistItemOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            updated: boolean;
+        };
         UpdateLensBody: {
             /**
              * Format: uri
@@ -6686,6 +8413,50 @@ export interface components {
             isDefault?: boolean;
             name?: string;
             sort?: unknown;
+        };
+        UpdateMemberRoleInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * @description New role
+             * @enum {string}
+             */
+            role: "owner" | "manager" | "editor" | "viewer";
+        };
+        UpdateMemberRoleOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            updated: boolean;
+        };
+        UpdateMemoInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Whether the memo is done */
+            done?: boolean;
+            /**
+             * Format: int32
+             * @description Sort weight for ordering
+             */
+            sortWeight?: number;
+            /** @description Memo title */
+            title?: string;
+        };
+        UpdateMemoOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            updated: boolean;
         };
         UpdatePageBody: {
             /**
@@ -6699,6 +8470,26 @@ export interface components {
             /** @description Project public id; null to unset */
             projectId?: string;
             title?: string;
+        };
+        UpdateRsvpInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * @description RSVP response
+             * @enum {string}
+             */
+            rsvp: "pending" | "accepted" | "declined" | "tentative";
+        };
+        UpdateRsvpOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            updated: boolean;
         };
         UpdateTimeboxBody: {
             /**
@@ -6812,6 +8603,17 @@ export interface components {
             /** Format: int64 */
             updatedAt: number | null;
             url: string;
+        };
+        WebhooksListOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            nextCursor: string | null;
+            /** Format: int64 */
+            total: number;
+            webhooks: components["schemas"]["WebhookSubscriptionDTO"][] | null;
         };
         WeeklyDigestCounts: {
             /** Format: int64 */
@@ -6927,11 +8729,43 @@ export interface components {
             updatedAt?: number;
             userId: string;
         };
+        WorkspaceResponse: {
+            country: string;
+            /** Format: int64 */
+            createdAt: number;
+            description?: string;
+            iconUrl?: string;
+            /** @description Workspace public id (UUID v7) */
+            id: string;
+            /**
+             * Format: int64
+             * @description Number of enabled members in this workspace
+             */
+            memberCount: number;
+            name: string;
+            /** @description Caller's role in this workspace */
+            role?: string;
+            slug: string;
+            timezone: string;
+            /** Format: int64 */
+            updatedAt?: number;
+        };
         WorkspaceUserSummary: {
             avatarUrl?: string;
             displayName: string;
             /** @description User public id (UUID v7) */
             id: string;
+        };
+        WorkspacesListOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            nextCursor: string | null;
+            /** Format: int64 */
+            total: number;
+            workspaces: components["schemas"]["WorkspaceResponse"][] | null;
         };
     };
     responses: never;
@@ -7122,7 +8956,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RevokeSessionOutputBody"];
+                    "application/json": components["schemas"]["AdminRevokeSessionOutputBody"];
                 };
             };
             /** @description Error */
@@ -8280,6 +10114,40 @@ export interface operations {
             };
         };
     };
+    "me-calendar-events-list": {
+        parameters: {
+            query: {
+                /** @description Range start (inclusive, YYYY-MM-DD or RFC3339) */
+                start: string;
+                /** @description Range end (exclusive, YYYY-MM-DD or RFC3339) */
+                end: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListMyCalendarEventsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "favorites-list": {
         parameters: {
             query?: {
@@ -8478,6 +10346,35 @@ export interface operations {
             };
         };
     };
+    "me-invites-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListMyInvitesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "notifications-list": {
         parameters: {
             query?: {
@@ -8498,7 +10395,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListOutputBody"];
+                    "application/json": components["schemas"]["NotificationsListOutputBody"];
                 };
             };
             /** @description Error */
@@ -9292,6 +11189,39 @@ export interface operations {
             };
         };
     };
+    "event-invites-accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptEventInviteInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptEventInviteResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "lenses-get-public": {
         parameters: {
             query?: never;
@@ -9347,6 +11277,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResolveOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "public-shares-render": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Public share URL token */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RenderPublicShareOutputBody"];
                 };
             };
             /** @description Error */
@@ -11105,10 +13067,7 @@ export interface operations {
     };
     "workspaces-list": {
         parameters: {
-            query?: {
-                limit?: number;
-                offset?: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -11121,7 +13080,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListWorkspacesOutputBody"];
+                    "application/json": components["schemas"]["WorkspacesListOutputBody"];
                 };
             };
             /** @description Error */
@@ -12240,6 +14199,43 @@ export interface operations {
             };
         };
     };
+    "calendar-events-list": {
+        parameters: {
+            query: {
+                /** @description Range start (inclusive, date or datetime) */
+                start: string;
+                /** @description Range end (exclusive, date or datetime) */
+                end: string;
+            };
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListCalendarEventsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "calendar-events-shift-apply": {
         parameters: {
             query?: never;
@@ -12334,6 +14330,1587 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProposeShiftOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "calendars-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListCalendarsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "calendars-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCalendarInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "calendars-subscribe-system": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubscribeSystemCalendarInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscribeSystemCalendarOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "calendars-get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "calendars-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteCalendarOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "calendars-patch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchCalendarInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "events-list": {
+        parameters: {
+            query: {
+                /** @description Range start (inclusive) */
+                start: string;
+                /** @description Range end (exclusive) */
+                end: string;
+            };
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListEventsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "events-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateEventInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "events-from-task": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateEventFromTaskInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "events-smart-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SmartCreateInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmartCreateOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "events-get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "events-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteEventOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "events-patch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchEventInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "attachments-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListAttachmentsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "attachments-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAttachmentInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "attachments-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+                /** @description Attachment public ID */
+                attId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteAttachmentOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "attendees-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListAttendeesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "attendees-add": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddAttendeesInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddAttendeesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "attendees-rsvp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRsvpInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateRsvpOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "event-invites-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+                /** @description Attendee public ID */
+                attendeeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateEventInviteInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventInviteCreateResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "attendees-remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+                /** @description User public ID */
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoveAttendeeOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "attendees-can-edit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+                /** @description User public ID */
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ToggleCanEditInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToggleCanEditOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "checklist-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListChecklistOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "checklist-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateChecklistItemInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecklistItemResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "checklist-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+                /** @description Checklist item public ID */
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteChecklistItemOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "checklist-update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+                /** @description Checklist item public ID */
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateChecklistItemInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateChecklistItemOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "comments-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListCommentsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "comments-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCommentInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "comments-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+                /** @description Comment public ID */
+                cId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteCommentOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "comments-edit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+                /** @description Comment public ID */
+                cId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditCommentInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EditCommentOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "event-invites-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListEventInvitesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "event-invites-revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+                /** @description Invite public ID */
+                inviteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevokeEventInviteOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "members-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListMembersOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "members-add": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddMemberInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "members-remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description User public ID */
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoveMemberOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "members-update-role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description User public ID */
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMemberRoleInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateMemberRoleOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "memos-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListMemosOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "memos-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateMemoInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "memos-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Memo public ID */
+                memoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteMemoOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "memos-update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Memo public ID */
+                memoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMemoInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateMemoOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "calendars-self-subscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SelfSubscribeOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "calendars-self-subscription-patch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchOwnSubscriptionInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatchOwnSubscriptionOutputBody"];
                 };
             };
             /** @description Error */
@@ -12539,6 +16116,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WidgetDTO"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "discoverable-calendars-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListDiscoverableCalendarsOutputBody"];
                 };
             };
             /** @description Error */
@@ -14054,6 +17663,326 @@ export interface operations {
             };
         };
     };
+    "public-shares-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListPublicSharesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "public-shares-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePublicShareInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicShareResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "public-shares-get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Share public ID */
+                shareId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GetPublicShareOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "public-shares-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Share public ID */
+                shareId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletePublicShareOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "public-shares-patch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Share public ID */
+                shareId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchPublicShareInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicShareResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "public-shares-events-attach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Share public ID */
+                shareId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttachEventsToShareInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachEventsToShareOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "public-shares-events-reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Share public ID */
+                shareId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReorderShareEventsInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReorderShareEventsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "public-shares-events-detach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Share public ID */
+                shareId: string;
+                /** @description Event public ID */
+                evtId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetachEventFromShareOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "public-shares-rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Share public ID */
+                shareId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicShareResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "relation-suggestions-list-workspace": {
         parameters: {
             query?: {
@@ -14592,7 +18521,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListOutputBody"];
+                    "application/json": components["schemas"]["WebhooksListOutputBody"];
                 };
             };
             /** @description Error */

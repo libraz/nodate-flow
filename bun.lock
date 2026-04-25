@@ -98,7 +98,6 @@
       "devDependencies": {
         "@axe-core/playwright": "^4.10.0",
         "@nodate-flow/sdk": "workspace:*",
-        "@nodate-flow/time-sdk": "workspace:*",
         "@nodate-flow/ui": "workspace:*",
         "@playwright/test": "1.48.2",
         "@tailwindcss/vite": "^4.1.0",
@@ -169,17 +168,6 @@
         "react-i18next",
         "zustand",
       ],
-    },
-    "packages/time-sdk": {
-      "name": "@nodate-flow/time-sdk",
-      "version": "0.0.1",
-      "dependencies": {
-        "openapi-fetch": "0.13.0",
-      },
-      "devDependencies": {
-        "openapi-typescript": "7.4.2",
-        "typescript": "5.6.3",
-      },
     },
     "packages/ui": {
       "name": "@nodate-flow/ui",
@@ -472,8 +460,6 @@
     "@nodate-flow/holidays": ["@nodate-flow/holidays@workspace:packages/holidays"],
 
     "@nodate-flow/sdk": ["@nodate-flow/sdk@workspace:packages/sdk"],
-
-    "@nodate-flow/time-sdk": ["@nodate-flow/time-sdk@workspace:packages/time-sdk"],
 
     "@nodate-flow/ui": ["@nodate-flow/ui@workspace:packages/ui"],
 
