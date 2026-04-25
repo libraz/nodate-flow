@@ -15,7 +15,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/itemkit"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/itemkit"
 )
 
 // escapeLike escapes the MySQL LIKE metacharacters %, _, and \ in a

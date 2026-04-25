@@ -19,7 +19,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/itemkit"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/itemkit"
 )
 
 // countLinkedEvents returns how many enabled calendar_events are

@@ -10,7 +10,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/itemkit"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/itemkit"
 )
 
 // CreateTaskEventLink handles POST /tasks/{id}/links. Delegates the
