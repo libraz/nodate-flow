@@ -62,9 +62,14 @@ type Event struct {
 // events, and the agentruntime event-source enqueues on_event agent
 // runs, both off the same dispatch.
 //
+// eventInternalID is the events.id row that was just appended; hooks
+// that need to dedupe (notification fan-out) anchor on it via
+// notifications.source_event_id, while hooks that only need the
+// signal (SSE tap, on_event triggers) ignore it.
+//
 // Hooks must be non-blocking and must never panic. Leave unset for
 // the no-op behaviour.
-type NotifyHook = func(ctx context.Context, workspaceInternalID uint32, eventType string)
+type NotifyHook = func(ctx context.Context, workspaceInternalID uint32, eventType string, eventInternalID uint32)
 
 var (
 	notifyMu    sync.RWMutex
@@ -122,12 +127,12 @@ func SeqFromContext(ctx context.Context) int64 {
 	return v
 }
 
-func fireNotifyHooks(ctx context.Context, workspaceInternalID uint32, eventType string) {
+func fireNotifyHooks(ctx context.Context, workspaceInternalID uint32, eventType string, eventInternalID uint32) {
 	notifyMu.RLock()
 	hooks := notifyHooks
 	notifyMu.RUnlock()
 	for _, h := range hooks {
-		h(ctx, workspaceInternalID, eventType)
+		h(ctx, workspaceInternalID, eventType, eventInternalID)
 	}
 }
 
@@ -153,7 +158,7 @@ func Append(ctx context.Context, db DBTX, evt Event) error {
 	if evt.ActorUserID != nil {
 		actorID = sql.NullInt32{Int32: int32(*evt.ActorUserID), Valid: true}
 	}
-	_, err := q.AppendEvent(ctx, generated.AppendEventParams{
+	lastID, err := q.AppendEvent(ctx, generated.AppendEventParams{
 		PublicID:    types.New(),
 		WorkspaceID: evt.WorkspaceID,
 		TaskID:      taskID,
@@ -170,8 +175,11 @@ func Append(ctx context.Context, db DBTX, evt Event) error {
 		)
 		return err
 	}
+	// LastInsertId is a positive int64 produced by AUTO_INCREMENT; cast to
+	// uint32 for the hook signature (events.id is INT UNSIGNED).
+	eventInternalID := uint32(lastID)
 	seq := globalSeq.Add(1)
 	seqCtx := WithSeq(ctx, seq)
-	fireNotifyHooks(seqCtx, evt.WorkspaceID, evt.Type)
+	fireNotifyHooks(seqCtx, evt.WorkspaceID, evt.Type, eventInternalID)
 	return nil
 }

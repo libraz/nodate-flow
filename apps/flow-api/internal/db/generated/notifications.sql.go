@@ -73,12 +73,13 @@ func (q *Queries) CountUnreadNotificationsForWorkspace(ctx context.Context, arg 
 	return unread_count, err
 }
 
-const createNotification = `-- name: CreateNotification :execlastid
-INSERT INTO notifications (
+const createNotification = `-- name: CreateNotification :execrows
+INSERT IGNORE INTO notifications (
   public_id,
   workspace_id,
   recipient_user_id,
   actor_user_id,
+  source_event_id,
   event_type,
   resource_type,
   resource_public_id,
@@ -86,7 +87,7 @@ INSERT INTO notifications (
   body,
   severity,
   channel
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateNotificationParams struct {
@@ -94,6 +95,7 @@ type CreateNotificationParams struct {
 	WorkspaceID      uint32                `json:"-"`
 	RecipientUserID  uint32                `json:"-"`
 	ActorUserID      sql.NullInt32         `json:"-"`
+	SourceEventID    sql.NullInt32         `json:"sourceEventId"`
 	EventType        string                `json:"eventType"`
 	ResourceType     string                `json:"resourceType"`
 	ResourcePublicID types.PublicID        `json:"resourcePublicId"`
@@ -103,13 +105,18 @@ type CreateNotificationParams struct {
 	Channel          NotificationsChannel  `json:"channel"`
 }
 
-// Create a single notification entry for a recipient.
+// Create a single notification entry for a recipient. INSERT IGNORE skips
+// rows that collide with the (recipient_user_id, source_event_id, channel)
+// unique key, providing at-least-once / idempotent fan-out semantics. The
+// caller can read the affected-rows count to distinguish a fresh insert
+// (1) from a deduplicated retry (0).
 func (q *Queries) CreateNotification(ctx context.Context, arg CreateNotificationParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, createNotification,
 		arg.PublicID,
 		arg.WorkspaceID,
 		arg.RecipientUserID,
 		arg.ActorUserID,
+		arg.SourceEventID,
 		arg.EventType,
 		arg.ResourceType,
 		arg.ResourcePublicID,
@@ -121,7 +128,7 @@ func (q *Queries) CreateNotification(ctx context.Context, arg CreateNotification
 	if err != nil {
 		return 0, err
 	}
-	return result.LastInsertId()
+	return result.RowsAffected()
 }
 
 const listNotificationsForUser = `-- name: ListNotificationsForUser :many

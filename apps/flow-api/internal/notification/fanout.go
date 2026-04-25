@@ -8,59 +8,168 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"sync"
+	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
 )
 
+// defaultFanoutTimeout caps how long a single fan-out goroutine may run
+// when no explicit timeout is configured. The detached context keeps
+// the trace span and logger values from the parent request but is no
+// longer subject to request cancellation, so an upper bound is needed
+// to prevent a misbehaving query from leaking goroutines indefinitely.
+const defaultFanoutTimeout = 30 * time.Second
+
 // Fanout creates per-user notification rows in response to eventbus
 // events. It subscribes via [eventbus.AddNotifyHook] and, for each
 // event, determines the set of recipients (workspace members minus the
 // actor) and inserts a notification row for each one.
+//
+// Fan-out goroutines detach from the request context using
+// [context.WithoutCancel] so the work is not aborted when the
+// originating HTTP handler returns. Each goroutine is wrapped with
+// [context.WithTimeout] (configurable, defaults to 30s) to bound the
+// runaway risk and is tracked by [sync.WaitGroup] so [Fanout.Shutdown]
+// can wait for in-flight work to drain at process exit.
 type Fanout struct {
 	db      *sql.DB
 	queries *generated.Queries
 	email   email.Sender
+
+	timeout time.Duration
+
+	wg       sync.WaitGroup
+	stopMu   sync.RWMutex
+	stopping bool
+
+	// run is the function executed inside each fan-out goroutine.
+	// It is overridable by tests so the goroutine plumbing
+	// (detached cancel, timeout, shutdown wait) can be exercised
+	// without a live database. Production code leaves this nil and
+	// the hook routes to [Fanout.fanout].
+	run func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint32)
 }
 
 // NewFanout creates a Fanout backed by the given database and email
 // transport. When emailSender is nil or a [email.NoopSender], email
 // delivery is silently skipped.
 func NewFanout(db *sql.DB, q *generated.Queries, emailSender email.Sender) *Fanout {
-	return &Fanout{db: db, queries: q, email: emailSender}
+	return &Fanout{
+		db:      db,
+		queries: q,
+		email:   emailSender,
+		timeout: defaultFanoutTimeout,
+	}
+}
+
+// SetTimeout overrides the per-event fan-out timeout. Values <= 0
+// reset to the package default. Safe to call once at start-up before
+// any hook fires; not safe under concurrent fan-out.
+func (f *Fanout) SetTimeout(d time.Duration) {
+	if d <= 0 {
+		f.timeout = defaultFanoutTimeout
+		return
+	}
+	f.timeout = d
 }
 
 // Hook returns an eventbus.NotifyHook that can be passed to
 // [eventbus.AddNotifyHook]. The returned function is non-blocking:
 // it spawns a goroutine so the eventbus append path is never delayed
 // by notification fan-out.
-func (f *Fanout) Hook() func(ctx context.Context, workspaceID uint32, eventType string) {
-	return func(ctx context.Context, workspaceID uint32, eventType string) {
-		// Fire-and-forget: fan-out must never block the eventbus
-		// append path. Use a background context so the work
-		// survives the request lifecycle.
-		go f.fanout(context.Background(), workspaceID, eventType)
+//
+// The spawned goroutine inherits the parent context's values
+// (trace span, logger, actor info) via [context.WithoutCancel] but
+// is no longer cancelled when the parent request completes. A
+// configurable timeout caps the maximum lifetime to prevent runaways.
+//
+// eventInternalID is the events.id of the row that triggered this
+// fan-out. It is threaded into notifications.source_event_id so the
+// (recipient, source_event, channel) unique key dedupes goroutine
+// retries and replicated dispatches.
+func (f *Fanout) Hook() func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint32) {
+	return func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint32) {
+		// Refuse to start new work after Shutdown has been called.
+		f.stopMu.RLock()
+		if f.stopping {
+			f.stopMu.RUnlock()
+			return
+		}
+		f.wg.Add(1)
+		f.stopMu.RUnlock()
+
+		// Detach cancellation from the request context but keep the
+		// values (trace span, slog attributes, etc.).
+		detached := context.WithoutCancel(ctx)
+
+		go func() {
+			defer f.wg.Done()
+			runCtx, cancel := context.WithTimeout(detached, f.timeout)
+			defer cancel()
+			fn := f.run
+			if fn == nil {
+				fn = f.fanout
+			}
+			fn(runCtx, workspaceID, eventType, eventInternalID)
+		}()
+	}
+}
+
+// Shutdown waits for all in-flight fan-out goroutines to finish or
+// for the supplied context to be cancelled, whichever happens first.
+// After Shutdown returns, new events delivered through the hook are
+// dropped (a debug log line records the drop).
+//
+// It is safe to call Shutdown multiple times; subsequent calls only
+// wait, they do not toggle state.
+func (f *Fanout) Shutdown(ctx context.Context) error {
+	f.stopMu.Lock()
+	f.stopping = true
+	f.stopMu.Unlock()
+
+	done := make(chan struct{})
+	go func() {
+		f.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
 
 // fanout performs the actual work of creating notification rows. It
 // runs in a background goroutine and logs errors instead of returning
 // them.
-func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType string) {
+//
+// eventInternalID anchors the at-least-once dedupe contract: the
+// underlying INSERT IGNORE collides on
+// (recipient_user_id, source_event_id, channel), so re-firing the
+// same hook (e.g. retry, replicated dispatch) yields zero new rows.
+func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint32) {
 	// Only fan out for event types that warrant user notifications.
 	title, resourceType, severity := classifyEvent(eventType)
 	if title == "" {
 		return
 	}
 
-	// Look up the most recent event of this type for this workspace
-	// to extract the actor and payload.
-	row, err := f.latestEvent(ctx, workspaceID, eventType)
+	// Resolve actor + resource for the exact event row identified by
+	// eventInternalID. Anchoring on events.id (rather than "latest of
+	// type") removes the race where two same-type events for the same
+	// workspace land back-to-back and the second hook reads the first
+	// hook's row.
+	row, err := f.eventByID(ctx, workspaceID, eventInternalID)
 	if err != nil {
-		slog.Warn("notification fanout: failed to fetch latest event",
+		slog.ErrorContext(ctx, "notification fanout: failed to fetch event by id",
 			slog.String("event_type", eventType),
 			slog.Uint64("workspace_id", uint64(workspaceID)),
+			slog.Uint64("event_id", uint64(eventInternalID)),
 			slog.String("err", err.Error()))
 		return
 	}
@@ -68,7 +177,7 @@ func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType strin
 	// Determine recipients: all active workspace members except the actor.
 	recipients, err := f.workspaceMemberUserIDs(ctx, workspaceID)
 	if err != nil {
-		slog.Warn("notification fanout: failed to list workspace members",
+		slog.ErrorContext(ctx, "notification fanout: failed to list workspace members",
 			slog.Uint64("workspace_id", uint64(workspaceID)),
 			slog.String("err", err.Error()))
 		return
@@ -77,6 +186,11 @@ func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType strin
 	actorUserID := uint32(0)
 	if row.actorUserID.Valid {
 		actorUserID = uint32(row.actorUserID.Int32)
+	}
+
+	sourceEventID := sql.NullInt32{}
+	if eventInternalID != 0 {
+		sourceEventID = sql.NullInt32{Int32: int32(eventInternalID), Valid: true}
 	}
 
 	for _, recipientID := range recipients {
@@ -91,11 +205,12 @@ func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType strin
 			actorID = row.actorUserID
 		}
 
-		_, err := f.queries.CreateNotification(ctx, generated.CreateNotificationParams{
+		affected, err := f.queries.CreateNotification(ctx, generated.CreateNotificationParams{
 			PublicID:         pubID,
 			WorkspaceID:      workspaceID,
 			RecipientUserID:  recipientID,
 			ActorUserID:      actorID,
+			SourceEventID:    sourceEventID,
 			EventType:        eventType,
 			ResourceType:     resourceType,
 			ResourcePublicID: row.resourcePublicID,
@@ -105,26 +220,44 @@ func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType strin
 			Channel:          generated.NotificationsChannelInApp,
 		})
 		if err != nil {
-			slog.Warn("notification fanout: failed to create notification",
+			slog.ErrorContext(ctx, "notification fanout: failed to create notification",
 				slog.Uint64("workspace_id", uint64(workspaceID)),
 				slog.Uint64("recipient_user_id", uint64(recipientID)),
 				slog.String("event_type", eventType),
+				slog.Uint64("event_id", uint64(eventInternalID)),
 				slog.String("err", err.Error()))
+			continue
+		}
+		if affected == 0 {
+			// INSERT IGNORE collided with the (recipient, source_event,
+			// channel) unique key — the notification already exists.
+			// This is the at-least-once happy path; record it as
+			// debug, not an error.
+			slog.DebugContext(ctx, "notification fanout: deduplicated",
+				slog.Uint64("workspace_id", uint64(workspaceID)),
+				slog.Uint64("recipient_user_id", uint64(recipientID)),
+				slog.Uint64("event_id", uint64(eventInternalID)),
+				slog.String("event_type", eventType),
+				slog.String("channel", string(generated.NotificationsChannelInApp)))
+			// TODO: increment a Prometheus counter
+			// `nf_notification_dedup_total{channel,event_type}` once the
+			// notification metrics file exists in apps/flow-api/internal/obs.
 		}
 	}
 }
 
-// eventRow is a minimal representation of the latest event extracted
-// from the events table.
+// eventRow is a minimal representation of an event extracted from the
+// events table for fan-out enrichment.
 type eventRow struct {
 	actorUserID      sql.NullInt32
 	resourcePublicID types.PublicID
 }
 
-// latestEvent fetches the most recent event of the given type for the
-// workspace. It uses a raw query because sqlc does not generate a
-// targeted single-row lookup for this pattern.
-func (f *Fanout) latestEvent(ctx context.Context, workspaceID uint32, eventType string) (eventRow, error) {
+// eventByID fetches the row identified by (workspaceID, eventInternalID).
+// The workspace_id predicate is defence-in-depth — events.id is globally
+// unique already, but anchoring on workspace prevents cross-tenant reads
+// if a caller ever passes a stale id.
+func (f *Fanout) eventByID(ctx context.Context, workspaceID uint32, eventInternalID uint32) (eventRow, error) {
 	const q = `
 		SELECT e.actor_user_id,
 		       CASE
@@ -132,18 +265,17 @@ func (f *Fanout) latestEvent(ctx context.Context, workspaceID uint32, eventType 
 		         ELSE NULL
 		       END AS resource_public_id
 		FROM events e
-		WHERE e.workspace_id = ?
-		  AND e.type = ?
-		ORDER BY e.id DESC
+		WHERE e.id = ?
+		  AND e.workspace_id = ?
 		LIMIT 1
 	`
 	var r eventRow
-	err := f.db.QueryRowContext(ctx, q, workspaceID, eventType).Scan(
+	err := f.db.QueryRowContext(ctx, q, eventInternalID, workspaceID).Scan(
 		&r.actorUserID,
 		&r.resourcePublicID,
 	)
 	if err != nil {
-		return r, fmt.Errorf("latestEvent: %w", err)
+		return r, fmt.Errorf("eventByID: %w", err)
 	}
 	return r, nil
 }

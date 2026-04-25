@@ -139,6 +139,12 @@ type Querier interface {
 	// still check expires_at against CURRENT_TIMESTAMP before trusting
 	// the returned row.
 	ConsumeOauthState(ctx context.Context, state string) (ConsumeOauthStateRow, error)
+	// Count enabled calendar events linked to a specific task (internal id).
+	// workspace_id is intentionally omitted: task.id is internal and already
+	// scoped to its owning workspace, so the FK on calendar_events.task_id
+	// transitively constrains the count. Direct table query (no view) because
+	// this is a simple single-row count on a hot path during task GET.
+	CountActiveCalendarEventsByTaskId(ctx context.Context, taskID sql.NullInt32) (int64, error)
 	// Count unused recovery codes for a user.
 	CountActiveRecoveryCodes(ctx context.Context, userID uint32) (int64, error)
 	// Count all active (non-disabled) users.
@@ -202,7 +208,11 @@ type Querier interface {
 	CreateMcpToken(ctx context.Context, arg CreateMcpTokenParams) (int64, error)
 	// Insert a mention record after extracting @mentions from markdown.
 	CreateMention(ctx context.Context, arg CreateMentionParams) (int64, error)
-	// Create a single notification entry for a recipient.
+	// Create a single notification entry for a recipient. INSERT IGNORE skips
+	// rows that collide with the (recipient_user_id, source_event_id, channel)
+	// unique key, providing at-least-once / idempotent fan-out semantics. The
+	// caller can read the affected-rows count to distinguish a fresh insert
+	// (1) from a deduplicated retry (0).
 	CreateNotification(ctx context.Context, arg CreateNotificationParams) (int64, error)
 	// Insert a short-lived CSRF state row for the personal OAuth flow.
 	CreateOauthState(ctx context.Context, arg CreateOauthStateParams) error
@@ -573,6 +583,10 @@ type Querier interface {
 	GetWebhookSubscription(ctx context.Context, arg GetWebhookSubscriptionParams) (GetWebhookSubscriptionRow, error)
 	// Fetch a single widget by workspace_id + public_id.
 	GetWidgetByPublicID(ctx context.Context, arg GetWidgetByPublicIDParams) (GetWidgetByPublicIDRow, error)
+	// Resolve internal workspace id from public_id; ignored if workspace is disabled.
+	// Direct table lookup (no view) because this is a single-column id resolution
+	// used on hot paths in task handlers; v_workspaces would project unused columns.
+	GetWorkspaceIdByPublicId(ctx context.Context, publicID types.PublicID) (uint32, error)
 	// Return the role string for an enabled workspace member. Returns
 	// sql.ErrNoRows when the user is not a member.
 	GetWorkspaceMemberRole(ctx context.Context, arg GetWorkspaceMemberRoleParams) (WorkspaceMembersRole, error)

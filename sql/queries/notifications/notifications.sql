@@ -1,10 +1,15 @@
--- name: CreateNotification :execlastid
--- Create a single notification entry for a recipient.
-INSERT INTO notifications (
+-- name: CreateNotification :execrows
+-- Create a single notification entry for a recipient. INSERT IGNORE skips
+-- rows that collide with the (recipient_user_id, source_event_id, channel)
+-- unique key, providing at-least-once / idempotent fan-out semantics. The
+-- caller can read the affected-rows count to distinguish a fresh insert
+-- (1) from a deduplicated retry (0).
+INSERT IGNORE INTO notifications (
   public_id,
   workspace_id,
   recipient_user_id,
   actor_user_id,
+  source_event_id,
   event_type,
   resource_type,
   resource_public_id,
@@ -12,7 +17,7 @@ INSERT INTO notifications (
   body,
   severity,
   channel
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: ListNotificationsForUser :many
 -- List notifications for a user across all their workspaces, ordered newest first.
