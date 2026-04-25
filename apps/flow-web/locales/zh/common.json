@@ -1,0 +1,916 @@
+{
+  "common": {
+    "loading": "Loading…",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "confirm_title": "Are you sure?",
+    "breadcrumb": "Breadcrumb",
+    "date": {
+      "weekdays": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+      "monthYear": "{month, plural, =1 {January} =2 {February} =3 {March} =4 {April} =5 {May} =6 {June} =7 {July} =8 {August} =9 {September} =10 {October} =11 {November} =12 {December} other {}} {year}",
+      "openPicker": "Choose date",
+      "placeholder": "Select a date"
+    }
+  },
+  "landing": {
+    "wordmark": "nodate-flow",
+    "hello": "Hello.",
+    "tagline": "Work flows. You observe.",
+    "shortcuts": "Shortcuts"
+  },
+  "home": {
+    "greeting_name": "Hello, {name}.",
+    "quick_create": "New task",
+    "quick_search": "Search",
+    "stat_open": "Open tasks",
+    "stat_overdue": "Overdue",
+    "stat_due_today": "Due today",
+    "stat_done": "Completed",
+    "recent_tasks": "Your tasks",
+    "view_all_tasks": "View all tasks →"
+  },
+  "nav": {
+    "theme": "Theme",
+    "mode": "Mode",
+    "language": "Language",
+    "primary": "Primary navigation",
+    "inbox": "Inbox",
+    "today": "My tasks",
+    "calendar": "Calendar",
+    "projects": "Projects",
+    "workspaces": "Workspaces",
+    "workspaceProjects": "Projects in this workspace",
+    "pages": "Pages",
+    "settings": "Settings",
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar"
+  },
+  "topbar": {
+    "workspace": {
+      "switcher": "Switch workspace",
+      "none": "Select a workspace"
+    },
+    "search": {
+      "placeholder": "Search tasks, projects, people..."
+    },
+    "user_menu": {
+      "open": "Open account menu",
+      "settings": "Settings",
+      "avatar_alt": "{name}'s profile picture"
+    },
+    "notifications": {
+      "label": "Notifications"
+    },
+    "ai": {
+      "cost_today": {
+        "label": "AI cost today",
+        "none": "No AI usage today"
+      }
+    }
+  },
+  "dock": {
+    "quick_actions": "Quick actions",
+    "new_task": "New task",
+    "quick_capture": "Quick capture",
+    "ai_assist": "AI assist",
+    "command_palette": {
+      "title": "Command palette",
+      "placeholder": "Type a command or search…",
+      "empty": "No results.",
+      "searching": "Searching…",
+      "group_navigation": "Navigation",
+      "group_workspaces": "Workspaces",
+      "group_tasks": "Tasks",
+      "group_projects": "Projects",
+      "group_actions": "Actions",
+      "home": "Home",
+      "create_task": "Create new task",
+      "hint_nav": "Navigate",
+      "hint_select": "Select",
+      "hint_close": "Close",
+      "placeholder_command": "Type a command in natural language\u2026",
+      "group_command": "AI Command",
+      "resolving": "Resolving command\u2026",
+      "confidence": "Confidence: {score}%",
+      "confirm_execute": "Press Enter to execute",
+      "confirm_low": "Confirm: {tool}?",
+      "command_hint": "Type > for AI commands",
+      "no_workspace": "Select a workspace first to use AI commands.",
+      "error": "Could not resolve the command. Please try again.",
+      "initial_command": "> "
+    }
+  },
+  "glass_dock": {
+    "unavailable": "AI suggestions unavailable"
+  },
+  "theme": {
+    "aurora-light": "Aurora Light",
+    "aurora-dark": "Aurora Dark",
+    "dotline-light": "Dotline Light",
+    "dotline-dark": "Dotline Dark",
+    "glass-light": "Glass Light",
+    "glass-dark": "Glass Dark",
+    "system": "System",
+    "family": {
+      "aurora": "Aurora",
+      "dotline": "Dotline",
+      "glass": "Glass"
+    },
+    "mode": {
+      "light": "Light",
+      "dark": "Dark"
+    }
+  },
+  "lang": {
+    "en": "English",
+    "ja": "Japanese",
+    "zh": "Chinese",
+    "native_en": "English",
+    "native_ja": "日本語",
+    "native_zh": "中文"
+  },
+  "a11y": {
+    "skipToContent": "Skip to content"
+  },
+  "today": {
+    "title": "My tasks",
+    "subtitle": "Tasks assigned to you across all workspaces, grouped by due date.",
+    "empty": "Nothing assigned to you.",
+    "loading": "Loading your tasks…",
+    "error": "Failed to load your tasks.",
+    "sections": {
+      "overdue": "Overdue",
+      "today": "Today",
+      "tomorrow": "Tomorrow",
+      "thisWeek": "This week",
+      "later": "Later",
+      "noDue": "No due date"
+    },
+    "in_workspace": "{workspace}",
+    "no_due_label": "No due date"
+  },
+  "gantt": {
+    "title": "Gantt",
+    "prev": "Earlier",
+    "next": "Later",
+    "today": "Today",
+    "empty": "No scheduled tasks in this project yet.",
+    "unscheduled": "{count, plural, one {# unscheduled task} other {# unscheduled tasks}}",
+    "zoom_in": "Zoom in",
+    "zoom_out": "Zoom out",
+    "zoom_day": "Day",
+    "zoom_week": "Week",
+    "zoom_month": "Month",
+    "zoom_preset_aria": "Zoom preset",
+    "critical_path": "Critical path",
+    "critical_path_none": "No critical path found."
+  },
+  "calendar": {
+    "title": "Calendar",
+    "subtitle": "Tasks and events across every workspace, on a monthly grid.",
+    "prev": "Previous month",
+    "next": "Next month",
+    "today": "Today",
+    "empty": "No scheduled tasks this month.",
+    "noDue": "No due date",
+    "more": "+{count} more",
+    "click_to_add": "Click to add",
+    "drag_to_reschedule": "Drag to reschedule",
+    "reschedule_success": "Due date updated",
+    "reschedule_error": "Failed to update due date",
+    "layers": "Layers",
+    "layer": {
+      "tasks_due": "Tasks (due)",
+      "events": "Events",
+      "blocks": "Blocks",
+      "free": "Free",
+      "milestone": "Milestones",
+      "holidays": "Holidays"
+    },
+    "holiday_more": "{name} +{count} more",
+    "weekday": {
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri",
+      "sat": "Sat",
+      "sun": "Sun"
+    },
+    "event_attendee_count": "{count, plural, one {# attendee} other {# attendees}}",
+    "event_detail": {
+      "title": "Event details",
+      "event": "Event",
+      "start": "Start",
+      "end": "End",
+      "all_day": "All day",
+      "workspace": "Workspace",
+      "location": "Location",
+      "close": "Close",
+      "delete": "Delete",
+      "delete_confirm": "Delete this event? This cannot be undone.",
+      "deleted": "Event deleted",
+      "delete_failed": "Could not delete the event. Please try again.",
+      "open_label": "Open event: {title} in {workspace}"
+    }
+  },
+  "calendars_rail": {
+    "title": "Calendars",
+    "add_teammate": "Add teammate calendar...",
+    "actions": {
+      "show": "Show",
+      "hide": "Hide",
+      "leave": "Leave calendar",
+      "menu": "Calendar actions",
+      "toggle_visibility": "Toggle visibility"
+    },
+    "discover": {
+      "title": "Add teammate calendar",
+      "search_placeholder": "Search by name...",
+      "empty": "No teammate calendars to subscribe to",
+      "subscribe": "Subscribe",
+      "subscribed_toast": "Subscribed to {name}"
+    }
+  },
+  "not_found": {
+    "code": "404",
+    "title": "Page not found",
+    "description": "The page you're looking for doesn't exist or has been moved.",
+    "back_home": "Back to home"
+  },
+  "forbidden": {
+    "code": "403",
+    "title": "Access denied",
+    "description": "You don't have permission to view this page. Ask an administrator to grant access.",
+    "back_home": "Back to home"
+  },
+  "fatal": {
+    "title": "Something went wrong",
+    "description": "An unexpected error occurred while rendering this page.",
+    "retry": "Retry",
+    "back_home": "Back to home"
+  },
+  "workspaces": {
+    "title": "Workspaces",
+    "new": "New workspace",
+    "empty": "No workspaces yet. Create your first one to get started.",
+    "columns": {
+      "name": "Name",
+      "slug": "Slug",
+      "members": "Members",
+      "created": "Created",
+      "actions": "Actions"
+    },
+    "form": {
+      "name": "Name",
+      "slug": "Slug",
+      "description": "Description",
+      "submit": "Save",
+      "submitting": "Saving…",
+      "cancel": "Cancel",
+      "close": "Close"
+    },
+    "detail": {
+      "tabs": {
+        "label": "Workspace detail tabs",
+        "overview": "Overview",
+        "members": "Members",
+        "settings": "Settings"
+      },
+      "projects_nav_label": "Workspace sub-sections",
+      "overview_empty": "No projects yet in this workspace."
+    },
+    "nav": {
+      "overview": "Overview",
+      "projects": "Projects",
+      "timeline": "Timeline",
+      "settings": "Settings",
+      "label": "Workspace sections"
+    },
+    "not_found": {
+      "title": "Workspace not found",
+      "body": "This workspace does not exist or you no longer have access.",
+      "cta": "Back to workspaces"
+    },
+    "members": {
+      "title": "Members",
+      "add": "Add member",
+      "email": "Email",
+      "role": "Role",
+      "added_at": "Added",
+      "pending": "Pending",
+      "change_role": "Change role",
+      "remove": "Remove",
+      "remove_confirm": "Remove {name} from this workspace?",
+      "removed": "Member removed",
+      "role_updated": "Role updated"
+    },
+    "invites": {
+      "create": "Create invite link",
+      "create_title": "Create Invite Link",
+      "link_ready_title": "Invite link ready",
+      "link_ready_description": "Share this link with people you want to invite to the workspace.",
+      "copy": "Copy link",
+      "copied": "Link copied!",
+      "copy_failed": "Could not copy the link. Please try again.",
+      "expires": "Expires",
+      "max_uses": "Max uses",
+      "unlimited": "Unlimited",
+      "no_expiry": "Never",
+      "1_day": "1 day",
+      "7_days": "7 days",
+      "30_days": "30 days",
+      "uses_1": "1 use",
+      "uses_10": "10 uses",
+      "uses_25": "25 uses",
+      "revoke": "Revoke",
+      "revoked": "Invite revoked",
+      "used": "{count} used",
+      "uses_display": "{used} / {max}",
+      "label": "Label (optional)",
+      "label_placeholder": "e.g. For Q2 sales team",
+      "active_links": "Active invite links",
+      "no_invites": "No active invite links",
+      "created_by": "Created by",
+      "accept_title": "Join {name}",
+      "accept_desc": "You've been invited to join as {role}",
+      "accept_btn": "Join workspace",
+      "expired": "This invite has expired",
+      "invalid": "This invite link is invalid or has been revoked",
+      "full": "This invite has reached its usage limit",
+      "join_success": "You've joined {name}!",
+      "create_failed": "Failed to create invite",
+      "email_label": "Send via email (optional)",
+      "email_placeholder": "Email address",
+      "list_title": "Invite links",
+      "col_label": "Label",
+      "col_role": "Role",
+      "col_expires": "Expires",
+      "col_uses": "Uses",
+      "col_created_by": "Created by",
+      "untitled": "Untitled",
+      "never": "Never",
+      "revoke_failed": "Could not revoke the invite. Please try again.",
+      "join_title": "Join {workspace}",
+      "join_description": "You've been invited to join {workspace} as {role}.",
+      "join_button": "Join workspace",
+      "joining": "Joining…",
+      "expires_at": "This invite expires on {date}.",
+      "accept_failed": "Could not accept the invite. Please try again.",
+      "login_required": "You need to sign in to accept this invite.",
+      "go_to_login": "Go to sign in"
+    },
+    "roles": {
+      "owner": "Owner",
+      "admin": "Admin",
+      "member": "Member",
+      "guest": "Guest"
+    },
+    "settings": {
+      "rename": "Rename",
+      "disable": "Disable workspace",
+      "disable_confirm": "Are you sure you want to disable this workspace? This cannot be undone from the UI."
+    },
+    "validation": {
+      "name_required": "Name is required.",
+      "slug_required": "Slug is required.",
+      "slug_format": "Slug may only contain lowercase letters, numbers, and hyphens.",
+      "slug_taken": "This slug is already taken. Please choose another.",
+      "email_required": "Email is required.",
+      "email_invalid": "Enter a valid email address."
+    },
+    "errors": {
+      "create_failed": "Could not create the workspace. Please try again.",
+      "update_failed": "Could not update the workspace. Please try again.",
+      "disable_failed": "Could not disable the workspace. Please try again.",
+      "add_member_failed": "Could not add the member. Please try again."
+    },
+    "setup": {
+      "title": "Create your workspace",
+      "description": "Set up your first workspace to start capturing tasks, events, and pages.",
+      "name_placeholder": "Acme, Personal, Team Nova...",
+      "slug_placeholder": "acme",
+      "slug_hint": "Lowercase letters, numbers, and hyphens only.",
+      "submit": "Create workspace",
+      "submitting": "Creating…"
+    }
+  },
+  "projects": {
+    "title": "Projects",
+    "new": "New project",
+    "nav": {
+      "label": "Project sections",
+      "overview": "Overview",
+      "tasks": "Tasks",
+      "gantt": "Gantt",
+      "timeline": "Timeline",
+      "members": "Members",
+      "settings": "Settings"
+    },
+    "not_found": {
+      "title": "Project not found",
+      "body": "The project you tried to open doesn't exist or you no longer have access.",
+      "cta": "Back to workspace"
+    },
+    "empty": "No projects yet. Create your first one to get started.",
+    "columns": {
+      "name": "Name",
+      "key": "Slug",
+      "visibility": "Status",
+      "created": "Created",
+      "actions": "Actions"
+    },
+    "status": {
+      "active": "Active",
+      "archived": "Archived"
+    },
+    "form": {
+      "name": "Name",
+      "key": "Slug",
+      "description": "Description",
+      "visibility": "Visibility",
+      "submit": "Save",
+      "submitting": "Saving…",
+      "cancel": "Cancel"
+    },
+    "visibility": {
+      "private": "Private",
+      "workspace": "Workspace",
+      "public": "Public"
+    },
+    "detail": {
+      "description_empty": "No description for this project yet.",
+      "overview_empty": "No tasks in this project yet.",
+      "active_tasks": "Active tasks",
+      "progress": "Progress {pct}%",
+      "view_all_tasks": "View all tasks",
+      "tabs": {
+        "overview": "Overview",
+        "members": "Members",
+        "settings": "Settings"
+      }
+    },
+    "members": {
+      "title": "Members",
+      "add": "Add member",
+      "email": "Email",
+      "user_id": "User ID",
+      "role": "Role",
+      "added_at": "Added",
+      "empty": "No members yet."
+    },
+    "roles": {
+      "lead": "Lead",
+      "editor": "Editor",
+      "commenter": "Commenter",
+      "viewer": "Viewer"
+    },
+    "settings": {
+      "rename": "Rename",
+      "disable": "Disable project",
+      "disable_confirm": "Are you sure you want to disable this project? This cannot be undone from the UI."
+    },
+    "validation": {
+      "name_required": "Name is required.",
+      "slug_required": "Slug is required.",
+      "slug_format": "Slug may only contain lowercase letters, numbers, and hyphens.",
+      "slug_taken": "This slug is already taken in the workspace. Please choose another.",
+      "user_id_required": "User ID is required."
+    },
+    "errors": {
+      "create_failed": "Could not create the project. Please try again.",
+      "update_failed": "Could not update the project. Please try again.",
+      "disable_failed": "Could not disable the project. Please try again.",
+      "add_member_failed": "Could not add the member. Please try again."
+    }
+  },
+  "tasks": {
+    "title": "Tasks",
+    "new": "New task",
+    "empty": "No tasks yet. Create your first one to get started.",
+    "title_placeholder": "Task title…",
+    "select_project": "Select project",
+    "create_error": "Failed to create task",
+    "created": "Task created",
+    "views": {
+      "board": "Board",
+      "list": "List",
+      "graph": "Graph",
+      "spreadsheet": "Spreadsheet"
+    },
+    "list": {
+      "select_row": "Select row {index}",
+      "select_all": "Select all rows"
+    },
+    "columns": {
+      "title": "Title",
+      "status": "Status",
+      "deps": "Deps",
+      "assignee": "Assignee",
+      "due": "Due",
+      "priority": "Priority",
+      "updated": "Updated"
+    },
+    "card": {
+      "blockedBy": "{count, plural, one {Blocked by # task} other {Blocked by # tasks}}"
+    },
+    "form": {
+      "title": "Title",
+      "description": "Description",
+      "priority": "Priority",
+      "assignee": "Assignee",
+      "start": "Start date",
+      "due": "Due date",
+      "submit": "Create",
+      "cancel": "Cancel"
+    },
+    "quick_capture": {
+      "title": "Quick capture",
+      "submit_label": "Capture"
+    },
+    "quick_create": {
+      "no_projects": {
+        "title": "Create a project first",
+        "cta": "Go to projects"
+      }
+    },
+    "status": {
+      "open": "Open",
+      "waiting": "In progress",
+      "review": "Review",
+      "done": "Done",
+      "cancelled": "Cancelled"
+    },
+    "priority": {
+      "none": "None",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "urgent": "Urgent",
+      "aria_label": "Priority"
+    },
+    "filters": {
+      "search_placeholder": "Search tasks…",
+      "status": "Status",
+      "assignee": "Assignee",
+      "priority": "Priority",
+      "clear": "Clear filters",
+      "chip_status": "Status: {value}",
+      "chip_assignee": "Assignee: {value}",
+      "chip_search": "Search: {value}",
+      "chip_priority": "Priority: {value}"
+    },
+    "validation": {
+      "title_required": "Title is required.",
+      "due_format": "Due date must be YYYY-MM-DD."
+    },
+    "errors": {
+      "create_failed": "Could not create the task. Please try again.",
+      "update_failed": "Could not update the task. Please try again.",
+      "delete_failed": "Could not delete the task. Please try again.",
+      "move_failed": "Could not move the task. Please try again.",
+      "illegal_transition": "That move isn't allowed from the current state.",
+      "comment_add_failed": "Could not add the comment. Please try again."
+    },
+    "board": {
+      "empty_column": "No tasks",
+      "drop_hint": "Drop here to move",
+      "moved_to": "Moved to {state}",
+      "move_menu": "Move task",
+      "move_to": "Move to {state}"
+    },
+    "assignee": {
+      "plus_n": "+{n, plural, one {# more} other {# more}}",
+      "count": "{count, plural, one {# person} other {# people}}"
+    },
+    "bulk": {
+      "selected": "{count, plural, one {# task selected} other {# tasks selected}}",
+      "set_priority": "Set priority",
+      "delete": "Delete",
+      "clear": "Clear",
+      "priority_updated": "Priority updated.",
+      "update_failed": "Could not update tasks.",
+      "deleted": "Tasks deleted.",
+      "delete_failed": "Could not delete tasks."
+    },
+    "inline": {
+      "edit_title": "Edit title",
+      "edit_priority": "Change priority",
+      "edit_due": "Change due date",
+      "edit_due_set": "{date}, change due date",
+      "edit_due_unset": "Set due date",
+      "edit_status": "Change status",
+      "save_failed": "Could not save changes. Please try again."
+    },
+    "spreadsheet": {
+      "edit_cell": "Edit cell",
+      "bulk_actions": "Bulk actions",
+      "set_priority": "Set priority",
+      "set_assignee": "Set assignee",
+      "set_due_date": "Set due date",
+      "selected_count": "{count, plural, one {# selected} other {# selected}}"
+    },
+    "reorder": {
+      "drag_handle": "Drag to reorder",
+      "failed": "Failed to save task order"
+    },
+    "markdown_editor": {
+      "toolbar": "Formatting toolbar",
+      "bold": "Bold",
+      "italic": "Italic",
+      "heading": "Heading",
+      "list": "Bullet list",
+      "code": "Inline code",
+      "link": "Insert link",
+      "quote": "Block quote",
+      "preview": "Preview",
+      "write": "Write",
+      "preview_empty": "Nothing to preview"
+    },
+    "detail": {
+      "title_edit": "Edit title",
+      "title_edit_named": "Edit title: {title}",
+      "description_edit": "Edit description",
+      "description_empty": "No description yet.",
+      "save": "Save",
+      "cancel": "Cancel",
+      "priority_label": "Priority",
+      "due_label": "Due date",
+      "state_label": "State",
+      "assignees_label": "Assignees",
+      "assignees": {
+        "title": "Assignees",
+        "add": "Add assignee",
+        "remove": "Remove {name}",
+        "empty": "No assignees yet.",
+        "none": "No members available."
+      },
+      "activity": {
+        "title": "Activity"
+      },
+      "duplicates": {
+        "title": "Related tasks",
+        "empty": "No related tasks found.",
+        "duplicate": "Likely duplicate",
+        "related": "Related"
+      },
+      "dependencies": {
+        "title": "Dependencies",
+        "blocks": "Blocks",
+        "blockedBy": "Blocked by",
+        "relates": "Relates to",
+        "parent": "Parent task",
+        "subtasks": "Subtasks",
+        "duplicateOf": "Duplicate of",
+        "duplicatedBy": "Duplicated by",
+        "empty": "No dependencies yet.",
+        "add": "Add dependency",
+        "addCancel": "Cancel",
+        "remove": "Remove",
+        "removeNamed": "Remove dependency on {title}",
+        "kindLabel": "Type",
+        "kind": {
+          "blocks": "Blocks",
+          "blockedBy": "Blocked by",
+          "relates": "Relates to",
+          "subtask_of": "Subtask of",
+          "duplicates": "Duplicates"
+        },
+        "search": "Search tasks…",
+        "searchEmpty": "No matches.",
+        "searchHint": "Type to search tasks in this workspace.",
+        "addError": "Failed to add dependency.",
+        "removeError": "Failed to remove dependency."
+      },
+      "infer_state": {
+        "title": "Suggested next step",
+        "empty": "No suggestion right now.",
+        "reason_label": "Reason (English):"
+      },
+      "ai_activity": {
+        "title": "AI reasoning",
+        "empty": "No AI activity recorded for this task yet."
+      },
+      "transitions": {
+        "title": "Transitions",
+        "start": "Start",
+        "block": "Block",
+        "unblock": "Unblock",
+        "submit": "Submit",
+        "complete": "Complete",
+        "reopen": "Reopen",
+        "cancel": "Cancel"
+      }
+    },
+    "steps": {
+      "title": "Step decomposition",
+      "propose_button": "Decompose into steps",
+      "proposing": "Analyzing task\u2026",
+      "propose_error": "Could not generate steps. Please try again.",
+      "empty": "No steps were suggested.",
+      "toggle_step": "Include step: {title}",
+      "edit_title": "Edit step title",
+      "priority_low": "Low",
+      "priority_medium": "Medium",
+      "priority_high": "High",
+      "expand": "Show description",
+      "collapse": "Hide description",
+      "apply_button": "Create as subtasks",
+      "applying": "Creating\u2026",
+      "apply_success": "{count, plural, one {# subtask created.} other {# subtasks created.}}",
+      "apply_error": "Could not create subtasks. Please try again.",
+      "discard": "Discard",
+      "granularity_label": "Detail level",
+      "granularity_coarse": "Coarse",
+      "granularity_standard": "Standard",
+      "granularity_fine": "Fine"
+    },
+    "smart_create": {
+      "assist_button": "AI Assist",
+      "suggesting": "Analyzing past tasks\u2026",
+      "assignee_section": "Suggested assignees",
+      "subtask_section": "Suggested subtasks",
+      "confidence": "Match: {value}%",
+      "reason": "Reason: {reason}",
+      "apply": "Apply suggestions and create",
+      "no_suggestions": "No suggestions available.",
+      "error": "Could not generate suggestions. You can still create the task manually.",
+      "no_provider": "No AI provider configured for this workspace."
+    },
+    "attachments": {
+      "title": "Attachments",
+      "empty": "No attachments yet.",
+      "delete": "Delete",
+      "delete_confirm": "Are you sure you want to delete this attachment?",
+      "filename": "Filename",
+      "size": "Size",
+      "uploaded_by": "Uploaded by {name}",
+      "add": "Add attachment",
+      "adding": "Adding…",
+      "upload": "Upload file",
+      "uploading": "Uploading…",
+      "upload_failed": "File upload failed.",
+      "download": "Download",
+      "deleting": "Deleting…"
+    },
+    "comments": {
+      "title": "Comments",
+      "add_placeholder": "Write a comment…",
+      "add": "Comment",
+      "empty": "No comments yet.",
+      "edit": "Edit",
+      "delete": "Delete",
+      "cancel": "Cancel",
+      "save": "Save",
+      "edited": "edited",
+      "menu_label": "Comment actions",
+      "edit_placeholder": "Edit your comment…",
+      "delete_confirm": "Delete this comment?",
+      "edit_failed": "Could not update the comment. Please try again.",
+      "delete_failed": "Could not delete the comment. Please try again."
+    },
+    "lens": {
+      "title": "Saved Views",
+      "save": "Save View",
+      "name_placeholder": "View name",
+      "create": "Save",
+      "creating": "Saving...",
+      "delete": "Delete",
+      "delete_confirm": "Delete this saved view?",
+      "empty": "No saved views",
+      "default_badge": "Default",
+      "apply": "Apply",
+      "load_failed": "Failed to load saved views",
+      "save_failed": "Failed to save view",
+      "delete_failed": "Failed to delete view"
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Sign in",
+      "submit": "Sign in",
+      "submitting": "Signing in…",
+      "email": "Email",
+      "password": "Password",
+      "no_account": "Don't have an account?",
+      "signup_link": "Create one",
+      "totp_title": "Two-factor authentication",
+      "totp_instructions": "Enter the 6-digit code from your authenticator app.",
+      "totp_code": "Code",
+      "totp_submit": "Verify",
+      "totp_cancel": "Cancel",
+      "totp_use_recovery": "Use a recovery code instead",
+      "totp_use_code": "Use authenticator code instead",
+      "recovery_code": "Recovery code",
+      "recovery_submit": "Verify recovery code"
+    },
+    "signup": {
+      "title": "Create your account",
+      "submit": "Create account",
+      "submitting": "Creating account…",
+      "name": "Display name",
+      "have_account": "Already have an account?",
+      "login_link": "Sign in"
+    },
+    "logout": "Sign out",
+    "errors": {
+      "invalid_credentials": "Invalid email or password.",
+      "email_taken": "That email is already registered.",
+      "account_locked": "Your account is temporarily locked. Please wait and try again later.",
+      "rate_limited": "Too many failed attempts. Please wait a few minutes and try again.",
+      "password_too_weak": "Password does not meet strength requirements. Use at least 12 characters with mixed case, numbers, and symbols.",
+      "registration_disabled": "Registration is not available on this server. Contact your administrator.",
+      "network": "Could not reach the server. Check your connection and try again.",
+      "totp_code_required": "Enter the 6-digit code from your authenticator app to continue.",
+      "totp_code_mismatch": "That code is not valid. Check your authenticator app and try again.",
+      "totp_challenge_expired": "Your 2FA challenge expired. Sign in again.",
+      "totp_recovery_invalid": "That recovery code is not valid or has already been used.",
+      "totp_recovery_required": "Enter your authenticator code or a recovery code to continue.",
+      "totp_already_enrolled": "Two-factor authentication is already enabled on this account.",
+      "totp_not_enrolled": "Two-factor authentication is not enabled on this account.",
+      "totp_not_configured": "Two-factor authentication is not available on this server.",
+      "password_current_mismatch": "Current password is incorrect.",
+      "password_no_local_identity": "This account uses an external login provider. Change your password there instead.",
+      "session_expired": "Your session has expired. Please sign in again.",
+      "session_revoked": "Your session has been revoked. Please sign in again.",
+      "oidc_state_mismatch": "Sign-in flow was interrupted. Please try again from the login page.",
+      "oidc_nonce_mismatch": "Sign-in flow was interrupted. Please try again from the login page.",
+      "oidc_id_token_invalid": "Could not verify your identity with the login provider. Please try again.",
+      "oidc_provider_unreachable": "The login provider is temporarily unavailable. Please try again later.",
+      "pat_token_unknown": "Personal access token is invalid or has been revoked.",
+      "pat_expired": "Personal access token has expired. Please create a new one.",
+      "token_refresh_invalid": "Your session could not be refreshed. Please sign in again.",
+      "token_refresh_expired": "Your session could not be refreshed. Please sign in again.",
+      "token_signature_invalid": "Authentication token is invalid. Please sign in again.",
+      "generic": "Something went wrong. Please try again.",
+      "unknown": "Something went wrong. Please try again."
+    },
+    "validation": {
+      "email_required": "Email is required.",
+      "email_invalid": "Enter a valid email address.",
+      "password_min": "Password must be at least 8 characters.",
+      "name_required": "Display name is required."
+    }
+  },
+  "realtime": {
+    "ai_suggestion": "New AI suggestion available",
+    "ai_invocation": "AI analysis completed",
+    "resync": "Connection restored — data refreshed"
+  },
+  "invites": {
+    "accept": {
+      "title": "You've been invited",
+      "prompt": "How would you like to respond?",
+      "action_accept": "Accept",
+      "action_tentative": "Tentative",
+      "action_decline": "Decline",
+      "submitting": "Recording your response...",
+      "success_title": "Your RSVP has been recorded",
+      "success_accepted": "You accepted this invite.",
+      "success_tentative": "You marked this invite as tentative.",
+      "success_declined": "You declined this invite.",
+      "invalid_link": "Invalid invite link.",
+      "not_found": "Invite not found or expired.",
+      "error_generic": "Something went wrong. Please try again."
+    },
+    "inbox": {
+      "title": "Pending invites",
+      "count_badge": "{count}",
+      "empty": "No pending invites.",
+      "rsvp_hint": "To RSVP, click the link in the invite email.",
+      "load_error": "Failed to load invites.",
+      "calendar_workspace": "{calendar} · {workspace}",
+      "undated": "Date to be announced",
+      "expired": "Expired",
+      "expires_in_hours": "{count, plural, one {# hour remaining} other {# hours remaining}}",
+      "expires_at": "Expires {date}"
+    }
+  },
+  "share": {
+    "brand": "nodate-flow",
+    "no_upcoming_events": "No events to display.",
+    "event_undated": "Date to be announced",
+    "holidays_country": "Holidays: {country}",
+    "error": {
+      "title_invalid": "This share link is invalid.",
+      "title_expired": "This share link has expired.",
+      "body": "This link may have expired or been removed.",
+      "back": "Back to nodate-flow"
+    }
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "section_navigation": "Navigation",
+    "section_tasks": "Tasks",
+    "section_general": "General",
+    "create_task": "Create task",
+    "focus_search": "Search",
+    "go_inbox": "Go to Inbox",
+    "go_today": "Go to My Tasks",
+    "go_calendar": "Go to Calendar",
+    "go_pages": "Go to Pages",
+    "go_workspaces": "Go to Workspaces",
+    "go_settings": "Go to Settings",
+    "show_help": "Show shortcuts"
+  }
+}

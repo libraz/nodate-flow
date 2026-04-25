@@ -1,0 +1,150 @@
+{
+  "action": {
+    "apply": "Apply",
+    "dismiss": "Dismiss",
+    "edit": "Edit"
+  },
+  "agents": {
+    "title": "AI agents",
+    "subtitle": "Manage trigger mode and kill switch for workspace agents.",
+    "empty": "No AI agents yet. Create an AI provider and set a default model first.",
+    "pause": "Pause",
+    "resume": "Resume",
+    "status": {
+      "active": "Active",
+      "paused": "Paused"
+    },
+    "scheduleKind": {
+      "label": "Trigger",
+      "options": {
+        "disabled": "Disabled",
+        "interval": "Every tick",
+        "on_event": "On event",
+        "manual": "Manual only"
+      }
+    },
+    "errors": {
+      "scheduleFailed": "Failed to update trigger",
+      "pauseFailed": "Failed to toggle kill switch",
+      "triggerFailed": "Failed to trigger agent"
+    },
+    "trigger": {
+      "label": "Run now",
+      "queued": "Run queued"
+    },
+    "eventTriggers": {
+      "label": "Event kinds",
+      "save": "Save triggers",
+      "saved": "Triggers saved",
+      "failed": "Failed to update event triggers"
+    },
+    "create": {
+      "open": "+ Agent",
+      "title": "New agent",
+      "name": "Name",
+      "model": "Model",
+      "systemPrompt": "System prompt",
+      "submit": "Create",
+      "cancel": "Cancel",
+      "success": "Agent created",
+      "failed": "Failed to create agent",
+      "missingFields": "Fill in name, model and system prompt",
+      "noModels": "No models registered. Add an AI provider and model first."
+    }
+  },
+  "empty": "No suggestions yet",
+  "loading": "Thinking...",
+  "error": "Failed to load suggestions",
+  "triage": {
+    "trigger": "Triage with AI",
+    "running": "Triaging...",
+    "result_title": "AI suggestions",
+    "score": "Score",
+    "recommended": "Recommended",
+    "reasoning": "Reasoning",
+    "missing_item": "Inbox item not found",
+    "success": "{count, plural, one {# AI suggestion ready} other {# AI suggestions ready}}",
+    "success_empty": "Triage complete — no suggestions"
+  },
+  "edit": {
+    "title": "Edit suggestion",
+    "action_label": "Recommended action",
+    "reasoning_label": "Reasoning",
+    "reasoning_required": "Reasoning is required",
+    "save": "Save",
+    "cancel": "Cancel",
+    "action": {
+      "open": "Open",
+      "snooze": "Snooze",
+      "archive": "Archive"
+    }
+  },
+  "glass_dock": {
+    "title": "AI suggestions",
+    "empty": "No pending suggestions",
+    "expand": "Expand suggestions panel",
+    "collapse": "Collapse suggestions panel"
+  },
+  "state_suggestions": {
+    "title": "Suggested next steps"
+  },
+  "reminders": {
+    "title": "Reminders",
+    "kind": {
+      "overdue": "Overdue",
+      "due_today": "Due today",
+      "due_soon": "Due soon"
+    }
+  },
+  "auto_actions": {
+    "title": "Suggested actions",
+    "kind": {
+      "escalate_overdue": "Escalate",
+      "assign_owner": "Assign owner",
+      "nudge_assignee": "Nudge",
+      "close_stale_review": "Close review"
+    }
+  },
+  "transition_label": {
+    "start": "Start",
+    "block": "Block",
+    "unblock": "Unblock",
+    "submit": "Submit",
+    "complete": "Complete",
+    "reopen": "Reopen",
+    "cancel": "Cancel"
+  },
+  "confidence": {
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low"
+  },
+  "relative_date": {
+    "overdue": "{count}d overdue",
+    "today": "Today",
+    "in_days": "In {count}d"
+  },
+  "filter_condition": {
+    "priority": "Priority: {label}",
+    "blocked": "Blocked",
+    "due_this_week": "Due: This week",
+    "status": "Status: {values}"
+  },
+  "priority_label": {
+    "1": "Low",
+    "2": "Medium",
+    "3": "High"
+  },
+  "nl_query": {
+    "label": "Ask in plain language",
+    "placeholder": "show me everything blocked this week",
+    "submit": "Submit",
+    "compiling": "Processing...",
+    "unparseable": "Couldn't understand that — try rephrasing.",
+    "error": "Failed to process query",
+    "apply": "Apply filter",
+    "applied": "Filter applied",
+    "sort_label": "Sort",
+    "group_label": "Group by"
+  }
+}

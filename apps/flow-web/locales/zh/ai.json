@@ -1,0 +1,51 @@
+{
+  "cost_today": {
+    "label": "AI",
+    "tooltip": "Today's AI spend across this workspace"
+  },
+  "providers": {
+    "title": "AI providers",
+    "empty": "No providers configured",
+    "add": "Add provider",
+    "masked_key_label": "API key (masked)",
+    "write_only_notice": "API keys are write-only. Once saved, they cannot be read back — only rotated or deleted.",
+    "field": {
+      "kind": "Kind",
+      "name": "Name",
+      "api_key": "API key",
+      "api_key_placeholder": "sk-...",
+      "base_url": "Base URL (optional)",
+      "default_model": "Default model (optional)"
+    },
+    "kind": {
+      "anthropic": "Anthropic",
+      "openai": "OpenAI",
+      "google": "Google",
+      "ollama": "Ollama",
+      "openai_compat": "OpenAI-compatible"
+    },
+    "action": {
+      "save": "Save",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "confirm_delete": "Delete this provider?",
+      "rotate": "Rotate key"
+    },
+    "rotate_dialog": {
+      "title": "Rotate API key",
+      "description": "Replace the stored API key with a new value. The old key is discarded immediately.",
+      "submit": "Rotate"
+    },
+    "toast": {
+      "created": "Provider added",
+      "deleted": "Provider deleted",
+      "rotated": "API key rotated",
+      "error": "Action failed"
+    },
+    "error": {
+      "load_failed": "Failed to load AI providers. Please try again.",
+      "forbidden": "Only workspace admins can manage AI providers.",
+      "retry": "Try again"
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "title": "Dashboard",
+  "add_widget": "Add widget",
+  "add_widget_success": "Widget added",
+  "add_widget_error": "Failed to add widget",
+  "update_position_error": "Failed to update widget position",
+  "delete_widget_error": "Failed to remove widget",
+  "edit_layout": "Edit layout",
+  "done_editing": "Done",
+  "remove_widget": "Remove widget",
+  "widget_type": {
+    "task_summary": "Task summary",
+    "burndown": "Burndown",
+    "signals_feed": "Signals feed",
+    "ai_suggestions": "AI suggestions",
+    "overdue_tasks": "Overdue tasks",
+    "notification_feed": "Notifications"
+  },
+  "empty": "No widgets yet",
+  "empty_description": "Add widgets to customize your dashboard.",
+  "resize_label": "Resize",
+  "confirm_remove": "Remove this widget?",
+  "widget_title_label": "Widget title",
+  "select_type": "Select widget type",
+  "config": {
+    "timebox_label": "Timebox",
+    "project_label": "Project"
+  }
+}

@@ -27,6 +27,7 @@ type errorEntry struct {
 	Status      int    `yaml:"status"`
 	Message     string `yaml:"message"`
 	MessageJA   string `yaml:"message_ja"`
+	MessageZH   string `yaml:"message_zh"`
 	Description string `yaml:"description"`
 	UserAction  string `yaml:"userAction"`
 }
@@ -53,6 +54,7 @@ type record struct {
 	Status      int
 	Message     string
 	MessageJA   string
+	MessageZH   string
 	Description string
 	UserAction  string
 	Breadcrumb  string // resource breadcrumb (fallback to domain)
@@ -135,6 +137,7 @@ func run() error {
 					Status:      e.Status,
 					Message:     e.Message,
 					MessageJA:   e.MessageJA,
+					MessageZH:   e.MessageZH,
 					Description: e.Description,
 					UserAction:  e.UserAction,
 					Breadcrumb:  bc,

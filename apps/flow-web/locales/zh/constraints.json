@@ -1,0 +1,58 @@
+{
+  "editor": {
+    "title": "Constraints",
+    "kind": "Kind",
+    "expression": "Expression (JSON)",
+    "add": "Add constraint",
+    "remove": "Remove",
+    "evaluate": "Evaluate now",
+    "placeholder": "{\"op\":\"ci.status_is\",\"arg\":\"success\"}",
+    "outcomes": "Outcomes",
+    "satisfied": "satisfied",
+    "failed": "failed",
+    "parseError": "Parse error",
+    "nlPrompt": "Describe constraint in natural language\u2026",
+    "generate": "Generate",
+    "generating": "Generating\u2026",
+    "explain": "Explain",
+    "explaining": "Explaining\u2026",
+    "explanation": "Explanation",
+    "advanced": "Advanced (kind & JSON expression)",
+    "errors": {
+      "addFailed": "Failed to add constraint",
+      "removeFailed": "Failed to remove constraint",
+      "evaluateFailed": "Failed to evaluate constraints",
+      "compileFailed": "Failed to generate constraint from description.",
+      "explainFailed": "Failed to explain constraint."
+    },
+    "kinds": {
+      "deadline": "Deadline",
+      "dependency": "Dependency",
+      "approval": "Approval",
+      "signal": "Signal",
+      "custom": "Custom"
+    }
+  },
+  "replay": {
+    "title": "Replay",
+    "derived": "Replayed",
+    "stored": "Stored",
+    "equivalent": "Equivalent",
+    "drift": "Drift detected",
+    "refresh": "Refresh",
+    "loading": "Loading…",
+    "error": "Failed to replay task"
+  },
+  "stateGraph": {
+    "title": "State graph",
+    "legend": "Current state highlighted",
+    "projectTitle": "Task Dependency Graph",
+    "noTasks": "No tasks in this project",
+    "noDependencies": "No dependencies defined",
+    "external": {
+      "github": "GitHub",
+      "slack": "Slack",
+      "google": "Google"
+    }
+  }
+}

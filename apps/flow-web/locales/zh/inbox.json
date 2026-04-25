@@ -1,0 +1,32 @@
+{
+  "view": {
+    "title": "Inbox",
+    "subtitle": "Signals from connected sources land here for triage.",
+    "empty": "Your inbox is empty"
+  },
+  "action": {
+    "archive": "Archive",
+    "snooze": "Snooze"
+  },
+  "snooze": {
+    "one_hour": "1 hour",
+    "tomorrow": "Tomorrow",
+    "next_week": "Next week"
+  },
+  "source": {
+    "manual": "Manual",
+    "github": "GitHub",
+    "slack": "Slack",
+    "email": "Email",
+    "webhook": "Webhook"
+  },
+  "filter": {
+    "workspace_label": "Workspace",
+    "workspace_all": "All workspaces"
+  },
+  "toast": {
+    "archived": "Archived",
+    "snoozed": "Snoozed",
+    "error": "Action failed"
+  }
+}

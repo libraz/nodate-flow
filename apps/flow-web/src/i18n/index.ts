@@ -34,10 +34,26 @@ import jaReactions from '../../locales/ja/reactions.json';
 import jaRelations from '../../locales/ja/relations.json';
 import jaSettings from '../../locales/ja/settings.json';
 import jaTimeline from '../../locales/ja/timeline.json';
+import zhAiSuggestions from '../../locales/zh/ai-suggestions.json';
+import zhAi from '../../locales/zh/ai.json';
+import zhAuth from '../../locales/zh/auth.json';
+import zhCalendarEvents from '../../locales/zh/calendar-events.json';
+import zhCommon from '../../locales/zh/common.json';
+import zhConstraints from '../../locales/zh/constraints.json';
+import zhDashboard from '../../locales/zh/dashboard.json';
+import zhErrors from '../../locales/zh/errors.json';
+import zhInbox from '../../locales/zh/inbox.json';
+import zhLabels from '../../locales/zh/labels.json';
+import zhNotifications from '../../locales/zh/notifications.json';
+import zhPages from '../../locales/zh/pages.json';
+import zhReactions from '../../locales/zh/reactions.json';
+import zhRelations from '../../locales/zh/relations.json';
+import zhSettings from '../../locales/zh/settings.json';
+import zhTimeline from '../../locales/zh/timeline.json';
 import { defaultNamespace } from './namespaces';
 
 /** Supported UI languages. */
-export const supportedLanguages = ['en', 'ja'] as const;
+export const supportedLanguages = ['en', 'ja', 'zh'] as const;
 
 /** Union of supported UI language codes. */
 export type SupportedLanguage = (typeof supportedLanguages)[number];
@@ -54,7 +70,9 @@ function detectInitialLanguage(): SupportedLanguage {
     // ignore
   }
   const nav = typeof navigator !== 'undefined' ? navigator.language : 'en';
-  if (nav.toLowerCase().startsWith('ja')) return 'ja';
+  const lower = nav.toLowerCase();
+  if (lower.startsWith('ja')) return 'ja';
+  if (lower.startsWith('zh')) return 'zh';
   return 'en';
 }
 
@@ -122,6 +140,24 @@ export function initI18n(): typeof i18n {
           pages: jaPages,
           labels: jaLabels,
           reactions: jaReactions,
+        },
+        zh: {
+          auth: zhAuth,
+          common: zhCommon,
+          settings: zhSettings,
+          inbox: zhInbox,
+          timeline: zhTimeline,
+          'calendar-events': zhCalendarEvents,
+          ai: zhAi,
+          'ai-suggestions': zhAiSuggestions,
+          constraints: zhConstraints,
+          errors: zhErrors,
+          notifications: zhNotifications,
+          relations: zhRelations,
+          dashboard: zhDashboard,
+          pages: zhPages,
+          labels: zhLabels,
+          reactions: zhReactions,
         },
       },
       interpolation: { escapeValue: false },

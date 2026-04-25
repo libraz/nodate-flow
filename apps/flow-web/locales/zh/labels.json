@@ -1,0 +1,202 @@
+{
+  "title": "Labels",
+  "new": "New label",
+  "empty": "No labels yet. Create your first one to organize tasks.",
+  "search_placeholder": "Search labels…",
+  "columns": {
+    "name": "Name",
+    "color": "Color",
+    "description": "Description",
+    "actions": "Actions"
+  },
+  "form": {
+    "name": "Name",
+    "name_placeholder": "Label name",
+    "color": "Color",
+    "description": "Description",
+    "description_placeholder": "Optional description",
+    "submit": "Save",
+    "submitting": "Saving…",
+    "cancel": "Cancel"
+  },
+  "badge": {
+    "remove": "Remove label {name}"
+  },
+  "picker": {
+    "title": "Labels",
+    "search_placeholder": "Search labels…",
+    "empty": "No labels found.",
+    "no_labels": "No labels available.",
+    "create_new": "Create \"{name}\"",
+    "apply": "Apply"
+  },
+  "manager": {
+    "title": "Manage Labels",
+    "edit": "Edit label",
+    "create": "Create label",
+    "delete": "Delete label",
+    "delete_confirm": "Are you sure you want to delete this label? It will be removed from all tasks."
+  },
+  "task": {
+    "add": "Add label",
+    "remove": "Remove label",
+    "none": "No labels"
+  },
+  "filters": {
+    "label": "Label",
+    "chip_label": "Label: {value}"
+  },
+  "validation": {
+    "name_required": "Label name is required.",
+    "name_max": "Label name must be under 64 characters."
+  },
+  "errors": {
+    "create_failed": "Could not create the label. Please try again.",
+    "update_failed": "Could not update the label. Please try again.",
+    "delete_failed": "Could not delete the label. Please try again.",
+    "add_failed": "Could not add the label to the task. Please try again.",
+    "remove_failed": "Could not remove the label from the task. Please try again.",
+    "name_taken": "A label with this name already exists."
+  },
+  "archive": {
+    "action": "Archive",
+    "unarchive": "Unarchive",
+    "confirm": "Are you sure you want to archive this task?",
+    "archived": "Task archived",
+    "unarchived": "Task unarchived",
+    "view_archived": "View archived tasks",
+    "archived_title": "Archived Tasks",
+    "archived_empty": "No archived tasks.",
+    "error_archive": "Could not archive the task. Please try again.",
+    "error_unarchive": "Could not unarchive the task. Please try again.",
+    "already_archived": "This task is already archived.",
+    "not_archived": "This task is not archived."
+  },
+  "identifier": {
+    "label": "Identifier",
+    "placeholder": "e.g. NF",
+    "hint": "A short key for task references (e.g. NF-42). Max 5 characters.",
+    "validation": {
+      "required": "Project identifier is required.",
+      "max": "Identifier must be 5 characters or fewer.",
+      "format": "Identifier may only contain letters and numbers.",
+      "taken": "This identifier is already taken in the workspace."
+    }
+  },
+  "feature_toggles": {
+    "title": "Features",
+    "coming_soon_subtitle": "Coming soon",
+    "description": "Enable or disable features for this project.",
+    "pages": "Pages",
+    "pages_description": "Enable document pages within this project.",
+    "timeboxes": "Timeboxes",
+    "timeboxes_description": "Enable timeboxes (sprints/iterations) for this project.",
+    "lenses": "Saved Views",
+    "lenses_description": "Enable saved views for task filtering.",
+    "calendar": "Calendar",
+    "calendar_description": "Enable calendar view for this project.",
+    "updated": "Feature settings updated.",
+    "update_failed": "Could not update feature settings. Please try again.",
+    "not_editable": "Not yet editable from the project settings."
+  },
+  "favorites": {
+    "title": "Favorites",
+    "add": "Add to favorites",
+    "remove": "Remove from favorites",
+    "added": "Added to favorites",
+    "removed": "Removed from favorites",
+    "empty": "No favorites yet. Star items to find them quickly.",
+    "error_add": "Could not add to favorites. Please try again.",
+    "error_remove": "Could not remove from favorites. Please try again.",
+    "sidebar_title": "Favorites"
+  },
+  "reactions": {
+    "add": "Add reaction",
+    "remove": "Remove reaction",
+    "reacted": "You reacted with {emoji}",
+    "count": "{count, plural, one {# reaction} other {# reactions}}",
+    "error_add": "Could not add reaction. Please try again.",
+    "error_remove": "Could not remove reaction. Please try again."
+  },
+  "intake": {
+    "title": "Intake",
+    "new": "New item",
+    "empty": "No items in the triage queue.",
+    "status": {
+      "pending": "Pending",
+      "accepted": "Accepted",
+      "rejected": "Rejected",
+      "snoozed": "Snoozed",
+      "duplicate": "Duplicate"
+    },
+    "actions": {
+      "accept": "Accept",
+      "reject": "Reject",
+      "snooze": "Snooze",
+      "duplicate": "Mark as duplicate",
+      "convert": "Convert to task"
+    },
+    "form": {
+      "title": "Title",
+      "title_placeholder": "What needs to be triaged?",
+      "body": "Description",
+      "body_placeholder": "Details...",
+      "submit": "Add to queue",
+      "submitting": "Adding..."
+    },
+    "converted": "Converted to task",
+    "triaged": "Item triaged",
+    "errors": {
+      "create_failed": "Could not create intake item. Please try again.",
+      "triage_failed": "Could not triage the item. Please try again.",
+      "convert_failed": "Could not convert to task. Please try again."
+    }
+  },
+  "imports": {
+    "title": "Imports",
+    "new": "New import",
+    "empty": "No import jobs yet.",
+    "source": {
+      "github": "GitHub",
+      "jira": "Jira",
+      "linear": "Linear",
+      "csv": "CSV"
+    },
+    "status": {
+      "pending": "Pending",
+      "running": "Running",
+      "completed": "Completed",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
+    },
+    "columns": {
+      "source": "Source",
+      "status": "Status",
+      "progress": "Progress",
+      "created": "Created",
+      "actions": "Actions"
+    },
+    "actions": {
+      "cancel": "Cancel",
+      "cancel_confirm": "Are you sure you want to cancel this import?"
+    },
+    "errors": {
+      "create_failed": "Could not create import job. Please try again.",
+      "cancel_failed": "Could not cancel the import job. Please try again.",
+      "already_running": "An import job is already running for this project."
+    }
+  },
+  "description_history": {
+    "title": "Version History",
+    "empty": "No previous versions.",
+    "version": "Version {number}",
+    "by": "by {name}",
+    "chars": "{count} characters",
+    "restore": "Restore this version",
+    "restoring": "Restoring...",
+    "restored": "Version restored",
+    "restore_confirm": "Restore this version? The current description will be saved as a new version.",
+    "error_restore": "Could not restore the version. Please try again.",
+    "current": "Current"
+  }
+}

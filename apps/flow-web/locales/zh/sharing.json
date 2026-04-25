@@ -1,0 +1,39 @@
+{
+  "title": "Sharing",
+  "publish": "Publish",
+  "unpublish": "Unpublish",
+  "public_link": "Public link",
+  "copy_link": "Copy link",
+  "link_copied": "Link copied to clipboard",
+  "safety_check": {
+    "title": "Safety check",
+    "description": "Scanning for sensitive data before publishing...",
+    "passed": "No sensitive data found",
+    "findings": "{count} potential issue found",
+    "findings_plural": "{count} potential issues found",
+    "proceed_anyway": "Publish anyway"
+  },
+  "confirm_publish": "This will make the view accessible to anyone with the link. Continue?",
+  "confirm_unpublish": "This will revoke public access. Existing links will stop working.",
+  "toast": {
+    "published": "View published",
+    "unpublished": "View unpublished"
+  },
+  "badge": "Public",
+  "badge_private": "Private",
+  "error": {
+    "publish_failed": "Failed to publish view",
+    "unpublish_failed": "Failed to unpublish view"
+  },
+  "public_page": {
+    "loading": "Loading view...",
+    "not_found": "This public view is not available.",
+    "footer": "Powered by nodate-flow",
+    "col_title": "Title",
+    "col_status": "Status",
+    "col_priority": "Priority",
+    "col_due": "Due",
+    "col_assignee": "Assignee",
+    "no_tasks": "No tasks in this view."
+  }
+}

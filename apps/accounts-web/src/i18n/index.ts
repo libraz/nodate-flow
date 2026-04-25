@@ -8,9 +8,12 @@ import enCommon from '../../locales/en/common.json';
 import jaAdmin from '../../locales/ja/admin.json';
 import jaAuth from '../../locales/ja/auth.json';
 import jaCommon from '../../locales/ja/common.json';
+import zhAdmin from '../../locales/zh/admin.json';
+import zhAuth from '../../locales/zh/auth.json';
+import zhCommon from '../../locales/zh/common.json';
 
 /** Supported UI languages. */
-export const supportedLanguages = ['en', 'ja'] as const;
+export const supportedLanguages = ['en', 'ja', 'zh'] as const;
 
 /** Union of supported UI language codes. */
 export type SupportedLanguage = (typeof supportedLanguages)[number];
@@ -27,7 +30,9 @@ function detectInitialLanguage(): SupportedLanguage {
     // ignore
   }
   const nav = typeof navigator !== 'undefined' ? navigator.language : 'en';
-  if (nav.toLowerCase().startsWith('ja')) return 'ja';
+  const lower = nav.toLowerCase();
+  if (lower.startsWith('ja')) return 'ja';
+  if (lower.startsWith('zh')) return 'zh';
   return 'en';
 }
 
@@ -53,6 +58,11 @@ export function initI18n(): typeof i18n {
           auth: jaAuth,
           admin: jaAdmin,
           common: jaCommon,
+        },
+        zh: {
+          auth: zhAuth,
+          admin: zhAdmin,
+          common: zhCommon,
         },
       },
       interpolation: { escapeValue: false },

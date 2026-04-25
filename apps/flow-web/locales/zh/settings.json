@@ -1,0 +1,517 @@
+{
+  "nav": {
+    "profile": "Profile",
+    "notifications": "Notifications",
+    "general": "General",
+    "public_shares": "Public share pages",
+    "mcp_tokens": "MCP tokens",
+    "ai_providers": "AI providers",
+    "ai_agents": "AI agents",
+    "ai_activity": "AI activity",
+    "weekly_digest": "Weekly digest",
+    "audit_log": "Audit log",
+    "security": "Security",
+    "integrations": "Integrations",
+    "auto_actions": "Auto-actions"
+  },
+  "integrations": {
+    "title": "Integrations",
+    "description": "Connect your personal GitHub, Slack, and Google Calendar accounts so nodate-flow can act on your behalf. Tokens are encrypted at rest.",
+    "connect": "Connect",
+    "disconnect": "Disconnect",
+    "disconnect_confirm": "Disconnect {provider}? You will need to re-authorise to use it again.",
+    "disconnected": "Integration disconnected",
+    "connected_as": "Connected as {account} · {time}",
+    "connected_toast": "{provider} connected.",
+    "not_configured": "Not configured on this server. Ask the administrator to set the OAuth credentials.",
+    "provider": {
+      "github": {
+        "name": "GitHub",
+        "description": "Read your repositories and open issues as yourself."
+      },
+      "slack": {
+        "name": "Slack",
+        "description": "Send direct messages and read your DMs as yourself."
+      },
+      "google_calendar": {
+        "name": "Google Calendar",
+        "description": "Read your calendars and upcoming events."
+      }
+    },
+    "errors": {
+      "connect_failed": "Could not start the connect flow. Please try again.",
+      "disconnect_failed": "Could not disconnect the integration. Please try again.",
+      "callback_failed": "Connect flow failed: {reason}"
+    }
+  },
+  "ai_activity": {
+    "title": "AI activity",
+    "description": "A read-only audit of recent LLM calls made on behalf of this workspace. Prompts and responses are redacted at write time.",
+    "empty": "No LLM calls recorded yet.",
+    "error_code": "Error: {code}"
+  },
+  "audit_log": {
+    "title": "Audit log",
+    "description": "A read-only log of actions performed in this workspace. Metadata is redacted at write time.",
+    "empty": "No audit entries recorded yet.",
+    "empty_filtered": "No entries match your filters. Clear filters to see all entries.",
+    "unknown_actor": "System",
+    "export_csv": "Export CSV",
+    "column": {
+      "timestamp": "Timestamp",
+      "action": "Action",
+      "actor": "Actor",
+      "resource_type": "Resource type",
+      "resource_id": "Resource ID",
+      "ip_address": "IP address",
+      "metadata": "Metadata"
+    },
+    "filter": {
+      "action": "Action",
+      "resource_type": "Resource type",
+      "actor_search": "Actor",
+      "actor_search_placeholder": "Search by name\u2026",
+      "date_from": "From",
+      "date_to": "To",
+      "all_actions": "All actions",
+      "all_types": "All types",
+      "clear": "Clear filters"
+    },
+    "pagination": {
+      "label": "Audit log pagination",
+      "prev": "Previous",
+      "next": "Next",
+      "page_of": "Page {current} of {total}"
+    }
+  },
+  "sections_label": "Workspace settings sections",
+  "settings_sections_label": "Settings sections",
+  "access_restricted": {
+    "body": "This section is only available to workspace admins.",
+    "cta": "Back to General"
+  },
+  "weekly_digest": {
+    "title": "Weekly digest",
+    "description": "A deterministic snapshot of this workspace: state counts, what was completed in the last seven days, and what is overdue.",
+    "counts": {
+      "open": "Open",
+      "waiting": "In progress",
+      "review": "Review",
+      "done": "Done",
+      "cancelled": "Cancelled"
+    },
+    "completed_this_week": "Completed this week",
+    "overdue_open": "Overdue",
+    "empty_completed": "Nothing completed in the last seven days.",
+    "empty_overdue": "No overdue tasks.",
+    "markdown": "Markdown"
+  },
+  "profile": {
+    "title": "Profile",
+    "display_name": "Display name",
+    "locale": "Language",
+    "locale_en": "English",
+    "locale_ja": "日本語",
+    "timezone": "Timezone",
+    "country": "Country",
+    "country_help": "Used to show the right public holidays on your calendar. Leave unset for none.",
+    "country_unset": "(none)",
+    "week_start": {
+      "label": "First day of the week",
+      "help": "Used by the calendar grid",
+      "mon": "Monday",
+      "sun": "Sunday",
+      "sat": "Saturday"
+    },
+    "theme": "Theme",
+    "theme_glass": "Glass",
+    "theme_aurora": "Aurora",
+    "theme_dotline": "Dotline",
+    "color_mode": "Color mode",
+    "color_mode_light": "Light",
+    "color_mode_dark": "Dark",
+    "color_mode_system": "System",
+    "theme_system": "System",
+    "theme_aurora_light": "Aurora Light",
+    "theme_aurora_dark": "Aurora Dark",
+    "theme_dotline_light": "Dotline Light",
+    "theme_dotline_dark": "Dotline Dark",
+    "theme_glass_light": "Glass Light",
+    "theme_glass_dark": "Glass Dark",
+    "save": "Save",
+    "saving": "Saving...",
+    "saved": "Saved",
+    "avatar": {
+      "label": "Profile picture",
+      "description": "JPEG, PNG, WebP, or GIF. Max 5 MB.",
+      "upload": "Upload image",
+      "change": "Change image",
+      "remove": "Remove",
+      "uploading": "Uploading…",
+      "removed": "Profile picture removed.",
+      "updated": "Profile picture updated.",
+      "alt": "{name}'s profile picture",
+      "empty_alt": "No profile picture"
+    },
+    "validation": {
+      "display_name_required": "Display name is required.",
+      "timezone_required": "Timezone is required.",
+      "country_invalid": "Country must be a 2-letter ISO code (uppercase) or left empty."
+    },
+    "errors": {
+      "update_failed": "Could not update your profile. Please try again."
+    }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "save": "Save",
+    "saving": "Saving...",
+    "saved": "Notification preferences updated",
+    "email_digest": {
+      "label": "Weekly digest email",
+      "description": "Receive a summary of your workspace activity every week."
+    },
+    "email_mention": {
+      "label": "Mentions",
+      "description": "Email me when someone @-mentions me in a comment."
+    },
+    "email_assignment": {
+      "label": "Task assignments",
+      "description": "Email me when a task is assigned to me."
+    },
+    "email_due_soon": {
+      "label": "Due soon",
+      "description": "Email me when a task I own is due within the next 24 hours."
+    },
+    "web_push": {
+      "label": "Browser push notifications",
+      "description": "Show desktop notifications in this browser. Requires permission."
+    },
+    "errors": {
+      "update_failed": "Could not update your notification preferences. Please try again."
+    }
+  },
+  "security": {
+    "title": "Security",
+    "password": {
+      "title": "Password",
+      "description": "Change your password. Every other device will be signed out.",
+      "current": "Current password",
+      "next": "New password",
+      "confirm": "Confirm new password",
+      "save": "Change password",
+      "saving": "Saving...",
+      "changed": "Password changed. {count} other session(s) were signed out.",
+      "validation": {
+        "too_short": "New password must be at least 8 characters.",
+        "mismatch": "New password and confirmation do not match."
+      },
+      "errors": {
+        "current_mismatch": "Current password is incorrect.",
+        "no_local_identity": "This account has no local password to change. Change it through your identity provider instead.",
+        "generic": "Could not change your password. Please try again."
+      }
+    },
+    "totp": {
+      "title": "Two-factor authentication",
+      "disabled_description": "Add an extra layer of protection by requiring a 6-digit code from your authenticator app at sign-in.",
+      "enabled_description": "Two-factor authentication is enabled. Enter your password to disable it.",
+      "pending_description": "An enrollment was started but never confirmed. Regenerate the secret to finish setting up 2FA.",
+      "enroll_instructions": "Add this secret to your authenticator app (Google Authenticator, 1Password, Authy, ...) and enter the 6-digit code it shows.",
+      "secret_label": "Secret",
+      "code_label": "6-digit code",
+      "password_label": "Current password",
+      "enable": "Enable two-factor authentication",
+      "resume_enroll": "Restart enrollment",
+      "confirm": "Confirm",
+      "confirming": "Confirming...",
+      "disable": "Disable",
+      "disabling": "Disabling...",
+      "disable_confirm": "Disable two-factor authentication? Your account will be protected by a password only.",
+      "copy": "Copy",
+      "secret_copied": "Secret copied",
+      "open_in_app": "Open in authenticator app",
+      "enabled_toast": "Two-factor authentication is now enabled.",
+      "disabled_toast": "Two-factor authentication disabled.",
+      "errors": {
+        "enroll_failed": "Could not start enrollment. Please try again.",
+        "confirm_failed": "Could not confirm the code. Please try again.",
+        "code_mismatch": "That code is not valid. Check your authenticator app and try again.",
+        "password_mismatch": "Current password is incorrect.",
+        "disable_failed": "Could not disable 2FA. Please try again.",
+        "not_configured": "Two-factor authentication is not available on this server. Ask an administrator to configure NF_SECRET_KEY."
+      },
+      "recovery": {
+        "title": "Recovery codes",
+        "description": "Use these one-time codes to sign in if you lose access to your authenticator app. Save them somewhere safe — they will not be shown again.",
+        "remaining": "{count, plural, one {# recovery code remaining} other {# recovery codes remaining}}",
+        "regenerate": "Regenerate recovery codes",
+        "regenerate_confirm": "Generate a new set of recovery codes? Your previous codes will stop working.",
+        "regenerate_password_label": "Current password",
+        "copy_all": "Copy all",
+        "download": "Download as .txt",
+        "saved": "I've saved them",
+        "copied": "Recovery codes copied",
+        "regenerated_toast": "New recovery codes generated.",
+        "errors": {
+          "regenerate_failed": "Could not regenerate recovery codes. Please try again."
+        }
+      }
+    },
+    "sessions": {
+      "title": "Active sessions",
+      "description": "Devices currently signed in to your account. Revoke any session you do not recognise.",
+      "empty": "No active sessions.",
+      "revoke": "Revoke",
+      "revoke_all": "Sign out of all other devices",
+      "revoke_all_confirm": "Sign out of all other devices? Other browsers and apps will stop working immediately.",
+      "revoked": "Session revoked",
+      "revoked_all": "Revoked {count} other session(s)",
+      "current_badge": "Current",
+      "unknown_device": "Unknown device",
+      "unknown_ip": "Unknown location",
+      "created_at": "Signed in {time}",
+      "last_used_at": "last active {time}",
+      "errors": {
+        "revoke_failed": "Could not revoke the session. Please try again.",
+        "revoke_all_failed": "Could not revoke the other sessions. Please try again."
+      }
+    }
+  },
+  "workspace": {
+    "general": {
+      "title": "General",
+      "description": "Update the workspace name, slug, description, and icon.",
+      "field": {
+        "name": "Name",
+        "slug": "Slug",
+        "slug_help": "Lowercase letters, numbers, and hyphens.",
+        "description": "Description",
+        "icon_url": "Icon URL"
+      },
+      "save": "Save changes",
+      "saving": "Saving...",
+      "saved": "Workspace updated",
+      "validation": {
+        "name_required": "Name is required.",
+        "slug_required": "Slug is required.",
+        "slug_format": "Slug may only contain lowercase letters, numbers, and hyphens.",
+        "icon_url_format": "Icon URL must be a valid URL."
+      },
+      "errors": {
+        "update_failed": "Could not update the workspace. Please try again."
+      },
+      "danger": {
+        "title": "Danger zone",
+        "description": "Irreversible actions. Deleting a workspace hides it from your list along with its projects and tasks.",
+        "delete": "Delete workspace",
+        "deleting": "Deleting...",
+        "confirm": {
+          "title": "Delete this workspace?",
+          "body": "This will delete {name} and hide all of its projects and tasks. This action cannot be undone from the UI.",
+          "submit": "Delete workspace",
+          "cancel": "Cancel"
+        },
+        "deleted": "Workspace deleted",
+        "errors": {
+          "delete_failed": "Could not delete the workspace. Please try again."
+        }
+      }
+    },
+    "public_shares": {
+      "title": "Public share pages",
+      "description": "Workspace-owned read-only URLs for publishing selected events to the public. The URL is the capability — anyone with it can view the page.",
+      "create": "Create share",
+      "empty": "No public share pages yet.",
+      "rotate": "Rotate",
+      "rotate_confirm": "Rotate the URL? The current URL will stop working immediately.",
+      "delete": "Delete",
+      "delete_confirm": "Delete \"{title}\"? The URL will become invalid and events will no longer be published.",
+      "deleted": "Share page deleted",
+      "never_expires": "—",
+      "table": {
+        "title": "Title",
+        "events": "Events",
+        "expires_at": "Expires",
+        "created_at": "Created",
+        "actions": "Actions"
+      },
+      "errors": {
+        "create_failed": "Could not create the share page. Please try again.",
+        "delete_failed": "Could not delete the share page. Only workspace admins or owners can delete a share.",
+        "rotate_failed": "Could not rotate the URL token. Please try again."
+      },
+      "dialog": {
+        "create_title": "Create public share page",
+        "reveal_title": "Share page created",
+        "rotate_title": "Token rotated",
+        "field": {
+          "title": "Title",
+          "title_placeholder": "e.g. Group A Official Schedule",
+          "description": "Description",
+          "description_help": "Markdown is not rendered yet; plain text only.",
+          "holidays_country": "Holiday overlay country",
+          "holidays_country_help": "Choose a country to overlay its public holidays on the share page. Leave unset for no holiday overlay.",
+          "holidays_country_unset": "No holiday overlay"
+        },
+        "reveal_warning": "Copy this URL now. The token is stored hashed — you will not be able to see it again.",
+        "rotate_warning": "The previous URL has been invalidated. Share this new URL with anyone who still needs access.",
+        "url_label": "Share URL",
+        "copy": "Copy",
+        "copied": "Copied",
+        "done": "Done",
+        "cancel": "Cancel",
+        "submit": "Create"
+      },
+      "detail": {
+        "back": "Back to share pages",
+        "events_title": "Published events",
+        "events_description": "Events listed here appear on the public page in the order shown. Confidential events are refused at attach time.",
+        "empty_events": "No events yet. Add events from this workspace to publish them.",
+        "add_events": "Add events",
+        "detach": "Remove",
+        "detach_confirm": "Remove \"{title}\" from this share page? It will no longer appear on the public page.",
+        "detached": "Event removed",
+        "event_undated": "No date",
+        "event_all_day": "All day",
+        "table": {
+          "event": "Event",
+          "when": "When",
+          "calendar": "Calendar",
+          "actions": "Actions"
+        },
+        "picker": {
+          "title": "Add events to share",
+          "range_label": "Date range",
+          "range_from": "From",
+          "range_to": "To",
+          "hint": "Showing events within the selected range. Use the checkboxes to pick the events to publish.",
+          "no_candidates": "No events in this range.",
+          "already_attached": "Already published",
+          "confidential": "Confidential",
+          "select": "Select",
+          "attach": "Attach {count, plural, one {# event} other {# events}}",
+          "attached_toast": "{attached} attached, {skipped} skipped",
+          "cancel": "Cancel",
+          "attaching": "Attaching..."
+        },
+        "errors": {
+          "detach_failed": "Could not remove the event. Please try again.",
+          "attach_failed": "Could not attach the events. Please try again.",
+          "reorder_failed": "Could not save the new order. The list has been reset to the saved order."
+        },
+        "reorder_handle_label": "Drag to reorder event",
+        "reorder_a11y": {
+          "lifted": "Picked up event {id}. Use the arrow keys to move, space to drop, escape to cancel.",
+          "over": "Event {active} is now over event {over}.",
+          "dropped": "Event {active} was dropped over event {over}.",
+          "cancelled": "Drag for event {id} was cancelled."
+        }
+      }
+    },
+    "mcp_tokens": {
+      "title": "MCP tokens",
+      "description": "Personal access tokens used to authenticate MCP clients against this workspace.",
+      "create": "Create token",
+      "empty": "No tokens yet. Create one to connect an MCP client.",
+      "table": {
+        "name": "Name",
+        "prefix": "Prefix",
+        "scopes": "Scopes",
+        "created_at": "Created",
+        "last_used_at": "Last used",
+        "actions": "Actions"
+      },
+      "never_used": "Never",
+      "revoke": "Revoke",
+      "revoke_confirm": "Revoke this token? MCP clients using it will stop working immediately.",
+      "revoked": "Token revoked",
+      "dialog": {
+        "create_title": "Create MCP token",
+        "reveal_title": "Token created",
+        "field": {
+          "name": "Name",
+          "name_placeholder": "e.g. Local dev laptop",
+          "scopes": "Scopes",
+          "scopes_help": "Space-separated list of scopes. Leave empty for default scopes."
+        },
+        "reveal_warning": "Copy this token now. You will not be able to see it again.",
+        "token_label": "Token",
+        "copy": "Copy",
+        "copied": "Copied",
+        "done": "Done",
+        "cancel": "Cancel",
+        "submit": "Create"
+      },
+      "validation": {
+        "name_required": "Name is required."
+      },
+      "errors": {
+        "create_failed": "Could not create the token. Please try again.",
+        "revoke_failed": "Could not revoke the token. Please try again."
+      }
+    },
+    "auto_actions": {
+      "title": "Auto-actions",
+      "description": "Configure how nodate-flow autonomously manages tasks in this workspace. When enabled, the system periodically evaluates tasks and applies actions like escalating overdue items or closing stale reviews.",
+      "enabled": {
+        "label": "Enable auto-actions",
+        "description": "Allow the system to automatically apply actions to tasks."
+      },
+      "interval": {
+        "label": "Evaluation interval",
+        "description": "How often the system checks tasks and applies actions.",
+        "minutes": "min",
+        "disabled": "Disabled"
+      },
+      "threshold": {
+        "label": "Confidence threshold",
+        "description": "Minimum confidence score required for an action to be applied automatically. Lower values apply more actions; higher values are more conservative.",
+        "low": "Aggressive",
+        "medium": "Balanced",
+        "high": "Conservative"
+      },
+      "save": "Save",
+      "saving": "Saving...",
+      "saved": "Auto-action settings updated",
+      "rules": {
+        "title": "Rule configuration",
+        "description": "Enable or disable individual rules and adjust their sensitivity.",
+        "column": {
+          "rule": "Rule",
+          "enabled": "Enabled",
+          "confidence": "Confidence",
+          "idle_hours": "Idle threshold (hours)"
+        },
+        "escalate_overdue": {
+          "label": "Escalate overdue",
+          "description": "Bumps priority when a task passes its due date."
+        },
+        "assign_owner": {
+          "label": "Assign owner",
+          "description": "Suggests an owner when a task has no assignee and has been idle."
+        },
+        "nudge_assignee": {
+          "label": "Nudge assignee",
+          "description": "Suggests a nudge when an assigned task has no progress."
+        },
+        "close_stale_review": {
+          "label": "Close stale review",
+          "description": "Closes reviews that have been open without activity."
+        },
+        "idle_na": "N/A (uses due date)",
+        "save": "Save rules",
+        "saving": "Saving...",
+        "saved": "Rule settings updated",
+        "errors": {
+          "load_failed": "Could not load rule settings.",
+          "update_failed": "Could not update rule settings. Please try again."
+        }
+      },
+      "errors": {
+        "load_failed": "Could not load auto-action settings.",
+        "update_failed": "Could not update auto-action settings. Please try again."
+      }
+    }
+  }
+}
