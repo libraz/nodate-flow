@@ -10,6 +10,12 @@ var (
 	IntegrationSlackTokenInvalid = &Spec{Code: "INTEGRATION.SLACK.TOKEN_INVALID", Status: 401, Message: "Slack API token is invalid"}
 	// INTEGRATION.SLACK.WEBHOOK_PAYLOAD_UNPARSEABLE — Slack webhook payload could not be parsed
 	IntegrationSlackWebhookPayloadUnparseable = &Spec{Code: "INTEGRATION.SLACK.WEBHOOK_PAYLOAD_UNPARSEABLE", Status: 400, Message: "Slack webhook payload could not be parsed"}
-	// INTEGRATION.SLACK.WEBHOOK_SIGNING_FAILED — Slack request signature verification failed
-	IntegrationSlackWebhookSigningFailed = &Spec{Code: "INTEGRATION.SLACK.WEBHOOK_SIGNING_FAILED", Status: 401, Message: "Slack request signature verification failed"}
+	// INTEGRATION.SLACK.WEBHOOK_SIGNATURE_MALFORMED — Slack webhook signature is malformed
+	IntegrationSlackWebhookSignatureMalformed = &Spec{Code: "INTEGRATION.SLACK.WEBHOOK_SIGNATURE_MALFORMED", Status: 400, Message: "Slack webhook signature is malformed"}
+	// INTEGRATION.SLACK.WEBHOOK_SIGNATURE_MISMATCH — Slack webhook signature does not match
+	IntegrationSlackWebhookSignatureMismatch = &Spec{Code: "INTEGRATION.SLACK.WEBHOOK_SIGNATURE_MISMATCH", Status: 401, Message: "Slack webhook signature does not match"}
+	// INTEGRATION.SLACK.WEBHOOK_SIGNATURE_MISSING — Slack webhook signature header is missing
+	IntegrationSlackWebhookSignatureMissing = &Spec{Code: "INTEGRATION.SLACK.WEBHOOK_SIGNATURE_MISSING", Status: 401, Message: "Slack webhook signature header is missing"}
+	// INTEGRATION.SLACK.WEBHOOK_TIMESTAMP_EXPIRED — Slack webhook timestamp is outside the allowed clock skew
+	IntegrationSlackWebhookTimestampExpired = &Spec{Code: "INTEGRATION.SLACK.WEBHOOK_TIMESTAMP_EXPIRED", Status: 401, Message: "Slack webhook timestamp is outside the allowed clock skew"}
 )

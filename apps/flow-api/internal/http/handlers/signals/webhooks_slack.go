@@ -26,8 +26,8 @@ func HandleSlackWebhook(deps Deps) http.HandlerFunc {
 		}
 		ts := r.Header.Get(sl.TimestampHeader)
 		sig := r.Header.Get(sl.SignatureHeader)
-		if !sl.VerifySignature(body, sig, ts, deps.SlackSigningSecret, time.Now()) {
-			writeError(w, apierrors.IntegrationSlackWebhookSigningFailed)
+		if verr := sl.VerifySignature(body, sig, ts, deps.SlackSigningSecret, time.Now()); verr != nil {
+			writeError(w, slackVerifyErrorSpec(verr))
 			return
 		}
 
@@ -86,5 +86,21 @@ func HandleSlackWebhook(deps Deps) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, http.StatusAccepted, map[string]any{"id": pub.String()})
+	}
+}
+
+// slackVerifyErrorSpec maps a sentinel error from sl.VerifySignature to
+// the matching public API error spec. Unknown errors fall back to the
+// generic mismatch code so we never leak unclassified internals.
+func slackVerifyErrorSpec(verr error) *apierrors.Spec {
+	switch {
+	case errors.Is(verr, sl.ErrSignatureMissing):
+		return apierrors.IntegrationSlackWebhookSignatureMissing
+	case errors.Is(verr, sl.ErrSignatureMalformed):
+		return apierrors.IntegrationSlackWebhookSignatureMalformed
+	case errors.Is(verr, sl.ErrTimestampExpired):
+		return apierrors.IntegrationSlackWebhookTimestampExpired
+	default:
+		return apierrors.IntegrationSlackWebhookSignatureMismatch
 	}
 }

@@ -215,6 +215,7 @@ func run() error {
 	for _, app := range localeApps {
 		enDir := filepath.Join(root, app, "locales", "en")
 		jaDir := filepath.Join(root, app, "locales", "ja")
+		zhDir := filepath.Join(root, app, "locales", "zh")
 		// Skip apps whose locales directory doesn't exist yet.
 		if _, err := os.Stat(enDir); os.IsNotExist(err) {
 			continue
@@ -225,10 +226,16 @@ func run() error {
 		if err := os.MkdirAll(jaDir, 0o755); err != nil {
 			return err
 		}
+		if err := os.MkdirAll(zhDir, 0o755); err != nil {
+			return err
+		}
 		if err := writeFile(filepath.Join(enDir, "errors.json"), genLocale(all, "en")); err != nil {
 			return err
 		}
 		if err := writeFile(filepath.Join(jaDir, "errors.json"), genLocale(all, "ja")); err != nil {
+			return err
+		}
+		if err := writeFile(filepath.Join(zhDir, "errors.json"), genLocale(all, "zh")); err != nil {
 			return err
 		}
 	}
@@ -479,6 +486,12 @@ func genTsBarrel(names []string) []byte {
 // when set; otherwise we emit an empty string so the i18n lint in
 // scripts/i18n-translate.mjs (--check) fails loudly rather than silently
 // falling back to English copy inside the JA locale.
+//
+// For "zh" we use record.MessageZH when set; otherwise we fall back to
+// the English message. The zh catalog is being filled in incrementally,
+// and empty strings would trip the i18n empty-value lint, so until every
+// entry has a Simplified Chinese translation we ship the English text as
+// a deterministic placeholder instead of "" or "[TODO]".
 func genLocale(all []record, lang string) []byte {
 	var b bytes.Buffer
 	b.WriteString("{\n")
@@ -487,6 +500,12 @@ func genLocale(all []record, lang string) []byte {
 		switch lang {
 		case "ja":
 			val = r.MessageJA
+		case "zh":
+			if r.MessageZH != "" {
+				val = r.MessageZH
+			} else {
+				val = r.Message
+			}
 		default:
 			val = r.Message
 		}

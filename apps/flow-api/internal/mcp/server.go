@@ -265,16 +265,16 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 		if aerr != nil {
 			slog.ErrorContext(r.Context(), "mcp: agent guard load failed", slog.Any("err", aerr))
 			h.audit(r.Context(), s, params.Name, params.Arguments, nil,
-				generated.McpInvocationsStatusError, apierrors.McpToolExecutionFailed.Code, 0)
-			writeRPCError(w, req.ID, apierrors.McpToolExecutionFailed, "agent guard check failed")
+				generated.McpInvocationsStatusError, apierrors.McpToolGuardUnavailable.Code, 0)
+			writeRPCError(w, req.ID, apierrors.McpToolGuardUnavailable, "agent guard check failed")
 			return
 		}
 		spent, serr := h.loadAgentMonthSpendCents(r.Context(), s.agentID)
 		if serr != nil {
 			slog.ErrorContext(r.Context(), "mcp: agent spend load failed", slog.Any("err", serr))
 			h.audit(r.Context(), s, params.Name, params.Arguments, nil,
-				generated.McpInvocationsStatusError, apierrors.McpToolExecutionFailed.Code, 0)
-			writeRPCError(w, req.ID, apierrors.McpToolExecutionFailed, "agent spend check failed")
+				generated.McpInvocationsStatusError, apierrors.McpToolGuardUnavailable.Code, 0)
+			writeRPCError(w, req.ID, apierrors.McpToolGuardUnavailable, "agent spend check failed")
 			return
 		}
 		decision := agentguard.Decide(agent, agentguard.Request{

@@ -10,6 +10,7 @@ resources:
         status: 401
         message: "MCP token is invalid"
         message_ja: "MCP トークンが無効です"
+        message_zh: "MCP 令牌无效"
         description: "Returned when the bearer token presented to the MCP endpoint is unknown or malformed."
         userAction: "Re-issue an MCP token from your account settings."
 
@@ -18,6 +19,7 @@ resources:
         status: 401
         message: "MCP token has expired"
         message_ja: "MCP トークンの有効期限が切れました"
+        message_zh: "MCP 令牌已过期"
         description: "Returned when the MCP token has passed its expiration timestamp."
         userAction: "Re-issue a new MCP token."
 
@@ -26,6 +28,7 @@ resources:
         status: 401
         message: "MCP token has been revoked"
         message_ja: "MCP トークンは取り消されました"
+        message_zh: "MCP 令牌已被撤销"
         description: "Returned when the MCP token has been explicitly revoked by the user or an admin."
         userAction: "Re-issue a new MCP token."
 
@@ -34,6 +37,7 @@ resources:
         status: 403
         message: "MCP token is bound to a different workspace"
         message_ja: "MCP トークンは別のワークスペースに紐付けられています"
+        message_zh: "MCP 令牌绑定到其他工作区"
         description: "Returned when the MCP token is bound to one workspace but the tool arguments reference a resource belonging to another workspace."
         userAction: "Use an MCP token issued for the workspace that owns the target resource."
 
@@ -45,6 +49,7 @@ resources:
         status: 403
         message: "MCP token does not have the required scope"
         message_ja: "MCP トークンに必要なスコープが付与されていません"
+        message_zh: "MCP 令牌缺少所需的作用域"
         description: "Returned when the requested tool or resource requires a scope not granted to the presented MCP token."
         userAction: "Re-issue the MCP token with the required scope."
 
@@ -56,6 +61,7 @@ resources:
         status: 404
         message: "MCP tool not found"
         message_ja: "MCP ツールが見つかりません"
+        message_zh: "未找到 MCP 工具"
         description: "Returned when the client requests a tool name that is not registered on this MCP server."
         userAction: "Check the tool name against the list returned by tools/list."
 
@@ -64,6 +70,7 @@ resources:
         status: 422
         message: "MCP tool arguments are invalid"
         message_ja: "MCP ツールの引数が不正です"
+        message_zh: "MCP 工具参数无效"
         description: "Returned when the supplied arguments do not match the tool's input schema."
         userAction: "Inspect the tool schema and correct the argument types or required fields."
 
@@ -72,8 +79,18 @@ resources:
         status: 500
         message: "MCP tool execution failed"
         message_ja: "MCP ツールの実行に失敗しました"
+        message_zh: "MCP 工具执行失败"
         description: "Returned when an internal error occurs inside the tool body, such as a database error while executing the tool."
         userAction: "Retry the call; if the problem persists, contact the server administrator."
+
+      guard_unavailable:
+        code: MCP.TOOL.GUARD_UNAVAILABLE
+        status: 500
+        message: "MCP tool guard subsystem is unavailable"
+        message_ja: "MCP ツールのガード判定が実施できません"
+        message_zh: "MCP 工具守卫子系统不可用"
+        description: "Returned when the agent guard or budget snapshot for an AI-agent-backed MCP session could not be loaded (e.g. DB error before tool execution started). The tool body itself was never invoked."
+        userAction: "Retry; if the problem persists, check service health and the agent's configuration."
 
   protocol:
     breadcrumb: "MCP > Protocol"
@@ -83,6 +100,7 @@ resources:
         status: 400
         message: "MCP protocol frame is malformed"
         message_ja: "MCP プロトコルのフレームが不正です"
+        message_zh: "MCP 协议帧格式错误"
         description: "Returned when the incoming JSON-RPC frame cannot be parsed, uses an unsupported method, or declares a jsonrpc version other than 2.0."
         userAction: "Ensure the client sends a well-formed JSON-RPC 2.0 request with a supported method."
 
@@ -94,5 +112,6 @@ resources:
         status: 429
         message: "MCP request rate limit exceeded"
         message_ja: "MCP リクエストのレート制限を超えました"
+        message_zh: "MCP 请求速率限制已超过"
         description: "Returned when the per-token MCP call rate limit has been reached."
         userAction: "Slow down the request rate and retry after the Retry-After interval."

@@ -46,6 +46,11 @@ export const McpErrors = {
     status: 500,
     message: "MCP tool execution failed",
   },
+  MCP_TOOL_GUARD_UNAVAILABLE: {
+    code: "MCP.TOOL.GUARD_UNAVAILABLE",
+    status: 500,
+    message: "MCP tool guard subsystem is unavailable",
+  },
   MCP_TOOL_NOT_FOUND: {
     code: "MCP.TOOL.NOT_FOUND",
     status: 404,

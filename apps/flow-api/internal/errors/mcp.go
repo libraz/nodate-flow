@@ -22,6 +22,8 @@ var (
 	McpToolArgumentsInvalid = &Spec{Code: "MCP.TOOL.ARGUMENTS_INVALID", Status: 422, Message: "MCP tool arguments are invalid"}
 	// MCP.TOOL.EXECUTION_FAILED — MCP tool execution failed
 	McpToolExecutionFailed = &Spec{Code: "MCP.TOOL.EXECUTION_FAILED", Status: 500, Message: "MCP tool execution failed"}
+	// MCP.TOOL.GUARD_UNAVAILABLE — MCP tool guard subsystem is unavailable
+	McpToolGuardUnavailable = &Spec{Code: "MCP.TOOL.GUARD_UNAVAILABLE", Status: 500, Message: "MCP tool guard subsystem is unavailable"}
 	// MCP.TOOL.NOT_FOUND — MCP tool not found
 	McpToolNotFound = &Spec{Code: "MCP.TOOL.NOT_FOUND", Status: 404, Message: "MCP tool not found"}
 )

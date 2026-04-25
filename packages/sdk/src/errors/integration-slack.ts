@@ -16,10 +16,25 @@ export const IntegrationSlackErrors = {
     status: 400,
     message: "Slack webhook payload could not be parsed",
   },
-  INTEGRATION_SLACK_WEBHOOK_SIGNING_FAILED: {
-    code: "INTEGRATION.SLACK.WEBHOOK_SIGNING_FAILED",
+  INTEGRATION_SLACK_WEBHOOK_SIGNATURE_MALFORMED: {
+    code: "INTEGRATION.SLACK.WEBHOOK_SIGNATURE_MALFORMED",
+    status: 400,
+    message: "Slack webhook signature is malformed",
+  },
+  INTEGRATION_SLACK_WEBHOOK_SIGNATURE_MISMATCH: {
+    code: "INTEGRATION.SLACK.WEBHOOK_SIGNATURE_MISMATCH",
     status: 401,
-    message: "Slack request signature verification failed",
+    message: "Slack webhook signature does not match",
+  },
+  INTEGRATION_SLACK_WEBHOOK_SIGNATURE_MISSING: {
+    code: "INTEGRATION.SLACK.WEBHOOK_SIGNATURE_MISSING",
+    status: 401,
+    message: "Slack webhook signature header is missing",
+  },
+  INTEGRATION_SLACK_WEBHOOK_TIMESTAMP_EXPIRED: {
+    code: "INTEGRATION.SLACK.WEBHOOK_TIMESTAMP_EXPIRED",
+    status: 401,
+    message: "Slack webhook timestamp is outside the allowed clock skew",
   },
 } as const;
 

@@ -5,12 +5,40 @@ resources:
   webhook:
     breadcrumb: "Integration > Slack > Webhook"
     errors:
-      signing_failed:
-        code: INTEGRATION.SLACK.WEBHOOK_SIGNING_FAILED
+      signature_missing:
+        code: INTEGRATION.SLACK.WEBHOOK_SIGNATURE_MISSING
         status: 401
-        message: "Slack request signature verification failed"
-        message_ja: "Slack リクエストの署名検証に失敗しました"
-        description: "Returned when the X-Slack-Signature header does not match the HMAC computed from the configured signing secret, or the timestamp is outside the allowed window."
+        message: "Slack webhook signature header is missing"
+        message_ja: "Slack Webhook の署名ヘッダがありません"
+        message_zh: "Slack Webhook 签名头缺失"
+        description: "Returned when the X-Slack-Signature or X-Slack-Request-Timestamp header is absent, or when the workspace has no signing secret configured for the integration."
+        userAction: "Check that the Slack app is configured to forward signed events and that the signing secret is present in the integration settings."
+
+      signature_malformed:
+        code: INTEGRATION.SLACK.WEBHOOK_SIGNATURE_MALFORMED
+        status: 400
+        message: "Slack webhook signature is malformed"
+        message_ja: "Slack Webhook の署名が不正な形式です"
+        message_zh: "Slack Webhook 签名格式错误"
+        description: "Returned when the X-Slack-Signature header does not start with the expected v0= prefix, or when the X-Slack-Request-Timestamp header is not a valid Unix timestamp."
+        userAction: "Verify that the Slack signing version (v0) and timestamp format are unchanged."
+
+      timestamp_expired:
+        code: INTEGRATION.SLACK.WEBHOOK_TIMESTAMP_EXPIRED
+        status: 401
+        message: "Slack webhook timestamp is outside the allowed clock skew"
+        message_ja: "Slack Webhook のタイムスタンプが許容範囲外です"
+        message_zh: "Slack Webhook 时间戳超出允许的时钟偏差范围"
+        description: "Returned when the request timestamp drifts more than the configured replay window (5 minutes). This blocks replay attacks."
+        userAction: "Ensure the sender clock is in sync; if the request was queued, retry it now."
+
+      signature_mismatch:
+        code: INTEGRATION.SLACK.WEBHOOK_SIGNATURE_MISMATCH
+        status: 401
+        message: "Slack webhook signature does not match"
+        message_ja: "Slack Webhook の署名が一致しません"
+        message_zh: "Slack Webhook 签名不匹配"
+        description: "Returned when the HMAC-SHA256 of the body computed with the configured signing secret does not match the X-Slack-Signature header. Indicates either secret mismatch or payload tampering."
         userAction: "Verify that the signing secret in Slack matches the one configured in the integration settings."
 
       payload_unparseable:
@@ -18,6 +46,7 @@ resources:
         status: 400
         message: "Slack webhook payload could not be parsed"
         message_ja: "Slack Webhook のペイロードを解析できませんでした"
+        message_zh: "Slack Webhook 载荷无法解析"
         description: "Returned when the Slack event payload is malformed or missing required fields."
         userAction: "Check the Slack app event subscription configuration."
 
@@ -29,6 +58,7 @@ resources:
         status: 401
         message: "Slack API token is invalid"
         message_ja: "Slack API トークンが無効です"
+        message_zh: "Slack API 令牌无效"
         description: "Returned when Slack rejects the integration's bot or user token."
         userAction: "Re-authorize the Slack integration."
 
@@ -37,5 +67,6 @@ resources:
         status: 429
         message: "Slack API rate limit exceeded"
         message_ja: "Slack API のレート制限を超えました"
+        message_zh: "Slack API 速率限制已超过"
         description: "Returned when Slack returns a 429 due to method-level rate limiting."
         userAction: "Wait for the Retry-After interval before retrying."
