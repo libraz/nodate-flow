@@ -13,21 +13,50 @@ resources:
         description: "Returned when an AI feature is invoked but no provider credentials have been configured for the workspace or instance."
         userAction: "Configure an AI provider in workspace or instance settings."
 
-      upstream_call_failed:
-        code: AI.PROVIDER.UPSTREAM_CALL_FAILED
+      upstream_unreachable:
+        code: AI.PROVIDER.UPSTREAM_UNREACHABLE
         status: 502
-        message: "AI provider call failed"
-        message_ja: "AI プロバイダの呼び出しに失敗しました"
-        description: "Returned when the upstream LLM provider returned a non-success response or could not be reached."
-        userAction: "Retry in a moment; if the problem persists, check the provider's status page."
+        message: "Could not reach AI provider"
+        message_ja: "AI プロバイダに接続できませんでした"
+        message_zh: "无法连接到 AI 服务提供商"
+        description: "Returned when the request to the upstream LLM provider failed at the transport layer (DNS, TCP, TLS, or the connection was refused or reset)."
+        userAction: "Check network connectivity and the provider's status page, then retry."
 
       upstream_timeout:
         code: AI.PROVIDER.UPSTREAM_TIMEOUT
         status: 504
         message: "AI provider call timed out"
         message_ja: "AI プロバイダの呼び出しがタイムアウトしました"
+        message_zh: "AI 服务提供商调用超时"
         description: "Returned when the upstream LLM provider did not respond within the configured timeout."
         userAction: "Retry the request, or reduce the prompt size."
+
+      upstream_rate_limited:
+        code: AI.PROVIDER.UPSTREAM_RATE_LIMITED
+        status: 429
+        message: "AI provider rate limit exceeded"
+        message_ja: "AI プロバイダのレート制限に達しました"
+        message_zh: "AI 服务提供商速率限制已超过"
+        description: "Returned when the upstream LLM provider responded with HTTP 429 after the client exhausted its retry budget."
+        userAction: "Wait a moment and retry, or lower the request rate."
+
+      upstream_auth_rejected:
+        code: AI.PROVIDER.UPSTREAM_AUTH_REJECTED
+        status: 502
+        message: "AI provider rejected credentials"
+        message_ja: "AI プロバイダが認証を拒否しました"
+        message_zh: "AI 服务提供商拒绝了认证凭据"
+        description: "Returned when the upstream LLM provider responded with HTTP 401 or 403, indicating the API key is invalid, revoked, or lacks permission for the requested model."
+        userAction: "Verify the AI provider API key in workspace or instance settings."
+
+      upstream_request_rejected:
+        code: AI.PROVIDER.UPSTREAM_REQUEST_REJECTED
+        status: 502
+        message: "AI provider rejected the request"
+        message_ja: "AI プロバイダがリクエストを拒否しました"
+        message_zh: "AI 服务提供商拒绝了该请求"
+        description: "Returned when the upstream LLM provider responded with a non-success status that is not auth-related or rate-limited (e.g. 400 invalid request, 5xx provider error)."
+        userAction: "Retry in a moment; if the problem persists, check the provider's status page or the model configuration."
 
   cost:
     breadcrumb: "AI > Cost"
@@ -43,13 +72,32 @@ resources:
   response:
     breadcrumb: "AI > Response"
     errors:
-      parse_failed:
-        code: AI.RESPONSE.PARSE_FAILED
+      invalid_json:
+        code: AI.RESPONSE.INVALID_JSON
         status: 502
-        message: "AI provider response could not be parsed"
-        message_ja: "AI プロバイダの応答を解析できませんでした"
-        description: "Returned when the upstream LLM returned a completion whose body could not be decoded into the expected JSON shape."
+        message: "AI provider response was not valid JSON"
+        message_ja: "AI プロバイダの応答が JSON として解析できませんでした"
+        message_zh: "AI 服务提供商的响应不是有效的 JSON"
+        description: "Returned when the upstream LLM returned a completion whose body could not be decoded as JSON, or where no JSON payload could be extracted from the surrounding text."
         userAction: "Retry the request; if the problem persists, check the provider or model configuration."
+
+      missing_field:
+        code: AI.RESPONSE.MISSING_FIELD
+        status: 502
+        message: "AI provider response is missing a required field"
+        message_ja: "AI プロバイダの応答に必須フィールドがありません"
+        message_zh: "AI 服务提供商的响应缺少必填字段"
+        description: "Returned when the JSON returned by the upstream LLM decoded successfully but a field required by the response schema (e.g. tool name, action, or score) was absent or empty."
+        userAction: "Retry the request; if the problem persists, lower the prompt complexity or pick a stronger model."
+
+      schema_mismatch:
+        code: AI.RESPONSE.SCHEMA_MISMATCH
+        status: 502
+        message: "AI provider response did not match the expected schema"
+        message_ja: "AI プロバイダの応答が期待されるスキーマと一致しません"
+        message_zh: "AI 服务提供商的响应与预期的架构不匹配"
+        description: "Returned when the JSON returned by the upstream LLM decoded successfully but failed structural validation (wrong field types, unknown enum values, or values outside the allowed range)."
+        userAction: "Retry the request; if the problem persists, pick a stronger model or simplify the prompt."
 
   nl_query:
     breadcrumb: "AI > NL Query"
@@ -65,13 +113,32 @@ resources:
   redaction:
     breadcrumb: "AI > Redaction"
     errors:
-      pipeline_failed:
-        code: AI.REDACTION.PIPELINE_FAILED
+      lens_unavailable:
+        code: AI.REDACTION.LENS_UNAVAILABLE
         status: 500
-        message: "Sensitive data redaction failed"
-        message_ja: "機密情報の除去処理に失敗しました"
-        description: "Returned when the pre-LLM redaction pipeline raised an error and the request was blocked to prevent leaking secrets."
-        userAction: "Retry; if the problem persists, contact your administrator."
+        message: "Redaction lens is unavailable"
+        message_ja: "機密情報の除去設定を読み込めません"
+        message_zh: "脱敏配置不可用"
+        description: "Returned when the pre-LLM redactor could not load its configured lens (the rule set was missing, the workspace setting failed to fetch, or the lens registry is offline) and the request was blocked to avoid leaking secrets."
+        userAction: "Retry in a moment; if the problem persists, contact your administrator."
+
+      rule_invalid:
+        code: AI.REDACTION.RULE_INVALID
+        status: 500
+        message: "Redaction rule is invalid"
+        message_ja: "機密情報の除去ルールが不正です"
+        message_zh: "脱敏规则无效"
+        description: "Returned when the redactor compiled lens contains a malformed rule (e.g. an unparseable pattern or unsupported action) and refused to run."
+        userAction: "Ask your administrator to review the redaction rule configuration."
+
+      timeout:
+        code: AI.REDACTION.TIMEOUT
+        status: 504
+        message: "Redaction pipeline timed out"
+        message_ja: "機密情報の除去処理がタイムアウトしました"
+        message_zh: "脱敏处理超时"
+        description: "Returned when the pre-LLM redactor exceeded its configured deadline while scanning the prompt and the request was blocked to avoid leaking secrets."
+        userAction: "Retry with a shorter prompt; if the problem persists, contact your administrator."
 
   agent:
     breadcrumb: "AI > Agent"

@@ -4,12 +4,16 @@ package errors
 
 // Error codes and specs.
 var (
+	// EXPORT.TASK.DATASET_QUERY_FAILED — Could not load tasks for export
+	ExportTaskDatasetQueryFailed = &Spec{Code: "EXPORT.TASK.DATASET_QUERY_FAILED", Status: 500, Message: "Could not load tasks for export"}
+	// EXPORT.TASK.FORMAT_RENDER_FAILED — Could not render export file
+	ExportTaskFormatRenderFailed = &Spec{Code: "EXPORT.TASK.FORMAT_RENDER_FAILED", Status: 500, Message: "Could not render export file"}
 	// EXPORT.TASK.FORMAT_UNSUPPORTED — Unsupported export format
 	ExportTaskFormatUnsupported = &Spec{Code: "EXPORT.TASK.FORMAT_UNSUPPORTED", Status: 400, Message: "Unsupported export format"}
-	// EXPORT.TASK.GENERATION_FAILED — Export file generation failed
-	ExportTaskGenerationFailed = &Spec{Code: "EXPORT.TASK.GENERATION_FAILED", Status: 500, Message: "Export file generation failed"}
 	// EXPORT.TASK.LENS_NOT_FOUND — Lens referenced for export not found
 	ExportTaskLensNotFound = &Spec{Code: "EXPORT.TASK.LENS_NOT_FOUND", Status: 404, Message: "Lens referenced for export not found"}
+	// EXPORT.TASK.STORAGE_WRITE_FAILED — Could not write export file
+	ExportTaskStorageWriteFailed = &Spec{Code: "EXPORT.TASK.STORAGE_WRITE_FAILED", Status: 500, Message: "Could not write export file"}
 	// EXPORT.TASK.TOO_MANY_ROWS — Export exceeds maximum row limit
 	ExportTaskTooManyRows = &Spec{Code: "EXPORT.TASK.TOO_MANY_ROWS", Status: 422, Message: "Export exceeds maximum row limit"}
 )

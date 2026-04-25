@@ -21,9 +21,9 @@ func CompileConstraint(deps Deps) func(context.Context, *CompileConstraintInput)
 		parsed, err := deps.NlConstraint.Compile(ctx, in.Body.Prompt)
 		if err != nil {
 			if errors.Is(err, nlconstraint.ErrUnparseable) {
-				return nil, httpErr(apierrors.AiResponseParseFailed)
+				return nil, httpErr(apierrors.AiResponseInvalidJson)
 			}
-			return nil, httpErr(apierrors.AiProviderUpstreamCallFailed)
+			return nil, httpErr(apierrors.AiProviderUpstreamUnreachable)
 		}
 		raw, err := json.Marshal(parsed)
 		if err != nil {

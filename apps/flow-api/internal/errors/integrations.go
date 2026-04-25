@@ -6,14 +6,24 @@ package errors
 var (
 	// INTEGRATION.CONNECTION.NOT_FOUND — Integration connection not found
 	IntegrationConnectionNotFound = &Spec{Code: "INTEGRATION.CONNECTION.NOT_FOUND", Status: 404, Message: "Integration connection not found"}
-	// INTEGRATION.OAUTH.ACCOUNT_FETCH_FAILED — Could not fetch the provider account profile
-	IntegrationOauthAccountFetchFailed = &Spec{Code: "INTEGRATION.OAUTH.ACCOUNT_FETCH_FAILED", Status: 502, Message: "Could not fetch the provider account profile"}
-	// INTEGRATION.OAUTH.EXCHANGE_FAILED — Could not exchange the OAuth code for an access token
-	IntegrationOauthExchangeFailed = &Spec{Code: "INTEGRATION.OAUTH.EXCHANGE_FAILED", Status: 502, Message: "Could not exchange the OAuth code for an access token"}
+	// INTEGRATION.OAUTH.AUTHORIZATION_CODE_INVALID — OAuth authorization code is invalid or expired
+	IntegrationOauthAuthorizationCodeInvalid = &Spec{Code: "INTEGRATION.OAUTH.AUTHORIZATION_CODE_INVALID", Status: 400, Message: "OAuth authorization code is invalid or expired"}
+	// INTEGRATION.OAUTH.PROFILE_FETCH_REJECTED — OAuth provider rejected the profile request
+	IntegrationOauthProfileFetchRejected = &Spec{Code: "INTEGRATION.OAUTH.PROFILE_FETCH_REJECTED", Status: 502, Message: "OAuth provider rejected the profile request"}
+	// INTEGRATION.OAUTH.PROFILE_FETCH_UNREACHABLE — Could not reach the OAuth provider profile endpoint
+	IntegrationOauthProfileFetchUnreachable = &Spec{Code: "INTEGRATION.OAUTH.PROFILE_FETCH_UNREACHABLE", Status: 502, Message: "Could not reach the OAuth provider profile endpoint"}
+	// INTEGRATION.OAUTH.PROFILE_INVALID_PAYLOAD — OAuth provider returned an unparseable profile payload
+	IntegrationOauthProfileInvalidPayload = &Spec{Code: "INTEGRATION.OAUTH.PROFILE_INVALID_PAYLOAD", Status: 502, Message: "OAuth provider returned an unparseable profile payload"}
 	// INTEGRATION.OAUTH.PROVIDER_NOT_CONFIGURED — Integration provider is not configured on this server
 	IntegrationOauthProviderNotConfigured = &Spec{Code: "INTEGRATION.OAUTH.PROVIDER_NOT_CONFIGURED", Status: 503, Message: "Integration provider is not configured on this server"}
+	// INTEGRATION.OAUTH.PROVIDER_UNREACHABLE — Could not reach the OAuth provider
+	IntegrationOauthProviderUnreachable = &Spec{Code: "INTEGRATION.OAUTH.PROVIDER_UNREACHABLE", Status: 502, Message: "Could not reach the OAuth provider"}
 	// INTEGRATION.OAUTH.PROVIDER_UNSUPPORTED — Unknown integration provider
 	IntegrationOauthProviderUnsupported = &Spec{Code: "INTEGRATION.OAUTH.PROVIDER_UNSUPPORTED", Status: 400, Message: "Unknown integration provider"}
+	// INTEGRATION.OAUTH.REDIRECT_URI_MISMATCH — OAuth redirect URI does not match the registered value
+	IntegrationOauthRedirectUriMismatch = &Spec{Code: "INTEGRATION.OAUTH.REDIRECT_URI_MISMATCH", Status: 400, Message: "OAuth redirect URI does not match the registered value"}
 	// INTEGRATION.OAUTH.STATE_INVALID — OAuth state token is missing, unknown, or expired
 	IntegrationOauthStateInvalid = &Spec{Code: "INTEGRATION.OAUTH.STATE_INVALID", Status: 400, Message: "OAuth state token is missing, unknown, or expired"}
+	// INTEGRATION.OAUTH.TOKEN_EXCHANGE_REJECTED — OAuth provider rejected the token exchange
+	IntegrationOauthTokenExchangeRejected = &Spec{Code: "INTEGRATION.OAUTH.TOKEN_EXCHANGE_REJECTED", Status: 502, Message: "OAuth provider rejected the token exchange"}
 )

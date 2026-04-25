@@ -30,10 +30,29 @@ resources:
         description: "Returned when the result set for the export exceeds the configured maximum number of rows."
         userAction: "Apply filters or narrow the lens to reduce the number of rows."
 
-      generation_failed:
-        code: EXPORT.TASK.GENERATION_FAILED
+      dataset_query_failed:
+        code: EXPORT.TASK.DATASET_QUERY_FAILED
         status: 500
-        message: "Export file generation failed"
+        message: "Could not load tasks for export"
+        message_ja: "エクスポート対象のタスクを取得できませんでした"
+        message_zh: "无法加载用于导出的任务"
+        description: "Returned when the database query that materialises the rows for the export (workspace-scoped or lens-scoped) fails before any output is rendered."
+        userAction: "Retry the export; if the problem persists, contact your administrator."
+
+      format_render_failed:
+        code: EXPORT.TASK.FORMAT_RENDER_FAILED
+        status: 500
+        message: "Could not render export file"
         message_ja: "エクスポートファイルの生成に失敗しました"
-        description: "Returned when an internal error occurred while generating the export file."
+        message_zh: "无法生成导出文件"
+        description: "Returned when serialising the materialised dataset into the requested format (csv, json) failed, e.g. an encoding error mid-stream."
+        userAction: "Retry the export; if the problem persists, choose a different format or contact your administrator."
+
+      storage_write_failed:
+        code: EXPORT.TASK.STORAGE_WRITE_FAILED
+        status: 500
+        message: "Could not write export file"
+        message_ja: "エクスポートファイルの書き込みに失敗しました"
+        message_zh: "无法写入导出文件"
+        description: "Returned when the export file could not be written to its destination (response stream closed early, temporary storage full, or storage backend unavailable)."
         userAction: "Retry the export; if the problem persists, contact your administrator."

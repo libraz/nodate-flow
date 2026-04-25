@@ -18,14 +18,28 @@ var (
 	AiNlQueryUnparseable = &Spec{Code: "AI.NL_QUERY.UNPARSEABLE", Status: 422, Message: "Could not turn that into a filter"}
 	// AI.PROVIDER.NOT_CONFIGURED — AI provider is not configured
 	AiProviderNotConfigured = &Spec{Code: "AI.PROVIDER.NOT_CONFIGURED", Status: 412, Message: "AI provider is not configured"}
-	// AI.PROVIDER.UPSTREAM_CALL_FAILED — AI provider call failed
-	AiProviderUpstreamCallFailed = &Spec{Code: "AI.PROVIDER.UPSTREAM_CALL_FAILED", Status: 502, Message: "AI provider call failed"}
+	// AI.PROVIDER.UPSTREAM_AUTH_REJECTED — AI provider rejected credentials
+	AiProviderUpstreamAuthRejected = &Spec{Code: "AI.PROVIDER.UPSTREAM_AUTH_REJECTED", Status: 502, Message: "AI provider rejected credentials"}
+	// AI.PROVIDER.UPSTREAM_RATE_LIMITED — AI provider rate limit exceeded
+	AiProviderUpstreamRateLimited = &Spec{Code: "AI.PROVIDER.UPSTREAM_RATE_LIMITED", Status: 429, Message: "AI provider rate limit exceeded"}
+	// AI.PROVIDER.UPSTREAM_REQUEST_REJECTED — AI provider rejected the request
+	AiProviderUpstreamRequestRejected = &Spec{Code: "AI.PROVIDER.UPSTREAM_REQUEST_REJECTED", Status: 502, Message: "AI provider rejected the request"}
 	// AI.PROVIDER.UPSTREAM_TIMEOUT — AI provider call timed out
 	AiProviderUpstreamTimeout = &Spec{Code: "AI.PROVIDER.UPSTREAM_TIMEOUT", Status: 504, Message: "AI provider call timed out"}
-	// AI.REDACTION.PIPELINE_FAILED — Sensitive data redaction failed
-	AiRedactionPipelineFailed = &Spec{Code: "AI.REDACTION.PIPELINE_FAILED", Status: 500, Message: "Sensitive data redaction failed"}
-	// AI.RESPONSE.PARSE_FAILED — AI provider response could not be parsed
-	AiResponseParseFailed = &Spec{Code: "AI.RESPONSE.PARSE_FAILED", Status: 502, Message: "AI provider response could not be parsed"}
+	// AI.PROVIDER.UPSTREAM_UNREACHABLE — Could not reach AI provider
+	AiProviderUpstreamUnreachable = &Spec{Code: "AI.PROVIDER.UPSTREAM_UNREACHABLE", Status: 502, Message: "Could not reach AI provider"}
+	// AI.REDACTION.LENS_UNAVAILABLE — Redaction lens is unavailable
+	AiRedactionLensUnavailable = &Spec{Code: "AI.REDACTION.LENS_UNAVAILABLE", Status: 500, Message: "Redaction lens is unavailable"}
+	// AI.REDACTION.RULE_INVALID — Redaction rule is invalid
+	AiRedactionRuleInvalid = &Spec{Code: "AI.REDACTION.RULE_INVALID", Status: 500, Message: "Redaction rule is invalid"}
+	// AI.REDACTION.TIMEOUT — Redaction pipeline timed out
+	AiRedactionTimeout = &Spec{Code: "AI.REDACTION.TIMEOUT", Status: 504, Message: "Redaction pipeline timed out"}
+	// AI.RESPONSE.INVALID_JSON — AI provider response was not valid JSON
+	AiResponseInvalidJson = &Spec{Code: "AI.RESPONSE.INVALID_JSON", Status: 502, Message: "AI provider response was not valid JSON"}
+	// AI.RESPONSE.MISSING_FIELD — AI provider response is missing a required field
+	AiResponseMissingField = &Spec{Code: "AI.RESPONSE.MISSING_FIELD", Status: 502, Message: "AI provider response is missing a required field"}
+	// AI.RESPONSE.SCHEMA_MISMATCH — AI provider response did not match the expected schema
+	AiResponseSchemaMismatch = &Spec{Code: "AI.RESPONSE.SCHEMA_MISMATCH", Status: 502, Message: "AI provider response did not match the expected schema"}
 	// AI.SAFETY.BLOCKED — Request blocked by safety policy
 	AiSafetyBlocked = &Spec{Code: "AI.SAFETY.BLOCKED", Status: 422, Message: "Request blocked by safety policy"}
 )

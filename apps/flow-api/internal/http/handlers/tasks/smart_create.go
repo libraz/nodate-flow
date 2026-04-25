@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -295,7 +296,7 @@ func addActorByPublicID(ctx context.Context, qtx *generated.Queries, db *sql.DB,
 // emitCreatedEvent appends a TaskCreated event for a newly created task.
 func emitCreatedEvent(ctx context.Context, db *sql.DB, wsID, actorID uint32, taskID int64, taskPub, prjPub types.PublicID, title string) {
 	actorIDv := int64(actorID)
-	_ = eventbus.Append(ctx, db, eventbus.Event{
+	if err := eventbus.Append(ctx, db, eventbus.Event{
 		Type:        eventbus.TaskCreated,
 		WorkspaceID: wsID,
 		ActorUserID: &actorIDv,
@@ -305,7 +306,17 @@ func emitCreatedEvent(ctx context.Context, db *sql.DB, wsID, actorID uint32, tas
 			"projectId": prjPub.String(),
 			"title":     title,
 		},
-	})
+	}); err != nil {
+		slog.ErrorContext(ctx, "eventbus.Append failed",
+			slog.Any("err", err),
+			slog.String("handler", "tasks.emitCreatedEvent"),
+			slog.String("event_type", string(eventbus.TaskCreated)),
+			slog.Int64("workspace_id", int64(wsID)),
+			slog.Int64("actor_id", actorIDv),
+			slog.Int64("task_id", taskID),
+			slog.String("task_public_id", taskPub.String()),
+		)
+	}
 }
 
 // mapAIError translates AI package sentinel errors into HTTP error
@@ -317,8 +328,8 @@ func mapAIError(err error) error {
 	case errors.Is(err, ai.ErrDailyBudgetExceeded):
 		return httpErr(apierrors.AiCostGuardExceeded)
 	case errors.Is(err, ai.ErrParse):
-		return httpErr(apierrors.AiResponseParseFailed)
+		return httpErr(apierrors.AiResponseInvalidJson)
 	default:
-		return httpErr(apierrors.AiProviderUpstreamCallFailed)
+		return httpErr(apierrors.AiProviderUpstreamUnreachable)
 	}
 }

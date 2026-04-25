@@ -32,7 +32,7 @@ type ResolveCommandOutput struct {
 // ResolveCommand handles POST /workspaces/{wsId}/ai/resolve-command. It runs
 // the NL command resolver under the workspace's LLM provider (or the mock
 // under NF_AI_MOCK=1) and returns the validated ToolCall JSON. Failures
-// surface as AI.RESPONSE.PARSE_FAILED so the command palette can render
+// surface as AI.RESPONSE.INVALID_JSON so the command palette can render
 // a "could not understand" toast.
 func ResolveCommand(deps Deps) func(context.Context, *ResolveCommandInput) (*ResolveCommandOutput, error) {
 	return func(ctx context.Context, in *ResolveCommandInput) (*ResolveCommandOutput, error) {
@@ -47,9 +47,9 @@ func ResolveCommand(deps Deps) func(context.Context, *ResolveCommandInput) (*Res
 		tc, err := deps.NlCommand.Resolve(ctx, in.Body.Prompt)
 		if err != nil {
 			if errors.Is(err, nlcommand.ErrUnresolvable) {
-				return nil, httpErr(apierrors.AiResponseParseFailed)
+				return nil, httpErr(apierrors.AiResponseInvalidJson)
 			}
-			return nil, httpErr(apierrors.AiProviderUpstreamCallFailed)
+			return nil, httpErr(apierrors.AiProviderUpstreamUnreachable)
 		}
 
 		// Audit the resolved command so usage analytics and cost tracking

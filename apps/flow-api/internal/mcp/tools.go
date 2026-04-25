@@ -1598,9 +1598,9 @@ func mapAiError(err error) error {
 	case stderrors.Is(err, ai.ErrDailyBudgetExceeded):
 		return apierrors.New(apierrors.AiCostGuardExceeded)
 	case stderrors.Is(err, ai.ErrParse):
-		return apierrors.New(apierrors.AiResponseParseFailed)
+		return apierrors.New(apierrors.AiResponseInvalidJson)
 	}
-	return apierrors.Wrap(apierrors.AiProviderUpstreamCallFailed, err)
+	return apierrors.Wrap(apierrors.AiProviderUpstreamUnreachable, err)
 }
 
 // toBytes coerces an interface{} column (returned by sqlc for VECTOR
@@ -2029,9 +2029,9 @@ func runProposeLens(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	lens, err := deps.NlQuery.Compile(ctx, in.Prompt)
 	if err != nil {
 		if stderrors.Is(err, nlquery.ErrUnparseable) {
-			return nil, apierrors.New(apierrors.AiResponseParseFailed)
+			return nil, apierrors.New(apierrors.AiResponseInvalidJson)
 		}
-		return nil, apierrors.Wrap(apierrors.AiProviderUpstreamCallFailed, err)
+		return nil, apierrors.Wrap(apierrors.AiProviderUpstreamUnreachable, err)
 	}
 	return map[string]any{"lens": lens}, nil
 }

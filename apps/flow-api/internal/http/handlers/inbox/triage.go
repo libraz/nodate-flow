@@ -143,9 +143,9 @@ func Triage(deps TriageDeps) func(context.Context, *InboxTriageInput) (*InboxTri
 				case errors.Is(err, ai.ErrNoProvider), errors.Is(err, ai.ErrDailyBudgetExceeded):
 					suggestions, err = deterministicFallback(ctx, deps, wsID, limit)
 				case errors.Is(err, ai.ErrParse):
-					return nil, httpErr(apierrors.AiResponseParseFailed)
+					return nil, httpErr(apierrors.AiResponseInvalidJson)
 				default:
-					return nil, httpErr(apierrors.AiProviderUpstreamCallFailed)
+					return nil, httpErr(apierrors.AiProviderUpstreamUnreachable)
 				}
 			}
 		} else {

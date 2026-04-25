@@ -36,25 +36,60 @@ export const AiErrors = {
     status: 412,
     message: "AI provider is not configured",
   },
-  AI_PROVIDER_UPSTREAM_CALL_FAILED: {
-    code: "AI.PROVIDER.UPSTREAM_CALL_FAILED",
+  AI_PROVIDER_UPSTREAM_AUTH_REJECTED: {
+    code: "AI.PROVIDER.UPSTREAM_AUTH_REJECTED",
     status: 502,
-    message: "AI provider call failed",
+    message: "AI provider rejected credentials",
+  },
+  AI_PROVIDER_UPSTREAM_RATE_LIMITED: {
+    code: "AI.PROVIDER.UPSTREAM_RATE_LIMITED",
+    status: 429,
+    message: "AI provider rate limit exceeded",
+  },
+  AI_PROVIDER_UPSTREAM_REQUEST_REJECTED: {
+    code: "AI.PROVIDER.UPSTREAM_REQUEST_REJECTED",
+    status: 502,
+    message: "AI provider rejected the request",
   },
   AI_PROVIDER_UPSTREAM_TIMEOUT: {
     code: "AI.PROVIDER.UPSTREAM_TIMEOUT",
     status: 504,
     message: "AI provider call timed out",
   },
-  AI_REDACTION_PIPELINE_FAILED: {
-    code: "AI.REDACTION.PIPELINE_FAILED",
-    status: 500,
-    message: "Sensitive data redaction failed",
-  },
-  AI_RESPONSE_PARSE_FAILED: {
-    code: "AI.RESPONSE.PARSE_FAILED",
+  AI_PROVIDER_UPSTREAM_UNREACHABLE: {
+    code: "AI.PROVIDER.UPSTREAM_UNREACHABLE",
     status: 502,
-    message: "AI provider response could not be parsed",
+    message: "Could not reach AI provider",
+  },
+  AI_REDACTION_LENS_UNAVAILABLE: {
+    code: "AI.REDACTION.LENS_UNAVAILABLE",
+    status: 500,
+    message: "Redaction lens is unavailable",
+  },
+  AI_REDACTION_RULE_INVALID: {
+    code: "AI.REDACTION.RULE_INVALID",
+    status: 500,
+    message: "Redaction rule is invalid",
+  },
+  AI_REDACTION_TIMEOUT: {
+    code: "AI.REDACTION.TIMEOUT",
+    status: 504,
+    message: "Redaction pipeline timed out",
+  },
+  AI_RESPONSE_INVALID_JSON: {
+    code: "AI.RESPONSE.INVALID_JSON",
+    status: 502,
+    message: "AI provider response was not valid JSON",
+  },
+  AI_RESPONSE_MISSING_FIELD: {
+    code: "AI.RESPONSE.MISSING_FIELD",
+    status: 502,
+    message: "AI provider response is missing a required field",
+  },
+  AI_RESPONSE_SCHEMA_MISMATCH: {
+    code: "AI.RESPONSE.SCHEMA_MISMATCH",
+    status: 502,
+    message: "AI provider response did not match the expected schema",
   },
   AI_SAFETY_BLOCKED: {
     code: "AI.SAFETY.BLOCKED",

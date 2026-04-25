@@ -3,7 +3,7 @@
 // the shape of [nlquery]: a single-round LLM call whose raw JSON
 // output is validated server-side against the closed constraint
 // grammar before it reaches the caller. Invalid output surfaces as
-// [ErrUnparseable] and the public AI.RESPONSE.PARSE_FAILED error
+// [ErrUnparseable] and the public AI.RESPONSE.INVALID_JSON error
 // code.
 //
 // The closed grammar lives in apps/flow-api/internal/constraint; this

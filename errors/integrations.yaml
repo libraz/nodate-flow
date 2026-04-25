@@ -29,21 +29,68 @@ resources:
         description: "Returned by the OAuth callback handler when the state query parameter does not match a row in oauth_states, or the row has expired."
         userAction: "Start the connect flow again."
 
-      exchange_failed:
-        code: INTEGRATION.OAUTH.EXCHANGE_FAILED
+      authorization_code_invalid:
+        code: INTEGRATION.OAUTH.AUTHORIZATION_CODE_INVALID
+        status: 400
+        message: "OAuth authorization code is invalid or expired"
+        message_ja: "OAuth 認可コードが無効または期限切れです"
+        message_zh: "OAuth 授权码无效或已过期"
+        description: "Returned when the provider's token endpoint rejected the authorization code as unknown, already-used, or expired."
+        userAction: "Start the connect flow again from the integrations page."
+
+      redirect_uri_mismatch:
+        code: INTEGRATION.OAUTH.REDIRECT_URI_MISMATCH
+        status: 400
+        message: "OAuth redirect URI does not match the registered value"
+        message_ja: "OAuth リダイレクト URI が登録値と一致しません"
+        message_zh: "OAuth 重定向 URI 与已注册的值不一致"
+        description: "Returned when the provider's token endpoint rejected the exchange because the redirect_uri parameter did not match the value registered for this OAuth application."
+        userAction: "Ask the instance administrator to verify the OAuth application's redirect URI."
+
+      provider_unreachable:
+        code: INTEGRATION.OAUTH.PROVIDER_UNREACHABLE
         status: 502
-        message: "Could not exchange the OAuth code for an access token"
-        message_ja: "OAuth コードをアクセストークンに交換できませんでした"
-        description: "Returned when the provider's token endpoint rejects the authorization code or returns an unparseable response."
+        message: "Could not reach the OAuth provider"
+        message_ja: "OAuth プロバイダに接続できませんでした"
+        message_zh: "无法连接到 OAuth 服务提供商"
+        description: "Returned when the request to the provider's token endpoint failed at the transport layer (DNS, TCP, TLS, or the connection was refused or reset)."
+        userAction: "Check the provider's status page and try the connect flow again."
+
+      token_exchange_rejected:
+        code: INTEGRATION.OAUTH.TOKEN_EXCHANGE_REJECTED
+        status: 502
+        message: "OAuth provider rejected the token exchange"
+        message_ja: "OAuth プロバイダがトークン交換を拒否しました"
+        message_zh: "OAuth 服务提供商拒绝了令牌交换"
+        description: "Returned when the provider's token endpoint replied with a non-success status that is not an invalid-code or redirect-mismatch error (e.g. unsupported_grant_type, invalid_client, or a 5xx)."
         userAction: "Try the connect flow again. If the problem persists, check the server logs."
 
-      account_fetch_failed:
-        code: INTEGRATION.OAUTH.ACCOUNT_FETCH_FAILED
+      profile_fetch_unreachable:
+        code: INTEGRATION.OAUTH.PROFILE_FETCH_UNREACHABLE
         status: 502
-        message: "Could not fetch the provider account profile"
-        message_ja: "プロバイダのアカウント情報を取得できませんでした"
-        description: "Returned when the token exchange succeeded but the subsequent call to the provider's /me / user identity endpoint failed."
-        userAction: "Try the connect flow again."
+        message: "Could not reach the OAuth provider profile endpoint"
+        message_ja: "OAuth プロバイダのプロフィール API に接続できませんでした"
+        message_zh: "无法连接到 OAuth 服务提供商的用户信息接口"
+        description: "Returned when the token exchange succeeded but the subsequent call to the provider's identity endpoint failed at the transport layer."
+        userAction: "Check the provider's status page and try the connect flow again."
+
+      profile_fetch_rejected:
+        code: INTEGRATION.OAUTH.PROFILE_FETCH_REJECTED
+        status: 502
+        message: "OAuth provider rejected the profile request"
+        message_ja: "OAuth プロバイダがプロフィール取得を拒否しました"
+        message_zh: "OAuth 服务提供商拒绝了用户信息请求"
+        description: "Returned when the token exchange succeeded but the provider's identity endpoint replied with an error status (e.g. 401 invalid token, 403 missing scope, or a 5xx)."
+        userAction: "Try the connect flow again, ensuring the requested scopes are still granted."
+
+      profile_invalid_payload:
+        code: INTEGRATION.OAUTH.PROFILE_INVALID_PAYLOAD
+        status: 502
+        message: "OAuth provider returned an unparseable profile payload"
+        message_ja: "OAuth プロバイダのプロフィール応答を解析できませんでした"
+        message_zh: "无法解析 OAuth 服务提供商返回的用户信息"
+        description: "Returned when the provider's identity endpoint responded successfully but the body could not be decoded as JSON, was missing required identity fields, or did not match the expected schema."
+        userAction: "Try the connect flow again. If the problem persists, contact your administrator."
 
   connection:
     breadcrumb: "Integration > Connection"

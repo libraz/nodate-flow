@@ -6,30 +6,55 @@ export const IntegrationsErrors = {
     status: 404,
     message: "Integration connection not found",
   },
-  INTEGRATION_OAUTH_ACCOUNT_FETCH_FAILED: {
-    code: "INTEGRATION.OAUTH.ACCOUNT_FETCH_FAILED",
-    status: 502,
-    message: "Could not fetch the provider account profile",
+  INTEGRATION_OAUTH_AUTHORIZATION_CODE_INVALID: {
+    code: "INTEGRATION.OAUTH.AUTHORIZATION_CODE_INVALID",
+    status: 400,
+    message: "OAuth authorization code is invalid or expired",
   },
-  INTEGRATION_OAUTH_EXCHANGE_FAILED: {
-    code: "INTEGRATION.OAUTH.EXCHANGE_FAILED",
+  INTEGRATION_OAUTH_PROFILE_FETCH_REJECTED: {
+    code: "INTEGRATION.OAUTH.PROFILE_FETCH_REJECTED",
     status: 502,
-    message: "Could not exchange the OAuth code for an access token",
+    message: "OAuth provider rejected the profile request",
+  },
+  INTEGRATION_OAUTH_PROFILE_FETCH_UNREACHABLE: {
+    code: "INTEGRATION.OAUTH.PROFILE_FETCH_UNREACHABLE",
+    status: 502,
+    message: "Could not reach the OAuth provider profile endpoint",
+  },
+  INTEGRATION_OAUTH_PROFILE_INVALID_PAYLOAD: {
+    code: "INTEGRATION.OAUTH.PROFILE_INVALID_PAYLOAD",
+    status: 502,
+    message: "OAuth provider returned an unparseable profile payload",
   },
   INTEGRATION_OAUTH_PROVIDER_NOT_CONFIGURED: {
     code: "INTEGRATION.OAUTH.PROVIDER_NOT_CONFIGURED",
     status: 503,
     message: "Integration provider is not configured on this server",
   },
+  INTEGRATION_OAUTH_PROVIDER_UNREACHABLE: {
+    code: "INTEGRATION.OAUTH.PROVIDER_UNREACHABLE",
+    status: 502,
+    message: "Could not reach the OAuth provider",
+  },
   INTEGRATION_OAUTH_PROVIDER_UNSUPPORTED: {
     code: "INTEGRATION.OAUTH.PROVIDER_UNSUPPORTED",
     status: 400,
     message: "Unknown integration provider",
   },
+  INTEGRATION_OAUTH_REDIRECT_URI_MISMATCH: {
+    code: "INTEGRATION.OAUTH.REDIRECT_URI_MISMATCH",
+    status: 400,
+    message: "OAuth redirect URI does not match the registered value",
+  },
   INTEGRATION_OAUTH_STATE_INVALID: {
     code: "INTEGRATION.OAUTH.STATE_INVALID",
     status: 400,
     message: "OAuth state token is missing, unknown, or expired",
+  },
+  INTEGRATION_OAUTH_TOKEN_EXCHANGE_REJECTED: {
+    code: "INTEGRATION.OAUTH.TOKEN_EXCHANGE_REJECTED",
+    status: 502,
+    message: "OAuth provider rejected the token exchange",
   },
 } as const;
 
