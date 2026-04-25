@@ -138,6 +138,13 @@ type Config struct {
 	// to disable. Default: 5m.
 	ItemReconcilerInterval time.Duration `env:"NF_FLOW_ITEM_RECONCILER_INTERVAL" envDefault:"5m"`
 
+	// NotificationFanoutTimeout caps how long a single notification
+	// fan-out goroutine may run after the originating request returns.
+	// The fan-out detaches the request context (so trace span / logger
+	// values are kept but cancellation is not propagated) and then
+	// imposes this timeout to prevent runaway work. Default: 30s.
+	NotificationFanoutTimeout time.Duration `env:"NF_NOTIFICATION_FANOUT_TIMEOUT" envDefault:"30s"`
+
 	// MetricsPort is the port for the internal-only Prometheus metrics
 	// HTTP server. Metrics are served on a separate listener so they are
 	// never exposed through the public-facing API port.
@@ -162,6 +169,12 @@ type Config struct {
 	SmtpPassword string `env:"NF_FLOW_SMTP_PASSWORD" envDefault:""`
 	// SmtpFrom is the default envelope sender address.
 	SmtpFrom string `env:"NF_FLOW_SMTP_FROM" envDefault:"noreply@nodate-flow.local"`
+
+	// FlowWebURL is the origin of the flow-web frontend that hosts the
+	// public /invites/accept RSVP page. Used by calendar handlers when
+	// dispatching event-invite magic-link emails so the recipient can
+	// reach the accept page hosted alongside the rest of the app.
+	FlowWebURL string `env:"NF_FLOW_WEB_URL" envDefault:"http://localhost:5173"`
 
 	// DisableRateLimit turns off all per-IP rate limiters. Intended for
 	// local development and E2E test runs where many requests happen

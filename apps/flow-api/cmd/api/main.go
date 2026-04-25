@@ -28,6 +28,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/router"
 	nflog "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/log"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/notification"
+	calendarnotifs "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/notifications"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/obs"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/outbound"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/reconciler"
@@ -293,7 +294,10 @@ func main() {
 	// Notification fan-out: creates per-user notification rows whenever
 	// the eventbus fires a relevant event (task.created, task.comment.added,
 	// etc.). Email delivery is attempted when the SMTP sender is configured.
+	// Each fan-out goroutine detaches from the request context and is
+	// bounded by NF_NOTIFICATION_FANOUT_TIMEOUT (default 30s).
 	notifFanout := notification.NewFanout(db, queries, emailSender)
+	notifFanout.SetTimeout(cfg.NotificationFanoutTimeout)
 	eventbus.AddNotifyHook(notifFanout.Hook())
 
 	// Webhook delivery worker: creates delivery rows for matching
@@ -318,6 +322,8 @@ func main() {
 		AgentRunner:           runner,
 		Storage:               storageClient,
 		EmailSender:           emailSender,
+		EmailFrom:             cfg.SmtpFrom,
+		FlowWebURL:            cfg.FlowWebURL,
 		EmbedOpenAIKey:        cfg.EmbedOpenAIKey,
 		EmbedModel:            cfg.EmbedModel,
 		EmbedBaseURL:          cfg.EmbedBaseURL,
@@ -449,6 +455,12 @@ func main() {
 	stopCtx, stopCancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stopCancel()
 
+	// Calendar event reminder ticker (relocated from time-api per ADR
+	// 0007). Scans calendar_events on a 1-minute interval, logs
+	// reminders, and marks notified_at to prevent duplicates. Exits
+	// when stopCtx is cancelled by the shutdown signal handler.
+	go calendarnotifs.StartNotificationScheduler(stopCtx, db, time.Minute)
+
 	serverErr := make(chan error, 1)
 	go func() {
 		logger.Info("listening", "addr", addr)
@@ -492,6 +504,12 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("graceful shutdown failed", "err", err)
 		os.Exit(1)
+	}
+	// Drain in-flight notification fan-out goroutines. The shutdown
+	// context already has a 20s budget shared with the HTTP server
+	// drain above; if it expires we log and move on.
+	if err := notifFanout.Shutdown(shutdownCtx); err != nil {
+		logger.Warn("notification fanout shutdown timed out", "err", err)
 	}
 	logger.Info("shutdown complete")
 }
