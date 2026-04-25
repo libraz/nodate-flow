@@ -38,6 +38,16 @@ WHERE public_id = ?
   AND enabled = TRUE
 LIMIT 1;
 
+-- name: GetWorkspaceIdByPublicId :one
+-- Resolve internal workspace id from public_id; ignored if workspace is disabled.
+-- Direct table lookup (no view) because this is a single-column id resolution
+-- used on hot paths in task handlers; v_workspaces would project unused columns.
+SELECT id
+FROM workspaces
+WHERE public_id = ?
+  AND enabled = TRUE
+LIMIT 1;
+
 -- name: FindWorkspaceBySlug :one
 -- Resolve a workspace by slug. Returns internal id for ACL.
 SELECT

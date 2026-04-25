@@ -22,6 +22,12 @@ type Querier interface {
 	// Dedicated setter that clears expires_at (COALESCE-based patch cannot
 	// distinguish "leave unchanged" from "clear" for nullable columns).
 	ClearPublicShareExpiresAt(ctx context.Context, arg ClearPublicShareExpiresAtParams) error
+	// Count enabled calendar events linked to a specific task (internal id).
+	// workspace_id is intentionally omitted: task.id is internal and already
+	// scoped to its owning workspace, so the FK on calendar_events.task_id
+	// transitively constrains the count. Direct table query (no view) because
+	// this is a simple single-row count on a hot path during task GET.
+	CountActiveCalendarEventsByTaskId(ctx context.Context, taskID sql.NullInt32) (int64, error)
 	// Insert a new calendar. kind determines behavior: personal (user-owned
 	// layer, may own many) or system (holiday feeds).
 	CreateCalendar(ctx context.Context, arg CreateCalendarParams) (int64, error)

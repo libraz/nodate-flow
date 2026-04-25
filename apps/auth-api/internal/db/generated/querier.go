@@ -177,6 +177,10 @@ type Querier interface {
 	// Fetch just the timezone and country columns by internal id. Used by
 	// time-api when resolving the effective timezone for a request.
 	FindWorkspaceTimezoneCountryById(ctx context.Context, id uint32) (FindWorkspaceTimezoneCountryByIdRow, error)
+	// Resolve internal workspace id from public_id; ignored if workspace is disabled.
+	// Direct table lookup (no view) because this is a single-column id resolution
+	// used on hot paths in task handlers; v_workspaces would project unused columns.
+	GetWorkspaceIdByPublicId(ctx context.Context, publicID types.PublicID) (uint32, error)
 	// Return the role string for an enabled workspace member. Returns
 	// sql.ErrNoRows when the user is not a member.
 	GetWorkspaceMemberRole(ctx context.Context, arg GetWorkspaceMemberRoleParams) (WorkspaceMembersRole, error)

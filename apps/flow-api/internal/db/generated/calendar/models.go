@@ -3031,6 +3031,8 @@ type Notification struct {
 	RecipientUserID uint32 `json:"recipientUserId"`
 	// Internal FK to users.id, who triggered the event (null for system)
 	ActorUserID sql.NullInt32 `json:"actorUserId"`
+	// Internal FK to events.id used for at-least-once dedup; null for non-event-driven paths (scheduler, system)
+	SourceEventID sql.NullInt32 `json:"sourceEventId"`
 	// Matches eventbus event types (e.g. task.created, task.comment.added)
 	EventType string `json:"eventType"`
 	// Resource kind: task, project, comment, etc.
@@ -3958,6 +3960,33 @@ type VTaskDetail struct {
 }
 
 type VTaskList struct {
+	WorkspaceID             uint32            `json:"-"`
+	TaskInternalID          uint32            `json:"taskInternalId"`
+	ProjectID               uint32            `json:"-"`
+	CreatedByUserID         sql.NullInt32     `json:"-"`
+	PublicID                types.PublicID    `json:"publicId"`
+	ProjectPublicID         []byte            `json:"projectPublicId"`
+	ProjectName             string            `json:"projectName"`
+	ProjectIdentifier       string            `json:"projectIdentifier"`
+	TaskNumber              uint32            `json:"taskNumber"`
+	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
+	Title                   string            `json:"title"`
+	Visibility              TasksVisibility   `json:"visibility"`
+	DerivedState            TasksDerivedState `json:"derivedState"`
+	Priority                int32             `json:"priority"`
+	DueOn                   sql.NullTime      `json:"dueOn"`
+	StartedOn               sql.NullTime      `json:"startedOn"`
+	CompletedAt             sql.NullTime      `json:"completedAt"`
+	ArchivedAt              sql.NullTime      `json:"archivedAt"`
+	SortWeight              int32             `json:"sortWeight"`
+	UpdatedAt               sql.NullTime      `json:"updatedAt"`
+	CreatedAt               time.Time         `json:"createdAt"`
+	PrimaryAssigneePublicID interface{}       `json:"primaryAssigneePublicId"`
+	AssigneeCount           int64             `json:"assigneeCount"`
+	LabelIds                sql.NullString    `json:"labelIds"`
+}
+
+type VTaskListAll struct {
 	WorkspaceID             uint32            `json:"-"`
 	TaskInternalID          uint32            `json:"taskInternalId"`
 	ProjectID               uint32            `json:"-"`

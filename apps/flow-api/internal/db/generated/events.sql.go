@@ -54,6 +54,25 @@ func (q *Queries) AppendEvent(ctx context.Context, arg AppendEventParams) (int64
 	return result.LastInsertId()
 }
 
+const countActiveCalendarEventsByTaskId = `-- name: CountActiveCalendarEventsByTaskId :one
+SELECT COUNT(*)
+FROM calendar_events
+WHERE task_id = ?
+  AND enabled = TRUE
+`
+
+// Count enabled calendar events linked to a specific task (internal id).
+// workspace_id is intentionally omitted: task.id is internal and already
+// scoped to its owning workspace, so the FK on calendar_events.task_id
+// transitively constrains the count. Direct table query (no view) because
+// this is a simple single-row count on a hot path during task GET.
+func (q *Queries) CountActiveCalendarEventsByTaskId(ctx context.Context, taskID sql.NullInt32) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countActiveCalendarEventsByTaskId, taskID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countAiSuggestionOutcomesForWorkspace = `-- name: CountAiSuggestionOutcomesForWorkspace :one
 SELECT
   COALESCE(SUM(CASE WHEN type = 'ai.suggestion.proposed'  THEN 1 ELSE 0 END), 0) AS proposed,

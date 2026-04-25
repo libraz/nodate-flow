@@ -364,6 +364,24 @@ func (q *Queries) FindWorkspaceTimezoneCountryById(ctx context.Context, id uint3
 	return i, err
 }
 
+const getWorkspaceIdByPublicId = `-- name: GetWorkspaceIdByPublicId :one
+SELECT id
+FROM workspaces
+WHERE public_id = ?
+  AND enabled = TRUE
+LIMIT 1
+`
+
+// Resolve internal workspace id from public_id; ignored if workspace is disabled.
+// Direct table lookup (no view) because this is a single-column id resolution
+// used on hot paths in task handlers; v_workspaces would project unused columns.
+func (q *Queries) GetWorkspaceIdByPublicId(ctx context.Context, publicID types.PublicID) (uint32, error) {
+	row := q.db.QueryRowContext(ctx, getWorkspaceIdByPublicId, publicID)
+	var id uint32
+	err := row.Scan(&id)
+	return id, err
+}
+
 const listWorkspacesForUser = `-- name: ListWorkspacesForUser :many
 SELECT
   w.public_id,

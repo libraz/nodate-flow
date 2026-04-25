@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -322,9 +323,8 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 				if perr != nil {
 					return nil, httpErr(apierrors.WsMemberNotFound)
 				}
-				const userLookup = `SELECT id FROM users WHERE public_id = ? AND enabled = TRUE LIMIT 1`
-				var uid uint32
-				if lerr := tx.QueryRowContext(ctx, userLookup, userPub).Scan(&uid); lerr != nil {
+				uid, lerr := qtx.FindUserInternalIdByPublicId(ctx, userPub)
+				if lerr != nil {
 					if errors.Is(lerr, sql.ErrNoRows) {
 						return nil, httpErr(apierrors.WsMemberNotFound)
 					}
@@ -350,7 +350,7 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 		if err := tx.Commit(); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.TaskCreated,
 			WorkspaceID: prj.WorkspaceID,
 			ActorUserID: actorPtr(ctx),
@@ -360,7 +360,16 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 				"projectId": prjPub.String(),
 				"title":     in.Body.Title,
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "tasks.Create"),
+				slog.String("event_type", string(eventbus.TaskCreated)),
+				slog.Int64("workspace_id", int64(prj.WorkspaceID)),
+				slog.Int64("task_id", taskID),
+				slog.Int64("actor_id", int64(actorID)),
+			)
+		}
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "task.create",
 			ActorID:      actorID,
@@ -463,9 +472,8 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 		if err != nil {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
-		const wsLookup = `SELECT id FROM workspaces WHERE public_id = ? AND enabled = TRUE LIMIT 1`
-		var wsInternal uint32
-		if err := deps.DB.QueryRowContext(ctx, wsLookup, wsPub).Scan(&wsInternal); err != nil {
+		wsInternal, err := deps.Queries.GetWorkspaceIdByPublicId(ctx, wsPub)
+		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, httpErr(apierrors.WsWorkspaceNotFound)
 			}
@@ -549,6 +557,14 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
 		}
+		// Resolve the actor once so itemkit calls (which refuse a zero
+		// actor) and the downstream audit entry stay consistent. The auth
+		// middleware is expected to have populated this; a missing actor
+		// here is a 401, not a 404.
+		actorID, ok := middleware.ActorFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.AuthTokenMissingOrMalformed)
+		}
 		current, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
 			WorkspaceID: ws.ID,
 			PublicID:    types.FromUUID(task.PublicID),
@@ -612,17 +628,14 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 
 		needsItemkit := false
 		if titleChanged || dueOnChanged {
-			var linkedCount int
-			if err := deps.DB.QueryRowContext(ctx,
-				`SELECT COUNT(*) FROM calendar_events WHERE task_id = ? AND enabled = TRUE`,
-				task.ID,
-			).Scan(&linkedCount); err != nil {
+			linkedCount, err := deps.Queries.CountActiveCalendarEventsByTaskId(ctx,
+				sql.NullInt32{Int32: int32(task.ID), Valid: true},
+			)
+			if err != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
 			needsItemkit = linkedCount > 0
 		}
-
-		actorID, _ := middleware.ActorFromContext(ctx)
 
 		updateParams := generated.UpdateTaskParams{
 			Title:       newTitle,
@@ -684,20 +697,18 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
 		}
-		if actorID, ok := middleware.ActorFromContext(ctx); ok {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "task.update",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
-				ResourceType: "task",
-				ResourceID:   task.PublicID.String(),
-			})
-		}
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "task.update",
+			ActorID:      actorID,
+			WorkspaceID:  ws.ID,
+			ResourceType: "task",
+			ResourceID:   task.PublicID.String(),
+		})
 		if deps.Embedder != nil && (in.Body.Title != nil || in.Body.Description != nil) {
 			_ = deps.Embedder.EmbedTask(ctx, task.ID, newTitle, nullStr(newDesc))
 		}
 		taskInternal := int64(task.ID)
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.TaskUpdated,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -705,7 +716,16 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			Payload: map[string]any{
 				"taskId": task.PublicID.String(),
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "tasks.Patch"),
+				slog.String("event_type", string(eventbus.TaskUpdated)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("task_id", taskInternal),
+				slog.Int64("actor_id", int64(actorID)),
+			)
+		}
 
 		row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
 			WorkspaceID: ws.ID,
@@ -767,7 +787,7 @@ func Disable(deps Deps) func(context.Context, *DisableTaskInput) (*DisableTaskOu
 			})
 		}
 		taskInternal := int64(task.ID)
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.TaskDisabled,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -775,7 +795,16 @@ func Disable(deps Deps) func(context.Context, *DisableTaskInput) (*DisableTaskOu
 			Payload: map[string]any{
 				"taskId": task.PublicID.String(),
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "tasks.Disable"),
+				slog.String("event_type", string(eventbus.TaskDisabled)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("task_id", taskInternal),
+				slog.Int64("actor_id", int64(actorID)),
+			)
+		}
 		out := &DisableTaskOutput{}
 		out.Body.Ok = true
 		return out, nil
