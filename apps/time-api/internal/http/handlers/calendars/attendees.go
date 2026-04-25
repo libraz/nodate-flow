@@ -44,6 +44,20 @@ type AddAttendeesOutput struct {
 	}
 }
 
+// ListAttendeesInput is the input for listing attendees on an event.
+type ListAttendeesInput struct {
+	WsId  string `path:"wsId" doc:"Workspace public ID"`
+	CalId string `path:"calId" doc:"Calendar public ID"`
+	EvtId string `path:"evtId" doc:"Event public ID"`
+}
+
+// ListAttendeesOutput is the response for the list attendees endpoint.
+type ListAttendeesOutput struct {
+	Body struct {
+		Attendees []AttendeeResponse `json:"attendees"`
+	}
+}
+
 // RemoveAttendeeInput is the input for removing an attendee from an event.
 type RemoveAttendeeInput struct {
 	WsId   string `path:"wsId" doc:"Workspace public ID"`
@@ -198,6 +212,50 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 			"count":      len(out.Body.Attendees),
 		})
 
+		return out, nil
+	}
+}
+
+// ListAttendees returns all active attendees on a calendar event. Access is
+// gated by resolveCalendar (the actor must be a calendar subscriber) and
+// resolveEvent (the event must belong to that calendar in the workspace).
+func ListAttendees(deps Deps) func(context.Context, *ListAttendeesInput) (*ListAttendeesOutput, error) {
+	return func(ctx context.Context, input *ListAttendeesInput) (*ListAttendeesOutput, error) {
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		if err != nil {
+			return nil, err
+		}
+		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		if err != nil {
+			return nil, err
+		}
+
+		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
+		if err != nil {
+			return nil, err
+		}
+
+		rows, err := deps.Queries.ListCalendarEventAttendees(ctx, evt.ID)
+		if err != nil {
+			return nil, httpErr(apierrors.CalendarAttendeeListQueryInterrupted)
+		}
+
+		out := &ListAttendeesOutput{}
+		out.Body.Attendees = make([]AttendeeResponse, len(rows))
+		for i, r := range rows {
+			resp := AttendeeResponse{
+				ID:          r.PublicID.String(),
+				UserID:      r.UserPublicID.String(),
+				DisplayName: r.DisplayName,
+				Rsvp:        string(r.Rsvp),
+				CanEdit:     r.CanEdit,
+				CreatedAt:   r.CreatedAt.Unix(),
+			}
+			if r.AvatarUrl.Valid {
+				resp.AvatarUrl = &r.AvatarUrl.String
+			}
+			out.Body.Attendees[i] = resp
+		}
 		return out, nil
 	}
 }

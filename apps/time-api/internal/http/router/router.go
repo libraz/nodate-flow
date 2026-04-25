@@ -359,6 +359,12 @@ func BuildResult(deps Deps) Result {
 
 		// Event attendees.
 		huma.Register(calAPI, huma.Operation{
+			OperationID: "attendees-list",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees",
+			Summary:     "List attendees on an event",
+		}, calendars.ListAttendees(calDeps))
+		huma.Register(calAPI, huma.Operation{
 			OperationID: "attendees-add",
 			Method:      http.MethodPost,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees",

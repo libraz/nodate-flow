@@ -36,6 +36,11 @@ export const CalendarErrors = {
     status: 500,
     message: "Could not update edit permission",
   },
+  CALENDAR_ATTENDEE_LIST_QUERY_INTERRUPTED: {
+    code: "CALENDAR.ATTENDEE.LIST_QUERY_INTERRUPTED",
+    status: 500,
+    message: "Could not retrieve attendees",
+  },
   CALENDAR_ATTENDEE_OWNER_REQUIRED_TO_TOGGLE_EDIT: {
     code: "CALENDAR.ATTENDEE.OWNER_REQUIRED_TO_TOGGLE_EDIT",
     status: 403,

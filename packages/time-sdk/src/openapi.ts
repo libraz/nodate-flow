@@ -290,7 +290,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** List attendees on an event */
+        get: operations["attendees-list"];
         put?: never;
         /** Add attendees to an event */
         post: operations["attendees-add"];
@@ -1234,6 +1235,14 @@ export interface components {
              */
             readonly $schema?: string;
             attachments: components["schemas"]["AttachmentResponse"][] | null;
+        };
+        ListAttendeesOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            attendees: components["schemas"]["AttendeeResponse"][] | null;
         };
         ListCalendarEventsOutputBody: {
             /**
@@ -2574,6 +2583,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeleteAttachmentOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "attendees-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListAttendeesOutputBody"];
                 };
             };
             /** @description Error */

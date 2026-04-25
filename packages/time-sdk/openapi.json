@@ -1253,6 +1253,26 @@
         "required": ["attachments"],
         "type": "object"
       },
+      "ListAttendeesOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListAttendeesOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "attendees": {
+            "items": {
+              "$ref": "#/components/schemas/AttendeeResponse"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["attendees"],
+        "type": "object"
+      },
       "ListCalendarEventsOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -3705,6 +3725,64 @@
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees": {
+      "get": {
+        "operationId": "attendees-list",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Calendar public ID",
+            "in": "path",
+            "name": "calId",
+            "required": true,
+            "schema": {
+              "description": "Calendar public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Event public ID",
+            "in": "path",
+            "name": "evtId",
+            "required": true,
+            "schema": {
+              "description": "Event public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListAttendeesOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List attendees on an event"
+      },
       "post": {
         "operationId": "attendees-add",
         "parameters": [

@@ -18,6 +18,8 @@ var (
 	CalendarAttachmentUploaderOrOwnerRequired = &Spec{Code: "CALENDAR.ATTACHMENT.UPLOADER_OR_OWNER_REQUIRED", Status: 403, Message: "Only the uploader or calendar owner can delete this attachment"}
 	// CALENDAR.ATTENDEE.CAN_EDIT_UPDATE_INTERRUPTED — Could not update edit permission
 	CalendarAttendeeCanEditUpdateInterrupted = &Spec{Code: "CALENDAR.ATTENDEE.CAN_EDIT_UPDATE_INTERRUPTED", Status: 500, Message: "Could not update edit permission"}
+	// CALENDAR.ATTENDEE.LIST_QUERY_INTERRUPTED — Could not retrieve attendees
+	CalendarAttendeeListQueryInterrupted = &Spec{Code: "CALENDAR.ATTENDEE.LIST_QUERY_INTERRUPTED", Status: 500, Message: "Could not retrieve attendees"}
 	// CALENDAR.ATTENDEE.OWNER_REQUIRED_TO_TOGGLE_EDIT — Only the event owner can change edit permissions
 	CalendarAttendeeOwnerRequiredToToggleEdit = &Spec{Code: "CALENDAR.ATTENDEE.OWNER_REQUIRED_TO_TOGGLE_EDIT", Status: 403, Message: "Only the event owner can change edit permissions"}
 	// CALENDAR.ATTENDEE.RSVP_UPDATE_INTERRUPTED — Could not update RSVP

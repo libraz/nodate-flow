@@ -346,6 +346,14 @@ resources:
   attendee:
     breadcrumb: "Calendar > Attendee"
     errors:
+      list_query_interrupted:
+        code: CALENDAR.ATTENDEE.LIST_QUERY_INTERRUPTED
+        status: 500
+        message: "Could not retrieve attendees"
+        message_ja: "参加者一覧を取得できませんでした"
+        description: "Returned when the query to list attendees of an event encounters an unexpected database error."
+        userAction: "Retry the request. If the problem persists, contact support."
+
       user_id_malformed:
         code: CALENDAR.ATTENDEE.USER_ID_MALFORMED
         status: 400
