@@ -40,9 +40,11 @@ type EventTrigger struct {
 
 // NotifyHook returns a closure compatible with eventbus.AddNotifyHook.
 // The closure fires agent lookups off the request goroutine — it is
-// best-effort and never blocks the caller.
-func (e *EventTrigger) NotifyHook() func(ctx context.Context, workspaceID uint32, eventType string) {
-	return func(ctx context.Context, workspaceID uint32, eventType string) {
+// best-effort and never blocks the caller. The eventInternalID
+// parameter is accepted for signature compatibility but unused: the
+// dedupe key is built from agent_id + event_type + tick.
+func (e *EventTrigger) NotifyHook() func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint32) {
+	return func(ctx context.Context, workspaceID uint32, eventType string, _ uint32) {
 		if e == nil || e.Queries == nil || e.Queue == nil {
 			return
 		}

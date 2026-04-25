@@ -36,7 +36,7 @@ func TestEventTriggerFanOut(t *testing.T) {
 	et := &EventTrigger{Queries: q, Queue: queue}
 	hook := et.NotifyHook()
 
-	hook(context.Background(), 1, "signal.attached")
+	hook(context.Background(), 1, "signal.attached", 0)
 	require.Equal(t, "signal.attached", q.lastKnd)
 
 	got1, err := queue.Claim(context.Background())
@@ -57,7 +57,7 @@ func TestEventTriggerNoMatches(t *testing.T) {
 	q := &fakeOnEventQuerier{rows: nil}
 	queue := NewInProcessQueue(4)
 	et := &EventTrigger{Queries: q, Queue: queue}
-	et.NotifyHook()(context.Background(), 1, "task.updated")
+	et.NotifyHook()(context.Background(), 1, "task.updated", 0)
 	// Claim with a cancelled ctx should error immediately since the
 	// buffer is empty.
 	ctx, cancel := context.WithCancel(context.Background())
