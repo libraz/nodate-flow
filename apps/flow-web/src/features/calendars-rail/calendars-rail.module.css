@@ -1,0 +1,171 @@
+/**
+ * Calendars rail — right-rail panel that lists subscribed calendars
+ * (grouped per workspace) plus an "Add teammate calendar..." trigger
+ * for each workspace section.
+ *
+ * Tokens only — never hardcode colour, spacing, or radius. The width
+ * is fixed so the surrounding grid can compose it into a third column
+ * on wide viewports; the route's CSS module handles the responsive
+ * collapse rule.
+ */
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  min-inline-size: 0;
+  font-size: var(--nf-text-sm);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--nf-text-base);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.sectionHeader {
+  font-size: var(--nf-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--nf-color-fg-muted);
+  margin: 0;
+  padding-block-end: var(--nf-space-1);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-px);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  min-block-size: 2rem;
+  padding-inline: var(--nf-space-2);
+  padding-block: var(--nf-space-1);
+  border-radius: var(--nf-radius-sm);
+  color: var(--nf-color-fg);
+  transition: background var(--nf-duration-fast);
+}
+
+.row:hover {
+  background: var(--nf-color-bg);
+}
+
+.row--hidden {
+  opacity: 0.55;
+}
+
+.dot {
+  flex-shrink: 0;
+  inline-size: 0.625rem;
+  block-size: 0.625rem;
+  border-radius: var(--nf-radius-pill);
+  border: 1px solid var(--nf-color-border);
+}
+
+.name {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--nf-text-sm);
+  line-height: var(--nf-leading-tight);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-px);
+  flex-shrink: 0;
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--nf-color-fg-muted);
+  border-radius: var(--nf-radius-sm);
+  cursor: pointer;
+  transition: background var(--nf-duration-fast), color var(--nf-duration-fast);
+}
+
+.iconButton:hover:not(:disabled) {
+  background: var(--nf-color-surface);
+  color: var(--nf-color-fg);
+}
+
+.iconButton:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.iconButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.menu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 12rem;
+}
+
+.menuItem {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  padding-inline: var(--nf-space-2);
+  padding-block: var(--nf-space-2);
+  border-radius: var(--nf-radius-sm);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg);
+  cursor: pointer;
+}
+
+.menuItem:hover {
+  background: var(--nf-color-bg);
+}
+
+.menuItem:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.menuItem--danger {
+  color: var(--nf-color-danger);
+}
+
+.addButton {
+  align-self: flex-start;
+  margin-block-start: var(--nf-space-1);
+}
+
+.empty {
+  margin: 0;
+  padding-block: var(--nf-space-2);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}

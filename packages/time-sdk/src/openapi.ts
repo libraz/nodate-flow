@@ -547,6 +547,57 @@ export interface paths {
         patch: operations["memos-update"];
         trace?: never;
     };
+    "/workspaces/{wsId}/calendars/{calId}/subscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Subscribe the caller to a calendar visible in the workspace */
+        post: operations["calendars-self-subscribe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/subscription": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update the caller's own subscription preferences for a calendar */
+        patch: operations["calendars-self-subscription-patch"];
+        trace?: never;
+    };
+    "/workspaces/{wsId}/discoverable-calendars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List teammate personal calendars the caller can subscribe to */
+        get: operations["discoverable-calendars-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{wsId}/public-shares": {
         parameters: {
             query?: never;
@@ -1092,6 +1143,18 @@ export interface components {
             readonly $schema?: string;
             removed: boolean;
         };
+        DiscoverableCalendarResponse: {
+            color: string;
+            /** Format: int64 */
+            createdAt: number;
+            description?: string;
+            id: string;
+            kind: string;
+            name: string;
+            ownerAvatarUrl?: string;
+            ownerDisplayName: string;
+            ownerUserId: string;
+        };
         EditCommentInputBody: {
             /**
              * Format: uri
@@ -1275,6 +1338,14 @@ export interface components {
              */
             readonly $schema?: string;
             comments: components["schemas"]["CommentResponse"][] | null;
+        };
+        ListDiscoverableCalendarsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            calendars: components["schemas"]["DiscoverableCalendarResponse"][] | null;
         };
         ListEventInvitesOutputBody: {
             /**
@@ -1488,6 +1559,30 @@ export interface components {
             /** @description Visibility */
             visibility?: string;
         };
+        PatchOwnSubscriptionInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Caller-specific display color (hex) */
+            displayColor?: string;
+            /**
+             * Format: int64
+             * @description Caller-specific sort weight in the right-rail list
+             */
+            sortWeight?: number;
+            /** @description Whether events from this calendar are rendered for the caller */
+            visible?: boolean;
+        };
+        PatchOwnSubscriptionOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            updated: boolean;
+        };
         PatchPublicShareInputBody: {
             /**
              * Format: uri
@@ -1614,6 +1709,15 @@ export interface components {
              */
             readonly $schema?: string;
             revoked: boolean;
+        };
+        SelfSubscribeOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            alreadySubscribed: boolean;
+            subscribed: boolean;
         };
         ShareEventResponse: {
             allDay: boolean;
@@ -3507,6 +3611,110 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UpdateMemoOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "calendars-self-subscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SelfSubscribeOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "calendars-self-subscription-patch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchOwnSubscriptionInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatchOwnSubscriptionOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "discoverable-calendars-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListDiscoverableCalendarsOutputBody"];
                 };
             };
             /** @description Error */

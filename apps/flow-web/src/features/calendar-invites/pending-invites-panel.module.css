@@ -7,9 +7,20 @@
 
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 18rem);
-  gap: 1.5rem;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 20rem);
+  gap: var(--nf-space-6);
   align-items: start;
+}
+
+/*
+ * On wide viewports we promote the layout to three columns so the
+ * calendars rail sits to the right of the month grid alongside the
+ * pending-invites panel.
+ */
+@media (min-width: 80rem) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 20rem) minmax(0, 18rem);
+  }
 }
 
 @media (max-width: 64rem) {

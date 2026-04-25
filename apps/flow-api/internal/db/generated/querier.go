@@ -669,6 +669,16 @@ type Querier interface {
 	ListDependencyStatesForEngine(ctx context.Context, fromTaskID uint32) ([]ListDependencyStatesForEngineRow, error)
 	// List all description versions for a task, newest first.
 	ListDescriptionVersions(ctx context.Context, arg ListDescriptionVersionsParams) ([]ListDescriptionVersionsRow, error)
+	// List teammate personal calendars in a workspace that the actor is not
+	// currently subscribed to. Used by the "Add teammate calendar" picker in
+	// the right-rail Calendars panel. Excludes:
+	//   - calendars owned by the actor (their own personal calendar)
+	//   - calendars where an active calendar_subscriptions row already exists
+	//     for the actor
+	//   - non-personal calendars (system/holiday/etc — those have their own UI)
+	// Owners must still be active workspace members so we don't surface
+	// calendars whose owner has left the workspace.
+	ListDiscoverableCalendarsInWorkspace(ctx context.Context, arg ListDiscoverableCalendarsInWorkspaceParams) ([]ListDiscoverableCalendarsInWorkspaceRow, error)
 	// List a project's timeline via v_task_timeline. Filters events whose
 	// owning task lives in the given project (events with no task_id are
 	// excluded by virtue of project_public_id being NULL).

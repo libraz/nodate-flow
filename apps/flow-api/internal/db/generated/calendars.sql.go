@@ -326,6 +326,114 @@ func (q *Queries) ListCalendarsForUser(ctx context.Context, arg ListCalendarsFor
 	return items, nil
 }
 
+const listDiscoverableCalendarsInWorkspace = `-- name: ListDiscoverableCalendarsInWorkspace :many
+SELECT
+  c.id,
+  c.public_id,
+  c.kind,
+  c.name,
+  c.description,
+  c.color,
+  c.cover_url,
+  c.owner_user_id,
+  uo.public_id AS owner_public_id,
+  uo.display_name AS owner_display_name,
+  uo.avatar_url AS owner_avatar_url,
+  c.system_slug,
+  c.updated_at,
+  c.created_at
+FROM calendars c
+INNER JOIN users uo
+  ON uo.id = c.owner_user_id AND uo.enabled = TRUE
+INNER JOIN workspace_members wm
+  ON wm.workspace_id = c.workspace_id
+  AND wm.user_id = c.owner_user_id
+  AND wm.enabled = TRUE
+WHERE c.workspace_id = ?
+  AND c.kind = 'personal'
+  AND c.enabled = TRUE
+  AND c.owner_user_id <> CAST(? AS UNSIGNED)
+  AND NOT EXISTS (
+    SELECT 1 FROM calendar_subscriptions cs
+    WHERE cs.calendar_id = c.id
+      AND cs.user_id = CAST(? AS UNSIGNED)
+      AND cs.enabled = TRUE
+  )
+ORDER BY uo.display_name ASC, c.created_at ASC
+LIMIT 200
+`
+
+type ListDiscoverableCalendarsInWorkspaceParams struct {
+	WorkspaceID uint32 `json:"-"`
+	ActorID     int64  `json:"actorId"`
+	ActorID_2   int64  `json:"actorId2"`
+}
+
+type ListDiscoverableCalendarsInWorkspaceRow struct {
+	ID               uint32         `json:"-"`
+	PublicID         types.PublicID `json:"publicId"`
+	Kind             CalendarsKind  `json:"kind"`
+	Name             string         `json:"name"`
+	Description      sql.NullString `json:"description"`
+	Color            string         `json:"color"`
+	CoverUrl         sql.NullString `json:"coverUrl"`
+	OwnerUserID      sql.NullInt32  `json:"-"`
+	OwnerPublicID    types.PublicID `json:"ownerPublicId"`
+	OwnerDisplayName string         `json:"ownerDisplayName"`
+	OwnerAvatarUrl   sql.NullString `json:"ownerAvatarUrl"`
+	SystemSlug       sql.NullString `json:"systemSlug"`
+	UpdatedAt        sql.NullTime   `json:"updatedAt"`
+	CreatedAt        time.Time      `json:"createdAt"`
+}
+
+// List teammate personal calendars in a workspace that the actor is not
+// currently subscribed to. Used by the "Add teammate calendar" picker in
+// the right-rail Calendars panel. Excludes:
+//   - calendars owned by the actor (their own personal calendar)
+//   - calendars where an active calendar_subscriptions row already exists
+//     for the actor
+//   - non-personal calendars (system/holiday/etc — those have their own UI)
+//
+// Owners must still be active workspace members so we don't surface
+// calendars whose owner has left the workspace.
+func (q *Queries) ListDiscoverableCalendarsInWorkspace(ctx context.Context, arg ListDiscoverableCalendarsInWorkspaceParams) ([]ListDiscoverableCalendarsInWorkspaceRow, error) {
+	rows, err := q.db.QueryContext(ctx, listDiscoverableCalendarsInWorkspace, arg.WorkspaceID, arg.ActorID, arg.ActorID_2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDiscoverableCalendarsInWorkspaceRow{}
+	for rows.Next() {
+		var i ListDiscoverableCalendarsInWorkspaceRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicID,
+			&i.Kind,
+			&i.Name,
+			&i.Description,
+			&i.Color,
+			&i.CoverUrl,
+			&i.OwnerUserID,
+			&i.OwnerPublicID,
+			&i.OwnerDisplayName,
+			&i.OwnerAvatarUrl,
+			&i.SystemSlug,
+			&i.UpdatedAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const patchCalendar = `-- name: PatchCalendar :exec
 UPDATE calendars
 SET name        = COALESCE(?, name),

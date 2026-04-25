@@ -1,0 +1,93 @@
+/**
+ * Add-teammate-calendar drawer — search input, scrollable result
+ * list, and per-row subscribe affordance.
+ *
+ * Tokens only. The drawer primitive owns the side-sheet chrome; this
+ * module styles the body content.
+ */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  min-block-size: 0;
+}
+
+.search {
+  inline-size: 100%;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  overflow-y: auto;
+  max-block-size: 60vh;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-2);
+  border-radius: var(--nf-radius-md);
+  border: 1px solid var(--nf-color-border);
+  background: var(--nf-color-surface);
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-px);
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.displayName {
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendarMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  min-inline-size: 0;
+}
+
+.calendarName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dot {
+  flex-shrink: 0;
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  border-radius: var(--nf-radius-pill);
+  border: 1px solid var(--nf-color-border);
+}
+
+.empty {
+  margin: 0;
+  padding-block: var(--nf-space-4);
+  text-align: center;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+}
+
+.error {
+  margin: 0;
+  color: var(--nf-color-danger);
+  font-size: var(--nf-text-sm);
+}

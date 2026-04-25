@@ -928,6 +928,41 @@
         "required": ["removed"],
         "type": "object"
       },
+      "DiscoverableCalendarResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "color": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "ownerAvatarUrl": {
+            "type": "string"
+          },
+          "ownerDisplayName": {
+            "type": "string"
+          },
+          "ownerUserId": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "kind", "name", "color", "ownerUserId", "ownerDisplayName", "createdAt"],
+        "type": "object"
+      },
       "EditCommentInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -1351,6 +1386,26 @@
           }
         },
         "required": ["comments"],
+        "type": "object"
+      },
+      "ListDiscoverableCalendarsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListDiscoverableCalendarsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "calendars": {
+            "items": {
+              "$ref": "#/components/schemas/DiscoverableCalendarResponse"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["calendars"],
         "type": "object"
       },
       "ListEventInvitesOutputBody": {
@@ -1857,6 +1912,49 @@
         },
         "type": "object"
       },
+      "PatchOwnSubscriptionInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PatchOwnSubscriptionInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "displayColor": {
+            "description": "Caller-specific display color (hex)",
+            "type": "string"
+          },
+          "sortWeight": {
+            "description": "Caller-specific sort weight in the right-rail list",
+            "format": "int64",
+            "type": "integer"
+          },
+          "visible": {
+            "description": "Whether events from this calendar are rendered for the caller",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "PatchOwnSubscriptionOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PatchOwnSubscriptionOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "updated": {
+            "type": "boolean"
+          }
+        },
+        "required": ["updated"],
+        "type": "object"
+      },
       "PatchPublicShareInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -2171,6 +2269,26 @@
           }
         },
         "required": ["revoked"],
+        "type": "object"
+      },
+      "SelfSubscribeOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/SelfSubscribeOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "alreadySubscribed": {
+            "type": "boolean"
+          },
+          "subscribed": {
+            "type": "boolean"
+          }
+        },
+        "required": ["subscribed", "alreadySubscribed"],
         "type": "object"
       },
       "ShareEventResponse": {
@@ -5317,6 +5435,156 @@
           }
         },
         "summary": "Update a memo"
+      }
+    },
+    "/workspaces/{wsId}/calendars/{calId}/subscribe": {
+      "post": {
+        "operationId": "calendars-self-subscribe",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Calendar public ID",
+            "in": "path",
+            "name": "calId",
+            "required": true,
+            "schema": {
+              "description": "Calendar public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SelfSubscribeOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Subscribe the caller to a calendar visible in the workspace"
+      }
+    },
+    "/workspaces/{wsId}/calendars/{calId}/subscription": {
+      "patch": {
+        "operationId": "calendars-self-subscription-patch",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Calendar public ID",
+            "in": "path",
+            "name": "calId",
+            "required": true,
+            "schema": {
+              "description": "Calendar public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchOwnSubscriptionInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatchOwnSubscriptionOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update the caller's own subscription preferences for a calendar"
+      }
+    },
+    "/workspaces/{wsId}/discoverable-calendars": {
+      "get": {
+        "operationId": "discoverable-calendars-list",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListDiscoverableCalendarsOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List teammate personal calendars the caller can subscribe to"
       }
     },
     "/workspaces/{wsId}/public-shares": {

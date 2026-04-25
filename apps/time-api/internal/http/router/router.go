@@ -157,6 +157,18 @@ func BuildResult(deps Deps) Result {
 			Path:        "/workspaces/{wsId}/calendars/subscribe-system",
 			Summary:     "Subscribe the caller to the holiday feed for a country",
 		}, calendars.SubscribeSystemCalendar(calDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "discoverable-calendars-list",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/discoverable-calendars",
+			Summary:     "List teammate personal calendars the caller can subscribe to",
+		}, calendars.ListDiscoverableCalendars(calDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "calendars-self-subscribe",
+			Method:      http.MethodPost,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/subscribe",
+			Summary:     "Subscribe the caller to a calendar visible in the workspace",
+		}, calendars.SelfSubscribe(calDeps))
 
 		// Cross-calendar event query (no calId, outside calendar member scope).
 		huma.Register(subAPI, huma.Operation{
@@ -328,6 +340,12 @@ func BuildResult(deps Deps) Result {
 		}, calendars.CreateEventFromTask(calDeps))
 
 		// Calendar members.
+		huma.Register(calAPI, huma.Operation{
+			OperationID: "calendars-self-subscription-patch",
+			Method:      http.MethodPatch,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/subscription",
+			Summary:     "Update the caller's own subscription preferences for a calendar",
+		}, calendars.PatchOwnSubscription(calDeps))
 		huma.Register(calAPI, huma.Operation{
 			OperationID: "members-add",
 			Method:      http.MethodPost,

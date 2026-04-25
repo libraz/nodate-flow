@@ -212,6 +212,24 @@
       "open_label": "イベントを開く: {title}（{workspace}）"
     }
   },
+  "calendars_rail": {
+    "title": "カレンダー",
+    "add_teammate": "メンバーのカレンダーを追加...",
+    "actions": {
+      "show": "表示",
+      "hide": "非表示",
+      "leave": "カレンダーから抜ける",
+      "menu": "カレンダーの操作",
+      "toggle_visibility": "表示を切替"
+    },
+    "discover": {
+      "title": "メンバーのカレンダーを追加",
+      "search_placeholder": "名前で絞り込み...",
+      "empty": "購読できるメンバーのカレンダーがありません",
+      "subscribe": "購読",
+      "subscribed_toast": "{name} を購読しました"
+    }
+  },
   "not_found": {
     "code": "404",
     "title": "ページが見つかりません",

@@ -111,3 +111,48 @@ WHERE workspace_id = ?
   AND system_slug = ?
   AND enabled = TRUE
 LIMIT 1;
+
+-- name: ListDiscoverableCalendarsInWorkspace :many
+-- List teammate personal calendars in a workspace that the actor is not
+-- currently subscribed to. Used by the "Add teammate calendar" picker in
+-- the right-rail Calendars panel. Excludes:
+--   - calendars owned by the actor (their own personal calendar)
+--   - calendars where an active calendar_subscriptions row already exists
+--     for the actor
+--   - non-personal calendars (system/holiday/etc — those have their own UI)
+-- Owners must still be active workspace members so we don't surface
+-- calendars whose owner has left the workspace.
+SELECT
+  c.id,
+  c.public_id,
+  c.kind,
+  c.name,
+  c.description,
+  c.color,
+  c.cover_url,
+  c.owner_user_id,
+  uo.public_id AS owner_public_id,
+  uo.display_name AS owner_display_name,
+  uo.avatar_url AS owner_avatar_url,
+  c.system_slug,
+  c.updated_at,
+  c.created_at
+FROM calendars c
+INNER JOIN users uo
+  ON uo.id = c.owner_user_id AND uo.enabled = TRUE
+INNER JOIN workspace_members wm
+  ON wm.workspace_id = c.workspace_id
+  AND wm.user_id = c.owner_user_id
+  AND wm.enabled = TRUE
+WHERE c.workspace_id = ?
+  AND c.kind = 'personal'
+  AND c.enabled = TRUE
+  AND c.owner_user_id <> CAST(sqlc.arg('actor_id') AS UNSIGNED)
+  AND NOT EXISTS (
+    SELECT 1 FROM calendar_subscriptions cs
+    WHERE cs.calendar_id = c.id
+      AND cs.user_id = CAST(sqlc.arg('actor_id') AS UNSIGNED)
+      AND cs.enabled = TRUE
+  )
+ORDER BY uo.display_name ASC, c.created_at ASC
+LIMIT 200;

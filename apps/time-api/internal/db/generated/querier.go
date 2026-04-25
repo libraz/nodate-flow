@@ -237,6 +237,16 @@ type Querier interface {
 	ListCalendarSubscribers(ctx context.Context, arg ListCalendarSubscribersParams) ([]ListCalendarSubscribersRow, error)
 	// List all calendars a user subscribes to within a workspace.
 	ListCalendarsForUser(ctx context.Context, arg ListCalendarsForUserParams) ([]ListCalendarsForUserRow, error)
+	// List teammate personal calendars in a workspace that the actor is not
+	// currently subscribed to. Used by the "Add teammate calendar" picker in
+	// the right-rail Calendars panel. Excludes:
+	//   - calendars owned by the actor (their own personal calendar)
+	//   - calendars where an active calendar_subscriptions row already exists
+	//     for the actor
+	//   - non-personal calendars (system/holiday/etc — those have their own UI)
+	// Owners must still be active workspace members so we don't surface
+	// calendars whose owner has left the workspace.
+	ListDiscoverableCalendarsInWorkspace(ctx context.Context, arg ListDiscoverableCalendarsInWorkspaceParams) ([]ListDiscoverableCalendarsInWorkspaceRow, error)
 	// Inbox query for /me/invites: active, unaccepted, non-expired invites
 	// addressed to the authenticated user's primary email. JOINs event,
 	// calendar, and workspace metadata so the handler can build a rich

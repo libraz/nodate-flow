@@ -212,6 +212,24 @@
       "open_label": "Open event: {title} in {workspace}"
     }
   },
+  "calendars_rail": {
+    "title": "Calendars",
+    "add_teammate": "Add teammate calendar...",
+    "actions": {
+      "show": "Show",
+      "hide": "Hide",
+      "leave": "Leave calendar",
+      "menu": "Calendar actions",
+      "toggle_visibility": "Toggle visibility"
+    },
+    "discover": {
+      "title": "Add teammate calendar",
+      "search_placeholder": "Search by name...",
+      "empty": "No teammate calendars to subscribe to",
+      "subscribe": "Subscribe",
+      "subscribed_toast": "Subscribed to {name}"
+    }
+  },
   "not_found": {
     "code": "404",
     "title": "Page not found",

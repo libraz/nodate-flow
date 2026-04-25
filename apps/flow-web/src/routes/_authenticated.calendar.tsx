@@ -42,6 +42,8 @@ import EventDialog, {
 } from '../features/calendar-events/event-dialog';
 import PendingInvitesPanel from '../features/calendar-invites/pending-invites-panel';
 import calendarLayoutStyles from '../features/calendar-invites/pending-invites-panel.module.css';
+import AddTeammateDrawer from '../features/calendars-rail/add-teammate-drawer';
+import CalendarsRail from '../features/calendars-rail/calendars-rail';
 import type { Project } from '../features/projects/api';
 import { useMeQuery } from '../features/settings/api';
 import type { TaskDerivedState } from '../features/tasks/api';
@@ -240,6 +242,10 @@ function CalendarRoute(): ReactElement {
   const enterCountRef = useRef<Record<string, number>>({});
 
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
+  // Right-rail "Add teammate calendar" drawer state. `null` keeps the
+  // drawer closed; setting a workspace id opens the drawer scoped to
+  // that workspace's discoverable list.
+  const [addTeammateWsId, setAddTeammateWsId] = useState<string | null>(null);
   const [layers, setLayers] = useState<LayerFlags>({
     tasksDue: true,
     events: true,
@@ -253,6 +259,13 @@ function CalendarRoute(): ReactElement {
   const activeWsId = useActiveWorkspaceId();
   const { data: me } = useMeQuery();
   const country = me.country;
+  const selfUserId = me.id;
+  // Narrow workspace shape for the rail — id + name only — so the
+  // component does not depend on the full Workspace schema.
+  const railWorkspaces = useMemo(
+    () => workspaces.map((w) => ({ id: w.id, name: w.name })),
+    [workspaces],
+  );
   // `weekStart` may be undefined when the running auth-api binary predates
   // the column rollout; fall back to the schema default so the grid keeps
   // rendering against an older backend until the binary is restarted.
@@ -755,7 +768,21 @@ function CalendarRoute(): ReactElement {
         </div>
 
         <PendingInvitesPanel />
+
+        <CalendarsRail
+          workspaces={railWorkspaces}
+          selfUserId={selfUserId}
+          onAddTeammate={setAddTeammateWsId}
+        />
       </div>
+
+      {addTeammateWsId !== null ? (
+        <AddTeammateDrawer
+          open
+          workspaceId={addTeammateWsId}
+          onClose={() => setAddTeammateWsId(null)}
+        />
+      ) : null}
 
       {editTarget !== null ? (
         <EventDialog
