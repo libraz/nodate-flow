@@ -149,19 +149,20 @@ sql:
               type: "PublicID"
           - column: "*.initiated_by_user_id"
             go_struct_tag: 'json:"-"'
-  # --- nodate-time API (calendar + auth queries only) ---
+  # --- flow-api calendar subpackage (calendar queries only) ---
+  # Generated alongside the primary flow-api generated package so that the
+  # relocated calendar handlers (R6 Phase 0 Step 0-2) can import a calendar-
+  # scoped queries struct without polluting the root generated package.
   - engine: "mysql"
     queries:
       - "queries/calendars"
-      - "queries/auth"
-      - "queries/workspaces"
     schema:
       - "tables"
       - "views"
     gen:
       go:
-        package: "generated"
-        out: "../apps/time-api/internal/db/generated"
+        package: "calendar"
+        out: "../apps/flow-api/internal/db/generated/calendar"
         sql_package: "database/sql"
         emit_interface: true
         emit_json_tags: true
@@ -174,17 +175,17 @@ sql:
         overrides:
           - column: "*.public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/types"
+              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.user_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/types"
+              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.calendar_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/time-api/internal/db/types"
+              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.id"
