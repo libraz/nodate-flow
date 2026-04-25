@@ -8729,43 +8729,11 @@ export interface components {
             updatedAt?: number;
             userId: string;
         };
-        WorkspaceResponse: {
-            country: string;
-            /** Format: int64 */
-            createdAt: number;
-            description?: string;
-            iconUrl?: string;
-            /** @description Workspace public id (UUID v7) */
-            id: string;
-            /**
-             * Format: int64
-             * @description Number of enabled members in this workspace
-             */
-            memberCount: number;
-            name: string;
-            /** @description Caller's role in this workspace */
-            role?: string;
-            slug: string;
-            timezone: string;
-            /** Format: int64 */
-            updatedAt?: number;
-        };
         WorkspaceUserSummary: {
             avatarUrl?: string;
             displayName: string;
             /** @description User public id (UUID v7) */
             id: string;
-        };
-        WorkspacesListOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            nextCursor: string | null;
-            /** Format: int64 */
-            total: number;
-            workspaces: components["schemas"]["WorkspaceResponse"][] | null;
         };
     };
     responses: never;
@@ -13067,7 +13035,10 @@ export interface operations {
     };
     "workspaces-list": {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -13080,7 +13051,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["WorkspacesListOutputBody"];
+                    "application/json": components["schemas"]["ListWorkspacesOutputBody"];
                 };
             };
             /** @description Error */

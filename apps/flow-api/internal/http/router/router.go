@@ -78,7 +78,6 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/timeboxes"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/timeline"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/webhooks"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/workspaces"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/mcp"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/obs"
@@ -353,7 +352,6 @@ type sharedDeps struct {
 	aiDeps               aihandlers.Deps
 	signalDeps           signals.Deps
 	calDeps              calendars.Deps
-	wsDeps               workspaces.Deps
 }
 
 // buildSharedDeps constructs the per-feature handler Deps structs and
@@ -500,7 +498,6 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 			EmailFrom:   deps.EmailFrom,
 			FlowWebURL:  deps.FlowWebURL,
 		},
-		wsDeps: workspaces.Deps{Queries: deps.Queries},
 	}
 }
 
@@ -813,12 +810,6 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		subAPI := newSubAPI(sub)
 		apis = append(apis, subAPI)
 
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "workspaces-list",
-			Method:      http.MethodGet,
-			Path:        "/workspaces",
-			Summary:     "List workspaces for the authenticated user",
-		}, workspaces.List(shared.wsDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "calendars-list",
 			Method:      http.MethodGet,

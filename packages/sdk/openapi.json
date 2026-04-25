@@ -11675,52 +11675,6 @@
         "required": ["id", "userId", "email", "displayName", "role", "createdAt"],
         "type": "object"
       },
-      "WorkspaceResponse": {
-        "additionalProperties": false,
-        "properties": {
-          "country": {
-            "type": "string"
-          },
-          "createdAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "description": {
-            "type": "string"
-          },
-          "iconUrl": {
-            "type": "string"
-          },
-          "id": {
-            "description": "Workspace public id (UUID v7)",
-            "type": "string"
-          },
-          "memberCount": {
-            "description": "Number of enabled members in this workspace",
-            "format": "int64",
-            "type": "integer"
-          },
-          "name": {
-            "type": "string"
-          },
-          "role": {
-            "description": "Caller's role in this workspace",
-            "type": "string"
-          },
-          "slug": {
-            "type": "string"
-          },
-          "timezone": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "int64",
-            "type": "integer"
-          }
-        },
-        "required": ["id", "slug", "name", "timezone", "country", "memberCount", "createdAt"],
-        "type": "object"
-      },
       "WorkspaceUserSummary": {
         "additionalProperties": false,
         "properties": {
@@ -11736,33 +11690,6 @@
           }
         },
         "required": ["id", "displayName"],
-        "type": "object"
-      },
-      "WorkspacesListOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/WorkspacesListOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "nextCursor": {
-            "type": ["string", "null"]
-          },
-          "total": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "workspaces": {
-            "items": {
-              "$ref": "#/components/schemas/WorkspaceResponse"
-            },
-            "type": ["array", "null"]
-          }
-        },
-        "required": ["total", "workspaces", "nextCursor"],
         "type": "object"
       }
     }
@@ -17774,12 +17701,37 @@
     "/workspaces": {
       "get": {
         "operationId": "workspaces-list",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WorkspacesListOutputBody"
+                  "$ref": "#/components/schemas/ListWorkspacesOutputBody"
                 }
               }
             },
