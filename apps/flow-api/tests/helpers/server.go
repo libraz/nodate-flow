@@ -14,12 +14,12 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/testutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/router"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/stream"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 )
 
 // TestServer is a running httptest.Server bound to the full
@@ -29,6 +29,10 @@ type TestServer struct {
 	BaseURL string
 	Server  *httptest.Server
 	DB      *sql.DB
+	// JWT is exposed so calendar tests that bypass /auth/register and
+	// seed stub users via direct sqlc inserts can mint a token recognized
+	// by the merged router.
+	JWT *auth.JWTIssuer
 }
 
 // testCipherHex is a 64-char hex string (32 bytes) used only by the
@@ -103,7 +107,7 @@ func StartTestServer(t *testing.T, db *sql.DB) *TestServer {
 		srv.Close()
 	})
 
-	return &TestServer{BaseURL: srv.URL, Server: srv, DB: db}
+	return &TestServer{BaseURL: srv.URL, Server: srv, DB: db, JWT: jwtIssuer}
 }
 
 // NewTestServer is the same as StartTestServer but without a *testing.T
@@ -154,7 +158,7 @@ func NewTestServer(db *sql.DB) (*TestServer, func(), error) {
 		eventbus.SetNotifyHook(nil)
 		srv.Close()
 	}
-	return &TestServer{BaseURL: srv.URL, Server: srv, DB: db}, cleanup, nil
+	return &TestServer{BaseURL: srv.URL, Server: srv, DB: db, JWT: jwtIssuer}, cleanup, nil
 }
 
 // compositeHandler dispatches requests to the primary handler first.

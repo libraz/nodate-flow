@@ -28,7 +28,6 @@ jobs:
           cache-dependency-path: |
             apps/flow-api/go.sum
             apps/auth-api/go.sum
-            apps/time-api/go.sum
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -66,16 +65,6 @@ jobs:
         run: go vet ./...
         working-directory: apps/auth-api
 
-      - name: golangci-lint (time-api)
-        uses: golangci/golangci-lint-action@v8
-        with:
-          version: latest
-          working-directory: apps/time-api
-
-      - name: Go vet (time-api)
-        run: go vet ./...
-        working-directory: apps/time-api
-
   # ---------- Job 2: Unit tests (Go short + Vitest) ----------
   test-unit:
     name: Unit tests
@@ -90,7 +79,6 @@ jobs:
           cache-dependency-path: |
             apps/flow-api/go.sum
             apps/auth-api/go.sum
-            apps/time-api/go.sum
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -119,20 +107,6 @@ jobs:
 
       - name: Check Go coverage threshold (80%) — auth-api
         working-directory: apps/auth-api
-        run: |
-          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-          echo "Total coverage: ${COVERAGE}%"
-          if [ "$(echo "${COVERAGE} < 80" | bc -l)" -eq 1 ]; then
-            echo "::error::Go coverage ${COVERAGE}% is below 80% threshold"
-            exit 1
-          fi
-
-      - name: Go test (short) — time-api
-        run: go test -short -race -count=1 -coverprofile=coverage.out -covermode=atomic ./...
-        working-directory: apps/time-api
-
-      - name: Check Go coverage threshold (80%) — time-api
-        working-directory: apps/time-api
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
           echo "Total coverage: ${COVERAGE}%"
@@ -173,7 +147,6 @@ jobs:
           cache-dependency-path: |
             apps/flow-api/go.sum
             apps/auth-api/go.sum
-            apps/time-api/go.sum
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -188,8 +161,12 @@ jobs:
 
       # Integration tests use testcontainers (MySQL, MinIO, Redis).
       # The containers are started automatically by Go test helpers.
+      # The flow-api job also covers the calendar/event suite that
+      # used to live under apps/time-api/tests/.
 
       - name: Go test (full, with testcontainers) — flow-api
+        env:
+          NF_TEST_INTEGRATION: "1"
         run: go test -race -count=1 -timeout=10m -coverprofile=coverage.out -covermode=atomic ./...
         working-directory: apps/flow-api
 
@@ -206,10 +183,6 @@ jobs:
       - name: Go test (full, with testcontainers) — auth-api
         run: go test -race -count=1 -timeout=10m -coverprofile=coverage.out -covermode=atomic ./...
         working-directory: apps/auth-api
-
-      - name: Go test (full, with testcontainers) — time-api
-        run: go test -race -count=1 -timeout=10m -coverprofile=coverage.out -covermode=atomic ./...
-        working-directory: apps/time-api
 
       - name: Build web for E2E
         run: bun run build
@@ -242,7 +215,6 @@ jobs:
           cache-dependency-path: |
             apps/flow-api/go.sum
             apps/auth-api/go.sum
-            apps/time-api/go.sum
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -273,10 +245,6 @@ jobs:
         run: govulncheck ./...
         working-directory: apps/auth-api
 
-      - name: Go vulnerability check — time-api
-        run: govulncheck ./...
-        working-directory: apps/time-api
-
       - name: Install JS dependencies
         run: bun install --frozen-lockfile
 
@@ -299,7 +267,6 @@ jobs:
           cache-dependency-path: |
             apps/flow-api/go.sum
             apps/auth-api/go.sum
-            apps/time-api/go.sum
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -310,6 +277,12 @@ jobs:
 
       - name: Verify OpenAPI specs match Go sources
         run: ./scripts/openapi-diff.sh
+
+      - name: Verify merged spec has no schema name collisions
+        run: ./scripts/check-schema-collisions.sh
+
+      - name: Verify public router allowlist (no auth-required path leaks into public surface)
+        run: bun run scripts/check-public-router.ts
 
   # ---------- Job 5b: Contract tests (Schemathesis against OpenAPI spec) ----------
   contract-tests:

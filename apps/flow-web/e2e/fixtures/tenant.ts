@@ -21,7 +21,6 @@ import type { BrowserContext } from '@playwright/test';
 
 export const API_BASE_URL = process.env.NF_API_URL ?? 'http://localhost:8080';
 export const AUTH_API_URL = process.env.NF_AUTH_API_URL ?? 'http://localhost:8082';
-export const TIME_API_URL = process.env.NF_TIME_API_URL ?? 'http://localhost:8081';
 
 export interface TestTenant {
   email: string;
@@ -216,10 +215,10 @@ export async function createTask(
 }
 
 /**
- * Fetches the tenant's calendar list on time-api. The GET triggers the
- * lazy auto-creation of the personal + system calendars, so after this
- * call the workspace is guaranteed to have at least one writable
- * personal calendar the user owns.
+ * Fetches the tenant's calendar list. The GET triggers the lazy
+ * auto-creation of the personal + system calendars, so after this call
+ * the workspace is guaranteed to have at least one writable personal
+ * calendar the user owns.
  *
  * Returns the first calendar whose role is `owner` so the caller can
  * POST events into it. Throws if the list is empty or the call fails —
@@ -228,7 +227,7 @@ export async function createTask(
 export async function ensurePersonalCalendar(
   tenant: TestTenant,
 ): Promise<{ id: string; name: string; role: string }> {
-  const res = await fetch(`${TIME_API_URL}/workspaces/${tenant.workspaceId}/calendars`, {
+  const res = await fetch(`${API_BASE_URL}/workspaces/${tenant.workspaceId}/calendars`, {
     method: 'GET',
     headers: {
       accept: 'application/json',
@@ -261,9 +260,9 @@ export interface CreateCalendarEventArgs {
 }
 
 /**
- * Seeds a calendar event directly via time-api REST. Used by edit/
- * delete tests that need a pre-existing row to click on without going
- * through the create UI path first.
+ * Seeds a calendar event directly via REST. Used by edit/delete tests
+ * that need a pre-existing row to click on without going through the
+ * create UI path first.
  */
 export async function createCalendarEvent(
   tenant: TestTenant,
@@ -279,7 +278,7 @@ export async function createCalendarEvent(
     timezone: args.timezone ?? 'UTC',
   };
   const res = await fetch(
-    `${TIME_API_URL}/workspaces/${tenant.workspaceId}/calendars/${calendarId}/events`,
+    `${API_BASE_URL}/workspaces/${tenant.workspaceId}/calendars/${calendarId}/events`,
     {
       method: 'POST',
       headers: {

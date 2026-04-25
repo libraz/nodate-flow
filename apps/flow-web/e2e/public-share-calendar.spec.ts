@@ -6,8 +6,8 @@
  * calendar shares at /share/cal/{token} — and exercises the full create
  * then anonymous-view round trip:
  *
- *   1. Create a workspace-owned public share via time-api REST (the
- *      POST returns the plaintext token exactly once).
+ *   1. Create a workspace-owned public share via REST (the POST
+ *      returns the plaintext token exactly once).
  *   2. Open the /share/cal/{token} route in a fresh, unauthenticated
  *      browser context to ensure the token alone grants access.
  *   3. Assert the share page renders the share title as an h1 without
@@ -22,8 +22,7 @@
 import { expect, test } from '@playwright/test';
 
 import { loadTenants } from './fixtures/load-tenants';
-
-const TIME_API_URL = process.env.NF_TIME_API_URL ?? 'http://localhost:8081';
+import { API_BASE_URL } from './fixtures/tenant';
 
 test.describe('public share calendar', () => {
   test('create via REST, view anonymously, title renders', async ({ browser }) => {
@@ -31,7 +30,7 @@ test.describe('public share calendar', () => {
 
     const title = `E2E Share ${Date.now().toString(36)}`;
     const createRes = await fetch(
-      `${TIME_API_URL}/workspaces/${tenant.workspaceId}/public-shares`,
+      `${API_BASE_URL}/workspaces/${tenant.workspaceId}/public-shares`,
       {
         method: 'POST',
         headers: {

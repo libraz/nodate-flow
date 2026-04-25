@@ -3,7 +3,7 @@
  *
  * Regression coverage for apps/flow-web/src/features/calendar-events/
  * event-dialog.tsx, driven through the `/calendar` route against the
- * real flow-api (tasks) and time-api (calendar events) backends.
+ * real flow-api backend (tasks + calendar events, merged in R6 Phase 0).
  *
  * Each test creates its own tenant via REST + seeds any prerequisites
  * (personal calendar, pre-existing event, etc.) so the suite stays
@@ -30,7 +30,7 @@ import { type Locator, type Page, expect, test } from '@playwright/test';
 import enCal from '../locales/en/calendar-events.json' with { type: 'json' };
 import jaCal from '../locales/ja/calendar-events.json' with { type: 'json' };
 import {
-  TIME_API_URL,
+  API_BASE_URL,
   type TestTenant,
   cleanupTenant,
   createCalendarEvent,
@@ -474,7 +474,7 @@ test.describe('calendar event dialog', () => {
     const dayEnd = new Date(today);
     dayEnd.setHours(23, 59, 59, 999);
     const res = await fetch(
-      `${TIME_API_URL}/workspaces/${tenant.workspaceId}/calendars/${cal.id}/events?start=${dayStart.toISOString()}&end=${dayEnd.toISOString()}`,
+      `${API_BASE_URL}/workspaces/${tenant.workspaceId}/calendars/${cal.id}/events?start=${dayStart.toISOString()}&end=${dayEnd.toISOString()}`,
       {
         headers: {
           accept: 'application/json',
