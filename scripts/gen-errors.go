@@ -156,8 +156,8 @@ func run() error {
 
 	// Generate Go per-domain files for all app directories that have
 	// an internal/errors/ directory. flow-api receives all domains;
-	// auth-api and time-api receive only updates for domains they already
-	// track. The runtime helper (Spec/APIError/New/Newf/Wrap) lives in
+	// auth-api receives only updates for domains it already tracks.
+	// The runtime helper (Spec/APIError/New/Newf/Wrap) lives in
 	// packages/go-shared/apierr and is not generated here.
 	goTargets := []struct {
 		dir     string
@@ -166,7 +166,6 @@ func run() error {
 	}{
 		{filepath.Join(root, "apps", "flow-api", "internal", "errors"), true, false},
 		{filepath.Join(root, "apps", "auth-api", "internal", "errors"), false, false},
-		{filepath.Join(root, "apps", "time-api", "internal", "errors"), false, false},
 	}
 	for _, tgt := range goTargets {
 		if _, err := os.Stat(tgt.dir); os.IsNotExist(err) {

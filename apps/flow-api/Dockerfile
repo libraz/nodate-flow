@@ -6,8 +6,11 @@ FROM golang:1.25-alpine AS build
 WORKDIR /src
 
 # Copy workspace + module manifests first for layer caching.
+# All modules listed in go.work must be resolvable, even when only
+# one is built here.
 COPY go.work go.work.sum* ./
 COPY apps/flow-api/go.mod apps/flow-api/go.sum ./apps/flow-api/
+COPY apps/auth-api/go.mod apps/auth-api/go.sum ./apps/auth-api/
 COPY packages/go-shared/go.mod packages/go-shared/go.sum ./packages/go-shared/
 
 RUN --mount=type=cache,target=/go/pkg/mod \
