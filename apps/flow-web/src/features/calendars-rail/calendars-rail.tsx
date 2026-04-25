@@ -34,7 +34,7 @@ import { ChevronLeft, Eye, EyeOff, MoreVertical } from 'lucide-react';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { timeSdk } from '../../lib/sdk';
+import { sdk } from '../../lib/sdk';
 import { type RailCalendar, usePatchOwnSubscriptionMutation, useUnsubscribeMutation } from './api';
 import styles from './calendars-rail.module.css';
 import DiscoverList from './discover-list';
@@ -73,7 +73,7 @@ export default function CalendarsRail({
       queryKey: ['calendar-events', 'calendars', w.id] as const,
       staleTime: 60_000,
       queryFn: async (): Promise<RailCalendar[]> => {
-        const { data, error } = await timeSdk.GET('/workspaces/{wsId}/calendars', {
+        const { data, error } = await sdk.GET('/workspaces/{wsId}/calendars', {
           params: { path: { wsId: w.id } },
         });
         if (error || !data) return [];

@@ -5,14 +5,6 @@
  * Used by the `/invites/accept?token=<magic>` route. Unauthenticated: the
  * backend response is intentionally minimal (just inviteId + rsvp), so
  * this page shows a simple confirmation without event enrichment.
- *
- * Ported from the legacy time-web route at
- * `apps/time-web/src/routes/invites/accept.tsx` as part of the
- * time-web decommissioning effort (Phase 1). The only substantive
- * difference is that the request is issued against the time-api via
- * `timeSdk`, because flow-web splits clients between flow-api (`sdk`)
- * and time-api (`timeSdk`); time-web had a single `sdk` that pointed at
- * time-api.
  */
 
 import { useMutation } from '@tanstack/react-query';
@@ -24,7 +16,7 @@ import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
 
 import { ApiError, toApiError } from '../../lib/api-error';
-import { timeSdk } from '../../lib/sdk';
+import { sdk } from '../../lib/sdk';
 
 type RsvpChoice = 'accepted' | 'tentative' | 'declined';
 
@@ -71,7 +63,7 @@ function AcceptInviteForm({ token }: AcceptInviteFormProps): ReactElement {
 
   const mutation = useMutation({
     mutationFn: async (rsvp: RsvpChoice): Promise<AcceptInviteResult> => {
-      const response = await timeSdk.POST('/public/invites/accept', {
+      const response = await sdk.POST('/public/invites/accept', {
         body: { token, rsvp },
       });
       if (response.error || !response.data) {

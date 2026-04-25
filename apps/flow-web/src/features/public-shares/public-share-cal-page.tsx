@@ -3,13 +3,12 @@
  * calendar share by URL token. Accessible at /share/cal/{token} without
  * authentication; no sidebar, topbar, or navigation chrome.
  *
- * Backed by time-api GET /share/cal/{token}, reached through the anonymous
- * timeSdk client. The page surfaces its own invalid/expired error states
- * rather than escalating to the root FatalFallback so anonymous visitors
- * land on a branded retry page.
+ * Backed by GET /share/cal/{token}. The page surfaces its own
+ * invalid/expired error states rather than escalating to the root
+ * FatalFallback so anonymous visitors land on a branded retry page.
  */
 
-import type { components } from '@nodate-flow/time-sdk';
+import type { components } from '@nodate-flow/sdk';
 import Card from '@nodate-flow/ui/primitives/card';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { useQuery } from '@tanstack/react-query';
@@ -18,7 +17,7 @@ import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ApiError, toApiError } from '../../lib/api-error';
-import { timeSdk } from '../../lib/sdk';
+import { sdk } from '../../lib/sdk';
 
 type SharePageDTO = components['schemas']['PublicShareRenderPage'];
 type ShareEventDTO = components['schemas']['PublicShareRenderEvent'];
@@ -39,7 +38,7 @@ function useShareRenderQuery(token: string) {
   return useQuery({
     queryKey: ['share', 'cal', token],
     queryFn: async (): Promise<ShareRenderBody> => {
-      const result = await timeSdk.GET('/share/cal/{token}', {
+      const result = await sdk.GET('/share/cal/{token}', {
         params: { path: { token } },
       });
       if (result.error || !result.data) {

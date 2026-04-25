@@ -4,7 +4,7 @@
  *
  * This is distinct from `/invite/$token` (workspace join invites); the
  * two flows are intentionally kept separate because they cover different
- * services (time-api calendar invites vs workspace membership).
+ * surfaces (calendar event invites vs workspace membership).
  */
 
 import { createFileRoute } from '@tanstack/react-router';

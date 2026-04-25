@@ -2,14 +2,14 @@
  * Calendar event attendees — react-query hooks for the per-event attendee
  * roster surfaced inside the unified EventDialog.
  *
- * Mirrors the conventions in {@link ./api.ts}: typed via the time-sdk
+ * Mirrors the conventions in {@link ./api.ts}: typed via the SDK's
  * generated `components['schemas']` shapes, errors normalised through
  * {@link toApiError}, mutations invalidate both the per-event attendee
  * list and (for RSVP) the cross-workspace `['calendar', 'me-events']`
  * aggregate so the calendar grid can refresh viewer-state pills.
  */
 
-import type { components } from '@nodate-flow/time-sdk';
+import type { components } from '@nodate-flow/sdk';
 import {
   type UseMutationResult,
   type UseQueryResult,
@@ -19,7 +19,7 @@ import {
 } from '@tanstack/react-query';
 
 import { type ApiError, toApiError } from '../../lib/api-error';
-import { timeSdk } from '../../lib/sdk';
+import { sdk } from '../../lib/sdk';
 
 /** Attendee row as returned by GET /attendees and POST /attendees. */
 export type Attendee = components['schemas']['AttendeeResponse'];
@@ -64,7 +64,7 @@ export function useAttendeesQuery({
     queryKey: attendeesQueryKey(workspaceId, calendarId, eventId),
     enabled: workspaceId.length > 0 && calendarId.length > 0 && eventId.length > 0,
     queryFn: async (): Promise<Attendee[]> => {
-      const { data, error } = await timeSdk.GET(
+      const { data, error } = await sdk.GET(
         '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees',
         {
           params: { path: { wsId: workspaceId, calId: calendarId, evtId: eventId } },
@@ -95,7 +95,7 @@ export function useAddAttendeesMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<Attendee[], ApiError, AttendeesScope & { userIds: string[] }>({
     mutationFn: async ({ workspaceId, calendarId, eventId, userIds }): Promise<Attendee[]> => {
-      const { data, error } = await timeSdk.POST(
+      const { data, error } = await sdk.POST(
         '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees',
         {
           params: { path: { wsId: workspaceId, calId: calendarId, evtId: eventId } },
@@ -120,7 +120,7 @@ export function useRemoveAttendeeMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<void, ApiError, AttendeesScope & { userId: string }>({
     mutationFn: async ({ workspaceId, calendarId, eventId, userId }): Promise<void> => {
-      const { error } = await timeSdk.DELETE(
+      const { error } = await sdk.DELETE(
         '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{userId}',
         {
           params: {
@@ -151,7 +151,7 @@ export function useUpdateOwnRsvpMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<void, ApiError, AttendeesScope & { rsvp: Rsvp }>({
     mutationFn: async ({ workspaceId, calendarId, eventId, rsvp }): Promise<void> => {
-      const { error } = await timeSdk.PATCH(
+      const { error } = await sdk.PATCH(
         '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/rsvp',
         {
           params: { path: { wsId: workspaceId, calId: calendarId, evtId: eventId } },
@@ -176,7 +176,7 @@ export function useToggleCanEditMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<void, ApiError, AttendeesScope & { userId: string; canEdit: boolean }>({
     mutationFn: async ({ workspaceId, calendarId, eventId, userId, canEdit }): Promise<void> => {
-      const { error } = await timeSdk.PATCH(
+      const { error } = await sdk.PATCH(
         '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{userId}/can-edit',
         {
           params: {
@@ -223,7 +223,7 @@ export function useCreateAttendeeInviteMutation(): UseMutationResult<
       attendeeId,
       expiresInHours,
     }): Promise<CreateAttendeeInviteResult> => {
-      const { data, error } = await timeSdk.POST(
+      const { data, error } = await sdk.POST(
         '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{attendeeId}/invite',
         {
           params: {

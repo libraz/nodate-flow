@@ -2,8 +2,8 @@
  * /calendar — unified cross-workspace calendar.
  *
  * Consumes two aggregated endpoints instead of per-workspace fan-out:
- *   - `GET /me/tasks-with-dates?from=&to=` (flow-api)   — tasks with due_on
- *   - `GET /me/calendar-events?start=&end=` (time-api)  — calendar events
+ *   - `GET /me/tasks-with-dates?from=&to=` — tasks with due_on
+ *   - `GET /me/calendar-events?start=&end=` — calendar events
  *
  * The month grid overlays five toggleable layers: task-due, calendar
  * events, blocks, free, and milestones. Dragging a task cell
@@ -22,7 +22,6 @@
  */
 
 import type { components } from '@nodate-flow/sdk';
-import type { components as timeComponents } from '@nodate-flow/time-sdk';
 import { cx } from '@nodate-flow/ui/lib/cx';
 import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
@@ -50,7 +49,7 @@ import { STATE_COLOR } from '../features/tasks/constants';
 import { useWorkspacesQuery } from '../features/workspaces/api';
 import { type ApiError, toApiError } from '../lib/api-error';
 import { dateKey } from '../lib/date-utils';
-import { sdk, timeSdk } from '../lib/sdk';
+import { sdk } from '../lib/sdk';
 import { useActiveWorkspaceId } from '../lib/use-current-workspace';
 import styles from './_authenticated.calendar.module.css';
 
@@ -62,7 +61,7 @@ import styles from './_authenticated.calendar.module.css';
 const DUE_BEFORE_START_CODE = 'VALIDATION.BODY.DUE_BEFORE_START';
 
 type CalendarTask = components['schemas']['MyTaskListItem'];
-type CalendarEvent = timeComponents['schemas']['MyCalendarEventResponse'];
+type CalendarEvent = components['schemas']['MyCalendarEventResponse'];
 type WeekStart = 'mon' | 'sun' | 'sat';
 type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 
@@ -309,12 +308,12 @@ function CalendarRoute(): ReactElement {
 
   const tasks = tasksQuery.data ?? [];
 
-  // Single cross-workspace event query (time-api /me/calendar-events).
+  // Single cross-workspace event query (/me/calendar-events).
   const eventsQuery = useQuery({
     queryKey: ['calendar', 'me-events', fromIso, toIso] as const,
     staleTime: 30_000,
     queryFn: async (): Promise<CalendarEvent[]> => {
-      const { data, error } = await timeSdk.GET('/me/calendar-events', {
+      const { data, error } = await sdk.GET('/me/calendar-events', {
         params: { query: { start: fromIso, end: toIso } },
       });
       if (error || !data) return [];

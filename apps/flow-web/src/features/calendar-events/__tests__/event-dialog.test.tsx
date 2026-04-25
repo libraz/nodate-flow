@@ -12,13 +12,13 @@ import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { components as timeComponents } from '@nodate-flow/time-sdk';
+import type { components } from '@nodate-flow/sdk';
 
 import { renderWithProviders } from '../../../test/helpers/render';
 import EventDialog, { type EventDialogMode } from '../event-dialog';
 
-type CreateEventInput = timeComponents['schemas']['CreateEventInputBody'];
-type CalEventLike = timeComponents['schemas']['MyCalendarEventResponse'];
+type CreateEventInput = components['schemas']['CreateEventInputBody'];
+type CalEventLike = components['schemas']['MyCalendarEventResponse'];
 
 /* ── mocks ────────────────────────────────────────────────────── */
 

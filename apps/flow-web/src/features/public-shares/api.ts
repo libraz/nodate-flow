@@ -1,5 +1,5 @@
 /**
- * Public shares feature — typed queries and mutations against time-api's
+ * Public shares feature — typed queries and mutations against the
  * /workspaces/{wsId}/public-shares family of endpoints.
  *
  * Security:
@@ -9,7 +9,7 @@
  *   clear it as soon as the dialog closes.
  */
 
-import type { components } from '@nodate-flow/time-sdk';
+import type { components } from '@nodate-flow/sdk';
 import {
   type UseMutationResult,
   type UseSuspenseQueryResult,
@@ -19,7 +19,7 @@ import {
 } from '@tanstack/react-query';
 
 import { ApiError, toApiError } from '../../lib/api-error';
-import { timeSdk } from '../../lib/sdk';
+import { sdk } from '../../lib/sdk';
 
 export type PublicShare = components['schemas']['PublicShareResponse'];
 export type ShareEvent = components['schemas']['ShareEventResponse'];
@@ -44,7 +44,7 @@ export function usePublicSharesQuery(workspaceId: string): UseSuspenseQueryResul
   return useSuspenseQuery({
     queryKey: publicSharesKeys.list(workspaceId),
     queryFn: async (): Promise<PublicShare[]> => {
-      const { data, error } = await timeSdk.GET('/workspaces/{wsId}/public-shares', {
+      const { data, error } = await sdk.GET('/workspaces/{wsId}/public-shares', {
         params: { path: { wsId: workspaceId } },
       });
       if (error || !data) throw toApiError(error, 'Failed to load public share pages');
@@ -64,7 +64,7 @@ export function useCreatePublicShare(
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: CreatePublicShareInput): Promise<PublicShare> => {
-      const { data, error } = await timeSdk.POST('/workspaces/{wsId}/public-shares', {
+      const { data, error } = await sdk.POST('/workspaces/{wsId}/public-shares', {
         params: { path: { wsId: workspaceId } },
         body: input,
       });
@@ -84,7 +84,7 @@ export function useDeletePublicShare(
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (shareId: string): Promise<void> => {
-      const { error } = await timeSdk.DELETE('/workspaces/{wsId}/public-shares/{shareId}', {
+      const { error } = await sdk.DELETE('/workspaces/{wsId}/public-shares/{shareId}', {
         params: { path: { wsId: workspaceId, shareId } },
       });
       if (error) throw toApiError(error, 'Failed to delete public share page');
@@ -105,12 +105,9 @@ export function useRotatePublicShareToken(
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (shareId: string): Promise<PublicShare> => {
-      const { data, error } = await timeSdk.POST(
-        '/workspaces/{wsId}/public-shares/{shareId}/rotate',
-        {
-          params: { path: { wsId: workspaceId, shareId } },
-        },
-      );
+      const { data, error } = await sdk.POST('/workspaces/{wsId}/public-shares/{shareId}/rotate', {
+        params: { path: { wsId: workspaceId, shareId } },
+      });
       if (error || !data) throw toApiError(error, 'Failed to rotate share token');
       return data;
     },
@@ -128,7 +125,7 @@ export function usePublicShareDetailQuery(
   return useSuspenseQuery({
     queryKey: publicSharesKeys.detail(workspaceId, shareId),
     queryFn: async (): Promise<ShareDetail> => {
-      const { data, error } = await timeSdk.GET('/workspaces/{wsId}/public-shares/{shareId}', {
+      const { data, error } = await sdk.GET('/workspaces/{wsId}/public-shares/{shareId}', {
         params: { path: { wsId: workspaceId, shareId } },
       });
       if (error || !data) throw toApiError(error, 'Failed to load public share page');
@@ -152,7 +149,7 @@ export function useWorkspaceCalendarEventsQuery(
   return useSuspenseQuery({
     queryKey: publicSharesKeys.candidates(workspaceId, startIso, endIso),
     queryFn: async (): Promise<CrossCalendarEvent[]> => {
-      const { data, error } = await timeSdk.GET('/workspaces/{wsId}/calendar-events', {
+      const { data, error } = await sdk.GET('/workspaces/{wsId}/calendar-events', {
         params: {
           path: { wsId: workspaceId },
           query: { start: startIso, end: endIso },
@@ -178,13 +175,10 @@ export function useAttachEventsToShare(
     mutationFn: async (
       eventIds: string[],
     ): Promise<components['schemas']['AttachEventsToShareOutputBody']> => {
-      const { data, error } = await timeSdk.POST(
-        '/workspaces/{wsId}/public-shares/{shareId}/events',
-        {
-          params: { path: { wsId: workspaceId, shareId } },
-          body: { eventIds },
-        },
-      );
+      const { data, error } = await sdk.POST('/workspaces/{wsId}/public-shares/{shareId}/events', {
+        params: { path: { wsId: workspaceId, shareId } },
+        body: { eventIds },
+      });
       if (error || !data) throw toApiError(error, 'Failed to attach events');
       return data;
     },
@@ -210,7 +204,7 @@ export function useReorderShareEvents(
     mutationFn: async (
       linkPublicIds: string[],
     ): Promise<components['schemas']['ReorderShareEventsOutputBody']> => {
-      const { data, error } = await timeSdk.PATCH(
+      const { data, error } = await sdk.PATCH(
         '/workspaces/{wsId}/public-shares/{shareId}/events/reorder',
         {
           params: { path: { wsId: workspaceId, shareId } },
@@ -238,7 +232,7 @@ export function useDetachEventFromShare(
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (eventId: string): Promise<void> => {
-      const { error } = await timeSdk.DELETE(
+      const { error } = await sdk.DELETE(
         '/workspaces/{wsId}/public-shares/{shareId}/events/{evtId}',
         {
           params: { path: { wsId: workspaceId, shareId, evtId: eventId } },

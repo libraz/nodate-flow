@@ -10,8 +10,7 @@
  * These hooks isolate that lookup and the "remember last used" policy.
  */
 
-import type { components as flowComponents } from '@nodate-flow/sdk';
-import type { components } from '@nodate-flow/time-sdk';
+import type { components } from '@nodate-flow/sdk';
 import {
   type UseMutationResult,
   type UseQueryResult,
@@ -21,15 +20,15 @@ import {
 } from '@tanstack/react-query';
 
 import { type ApiError, toApiError } from '../../lib/api-error';
-import { sdk, timeSdk } from '../../lib/sdk';
+import { sdk } from '../../lib/sdk';
 
 export type Calendar = components['schemas']['CalendarResponse'];
 export type CalendarEventResponse = components['schemas']['EventResponse'];
 export type CreateEventInput = components['schemas']['CreateEventInputBody'];
 export type PatchEventInput = components['schemas']['PatchEventInputBody'];
 
-type FlowTask = flowComponents['schemas']['Task'];
-export type CreateTaskInput = flowComponents['schemas']['CreateTaskBody'];
+type FlowTask = components['schemas']['Task'];
+export type CreateTaskInput = components['schemas']['CreateTaskBody'];
 
 /** Roles that grant event-edit permission on a calendar. */
 const WRITABLE_ROLES: ReadonlySet<string> = new Set(['owner', 'manager', 'editor']);
@@ -66,7 +65,7 @@ export function useCalendarsQuery(workspaceId: string | null): UseQueryResult<Ca
     enabled: wsId.length > 0,
     staleTime: 60_000,
     queryFn: async (): Promise<Calendar[]> => {
-      const { data, error } = await timeSdk.GET('/workspaces/{wsId}/calendars', {
+      const { data, error } = await sdk.GET('/workspaces/{wsId}/calendars', {
         params: { path: { wsId } },
       });
       if (error || !data) throw new Error('Failed to load calendars');
@@ -145,7 +144,7 @@ export function useCreateEvent(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<CalendarEventResponse, ApiError, CreateEventArgs>({
     mutationFn: async ({ workspaceId, calendarId, body }): Promise<CalendarEventResponse> => {
-      const { data, error } = await timeSdk.POST('/workspaces/{wsId}/calendars/{calId}/events', {
+      const { data, error } = await sdk.POST('/workspaces/{wsId}/calendars/{calId}/events', {
         params: { path: { wsId: workspaceId, calId: calendarId } },
         body,
       });
@@ -179,7 +178,7 @@ export function useUpdateEvent(): UseMutationResult<
       eventId,
       body,
     }): Promise<CalendarEventResponse> => {
-      const { data, error } = await timeSdk.PATCH(
+      const { data, error } = await sdk.PATCH(
         '/workspaces/{wsId}/calendars/{calId}/events/{evtId}',
         {
           params: { path: { wsId: workspaceId, calId: calendarId, evtId: eventId } },
@@ -206,12 +205,9 @@ export function useDeleteEvent(): UseMutationResult<void, ApiError, DeleteEventA
   const qc = useQueryClient();
   return useMutation<void, ApiError, DeleteEventArgs>({
     mutationFn: async ({ workspaceId, calendarId, eventId }): Promise<void> => {
-      const { error } = await timeSdk.DELETE(
-        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}',
-        {
-          params: { path: { wsId: workspaceId, calId: calendarId, evtId: eventId } },
-        },
-      );
+      const { error } = await sdk.DELETE('/workspaces/{wsId}/calendars/{calId}/events/{evtId}', {
+        params: { path: { wsId: workspaceId, calId: calendarId, evtId: eventId } },
+      });
       if (error) throw toApiError(error, 'Failed to delete event');
     },
     onSuccess: () => {

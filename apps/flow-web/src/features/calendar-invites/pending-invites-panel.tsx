@@ -6,21 +6,9 @@
  * plaintext token is required by the public accept endpoint. The listing
  * API only exposes a public id, so this panel surfaces the invites as a
  * summary inbox with a hint to check email for the RSVP link.
- *
- * Ported from the legacy time-web page at
- * `apps/time-web/src/routes/me/invites.tsx` as part of the time-web
- * decommissioning effort (Phase 2). Differences from the original:
- *   - Rendered as a side widget, not a full page
- *   - Uses `timeSdk` against time-api (flow-web splits clients by backend)
- *   - Uses `Intl` helpers in `lib/format` instead of luxon, since flow-web
- *     does not depend on luxon
- *   - Surfaces the "check email" RSVP hint as a header subtitle instead
- *     of per-page explainer
- *   - Omits the standalone page header/heading; the panel sits beside the
- *     month grid rather than owning the viewport
  */
 
-import type { components as timeComponents } from '@nodate-flow/time-sdk';
+import type { components } from '@nodate-flow/sdk';
 import Card from '@nodate-flow/ui/primitives/card';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { useQuery } from '@tanstack/react-query';
@@ -30,9 +18,9 @@ import { useTranslation } from 'react-i18next';
 
 import { ApiError, toApiError } from '../../lib/api-error';
 import { formatEpochDateTime } from '../../lib/format';
-import { timeSdk } from '../../lib/sdk';
+import { sdk } from '../../lib/sdk';
 
-type MyInvite = timeComponents['schemas']['MyInviteResponse'];
+type MyInvite = components['schemas']['MyInviteResponse'];
 
 /**
  * Non-suspense query hook for listing the caller's pending invites.
@@ -44,7 +32,7 @@ function useMyInvitesQuery() {
     queryKey: ['me', 'invites'] as const,
     staleTime: 30_000,
     queryFn: async (): Promise<MyInvite[]> => {
-      const result = await timeSdk.GET('/me/invites');
+      const result = await sdk.GET('/me/invites');
       if (result.error || !result.data) {
         throw toApiError(result.error, 'Failed to load invites');
       }

@@ -29,7 +29,6 @@ import {
   createRefreshMiddleware,
   createTokenRefresher,
 } from '@nodate-flow/sdk';
-import { type NodateTimeClient, createClient as createTimeClient } from '@nodate-flow/time-sdk';
 
 import { authStore } from '../features/auth/auth-store';
 
@@ -43,22 +42,8 @@ export const apiBaseUrl = baseUrl;
 export const authApiBaseUrl =
   (import.meta.env.VITE_AUTH_API_BASE_URL as string | undefined) ?? 'http://localhost:8082';
 
-/** Base URL of the time-api service (calendars / events). */
-export const timeApiBaseUrl =
-  (import.meta.env.VITE_TIME_API_BASE_URL as string | undefined) ?? 'http://localhost:8081';
-
 export const sdk: NodateFlowClient = createClient({
   baseUrl,
-  tokenProvider: () => authStore.getState().accessToken ?? undefined,
-});
-
-/**
- * SDK client targeting the time-api service (port 8081). Typed against
- * the generated time-api OpenAPI schema; used by the unified /calendar
- * page to read `/me/calendar-events` and per-workspace calendar CRUD.
- */
-export const timeSdk: NodateTimeClient = createTimeClient({
-  baseUrl: timeApiBaseUrl,
   tokenProvider: () => authStore.getState().accessToken ?? undefined,
 });
 
@@ -95,7 +80,6 @@ const authRequestMiddleware = createAuthRequestMiddleware({
 });
 sdk.use(authRequestMiddleware);
 authSdk.use(authRequestMiddleware);
-timeSdk.use(authRequestMiddleware);
 
 // Reactive response-side middleware: retries once on an unexpected 401
 // (e.g. server-side revocation). The proactive middleware above should
@@ -103,4 +87,3 @@ timeSdk.use(authRequestMiddleware);
 const refreshMiddleware = createRefreshMiddleware(refreshAccessToken);
 sdk.use(refreshMiddleware);
 authSdk.use(refreshMiddleware);
-timeSdk.use(refreshMiddleware);
