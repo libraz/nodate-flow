@@ -68,9 +68,12 @@ func NewWorker(db *sql.DB, q *generated.Queries) *Worker {
 // Hook returns an eventbus.NotifyHook that creates webhook delivery
 // rows for every active subscription whose event_types list matches the
 // fired event. The returned function is non-blocking: it spawns a
-// goroutine so the eventbus append path is never delayed.
-func (w *Worker) Hook() func(ctx context.Context, workspaceID uint32, eventType string) {
-	return func(ctx context.Context, workspaceID uint32, eventType string) {
+// goroutine so the eventbus append path is never delayed. The
+// eventInternalID parameter is unused here — webhook deliveries
+// dedupe on (subscription_id, event_public_id) once the payload
+// builder is wired to surface the events.public_id.
+func (w *Worker) Hook() func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint32) {
+	return func(ctx context.Context, workspaceID uint32, eventType string, _ uint32) {
 		go w.createDeliveries(context.Background(), workspaceID, eventType)
 	}
 }

@@ -48,7 +48,7 @@ type Pipeline struct {
 // Hook returns an eventbus.NotifyHook that triggers processTask in a
 // background goroutine when a task is created or updated.
 func (p *Pipeline) Hook() eventbus.NotifyHook {
-	return func(ctx context.Context, workspaceInternalID uint32, eventType string) {
+	return func(ctx context.Context, workspaceInternalID uint32, eventType string, _ uint32) {
 		if eventType != eventbus.TaskCreated && eventType != eventbus.TaskUpdated {
 			return
 		}

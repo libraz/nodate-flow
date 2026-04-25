@@ -48,7 +48,11 @@ func (t *EventbusTap) RememberWorkspace(internalID uint32, publicID string) {
 // types and workspaces not yet in the cache are silently dropped:
 // the frontend will do the right thing on the next subscription
 // because the SSE handler always writes an initial resync marker.
-func (t *EventbusTap) Publish(ctx context.Context, workspaceInternalID uint32, eventType string) {
+//
+// eventInternalID is unused here; the SSE tap signals "something
+// happened" without carrying the events.id forward.
+func (t *EventbusTap) Publish(ctx context.Context, workspaceInternalID uint32, eventType string, eventInternalID uint32) {
+	_ = eventInternalID
 	kind, ok := KindForEventType(eventType)
 	if !ok {
 		return

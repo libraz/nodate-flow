@@ -223,8 +223,10 @@ func buildEventNotification(eventType string, seq int64) string {
 }
 
 // onWorkspaceEvent is the eventbus.NotifyHook callback that broadcasts
-// events to SSE-connected MCP clients. It must be non-blocking.
-func (h *Handler) onWorkspaceEvent(ctx context.Context, workspaceID uint32, eventType string) {
+// events to SSE-connected MCP clients. It must be non-blocking. The
+// eventInternalID parameter is accepted for signature compatibility
+// but unused — MCP clients receive only the type and seq.
+func (h *Handler) onWorkspaceEvent(ctx context.Context, workspaceID uint32, eventType string, _ uint32) {
 	seq := eventbus.SeqFromContext(ctx)
 	h.sse.broadcast(workspaceID, sseEvent{
 		EventType: "workspace.event",
