@@ -1,6 +1,6 @@
 // Package dbtype contains shared scalar types used by the sqlc-generated
 // database layer and hand-written code. The PublicID type lives here so that
-// both flow-api and time-api can share the same UUID v7 / BINARY(16) handling
+// both flow-api and auth-api can share the same UUID v7 / BINARY(16) handling
 // without duplication.
 package dbtype
 

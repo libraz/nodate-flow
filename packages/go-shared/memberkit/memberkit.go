@@ -16,9 +16,10 @@
 // only.
 //
 // Raw SQL is used rather than sqlc because this package is imported
-// by auth-api, time-api, and (indirectly, via tests) flow-api — sqlc
-// is generated per-service and can't produce a shared queries type.
-// itemkit follows the same pattern; see its doc for the precedent.
+// by auth-api and (indirectly, via tests) flow-api — sqlc is generated
+// per-service and can't produce a shared queries type. The flow-api
+// internal itemkit follows the same raw-SQL pattern within its own
+// service for cross-table writes.
 package memberkit
 
 import (
@@ -138,7 +139,7 @@ func findSystemHolidayCalendar(ctx context.Context, tx TX, wsID uint32, country 
 }
 
 // holidaySlug builds the canonical system_slug for a country's
-// holiday feed. Mirrors time-api's auto_create.holidaySlug.
+// holiday feed. Mirrors flow-api calendars/auto_create.holidaySlug.
 func holidaySlug(country string) string {
 	return "holidays." + lowercase(country)
 }

@@ -1,7 +1,7 @@
 // Package testutil provides a test-only helper for constructing an
 // auth-api HTTP handler. It exists outside internal/ so that sibling
-// modules (flow-api tests, time-api tests) can compose the auth-api
-// router into their own test servers without duplicating the wiring.
+// modules (flow-api tests) can compose the auth-api router into their
+// own test servers without duplicating the wiring.
 package testutil
 
 import (
@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/router"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 )
 
 // BuildTestRouter constructs a fully-wired auth-api HTTP handler

@@ -2,10 +2,11 @@
 // primitives: a shared MySQL 9 testcontainer with the full repo
 // schema loaded, a repo-root finder, and a per-file SQL executor.
 //
-// Apps (flow-api, time-api, itemkit) wrap this package with
-// service-specific tenant / server bootstrap as needed. Keeping the
-// container + schema application here guarantees itemkit tests run
-// against the same schema as the owning service integration tests.
+// Apps (flow-api, auth-api) and shared kits (itemkit) wrap this
+// package with service-specific tenant / server bootstrap as needed.
+// Keeping the container + schema application here guarantees itemkit
+// tests run against the same schema as the owning service integration
+// tests.
 //
 // Requires Docker. Callers should guard tests behind
 // testing.Short() / NF_TEST_INTEGRATION so `go test -short` stays

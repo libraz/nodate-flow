@@ -1,8 +1,8 @@
 // Package eventlog provides a service-agnostic appender for the
 // shared `events` table. It uses raw SQL (no sqlc dependency) so
 // cross-service code — itemkit, memberkit, reconciler — can write
-// event rows without coupling to either flow-api or time-api
-// generated types.
+// event rows without coupling to flow-api or auth-api generated
+// types.
 //
 // Per ADR 0005 the events table is append-only. The sole deletion
 // path is the per-tenant purge used by test fixtures.

@@ -14,7 +14,7 @@ type Config struct {
 	Port     string `env:"NF_AUTH_PORT" envDefault:"8082"`
 	LogLevel string `env:"NF_AUTH_LOG_LEVEL" envDefault:"info"`
 
-	// DbDsn is the MySQL DSN shared with flow-api and time-api.
+	// DbDsn is the MySQL DSN shared with flow-api.
 	DbDsn string `env:"NF_DB_DSN,required"`
 
 	// DbMaxOpenConns is the maximum number of open connections to the database.

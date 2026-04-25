@@ -275,7 +275,7 @@ type ListMyTasksOutput struct {
 }
 
 // ListMyTasksWithDatesInput is the query for GET /me/tasks-with-dates.
-// Pairs with time-api's GET /me/calendar-events to power the unified
+// Pairs with GET /me/calendar-events to power the unified
 // cross-workspace calendar. `from` / `to` are inclusive dates on the
 // server-side clock; the client should send the widest range it plans
 // to render.

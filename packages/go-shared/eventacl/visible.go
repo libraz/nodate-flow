@@ -1,6 +1,6 @@
 // Package eventacl holds the shared visibility decision for
 // calendar_events rows. The same predicate is applied by:
-//   - time-api list / detail handlers
+//   - flow-api calendar list / detail handlers
 //   - itemkit (before mutating any cross-table link)
 //   - the reconciler when scanning for drift
 //

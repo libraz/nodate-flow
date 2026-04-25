@@ -1,7 +1,7 @@
 // Package eventbus holds the canonical set of event-kind strings
 // appended to the shared `events` table across all nodate-flow services.
 //
-// The strings live in a shared package so flow-api, time-api and
+// The strings live in a shared package so flow-api, auth-api and
 // future services (itemkit, reconciler, memberkit) can all refer to
 // the same symbols. Service-local packages (e.g.
 // apps/flow-api/internal/eventbus) re-export these constants for
@@ -257,12 +257,12 @@ const (
 
 // Public share events — calendar_public_shares.
 const (
-	SharePublished      Kind = "share.published"
-	ShareUpdated        Kind = "share.updated"
-	ShareTokenRotated   Kind = "share.token.rotated"
-	ShareDeleted        Kind = "share.deleted"
-	ShareEventAttached  Kind = "share.event.attached"
-	ShareEventDetached  Kind = "share.event.detached"
+	SharePublished     Kind = "share.published"
+	ShareUpdated       Kind = "share.updated"
+	ShareTokenRotated  Kind = "share.token.rotated"
+	ShareDeleted       Kind = "share.deleted"
+	ShareEventAttached Kind = "share.event.attached"
+	ShareEventDetached Kind = "share.event.detached"
 )
 
 // Legacy / compatibility kinds. Kept so historical events continue to
