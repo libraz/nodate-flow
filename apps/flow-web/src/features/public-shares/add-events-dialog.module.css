@@ -1,0 +1,96 @@
+/**
+ * Add events picker dialog styling.
+ */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+  min-inline-size: 28rem;
+}
+
+.rangeRow {
+  display: flex;
+  gap: var(--nf-space-3);
+}
+
+.rangeField {
+  flex: 1;
+}
+
+.skeletonRow {
+  block-size: 2rem;
+  inline-size: 100%;
+}
+
+.hint {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+}
+
+.skeletonStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.empty {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+}
+
+.endActions {
+  display: flex;
+  gap: var(--nf-space-2);
+  justify-content: flex-end;
+}
+
+.candidateList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  max-block-size: 24rem;
+  overflow-y: auto;
+  border: 1px solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-2) var(--nf-space-3);
+}
+
+.rowDisabled {
+  opacity: 0.55;
+}
+
+.rowIdentity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-px);
+  flex: 1;
+}
+
+.eventTitle {
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+}
+
+.eventWhen {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.attachedBadge {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  border: 1px solid var(--nf-color-border);
+  border-radius: var(--nf-radius-xs);
+  padding: var(--nf-space-px) var(--nf-space-2);
+}

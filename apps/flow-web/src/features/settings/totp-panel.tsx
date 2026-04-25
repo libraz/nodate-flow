@@ -29,6 +29,7 @@ import {
   useTotpEnroll,
   useTotpStatusQuery,
 } from './api';
+import styles from './totp-panel.module.css';
 
 function RecoveryCodesView({
   codes,
@@ -51,27 +52,14 @@ function RecoveryCodesView({
     URL.revokeObjectURL(url);
   };
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-      <p style={{ margin: 0 }}>{t('security.totp.recovery.description')}</p>
-      <ul
-        style={{
-          listStyle: 'none',
-          padding: '0.75rem 1rem',
-          margin: 0,
-          border: '1px solid var(--nf-color-border)',
-          borderRadius: '0.5rem',
-          fontFamily: 'var(--font-mono)',
-          fontSize: '0.875rem',
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '0.25rem 1rem',
-        }}
-      >
+    <div className={styles.column}>
+      <p className={styles.bareParagraph}>{t('security.totp.recovery.description')}</p>
+      <ul className={styles.recoveryList}>
         {codes.map((c) => (
           <li key={c}>{c}</li>
         ))}
       </ul>
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+      <div className={styles.buttonRow}>
         <Button type="button" variant="ghost" onClick={handleCopyAll}>
           {t('security.totp.recovery.copy_all')}
         </Button>
@@ -144,44 +132,26 @@ function EnrollmentForm({
       onSubmit={(e) => {
         void handleSubmit(e);
       }}
-      style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
+      className={styles.column}
     >
-      <p style={{ margin: 0 }}>{t('security.totp.enroll_instructions')}</p>
+      <p className={styles.bareParagraph}>{t('security.totp.enroll_instructions')}</p>
       {qrDataUrl ? (
         <img
           src={qrDataUrl}
           alt="TOTP QR code"
           width={200}
           height={200}
-          style={{ alignSelf: 'center' }}
+          className={styles.qrImage}
         />
       ) : null}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'auto 1fr auto',
-          gap: '0.5rem',
-          alignItems: 'center',
-          padding: '0.75rem 1rem',
-          border: '1px solid var(--nf-color-border)',
-          borderRadius: '0.5rem',
-        }}
-      >
-        <span style={{ fontWeight: 500 }}>{t('security.totp.secret_label')}</span>
-        <code
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: '0.875rem',
-            wordBreak: 'break-all',
-          }}
-        >
-          {enrollment.secret}
-        </code>
+      <div className={styles.secretRow}>
+        <span className={styles.secretLabel}>{t('security.totp.secret_label')}</span>
+        <code className={styles.secretCode}>{enrollment.secret}</code>
         <Button type="button" variant="ghost" onClick={handleCopy}>
           {t('security.totp.copy')}
         </Button>
       </div>
-      <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--nf-color-fg-muted)' }}>
+      <p className={styles.helpParagraph}>
         <a href={enrollment.otpauthUrl.startsWith('otpauth:') ? enrollment.otpauthUrl : undefined}>
           {t('security.totp.open_in_app')}
         </a>
@@ -202,7 +172,7 @@ function EnrollmentForm({
           />
         )}
       </FormField>
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <div className={styles.endActions}>
         <Button type="submit" variant="primary" disabled={submitting || code.length !== 6}>
           {submitting ? t('security.totp.confirming') : t('security.totp.confirm')}
         </Button>
@@ -255,24 +225,19 @@ function EnabledPanel(): ReactElement {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <div className={styles.columnGapMd}>
       <DisableForm />
-      <hr style={{ border: 0, borderTop: '1px solid var(--nf-color-border)', width: '100%' }} />
+      <hr className={styles.divider} />
       <div>
-        <h3 style={{ margin: '0 0 0.5rem' }}>{t('security.totp.recovery.title')}</h3>
-        <p style={{ margin: '0 0 0.75rem' }}>
+        <h3 className={styles.recoveryHeading}>{t('security.totp.recovery.title')}</h3>
+        <p className={styles.recoveryRemaining}>
           {t('security.totp.recovery.remaining', { count: remaining })}
         </p>
         <form
           onSubmit={(e) => {
             void handleRegenerate(e);
           }}
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.5rem',
-            maxInlineSize: '28rem',
-          }}
+          className={styles.formNarrow}
         >
           <FormField label={t('security.totp.recovery.regenerate_password_label')} required>
             {(control) => (
@@ -288,7 +253,7 @@ function EnabledPanel(): ReactElement {
               />
             )}
           </FormField>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <div className={styles.endActions}>
             <Button type="submit" variant="default" disabled={submitting || password === ''}>
               {t('security.totp.recovery.regenerate')}
             </Button>
@@ -330,14 +295,9 @@ function DisableForm(): ReactElement {
       onSubmit={(e) => {
         void handleSubmit(e);
       }}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.75rem',
-        maxInlineSize: '28rem',
-      }}
+      className={styles.formNarrow}
     >
-      <p style={{ margin: 0 }}>{t('security.totp.enabled_description')}</p>
+      <p className={styles.bareParagraph}>{t('security.totp.enabled_description')}</p>
       <FormField label={t('security.totp.password_label')} required>
         {(control) => (
           <Input
@@ -352,7 +312,7 @@ function DisableForm(): ReactElement {
           />
         )}
       </FormField>
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <div className={styles.endActions}>
         <Button type="submit" variant="danger" disabled={submitting || password === ''}>
           {submitting ? t('security.totp.disabling') : t('security.totp.disable')}
         </Button>
@@ -402,8 +362,8 @@ export default function TotpPanel(): ReactElement {
       // pending server-side but we don't have the secret in this tab;
       // offer to regenerate.
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <p style={{ margin: 0 }}>{t('security.totp.pending_description')}</p>
+        <div className={styles.column}>
+          <p className={styles.bareParagraph}>{t('security.totp.pending_description')}</p>
           <div>
             <Button
               type="button"
@@ -431,8 +391,8 @@ export default function TotpPanel(): ReactElement {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-      <p style={{ margin: 0 }}>{t('security.totp.disabled_description')}</p>
+    <div className={styles.column}>
+      <p className={styles.bareParagraph}>{t('security.totp.disabled_description')}</p>
       <div>
         <Button
           type="button"

@@ -17,6 +17,7 @@ import {
   useRevokeAllOtherSessions,
   useRevokeSession,
 } from './api';
+import styles from './sessions-panel.module.css';
 
 interface ParsedUA {
   browser: string;
@@ -123,65 +124,28 @@ export default function SessionsPanel(): ReactElement {
   };
 
   return (
-    <section
-      style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxInlineSize: '48rem' }}
-    >
-      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
-        {t('security.sessions.description')}
-      </p>
+    <section className={styles.section}>
+      <p className={styles.description}>{t('security.sessions.description')}</p>
 
       {sessions.length === 0 ? (
-        <p style={{ margin: 0 }}>{t('security.sessions.empty')}</p>
+        <p className={styles.empty}>{t('security.sessions.empty')}</p>
       ) : (
-        <ul
-          style={{
-            listStyle: 'none',
-            margin: 0,
-            padding: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.5rem',
-          }}
-        >
+        <ul className={styles.list}>
           {sessions.map((s: SessionSummary) => (
-            <li
-              key={s.id}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr auto',
-                gap: '0.75rem',
-                alignItems: 'center',
-                padding: '0.75rem 1rem',
-                border: '1px solid var(--nf-color-border)',
-                borderRadius: '0.5rem',
-                background: s.current ? 'var(--nf-color-surface-hover)' : 'transparent',
-              }}
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                <span
-                  style={{ fontWeight: 500, color: 'var(--nf-color-fg)' }}
-                  title={s.userAgent || undefined}
-                >
+            <li key={s.id} className={`${styles.row} ${s.current ? styles.rowCurrent : ''}`.trim()}>
+              <div className={styles.identity}>
+                <span className={styles.deviceLine} title={s.userAgent || undefined}>
                   {s.userAgent ? formatDevice(s.userAgent) : t('security.sessions.unknown_device')}
                   {s.current && (
-                    <span
-                      style={{
-                        marginInlineStart: '0.5rem',
-                        fontSize: '0.75rem',
-                        padding: '0.125rem 0.5rem',
-                        borderRadius: '0.25rem',
-                        background: 'var(--nf-color-accent-hover)',
-                        color: 'var(--nf-color-accent)',
-                      }}
-                    >
+                    <span className={styles.currentBadge}>
                       {t('security.sessions.current_badge')}
                     </span>
                   )}
                 </span>
-                <span style={{ fontSize: '0.875rem', color: 'var(--nf-color-fg-muted)' }}>
+                <span className={styles.metaPrimary}>
                   {s.ipAddress || t('security.sessions.unknown_ip')}
                 </span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}>
+                <span className={styles.metaSecondary}>
                   {t('security.sessions.created_at', {
                     time: formatUnix(s.createdAt, i18n.language),
                   })}
@@ -211,7 +175,7 @@ export default function SessionsPanel(): ReactElement {
       )}
 
       {hasOthers && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <div className={styles.actions}>
           <Button
             type="button"
             variant="danger"

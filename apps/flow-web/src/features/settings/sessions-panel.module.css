@@ -1,0 +1,81 @@
+/**
+ * Active sessions list for /settings/security.
+ *
+ * Each session renders as a hairline-bordered row that highlights the
+ * caller's current session via the elevated surface token.
+ */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+  max-inline-size: 48rem;
+}
+
+.description {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+}
+
+.empty {
+  margin: 0;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--nf-space-3);
+  align-items: center;
+  padding: var(--nf-space-3) var(--nf-space-4);
+  border: 1px solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  background: transparent;
+}
+
+.rowCurrent {
+  background: var(--nf-color-surface-hover);
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.deviceLine {
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
+}
+
+.currentBadge {
+  margin-inline-start: var(--nf-space-2);
+  font-size: var(--nf-text-xs);
+  padding: var(--nf-space-px) var(--nf-space-2);
+  border-radius: var(--nf-radius-xs);
+  background: var(--nf-color-accent-hover);
+  color: var(--nf-color-accent);
+}
+
+.metaPrimary {
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.metaSecondary {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}

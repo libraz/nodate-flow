@@ -44,6 +44,7 @@ import {
   usePublicShareDetailQuery,
   useReorderShareEvents,
 } from './api';
+import styles from './share-detail.module.css';
 
 export interface ShareDetailProps {
   workspaceId: string;
@@ -194,39 +195,23 @@ export default function ShareDetail({ workspaceId, shareId }: ShareDetailProps):
   const dragHandleLabel = t('workspace.public_shares.detail.reorder_handle_label');
 
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <section className={styles.section}>
       <div>
         <Link
           to="/workspaces/$id/settings/public-shares"
           params={{ id: workspaceId }}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.25rem',
-            color: 'var(--nf-color-fg-muted)',
-            fontSize: '0.8125rem',
-            textDecoration: 'none',
-          }}
+          className={styles.backLink}
         >
           <ArrowLeft size={14} aria-hidden />
           {t('workspace.public_shares.detail.back')}
         </Link>
       </div>
 
-      <header
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: '1rem',
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <h1 style={{ margin: 0, fontSize: '1.5rem' }}>{data.share.title}</h1>
+      <header className={styles.header}>
+        <div className={styles.headerIdentity}>
+          <h1 className={styles.title}>{data.share.title}</h1>
           {data.share.description ? (
-            <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
-              {data.share.description}
-            </p>
+            <p className={styles.headerDescription}>{data.share.description}</p>
           ) : null}
         </div>
         <Button
@@ -236,27 +221,21 @@ export default function ShareDetail({ workspaceId, shareId }: ShareDetailProps):
             setPickerOpen(true);
           }}
         >
-          <Plus size={14} aria-hidden style={{ marginInlineEnd: '0.25rem' }} />
+          <Plus size={14} aria-hidden className={styles.addIcon} />
           {t('workspace.public_shares.detail.add_events')}
         </Button>
       </header>
 
       <div>
-        <h2 style={{ margin: '0 0 0.25rem', fontSize: '1rem' }}>
-          {t('workspace.public_shares.detail.events_title')}
-        </h2>
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.8125rem' }}>
+        <h2 className={styles.eventsHeading}>{t('workspace.public_shares.detail.events_title')}</h2>
+        <p className={styles.eventsDescription}>
           {t('workspace.public_shares.detail.events_description')}
         </p>
       </div>
 
       {orderedEvents.length > 0 ? (
         <div
-          style={{
-            overflowX: 'auto',
-            opacity: reordering ? 0.6 : 1,
-            transition: 'opacity var(--nf-duration-fast, 120ms) ease',
-          }}
+          className={`${styles.tableWrap} ${reordering ? styles.tableWrapBusy : ''}`.trim()}
           aria-busy={reordering || undefined}
         >
           <DndContext
@@ -265,24 +244,24 @@ export default function ShareDetail({ workspaceId, shareId }: ShareDetailProps):
             onDragEnd={handleDragEnd}
             accessibility={{ announcements: dragAnnouncements }}
           >
-            <table style={{ inlineSize: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+            <table className={styles.table}>
               <thead>
-                <tr style={{ textAlign: 'start', color: 'var(--nf-color-fg-muted)' }}>
+                <tr className={styles.headerRow}>
                   <th
                     scope="col"
-                    style={{ inlineSize: '2rem', padding: '0.5rem 0.25rem' }}
+                    className={styles.handleHeaderCell}
                     aria-label={dragHandleLabel}
                   />
-                  <th scope="col" style={{ padding: '0.5rem 0.75rem', textAlign: 'start' }}>
+                  <th scope="col" className={styles.headerCell}>
                     {t('workspace.public_shares.detail.table.event')}
                   </th>
-                  <th scope="col" style={{ padding: '0.5rem 0.75rem', textAlign: 'start' }}>
+                  <th scope="col" className={styles.headerCell}>
                     {t('workspace.public_shares.detail.table.when')}
                   </th>
-                  <th scope="col" style={{ padding: '0.5rem 0.75rem', textAlign: 'start' }}>
+                  <th scope="col" className={styles.headerCell}>
                     {t('workspace.public_shares.detail.table.calendar')}
                   </th>
-                  <th scope="col" style={{ padding: '0.5rem 0.75rem', textAlign: 'end' }}>
+                  <th scope="col" className={styles.headerCellEnd}>
                     {t('workspace.public_shares.detail.table.actions')}
                   </th>
                 </tr>
@@ -311,15 +290,13 @@ export default function ShareDetail({ workspaceId, shareId }: ShareDetailProps):
           </DndContext>
         </div>
       ) : (
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
-          {t('workspace.public_shares.detail.empty_events')}
-        </p>
+        <p className={styles.empty}>{t('workspace.public_shares.detail.empty_events')}</p>
       )}
 
       <Suspense
         fallback={
-          <div style={{ display: 'none' }}>
-            <Skeleton style={{ blockSize: '1px' }} />
+          <div className={styles.suspenseFallback}>
+            <Skeleton className={styles.suspenseSkeleton} />
           </div>
         }
       >
@@ -369,62 +346,41 @@ function SortableRow({
     disabled,
   });
 
+  // The row uses inline style strictly for the dnd-kit-driven dynamic
+  // transform / transition / drag highlight; visual rules (borders,
+  // padding, etc.) live in the CSS module.
   const rowStyle: CSSProperties = {
-    borderBlockStart: '1px solid var(--nf-color-border)',
     transform: CSS.Transform.toString(transform),
     transition,
-    backgroundColor: isDragging ? 'var(--nf-color-surface-raised, transparent)' : undefined,
-    boxShadow: isDragging ? 'var(--nf-shadow-sm, 0 1px 2px rgba(0,0,0,0.08))' : undefined,
+    backgroundColor: isDragging ? 'var(--nf-color-surface-hover)' : undefined,
+    boxShadow: isDragging ? 'var(--nf-shadow-sm)' : undefined,
     position: isDragging ? 'relative' : undefined,
     zIndex: isDragging ? 1 : undefined,
   };
 
   return (
-    <tr ref={setNodeRef} style={rowStyle}>
-      <td style={{ padding: '0.25rem 0.25rem 0.25rem 0.5rem', verticalAlign: 'middle' }}>
+    <tr ref={setNodeRef} className={styles.row} style={rowStyle}>
+      <td className={styles.handleCell}>
         <button
           type="button"
           aria-label={handleLabel}
           disabled={disabled}
           {...attributes}
           {...listeners}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            inlineSize: '1.5rem',
-            blockSize: '1.5rem',
-            padding: 0,
-            background: 'transparent',
-            border: 'none',
-            color: 'var(--nf-color-fg-muted)',
-            cursor: disabled ? 'not-allowed' : 'grab',
-            touchAction: 'none',
-            borderRadius: 'var(--nf-radius-sm, 4px)',
-          }}
+          className={styles.dragHandle}
         >
           <GripVertical size={14} aria-hidden />
         </button>
       </td>
-      <td style={{ padding: '0.75rem' }}>
-        <div style={{ fontWeight: 500 }}>{event.title}</div>
-        {event.location ? (
-          <div style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}>
-            {event.location}
-          </div>
-        ) : null}
+      <td className={styles.cell}>
+        <div className={styles.eventTitle}>{event.title}</div>
+        {event.location ? <div className={styles.eventLocation}>{event.location}</div> : null}
       </td>
-      <td style={{ padding: '0.75rem' }}>
+      <td className={styles.cell}>
         {event.startAt ? formatWhen(event, locale, allDayLabel) : undatedLabel}
       </td>
-      <td style={{ padding: '0.75rem' }}>{event.calendarName}</td>
-      <td
-        style={{
-          padding: '0.75rem',
-          textAlign: 'end',
-          whiteSpace: 'nowrap',
-        }}
-      >
+      <td className={styles.cell}>{event.calendarName}</td>
+      <td className={styles.cellActions}>
         <Button
           type="button"
           variant="ghost"

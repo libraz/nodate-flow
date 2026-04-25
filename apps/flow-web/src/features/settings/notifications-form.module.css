@@ -1,0 +1,50 @@
+/**
+ * Notification preference toggles for /settings/notifications.
+ */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+  max-inline-size: 40rem;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--nf-space-3);
+  align-items: start;
+  padding: var(--nf-space-3) var(--nf-space-4);
+  border: 1px solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.label {
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
+}
+
+.helpText {
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}

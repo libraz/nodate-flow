@@ -27,3 +27,117 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ───── invite-row card content ───── */
+
+.eventTitle {
+  margin: 0;
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+  font-size: var(--nf-text-sm);
+  line-height: var(--nf-leading-tight);
+}
+
+.metaLine {
+  margin-block-start: var(--nf-space-1);
+  margin-block-end: 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+}
+
+.calendarLine {
+  margin-block-start: var(--nf-space-2);
+  margin-block-end: 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-subtle);
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+}
+
+.expiresLine {
+  margin-block-start: var(--nf-space-1);
+  margin-block-end: 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-subtle);
+}
+
+.inviteListItem {
+  list-style: none;
+}
+
+/* ───── panel header ───── */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nf-space-2);
+  margin-block-end: var(--nf-space-2);
+}
+
+.headerTitle {
+  margin: 0;
+  font-size: var(--nf-text-base);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+}
+
+.countBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 1.25rem;
+  padding-inline: var(--nf-space-1);
+  block-size: 1.25rem;
+  border-radius: var(--nf-radius-pill);
+  background: var(--nf-color-accent-subtle);
+  color: var(--nf-color-accent);
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ───── panel container ───── */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  min-inline-size: 0;
+}
+
+.errorMessage {
+  margin: 0;
+  color: var(--nf-color-danger);
+}
+
+.emptyMessage {
+  margin: 0;
+  text-align: center;
+  color: var(--nf-color-fg-muted);
+  padding: var(--nf-space-3) 0;
+  font-size: var(--nf-text-sm);
+}
+
+.rsvpHint {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.inviteList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.loadingSkeleton {
+  block-size: 4rem;
+}

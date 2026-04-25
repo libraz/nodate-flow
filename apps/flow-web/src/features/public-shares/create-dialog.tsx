@@ -20,7 +20,9 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { getPublicBaseUrl } from '../../lib/public-base-url';
 import { type CreatePublicShareInput, useCreatePublicShare } from './api';
+import styles from './create-dialog.module.css';
 
 export interface PublicShareCreateDialogProps {
   workspaceId: string;
@@ -46,7 +48,7 @@ export default function PublicShareCreateDialog({
   const [plaintext, setPlaintext] = useState('');
   const [copied, setCopied] = useState(false);
 
-  const shareUrl = plaintext === '' ? '' : `${window.location.origin}/share/cal/${plaintext}`;
+  const shareUrl = plaintext === '' ? '' : `${getPublicBaseUrl()}/share/cal/${plaintext}`;
 
   const reset = (): void => {
     setStage('form');
@@ -113,7 +115,7 @@ export default function PublicShareCreateDialog({
           onSubmit={(e) => {
             void handleSubmit(e);
           }}
-          style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
+          className={styles.form}
         >
           <FormField label={t('workspace.public_shares.dialog.field.title')} required>
             {(control) => (
@@ -154,14 +156,7 @@ export default function PublicShareCreateDialog({
                 onChange={(e) => {
                   setHolidaysCountry(e.target.value);
                 }}
-                style={{
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: 'var(--nf-radius-md, 0.375rem)',
-                  border: 'var(--nf-space-px, 1px) solid var(--nf-color-border)',
-                  background: 'var(--nf-color-bg)',
-                  color: 'var(--nf-color-fg)',
-                  fontSize: 'var(--nf-text-sm, 0.875rem)',
-                }}
+                className={styles.select}
               >
                 <option value="">
                   {t('workspace.public_shares.dialog.field.holidays_country_unset')}
@@ -177,7 +172,7 @@ export default function PublicShareCreateDialog({
             )}
           </FormField>
 
-          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+          <div className={styles.endActions}>
             <Button type="button" variant="ghost" onClick={handleClose}>
               {t('workspace.public_shares.dialog.cancel')}
             </Button>
@@ -187,10 +182,8 @@ export default function PublicShareCreateDialog({
           </div>
         </form>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <p style={{ margin: 0, color: 'var(--nf-color-warning)', fontSize: '0.875rem' }}>
-            {t('workspace.public_shares.dialog.reveal_warning')}
-          </p>
+        <div className={styles.reveal}>
+          <p className={styles.warning}>{t('workspace.public_shares.dialog.reveal_warning')}</p>
           <FormField label={t('workspace.public_shares.dialog.url_label')}>
             {(control) => (
               <Input
@@ -201,11 +194,11 @@ export default function PublicShareCreateDialog({
                 onFocus={(e) => {
                   e.currentTarget.select();
                 }}
-                style={{ fontFamily: 'var(--font-mono, monospace)' }}
+                className={styles.urlInput}
               />
             )}
           </FormField>
-          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+          <div className={styles.endActions}>
             <Button
               type="button"
               variant="ghost"

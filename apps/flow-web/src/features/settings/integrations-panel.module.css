@@ -1,0 +1,55 @@
+/**
+ * Provider integrations list for /settings/integrations.
+ */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+  max-inline-size: 48rem;
+}
+
+.description {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--nf-space-3);
+  align-items: center;
+  padding: var(--nf-space-4) var(--nf-space-5);
+  border: 1px solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.providerName {
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
+}
+
+.providerDescription {
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.metaSecondary {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}

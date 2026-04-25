@@ -314,7 +314,12 @@ function LanguageSwitcher(): ReactElement {
       </legend>
       {supportedLanguages.map((lng) => {
         const active = lng === current;
-        const label = lng === 'en' ? t('lang.en') : t('lang.ja');
+        const labelMap: Record<SupportedLanguage, string> = {
+          en: t('lang.en'),
+          ja: t('lang.ja'),
+          zh: t('lang.zh'),
+        };
+        const label = labelMap[lng];
         return (
           <button
             key={lng}

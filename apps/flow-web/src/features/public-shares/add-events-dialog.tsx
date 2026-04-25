@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 
 import { formatDate } from '../../lib/format';
 
+import styles from './add-events-dialog.module.css';
 import {
   type CrossCalendarEvent,
   useAttachEventsToShare,
@@ -76,13 +77,11 @@ export default function AddEventsDialog({
 
   return (
     <Dialog open={open} onClose={onClose} title={t('workspace.public_shares.detail.picker.title')}>
-      <div
-        style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minInlineSize: '28rem' }}
-      >
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
+      <div className={styles.body}>
+        <div className={styles.rangeRow}>
           <FormField
             label={t('workspace.public_shares.detail.picker.range_from')}
-            style={{ flex: 1 }}
+            className={styles.rangeField}
           >
             {() => (
               <DatePicker
@@ -98,7 +97,7 @@ export default function AddEventsDialog({
           </FormField>
           <FormField
             label={t('workspace.public_shares.detail.picker.range_to')}
-            style={{ flex: 1 }}
+            className={styles.rangeField}
           >
             {() => (
               <DatePicker
@@ -115,16 +114,14 @@ export default function AddEventsDialog({
           </FormField>
         </div>
 
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.8125rem' }}>
-          {t('workspace.public_shares.detail.picker.hint')}
-        </p>
+        <p className={styles.hint}>{t('workspace.public_shares.detail.picker.hint')}</p>
 
         <Suspense
           fallback={
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <Skeleton style={{ blockSize: '2rem', inlineSize: '100%' }} />
-              <Skeleton style={{ blockSize: '2rem', inlineSize: '100%' }} />
-              <Skeleton style={{ blockSize: '2rem', inlineSize: '100%' }} />
+            <div className={styles.skeletonStack}>
+              <Skeleton className={styles.skeletonRow} />
+              <Skeleton className={styles.skeletonRow} />
+              <Skeleton className={styles.skeletonRow} />
             </div>
           }
         >
@@ -199,10 +196,8 @@ function PickerBody({
   if (visible.length === 0) {
     return (
       <>
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
-          {t('workspace.public_shares.detail.picker.no_candidates')}
-        </p>
-        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+        <p className={styles.empty}>{t('workspace.public_shares.detail.picker.no_candidates')}</p>
+        <div className={styles.endActions}>
           <Button type="button" variant="ghost" onClick={onClose}>
             {t('workspace.public_shares.detail.picker.cancel')}
           </Button>
@@ -213,20 +208,7 @@ function PickerBody({
 
   return (
     <>
-      <ul
-        style={{
-          listStyle: 'none',
-          margin: 0,
-          padding: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.25rem',
-          maxBlockSize: '24rem',
-          overflowY: 'auto',
-          border: '1px solid var(--nf-color-border)',
-          borderRadius: '0.5rem',
-        }}
-      >
+      <ul className={styles.candidateList}>
         {visible.map((ev) => (
           <PickerRow
             key={ev.id}
@@ -240,7 +222,7 @@ function PickerBody({
         ))}
       </ul>
 
-      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+      <div className={styles.endActions}>
         <Button type="button" variant="ghost" onClick={onClose} disabled={attach.isPending}>
           {t('workspace.public_shares.detail.picker.cancel')}
         </Button>
@@ -274,30 +256,14 @@ function PickerRow({ event, attached, checked, onToggle }: PickerRowProps): Reac
   const whenLabel = formatRange(event, locale, t('workspace.public_shares.detail.event_all_day'));
   const disabled = attached;
   return (
-    <li
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.5rem',
-        padding: '0.5rem 0.75rem',
-        opacity: disabled ? 0.55 : 1,
-      }}
-    >
+    <li className={`${styles.row} ${disabled ? styles.rowDisabled : ''}`.trim()}>
       <Checkbox checked={checked} onChange={onToggle} disabled={disabled} />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem', flex: 1 }}>
-        <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>{event.title}</span>
-        <span style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}>{whenLabel}</span>
+      <div className={styles.rowIdentity}>
+        <span className={styles.eventTitle}>{event.title}</span>
+        <span className={styles.eventWhen}>{whenLabel}</span>
       </div>
       {attached ? (
-        <span
-          style={{
-            fontSize: '0.75rem',
-            color: 'var(--nf-color-fg-muted)',
-            border: '1px solid var(--nf-color-border)',
-            borderRadius: '0.25rem',
-            padding: '0.125rem 0.375rem',
-          }}
-        >
+        <span className={styles.attachedBadge}>
           {t('workspace.public_shares.detail.picker.already_attached')}
         </span>
       ) : null}

@@ -13,6 +13,7 @@ import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { PublicShare } from './api';
+import styles from './rotate-dialog.module.css';
 
 export interface RotateTokenDialogProps {
   share: PublicShare | null;
@@ -53,10 +54,8 @@ export default function RotateTokenDialog({
       onClose={handleClose}
       title={t('workspace.public_shares.dialog.rotate_title')}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <p style={{ margin: 0, color: 'var(--nf-color-warning)', fontSize: '0.875rem' }}>
-          {t('workspace.public_shares.dialog.rotate_warning')}
-        </p>
+      <div className={styles.body}>
+        <p className={styles.warning}>{t('workspace.public_shares.dialog.rotate_warning')}</p>
         <FormField label={t('workspace.public_shares.dialog.url_label')}>
           {(control) => (
             <Input
@@ -67,11 +66,11 @@ export default function RotateTokenDialog({
               onFocus={(e) => {
                 e.currentTarget.select();
               }}
-              style={{ fontFamily: 'var(--font-mono, monospace)' }}
+              className={styles.urlInput}
             />
           )}
         </FormField>
-        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+        <div className={styles.endActions}>
           <Button
             type="button"
             variant="ghost"

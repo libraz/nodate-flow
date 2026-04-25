@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 
 import { confirmAction } from '../../lib/confirm-action';
 import { formatEpochDateTime } from '../../lib/format';
+import { getPublicBaseUrl } from '../../lib/public-base-url';
 import {
   type PublicShare,
   useDeletePublicShare,
@@ -21,6 +22,7 @@ import {
 } from './api';
 import PublicShareCreateDialog from './create-dialog';
 import RotateTokenDialog from './rotate-dialog';
+import styles from './share-list.module.css';
 
 export interface ShareListProps {
   workspaceId: string;
@@ -68,20 +70,11 @@ export default function ShareList({ workspaceId }: ShareListProps): ReactElement
   };
 
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      <header
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: '1rem',
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <h1 style={{ margin: 0, fontSize: '1.5rem' }}>{t('workspace.public_shares.title')}</h1>
-          <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
-            {t('workspace.public_shares.description')}
-          </p>
+    <section className={styles.section}>
+      <header className={styles.header}>
+        <div className={styles.headerIdentity}>
+          <h1 className={styles.title}>{t('workspace.public_shares.title')}</h1>
+          <p className={styles.description}>{t('workspace.public_shares.description')}</p>
         </div>
         <Button
           type="button"
@@ -95,74 +88,51 @@ export default function ShareList({ workspaceId }: ShareListProps): ReactElement
       </header>
 
       {shares.length === 0 ? (
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
-          {t('workspace.public_shares.empty')}
-        </p>
+        <p className={styles.empty}>{t('workspace.public_shares.empty')}</p>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ inlineSize: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
             <thead>
-              <tr style={{ textAlign: 'start', color: 'var(--nf-color-fg-muted)' }}>
-                <th style={{ padding: '0.5rem 0.75rem', textAlign: 'start' }}>
-                  {t('workspace.public_shares.table.title')}
-                </th>
-                <th style={{ padding: '0.5rem 0.75rem', textAlign: 'start' }}>
-                  {t('workspace.public_shares.table.events')}
-                </th>
-                <th style={{ padding: '0.5rem 0.75rem', textAlign: 'start' }}>
+              <tr className={styles.headerRow}>
+                <th className={styles.headerCell}>{t('workspace.public_shares.table.title')}</th>
+                <th className={styles.headerCell}>{t('workspace.public_shares.table.events')}</th>
+                <th className={styles.headerCell}>
                   {t('workspace.public_shares.table.expires_at')}
                 </th>
-                <th style={{ padding: '0.5rem 0.75rem', textAlign: 'start' }}>
+                <th className={styles.headerCell}>
                   {t('workspace.public_shares.table.created_at')}
                 </th>
-                <th style={{ padding: '0.5rem 0.75rem', textAlign: 'end' }}>
+                <th className={styles.headerCellEnd}>
                   {t('workspace.public_shares.table.actions')}
                 </th>
               </tr>
             </thead>
             <tbody>
               {shares.map((share) => (
-                <tr key={share.id} style={{ borderBlockStart: '1px solid var(--nf-color-border)' }}>
-                  <td style={{ padding: '0.75rem' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
+                <tr key={share.id} className={styles.row}>
+                  <td className={styles.cell}>
+                    <div className={styles.titleCellInner}>
                       <Link
                         to="/workspaces/$id/settings/public-shares/$shareId"
                         params={{ id: workspaceId, shareId: share.id }}
-                        style={{
-                          fontWeight: 500,
-                          color: 'var(--nf-color-fg)',
-                          textDecoration: 'none',
-                        }}
+                        className={styles.titleLink}
                       >
                         {share.title}
                       </Link>
                       {share.description ? (
-                        <span
-                          style={{
-                            fontSize: '0.75rem',
-                            color: 'var(--nf-color-fg-muted)',
-                          }}
-                        >
-                          {share.description}
-                        </span>
+                        <span className={styles.shareDescription}>{share.description}</span>
                       ) : null}
                     </div>
                   </td>
-                  <td style={{ padding: '0.75rem' }}>{share.eventCount}</td>
-                  <td style={{ padding: '0.75rem' }}>
+                  <td className={styles.cell}>{share.eventCount}</td>
+                  <td className={styles.cell}>
                     {formatEpochDateTime(share.expiresAt, locale) ??
                       t('workspace.public_shares.never_expires')}
                   </td>
-                  <td style={{ padding: '0.75rem' }}>
+                  <td className={styles.cell}>
                     {formatEpochDateTime(share.createdAt, locale) ?? '—'}
                   </td>
-                  <td
-                    style={{
-                      padding: '0.75rem',
-                      textAlign: 'end',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
+                  <td className={styles.cellActions}>
                     <Button
                       type="button"
                       variant="ghost"
@@ -198,7 +168,7 @@ export default function ShareList({ workspaceId }: ShareListProps): ReactElement
       />
       <RotateTokenDialog
         share={rotatedShare}
-        webUrl={window.location.origin}
+        webUrl={getPublicBaseUrl()}
         onClose={() => {
           setRotatedShare(null);
         }}

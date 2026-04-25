@@ -37,7 +37,7 @@ export type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
 
 export const profileSchema = z.object({
   displayName: z.string().min(1, 'validation.name_required'),
-  locale: z.enum(['en', 'ja']),
+  locale: z.enum(['en', 'ja', 'zh']),
   timezone: z.string().min(1, 'validation.timezone_required'),
   country: z
     .string()

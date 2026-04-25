@@ -124,8 +124,10 @@
   "lang": {
     "en": "English",
     "ja": "Japanese",
+    "zh": "Chinese",
     "native_en": "English",
-    "native_ja": "日本語"
+    "native_ja": "日本語",
+    "native_zh": "中文"
   },
   "a11y": {
     "skipToContent": "Skip to content"

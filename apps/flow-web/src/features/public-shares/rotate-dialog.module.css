@@ -1,0 +1,25 @@
+/**
+ * Rotate-token reveal dialog styling.
+ */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+}
+
+.warning {
+  margin: 0;
+  color: var(--nf-color-warning);
+  font-size: var(--nf-text-sm);
+}
+
+.endActions {
+  display: flex;
+  gap: var(--nf-space-2);
+  justify-content: flex-end;
+}
+
+.urlInput {
+  font-family: var(--nf-font-mono);
+}

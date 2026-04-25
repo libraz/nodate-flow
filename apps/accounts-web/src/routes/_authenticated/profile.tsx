@@ -37,6 +37,7 @@ import { type ThemePreference, useTheme } from '../../providers/theme-provider';
 const LANGUAGE_DEFAULT_COUNTRY: Record<SupportedLanguage, string> = {
   en: 'US',
   ja: 'JP',
+  zh: 'CN',
 };
 
 /**
@@ -121,9 +122,10 @@ function ProfilePage(): ReactElement {
     return list;
   }, [i18n.language, t]);
 
-  const localeOptions: SegmentedControlOption<'en' | 'ja'>[] = [
+  const localeOptions: SegmentedControlOption<SupportedLanguage>[] = [
     { value: 'en', label: 'English' },
     { value: 'ja', label: '日本語' },
+    { value: 'zh', label: '中文' },
   ];
 
   const weekStartOptions: SegmentedControlOption<WeekStart>[] = [
@@ -137,7 +139,8 @@ function ProfilePage(): ReactElement {
   // form picks up the persisted value when it is present and falls back to
   // a locale-appropriate default otherwise.
   const persistedWeekStart = (user as Partial<MeResponse> | null)?.weekStart;
-  const fallbackWeekStart: WeekStart = (user?.locale ?? 'en') === 'ja' ? 'mon' : 'sun';
+  const userLocale = (user?.locale ?? 'en') as SupportedLanguage | string;
+  const fallbackWeekStart: WeekStart = userLocale === 'ja' || userLocale === 'zh' ? 'mon' : 'sun';
 
   // `values` keeps the form in sync with the auth store; essential because
   // the user profile may populate asynchronously after the form mounts.
@@ -152,7 +155,7 @@ function ProfilePage(): ReactElement {
     resolver: zodResolver(profileSchema),
     values: {
       displayName: user?.displayName ?? '',
-      locale: (user?.locale as 'en' | 'ja') ?? 'en',
+      locale: (user?.locale as ProfileFormValues['locale']) ?? 'en',
       timezone: user?.timezone || detectTimezone(),
       country: user?.country ?? '',
       themePreference: (user?.themePreference as ProfileFormValues['themePreference']) ?? 'system',
@@ -175,7 +178,12 @@ function ProfilePage(): ReactElement {
       });
     }
     if (getValues('timezone') === 'UTC') {
-      const nextTz = next === 'ja' ? 'Asia/Tokyo' : detectTimezone();
+      const tzMap: Record<SupportedLanguage, string | null> = {
+        en: null,
+        ja: 'Asia/Tokyo',
+        zh: 'Asia/Shanghai',
+      };
+      const nextTz = tzMap[next] ?? detectTimezone();
       setValue('timezone', nextTz, { shouldDirty: true, shouldValidate: true });
     }
     // Cascade the week-start preference only when the user has not made an
@@ -183,7 +191,12 @@ function ProfilePage(): ReactElement {
     // round-tripping the profile does not silently override their choice.
     const currentWeekStart = getValues('weekStart');
     if (!currentWeekStart || currentWeekStart === persistedWeekStart) {
-      const nextWeekStart: WeekStart = next === 'ja' ? 'mon' : 'sun';
+      const weekStartMap: Record<SupportedLanguage, WeekStart> = {
+        en: 'sun',
+        ja: 'mon',
+        zh: 'mon',
+      };
+      const nextWeekStart: WeekStart = weekStartMap[next];
       if (currentWeekStart !== nextWeekStart) {
         setValue('weekStart', nextWeekStart, { shouldDirty: true, shouldValidate: true });
       }
@@ -264,7 +277,7 @@ function ProfilePage(): ReactElement {
               name="locale"
               control={control}
               render={({ field }) => (
-                <SegmentedControl<'en' | 'ja'>
+                <SegmentedControl<SupportedLanguage>
                   fullWidth
                   value={field.value}
                   onChange={handleLocaleChange}

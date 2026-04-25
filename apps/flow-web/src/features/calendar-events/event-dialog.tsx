@@ -14,8 +14,7 @@
  * kind picker disables "task" while editing.
  */
 
-import type { components as flowComponents } from '@nodate-flow/sdk';
-import type { components as timeComponents } from '@nodate-flow/time-sdk';
+import type { components } from '@nodate-flow/sdk';
 import Button from '@nodate-flow/ui/primitives/button';
 import Combobox from '@nodate-flow/ui/primitives/combobox';
 import DatePicker from '@nodate-flow/ui/primitives/date-picker';
@@ -42,6 +41,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { confirmAction } from '../../lib/confirm-action';
 import { dateKey } from '../../lib/date-utils';
 import { formatDate } from '../../lib/format';
 import { selectUser, useAuth } from '../auth/auth-store';
@@ -61,10 +61,10 @@ import {
 import AttendeesSection from './attendees-section';
 import styles from './event-dialog.module.css';
 
-type FlowProject = flowComponents['schemas']['Project'];
-type CalEventLike = timeComponents['schemas']['MyCalendarEventResponse'];
+type FlowProject = components['schemas']['Project'];
+type CalEventLike = components['schemas']['MyCalendarEventResponse'];
 
-/** Every item kind selectable in the dialog. `task` is flow-api; the others are time-api. */
+/** Every item kind selectable in the dialog. */
 export type ItemKind = 'task' | 'event' | 'block' | 'free' | 'milestone';
 
 /** Subset of {@link ItemKind} that maps to a calendar event row. */
@@ -135,13 +135,22 @@ function toUnix(dateStr: string, timeStr: string): number {
   return Math.floor(d.getTime() / 1000);
 }
 
-/** Detect the browser's IANA timezone or fall back to UTC. */
-function browserTimezone(): string {
+/**
+ * Detect the browser's IANA timezone or fall back to UTC.
+ *
+ * Cached at module load — the resolved timezone never changes during a
+ * session, so calling `Intl.DateTimeFormat()` per render would be waste.
+ */
+const CACHED_BROWSER_TIMEZONE: string = (() => {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   } catch {
     return 'UTC';
   }
+})();
+
+function browserTimezone(): string {
+  return CACHED_BROWSER_TIMEZONE;
 }
 
 /** Translate a notification preset to minutes (null = omit from payload). */
@@ -172,9 +181,8 @@ function presetToMinutes(preset: NotificationPreset): number | null {
  * textarea. `'none'` returns null so the caller omits the field.
  *
  * The backend stores `recurrenceRule` as unknown/JSON, so we emit a
- * `{ freq, byDay? }` shape that matches the time-api migration plan
- * without committing to a full RFC 5545 builder. The full builder is
- * out of scope for this PR.
+ * `{ freq, byDay? }` shape without committing to a full RFC 5545
+ * builder. The full builder is out of scope for this PR.
  */
 export function presetToRRule(
   preset: RecurrencePreset,
@@ -227,6 +235,108 @@ function blockPresetFromLabel(label?: string): BlockPreset {
       return 'custom';
   }
 }
+
+/* ── static i18n key maps ──────────────────────────────────────── */
+
+/**
+ * Static lookup tables for translation keys that previously used dynamic
+ * template-string interpolation. Keeping every literal key reachable
+ * lets `i18next-parser` extract them and our locale-sync checker catch
+ * misses across en/ja/zh.
+ */
+
+const DIALOG_TITLE_KEYS = {
+  create: {
+    task: 'dialog.title.create.task',
+    event: 'dialog.title.create.event',
+    block: 'dialog.title.create.block',
+    free: 'dialog.title.create.free',
+    milestone: 'dialog.title.create.milestone',
+  },
+  edit: {
+    task: 'dialog.title.edit.task',
+    event: 'dialog.title.edit.event',
+    block: 'dialog.title.edit.block',
+    free: 'dialog.title.edit.free',
+    milestone: 'dialog.title.edit.milestone',
+  },
+} as const;
+
+const KIND_LABEL_KEYS = {
+  task: 'kind.task',
+  event: 'kind.event',
+  block: 'kind.block',
+  free: 'kind.free',
+  milestone: 'kind.milestone',
+} as const;
+
+const PLACEHOLDER_TITLE_KEYS = {
+  task: 'placeholder.title.task',
+  event: 'placeholder.title.event',
+  block: 'placeholder.title.block',
+  free: 'placeholder.title.free',
+  milestone: 'placeholder.title.milestone',
+} as const;
+
+const TOAST_CREATED_KEYS = {
+  task: 'toast.created.task',
+  event: 'toast.created.event',
+  block: 'toast.created.block',
+  free: 'toast.created.free',
+  milestone: 'toast.created.milestone',
+} as const;
+
+const TOAST_UPDATED_KEYS = {
+  task: 'toast.updated.task',
+  event: 'toast.updated.event',
+  block: 'toast.updated.block',
+  free: 'toast.updated.free',
+  milestone: 'toast.updated.milestone',
+} as const;
+
+const TOAST_DELETED_KEYS = {
+  task: 'toast.deleted.task',
+  event: 'toast.deleted.event',
+  block: 'toast.deleted.block',
+  free: 'toast.deleted.free',
+  milestone: 'toast.deleted.milestone',
+} as const;
+
+const SHOW_AS_KEYS = {
+  busy: 'showAs.busy',
+  free: 'showAs.free',
+  tentative: 'showAs.tentative',
+  oof: 'showAs.oof',
+} as const satisfies Record<ShowAs, string>;
+
+const BLOCK_PRESET_KEYS = {
+  working: 'blockLabel.preset.working',
+  focus: 'blockLabel.preset.focus',
+  oof: 'blockLabel.preset.oof',
+  custom: 'blockLabel.preset.custom',
+} as const satisfies Record<BlockPreset, string>;
+
+const RECURRENCE_PRESET_KEYS = {
+  none: 'recurrence.preset.none',
+  daily: 'recurrence.preset.daily',
+  weekdays: 'recurrence.preset.weekdays',
+  weekly: 'recurrence.preset.weekly',
+  monthly: 'recurrence.preset.monthly',
+  yearly: 'recurrence.preset.yearly',
+  custom: 'recurrence.preset.custom',
+} as const satisfies Record<RecurrencePreset, string>;
+
+const NOTIFICATION_PRESET_KEYS = {
+  none: 'notification.preset.none',
+  // biome-ignore lint/style/useNamingConvention: matches NotificationPreset literal union
+  at_time: 'notification.preset.at_time',
+  '5min': 'notification.preset.5min',
+  '10min': 'notification.preset.10min',
+  '15min': 'notification.preset.15min',
+  '30min': 'notification.preset.30min',
+  '1hour': 'notification.preset.1hour',
+  '1day': 'notification.preset.1day',
+} as const satisfies Record<NotificationPreset, string>;
 
 /* ── component ──────────────────────────────────────────────────── */
 
@@ -411,11 +521,11 @@ export default function EventDialog({
 
   /* ── derived labels ─── */
 
-  const headerTitle = t(`dialog.title.${isCreate ? 'create' : 'edit'}.${kind}` as const);
+  const headerTitle = t(DIALOG_TITLE_KEYS[isCreate ? 'create' : 'edit'][kind]);
 
   const kindOptions: SegmentedControlOption<ItemKind>[] = KIND_OPTIONS.map((k) => ({
     value: k,
-    label: t(`kind.${k}` as const),
+    label: t(KIND_LABEL_KEYS[k]),
     tone: k,
     // Task kind is not a valid edit target (event→task morph has no
     // backend semantics). Lock the picker when editing.
@@ -494,7 +604,7 @@ export default function EventDialog({
         const body = buildCreateBody();
         await createEvent.mutateAsync({ workspaceId, calendarId, body });
         rememberCalendarChoice(workspaceId, calendarId);
-        toaster.show({ tone: 'success', message: t(`toast.created.${kind}` as const) });
+        toaster.show({ tone: 'success', message: t(TOAST_CREATED_KEYS[kind]) });
       } else if (isEdit) {
         const body = buildPatchBody();
         await updateEvent.mutateAsync({
@@ -504,7 +614,7 @@ export default function EventDialog({
           body,
         });
         rememberCalendarChoice(workspaceId, calendarId);
-        toaster.show({ tone: 'success', message: t(`toast.updated.${kind}` as const) });
+        toaster.show({ tone: 'success', message: t(TOAST_UPDATED_KEYS[kind]) });
       }
       onSaved();
     } catch {
@@ -525,7 +635,7 @@ export default function EventDialog({
       allDay: calKind === 'milestone' ? true : allDay,
     };
     if (calKind === 'milestone') {
-      // time-api enforces (StartAt == nil) != (EndAt == nil); set both.
+      // Backend enforces (StartAt == nil) != (EndAt == nil); set both.
       body.startAt = toUnix(startDate, '00:00');
       body.endAt = body.startAt;
     } else if (allDay) {
@@ -559,7 +669,7 @@ export default function EventDialog({
       allDay: calKind === 'milestone' ? true : allDay,
     };
     if (calKind === 'milestone') {
-      // time-api enforces (StartAt == nil) != (EndAt == nil); set both.
+      // Backend enforces (StartAt == nil) != (EndAt == nil); set both.
       body.startAt = toUnix(startDate, '00:00');
       body.endAt = body.startAt;
     } else if (allDay) {
@@ -589,14 +699,17 @@ export default function EventDialog({
   async function handleDelete(): Promise<void> {
     if (mode.kind !== 'edit') return;
     if (isPending) return;
-    if (!window.confirm(t('action.deleteConfirm', { kind: t(`kind.${kind}` as const) }))) return;
+    const confirmed = await confirmAction({
+      message: t('action.deleteConfirm', { kind: t(KIND_LABEL_KEYS[kind]) }),
+    });
+    if (!confirmed) return;
     try {
       await deleteEvent.mutateAsync({
         workspaceId,
         calendarId: mode.calendarId,
         eventId: mode.eventId,
       });
-      toaster.show({ tone: 'success', message: t(`toast.deleted.${kind}` as const) });
+      toaster.show({ tone: 'success', message: t(TOAST_DELETED_KEYS[kind]) });
       onSaved();
     } catch {
       toaster.show({ tone: 'danger', message: t('toast.deleteFailed') });
@@ -645,7 +758,7 @@ export default function EventDialog({
                 {...control}
                 value={title}
                 onChange={(e) => setTitle(e.currentTarget.value)}
-                placeholder={t(`placeholder.title.${kind}` as const)}
+                placeholder={t(PLACEHOLDER_TITLE_KEYS[kind])}
                 autoFocus={isCreate}
               />
             )}
@@ -842,7 +955,7 @@ export default function EventDialog({
                     fullWidth
                     options={(['busy', 'free', 'tentative', 'oof'] as const).map((v) => ({
                       value: v,
-                      label: t(`showAs.${v}` as const),
+                      label: t(SHOW_AS_KEYS[v]),
                     }))}
                     value={showAs}
                     onChange={setShowAs}
@@ -875,7 +988,7 @@ export default function EventDialog({
                             if (v) setBlockPreset(preset);
                           }}
                         >
-                          {t(`blockLabel.preset.${preset}` as const)}
+                          {t(BLOCK_PRESET_KEYS[preset])}
                         </ToggleChip>
                       ))}
                     </ToggleChipGroup>
@@ -924,7 +1037,7 @@ export default function EventDialog({
                       ] as const
                     ).map((v) => (
                       <option key={v} value={v}>
-                        {t(`recurrence.preset.${v}` as const)}
+                        {t(RECURRENCE_PRESET_KEYS[v])}
                       </option>
                     ))}
                   </Select>
@@ -958,7 +1071,7 @@ export default function EventDialog({
                       ] as const
                     ).map((v) => (
                       <option key={v} value={v}>
-                        {t(`notification.preset.${v}` as const)}
+                        {t(NOTIFICATION_PRESET_KEYS[v])}
                       </option>
                     ))}
                   </Select>

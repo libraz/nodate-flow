@@ -124,8 +124,10 @@
   "lang": {
     "en": "英語",
     "ja": "日本語",
+    "zh": "中国語",
     "native_en": "English",
-    "native_ja": "日本語"
+    "native_ja": "日本語",
+    "native_zh": "中文"
   },
   "a11y": {
     "skipToContent": "本文へスキップ"

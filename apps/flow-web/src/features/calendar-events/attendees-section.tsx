@@ -27,6 +27,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ReactElement, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { getPublicBaseUrl } from '../../lib/public-base-url';
 import { useWorkspaceMembersQuery } from '../workspaces/api';
 import {
   type Attendee,
@@ -153,8 +154,7 @@ export default function AttendeesSection({
   const handleInvite = async (attendeeId: string): Promise<void> => {
     try {
       const result = await createInvite.mutateAsync({ ...scope, attendeeId });
-      const origin = typeof window !== 'undefined' ? window.location.origin : '';
-      const link = `${origin}/invites/accept?token=${result.token}`;
+      const link = `${getPublicBaseUrl()}/invites/accept?token=${result.token}`;
       try {
         await navigator.clipboard.writeText(link);
       } catch {

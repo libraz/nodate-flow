@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { ApiError, toApiError } from '../../lib/api-error';
 import { formatEpochDateTime } from '../../lib/format';
 import { sdk } from '../../lib/sdk';
+import styles from './pending-invites-panel.module.css';
 
 type MyInvite = components['schemas']['MyInviteResponse'];
 
@@ -112,63 +113,23 @@ function InviteRow({ invite }: InviteCardProps): ReactElement {
   }
 
   return (
-    <li style={{ listStyle: 'none' }}>
+    <li className={styles.inviteListItem}>
       <Card>
-        <p
-          style={{
-            margin: 0,
-            fontWeight: 'var(--nf-weight-semibold)',
-            color: 'var(--nf-color-fg)',
-            fontSize: 'var(--nf-text-sm)',
-            lineHeight: 'var(--nf-leading-snug)',
-          }}
-        >
-          {invite.eventTitle}
-        </p>
+        <p className={styles.eventTitle}>{invite.eventTitle}</p>
 
-        <p
-          style={{
-            marginBlockStart: 'var(--nf-space-1)',
-            marginBlockEnd: 0,
-            fontSize: 'var(--nf-text-xs)',
-            color: 'var(--nf-color-fg-muted)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--nf-space-1)',
-          }}
-        >
+        <p className={styles.metaLine}>
           <Clock size={12} aria-hidden="true" />
           <span>{whenLabel}</span>
         </p>
 
         {invite.eventLocation ? (
-          <p
-            style={{
-              marginBlockStart: 'var(--nf-space-1)',
-              marginBlockEnd: 0,
-              fontSize: 'var(--nf-text-xs)',
-              color: 'var(--nf-color-fg-muted)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--nf-space-1)',
-            }}
-          >
+          <p className={styles.metaLine}>
             <MapPin size={12} aria-hidden="true" />
             <span>{invite.eventLocation}</span>
           </p>
         ) : null}
 
-        <p
-          style={{
-            marginBlockStart: 'var(--nf-space-2)',
-            marginBlockEnd: 0,
-            fontSize: 'var(--nf-text-xs)',
-            color: 'var(--nf-color-fg-subtle)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--nf-space-1)',
-          }}
-        >
+        <p className={styles.calendarLine}>
           <CalendarIcon size={12} aria-hidden="true" />
           <span>
             {t('invites.inbox.calendar_workspace', {
@@ -178,16 +139,7 @@ function InviteRow({ invite }: InviteCardProps): ReactElement {
           </span>
         </p>
 
-        <p
-          style={{
-            marginBlockStart: 'var(--nf-space-1)',
-            marginBlockEnd: 0,
-            fontSize: 'var(--nf-text-xs)',
-            color: 'var(--nf-color-fg-subtle)',
-          }}
-        >
-          {expiresLabel}
-        </p>
+        <p className={styles.expiresLine}>{expiresLabel}</p>
       </Card>
     </li>
   );
@@ -196,43 +148,10 @@ function InviteRow({ invite }: InviteCardProps): ReactElement {
 function PanelHeader({ count }: { count: number | null }): ReactElement {
   const { t } = useTranslation('common');
   return (
-    <header
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 'var(--nf-space-2)',
-        marginBlockEnd: 'var(--nf-space-2)',
-      }}
-    >
-      <h2
-        style={{
-          margin: 0,
-          fontSize: 'var(--nf-text-base)',
-          fontWeight: 'var(--nf-weight-semibold)',
-          color: 'var(--nf-color-fg)',
-        }}
-      >
-        {t('invites.inbox.title')}
-      </h2>
+    <header className={styles.header}>
+      <h2 className={styles.headerTitle}>{t('invites.inbox.title')}</h2>
       {count !== null && count > 0 ? (
-        <span
-          aria-label={t('invites.inbox.count_badge', { count })}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minInlineSize: '1.25rem',
-            paddingInline: 'var(--nf-space-1)',
-            blockSize: '1.25rem',
-            borderRadius: '999px',
-            background: 'var(--nf-color-accent-subtle)',
-            color: 'var(--nf-color-accent)',
-            fontSize: 'var(--nf-text-xs)',
-            fontWeight: 'var(--nf-weight-semibold)',
-            fontVariantNumeric: 'tabular-nums',
-          }}
-        >
+        <span aria-label={t('invites.inbox.count_badge', { count })} className={styles.countBadge}>
           {count}
         </span>
       ) : null}
@@ -251,18 +170,10 @@ export default function PendingInvitesPanel(): ReactElement {
 
   if (isLoading) {
     return (
-      <aside
-        aria-label={t('invites.inbox.title')}
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-2)',
-          minInlineSize: 0,
-        }}
-      >
+      <aside aria-label={t('invites.inbox.title')} className={styles.panel}>
         <PanelHeader count={null} />
-        <Skeleton style={{ blockSize: '4rem' }} />
-        <Skeleton style={{ blockSize: '4rem' }} />
+        <Skeleton className={styles.loadingSkeleton} />
+        <Skeleton className={styles.loadingSkeleton} />
       </aside>
     );
   }
@@ -270,18 +181,10 @@ export default function PendingInvitesPanel(): ReactElement {
   if (error) {
     const message = error instanceof ApiError ? error.message : t('invites.inbox.load_error');
     return (
-      <aside
-        aria-label={t('invites.inbox.title')}
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-2)',
-          minInlineSize: 0,
-        }}
-      >
+      <aside aria-label={t('invites.inbox.title')} className={styles.panel}>
         <PanelHeader count={null} />
         <Card>
-          <p style={{ margin: 0, color: 'var(--nf-color-danger)' }} role="alert">
+          <p className={styles.errorMessage} role="alert">
             {message}
           </p>
         </Card>
@@ -292,52 +195,17 @@ export default function PendingInvitesPanel(): ReactElement {
   const invites = data ?? [];
 
   return (
-    <aside
-      aria-label={t('invites.inbox.title')}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-2)',
-        minInlineSize: 0,
-      }}
-    >
+    <aside aria-label={t('invites.inbox.title')} className={styles.panel}>
       <PanelHeader count={invites.length} />
 
       {invites.length === 0 ? (
         <Card>
-          <p
-            style={{
-              margin: 0,
-              textAlign: 'center',
-              color: 'var(--nf-color-fg-muted)',
-              padding: 'var(--nf-space-3) 0',
-              fontSize: 'var(--nf-text-sm)',
-            }}
-          >
-            {t('invites.inbox.empty')}
-          </p>
+          <p className={styles.emptyMessage}>{t('invites.inbox.empty')}</p>
         </Card>
       ) : (
         <>
-          <p
-            style={{
-              margin: 0,
-              fontSize: 'var(--nf-text-xs)',
-              color: 'var(--nf-color-fg-muted)',
-            }}
-          >
-            {t('invites.inbox.rsvp_hint')}
-          </p>
-          <ul
-            style={{
-              listStyle: 'none',
-              margin: 0,
-              padding: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 'var(--nf-space-2)',
-            }}
-          >
+          <p className={styles.rsvpHint}>{t('invites.inbox.rsvp_hint')}</p>
+          <ul className={styles.inviteList}>
             {invites.map((invite) => (
               <InviteRow key={invite.id} invite={invite} />
             ))}

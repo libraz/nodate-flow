@@ -1,0 +1,35 @@
+/**
+ * Public share create + reveal dialog styling.
+ */
+
+.form,
+.reveal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+}
+
+.warning {
+  margin: 0;
+  color: var(--nf-color-warning);
+  font-size: var(--nf-text-sm);
+}
+
+.endActions {
+  display: flex;
+  gap: var(--nf-space-2);
+  justify-content: flex-end;
+}
+
+.select {
+  padding: var(--nf-space-2) var(--nf-space-3);
+  border-radius: var(--nf-radius-md);
+  border: 1px solid var(--nf-color-border);
+  background: var(--nf-color-bg);
+  color: var(--nf-color-fg);
+  font-size: var(--nf-text-sm);
+}
+
+.urlInput {
+  font-family: var(--nf-font-mono);
+}

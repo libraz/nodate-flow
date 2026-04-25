@@ -12,6 +12,7 @@ import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { type SettingsApiError, useChangePassword } from './api';
+import styles from './password-panel.module.css';
 
 interface State {
   current: string;
@@ -73,11 +74,9 @@ export default function PasswordPanel(): ReactElement {
       onSubmit={(e) => {
         void handleSubmit(e);
       }}
-      style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxInlineSize: '28rem' }}
+      className={styles.form}
     >
-      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
-        {t('security.password.description')}
-      </p>
+      <p className={styles.description}>{t('security.password.description')}</p>
       <FormField label={t('security.password.current')} required>
         {(control) => (
           <Input
@@ -123,11 +122,11 @@ export default function PasswordPanel(): ReactElement {
         )}
       </FormField>
       {fieldError != null && (
-        <p style={{ margin: 0, color: 'var(--nf-color-danger)' }} role="alert">
+        <p className={styles.error} role="alert">
           {fieldError}
         </p>
       )}
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <div className={styles.actions}>
         <Button type="submit" variant="primary" disabled={submitting}>
           {submitting ? t('security.password.saving') : t('security.password.save')}
         </Button>

@@ -1,0 +1,94 @@
+/**
+ * Public share list page styling.
+ */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-5);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--nf-space-4);
+}
+
+.headerIdentity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--nf-text-2xl);
+}
+
+.description {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+}
+
+.empty {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: var(--nf-text-sm);
+}
+
+.headerRow {
+  text-align: start;
+  color: var(--nf-color-fg-muted);
+}
+
+.headerCell {
+  padding: var(--nf-space-2) var(--nf-space-3);
+  text-align: start;
+}
+
+.headerCellEnd {
+  padding: var(--nf-space-2) var(--nf-space-3);
+  text-align: end;
+}
+
+.row {
+  border-block-start: 1px solid var(--nf-color-border);
+}
+
+.cell {
+  padding: var(--nf-space-3);
+}
+
+.cellActions {
+  padding: var(--nf-space-3);
+  text-align: end;
+  white-space: nowrap;
+}
+
+.titleCellInner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-px);
+}
+
+.titleLink {
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
+  text-decoration: none;
+}
+
+.shareDescription {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}

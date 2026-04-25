@@ -1,0 +1,148 @@
+/**
+ * Public share detail (events list + reorder) page styling.
+ */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-5);
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+  text-decoration: none;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--nf-space-4);
+}
+
+.headerIdentity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--nf-text-2xl);
+}
+
+.headerDescription {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+}
+
+.addIcon {
+  margin-inline-end: var(--nf-space-1);
+}
+
+.eventsHeading {
+  margin: 0 0 var(--nf-space-1);
+  font-size: var(--nf-text-base);
+}
+
+.eventsDescription {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+}
+
+.tableWrap {
+  overflow-x: auto;
+  transition: opacity var(--nf-duration-fast) ease;
+}
+
+.tableWrapBusy {
+  opacity: 0.6;
+}
+
+.table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: var(--nf-text-sm);
+}
+
+.headerRow {
+  text-align: start;
+  color: var(--nf-color-fg-muted);
+}
+
+.handleHeaderCell {
+  inline-size: 2rem;
+  padding: var(--nf-space-2) var(--nf-space-1);
+}
+
+.headerCell {
+  padding: var(--nf-space-2) var(--nf-space-3);
+  text-align: start;
+}
+
+.headerCellEnd {
+  padding: var(--nf-space-2) var(--nf-space-3);
+  text-align: end;
+}
+
+.empty {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+}
+
+.handleCell {
+  padding: var(--nf-space-1) var(--nf-space-1) var(--nf-space-1) var(--nf-space-2);
+  vertical-align: middle;
+}
+
+.cell {
+  padding: var(--nf-space-3);
+}
+
+.cellActions {
+  padding: var(--nf-space-3);
+  text-align: end;
+  white-space: nowrap;
+}
+
+.eventTitle {
+  font-weight: var(--nf-weight-medium);
+}
+
+.eventLocation {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.dragHandle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--nf-color-fg-muted);
+  cursor: grab;
+  touch-action: none;
+  border-radius: var(--nf-radius-sm);
+}
+
+.dragHandle:disabled {
+  cursor: not-allowed;
+}
+
+.suspenseFallback {
+  display: none;
+}
+
+.suspenseSkeleton {
+  block-size: 1px;
+}

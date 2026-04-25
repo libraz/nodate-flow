@@ -11,6 +11,7 @@ import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { type PatchMeInput, useMeQuery, useUpdateMe } from './api';
+import styles from './notifications-form.module.css';
 
 interface ToggleKey {
   readonly key:
@@ -86,41 +87,19 @@ export default function NotificationsForm(): ReactElement {
       onSubmit={(e) => {
         void handleSubmit(e);
       }}
-      style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxInlineSize: '40rem' }}
+      className={styles.form}
     >
-      <ul
-        style={{
-          listStyle: 'none',
-          margin: 0,
-          padding: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.75rem',
-        }}
-      >
+      <ul className={styles.list}>
         {TOGGLES.map((item) => {
           const checked = state[item.key];
           const id = `notif-${item.key}`;
           return (
-            <li
-              key={item.key}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr auto',
-                gap: '0.75rem',
-                alignItems: 'start',
-                padding: '0.75rem 1rem',
-                border: '1px solid var(--nf-color-border)',
-                borderRadius: '0.5rem',
-              }}
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                <label htmlFor={id} style={{ fontWeight: 500, color: 'var(--nf-color-fg)' }}>
+            <li key={item.key} className={styles.row}>
+              <div className={styles.identity}>
+                <label htmlFor={id} className={styles.label}>
                   {t(item.labelKey)}
                 </label>
-                <span style={{ fontSize: '0.875rem', color: 'var(--nf-color-fg-muted)' }}>
-                  {t(item.descriptionKey)}
-                </span>
+                <span className={styles.helpText}>{t(item.descriptionKey)}</span>
               </div>
               <Switch
                 id={id}
@@ -135,7 +114,7 @@ export default function NotificationsForm(): ReactElement {
         })}
       </ul>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <div className={styles.actions}>
         <Button type="submit" variant="primary" disabled={submitting}>
           {submitting ? t('notifications.saving') : t('notifications.save')}
         </Button>

@@ -40,7 +40,7 @@ import { useTheme } from '../../providers/theme-provider';
 import { type Me, type PatchMeInput, useMeQuery, useUpdateMe } from './api';
 import AvatarUpload from './avatar-upload';
 
-const LOCALES: readonly SupportedLanguage[] = ['en', 'ja'] as const;
+const LOCALES: readonly SupportedLanguage[] = ['en', 'ja', 'zh'] as const;
 
 /**
  * Allowed `weekStart` values, mirrored from the SDK `MeBody.weekStart` enum.
@@ -56,11 +56,12 @@ type WeekStart = NonNullable<Me['weekStart']>;
 const LANGUAGE_DEFAULT_COUNTRY: Record<SupportedLanguage, string> = {
   en: 'US',
   ja: 'JP',
+  zh: 'CN',
 };
 
 const profileSchema = z.object({
   displayName: z.string().min(1, 'profile.validation.display_name_required'),
-  locale: z.enum(['en', 'ja']),
+  locale: z.enum(['en', 'ja', 'zh']),
   timezone: z.string().min(1, 'profile.validation.timezone_required'),
   country: z
     .string()
@@ -146,6 +147,7 @@ export default function ProfileForm(): ReactElement {
   const localeOptions: SegmentedControlOption<SupportedLanguage>[] = [
     { value: 'en', label: 'English' },
     { value: 'ja', label: '日本語' },
+    { value: 'zh', label: '中文' },
   ];
 
   const weekStartOptions: SegmentedControlOption<WeekStart>[] = [
@@ -187,7 +189,12 @@ export default function ProfileForm(): ReactElement {
       });
     }
     if (getValues('timezone') === 'UTC') {
-      const nextTz = next === 'ja' ? 'Asia/Tokyo' : detectTimezone();
+      const tzMap: Record<SupportedLanguage, string | null> = {
+        en: null,
+        ja: 'Asia/Tokyo',
+        zh: 'Asia/Shanghai',
+      };
+      const nextTz = tzMap[next] ?? detectTimezone();
       setValue('timezone', nextTz, { shouldDirty: true, shouldValidate: true });
     }
     // Cascade the week-start preference only when the user has not made an
@@ -196,7 +203,12 @@ export default function ProfileForm(): ReactElement {
     const currentWeekStart = getValues('weekStart');
     const persistedWeekStart = me.weekStart as WeekStart | undefined;
     if (!currentWeekStart || currentWeekStart === persistedWeekStart) {
-      const nextWeekStart: WeekStart = next === 'ja' ? 'mon' : 'sun';
+      const weekStartMap: Record<SupportedLanguage, WeekStart> = {
+        en: 'sun',
+        ja: 'mon',
+        zh: 'mon',
+      };
+      const nextWeekStart: WeekStart = weekStartMap[next];
       if (currentWeekStart !== nextWeekStart) {
         setValue('weekStart', nextWeekStart, { shouldDirty: true, shouldValidate: true });
       }

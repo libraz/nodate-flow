@@ -13,6 +13,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ReactElement, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { getPublicBaseUrl } from '../../lib/public-base-url';
 import { usePublishLens, useUnpublishLens } from './api';
 import styles from './sharing.module.css';
 
@@ -28,7 +29,7 @@ export interface ShareLensDialogProps {
 }
 
 function buildPublicUrl(token: string): string {
-  return `${window.location.origin}/public/lenses/${token}`;
+  return `${getPublicBaseUrl()}/public/lenses/${token}`;
 }
 
 export default function ShareLensDialog({
