@@ -58,8 +58,8 @@ func ListUserSessions(deps Deps) func(context.Context, *ListUserSessionsInput) (
 
 // RevokeSession handles DELETE /admin/sessions/{sessionId}. Revokes a single
 // session by its public id regardless of which user owns it.
-func RevokeSession(deps Deps) func(context.Context, *RevokeSessionInput) (*RevokeSessionOutput, error) {
-	return func(ctx context.Context, in *RevokeSessionInput) (*RevokeSessionOutput, error) {
+func RevokeSession(deps Deps) func(context.Context, *AdminRevokeSessionInput) (*AdminRevokeSessionOutput, error) {
+	return func(ctx context.Context, in *AdminRevokeSessionInput) (*AdminRevokeSessionOutput, error) {
 		uid, _ := authn.ActorFromContext(ctx)
 
 		pid, err := types.Parse(in.SessionID)
@@ -79,7 +79,7 @@ func RevokeSession(deps Deps) func(context.Context, *RevokeSessionInput) (*Revok
 			ResourceID:   in.SessionID,
 		})
 
-		out := &RevokeSessionOutput{}
+		out := &AdminRevokeSessionOutput{}
 		out.Body.Ok = true
 		return out, nil
 	}

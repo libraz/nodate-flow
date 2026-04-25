@@ -31,9 +31,9 @@ type PaginatedInput struct {
 
 // AdminUser is the public DTO for a user in the admin panel.
 type AdminUser struct {
-	ID              string `json:"id"`
-	Email           string `json:"email"`
-	DisplayName     string `json:"displayName"`
+	ID              string  `json:"id"`
+	Email           string  `json:"email"`
+	DisplayName     string  `json:"displayName"`
 	AvatarURL       *string `json:"avatarUrl,omitempty"`
 	Locale          string  `json:"locale"`
 	LastLoginAt     *int64  `json:"lastLoginAt,omitempty"`
@@ -178,16 +178,19 @@ type ListUserSessionsOutput struct {
 	}
 }
 
-// RevokeSessionInput binds the path parameter for DELETE /admin/sessions/{sessionId}.
-type RevokeSessionInput struct {
+// AdminRevokeSessionInput binds the path parameter for DELETE /admin/sessions/{sessionId}.
+type AdminRevokeSessionInput struct {
 	SessionID string `path:"sessionId"`
 }
 
-// RevokeSessionOutput is the response for DELETE /admin/sessions/{sessionId}.
-type RevokeSessionOutput struct {
-	Body struct {
-		Ok bool `json:"ok"`
-	}
+// AdminRevokeSessionOutputBody is the response body for DELETE /admin/sessions/{sessionId}.
+type AdminRevokeSessionOutputBody struct {
+	Ok bool `json:"ok"`
+}
+
+// AdminRevokeSessionOutput is the response for DELETE /admin/sessions/{sessionId}.
+type AdminRevokeSessionOutput struct {
+	Body AdminRevokeSessionOutputBody
 }
 
 // --- Instance Admins ---
