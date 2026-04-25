@@ -2,6 +2,7 @@ package tasks
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
@@ -31,13 +32,21 @@ func Archive(deps Deps) func(context.Context, *ArchiveTaskInput) (*ArchiveTaskOu
 		}
 
 		taskInternal := int64(task.ID)
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.TaskArchived,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			TaskID:      &taskInternal,
 			Payload:     map[string]any{"taskId": task.PublicID.String()},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "tasks.Archive"),
+				slog.String("event_type", string(eventbus.TaskArchived)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("task_id", taskInternal),
+			)
+		}
 
 		if actorID, aOk := middleware.ActorFromContext(ctx); aOk {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -75,13 +84,21 @@ func Unarchive(deps Deps) func(context.Context, *UnarchiveTaskInput) (*Unarchive
 		}
 
 		taskInternal := int64(task.ID)
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.TaskUnarchived,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			TaskID:      &taskInternal,
 			Payload:     map[string]any{"taskId": task.PublicID.String()},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "tasks.Unarchive"),
+				slog.String("event_type", string(eventbus.TaskUnarchived)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("task_id", taskInternal),
+			)
+		}
 
 		if actorID, aOk := middleware.ActorFromContext(ctx); aOk {
 			deps.Audit.Record(ctx, audit.Entry{

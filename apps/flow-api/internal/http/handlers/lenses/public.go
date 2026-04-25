@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"log/slog"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
@@ -69,7 +70,7 @@ func Publish(deps Deps) func(context.Context, *PublishLensInput) (*PublishLensOu
 		}
 
 		// Append event for the state change.
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.LensShared,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorInt64Ptr(actorID),
@@ -77,7 +78,16 @@ func Publish(deps Deps) func(context.Context, *PublishLensInput) (*PublishLensOu
 				"lensId":      lensRow.PublicID.String(),
 				"publicToken": token,
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "lenses.Publish"),
+				slog.String("event_type", string(eventbus.LensShared)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("actor_id", int64(actorID)),
+				slog.String("lens_id", lensRow.PublicID.String()),
+			)
+		}
 
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "lens.publish",
@@ -139,14 +149,23 @@ func Unpublish(deps Deps) func(context.Context, *UnpublishLensInput) (*Unpublish
 		}
 
 		// Append event for the state change.
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.LensUnshared,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorInt64Ptr(actorID),
 			Payload: map[string]any{
 				"lensId": lensRow.PublicID.String(),
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "lenses.Unpublish"),
+				slog.String("event_type", string(eventbus.LensUnshared)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("actor_id", int64(actorID)),
+				slog.String("lens_id", lensRow.PublicID.String()),
+			)
+		}
 
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "lens.unpublish",

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
@@ -95,7 +96,7 @@ func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error
 
 		if taskLinked {
 			actor := int64(actorID)
-			_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+			if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 				Type:        eventbus.SignalAttached,
 				WorkspaceID: wsID,
 				ActorUserID: &actor,
@@ -105,7 +106,17 @@ func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error
 					"source":   in.Body.Source,
 					"kind":     in.Body.Kind,
 				},
-			})
+			}); err != nil {
+				slog.ErrorContext(ctx, "eventbus.Append failed",
+					slog.Any("err", err),
+					slog.String("handler", "signals.Create"),
+					slog.String("event_type", string(eventbus.SignalAttached)),
+					slog.Int64("workspace_id", int64(wsID)),
+					slog.Int64("actor_id", actor),
+					slog.Int64("task_id", taskInternal),
+					slog.String("signal_id", pub.String()),
+				)
+			}
 		}
 
 		out := &CreateOutput{Body: Signal{

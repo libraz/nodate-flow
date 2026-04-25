@@ -7,6 +7,7 @@ package tasks
 import (
 	"context"
 	stderrors "errors"
+	"log/slog"
 
 	"database/sql"
 
@@ -55,7 +56,7 @@ func AddAgentActor(deps Deps) func(context.Context, *AddTaskAgentActorInput) (*A
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		taskInternal := int64(task.ID)
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.TaskActorAdded,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -67,7 +68,17 @@ func AddAgentActor(deps Deps) func(context.Context, *AddTaskAgentActorInput) (*A
 				"kind":    "agent",
 				"role":    in.Body.Role,
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "tasks.AddAgentActor"),
+				slog.String("event_type", string(eventbus.TaskActorAdded)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("task_id", taskInternal),
+				slog.String("actor_public_id", pub.String()),
+				slog.String("agent_id", agentPub.String()),
+			)
+		}
 		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
 			deps.Audit.Record(ctx, audit.Entry{
 				Action:       "task.agent_actor.add",

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 	"strings"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
@@ -159,7 +160,7 @@ func Create(deps Deps) func(context.Context, *CreatePageInput) (*CreatePageOutpu
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.PageCreated,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -167,7 +168,16 @@ func Create(deps Deps) func(context.Context, *CreatePageInput) (*CreatePageOutpu
 				"pageId": pub.String(),
 				"title":  in.Body.Title,
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "pages.Create"),
+				slog.String("event_type", string(eventbus.PageCreated)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("actor_id", int64(actorID)),
+				slog.String("page_id", pub.String()),
+			)
+		}
 
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "page.create",
@@ -380,14 +390,22 @@ func Update(deps Deps) func(context.Context, *UpdatePageInput) (*UpdatePageOutpu
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.PageUpdated,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			Payload: map[string]any{
 				"pageId": pub.String(),
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "pages.Update"),
+				slog.String("event_type", string(eventbus.PageUpdated)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.String("page_id", pub.String()),
+			)
+		}
 
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -430,14 +448,22 @@ func Delete(deps Deps) func(context.Context, *DeletePageInput) (*DeletePageOutpu
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.PageDisabled,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			Payload: map[string]any{
 				"pageId": pub.String(),
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "pages.Delete"),
+				slog.String("event_type", string(eventbus.PageDisabled)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.String("page_id", pub.String()),
+			)
+		}
 
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{

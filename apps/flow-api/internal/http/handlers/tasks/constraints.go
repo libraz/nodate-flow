@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
@@ -35,7 +36,7 @@ func AddConstraint(deps Deps) func(context.Context, *AddTaskConstraintInput) (*A
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		taskInternal := int64(task.ID)
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.TaskConstraintAdded,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -45,7 +46,16 @@ func AddConstraint(deps Deps) func(context.Context, *AddTaskConstraintInput) (*A
 				"constraintId": pub.String(),
 				"kind":         in.Body.Kind,
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "tasks.AddConstraint"),
+				slog.String("event_type", string(eventbus.TaskConstraintAdded)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("task_id", taskInternal),
+				slog.String("constraint_id", pub.String()),
+			)
+		}
 		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
 			deps.Audit.Record(ctx, audit.Entry{
 				Action:       "task.constraint.add",
@@ -89,7 +99,7 @@ func RemoveConstraint(deps Deps) func(context.Context, *RemoveTaskConstraintInpu
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		taskInternal := int64(task.ID)
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.TaskConstraintRemoved,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -98,7 +108,16 @@ func RemoveConstraint(deps Deps) func(context.Context, *RemoveTaskConstraintInpu
 				"taskId":       task.PublicID.String(),
 				"constraintId": cid.String(),
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "tasks.RemoveConstraint"),
+				slog.String("event_type", string(eventbus.TaskConstraintRemoved)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("task_id", taskInternal),
+				slog.String("constraint_id", cid.String()),
+			)
+		}
 		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
 			deps.Audit.Record(ctx, audit.Entry{
 				Action:       "task.constraint.remove",

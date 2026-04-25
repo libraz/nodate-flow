@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
@@ -57,7 +58,7 @@ func Create(deps Deps) func(context.Context, *CreateReactionInput) (*CreateReact
 		}
 
 		taskIDInt64 := int64(task.ID)
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.ReactionAdded,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -66,7 +67,17 @@ func Create(deps Deps) func(context.Context, *CreateReactionInput) (*CreateReact
 				"reactionId": pub.String(),
 				"emoji":      in.Body.Emoji,
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "reactions.Create"),
+				slog.String("event_type", string(eventbus.ReactionAdded)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("actor_id", int64(actorID)),
+				slog.Int64("task_id", taskIDInt64),
+				slog.String("reaction_id", pub.String()),
+			)
+		}
 
 		if deps.Audit != nil {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -176,7 +187,7 @@ func Delete(deps Deps) func(context.Context, *DeleteReactionInput) (*DeleteReact
 		}
 
 		taskIDInt64 := int64(row.TaskID.Int32)
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.ReactionRemoved,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -185,7 +196,17 @@ func Delete(deps Deps) func(context.Context, *DeleteReactionInput) (*DeleteReact
 				"reactionId": pub.String(),
 				"emoji":      row.Emoji,
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "reactions.Delete"),
+				slog.String("event_type", string(eventbus.ReactionRemoved)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("actor_id", int64(actorID)),
+				slog.Int64("task_id", taskIDInt64),
+				slog.String("reaction_id", pub.String()),
+			)
+		}
 
 		if deps.Audit != nil {
 			deps.Audit.Record(ctx, audit.Entry{

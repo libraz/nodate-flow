@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
@@ -35,12 +36,20 @@ func Create(deps Deps) func(context.Context, *CreateIntakeItemInput) (*CreateInt
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.IntakeItemCreated,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			Payload:     map[string]any{"intakeItemId": pub.String()},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "intake.Create"),
+				slog.String("event_type", string(eventbus.IntakeItemCreated)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.String("intake_item_id", pub.String()),
+			)
+		}
 
 		if deps.Audit != nil {
 			if actorID, ok := middleware.ActorFromContext(ctx); ok {
@@ -192,12 +201,23 @@ func Triage(deps Deps) func(context.Context, *TriageIntakeItemInput) (*TriageInt
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
-			Type:        triageEventKind(in.Body.Status),
+		triageType := triageEventKind(in.Body.Status)
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+			Type:        triageType,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			Payload:     map[string]any{"intakeItemId": pub.String(), "status": in.Body.Status},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "intake.Triage"),
+				slog.String("event_type", string(triageType)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("actor_id", int64(actorID)),
+				slog.String("intake_item_id", pub.String()),
+				slog.String("status", in.Body.Status),
+			)
+		}
 
 		if deps.Audit != nil {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -316,7 +336,7 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.IntakeItemAccepted,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -326,9 +346,19 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 				"taskId":       taskPub.String(),
 				"projectId":    prjPub.String(),
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "intake.Convert"),
+				slog.String("event_type", string(eventbus.IntakeItemAccepted)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("actor_id", int64(actorID)),
+				slog.Int64("task_id", taskID),
+				slog.String("intake_item_id", pub.String()),
+			)
+		}
 
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.TaskCreated,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -339,7 +369,17 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 				"title":     item.Title,
 				"source":    "intake_convert",
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "intake.Convert"),
+				slog.String("event_type", string(eventbus.TaskCreated)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("actor_id", int64(actorID)),
+				slog.Int64("task_id", taskID),
+				slog.String("intake_item_id", pub.String()),
+			)
+		}
 
 		if deps.Audit != nil {
 			deps.Audit.Record(ctx, audit.Entry{

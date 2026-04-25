@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
@@ -157,7 +158,7 @@ func Create(deps Deps) func(context.Context, *CreateTimeboxInput) (*CreateTimebo
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.TimeboxCreated,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -165,7 +166,16 @@ func Create(deps Deps) func(context.Context, *CreateTimeboxInput) (*CreateTimebo
 				"timeboxId": pub.String(),
 				"name":      in.Body.Name,
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "timeboxes.Create"),
+				slog.String("event_type", string(eventbus.TimeboxCreated)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("actor_id", int64(actorID)),
+				slog.String("timebox_id", pub.String()),
+			)
+		}
 
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "timebox.create",
@@ -329,7 +339,7 @@ func Update(deps Deps) func(context.Context, *UpdateTimeboxInput) (*UpdateTimebo
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.TimeboxUpdated,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -337,7 +347,15 @@ func Update(deps Deps) func(context.Context, *UpdateTimeboxInput) (*UpdateTimebo
 				"timeboxId": pub.String(),
 				"name":      name,
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "timeboxes.Update"),
+				slog.String("event_type", string(eventbus.TimeboxUpdated)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.String("timebox_id", pub.String()),
+			)
+		}
 
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -405,7 +423,7 @@ func UpdateStatus(deps Deps) func(context.Context, *UpdateTimeboxStatusInput) (*
 		case generated.TimeboxesStatusCompleted:
 			evtType = eventbus.TimeboxCompleted
 		}
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        evtType,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -413,7 +431,16 @@ func UpdateStatus(deps Deps) func(context.Context, *UpdateTimeboxStatusInput) (*
 				"timeboxId": pub.String(),
 				"status":    in.Body.Status,
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "timeboxes.UpdateStatus"),
+				slog.String("event_type", string(evtType)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.String("timebox_id", pub.String()),
+				slog.String("status", in.Body.Status),
+			)
+		}
 
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -523,7 +550,7 @@ func AddTask(deps Deps) func(context.Context, *AddTaskInput) (*AddTaskOutput, er
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.TimeboxTaskAdded,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -531,7 +558,16 @@ func AddTask(deps Deps) func(context.Context, *AddTaskInput) (*AddTaskOutput, er
 				"timeboxId": tbPub.String(),
 				"taskId":    taskPub.String(),
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "timeboxes.AddTask"),
+				slog.String("event_type", string(eventbus.TimeboxTaskAdded)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.String("timebox_id", tbPub.String()),
+				slog.String("task_id", taskPub.String()),
+			)
+		}
 
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -591,7 +627,7 @@ func RemoveTask(deps Deps) func(context.Context, *RemoveTaskInput) (*RemoveTaskO
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.TimeboxTaskRemoved,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -599,7 +635,16 @@ func RemoveTask(deps Deps) func(context.Context, *RemoveTaskInput) (*RemoveTaskO
 				"timeboxId": tbPub.String(),
 				"taskId":    taskPub.String(),
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "timeboxes.RemoveTask"),
+				slog.String("event_type", string(eventbus.TimeboxTaskRemoved)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.String("timebox_id", tbPub.String()),
+				slog.String("task_id", taskPub.String()),
+			)
+		}
 
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{

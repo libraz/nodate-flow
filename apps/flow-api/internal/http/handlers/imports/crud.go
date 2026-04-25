@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"log/slog"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
@@ -74,12 +75,21 @@ func Create(deps Deps) func(context.Context, *CreateImportInput) (*CreateImportO
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.ImportJobCreated,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			Payload:     map[string]any{"importJobId": pub.String(), "source": in.Body.Source},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "imports.Create"),
+				slog.String("event_type", string(eventbus.ImportJobCreated)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("actor_id", int64(actorID)),
+				slog.String("import_job_id", pub.String()),
+			)
+		}
 
 		if deps.Audit != nil {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -202,12 +212,20 @@ func Cancel(deps Deps) func(context.Context, *CancelImportInput) (*CancelImportO
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.ImportJobCancelled,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			Payload:     map[string]any{"importJobId": pub.String()},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "imports.Cancel"),
+				slog.String("event_type", string(eventbus.ImportJobCancelled)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.String("import_job_id", pub.String()),
+			)
+		}
 
 		if deps.Audit != nil {
 			actorID, _ := middleware.ActorFromContext(ctx)

@@ -138,7 +138,7 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 		}
 
 		if taskLinked {
-			_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+			if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 				Type:        eventbus.SignalAttached,
 				WorkspaceID: wsID,
 				TaskID:      &taskInternal,
@@ -147,7 +147,17 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 					"source":   "github",
 					"kind":     event,
 				},
-			})
+			}); err != nil {
+				slog.ErrorContext(ctx, "eventbus.Append failed",
+					slog.Any("err", err),
+					slog.String("handler", "signals.HandleGithubWebhook"),
+					slog.String("event_type", string(eventbus.SignalAttached)),
+					slog.Int64("workspace_id", int64(wsID)),
+					slog.Int64("task_id", taskInternal),
+					slog.String("signal_id", pub.String()),
+					slog.String("kind", event),
+				)
+			}
 		}
 
 		writeJSON(w, http.StatusAccepted, map[string]any{

@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -73,7 +74,7 @@ func Export(deps Deps) func(ctx context.Context, in *ExportInput) (*ExportOutput
 
 		// Append event.
 		actorInt64 := int64(actorID)
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.ExportRequested,
 			WorkspaceID: ws.ID,
 			ActorUserID: &actorInt64,
@@ -81,7 +82,16 @@ func Export(deps Deps) func(ctx context.Context, in *ExportInput) (*ExportOutput
 				"format": in.Format,
 				"count":  len(tasks),
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "export.Export"),
+				slog.String("event_type", string(eventbus.ExportRequested)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("actor_id", actorInt64),
+				slog.String("format", in.Format),
+			)
+		}
 
 		return &ExportOutput{
 			Body: ExportBody{
@@ -176,7 +186,7 @@ func ExportCSV(deps Deps) http.HandlerFunc {
 
 		// Append event.
 		actorInt64 := int64(actorID)
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.ExportRequested,
 			WorkspaceID: ws.ID,
 			ActorUserID: &actorInt64,
@@ -184,7 +194,16 @@ func ExportCSV(deps Deps) http.HandlerFunc {
 				"format": "csv",
 				"count":  len(tasks),
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "export.ExportCSV"),
+				slog.String("event_type", string(eventbus.ExportRequested)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("actor_id", actorInt64),
+				slog.String("format", "csv"),
+			)
+		}
 	}
 }
 
@@ -220,7 +239,7 @@ func fetchForWorkspace(
 		Limit:       limit,
 	})
 	if err != nil {
-		return nil, httpErr(apierrors.ExportTaskGenerationFailed)
+		return nil, httpErr(apierrors.ExportTaskDatasetQueryFailed)
 	}
 	out := make([]exportRow, len(dbRows))
 	for i, r := range dbRows {
@@ -261,7 +280,7 @@ func fetchForLens(
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, httpErr(apierrors.ExportTaskLensNotFound)
 		}
-		return nil, httpErr(apierrors.ExportTaskGenerationFailed)
+		return nil, httpErr(apierrors.ExportTaskDatasetQueryFailed)
 	}
 
 	// If the lens has a project scope, use the project-scoped query.
@@ -272,7 +291,7 @@ func fetchForLens(
 			Limit:       limit,
 		})
 		if err != nil {
-			return nil, httpErr(apierrors.ExportTaskGenerationFailed)
+			return nil, httpErr(apierrors.ExportTaskDatasetQueryFailed)
 		}
 		out := make([]exportRow, len(dbRows))
 		for i, r := range dbRows {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 	"strconv"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
@@ -187,7 +188,7 @@ func resolveAccept(
 	// Emit event.
 	actor := int64(actorID)
 	srcTaskID := int64(suggestion.SourceTaskID)
-	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+	if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 		Type:        eventbus.RelationAccepted,
 		WorkspaceID: wsID,
 		ActorUserID: &actor,
@@ -198,7 +199,17 @@ func resolveAccept(
 			"sourceTaskId":  suggestion.SourceTaskPublicID.String(),
 			"targetTaskId":  suggestion.TargetTaskPublicID.String(),
 		},
-	})
+	}); err != nil {
+		slog.ErrorContext(ctx, "eventbus.Append failed",
+			slog.Any("err", err),
+			slog.String("handler", "relations.resolveAccept"),
+			slog.String("event_type", string(eventbus.RelationAccepted)),
+			slog.Int64("workspace_id", int64(wsID)),
+			slog.Int64("actor_id", actor),
+			slog.Int64("task_id", srcTaskID),
+			slog.String("suggestion_id", suggestion.PublicID.String()),
+		)
+	}
 
 	deps.Audit.Record(ctx, audit.Entry{
 		Action:       "relation.suggestion.accept",
@@ -233,7 +244,7 @@ func resolveDismiss(
 	// Emit event.
 	actor := int64(actorID)
 	srcTaskID := int64(suggestion.SourceTaskID)
-	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+	if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 		Type:        eventbus.RelationDismissed,
 		WorkspaceID: wsID,
 		ActorUserID: &actor,
@@ -244,7 +255,17 @@ func resolveDismiss(
 			"sourceTaskId":  suggestion.SourceTaskPublicID.String(),
 			"targetTaskId":  suggestion.TargetTaskPublicID.String(),
 		},
-	})
+	}); err != nil {
+		slog.ErrorContext(ctx, "eventbus.Append failed",
+			slog.Any("err", err),
+			slog.String("handler", "relations.resolveDismiss"),
+			slog.String("event_type", string(eventbus.RelationDismissed)),
+			slog.Int64("workspace_id", int64(wsID)),
+			slog.Int64("actor_id", actor),
+			slog.Int64("task_id", srcTaskID),
+			slog.String("suggestion_id", suggestion.PublicID.String()),
+		)
+	}
 
 	deps.Audit.Record(ctx, audit.Entry{
 		Action:       "relation.suggestion.dismiss",

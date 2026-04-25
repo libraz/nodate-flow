@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
@@ -187,7 +188,7 @@ func RestoreDescriptionVersion(deps Deps) func(context.Context, *RestoreDescript
 		}
 
 		taskIDInt64 := int64(task.ID)
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.DescriptionVersionRestored,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -198,7 +199,18 @@ func RestoreDescriptionVersion(deps Deps) func(context.Context, *RestoreDescript
 				"newVersionId":  newPub.String(),
 				"versionNumber": nextVer,
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "tasks.RestoreDescriptionVersion"),
+				slog.String("event_type", string(eventbus.DescriptionVersionRestored)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("actor_id", int64(actorID)),
+				slog.Int64("task_id", taskIDInt64),
+				slog.String("version_id", versionPub.String()),
+				slog.String("new_version_id", newPub.String()),
+			)
+		}
 
 		if deps.Audit != nil {
 			deps.Audit.Record(ctx, audit.Entry{

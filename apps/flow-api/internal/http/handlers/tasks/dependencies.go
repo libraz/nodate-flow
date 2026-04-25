@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
@@ -107,7 +108,7 @@ func AddDependency(deps Deps) func(context.Context, *AddTaskDependencyInput) (*A
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		taskInternal := int64(task.ID)
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.TaskDependencyAdded,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -118,7 +119,16 @@ func AddDependency(deps Deps) func(context.Context, *AddTaskDependencyInput) (*A
 				"toTaskId":     toPub.String(),
 				"kind":         in.Body.Kind,
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "tasks.AddDependency"),
+				slog.String("event_type", string(eventbus.TaskDependencyAdded)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("task_id", taskInternal),
+				slog.String("dependency_id", pub.String()),
+			)
+		}
 		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
 			deps.Audit.Record(ctx, audit.Entry{
 				Action:       "task.dependency.add",
@@ -160,7 +170,7 @@ func RemoveDependency(deps Deps) func(context.Context, *RemoveTaskDependencyInpu
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		taskInternal := int64(task.ID)
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.TaskDependencyRemoved,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -169,7 +179,16 @@ func RemoveDependency(deps Deps) func(context.Context, *RemoveTaskDependencyInpu
 				"taskId":       task.PublicID.String(),
 				"dependencyId": depID.String(),
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "tasks.RemoveDependency"),
+				slog.String("event_type", string(eventbus.TaskDependencyRemoved)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("task_id", taskInternal),
+				slog.String("dependency_id", depID.String()),
+			)
+		}
 		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
 			deps.Audit.Record(ctx, audit.Entry{
 				Action:       "task.dependency.remove",

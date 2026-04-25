@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
@@ -40,7 +41,7 @@ func AddComment(deps Deps) func(context.Context, *AddTaskCommentInput) (*AddTask
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		taskInternal := int64(task.ID)
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.TaskCommentAdded,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -49,7 +50,17 @@ func AddComment(deps Deps) func(context.Context, *AddTaskCommentInput) (*AddTask
 				"taskId":    task.PublicID.String(),
 				"commentId": pub.String(),
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "tasks.AddComment"),
+				slog.String("event_type", string(eventbus.TaskCommentAdded)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("actor_id", int64(actorID)),
+				slog.Int64("task_id", taskInternal),
+				slog.String("comment_id", pub.String()),
+			)
+		}
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "comment.create",
 			ActorID:      actorID,
@@ -149,7 +160,7 @@ func EditComment(deps Deps) func(context.Context, *EditTaskCommentInput) (*EditT
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		taskInternal := int64(task.ID)
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.TaskCommentEdited,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -158,7 +169,17 @@ func EditComment(deps Deps) func(context.Context, *EditTaskCommentInput) (*EditT
 				"taskId":    task.PublicID.String(),
 				"commentId": cid.String(),
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "tasks.EditComment"),
+				slog.String("event_type", string(eventbus.TaskCommentEdited)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("actor_id", int64(actorID)),
+				slog.Int64("task_id", taskInternal),
+				slog.String("comment_id", cid.String()),
+			)
+		}
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "comment.update",
 			ActorID:      actorID,
@@ -211,7 +232,7 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteTaskCommentInput) (*D
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		taskInternal := int64(task.ID)
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.TaskCommentRemoved,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -220,7 +241,17 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteTaskCommentInput) (*D
 				"taskId":    task.PublicID.String(),
 				"commentId": cid.String(),
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "tasks.DeleteComment"),
+				slog.String("event_type", string(eventbus.TaskCommentRemoved)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("actor_id", int64(actorID)),
+				slog.Int64("task_id", taskInternal),
+				slog.String("comment_id", cid.String()),
+			)
+		}
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "comment.delete",
 			ActorID:      actorID,

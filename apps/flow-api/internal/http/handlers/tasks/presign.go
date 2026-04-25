@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -121,7 +122,7 @@ func PresignUpload(deps Deps) func(context.Context, *PresignUploadInput) (*Presi
 		}
 
 		taskInternal := int64(task.ID)
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.TaskAttachmentAdded,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -131,7 +132,17 @@ func PresignUpload(deps Deps) func(context.Context, *PresignUploadInput) (*Presi
 				"attachmentId": pub.String(),
 				"filename":     in.Body.Filename,
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "tasks.PresignUpload"),
+				slog.String("event_type", string(eventbus.TaskAttachmentAdded)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("actor_id", int64(actorID)),
+				slog.Int64("task_id", taskInternal),
+				slog.String("attachment_id", pub.String()),
+			)
+		}
 
 		return &PresignUploadOutput{Body: PresignUploadOutputBody{
 			UploadURL:    uploadURL,

@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
@@ -60,14 +61,22 @@ func PauseAgent(deps Deps) func(context.Context, *PauseAgentInput) (*PauseAgentO
 		if in.Body.Paused {
 			kind = eventbus.AiAgentPaused
 		}
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        kind,
 			WorkspaceID: ws.ID,
 			Payload: map[string]any{
 				"agentId": agentPub.String(),
 				"paused":  in.Body.Paused,
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "ai.PauseAgent"),
+				slog.String("event_type", string(kind)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.String("agent_id", agentPub.String()),
+			)
+		}
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{
 				Action:       "ai_agent.pause",

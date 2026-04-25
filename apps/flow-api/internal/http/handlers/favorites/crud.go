@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
@@ -67,7 +68,7 @@ func Create(deps Deps) func(context.Context, *CreateFavoriteInput) (*CreateFavor
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.FavoriteAdded,
 			WorkspaceID: wsID,
 			ActorUserID: actorPtr(ctx),
@@ -76,7 +77,16 @@ func Create(deps Deps) func(context.Context, *CreateFavoriteInput) (*CreateFavor
 				"targetType": in.Body.TargetType,
 				"targetId":   in.Body.TargetID,
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "favorites.Create"),
+				slog.String("event_type", string(eventbus.FavoriteAdded)),
+				slog.Int64("workspace_id", int64(wsID)),
+				slog.Int64("actor_id", int64(actorID)),
+				slog.String("favorite_id", pub.String()),
+			)
+		}
 
 		if deps.Audit != nil {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -91,8 +101,8 @@ func Create(deps Deps) func(context.Context, *CreateFavoriteInput) (*CreateFavor
 
 		row, err := deps.Queries.FindFavoriteByPublicId(ctx, generated.FindFavoriteByPublicIdParams{
 			WorkspaceID: wsID,
-			PublicID:     pub,
-			UserID:       actorID,
+			PublicID:    pub,
+			UserID:      actorID,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -181,7 +191,7 @@ func Delete(deps Deps) func(context.Context, *DeleteFavoriteInput) (*DeleteFavor
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.FavoriteRemoved,
 			WorkspaceID: row.WorkspaceID,
 			ActorUserID: actorPtr(ctx),
@@ -190,7 +200,16 @@ func Delete(deps Deps) func(context.Context, *DeleteFavoriteInput) (*DeleteFavor
 				"targetType": string(row.TargetType),
 				"targetId":   row.TargetPublicID.String(),
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "favorites.Delete"),
+				slog.String("event_type", string(eventbus.FavoriteRemoved)),
+				slog.Int64("workspace_id", int64(row.WorkspaceID)),
+				slog.Int64("actor_id", int64(actorID)),
+				slog.String("favorite_id", pub.String()),
+			)
+		}
 
 		if deps.Audit != nil {
 			deps.Audit.Record(ctx, audit.Entry{

@@ -3,6 +3,7 @@ package tasks
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
@@ -44,7 +45,7 @@ func AddAttachment(deps Deps) func(context.Context, *AddTaskAttachmentInput) (*A
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		taskInternal := int64(task.ID)
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.TaskAttachmentAdded,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -54,7 +55,17 @@ func AddAttachment(deps Deps) func(context.Context, *AddTaskAttachmentInput) (*A
 				"attachmentId": pub.String(),
 				"filename":     in.Body.Filename,
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "tasks.AddAttachment"),
+				slog.String("event_type", string(eventbus.TaskAttachmentAdded)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("actor_id", int64(actorID)),
+				slog.Int64("task_id", taskInternal),
+				slog.String("attachment_id", pub.String()),
+			)
+		}
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "attachment.create",
 			ActorID:      actorID,
@@ -132,7 +143,7 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteTaskAttachmentInpu
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		taskInternal := int64(task.ID)
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.TaskAttachmentRemoved,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -141,7 +152,16 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteTaskAttachmentInpu
 				"taskId":       task.PublicID.String(),
 				"attachmentId": aid.String(),
 			},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "tasks.DeleteAttachment"),
+				slog.String("event_type", string(eventbus.TaskAttachmentRemoved)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("task_id", taskInternal),
+				slog.String("attachment_id", aid.String()),
+			)
+		}
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{
 				Action:       "attachment.delete",

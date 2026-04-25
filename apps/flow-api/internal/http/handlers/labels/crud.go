@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
@@ -81,12 +82,20 @@ func Create(deps Deps) func(context.Context, *CreateLabelInput) (*CreateLabelOut
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.LabelCreated,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			Payload:     map[string]any{"labelId": pub.String()},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "labels.Create"),
+				slog.String("event_type", string(eventbus.LabelCreated)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.String("label_id", pub.String()),
+			)
+		}
 
 		if deps.Audit != nil {
 			if actorID, ok := middleware.ActorFromContext(ctx); ok {
@@ -288,12 +297,20 @@ func Patch(deps Deps) func(context.Context, *PatchLabelInput) (*PatchLabelOutput
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.LabelUpdated,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			Payload:     map[string]any{"labelId": pub.String()},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "labels.Patch"),
+				slog.String("event_type", string(eventbus.LabelUpdated)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.String("label_id", pub.String()),
+			)
+		}
 
 		if deps.Audit != nil {
 			if actorID, ok := middleware.ActorFromContext(ctx); ok {
@@ -339,12 +356,20 @@ func Disable(deps Deps) func(context.Context, *DisableLabelInput) (*DisableLabel
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.LabelDisabled,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			Payload:     map[string]any{"labelId": pub.String()},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "labels.Disable"),
+				slog.String("event_type", string(eventbus.LabelDisabled)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.String("label_id", pub.String()),
+			)
+		}
 
 		if deps.Audit != nil {
 			if actorID, ok := middleware.ActorFromContext(ctx); ok {
@@ -407,13 +432,22 @@ func AddTaskLabel(deps Deps) func(context.Context, *AddTaskLabelInput) (*AddTask
 		}
 
 		taskID := int64(task.ID)
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.TaskLabelAdded,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			TaskID:      &taskID,
 			Payload:     map[string]any{"labelId": labelPub.String()},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "labels.AddTaskLabel"),
+				slog.String("event_type", string(eventbus.TaskLabelAdded)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("task_id", taskID),
+				slog.String("label_id", labelPub.String()),
+			)
+		}
 
 		return &AddTaskLabelOutput{Body: TaskLabel{
 			ID:          labelPub.String(),
@@ -492,13 +526,22 @@ func RemoveTaskLabel(deps Deps) func(context.Context, *RemoveTaskLabelInput) (*R
 		}
 
 		taskID := int64(task.ID)
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.TaskLabelRemoved,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			TaskID:      &taskID,
 			Payload:     map[string]any{"labelId": labelPub.String()},
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "labels.RemoveTaskLabel"),
+				slog.String("event_type", string(eventbus.TaskLabelRemoved)),
+				slog.Int64("workspace_id", int64(ws.ID)),
+				slog.Int64("task_id", taskID),
+				slog.String("label_id", labelPub.String()),
+			)
+		}
 
 		if deps.Audit != nil {
 			if actorID, ok := middleware.ActorFromContext(ctx); ok {

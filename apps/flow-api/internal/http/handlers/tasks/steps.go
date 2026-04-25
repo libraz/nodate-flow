@@ -3,6 +3,7 @@ package tasks
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -242,7 +243,7 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 		parentPubStr := task.PublicID.String()
 		for i, st := range in.Body.Steps {
 			actor := int64(actorID)
-			_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+			if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 				Type:        eventbus.TaskCreated,
 				WorkspaceID: ws.ID,
 				ActorUserID: &actor,
@@ -253,7 +254,18 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 					"parentTaskId": parentPubStr,
 					"via":          "api:apply_steps",
 				},
-			})
+			}); err != nil {
+				slog.ErrorContext(ctx, "eventbus.Append failed",
+					slog.Any("err", err),
+					slog.String("handler", "tasks.ApplySteps"),
+					slog.String("event_type", string(eventbus.TaskCreated)),
+					slog.Int64("workspace_id", int64(ws.ID)),
+					slog.Int64("actor_id", actor),
+					slog.Int64("task_id", childIDs[i]),
+					slog.String("task_public_id", created[i]),
+					slog.String("parent_task_id", parentPubStr),
+				)
+			}
 		}
 
 		deps.Audit.Record(ctx, audit.Entry{
