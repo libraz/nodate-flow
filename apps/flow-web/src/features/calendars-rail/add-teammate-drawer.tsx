@@ -106,7 +106,7 @@ export default function AddTeammateDrawer({
       open={open}
       onClose={onClose}
       title={t('calendars_rail.discover.title')}
-      side="inline-end"
+      side="inline-start"
     >
       <div className={styles.body}>
         <Input
