@@ -488,6 +488,10 @@ SELECT
   ce.location,
   ce.owner_user_id,
   uo.public_id AS owner_public_id,
+  (SELECT COUNT(*) FROM calendar_event_attendees a
+     WHERE a.event_id = ce.id AND a.enabled = TRUE) AS attendee_count,
+  EXISTS(SELECT 1 FROM calendar_event_attendees a
+     WHERE a.event_id = ce.id AND a.user_id = wm.user_id AND a.enabled = TRUE) AS viewer_attending,
   ce.block_label,
   ce.task_id,
   ce.updated_at,
@@ -541,6 +545,8 @@ type ListMyCalendarEventsAcrossWorkspacesRow struct {
 	Location          sql.NullString           `json:"location"`
 	OwnerUserID       uint32                   `json:"-"`
 	OwnerPublicID     types.PublicID           `json:"ownerPublicId"`
+	AttendeeCount     int64                    `json:"attendeeCount"`
+	ViewerAttending   bool                     `json:"viewerAttending"`
 	BlockLabel        sql.NullString           `json:"blockLabel"`
 	TaskID            sql.NullInt32            `json:"-"`
 	UpdatedAt         sql.NullTime             `json:"updatedAt"`
@@ -581,6 +587,8 @@ func (q *Queries) ListMyCalendarEventsAcrossWorkspaces(ctx context.Context, arg 
 			&i.Location,
 			&i.OwnerUserID,
 			&i.OwnerPublicID,
+			&i.AttendeeCount,
+			&i.ViewerAttending,
 			&i.BlockLabel,
 			&i.TaskID,
 			&i.UpdatedAt,
@@ -618,6 +626,10 @@ SELECT
   ce.location,
   ce.owner_user_id,
   uo.public_id AS owner_public_id,
+  (SELECT COUNT(*) FROM calendar_event_attendees a
+     WHERE a.event_id = ce.id AND a.enabled = TRUE) AS attendee_count,
+  EXISTS(SELECT 1 FROM calendar_event_attendees a
+     WHERE a.event_id = ce.id AND a.user_id = wm.user_id AND a.enabled = TRUE) AS viewer_attending,
   ce.block_label,
   ce.recurrence_rule,
   ce.recurrence_end,
@@ -674,6 +686,8 @@ type ListMyRecurringCalendarEventsAcrossWorkspacesRow struct {
 	Location             sql.NullString           `json:"location"`
 	OwnerUserID          uint32                   `json:"-"`
 	OwnerPublicID        types.PublicID           `json:"ownerPublicId"`
+	AttendeeCount        int64                    `json:"attendeeCount"`
+	ViewerAttending      bool                     `json:"viewerAttending"`
 	BlockLabel           sql.NullString           `json:"blockLabel"`
 	RecurrenceRule       json.RawMessage          `json:"recurrenceRule"`
 	RecurrenceEnd        sql.NullTime             `json:"recurrenceEnd"`
@@ -713,6 +727,8 @@ func (q *Queries) ListMyRecurringCalendarEventsAcrossWorkspaces(ctx context.Cont
 			&i.Location,
 			&i.OwnerUserID,
 			&i.OwnerPublicID,
+			&i.AttendeeCount,
+			&i.ViewerAttending,
 			&i.BlockLabel,
 			&i.RecurrenceRule,
 			&i.RecurrenceEnd,

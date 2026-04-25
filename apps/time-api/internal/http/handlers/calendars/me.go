@@ -116,6 +116,8 @@ type MyCalendarEventResponse struct {
 	WorkspaceID          string           `json:"workspaceId"`
 	WorkspaceName        string           `json:"workspaceName"`
 	OwnerUserID          string           `json:"ownerUserId"`
+	AttendeeCount        int64            `json:"attendeeCount"`
+	ViewerAttending      bool             `json:"viewerAttending"`
 	Kind                 string           `json:"kind"`
 	Visibility           string           `json:"visibility"`
 	ShowAs               string           `json:"showAs"`
@@ -188,20 +190,22 @@ func ListMyCalendarEvents(deps Deps) func(context.Context, *ListMyCalendarEvents
 
 		for _, r := range rows {
 			resp := MyCalendarEventResponse{
-				ID:            r.PublicID.String(),
-				CalendarID:    r.CalendarPublicID.String(),
-				WorkspaceID:   r.WorkspacePublicID.String(),
-				WorkspaceName: r.WorkspaceName,
-				OwnerUserID:   r.OwnerPublicID.String(),
-				Kind:          string(r.Kind),
-				Visibility:    string(r.Visibility),
-				ShowAs:        string(r.ShowAs),
-				Title:         r.Title,
-				AllDay:        r.AllDay,
-				StartAt:       nullTimeUnixPtr(r.StartAt),
-				EndAt:         nullTimeUnixPtr(r.EndAt),
-				Timezone:      r.Timezone,
-				CreatedAt:     r.CreatedAt.Unix(),
+				ID:              r.PublicID.String(),
+				CalendarID:      r.CalendarPublicID.String(),
+				WorkspaceID:     r.WorkspacePublicID.String(),
+				WorkspaceName:   r.WorkspaceName,
+				OwnerUserID:     r.OwnerPublicID.String(),
+				AttendeeCount:   r.AttendeeCount,
+				ViewerAttending: r.ViewerAttending,
+				Kind:            string(r.Kind),
+				Visibility:      string(r.Visibility),
+				ShowAs:          string(r.ShowAs),
+				Title:           r.Title,
+				AllDay:          r.AllDay,
+				StartAt:         nullTimeUnixPtr(r.StartAt),
+				EndAt:           nullTimeUnixPtr(r.EndAt),
+				Timezone:        r.Timezone,
+				CreatedAt:       r.CreatedAt.Unix(),
 			}
 			if r.Location.Valid {
 				resp.Location = &r.Location.String
@@ -217,20 +221,22 @@ func ListMyCalendarEvents(deps Deps) func(context.Context, *ListMyCalendarEvents
 
 		for _, r := range recurringRows {
 			resp := MyCalendarEventResponse{
-				ID:            r.PublicID.String(),
-				CalendarID:    r.CalendarPublicID.String(),
-				WorkspaceID:   r.WorkspacePublicID.String(),
-				WorkspaceName: r.WorkspaceName,
-				OwnerUserID:   r.OwnerPublicID.String(),
-				Kind:          string(r.Kind),
-				Visibility:    string(r.Visibility),
-				ShowAs:        string(r.ShowAs),
-				Title:         r.Title,
-				AllDay:        r.AllDay,
-				StartAt:       nullTimeUnixPtr(r.StartAt),
-				EndAt:         nullTimeUnixPtr(r.EndAt),
-				Timezone:      r.Timezone,
-				CreatedAt:     r.CreatedAt.Unix(),
+				ID:              r.PublicID.String(),
+				CalendarID:      r.CalendarPublicID.String(),
+				WorkspaceID:     r.WorkspacePublicID.String(),
+				WorkspaceName:   r.WorkspaceName,
+				OwnerUserID:     r.OwnerPublicID.String(),
+				AttendeeCount:   r.AttendeeCount,
+				ViewerAttending: r.ViewerAttending,
+				Kind:            string(r.Kind),
+				Visibility:      string(r.Visibility),
+				ShowAs:          string(r.ShowAs),
+				Title:           r.Title,
+				AllDay:          r.AllDay,
+				StartAt:         nullTimeUnixPtr(r.StartAt),
+				EndAt:           nullTimeUnixPtr(r.EndAt),
+				Timezone:        r.Timezone,
+				CreatedAt:       r.CreatedAt.Unix(),
 			}
 			if r.Location.Valid {
 				resp.Location = &r.Location.String

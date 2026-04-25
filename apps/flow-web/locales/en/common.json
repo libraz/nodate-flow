@@ -195,6 +195,7 @@
       "sat": "Sat",
       "sun": "Sun"
     },
+    "event_attendee_count": "{count, plural, one {# attendee} other {# attendees}}",
     "event_detail": {
       "title": "Event details",
       "event": "Event",

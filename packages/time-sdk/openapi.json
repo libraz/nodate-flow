@@ -1604,6 +1604,10 @@
           "allDay": {
             "type": "boolean"
           },
+          "attendeeCount": {
+            "format": "int64",
+            "type": "integer"
+          },
           "blockLabel": {
             "type": "string"
           },
@@ -1653,6 +1657,9 @@
             "format": "int64",
             "type": "integer"
           },
+          "viewerAttending": {
+            "type": "boolean"
+          },
           "visibility": {
             "type": "string"
           },
@@ -1669,6 +1676,8 @@
           "workspaceId",
           "workspaceName",
           "ownerUserId",
+          "attendeeCount",
+          "viewerAttending",
           "kind",
           "visibility",
           "showAs",

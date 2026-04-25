@@ -30,7 +30,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { ToggleChip, ToggleChipGroup } from '@nodate-flow/ui/primitives/toggle-chip';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import { type DragEvent, type ReactElement, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -718,7 +718,7 @@ function CalendarRoute(): ReactElement {
                               e.stopPropagation();
                               setEditTarget({ mode: 'edit', event: ev });
                             }}
-                            className={styles.eventPill}
+                            className={`${styles.eventPill}${ev.viewerAttending ? ` ${styles['eventPill--viewerAttending']}` : ''}`}
                             style={pill}
                           >
                             <span
@@ -727,6 +727,17 @@ function CalendarRoute(): ReactElement {
                               style={{ background: pill.markerColor }}
                             />
                             <span className={styles.eventPill__title}>{ev.title}</span>
+                            {ev.attendeeCount > 0 ? (
+                              <span
+                                className={styles.eventPill__attendees}
+                                aria-label={t('calendar.event_attendee_count', {
+                                  count: ev.attendeeCount,
+                                })}
+                              >
+                                <Users aria-hidden className={styles.eventPill__attendeesIcon} />
+                                {ev.attendeeCount}
+                              </span>
+                            ) : null}
                           </button>
                         </li>
                       );

@@ -229,6 +229,10 @@ SELECT
   ce.location,
   ce.owner_user_id,
   uo.public_id AS owner_public_id,
+  (SELECT COUNT(*) FROM calendar_event_attendees a
+     WHERE a.event_id = ce.id AND a.enabled = TRUE) AS attendee_count,
+  EXISTS(SELECT 1 FROM calendar_event_attendees a
+     WHERE a.event_id = ce.id AND a.user_id = wm.user_id AND a.enabled = TRUE) AS viewer_attending,
   ce.block_label,
   ce.task_id,
   ce.updated_at,
@@ -279,6 +283,10 @@ SELECT
   ce.location,
   ce.owner_user_id,
   uo.public_id AS owner_public_id,
+  (SELECT COUNT(*) FROM calendar_event_attendees a
+     WHERE a.event_id = ce.id AND a.enabled = TRUE) AS attendee_count,
+  EXISTS(SELECT 1 FROM calendar_event_attendees a
+     WHERE a.event_id = ce.id AND a.user_id = wm.user_id AND a.enabled = TRUE) AS viewer_attending,
   ce.block_label,
   ce.recurrence_rule,
   ce.recurrence_end,

@@ -1375,6 +1375,8 @@ export interface components {
         };
         MyCalendarEventResponse: {
             allDay: boolean;
+            /** Format: int64 */
+            attendeeCount: number;
             blockLabel?: string;
             calendarId: string;
             /** Format: int64 */
@@ -1396,6 +1398,7 @@ export interface components {
             title: string;
             /** Format: int64 */
             updatedAt?: number;
+            viewerAttending: boolean;
             visibility: string;
             workspaceId: string;
             workspaceName: string;

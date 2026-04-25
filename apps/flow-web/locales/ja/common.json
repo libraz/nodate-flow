@@ -195,6 +195,7 @@
       "sat": "土",
       "sun": "日"
     },
+    "event_attendee_count": "参加者 {count}人",
     "event_detail": {
       "title": "イベントの詳細",
       "event": "イベント",
