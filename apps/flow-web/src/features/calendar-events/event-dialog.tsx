@@ -44,6 +44,7 @@ import { useTranslation } from 'react-i18next';
 
 import { dateKey } from '../../lib/date-utils';
 import { formatDate } from '../../lib/format';
+import { selectUser, useAuth } from '../auth/auth-store';
 import { TASK_PRIORITIES, type TaskPriority } from '../tasks/api';
 import { PRIORITY_KEY } from '../tasks/constants';
 import {
@@ -57,6 +58,7 @@ import {
   useDeleteEvent,
   useUpdateEvent,
 } from './api';
+import AttendeesSection from './attendees-section';
 import styles from './event-dialog.module.css';
 
 type FlowProject = flowComponents['schemas']['Project'];
@@ -254,6 +256,12 @@ export default function EventDialog({
 
   const isCreate = mode.kind === 'create';
   const isEdit = mode.kind === 'edit';
+
+  // Current actor — used by the AttendeesSection to detect "self" rows
+  // and gate owner-only controls. Falls back to an empty string when the
+  // user is somehow not yet bootstrapped (treated as "no privileges").
+  const currentUser = useAuth(selectUser);
+  const selfUserId = currentUser?.id ?? '';
 
   const initialKind: ItemKind =
     mode.kind === 'create' ? (mode.initialItemKind ?? 'event') : mode.initialKind;
@@ -969,6 +977,17 @@ export default function EventDialog({
             </div>
           ) : null}
         </div>
+
+        {mode.kind === 'edit' &&
+        (mode.initialKind === 'event' || mode.initialKind === 'milestone') ? (
+          <AttendeesSection
+            workspaceId={workspaceId}
+            calendarId={mode.calendarId}
+            eventId={mode.eventId}
+            ownerUserId={mode.event.ownerUserId ?? null}
+            selfUserId={selfUserId}
+          />
+        ) : null}
 
         {/* Footer — sibling of the scrolling body so it stays anchored. */}
         <div className={styles.footer}>

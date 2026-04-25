@@ -53,6 +53,23 @@ vi.mock('@nodate-flow/ui/primitives/toast', () => ({
   toaster: { show: vi.fn() },
 }));
 
+// AttendeesSection pulls workspace members + per-event attendees via
+// react-query. Neither is under test for the dialog state machine, so
+// stub them out with empty resolved data to keep the edit-mode dialog
+// renderable without a backend.
+vi.mock('../attendees-api', () => ({
+  useAttendeesQuery: () => ({ data: [], isLoading: false }),
+  useAddAttendeesMutation: () => ({ mutate: vi.fn(), isPending: false }),
+  useRemoveAttendeeMutation: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateOwnRsvpMutation: () => ({ mutate: vi.fn(), isPending: false }),
+  useToggleCanEditMutation: () => ({ mutate: vi.fn(), isPending: false }),
+  useCreateAttendeeInviteMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}));
+
+vi.mock('../../workspaces/api', () => ({
+  useWorkspaceMembersQuery: () => ({ data: [], isLoading: false }),
+}));
+
 /* ── helpers ──────────────────────────────────────────────────── */
 
 function createMode(): EventDialogMode {

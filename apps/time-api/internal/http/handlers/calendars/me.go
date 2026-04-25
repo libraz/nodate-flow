@@ -115,6 +115,7 @@ type MyCalendarEventResponse struct {
 	CalendarID           string           `json:"calendarId"`
 	WorkspaceID          string           `json:"workspaceId"`
 	WorkspaceName        string           `json:"workspaceName"`
+	OwnerUserID          string           `json:"ownerUserId"`
 	Kind                 string           `json:"kind"`
 	Visibility           string           `json:"visibility"`
 	ShowAs               string           `json:"showAs"`
@@ -191,6 +192,7 @@ func ListMyCalendarEvents(deps Deps) func(context.Context, *ListMyCalendarEvents
 				CalendarID:    r.CalendarPublicID.String(),
 				WorkspaceID:   r.WorkspacePublicID.String(),
 				WorkspaceName: r.WorkspaceName,
+				OwnerUserID:   r.OwnerPublicID.String(),
 				Kind:          string(r.Kind),
 				Visibility:    string(r.Visibility),
 				ShowAs:        string(r.ShowAs),
@@ -219,6 +221,7 @@ func ListMyCalendarEvents(deps Deps) func(context.Context, *ListMyCalendarEvents
 				CalendarID:    r.CalendarPublicID.String(),
 				WorkspaceID:   r.WorkspacePublicID.String(),
 				WorkspaceName: r.WorkspaceName,
+				OwnerUserID:   r.OwnerPublicID.String(),
 				Kind:          string(r.Kind),
 				Visibility:    string(r.Visibility),
 				ShowAs:        string(r.ShowAs),

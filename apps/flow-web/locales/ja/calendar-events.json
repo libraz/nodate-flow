@@ -133,5 +133,25 @@
     "kind_picker": "種別",
     "close": "ダイアログを閉じる",
     "delete_button": "このアイテムを削除"
+  },
+  "event": {
+    "attendees": {
+      "add": "追加",
+      "can_edit": "編集可",
+      "empty": "まだ参加者がいません",
+      "invite_sent": "招待リンクをコピーしました",
+      "placeholder": "ワークスペースメンバーを追加...",
+      "remove": "参加者を除外",
+      "rsvp": {
+        "accepted": "出席",
+        "declined": "欠席",
+        "pending": "未回答",
+        "tentative": "未定"
+      },
+      "send_invite": "招待リンクを送信",
+      "title": "参加者",
+      "you": "あなた",
+      "your_response": "あなたの返事"
+    }
   }
 }

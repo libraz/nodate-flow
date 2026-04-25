@@ -228,6 +228,7 @@ SELECT
   ce.timezone,
   ce.location,
   ce.owner_user_id,
+  uo.public_id AS owner_public_id,
   ce.block_label,
   ce.task_id,
   ce.updated_at,
@@ -237,6 +238,8 @@ INNER JOIN calendars c
   ON c.id = ce.calendar_id AND c.enabled = TRUE
 INNER JOIN workspaces w
   ON w.id = ce.workspace_id AND w.enabled = TRUE
+INNER JOIN users uo
+  ON uo.id = ce.owner_user_id AND uo.enabled = TRUE
 INNER JOIN workspace_members wm
   ON wm.workspace_id = ce.workspace_id
   AND wm.user_id = ?
@@ -275,6 +278,7 @@ SELECT
   ce.timezone,
   ce.location,
   ce.owner_user_id,
+  uo.public_id AS owner_public_id,
   ce.block_label,
   ce.recurrence_rule,
   ce.recurrence_end,
@@ -287,6 +291,8 @@ INNER JOIN calendars c
   ON c.id = ce.calendar_id AND c.enabled = TRUE
 INNER JOIN workspaces w
   ON w.id = ce.workspace_id AND w.enabled = TRUE
+INNER JOIN users uo
+  ON uo.id = ce.owner_user_id AND uo.enabled = TRUE
 INNER JOIN workspace_members wm
   ON wm.workspace_id = ce.workspace_id
   AND wm.user_id = ?

@@ -133,5 +133,25 @@
     "kind_picker": "Item kind",
     "close": "Close dialog",
     "delete_button": "Delete this item"
+  },
+  "event": {
+    "attendees": {
+      "add": "Add",
+      "can_edit": "Can edit",
+      "empty": "No attendees yet",
+      "invite_sent": "Invite link copied",
+      "placeholder": "Add a workspace member...",
+      "remove": "Remove attendee",
+      "rsvp": {
+        "accepted": "Going",
+        "declined": "Declined",
+        "pending": "Pending",
+        "tentative": "Maybe"
+      },
+      "send_invite": "Send invite link",
+      "title": "Attendees",
+      "you": "you",
+      "your_response": "Your response"
+    }
   }
 }

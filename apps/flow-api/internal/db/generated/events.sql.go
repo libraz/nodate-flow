@@ -798,6 +798,7 @@ SELECT
   ce.timezone,
   ce.location,
   ce.owner_user_id,
+  uo.public_id AS owner_public_id,
   ce.block_label,
   ce.task_id,
   ce.updated_at,
@@ -807,6 +808,8 @@ INNER JOIN calendars c
   ON c.id = ce.calendar_id AND c.enabled = TRUE
 INNER JOIN workspaces w
   ON w.id = ce.workspace_id AND w.enabled = TRUE
+INNER JOIN users uo
+  ON uo.id = ce.owner_user_id AND uo.enabled = TRUE
 INNER JOIN workspace_members wm
   ON wm.workspace_id = ce.workspace_id
   AND wm.user_id = ?
@@ -848,6 +851,7 @@ type ListMyCalendarEventsAcrossWorkspacesRow struct {
 	Timezone          string                   `json:"timezone"`
 	Location          sql.NullString           `json:"location"`
 	OwnerUserID       uint32                   `json:"-"`
+	OwnerPublicID     types.PublicID           `json:"ownerPublicId"`
 	BlockLabel        sql.NullString           `json:"blockLabel"`
 	TaskID            sql.NullInt32            `json:"-"`
 	UpdatedAt         sql.NullTime             `json:"updatedAt"`
@@ -887,6 +891,7 @@ func (q *Queries) ListMyCalendarEventsAcrossWorkspaces(ctx context.Context, arg 
 			&i.Timezone,
 			&i.Location,
 			&i.OwnerUserID,
+			&i.OwnerPublicID,
 			&i.BlockLabel,
 			&i.TaskID,
 			&i.UpdatedAt,
@@ -923,6 +928,7 @@ SELECT
   ce.timezone,
   ce.location,
   ce.owner_user_id,
+  uo.public_id AS owner_public_id,
   ce.block_label,
   ce.recurrence_rule,
   ce.recurrence_end,
@@ -935,6 +941,8 @@ INNER JOIN calendars c
   ON c.id = ce.calendar_id AND c.enabled = TRUE
 INNER JOIN workspaces w
   ON w.id = ce.workspace_id AND w.enabled = TRUE
+INNER JOIN users uo
+  ON uo.id = ce.owner_user_id AND uo.enabled = TRUE
 INNER JOIN workspace_members wm
   ON wm.workspace_id = ce.workspace_id
   AND wm.user_id = ?
@@ -976,6 +984,7 @@ type ListMyRecurringCalendarEventsAcrossWorkspacesRow struct {
 	Timezone             string                   `json:"timezone"`
 	Location             sql.NullString           `json:"location"`
 	OwnerUserID          uint32                   `json:"-"`
+	OwnerPublicID        types.PublicID           `json:"ownerPublicId"`
 	BlockLabel           sql.NullString           `json:"blockLabel"`
 	RecurrenceRule       json.RawMessage          `json:"recurrenceRule"`
 	RecurrenceEnd        sql.NullTime             `json:"recurrenceEnd"`
@@ -1014,6 +1023,7 @@ func (q *Queries) ListMyRecurringCalendarEventsAcrossWorkspaces(ctx context.Cont
 			&i.Timezone,
 			&i.Location,
 			&i.OwnerUserID,
+			&i.OwnerPublicID,
 			&i.BlockLabel,
 			&i.RecurrenceRule,
 			&i.RecurrenceEnd,

@@ -1627,6 +1627,9 @@
           "location": {
             "type": "string"
           },
+          "ownerUserId": {
+            "type": "string"
+          },
           "recurrenceEnd": {
             "format": "int64",
             "type": "integer"
@@ -1665,6 +1668,7 @@
           "calendarId",
           "workspaceId",
           "workspaceName",
+          "ownerUserId",
           "kind",
           "visibility",
           "showAs",

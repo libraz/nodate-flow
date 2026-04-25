@@ -1384,6 +1384,7 @@ export interface components {
             id: string;
             kind: string;
             location?: string;
+            ownerUserId: string;
             /** Format: int64 */
             recurrenceEnd?: number;
             recurrenceExceptions?: unknown;

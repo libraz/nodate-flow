@@ -1,0 +1,132 @@
+/**
+ * AttendeesSection layout.
+ *
+ * Sits inside the EventDialog body scroll region. The section header,
+ * the optional "your response" row, the add-attendee combobox row, and
+ * the attendee list are stacked as a single column. Rows in the list are
+ * a 4-cell flex row: avatar | identity (name + you-pill) | rsvp badge |
+ * trailing controls. Owner-only controls (can-edit switch, invite,
+ * remove) live in the trailing slot and collapse out when the actor
+ * is not the owner.
+ */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+}
+
+.responseRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-3);
+  background: var(--nf-color-bg-sunken);
+  border-radius: var(--nf-radius-md);
+}
+
+.responseLabel {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.addRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.empty {
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+  padding-block: var(--nf-space-2);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-2);
+  border-radius: var(--nf-radius-md);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  background: var(--nf-color-bg);
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.name {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.youPill {
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg-muted);
+  background: var(--nf-color-bg-sunken);
+  padding-block: 0;
+  padding-inline: var(--nf-space-2);
+  border-radius: var(--nf-radius-pill);
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  margin-inline-start: auto;
+}
+
+.canEdit {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  white-space: nowrap;
+}
+
+.removeButton {
+  /* Square ghost icon button — re-use Button "ghost" + size sm and pin
+     the inline size so the X stays centered without leading whitespace. */
+  inline-size: var(--nf-space-7);
+  padding-inline: 0;
+}
+
+@media (max-width: 640px) {
+  .row {
+    flex-wrap: wrap;
+  }
+  .controls {
+    inline-size: 100%;
+    justify-content: flex-end;
+    margin-inline-start: 0;
+  }
+}
