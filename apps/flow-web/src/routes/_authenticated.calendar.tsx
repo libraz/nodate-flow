@@ -604,6 +604,11 @@ function CalendarRoute(): ReactElement {
       </div>
 
       <div className={calendarLayoutStyles.layout}>
+        <CalendarsRail
+          workspaces={railWorkspaces}
+          selfUserId={selfUserId}
+          onAddTeammate={setAddTeammateWsId}
+        />
         <div className={styles.gridColumn}>
           <div className={styles.weekdayRow}>
             {weekdayKeys.map((wk, idx) => (
@@ -768,12 +773,6 @@ function CalendarRoute(): ReactElement {
         </div>
 
         <PendingInvitesPanel />
-
-        <CalendarsRail
-          workspaces={railWorkspaces}
-          selfUserId={selfUserId}
-          onAddTeammate={setAddTeammateWsId}
-        />
       </div>
 
       {addTeammateWsId !== null ? (

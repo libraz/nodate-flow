@@ -7,19 +7,18 @@
 
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 20rem);
+  grid-template-columns: minmax(0, 18rem) minmax(0, 1fr);
   gap: var(--nf-space-6);
   align-items: start;
 }
 
 /*
- * On wide viewports we promote the layout to three columns so the
- * calendars rail sits to the right of the month grid alongside the
- * pending-invites panel.
+ * On wide viewports we promote the layout to three columns:
+ * left rail (calendars list) | month grid | pending invites.
  */
 @media (min-width: 80rem) {
   .layout {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 20rem) minmax(0, 18rem);
+    grid-template-columns: minmax(0, 18rem) minmax(0, 1fr) minmax(0, 20rem);
   }
 }
 
