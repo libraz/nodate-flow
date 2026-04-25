@@ -6,7 +6,7 @@ An OSS task platform where LLMs and MCP are not add-ons but the execution
 layer. Tasks are processes whose state is derived from constraints and
 events, not rows updated by button clicks.
 
-A single monorepo ships two products:
+A single monorepo ships two products served by **one combined backend** (`flow-api`):
 
 - **nodate-flow** — task management driven by constraints, events, and AI agents.
 - **nodate-time** — a calendar that blends TimeTree's shared-calendar simplicity with Google Calendar's permission model.
@@ -59,7 +59,6 @@ make seed-flow    # demo admin user + workspace
 ```
 
 ```
-make dev-time     # calendar stack instead
 make reload       # stop-dev (kill by port) + dev, for a clean restart
 make test         # Go + TS tests
 make gen          # codegen (sqlc + errors + SDK)
@@ -70,15 +69,13 @@ make help         # all targets
 
 ```
 apps/
-  flow-api/       # Go backend — tasks, AI, MCP (Huma + chi + sqlc)
+  flow-api/       # Go backend — tasks, calendar, AI, MCP, public shares (Huma + chi + sqlc)
   flow-web/       # React 19 frontend — tasks, calendar, /share/cal, /invites/accept, /setup
   auth-api/       # Go — auth & sessions (JWT, OIDC, TOTP)
   accounts-web/   # React 19 — login / signup / account UI
-  time-api/       # Go — calendar backend
   cli/            # CLI (binary: tnk)
 packages/
   sdk/            # TS SDK for flow-api (generated from OpenAPI)
-  time-sdk/       # TS SDK for time-api (generated from OpenAPI)
   ui/             # Design system (4 themes)
   go-shared/      # Shared Go packages
   holidays/       # Holiday data
