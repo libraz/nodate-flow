@@ -2247,6 +2247,7 @@ CREATE TABLE users (
   locale VARCHAR(16) NOT NULL DEFAULT 'en' COMMENT 'Preferred locale tag (BCP 47)',
   timezone VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT 'UTC' COMMENT 'Preferred IANA timezone (independent of locale)',
   country CHAR(2) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'ISO 3166-1 alpha-2 country (independent of locale); drives default holiday subscription',
+  week_start ENUM('mon','sun','sat') NOT NULL DEFAULT 'mon' COMMENT 'Preferred first day of the week for calendar grids',
   working_days CHAR(7) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'User override of workspace working_days; NULL = inherit',
   working_hours_start TIME NULL COMMENT 'User override of workspace working_hours_start; NULL = inherit',
   working_hours_end TIME NULL COMMENT 'User override of workspace working_hours_end; NULL = inherit',
@@ -2453,6 +2454,72 @@ DROP VIEW IF EXISTS `v_task_list`;
 DROP VIEW IF EXISTS `v_task_timeline`;
 DROP VIEW IF EXISTS `v_users`;
 DROP VIEW IF EXISTS `v_workspace_members`;
+DROP VIEW IF EXISTS `_v_task_list_all`;
+
+-- >>> _v_task_list_all.sql
+-- v_task_list_all
+-- Base projection that includes BOTH active and archived tasks.
+-- Acts as the single source of column definitions for the task list family.
+-- Consumers should prefer v_task_list (active) or v_task_list_archived
+-- (archived) which filter this base view by archived_at. MySQL 8.4 expands
+-- single-level views via the MERGE optimizer, so there is no runtime cost.
+CREATE OR REPLACE ALGORITHM=MERGE VIEW v_task_list_all AS
+SELECT
+  t.workspace_id,
+  t.id AS task_internal_id,
+  t.project_id,
+  t.created_by_user_id,
+  t.public_id,
+  p.public_id AS project_public_id,
+  p.name AS project_name,
+  p.identifier AS project_identifier,
+  t.task_number,
+  pt.public_id AS parent_task_public_id,
+  t.title,
+  t.visibility,
+  t.derived_state,
+  t.priority,
+  t.due_on,
+  t.started_on,
+  t.completed_at,
+  t.archived_at,
+  t.sort_weight,
+  t.updated_at,
+  t.created_at,
+  assignees.primary_assignee_public_id,
+  COALESCE(assignees.assignee_count, 0) AS assignee_count,
+  labels.label_ids
+FROM tasks t
+INNER JOIN projects p
+  ON p.id = t.project_id AND p.enabled = TRUE
+INNER JOIN workspaces w
+  ON w.id = t.workspace_id AND w.enabled = TRUE
+LEFT JOIN tasks pt
+  ON pt.id = t.parent_task_id AND pt.enabled = TRUE
+LEFT JOIN (
+  SELECT
+    ta.task_id,
+    MIN(CASE WHEN rn = 1 THEN u.public_id END) AS primary_assignee_public_id,
+    COUNT(*) AS assignee_count
+  FROM (
+    SELECT ta2.task_id, ta2.user_id,
+           ROW_NUMBER() OVER (PARTITION BY ta2.task_id ORDER BY ta2.sort_weight ASC, ta2.id ASC) AS rn
+    FROM task_actors ta2
+    WHERE ta2.enabled = TRUE AND ta2.role = 'assignee'
+  ) ta
+  INNER JOIN users u ON u.id = ta.user_id AND u.enabled = TRUE
+  GROUP BY ta.task_id
+) assignees ON assignees.task_id = t.id
+LEFT JOIN (
+  SELECT
+    tl.task_id,
+    GROUP_CONCAT(l.public_id ORDER BY tl.sort_weight ASC, tl.id ASC SEPARATOR ',') AS label_ids
+  FROM task_labels tl
+  INNER JOIN labels l ON l.id = tl.label_id AND l.enabled = TRUE
+  WHERE tl.enabled = TRUE
+  GROUP BY tl.task_id
+) labels ON labels.task_id = t.id
+WHERE t.enabled = TRUE;
 
 -- >>> v_admin_users.sql
 -- v_admin_users
@@ -2677,127 +2744,21 @@ WHERE t.enabled = TRUE
 
 -- >>> v_task_list_archived.sql
 -- v_task_list_archived
--- Same as v_task_list but only shows archived tasks.
-CREATE OR REPLACE VIEW v_task_list_archived AS
-SELECT
-  t.workspace_id,
-  t.id AS task_internal_id,
-  t.project_id,
-  t.created_by_user_id,
-  t.public_id,
-  p.public_id AS project_public_id,
-  p.name AS project_name,
-  p.identifier AS project_identifier,
-  t.task_number,
-  pt.public_id AS parent_task_public_id,
-  t.title,
-  t.visibility,
-  t.derived_state,
-  t.priority,
-  t.due_on,
-  t.started_on,
-  t.completed_at,
-  t.archived_at,
-  t.sort_weight,
-  t.updated_at,
-  t.created_at,
-  assignees.primary_assignee_public_id,
-  COALESCE(assignees.assignee_count, 0) AS assignee_count,
-  labels.label_ids
-FROM tasks t
-INNER JOIN projects p
-  ON p.id = t.project_id AND p.enabled = TRUE
-INNER JOIN workspaces w
-  ON w.id = t.workspace_id AND w.enabled = TRUE
-LEFT JOIN tasks pt
-  ON pt.id = t.parent_task_id AND pt.enabled = TRUE
-LEFT JOIN (
-  SELECT
-    ta.task_id,
-    MIN(CASE WHEN rn = 1 THEN u.public_id END) AS primary_assignee_public_id,
-    COUNT(*) AS assignee_count
-  FROM (
-    SELECT ta2.task_id, ta2.user_id,
-           ROW_NUMBER() OVER (PARTITION BY ta2.task_id ORDER BY ta2.sort_weight ASC, ta2.id ASC) AS rn
-    FROM task_actors ta2
-    WHERE ta2.enabled = TRUE AND ta2.role = 'assignee'
-  ) ta
-  INNER JOIN users u ON u.id = ta.user_id AND u.enabled = TRUE
-  GROUP BY ta.task_id
-) assignees ON assignees.task_id = t.id
-LEFT JOIN (
-  SELECT
-    tl.task_id,
-    GROUP_CONCAT(l.public_id ORDER BY tl.sort_weight ASC, tl.id ASC SEPARATOR ',') AS label_ids
-  FROM task_labels tl
-  INNER JOIN labels l ON l.id = tl.label_id AND l.enabled = TRUE
-  WHERE tl.enabled = TRUE
-  GROUP BY tl.task_id
-) labels ON labels.task_id = t.id
-WHERE t.enabled = TRUE
-  AND t.archived_at IS NOT NULL;
+-- Archived-only task projection. Thin filter over v_task_list_all;
+-- column definitions live in the base view.
+CREATE OR REPLACE ALGORITHM=MERGE VIEW v_task_list_archived AS
+SELECT v.*
+FROM v_task_list_all v
+WHERE v.archived_at IS NOT NULL;
 
 -- >>> v_task_list.sql
 -- v_task_list
--- Minimal task projection for list / board views.
-CREATE OR REPLACE VIEW v_task_list AS
-SELECT
-  t.workspace_id,
-  t.id AS task_internal_id,
-  t.project_id,
-  t.created_by_user_id,
-  t.public_id,
-  p.public_id AS project_public_id,
-  p.name AS project_name,
-  p.identifier AS project_identifier,
-  t.task_number,
-  pt.public_id AS parent_task_public_id,
-  t.title,
-  t.visibility,
-  t.derived_state,
-  t.priority,
-  t.due_on,
-  t.started_on,
-  t.completed_at,
-  t.archived_at,
-  t.sort_weight,
-  t.updated_at,
-  t.created_at,
-  assignees.primary_assignee_public_id,
-  COALESCE(assignees.assignee_count, 0) AS assignee_count,
-  labels.label_ids
-FROM tasks t
-INNER JOIN projects p
-  ON p.id = t.project_id AND p.enabled = TRUE
-INNER JOIN workspaces w
-  ON w.id = t.workspace_id AND w.enabled = TRUE
-LEFT JOIN tasks pt
-  ON pt.id = t.parent_task_id AND pt.enabled = TRUE
-LEFT JOIN (
-  SELECT
-    ta.task_id,
-    MIN(CASE WHEN rn = 1 THEN u.public_id END) AS primary_assignee_public_id,
-    COUNT(*) AS assignee_count
-  FROM (
-    SELECT ta2.task_id, ta2.user_id,
-           ROW_NUMBER() OVER (PARTITION BY ta2.task_id ORDER BY ta2.sort_weight ASC, ta2.id ASC) AS rn
-    FROM task_actors ta2
-    WHERE ta2.enabled = TRUE AND ta2.role = 'assignee'
-  ) ta
-  INNER JOIN users u ON u.id = ta.user_id AND u.enabled = TRUE
-  GROUP BY ta.task_id
-) assignees ON assignees.task_id = t.id
-LEFT JOIN (
-  SELECT
-    tl.task_id,
-    GROUP_CONCAT(l.public_id ORDER BY tl.sort_weight ASC, tl.id ASC SEPARATOR ',') AS label_ids
-  FROM task_labels tl
-  INNER JOIN labels l ON l.id = tl.label_id AND l.enabled = TRUE
-  WHERE tl.enabled = TRUE
-  GROUP BY tl.task_id
-) labels ON labels.task_id = t.id
-WHERE t.enabled = TRUE
-  AND t.archived_at IS NULL;
+-- Active (non-archived) task projection for list / board views.
+-- Thin filter over v_task_list_all; column definitions live in the base view.
+CREATE OR REPLACE ALGORITHM=MERGE VIEW v_task_list AS
+SELECT v.*
+FROM v_task_list_all v
+WHERE v.archived_at IS NULL;
 
 -- >>> v_task_timeline.sql
 -- v_task_timeline
@@ -2840,6 +2801,7 @@ SELECT
   u.locale,
   u.timezone,
   u.country,
+  u.week_start,
   u.theme_preference,
   wm.role AS workspace_role,
   u.last_login_at,

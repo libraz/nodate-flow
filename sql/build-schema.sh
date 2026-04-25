@@ -39,15 +39,32 @@ if [[ -d "${TABLES_DIR}" ]]; then
 fi
 
 if [[ -d "${VIEWS_DIR}" ]]; then
+  # Base views (suffix `_all.sql`) are loaded before their dependants so that
+  # filtered child views (e.g. v_task_list, v_task_list_archived) can reference
+  # them. Default glob ordering would otherwise put `v_task_list.sql` before
+  # `v_task_list_all.sql` because '.' (0x2E) sorts before '_' (0x5F).
+  base_views=()
+  leaf_views=()
   for f in "${VIEWS_DIR}"/*.sql; do
     [[ -e "${f}" ]] || continue
+    if [[ "$(basename "${f}")" == *_all.sql ]]; then
+      base_views+=("${f}")
+    else
+      leaf_views+=("${f}")
+    fi
+  done
+
+  # Drop in reverse dependency order: leaves first, then bases.
+  for f in "${leaf_views[@]:-}" "${base_views[@]:-}"; do
+    [[ -n "${f:-}" && -e "${f}" ]] || continue
     name="$(basename "${f}" .sql)"
     echo "DROP VIEW IF EXISTS \`${name}\`;"
   done
   echo
 
-  for f in "${VIEWS_DIR}"/*.sql; do
-    [[ -e "${f}" ]] || continue
+  # Create in dependency order: bases first, then leaves.
+  for f in "${base_views[@]:-}" "${leaf_views[@]:-}"; do
+    [[ -n "${f:-}" && -e "${f}" ]] || continue
     echo "-- >>> $(basename "${f}")"
     cat "${f}"
     echo
