@@ -95,8 +95,6 @@ services:
         condition: service_healthy
       auth-api:
         condition: service_healthy
-      time-api:
-        condition: service_healthy
       otel-collector:
         condition: service_healthy
     volumes:
@@ -235,37 +233,6 @@ services:
       NF_AUTH_SMTP_FROM: ${NF_AUTH_SMTP_FROM:-noreply@nodate-flow.local}
     ports:
       - "${NF_AUTH_PORT:-8082}:8082"
-    healthcheck:
-      test: ["CMD", "/healthcheck"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 10s
-
-  time-api:
-    build:
-      context: .
-      dockerfile: apps/time-api/Dockerfile
-    restart: unless-stopped
-    depends_on:
-      mysql:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    environment:
-      NF_TIME_PORT: "8081"
-      NF_TIME_LOG_LEVEL: ${NF_TIME_LOG_LEVEL:-info}
-      NF_DB_DSN: ${NF_DB_DSN:-nodate:nodatepw@tcp(mysql:3306)/nodate_flow?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci}
-      NF_TIME_CORS: ${NF_TIME_CORS:-http://localhost:5173,http://127.0.0.1:5173}
-      NF_FLOW_WEB_URL: ${NF_FLOW_WEB_URL:-http://localhost:5173}
-      NF_COOKIE_SECURE: "false"
-      NF_S3_ENDPOINT: ${NF_S3_ENDPOINT:-minio:9000}
-      NF_S3_ACCESS_KEY: ${NF_S3_ACCESS_KEY:-minioadmin}
-      NF_S3_SECRET_KEY: ${NF_S3_SECRET_KEY:-minioadmin}
-      NF_S3_BUCKET: ${NF_S3_BUCKET:-nodate}
-      NF_S3_USE_SSL: "false"
-    ports:
-      - "${NF_TIME_PORT:-8081}:8081"
     healthcheck:
       test: ["CMD", "/healthcheck"]
       interval: 5s
