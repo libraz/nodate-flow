@@ -15,8 +15,8 @@ func TestTaskCompleteSetCompletedAt(t *testing.T) {
 	tt := newTenant(t)
 
 	var task struct {
-		ID          string  `json:"id"`
-		CompletedAt *string `json:"completedAt"`
+		ID          string `json:"id"`
+		CompletedAt *int64 `json:"completedAt"`
 	}
 	doJSON(t, http.MethodPost, testServerURL+"/tasks", tt.AccessToken,
 		map[string]any{"projectId": tt.ProjectPublicID, "title": "Complete test"}, &task)
@@ -31,8 +31,8 @@ func TestTaskCompleteSetCompletedAt(t *testing.T) {
 
 	// Verify completedAt is now set.
 	var done struct {
-		DerivedState string  `json:"derivedState"`
-		CompletedAt  *string `json:"completedAt"`
+		DerivedState string `json:"derivedState"`
+		CompletedAt  *int64 `json:"completedAt"`
 	}
 	doJSON(t, http.MethodGet,
 		testServerURL+"/tasks/"+task.ID,
@@ -57,8 +57,8 @@ func TestTaskDirectCompleteFromOpen(t *testing.T) {
 		map[string]any{"projectId": tt.ProjectPublicID, "title": "Direct complete"}, &task)
 
 	var result struct {
-		DerivedState string  `json:"derivedState"`
-		CompletedAt  *string `json:"completedAt"`
+		DerivedState string `json:"derivedState"`
+		CompletedAt  *int64 `json:"completedAt"`
 	}
 	doJSON(t, http.MethodPost,
 		testServerURL+"/tasks/"+task.ID+"/transitions",
@@ -93,8 +93,8 @@ func TestTaskReopenPreservesCompletedAt(t *testing.T) {
 
 	// completedAt should still be set (not cleared on reopen).
 	var reopened struct {
-		DerivedState string  `json:"derivedState"`
-		CompletedAt  *string `json:"completedAt"`
+		DerivedState string `json:"derivedState"`
+		CompletedAt  *int64 `json:"completedAt"`
 	}
 	doJSON(t, http.MethodGet,
 		testServerURL+"/tasks/"+task.ID,

@@ -10,92 +10,21 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// 1. Self-reference CHECK constraints
+// 1. Self-reference CHECK constraints (FK-only columns)
 // ---------------------------------------------------------------------------
 // These tests verify that MySQL enforces the CHECK constraints that prevent
-// a row from pointing to itself. The API layer should also block these
-// operations, but the DB constraints are the last line of defense. We test
-// them via direct SQL to ensure they work independently of the API logic.
-
-// TestCheckConstraintTasksNoSelfParent verifies that setting a task's
-// parent_task_id to its own id is rejected by the
-// chk_tasks_no_self_parent CHECK constraint.
-func TestCheckConstraintTasksNoSelfParent(t *testing.T) {
-	bootstrap(t)
-	t.Parallel()
-
-	tt := newTenant(t)
-
-	// Create a task via the API.
-	var task struct {
-		ID string `json:"id"`
-	}
-	doJSON(t, http.MethodPost, testServerURL+"/tasks", tt.AccessToken,
-		map[string]any{"projectId": tt.ProjectPublicID, "title": "Self-parent test"},
-		&task)
-	require.NotEmpty(t, task.ID, "task creation must return a public id")
-
-	// Resolve the internal id from the public id.
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	var internalID uint32
-	err := testDB.QueryRowContext(ctx,
-		`SELECT id FROM tasks WHERE public_id = UUID_TO_BIN(?, 0)`, task.ID,
-	).Scan(&internalID)
-	require.NoError(t, err, "must resolve internal task id")
-	require.NotZero(t, internalID)
-
-	// Attempt to set parent_task_id = id (self-reference). The CHECK
-	// constraint chk_tasks_no_self_parent must reject this.
-	_, err = testDB.ExecContext(ctx,
-		`UPDATE tasks SET parent_task_id = ? WHERE id = ?`,
-		internalID, internalID)
-	require.Error(t, err, "UPDATE setting parent_task_id to own id must be rejected by CHECK constraint")
-	require.Contains(t, err.Error(), "chk_tasks_no_self_parent",
-		"error must reference the CHECK constraint name")
-}
-
-// TestCheckConstraintPagesNoSelfParent verifies that setting a page's
-// parent_page_id to its own id is rejected by the
-// chk_pages_no_self_parent CHECK constraint.
-func TestCheckConstraintPagesNoSelfParent(t *testing.T) {
-	bootstrap(t)
-	t.Parallel()
-
-	tt := newTenant(t)
-
-	wsURL := testServerURL + "/workspaces/" + tt.WorkspacePublicID
-
-	// Create a page via the API.
-	var page struct {
-		ID string `json:"id"`
-	}
-	doJSON(t, http.MethodPost, wsURL+"/pages", tt.AccessToken,
-		map[string]any{"title": "Self-parent page test", "body": "body"},
-		&page)
-	require.NotEmpty(t, page.ID, "page creation must return a public id")
-
-	// Resolve the internal id.
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	var internalID uint32
-	err := testDB.QueryRowContext(ctx,
-		`SELECT id FROM pages WHERE public_id = UUID_TO_BIN(?, 0)`, page.ID,
-	).Scan(&internalID)
-	require.NoError(t, err, "must resolve internal page id")
-	require.NotZero(t, internalID)
-
-	// Attempt to set parent_page_id = id (self-reference). The CHECK
-	// constraint chk_pages_no_self_parent must reject this.
-	_, err = testDB.ExecContext(ctx,
-		`UPDATE pages SET parent_page_id = ? WHERE id = ?`,
-		internalID, internalID)
-	require.Error(t, err, "UPDATE setting parent_page_id to own id must be rejected by CHECK constraint")
-	require.Contains(t, err.Error(), "chk_pages_no_self_parent",
-		"error must reference the CHECK constraint name")
-}
+// a row from pointing to itself on FK columns that are *not* the table's
+// AUTO_INCREMENT PK (e.g. task_dependencies.from_task_id /
+// relation_suggestions.source_task_id). The API layer should also block
+// these operations, but the DB constraints are the last line of defense.
+//
+// Note: tasks.parent_task_id and pages.parent_page_id cannot carry an
+// equivalent CHECK constraint because MySQL 8 forbids CHECK constraints
+// that (a) reference an AUTO_INCREMENT column (Error 3818) or
+// (b) coexist with a referential action like ON DELETE SET NULL on the
+// same column (Error 3823). Self-parent prevention for those columns is
+// enforced at the application layer instead (see pages PATCH handler;
+// tasks PATCH does not expose parentTaskId to user input).
 
 // TestCheckConstraintTaskDependenciesNoSelf verifies that inserting a
 // task_dependencies row where from_task_id = to_task_id is rejected by
