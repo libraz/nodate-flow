@@ -3178,8 +3178,8 @@ type Project struct {
 	WorkspaceID uint32 `json:"-"`
 	// Workspace-local slug
 	Slug string `json:"slug"`
-	// Human-readable project key (e.g. NF)
-	Identifier string `json:"identifier"`
+	// Human-readable project key (e.g. NF); NULL when not assigned
+	Identifier sql.NullString `json:"identifier"`
 	// Display name
 	Name string `json:"name"`
 	// Optional description
@@ -3901,7 +3901,7 @@ type VProject struct {
 	WorkspaceID      uint32         `json:"-"`
 	PublicID         types.PublicID `json:"publicId"`
 	Slug             string         `json:"slug"`
-	Identifier       string         `json:"identifier"`
+	Identifier       sql.NullString `json:"identifier"`
 	Name             string         `json:"name"`
 	Description      sql.NullString `json:"description"`
 	Color            sql.NullString `json:"color"`
@@ -3936,7 +3936,7 @@ type VTaskDetail struct {
 	PublicID                 types.PublicID    `json:"publicId"`
 	ProjectPublicID          []byte            `json:"projectPublicId"`
 	ProjectName              string            `json:"projectName"`
-	ProjectIdentifier        string            `json:"projectIdentifier"`
+	ProjectIdentifier        sql.NullString    `json:"projectIdentifier"`
 	TaskNumber               uint32            `json:"taskNumber"`
 	ParentTaskPublicID       sql.NullString    `json:"parentTaskPublicId"`
 	CreatedByUserPublicID    sql.NullString    `json:"createdByUserPublicId"`
@@ -3967,7 +3967,7 @@ type VTaskList struct {
 	PublicID                types.PublicID    `json:"publicId"`
 	ProjectPublicID         []byte            `json:"projectPublicId"`
 	ProjectName             string            `json:"projectName"`
-	ProjectIdentifier       string            `json:"projectIdentifier"`
+	ProjectIdentifier       sql.NullString    `json:"projectIdentifier"`
 	TaskNumber              uint32            `json:"taskNumber"`
 	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
 	Title                   string            `json:"title"`
@@ -3994,7 +3994,7 @@ type VTaskListAll struct {
 	PublicID                types.PublicID    `json:"publicId"`
 	ProjectPublicID         []byte            `json:"projectPublicId"`
 	ProjectName             string            `json:"projectName"`
-	ProjectIdentifier       string            `json:"projectIdentifier"`
+	ProjectIdentifier       sql.NullString    `json:"projectIdentifier"`
 	TaskNumber              uint32            `json:"taskNumber"`
 	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
 	Title                   string            `json:"title"`
@@ -4021,7 +4021,7 @@ type VTaskListArchived struct {
 	PublicID                types.PublicID    `json:"publicId"`
 	ProjectPublicID         []byte            `json:"projectPublicId"`
 	ProjectName             string            `json:"projectName"`
-	ProjectIdentifier       string            `json:"projectIdentifier"`
+	ProjectIdentifier       sql.NullString    `json:"projectIdentifier"`
 	TaskNumber              uint32            `json:"taskNumber"`
 	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
 	Title                   string            `json:"title"`

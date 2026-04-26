@@ -77,11 +77,11 @@ func runCreateLabel(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	}
 	pub := newPublicID()
 	if _, err := deps.Queries.CreateLabel(ctx, generated.CreateLabelParams{
-		PublicID:     pub,
-		WorkspaceID:  s.workspaceID,
-		Name:         in.Name,
-		Color:        in.Color,
-		Description:  sql.NullString{String: in.Description, Valid: in.Description != ""},
+		PublicID:    pub,
+		WorkspaceID: s.workspaceID,
+		Name:        in.Name,
+		Color:       in.Color,
+		Description: sql.NullString{String: in.Description, Valid: in.Description != ""},
 	}); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
@@ -126,10 +126,10 @@ func runAddTaskLabel(ctx context.Context, deps Deps, s *session, raw json.RawMes
 	}
 	junctionPub := newPublicID()
 	if _, err := deps.Queries.CreateTaskLabel(ctx, generated.CreateTaskLabelParams{
-		PublicID:     junctionPub,
-		WorkspaceID:  s.workspaceID,
-		TaskID:       taskInternal,
-		LabelID:      label.ID,
+		PublicID:    junctionPub,
+		WorkspaceID: s.workspaceID,
+		TaskID:      taskInternal,
+		LabelID:     label.ID,
 	}); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
@@ -214,7 +214,7 @@ func runResolveTaskRef(ctx context.Context, deps Deps, s *session, raw json.RawM
 	}
 	row, err := deps.Queries.ResolveTaskRef(ctx, generated.ResolveTaskRefParams{
 		WorkspaceID: s.workspaceID,
-		Identifier:  identifier,
+		Identifier:  sql.NullString{String: identifier, Valid: identifier != ""},
 		TaskNumber:  uint32(num),
 	})
 	if err != nil {

@@ -33,11 +33,12 @@ func Create(deps Deps) func(context.Context, *CreateProjectInput) (*CreateProjec
 		desc := sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""}
 		color := sql.NullString{String: in.Body.Color, Valid: in.Body.Color != ""}
 		identifier := strings.ToUpper(strings.TrimSpace(in.Body.Identifier))
+		identifierParam := sql.NullString{String: identifier, Valid: identifier != ""}
 		projectID, err := deps.Queries.CreateProject(ctx, generated.CreateProjectParams{
 			PublicID:    pub,
 			WorkspaceID: ws.ID,
 			Slug:        slug,
-			Identifier:  identifier,
+			Identifier:  identifierParam,
 			Name:        in.Body.Name,
 			Description: desc,
 			Color:       color,

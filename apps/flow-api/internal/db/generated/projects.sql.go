@@ -31,7 +31,7 @@ type CreateProjectParams struct {
 	PublicID    types.PublicID `json:"publicId"`
 	WorkspaceID uint32         `json:"-"`
 	Slug        string         `json:"slug"`
-	Identifier  string         `json:"identifier"`
+	Identifier  sql.NullString `json:"identifier"`
 	Name        string         `json:"name"`
 	Description sql.NullString `json:"description"`
 	Color       sql.NullString `json:"color"`
@@ -91,15 +91,15 @@ LIMIT 1
 `
 
 type FindProjectByIdentifierParams struct {
-	WorkspaceID uint32 `json:"-"`
-	Identifier  string `json:"identifier"`
+	WorkspaceID uint32         `json:"-"`
+	Identifier  sql.NullString `json:"identifier"`
 }
 
 type FindProjectByIdentifierRow struct {
 	ID          uint32         `json:"-"`
 	PublicID    types.PublicID `json:"publicId"`
 	WorkspaceID uint32         `json:"-"`
-	Identifier  string         `json:"identifier"`
+	Identifier  sql.NullString `json:"identifier"`
 	Name        string         `json:"name"`
 }
 
@@ -154,7 +154,7 @@ type FindProjectByPublicIdRow struct {
 	PublicID         types.PublicID `json:"publicId"`
 	WorkspaceID      uint32         `json:"-"`
 	Slug             string         `json:"slug"`
-	Identifier       string         `json:"identifier"`
+	Identifier       sql.NullString `json:"identifier"`
 	Name             string         `json:"name"`
 	Description      sql.NullString `json:"description"`
 	Color            sql.NullString `json:"color"`
@@ -231,7 +231,7 @@ type FindProjectByPublicIdGlobalRow struct {
 	WorkspaceID       uint32         `json:"-"`
 	WorkspacePublicID types.PublicID `json:"workspacePublicId"`
 	Slug              string         `json:"slug"`
-	Identifier        string         `json:"identifier"`
+	Identifier        sql.NullString `json:"identifier"`
 	Name              string         `json:"name"`
 	Description       sql.NullString `json:"description"`
 	Color             sql.NullString `json:"color"`
@@ -306,7 +306,7 @@ type ListProjectsForWorkspaceParams struct {
 type ListProjectsForWorkspaceRow struct {
 	PublicID    types.PublicID `json:"publicId"`
 	Slug        string         `json:"slug"`
-	Identifier  string         `json:"identifier"`
+	Identifier  sql.NullString `json:"identifier"`
 	Name        string         `json:"name"`
 	Description sql.NullString `json:"description"`
 	Color       sql.NullString `json:"color"`
@@ -377,7 +377,7 @@ WHERE workspace_id = ?
 
 type UpdateProjectParams struct {
 	Name             string         `json:"name"`
-	Identifier       string         `json:"identifier"`
+	Identifier       sql.NullString `json:"identifier"`
 	Description      sql.NullString `json:"description"`
 	Color            sql.NullString `json:"color"`
 	IsArchived       bool           `json:"isArchived"`
@@ -425,7 +425,7 @@ WHERE workspace_id = ?
 type UpdateProjectFullParams struct {
 	Name        string         `json:"name"`
 	Slug        string         `json:"slug"`
-	Identifier  string         `json:"identifier"`
+	Identifier  sql.NullString `json:"identifier"`
 	Description sql.NullString `json:"description"`
 	WorkspaceID uint32         `json:"-"`
 	PublicID    types.PublicID `json:"publicId"`

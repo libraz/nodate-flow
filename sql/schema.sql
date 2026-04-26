@@ -1376,6 +1376,7 @@ CREATE TABLE notifications (
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   recipient_user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id, the user who receives this notification',
   actor_user_id INT UNSIGNED NULL COMMENT 'Internal FK to users.id, who triggered the event (null for system)',
+  source_event_id INT UNSIGNED NULL COMMENT 'Internal FK to events.id used for at-least-once dedup; null for non-event-driven paths (scheduler, system)',
 
   event_type VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Matches eventbus event types (e.g. task.created, task.comment.added)',
   resource_type VARCHAR(32) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Resource kind: task, project, comment, etc.',
@@ -1395,6 +1396,11 @@ CREATE TABLE notifications (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   UNIQUE KEY uniq_notifications_public_id (public_id),
+  -- At-least-once dedup: a single (recipient, source_event, channel) tuple
+  -- yields exactly one row even if the fan-out goroutine retries.
+  -- MySQL UNIQUE treats NULLs as distinct, so rows with source_event_id IS NULL
+  -- (scheduler / system paths) are not deduplicated by this key.
+  UNIQUE KEY uniq_notifications_recipient_source_channel (recipient_user_id, source_event_id, channel),
   KEY idx_notifications_workspace_id_recipient_read (workspace_id, recipient_user_id, read_at, created_at DESC),
   KEY idx_notifications_workspace_id_recipient_archived (workspace_id, recipient_user_id, archived_at, created_at DESC),
   KEY idx_notifications_workspace_id_event_type (workspace_id, event_type),
@@ -1402,7 +1408,8 @@ CREATE TABLE notifications (
 
   CONSTRAINT fk_notifications_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_notifications_recipient FOREIGN KEY (recipient_user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_notifications_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL
+  CONSTRAINT fk_notifications_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_notifications_source_event FOREIGN KEY (source_event_id) REFERENCES events(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Per-user notification entries from eventbus fan-out';
 
 -- >>> oauth_states.sql
@@ -1546,7 +1553,7 @@ CREATE TABLE projects (
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
 
   slug VARCHAR(63) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Workspace-local slug',
-  identifier CHAR(5) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT '' COMMENT 'Human-readable project key (e.g. NF)',
+  identifier CHAR(5) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'Human-readable project key (e.g. NF); NULL when not assigned',
   name VARCHAR(255) NOT NULL COMMENT 'Display name',
   description TEXT NULL COMMENT 'Optional description',
   color VARCHAR(16) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'Hex color (e.g., #1abc9c)',
@@ -1567,7 +1574,7 @@ CREATE TABLE projects (
   UNIQUE KEY uniq_projects_public_id (public_id),
   UNIQUE KEY uniq_projects_workspace_id_slug_enabled (workspace_id, slug, enabled),
   KEY idx_projects_workspace_id_enabled (workspace_id, enabled),
-  UNIQUE KEY uniq_projects_workspace_id_identifier (workspace_id, identifier),
+  UNIQUE KEY uniq_projects_workspace_id_identifier_enabled (workspace_id, identifier, enabled),
 
   CONSTRAINT fk_projects_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Task container';

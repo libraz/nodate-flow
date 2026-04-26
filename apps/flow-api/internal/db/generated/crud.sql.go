@@ -289,7 +289,7 @@ type FindTaskByPublicIdRow struct {
 	DueOn                    sql.NullTime      `json:"dueOn"`
 	StartedOn                sql.NullTime      `json:"startedOn"`
 	CompletedAt              sql.NullTime      `json:"completedAt"`
-	ProjectIdentifier        string            `json:"projectIdentifier"`
+	ProjectIdentifier        sql.NullString    `json:"projectIdentifier"`
 	TaskNumber               uint32            `json:"taskNumber"`
 	ArchivedAt               sql.NullTime      `json:"archivedAt"`
 	LabelCount               int64             `json:"labelCount"`
@@ -431,7 +431,7 @@ type ListArchivedTasksForWorkspaceRow struct {
 	PublicID                types.PublicID    `json:"publicId"`
 	ProjectPublicID         []byte            `json:"projectPublicId"`
 	ProjectName             string            `json:"projectName"`
-	ProjectIdentifier       string            `json:"projectIdentifier"`
+	ProjectIdentifier       sql.NullString    `json:"projectIdentifier"`
 	TaskNumber              uint32            `json:"taskNumber"`
 	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
 	Title                   string            `json:"title"`
@@ -1065,7 +1065,7 @@ type ListTasksForProjectRow struct {
 	DueOn                   sql.NullTime      `json:"dueOn"`
 	StartedOn               sql.NullTime      `json:"startedOn"`
 	CompletedAt             sql.NullTime      `json:"completedAt"`
-	ProjectIdentifier       string            `json:"projectIdentifier"`
+	ProjectIdentifier       sql.NullString    `json:"projectIdentifier"`
 	TaskNumber              uint32            `json:"taskNumber"`
 	ArchivedAt              sql.NullTime      `json:"archivedAt"`
 	LabelIds                sql.NullString    `json:"labelIds"`
@@ -1175,7 +1175,7 @@ type ListTasksForWorkspaceRow struct {
 	DueOn                   sql.NullTime      `json:"dueOn"`
 	StartedOn               sql.NullTime      `json:"startedOn"`
 	CompletedAt             sql.NullTime      `json:"completedAt"`
-	ProjectIdentifier       string            `json:"projectIdentifier"`
+	ProjectIdentifier       sql.NullString    `json:"projectIdentifier"`
 	TaskNumber              uint32            `json:"taskNumber"`
 	ArchivedAt              sql.NullTime      `json:"archivedAt"`
 	LabelIds                sql.NullString    `json:"labelIds"`
@@ -1249,9 +1249,9 @@ LIMIT 1
 `
 
 type ResolveTaskRefParams struct {
-	WorkspaceID uint32 `json:"-"`
-	Identifier  string `json:"identifier"`
-	TaskNumber  uint32 `json:"taskNumber"`
+	WorkspaceID uint32         `json:"-"`
+	Identifier  sql.NullString `json:"identifier"`
+	TaskNumber  uint32         `json:"taskNumber"`
 }
 
 type ResolveTaskRefRow struct {
