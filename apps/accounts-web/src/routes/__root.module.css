@@ -1,0 +1,77 @@
+/**
+ * Root-level layout primitives for the accounts-web shell.
+ *
+ * `NotFound` and `FatalFallback` both render a centered single-column
+ * `<main>` with display headlines on a token-driven background. This
+ * module replaces the inline `style={{ ... }}` objects so that all
+ * lengths / colours route through `--nf-*` custom properties and the
+ * four themes can override them without touching this file.
+ */
+
+.shell {
+  min-block-size: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nf-space-4);
+  padding: var(--nf-space-8);
+  font-family: var(--nf-font-sans, var(--font-body));
+  background: var(--nf-color-bg);
+  color: var(--nf-color-fg);
+  text-align: center;
+}
+
+.notFoundHeading {
+  margin: 0;
+  font-family: var(--nf-font-display, var(--font-display));
+  /* The 404 hero scales between 4xl and roughly twice 4xl. There is no
+   * dedicated display-size token, so we clamp around the largest text
+   * token rather than introduce a raw literal. */
+  font-size: clamp(var(--nf-text-4xl), 8vw, calc(var(--nf-text-4xl) * 2));
+}
+
+.subtle {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+  max-inline-size: 36rem;
+}
+
+.fatalHeading {
+  margin: 0;
+  font-family: var(--nf-font-display, var(--font-display));
+}
+
+.errorBlock {
+  margin: 0;
+  padding: var(--nf-space-3) var(--nf-space-4);
+  border-radius: var(--nf-radius-lg);
+  background: var(--nf-color-surface);
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+  max-inline-size: 48rem;
+  white-space: pre-wrap;
+  text-align: start;
+}
+
+.actionRow {
+  display: flex;
+  gap: var(--nf-space-3);
+}
+
+.linkButton {
+  padding: var(--nf-space-2) var(--nf-space-4);
+  border-radius: var(--nf-radius-lg);
+  background: var(--nf-color-accent);
+  color: var(--nf-color-fg-on-accent);
+  text-decoration: none;
+}
+
+.ghostButton {
+  padding: var(--nf-space-2) var(--nf-space-4);
+  border-radius: var(--nf-radius-lg);
+  border: 1px solid var(--nf-color-border);
+  background: var(--nf-color-surface);
+  color: var(--nf-color-fg);
+  cursor: pointer;
+}

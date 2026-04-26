@@ -1058,7 +1058,7 @@ export default function EventDialog({
                   value={recurrenceCustom}
                   onChange={(e) => setRecurrenceCustom(e.currentTarget.value)}
                   rows={2}
-                  placeholder="RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR"
+                  placeholder={t('placeholder.recurrenceCustom')}
                 />
               ) : null}
               <FormField label={t('field.notification')}>

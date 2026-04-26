@@ -18,7 +18,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ApiError } from '../../../lib/api-error';
+import { formatApiError } from '../../../lib/api-error';
 import { useCalendarsQuery } from '../../calendar-events/api';
 import { useWorkspacesQuery } from '../../workspaces/api';
 import { useCreateEventFromTaskMutation } from './api';
@@ -100,8 +100,7 @@ export default function EventFromTaskDialog({
           onClose();
         },
         onError: (err) => {
-          const message =
-            err instanceof ApiError ? err.message : t('tasks.actions.create_event.error');
+          const message = formatApiError(err, t, 'tasks.actions.create_event.error');
           toaster.show({ tone: 'danger', message });
         },
       },

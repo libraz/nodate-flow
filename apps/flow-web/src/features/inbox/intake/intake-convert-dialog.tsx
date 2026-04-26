@@ -23,7 +23,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ApiError } from '../../../lib/api-error';
+import { formatApiError } from '../../../lib/api-error';
 import { useProjectsQuery } from '../../projects/api';
 import { type IntakeItem, useConvertIntakeItemMutation } from './api';
 
@@ -83,7 +83,7 @@ export default function IntakeConvertDialog({
           void navigate({ to: '/tasks/$taskId', params: { taskId } });
         },
         onError: (err) => {
-          const message = err instanceof ApiError ? err.message : t('intake.convert.error');
+          const message = formatApiError(err, t, 'intake.convert.error');
           toaster.show({ tone: 'danger', message });
         },
       },

@@ -48,7 +48,8 @@
       "block": "工作、专注…",
       "free": "可用于…",
       "milestone": "发布、截止…"
-    }
+    },
+    "recurrenceCustom": "RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR"
   },
   "showAs": {
     "busy": "忙碌",

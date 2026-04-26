@@ -93,6 +93,7 @@
     "mfa_required": "Required",
     "max_workspaces_per_user": "Max Workspaces per User",
     "max_members_per_workspace": "Max Members per Workspace",
+    "unlimited_placeholder": "0 = unlimited",
     "save": "Save Settings",
     "saving": "Saving\u2026",
     "saved": "Settings saved successfully."

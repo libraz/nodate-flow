@@ -93,6 +93,7 @@
     "mfa_required": "必需",
     "max_workspaces_per_user": "每位用户的最大工作区数",
     "max_members_per_workspace": "每个工作区的最大成员数",
+    "unlimited_placeholder": "0 表示不限",
     "save": "保存设置",
     "saving": "保存中…",
     "saved": "设置已保存。"

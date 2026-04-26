@@ -18,7 +18,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ApiError } from '../../../lib/api-error';
+import { formatApiError } from '../../../lib/api-error';
 import { formatDateTime } from '../../../lib/format';
 import {
   type DescriptionVersion,
@@ -89,7 +89,7 @@ function HistoryBody({ taskId, currentBody, onAfterRestore }: HistoryBodyProps):
           onAfterRestore();
         },
         onError: (err) => {
-          const message = err instanceof ApiError ? err.message : t('tasks.history.restore_error');
+          const message = formatApiError(err, t, 'tasks.history.restore_error');
           toaster.show({ tone: 'danger', message });
         },
       },

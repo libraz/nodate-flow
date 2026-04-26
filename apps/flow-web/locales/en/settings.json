@@ -166,7 +166,9 @@
       "empty_alt": "No profile picture",
       "upload_aria": "Upload profile picture",
       "replace_aria": "Replace profile picture",
-      "delete_aria": "Remove profile picture"
+      "delete_aria": "Remove profile picture",
+      "upload_error": "Could not upload the profile picture. Please try again.",
+      "remove_error": "Could not remove the profile picture. Please try again."
     },
     "validation": {
       "display_name_required": "Display name is required.",

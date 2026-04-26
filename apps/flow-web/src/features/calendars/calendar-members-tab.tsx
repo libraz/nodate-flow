@@ -20,7 +20,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ChangeEvent, type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ApiError } from '../../lib/api-error';
+import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import styles from './calendar-members-tab.module.css';
 import {
@@ -72,8 +72,7 @@ export default function CalendarMembersTab({
       { wsId: workspaceId, calId: calendarId, userId: member.userId, role: next },
       {
         onError: (err) => {
-          const message =
-            err instanceof ApiError ? err.message : t('calendar.settings.members.update_error');
+          const message = formatApiError(err, t, 'calendar.settings.members.update_error');
           toaster.show({ tone: 'danger', message });
         },
       },
@@ -100,8 +99,7 @@ export default function CalendarMembersTab({
           toaster.show({ tone: 'success', message: t('calendar.settings.members.remove_success') });
         },
         onError: (err) => {
-          const message =
-            err instanceof ApiError ? err.message : t('calendar.settings.members.remove_error');
+          const message = formatApiError(err, t, 'calendar.settings.members.remove_error');
           toaster.show({ tone: 'danger', message });
         },
       },
@@ -120,8 +118,7 @@ export default function CalendarMembersTab({
           setEmail('');
         },
         onError: (err) => {
-          const message =
-            err instanceof ApiError ? err.message : t('calendar.settings.members.add_error');
+          const message = formatApiError(err, t, 'calendar.settings.members.add_error');
           toaster.show({ tone: 'danger', message });
         },
       },

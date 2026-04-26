@@ -22,7 +22,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ReactElement, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ApiError } from '../../lib/api-error';
+import { formatApiError } from '../../lib/api-error';
 import { useSubscribeSystemCalendarMutation } from './api';
 import styles from './calendars-rail.module.css';
 
@@ -119,9 +119,10 @@ export default function HolidaysList({
           onClose();
         },
         onError: (err) => {
-          const message =
-            err instanceof ApiError ? err.message : t('calendars_rail.holidays.error');
-          toaster.show({ tone: 'danger', message });
+          toaster.show({
+            tone: 'danger',
+            message: formatApiError(err, t, 'calendars_rail.holidays.error'),
+          });
         },
       },
     );

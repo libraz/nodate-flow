@@ -1,0 +1,61 @@
+/**
+ * Instance settings page layout.
+ *
+ * Mirrors the inline styles previously embedded in settings.tsx but
+ * stays inside the design-token system: every length / colour resolves
+ * to a `--nf-*` custom property so the four themes can override them
+ * without touching this file.
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-6);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--nf-font-display, var(--font-display));
+  font-size: var(--nf-text-2xl);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.label {
+  font-size: var(--nf-text-sm);
+  font-weight: 600;
+}
+
+.description {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.input {
+  padding: var(--nf-space-2) var(--nf-space-3);
+  border-radius: var(--nf-radius-md);
+  border: 1px solid var(--nf-color-border);
+  background: var(--nf-color-bg);
+  color: var(--nf-color-fg);
+  font-size: var(--nf-text-sm);
+}
+
+.loading {
+  color: var(--nf-color-fg-muted);
+}
+
+.error {
+  margin: 0;
+  color: var(--nf-color-danger);
+  font-size: var(--nf-text-sm);
+}
+
+.success {
+  margin: 0;
+  color: var(--nf-color-success);
+  font-size: var(--nf-text-sm);
+}

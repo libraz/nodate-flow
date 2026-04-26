@@ -93,6 +93,7 @@
     "mfa_required": "必須",
     "max_workspaces_per_user": "ユーザーあたりの最大ワークスペース数",
     "max_members_per_workspace": "ワークスペースあたりの最大メンバー数",
+    "unlimited_placeholder": "0 で無制限",
     "save": "設定を保存",
     "saving": "保存中…",
     "saved": "設定を保存しました。"

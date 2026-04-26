@@ -166,7 +166,9 @@
       "empty_alt": "暂无头像",
       "upload_aria": "上传头像",
       "replace_aria": "更换头像",
-      "delete_aria": "删除头像"
+      "delete_aria": "删除头像",
+      "upload_error": "上传头像失败，请重试。",
+      "remove_error": "移除头像失败，请重试。"
     },
     "validation": {
       "display_name_required": "请填写显示名称。",

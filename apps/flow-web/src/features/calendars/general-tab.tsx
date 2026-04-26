@@ -20,7 +20,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ApiError } from '../../lib/api-error';
+import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import {
   useCalendarEventCountQuery,
@@ -101,8 +101,7 @@ export default function GeneralTab({
           toaster.show({ tone: 'success', message: t('calendar.settings.general.saved') });
         },
         onError: (err) => {
-          const message =
-            err instanceof ApiError ? err.message : t('calendar.settings.general.save_error');
+          const message = formatApiError(err, t, 'calendar.settings.general.save_error');
           toaster.show({ tone: 'danger', message });
         },
       },
@@ -127,8 +126,7 @@ export default function GeneralTab({
           onAfterDelete();
         },
         onError: (err) => {
-          const message =
-            err instanceof ApiError ? err.message : t('calendar.settings.delete.error');
+          const message = formatApiError(err, t, 'calendar.settings.delete.error');
           toaster.show({ tone: 'danger', message });
         },
       },

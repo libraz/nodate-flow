@@ -24,7 +24,7 @@ import { Camera } from 'lucide-react';
 import { type ChangeEvent, type ReactElement, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { ApiError } from '../../lib/api-error';
+import { type ApiError, formatApiError } from '../../lib/api-error';
 import { authStore } from '../auth/auth-store';
 import { type Me, settingsKeys } from './api';
 import { deleteAvatar, uploadAvatar } from './avatar-api';
@@ -76,15 +76,6 @@ export default function AvatarUpload({ user }: AvatarUploadProps): ReactElement 
     };
   }, [localPreview]);
 
-  const translateApiError = (err: ApiError, fallback: string): string => {
-    const code = err.code;
-    if (code) {
-      const translated = t(code, { ns: 'errors', defaultValue: '' });
-      if (translated) return translated;
-    }
-    return err.message || fallback;
-  };
-
   const uploadMut = useMutation<Me, ApiError, File>({
     throwOnError: false,
     mutationFn: (file) => uploadAvatar(file),
@@ -98,7 +89,7 @@ export default function AvatarUpload({ user }: AvatarUploadProps): ReactElement 
     onError: (err) => {
       toaster.show({
         tone: 'danger',
-        message: translateApiError(err, t('settings:profile.avatar.upload')),
+        message: formatApiError(err, t, 'settings:profile.avatar.upload_error'),
       });
     },
     onSettled: () => {
@@ -125,7 +116,7 @@ export default function AvatarUpload({ user }: AvatarUploadProps): ReactElement 
     onError: (err) => {
       toaster.show({
         tone: 'danger',
-        message: translateApiError(err, t('settings:profile.avatar.remove')),
+        message: formatApiError(err, t, 'settings:profile.avatar.remove_error'),
       });
     },
   });

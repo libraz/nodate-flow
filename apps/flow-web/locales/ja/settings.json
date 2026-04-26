@@ -166,7 +166,9 @@
       "empty_alt": "プロフィール画像なし",
       "upload_aria": "プロフィール画像をアップロード",
       "replace_aria": "プロフィール画像を変更",
-      "delete_aria": "プロフィール画像を削除"
+      "delete_aria": "プロフィール画像を削除",
+      "upload_error": "プロフィール画像をアップロードできませんでした。もう一度お試しください。",
+      "remove_error": "プロフィール画像を削除できませんでした。もう一度お試しください。"
     },
     "validation": {
       "display_name_required": "表示名は必須です。",

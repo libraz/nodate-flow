@@ -48,7 +48,8 @@
       "block": "Working, focus, …",
       "free": "Available for …",
       "milestone": "Release, deadline, …"
-    }
+    },
+    "recurrenceCustom": "RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR"
   },
   "showAs": {
     "busy": "Busy",

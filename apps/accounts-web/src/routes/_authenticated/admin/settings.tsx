@@ -8,6 +8,7 @@ import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { sdk } from '../../../lib/sdk';
+import styles from './settings.module.css';
 
 interface InstanceSetting {
   key: string;
@@ -17,31 +18,6 @@ interface InstanceSetting {
 interface SettingsResponse {
   items: InstanceSetting[];
 }
-
-const fieldStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--nf-space-1, 0.25rem)',
-};
-
-const labelStyle: React.CSSProperties = {
-  fontSize: 'var(--nf-text-sm, 0.875rem)',
-  fontWeight: 600,
-};
-
-const descStyle: React.CSSProperties = {
-  fontSize: 'var(--nf-text-xs, 0.75rem)',
-  color: 'var(--nf-color-fg-muted)',
-};
-
-const inputStyle: React.CSSProperties = {
-  padding: '0.5rem 0.75rem',
-  borderRadius: 'var(--nf-radius-md, 0.375rem)',
-  border: '1px solid var(--nf-color-border)',
-  background: 'var(--nf-color-bg)',
-  color: 'var(--nf-color-fg)',
-  fontSize: 'var(--nf-text-sm, 0.875rem)',
-};
 
 function SettingsPage(): ReactElement {
   const { t } = useTranslation('admin');
@@ -109,29 +85,21 @@ function SettingsPage(): ReactElement {
   };
 
   if (loading) {
-    return <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('common.loading')}</p>;
+    return <p className={styles.loading}>{t('common.loading')}</p>;
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6, 1.5rem)' }}>
-      <h1
-        style={{
-          fontFamily: 'var(--nf-font-display, var(--font-display))',
-          fontSize: 'var(--nf-text-2xl, 1.5rem)',
-          margin: 0,
-        }}
-      >
-        {t('settings.title')}
-      </h1>
+    <div className={styles.page}>
+      <h1 className={styles.title}>{t('settings.title')}</h1>
 
-      <div style={fieldStyle}>
-        <label style={labelStyle}>
+      <div className={styles.field}>
+        <label className={styles.label}>
           {t('settings.registration_open')}
-          <p style={descStyle}>{t('settings.registration_open_desc')}</p>
+          <p className={styles.description}>{t('settings.registration_open_desc')}</p>
           <select
             value={registrationOpen}
             onChange={(e) => setRegistrationOpen(e.target.value)}
-            style={inputStyle}
+            className={styles.input}
           >
             <option value="true">{t('common.yes')}</option>
             <option value="false">{t('common.no')}</option>
@@ -139,14 +107,14 @@ function SettingsPage(): ReactElement {
         </label>
       </div>
 
-      <div style={fieldStyle}>
-        <label style={labelStyle}>
+      <div className={styles.field}>
+        <label className={styles.label}>
           {t('settings.mfa_enforcement')}
-          <p style={descStyle}>{t('settings.mfa_enforcement_desc')}</p>
+          <p className={styles.description}>{t('settings.mfa_enforcement_desc')}</p>
           <select
             value={mfaEnforcement}
             onChange={(e) => setMfaEnforcement(e.target.value)}
-            style={inputStyle}
+            className={styles.input}
           >
             <option value="none">{t('settings.mfa_none')}</option>
             <option value="optional">{t('settings.mfa_optional')}</option>
@@ -155,58 +123,41 @@ function SettingsPage(): ReactElement {
         </label>
       </div>
 
-      <div style={fieldStyle}>
-        <label style={labelStyle}>
+      <div className={styles.field}>
+        <label className={styles.label}>
           {t('settings.max_workspaces_per_user')}
           <input
             type="number"
             min="0"
             value={maxWorkspacesPerUser}
             onChange={(e) => setMaxWorkspacesPerUser(e.target.value)}
-            style={inputStyle}
-            placeholder="0 = unlimited"
+            className={styles.input}
+            placeholder={t('settings.unlimited_placeholder')}
           />
         </label>
       </div>
 
-      <div style={fieldStyle}>
-        <label style={labelStyle}>
+      <div className={styles.field}>
+        <label className={styles.label}>
           {t('settings.max_members_per_workspace')}
           <input
             type="number"
             min="0"
             value={maxMembersPerWorkspace}
             onChange={(e) => setMaxMembersPerWorkspace(e.target.value)}
-            style={inputStyle}
-            placeholder="0 = unlimited"
+            className={styles.input}
+            placeholder={t('settings.unlimited_placeholder')}
           />
         </label>
       </div>
 
       {error ? (
-        <p
-          role="alert"
-          style={{
-            margin: 0,
-            color: 'var(--nf-color-danger)',
-            fontSize: 'var(--nf-text-sm, 0.875rem)',
-          }}
-        >
+        <p role="alert" className={styles.error}>
           {error}
         </p>
       ) : null}
 
-      {success ? (
-        <output
-          style={{
-            margin: 0,
-            color: 'var(--nf-color-success, var(--nf-color-success))',
-            fontSize: 'var(--nf-text-sm, 0.875rem)',
-          }}
-        >
-          {t('settings.saved')}
-        </output>
-      ) : null}
+      {success ? <output className={styles.success}>{t('settings.saved')}</output> : null}
 
       <div>
         <Button variant="primary" disabled={saving} onClick={() => void handleSave()}>

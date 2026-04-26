@@ -45,7 +45,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ApiError } from '../../lib/api-error';
+import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import {
   type Memo,
@@ -100,8 +100,10 @@ export default function CalendarMemosPanel({
           setDraftTitle('');
         },
         onError: (err) => {
-          const message = err instanceof ApiError ? err.message : t('calendar.memos.add_error');
-          toaster.show({ tone: 'danger', message });
+          toaster.show({
+            tone: 'danger',
+            message: formatApiError(err, t, 'calendar.memos.add_error'),
+          });
         },
       },
     );
@@ -138,9 +140,10 @@ export default function CalendarMemosPanel({
                   { wsId: workspaceId, calId: calendarId, memoId: memo.id, body },
                   {
                     onError: (err) => {
-                      const message =
-                        err instanceof ApiError ? err.message : t('calendar.memos.update_error');
-                      toaster.show({ tone: 'danger', message });
+                      toaster.show({
+                        tone: 'danger',
+                        message: formatApiError(err, t, 'calendar.memos.update_error'),
+                      });
                     },
                   },
                 )
@@ -164,9 +167,10 @@ export default function CalendarMemosPanel({
                         });
                       },
                       onError: (err) => {
-                        const message =
-                          err instanceof ApiError ? err.message : t('calendar.memos.delete_error');
-                        toaster.show({ tone: 'danger', message });
+                        toaster.show({
+                          tone: 'danger',
+                          message: formatApiError(err, t, 'calendar.memos.delete_error'),
+                        });
                       },
                     },
                   );
