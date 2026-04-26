@@ -96,6 +96,7 @@ export default function WidgetCard({
     styles.widget,
     editing ? styles.widgetEditing : '',
     dragging ? styles.widgetDragging : '',
+    'nf-focus-ring',
   ]
     .filter(Boolean)
     .join(' ');
@@ -118,7 +119,7 @@ export default function WidgetCard({
         {editing && onRemove && (
           <button
             type="button"
-            className={styles.removeButton}
+            className={`${styles.removeButton} nf-focus-ring`}
             onClick={(e) => {
               e.stopPropagation();
               onRemove();

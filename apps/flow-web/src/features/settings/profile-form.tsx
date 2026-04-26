@@ -4,13 +4,13 @@
  * `<Suspense>` because it consumes `useMeQuery` (Suspense mode).
  */
 
-import { zodResolver } from '@hookform/resolvers/zod';
 import {
   SUPPORTED_COUNTRIES,
   detectTimezone,
   formatTimezoneLabel,
   groupTimezonesByRegion,
 } from '@nodate-flow/sdk';
+import { useZodForm } from '@nodate-flow/ui/hooks/use-zod-form';
 import Button from '@nodate-flow/ui/primitives/button';
 import Combobox, { type ComboboxOption } from '@nodate-flow/ui/primitives/combobox';
 import FormField from '@nodate-flow/ui/primitives/form-field';
@@ -31,7 +31,7 @@ import {
   splitThemeId,
 } from '@nodate-flow/ui/providers/theme-provider';
 import { type ReactElement, useMemo } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
@@ -168,15 +168,12 @@ export default function ProfileForm(): ReactElement {
     getValues,
     setValue,
     formState: { errors, isSubmitting },
-  } = useForm<ProfileFormValues>({
-    resolver: zodResolver(profileSchema),
-    defaultValues: {
-      displayName: me.displayName,
-      locale: (me.locale as ProfileFormValues['locale']) ?? 'en',
-      timezone: me.timezone || detectTimezone(),
-      country: me.country ?? '',
-      weekStart: (me.weekStart as WeekStart) ?? (me.locale === 'ja' ? 'mon' : 'sun'),
-    },
+  } = useZodForm<typeof profileSchema>(profileSchema, {
+    displayName: me.displayName,
+    locale: (me.locale as ProfileFormValues['locale']) ?? 'en',
+    timezone: me.timezone || detectTimezone(),
+    country: me.country ?? '',
+    weekStart: (me.weekStart as WeekStart) ?? (me.locale === 'ja' ? 'mon' : 'sun'),
   });
 
   // Apply a locale change immediately so the rest of the form (country

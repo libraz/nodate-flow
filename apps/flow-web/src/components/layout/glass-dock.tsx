@@ -119,7 +119,7 @@ export default function GlassDock(): ReactElement {
             <Tooltip key={action.key} content={label}>
               <button
                 type="button"
-                className={styles.button}
+                className={`${styles.button} nf-focus-ring`}
                 aria-label={label}
                 onClick={handleClick}
               >

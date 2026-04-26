@@ -7,14 +7,13 @@
  * step triggered by the server, not a user-filled form.
  */
 
-import { zodResolver } from '@hookform/resolvers/zod';
 import { isSafeRedirect } from '@nodate-flow/sdk';
+import { useZodForm } from '@nodate-flow/ui/hooks/use-zod-form';
 import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import { Link, createFileRoute, useNavigate, useSearch } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, useCallback, useEffect, useRef, useState } from 'react';
-import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useCapabilities } from '../features/auth/use-capabilities';
 
@@ -67,9 +66,9 @@ function LoginPage(): ReactElement {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '' },
+  } = useZodForm<typeof loginSchema>(loginSchema, {
+    email: '',
+    password: '',
   });
 
   const [serverError, setServerError] = useState<AuthErrorI18nKey | null>(null);

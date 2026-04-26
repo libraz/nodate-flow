@@ -3,19 +3,18 @@
  * timezone, country). Only exposes fields backed by PATCH /workspaces/{wsId}.
  */
 
-import { zodResolver } from '@hookform/resolvers/zod';
 import {
   SUPPORTED_COUNTRIES,
   detectTimezone,
   formatTimezoneLabel,
   groupTimezonesByRegion,
 } from '@nodate-flow/sdk';
+import { useZodForm } from '@nodate-flow/ui/hooks/use-zod-form';
 import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import { Link, createFileRoute, useParams } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useMemo, useState } from 'react';
-import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
@@ -70,24 +69,33 @@ function WorkspaceEditPage(): ReactElement {
     register,
     handleSubmit,
     formState: { errors, isSubmitting, isDirty },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    values: workspace
-      ? {
-          name: workspace.name,
-          slug: workspace.slug,
-          description: workspace.description ?? '',
-          timezone: workspace.timezone || detectTimezone(),
-          country: workspace.country ?? '',
-        }
-      : {
-          name: '',
-          slug: '',
-          description: '',
-          timezone: detectTimezone(),
-          country: '',
-        },
-  });
+  } = useZodForm<typeof schema>(
+    schema,
+    {
+      name: '',
+      slug: '',
+      description: '',
+      timezone: detectTimezone(),
+      country: '',
+    },
+    {
+      values: workspace
+        ? {
+            name: workspace.name,
+            slug: workspace.slug,
+            description: workspace.description ?? '',
+            timezone: workspace.timezone || detectTimezone(),
+            country: workspace.country ?? '',
+          }
+        : {
+            name: '',
+            slug: '',
+            description: '',
+            timezone: detectTimezone(),
+            country: '',
+          },
+    },
+  );
 
   useEffect(() => {
     let cancelled = false;

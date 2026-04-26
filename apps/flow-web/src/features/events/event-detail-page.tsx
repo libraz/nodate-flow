@@ -228,7 +228,7 @@ export default function EventDetailPage(): ReactElement {
 
   return (
     <section className={styles.page}>
-      <Link to="/calendar" className={styles.back}>
+      <Link to="/calendar" className={`${styles.back} nf-focus-ring`}>
         {t('event.detail.back')}
       </Link>
       <Suspense fallback={<PaneFallback />}>

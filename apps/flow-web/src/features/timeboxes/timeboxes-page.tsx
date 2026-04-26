@@ -442,7 +442,7 @@ export default function TimeboxesPage(): ReactElement {
             <section className={styles.section} aria-label={t('timeboxes.section.archive')}>
               <button
                 type="button"
-                className={styles.archiveToggle}
+                className={`${styles.archiveToggle} nf-focus-ring`}
                 onClick={() => {
                   setArchiveOpen((v) => !v);
                 }}

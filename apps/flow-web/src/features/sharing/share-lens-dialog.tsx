@@ -111,7 +111,7 @@ export default function ShareLensDialog({
                 <input
                   ref={linkRef}
                   type="text"
-                  className={styles.linkInput}
+                  className={`${styles.linkInput} nf-focus-ring`}
                   value={buildPublicUrl(currentToken)}
                   readOnly
                   aria-label={t('public_link')}

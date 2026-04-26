@@ -34,7 +34,7 @@ export default function AppShell({ children }: AppShellProps): ReactElement {
           <ActiveTimeboxBar />
         </Suspense>
       </div>
-      <main id="main-content" tabIndex={-1} className={styles.main}>
+      <main id="main-content" tabIndex={-1} className={`${styles.main} nf-focus-ring-inset`}>
         {children}
       </main>
       <GlassDock />

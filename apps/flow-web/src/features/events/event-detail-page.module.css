@@ -32,10 +32,7 @@
   text-decoration: underline;
 }
 
-.back:focus-visible {
-  outline: 2px solid var(--nf-color-focus-ring, var(--nf-color-accent));
-  outline-offset: 2px;
-}
+/* Focus ring supplied by the global `.nf-focus-ring` utility (added in JSX). */
 
 .headerCard {
   display: flex;

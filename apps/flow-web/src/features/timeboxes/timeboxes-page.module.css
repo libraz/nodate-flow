@@ -97,10 +97,7 @@
   background: var(--nf-color-surface-hover);
 }
 
-.archiveToggle:focus-visible {
-  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
-  outline-offset: var(--nf-focus-ring-offset);
-}
+/* Focus ring supplied by the global `.nf-focus-ring` utility (added in JSX). */
 
 /* Card */
 .card {

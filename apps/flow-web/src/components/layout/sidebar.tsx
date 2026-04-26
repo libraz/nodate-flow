@@ -86,8 +86,10 @@ function WorkspaceProjectsSection({ workspaceId }: { workspaceId: string }): Rea
           key={p.id}
           to="/workspaces/$id/projects/$projectId"
           params={{ id: workspaceId, projectId: p.id }}
-          className={cx(styles.item, styles.subItem)}
-          activeProps={{ className: cx(styles.item, styles.subItem, styles.itemActive) }}
+          className={cx(styles.item, styles.subItem, 'nf-focus-ring')}
+          activeProps={{
+            className: cx(styles.item, styles.subItem, styles.itemActive, 'nf-focus-ring'),
+          }}
         >
           <Icon icon={FolderKanban} decorative />
           <span className={styles.label}>{p.name}</span>
@@ -109,8 +111,10 @@ function WorkspaceTimeboxesLink({ workspaceId }: { workspaceId: string }): React
     <Link
       to="/workspaces/$id/timeboxes"
       params={{ id: workspaceId }}
-      className={cx(styles.item, styles.subItem)}
-      activeProps={{ className: cx(styles.item, styles.subItem, styles.itemActive) }}
+      className={cx(styles.item, styles.subItem, 'nf-focus-ring')}
+      activeProps={{
+        className: cx(styles.item, styles.subItem, styles.itemActive, 'nf-focus-ring'),
+      }}
     >
       <Icon icon={Timer} decorative />
       <span className={styles.label}>{t('nav.timeboxes')}</span>
@@ -130,8 +134,10 @@ function WorkspaceInsightsPriorityLink({ workspaceId }: { workspaceId: string })
     <Link
       to="/workspaces/$id/insights/priority"
       params={{ id: workspaceId }}
-      className={cx(styles.item, styles.subItem)}
-      activeProps={{ className: cx(styles.item, styles.subItem, styles.itemActive) }}
+      className={cx(styles.item, styles.subItem, 'nf-focus-ring')}
+      activeProps={{
+        className: cx(styles.item, styles.subItem, styles.itemActive, 'nf-focus-ring'),
+      }}
     >
       <Icon icon={ListOrdered} decorative />
       <span className={styles.label}>{t('nav.insightsPriority')}</span>
@@ -172,8 +178,8 @@ function FavoriteRow({
   workspaceId: string;
 }): ReactElement | null {
   const icon = favoriteIconFor(favorite.targetType);
-  const className = cx(styles.item, styles.subItem);
-  const activeClassName = cx(styles.item, styles.subItem, styles.itemActive);
+  const className = cx(styles.item, styles.subItem, 'nf-focus-ring');
+  const activeClassName = cx(styles.item, styles.subItem, styles.itemActive, 'nf-focus-ring');
   if (favorite.targetType === 'task') {
     return (
       <Link
@@ -350,8 +356,8 @@ export default function Sidebar(): ReactElement {
                 to={item.to}
                 aria-label={label}
                 title={label}
-                className={cx(styles.item, sectionActive && styles.itemActive)}
-                activeProps={{ className: cx(styles.item, styles.itemActive) }}
+                className={cx(styles.item, sectionActive && styles.itemActive, 'nf-focus-ring')}
+                activeProps={{ className: cx(styles.item, styles.itemActive, 'nf-focus-ring') }}
               >
                 <Icon icon={item.icon} decorative />
                 <span className={styles.label}>{label}</span>
@@ -393,7 +399,7 @@ export default function Sidebar(): ReactElement {
         <div className={styles.footer}>
           <button
             type="button"
-            className={styles.toggle}
+            className={cx(styles.toggle, 'nf-focus-ring')}
             onClick={handleToggle}
             aria-label={collapsed ? t('nav.expand') : t('nav.collapse')}
             aria-expanded={!collapsed}

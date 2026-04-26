@@ -60,10 +60,7 @@
   padding-block-end: var(--nf-space-24);
 }
 
-.main:focus-visible {
-  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
-  outline-offset: calc(var(--nf-focus-ring-offset) * -1);
-}
+/* Focus ring supplied by the global `.nf-focus-ring-inset` utility (added in JSX). */
 
 /* Mobile: sidebar leaves grid flow (becomes fixed overlay via sidebar.module.css) */
 @media (max-width: 767px) {

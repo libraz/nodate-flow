@@ -154,7 +154,11 @@ export default function AddWidgetDialog({
             <div className={styles.typeGrid} role="radiogroup" aria-label={t('select_type')}>
               {widgetTypes.map((wt) => {
                 const selected = selectedType === wt.type;
-                const cardClass = [styles.typeCard, selected ? styles.typeCardSelected : '']
+                const cardClass = [
+                  styles.typeCard,
+                  selected ? styles.typeCardSelected : '',
+                  'nf-focus-ring',
+                ]
                   .filter(Boolean)
                   .join(' ');
                 return (

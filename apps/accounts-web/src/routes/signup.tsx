@@ -4,13 +4,12 @@
  * Uses React Hook Form + Zod for client-side validation.
  */
 
-import { zodResolver } from '@hookform/resolvers/zod';
+import { useZodForm } from '@nodate-flow/ui/hooks/use-zod-form';
 import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
 import AuthCard from '../components/auth-card';
@@ -50,9 +49,10 @@ function SignupPage(): ReactElement {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<SignupFormValues>({
-    resolver: zodResolver(signupSchema),
-    defaultValues: { email: '', password: '', displayName: '' },
+  } = useZodForm<typeof signupSchema>(signupSchema, {
+    email: '',
+    password: '',
+    displayName: '',
   });
 
   const [serverError, setServerError] = useState<AuthErrorI18nKey | null>(null);

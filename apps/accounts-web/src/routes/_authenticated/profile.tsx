@@ -3,7 +3,6 @@
  * Authenticated-only, guarded by the _authenticated layout route.
  */
 
-import { zodResolver } from '@hookform/resolvers/zod';
 import {
   SUPPORTED_COUNTRIES,
   type components,
@@ -11,6 +10,7 @@ import {
   formatTimezoneLabel,
   groupTimezonesByRegion,
 } from '@nodate-flow/sdk';
+import { useZodForm } from '@nodate-flow/ui/hooks/use-zod-form';
 import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
 import Combobox, { type ComboboxOption } from '@nodate-flow/ui/primitives/combobox';
@@ -21,7 +21,7 @@ import SegmentedControl, {
 } from '@nodate-flow/ui/primitives/segmented-control';
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useMemo, useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
 import AuthCard from '../../components/auth-card';
@@ -232,9 +232,9 @@ export function ProfilePage(): ReactElement {
     getValues,
     setValue,
     formState: { errors, isSubmitting, isDirty },
-  } = useForm<ProfileFormValues>({
-    resolver: zodResolver(profileSchema),
-    values: {
+  } = useZodForm<typeof profileSchema>(
+    profileSchema,
+    {
       displayName: user?.displayName ?? '',
       locale: (user?.locale as ProfileFormValues['locale']) ?? 'en',
       timezone: user?.timezone || detectTimezone(),
@@ -242,7 +242,18 @@ export function ProfilePage(): ReactElement {
       themePreference: (user?.themePreference as ProfileFormValues['themePreference']) ?? 'system',
       weekStart: persistedWeekStart ?? fallbackWeekStart,
     },
-  });
+    {
+      values: {
+        displayName: user?.displayName ?? '',
+        locale: (user?.locale as ProfileFormValues['locale']) ?? 'en',
+        timezone: user?.timezone || detectTimezone(),
+        country: user?.country ?? '',
+        themePreference:
+          (user?.themePreference as ProfileFormValues['themePreference']) ?? 'system',
+        weekStart: persistedWeekStart ?? fallbackWeekStart,
+      },
+    },
+  );
 
   // Apply a locale change immediately so the rest of the form (country
   // names via Intl.DisplayNames, validation messages, etc.) reflects the

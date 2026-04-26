@@ -64,10 +64,7 @@
   box-shadow: var(--nf-shadow-md);
 }
 
-.preview:focus-visible {
-  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
-  outline-offset: var(--nf-focus-ring-offset);
-}
+/* Focus ring supplied by the global `.nf-focus-ring` utility (added in JSX). */
 
 .preview:disabled {
   cursor: progress;

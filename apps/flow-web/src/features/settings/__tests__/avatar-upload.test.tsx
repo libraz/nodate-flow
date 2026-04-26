@@ -62,10 +62,12 @@ describe('avatar-upload icon-only buttons', () => {
     });
 
     it('attaches aria-label to the icon-only preview button', () => {
-      // The preview is a <button className={styles.preview}> with the
-      // computed aria-label spread on it. Both the className and the
+      // The preview is a <button> whose className references
+      // `styles.preview` (possibly composed with the global
+      // `nf-focus-ring` utility via a template literal) and carries the
+      // computed `aria-label`. Both the className reference and the
       // aria-label assignment must be present.
-      expect(source).toMatch(/className=\{styles\.preview\}/);
+      expect(source).toMatch(/className=\{[^}]*styles\.preview[^}]*\}/);
       expect(source).toMatch(/aria-label=\{previewAriaLabel\}/);
     });
   });

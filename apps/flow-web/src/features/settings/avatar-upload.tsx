@@ -177,7 +177,7 @@ export default function AvatarUpload({ user }: AvatarUploadProps): ReactElement 
       <div className={styles.previewRow}>
         <button
           type="button"
-          className={styles.preview}
+          className={`${styles.preview} nf-focus-ring`}
           onClick={openPicker}
           disabled={busy}
           aria-label={previewAriaLabel}

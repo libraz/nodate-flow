@@ -132,7 +132,7 @@ function SuggestionRow({
       <div className={styles.actions}>
         <button
           type="button"
-          className={`${styles.actionButton} ${styles.acceptButton}`}
+          className={`${styles.actionButton} ${styles.acceptButton} nf-focus-ring`}
           onClick={handleAccept}
           aria-label={t('action.accept')}
         >
@@ -140,7 +140,7 @@ function SuggestionRow({
         </button>
         <button
           type="button"
-          className={`${styles.actionButton} ${styles.dismissButton}`}
+          className={`${styles.actionButton} ${styles.dismissButton} nf-focus-ring`}
           onClick={handleDismiss}
           aria-label={t('action.dismiss')}
         >

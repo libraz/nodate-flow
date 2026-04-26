@@ -56,7 +56,7 @@ function AiCostMeterImpl(): ReactElement | null {
     <Link
       to="/workspaces/$id/settings/ai-activity"
       params={{ id: workspaceId }}
-      className={styles.meter}
+      className={`${styles.meter} nf-focus-ring`}
       title={title}
       aria-label={ariaLabel}
     >
