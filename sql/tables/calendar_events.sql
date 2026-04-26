@@ -17,8 +17,8 @@ CREATE TABLE calendar_events (
 
   title VARCHAR(500) NOT NULL COMMENT 'Event title',
   all_day BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'All-day event flag',
-  start_at DATETIME NULL COMMENT 'Start time (UTC or with timezone context); NULL = undated (planning-stage placeholder)',
-  end_at DATETIME NULL COMMENT 'End time; NULL = undated (planning-stage placeholder)',
+  start_at DATETIME(3) NULL COMMENT 'Start time (UTC or with timezone context); NULL = undated (planning-stage placeholder)',
+  end_at DATETIME(3) NULL COMMENT 'End time; NULL = undated (planning-stage placeholder)',
   timezone VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT 'UTC' COMMENT 'IANA timezone identifier; resolved from event > user > workspace > UTC',
 
   location VARCHAR(500) NULL COMMENT 'Location text',
@@ -34,11 +34,11 @@ CREATE TABLE calendar_events (
 
   -- Recurrence (RFC 5545 subset stored as JSON)
   recurrence_rule JSON NULL COMMENT 'Recurrence rule: {freq, interval, byDay, byMonthDay, bySetPos, until, count}',
-  recurrence_end DATETIME NULL COMMENT 'Computed end date for recurrence expansion queries',
+  recurrence_end DATETIME(3) NULL COMMENT 'Computed end date for recurrence expansion queries',
   recurrence_exceptions JSON DEFAULT NULL COMMENT 'Array of ISO 8601 dates/times to exclude from recurrence',
 
   notification_offset INT NULL COMMENT 'Minutes before event to send notification; NULL = no notification',
-  notified_at DATETIME NULL DEFAULT NULL COMMENT 'Timestamp when notification was sent; NULL = not yet notified',
+  notified_at DATETIME(3) NULL DEFAULT NULL COMMENT 'Timestamp when notification was sent; NULL = not yet notified',
 
   -- Cross-module link to nodate-flow tasks
   task_id INT UNSIGNED NULL COMMENT 'Linked task (optional, for task-calendar sync)',
@@ -48,10 +48,11 @@ CREATE TABLE calendar_events (
   notes TEXT NULL COMMENT 'Admin notes',
   flags JSON NULL COMMENT 'Structured per-event markers (non_working_day, auto_snapped, etc.); unknown keys preserved.',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_calendar_events_public_id (public_id),
+  UNIQUE KEY uniq_calendar_events_workspace_public_id (workspace_id, public_id),
   KEY idx_calendar_events_calendar_range (calendar_id, start_at, end_at),
   KEY idx_calendar_events_workspace_owner (workspace_id, owner_user_id, start_at),
   KEY idx_calendar_events_calendar_recurrence (calendar_id, recurrence_end),
@@ -77,4 +78,4 @@ CREATE TABLE calendar_events (
   CONSTRAINT chk_calendar_events_notification_requires_start CHECK (start_at IS NOT NULL OR notification_offset IS NULL),
   CONSTRAINT chk_calendar_events_chronology CHECK (end_at IS NULL OR start_at IS NULL OR end_at >= start_at),
   CONSTRAINT chk_calendar_events_milestone_no_recurrence CHECK (kind <> 'milestone' OR recurrence_rule IS NULL)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Calendar events with kind/visibility/show_as classification; nullable start/end for planning-stage placeholders; task_role links to task projection (D1).';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Calendar events with kind/visibility/show_as classification; nullable start/end for planning-stage placeholders; task_role links to task projection (D1).';

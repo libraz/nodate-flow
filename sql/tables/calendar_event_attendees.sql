@@ -17,14 +17,15 @@ CREATE TABLE calendar_event_attendees (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_calendar_event_attendees_public_id (public_id),
+  UNIQUE KEY uniq_calendar_event_attendees_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_calendar_event_attendees_event_user (event_id, user_id),
   KEY idx_calendar_event_attendees_workspace_user (workspace_id, user_id),
 
   CONSTRAINT fk_calendar_event_attendees_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_event_attendees_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_event_attendees_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Calendar event attendees with RSVP and edit permission';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Calendar event attendees with RSVP and edit permission';

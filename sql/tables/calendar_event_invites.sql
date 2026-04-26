@@ -23,16 +23,17 @@ CREATE TABLE calendar_event_invites (
 
   email VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Recipient email, denormalized from attendee for inbox queries',
   token_hash BINARY(32) NOT NULL COMMENT 'SHA-256 digest of the plaintext magic-link token',
-  expires_at DATETIME(6) NOT NULL COMMENT 'Magic-link expiry',
-  accepted_at DATETIME(6) NULL COMMENT 'Set when the recipient clicks the link',
-  sent_at DATETIME(6) NULL COMMENT 'Set when the invite email is dispatched',
+  expires_at DATETIME(3) NOT NULL COMMENT 'Magic-link expiry',
+  accepted_at DATETIME(3) NULL COMMENT 'Set when the recipient clicks the link',
+  sent_at DATETIME(3) NULL COMMENT 'Set when the invite email is dispatched',
 
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag; disabled rows are revoked invites',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_calendar_event_invites_public_id (public_id),
+  UNIQUE KEY uniq_calendar_event_invites_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_calendar_event_invites_token_hash (token_hash),
   UNIQUE KEY uniq_calendar_event_invites_event_attendee (event_id, attendee_id),
   KEY idx_calendar_event_invites_workspace_expires (workspace_id, expires_at),
@@ -44,4 +45,4 @@ CREATE TABLE calendar_event_invites (
   CONSTRAINT fk_calendar_event_invites_calendar FOREIGN KEY (calendar_id) REFERENCES calendars(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_event_invites_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_event_invites_attendee FOREIGN KEY (attendee_id) REFERENCES calendar_event_attendees(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Magic-link invite rows for calendar event attendees';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Magic-link invite rows for calendar event attendees';

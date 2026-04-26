@@ -1,12 +1,16 @@
 -- name: CreateTask :execlastid
 -- Insert a new task. derived_state defaults to 'open' and must NOT be set
 -- directly here; the constraint engine and event bus mutate it.
+-- Both created_by_user_id and updated_by_user_id are populated with the
+-- acting user on insert so that audit projections can render "last touched
+-- by" without falling back to the creator when no edit has occurred yet.
 INSERT INTO tasks (
   public_id,
   workspace_id,
   project_id,
   parent_task_id,
   created_by_user_id,
+  updated_by_user_id,
   task_number,
   title,
   description,
@@ -14,7 +18,7 @@ INSERT INTO tasks (
   due_on,
   started_on,
   visibility
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: FindTaskByPublicId :one
 -- Detail projection via v_task_detail. Workspace-scoped.
@@ -197,6 +201,8 @@ LIMIT ?;
 
 -- name: UpdateTask :exec
 -- Update mutable task fields. derived_state is intentionally NOT writable.
+-- updated_by_user_id is appended to the SET list so callers can attribute
+-- the edit; pass the acting user's internal id (NULL for system writers).
 UPDATE tasks
 SET title = ?,
     description = ?,
@@ -204,7 +210,8 @@ SET title = ?,
     due_on = ?,
     started_on = ?,
     sort_weight = ?,
-    visibility = ?
+    visibility = ?,
+    updated_by_user_id = ?
 WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
@@ -212,8 +219,11 @@ WHERE workspace_id = ?
 -- name: UpdateTaskSortWeight :exec
 -- Update only the sort_weight for a single task within a workspace.
 -- Used by the bulk reorder endpoint inside a transaction.
+-- updated_by_user_id is appended so reorder edits are attributed to the
+-- acting user (NULL for system writers).
 UPDATE tasks
-SET sort_weight = ?
+SET sort_weight = ?,
+    updated_by_user_id = ?
 WHERE id = ?
   AND workspace_id = ?
   AND enabled = TRUE;
@@ -222,17 +232,23 @@ WHERE id = ?
 -- Write the new derived_state computed by the transition handler. This is
 -- the only path allowed to mutate derived_state and must be called inside
 -- the same transaction as the events append.
+-- updated_by_user_id is appended so the audit field reflects who triggered
+-- the transition (NULL for system writers / event-bus replays).
 UPDATE tasks
 SET derived_state = ?,
-    completed_at = CASE WHEN ? = 'done' THEN CURRENT_TIMESTAMP ELSE completed_at END
+    completed_at = CASE WHEN ? = 'done' THEN CURRENT_TIMESTAMP ELSE completed_at END,
+    updated_by_user_id = ?
 WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
 
 -- name: DisableTask :exec
 -- Soft-disable a task.
+-- updated_by_user_id is appended so the audit field records who disabled
+-- the row (NULL for system writers).
 UPDATE tasks
-SET enabled = FALSE
+SET enabled = FALSE,
+    updated_by_user_id = ?
 WHERE workspace_id = ?
   AND public_id = ?;
 
@@ -465,8 +481,11 @@ LIMIT ?;
 
 -- name: ArchiveTask :exec
 -- Set archived_at on a task.
+-- updated_by_user_id is appended so the audit field records who archived
+-- the row (NULL for system writers).
 UPDATE tasks
-SET archived_at = CURRENT_TIMESTAMP
+SET archived_at = CURRENT_TIMESTAMP,
+    updated_by_user_id = ?
 WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE
@@ -474,8 +493,11 @@ WHERE workspace_id = ?
 
 -- name: UnarchiveTask :exec
 -- Clear archived_at on a task.
+-- updated_by_user_id is appended so the audit field records who unarchived
+-- the row (NULL for system writers).
 UPDATE tasks
-SET archived_at = NULL
+SET archived_at = NULL,
+    updated_by_user_id = ?
 WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE
@@ -558,8 +580,12 @@ WHERE project_id = ?;
 
 -- name: SetTaskNumber :exec
 -- Set the task_number after allocation.
+-- updated_by_user_id is appended so the audit field records who allocated
+-- the number; in practice this runs in the same transaction as CreateTask
+-- so the same actor id is reused (NULL for system writers).
 UPDATE tasks
-SET task_number = ?
+SET task_number = ?,
+    updated_by_user_id = ?
 WHERE id = ?;
 
 -- name: ResolveTaskRef :one

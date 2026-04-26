@@ -145,6 +145,8 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.created_by_user_id"
             go_struct_tag: 'json:"-"'
+          - column: "*.updated_by_user_id"
+            go_struct_tag: 'json:"-"'
           - column: "*.author_id"
             go_struct_tag: 'json:"-"'
           - column: "*.uploader_id"
@@ -238,6 +240,8 @@ sql:
           - column: "*.owner_user_id"
             go_struct_tag: 'json:"-"'
           - column: "*.created_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.updated_by_user_id"
             go_struct_tag: 'json:"-"'
           - column: "*.author_id"
             go_struct_tag: 'json:"-"'

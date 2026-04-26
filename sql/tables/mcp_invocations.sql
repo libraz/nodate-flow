@@ -16,15 +16,16 @@ CREATE TABLE mcp_invocations (
   status ENUM('ok','error','denied') NOT NULL COMMENT 'Outcome',
   error_code VARCHAR(128) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'Error code when status != ok',
   duration_ms INT UNSIGNED NULL COMMENT 'Wall-clock duration in milliseconds',
-  invoked_at DATETIME NOT NULL COMMENT 'Invocation start time (second precision)',
+  invoked_at DATETIME(3) NOT NULL COMMENT 'Invocation start time (millisecond precision)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_mcp_invocations_public_id (public_id),
+  UNIQUE KEY uniq_mcp_invocations_workspace_public_id (workspace_id, public_id),
   KEY idx_mcp_invocations_workspace_id_invoked_at (workspace_id, invoked_at),
   KEY idx_mcp_invocations_workspace_id_user_id (workspace_id, user_id),
   KEY idx_mcp_invocations_created_at (created_at),
@@ -32,4 +33,4 @@ CREATE TABLE mcp_invocations (
   CONSTRAINT fk_mcp_invocations_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_mcp_invocations_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT fk_mcp_invocations_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='MCP tool invocation audit';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='MCP tool invocation audit';

@@ -16,10 +16,11 @@ CREATE TABLE task_actors (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_task_actors_public_id (public_id),
+  UNIQUE KEY uniq_task_actors_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_task_actors_task_id_user_id_role (task_id, user_id, role),
   UNIQUE KEY uniq_task_actors_task_id_agent_id_role (task_id, agent_id, role),
   KEY idx_task_actors_workspace_id_user_id (workspace_id, user_id),
@@ -33,4 +34,4 @@ CREATE TABLE task_actors (
     (kind = 'user'  AND user_id  IS NOT NULL AND agent_id IS NULL) OR
     (kind = 'agent' AND agent_id IS NOT NULL AND user_id  IS NULL)
   )
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Task actors (assignees/reviewers/...)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task actors (assignees/reviewers/...)';

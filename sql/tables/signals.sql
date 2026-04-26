@@ -13,19 +13,20 @@ CREATE TABLE signals (
   kind VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Source-specific event kind (e.g., pull_request.opened)',
   external_id VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'External identifier (delivery id, message ts, ...)',
   payload_json JSON NOT NULL CHECK (JSON_VALID(payload_json)) COMMENT 'Raw normalized payload',
-  received_at DATETIME NOT NULL COMMENT 'Time the signal was received',
+  received_at DATETIME(3) NOT NULL COMMENT 'Time the signal was received',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_signals_public_id (public_id),
+  UNIQUE KEY uniq_signals_workspace_public_id (workspace_id, public_id),
   KEY idx_signals_workspace_id_received_at (workspace_id, received_at),
   KEY idx_signals_workspace_id_task_id (workspace_id, task_id),
   KEY idx_signals_source_external_id (source, external_id),
 
   CONSTRAINT fk_signals_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_signals_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Inbound signals';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Inbound signals';

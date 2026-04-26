@@ -17,10 +17,11 @@ CREATE TABLE calendar_subscriptions (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order in sidebar',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_calendar_subscriptions_public_id (public_id),
+  UNIQUE KEY uniq_calendar_subscriptions_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_calendar_subscriptions_calendar_user (calendar_id, user_id),
   KEY idx_calendar_subscriptions_user_workspace (user_id, workspace_id),
   KEY idx_calendar_subscriptions_workspace_calendar (workspace_id, calendar_id),
@@ -28,4 +29,4 @@ CREATE TABLE calendar_subscriptions (
   CONSTRAINT fk_calendar_subscriptions_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_subscriptions_calendar FOREIGN KEY (calendar_id) REFERENCES calendars(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_subscriptions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Per-user display preferences for a calendar (color, visibility). Not an ACL axis — event-level visibility is the only ws-internal ACL.';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-user display preferences for a calendar (color, visibility). Not an ACL axis — event-level visibility is the only ws-internal ACL.';

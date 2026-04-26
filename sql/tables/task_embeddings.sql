@@ -20,11 +20,11 @@ CREATE TABLE task_embeddings (
   content_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'SHA-256 hex of embedded text',
   embedded_at  DATETIME(3)  NOT NULL COMMENT 'Last embed time',
 
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
 
   PRIMARY KEY (task_id, model),
   KEY idx_task_embeddings_workspace_id (workspace_id, task_id),
   INDEX idx_task_embeddings_model_embedded_at (model, embedded_at),
 
   CONSTRAINT fk_task_embeddings_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Task embedding vectors for duplicate detection (ADR 0003)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task embedding vectors for duplicate detection (ADR 0003)';

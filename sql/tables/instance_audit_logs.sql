@@ -16,13 +16,13 @@ CREATE TABLE instance_audit_logs (
   ip_address VARBINARY(16) NULL COMMENT 'Packed IPv4/IPv6 address',
   user_agent VARCHAR(512) NULL COMMENT 'Client user agent',
   payload_json JSON NULL COMMENT 'Redacted payload (no secrets)',
-  occurred_at DATETIME NOT NULL COMMENT 'Logical occurrence time (second precision; ties broken by id)',
+  occurred_at DATETIME(3) NOT NULL COMMENT 'Logical occurrence time (millisecond precision; ties broken by id)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_instance_audit_logs_public_id (public_id),
   KEY idx_instance_audit_logs_occurred_at (occurred_at),
@@ -31,4 +31,4 @@ CREATE TABLE instance_audit_logs (
 
   CONSTRAINT fk_instance_audit_logs_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT fk_instance_audit_logs_workspace FOREIGN KEY (target_workspace_id) REFERENCES workspaces(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Instance-wide audit log';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Instance-wide audit log';

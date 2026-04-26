@@ -17,10 +17,11 @@ CREATE TABLE labels (
   sort_weight     INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes           TEXT NULL COMMENT 'Admin notes',
   enabled         BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at      DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_labels_public_id (public_id),
+  UNIQUE KEY uniq_labels_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_labels_workspace_id_project_id_name_enabled (workspace_id, project_id, name, enabled),
   KEY idx_labels_workspace_id_project_id_enabled (workspace_id, project_id, enabled),
   KEY idx_labels_parent_label_id (parent_label_id),
@@ -28,4 +29,4 @@ CREATE TABLE labels (
   CONSTRAINT fk_labels_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_labels_project   FOREIGN KEY (project_id)   REFERENCES projects(id)   ON DELETE CASCADE,
   CONSTRAINT fk_labels_parent    FOREIGN KEY (parent_label_id) REFERENCES labels(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Hierarchical colored labels';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Hierarchical colored labels';

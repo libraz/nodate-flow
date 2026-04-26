@@ -14,20 +14,21 @@ CREATE TABLE personal_access_tokens (
   token_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'SHA-256 hex of the bearer token',
   token_prefix CHAR(8) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Leading chars shown as hint',
   scopes_json JSON NOT NULL COMMENT 'Array of granted API scopes',
-  expires_at DATETIME NULL COMMENT 'Expiry time (null = never)',
-  last_used_at DATETIME NULL COMMENT 'Last successful use',
-  revoked_at DATETIME NULL COMMENT 'Explicit revocation time',
+  expires_at DATETIME(3) NULL COMMENT 'Expiry time (null = never)',
+  last_used_at DATETIME(3) NULL COMMENT 'Last successful use',
+  revoked_at DATETIME(3) NULL COMMENT 'Explicit revocation time',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_personal_access_tokens_public_id (public_id),
+  UNIQUE KEY uniq_personal_access_tokens_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_personal_access_tokens_token_hash (token_hash),
   KEY idx_personal_access_tokens_workspace_id_user_id (workspace_id, user_id),
 
   CONSTRAINT fk_personal_access_tokens_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_personal_access_tokens_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='User personal access tokens for REST/CLI';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='User personal access tokens for REST/CLI';

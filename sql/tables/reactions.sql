@@ -16,10 +16,11 @@ CREATE TABLE reactions (
   sort_weight  INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes        TEXT NULL COMMENT 'Admin notes',
   enabled      BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at   DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_reactions_public_id (public_id),
+  UNIQUE KEY uniq_reactions_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_reactions_user_task_emoji (user_id, task_id, emoji, enabled),
   UNIQUE KEY uniq_reactions_user_comment_emoji (user_id, comment_id, emoji, enabled),
   KEY idx_reactions_task_id (task_id),
@@ -34,4 +35,4 @@ CREATE TABLE reactions (
     (task_id IS NOT NULL AND comment_id IS NULL) OR
     (comment_id IS NOT NULL AND task_id IS NULL)
   )
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Emoji reactions on tasks and comments';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Emoji reactions on tasks and comments';

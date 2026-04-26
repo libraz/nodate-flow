@@ -18,19 +18,20 @@ CREATE TABLE import_jobs (
   failed_items         INT UNSIGNED NOT NULL DEFAULT 0          COMMENT 'Items that failed to import',
   config_json          JSON NOT NULL                            COMMENT 'Source-specific import configuration',
   error_log            TEXT NULL                                COMMENT 'Aggregated error log',
-  started_at           DATETIME NULL                            COMMENT 'When the worker began processing',
-  completed_at         DATETIME NULL                            COMMENT 'When the import finished (success or failure)',
+  started_at           DATETIME(3) NULL                         COMMENT 'When the worker began processing',
+  completed_at         DATETIME(3) NULL                         COMMENT 'When the import finished (success or failure)',
 
   sort_weight          INT NOT NULL DEFAULT 0                   COMMENT 'Display order',
   notes                TEXT NULL                                COMMENT 'Admin notes',
   enabled              BOOLEAN NOT NULL DEFAULT TRUE            COMMENT 'Enabled flag',
-  updated_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at           TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at           DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_import_jobs_public_id (public_id),
+  UNIQUE KEY uniq_import_jobs_workspace_public_id (workspace_id, public_id),
   KEY idx_import_jobs_workspace_id_status (workspace_id, status),
 
   CONSTRAINT fk_import_jobs_workspace FOREIGN KEY (workspace_id)         REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_import_jobs_project   FOREIGN KEY (project_id)           REFERENCES projects(id)   ON DELETE SET NULL,
   CONSTRAINT fk_import_jobs_initiator FOREIGN KEY (initiated_by_user_id) REFERENCES users(id)      ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Bulk import job tracking';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Bulk import job tracking';

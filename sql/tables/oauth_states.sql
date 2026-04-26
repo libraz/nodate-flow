@@ -14,11 +14,11 @@ CREATE TABLE oauth_states (
   provider ENUM('github','slack','google_calendar') NOT NULL COMMENT 'Which provider this state belongs to',
   redirect_to VARCHAR(512) NULL COMMENT 'Optional client-supplied return URL to send the user to after the callback completes',
 
-  expires_at DATETIME NOT NULL COMMENT 'Hard expiry; callback handler rejects rows past this timestamp',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at DATETIME(3) NOT NULL COMMENT 'Hard expiry; callback handler rejects rows past this timestamp',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   KEY idx_oauth_states_expires_at (expires_at),
 
   CONSTRAINT fk_oauth_states_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Short-lived OAuth CSRF state tokens for personal integrations';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Short-lived OAuth CSRF state tokens for personal integrations';

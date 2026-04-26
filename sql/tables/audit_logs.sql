@@ -15,18 +15,19 @@ CREATE TABLE audit_logs (
   ip_address VARBINARY(16) NULL COMMENT 'Packed IPv4/IPv6 address',
   user_agent VARCHAR(512) NULL COMMENT 'Client user agent',
   metadata_json JSON NULL COMMENT 'Redacted metadata (no secrets, no raw keys)',
-  occurred_at DATETIME NOT NULL COMMENT 'Logical occurrence time (second precision; ties broken by id)',
+  occurred_at DATETIME(3) NOT NULL COMMENT 'Logical occurrence time (millisecond precision; ties broken by id)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_audit_logs_public_id (public_id),
+  UNIQUE KEY uniq_audit_logs_workspace_public_id (workspace_id, public_id),
   KEY idx_audit_logs_workspace_id_occurred_at (workspace_id, occurred_at),
   KEY idx_audit_logs_workspace_id_action (workspace_id, action),
 
   CONSTRAINT fk_audit_logs_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_audit_logs_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Workspace audit log';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Workspace audit log';

@@ -93,25 +93,26 @@ CREATE TABLE agent_runs (
   dedupe_key VARCHAR(128) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Unique key shaped as <agent_id>:<unix_minute> to prevent double enqueue across scheduler replicas',
   status ENUM('pending','claimed','succeeded','failed') NOT NULL DEFAULT 'pending' COMMENT 'Lifecycle state',
   attempts TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Number of claim attempts (for retry budget)',
-  scheduled_at DATETIME NOT NULL COMMENT 'Tick time the scheduler enqueued the run for',
-  claimed_at DATETIME NULL COMMENT 'When a worker claimed the row',
-  finished_at DATETIME NULL COMMENT 'When the worker ack/nacked the row',
+  scheduled_at DATETIME(3) NOT NULL COMMENT 'Tick time the scheduler enqueued the run for',
+  claimed_at DATETIME(3) NULL COMMENT 'When a worker claimed the row',
+  finished_at DATETIME(3) NULL COMMENT 'When the worker ack/nacked the row',
   error_message TEXT NULL COMMENT 'Last failure message for operator visibility',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_agent_runs_public_id (public_id),
+  UNIQUE KEY uniq_agent_runs_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_agent_runs_dedupe_key (dedupe_key),
   KEY idx_agent_runs_status_scheduled_at (status, scheduled_at),
   KEY idx_agent_runs_workspace_id_agent_id (workspace_id, agent_id),
 
   CONSTRAINT fk_agent_runs_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_agent_runs_agent FOREIGN KEY (agent_id) REFERENCES ai_agents(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Agent execution queue + history';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Agent execution queue + history';
 
 -- >>> ai_agents.sql
 -- ====================================
@@ -140,16 +141,17 @@ CREATE TABLE ai_agents (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_ai_agents_public_id (public_id),
+  UNIQUE KEY uniq_ai_agents_workspace_public_id (workspace_id, public_id),
   KEY idx_ai_agents_workspace_id_enabled (workspace_id, enabled),
   KEY idx_ai_agents_model_id (model_id),
 
   CONSTRAINT fk_ai_agents_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_ai_agents_model FOREIGN KEY (model_id) REFERENCES ai_models(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Reusable LLM agent configurations';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Reusable LLM agent configurations';
 
 -- >>> ai_invocations.sql
 -- ====================================
@@ -175,15 +177,16 @@ CREATE TABLE ai_invocations (
   cost_estimate DECIMAL(10,6) NULL COMMENT 'Estimated cost (USD)',
   status ENUM('ok','error','blocked') NOT NULL COMMENT 'Outcome',
   error_code VARCHAR(128) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'Error code when status != ok',
-  invoked_at DATETIME NOT NULL COMMENT 'Invocation time (second precision)',
+  invoked_at DATETIME(3) NOT NULL COMMENT 'Invocation time (millisecond precision)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_ai_invocations_public_id (public_id),
+  UNIQUE KEY uniq_ai_invocations_workspace_public_id (workspace_id, public_id),
   KEY idx_ai_invocations_workspace_id_invoked_at (workspace_id, invoked_at),
   KEY idx_ai_invocations_workspace_id_provider_id (workspace_id, provider_id),
   KEY idx_ai_invocations_agent_id_invoked_at (agent_id, invoked_at),
@@ -194,7 +197,7 @@ CREATE TABLE ai_invocations (
   CONSTRAINT fk_ai_invocations_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT fk_ai_invocations_agent FOREIGN KEY (agent_id) REFERENCES ai_agents(id) ON DELETE SET NULL,
   CONSTRAINT fk_ai_invocations_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='LLM invocation audit';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='LLM invocation audit';
 
 -- >>> ai_models.sql
 -- ====================================
@@ -220,16 +223,17 @@ CREATE TABLE ai_models (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_ai_models_public_id (public_id),
+  UNIQUE KEY uniq_ai_models_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_ai_models_provider_id_name (provider_id, name),
   KEY idx_ai_models_workspace_id_enabled (workspace_id, enabled),
 
   CONSTRAINT fk_ai_models_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_ai_models_provider FOREIGN KEY (provider_id) REFERENCES ai_providers(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Concrete LLM models per provider';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Concrete LLM models per provider';
 
 -- >>> ai_providers.sql
 -- ====================================
@@ -253,14 +257,15 @@ CREATE TABLE ai_providers (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_ai_providers_public_id (public_id),
+  UNIQUE KEY uniq_ai_providers_workspace_public_id (workspace_id, public_id),
   KEY idx_ai_providers_workspace_id_enabled (workspace_id, enabled),
 
   CONSTRAINT fk_ai_providers_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='LLM provider credentials';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='LLM provider credentials';
 
 -- >>> ai_settings.sql
 -- ====================================
@@ -287,13 +292,13 @@ CREATE TABLE ai_settings (
   auto_action_threshold        DECIMAL(3,2) NOT NULL DEFAULT 0.80  COMMENT 'Minimum confidence score for an action to be applied automatically',
 
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_ai_settings_workspace (workspace_id),
 
   CONSTRAINT fk_ai_settings_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Per-workspace AI configuration (ADR 0003): embeddings, duplicates, auto-actions';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-workspace AI configuration (ADR 0003): embeddings, duplicates, auto-actions';
 
 -- >>> attachments.sql
 -- ====================================
@@ -317,10 +322,11 @@ CREATE TABLE attachments (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_attachments_public_id (public_id),
+  UNIQUE KEY uniq_attachments_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_attachments_storage_key (storage_key),
   KEY idx_attachments_workspace_id_task_id (workspace_id, task_id),
   KEY idx_attachments_workspace_id_uploader_id (workspace_id, uploader_id),
@@ -328,7 +334,7 @@ CREATE TABLE attachments (
   CONSTRAINT fk_attachments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_attachments_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
   CONSTRAINT fk_attachments_uploader FOREIGN KEY (uploader_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Task file attachments metadata';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task file attachments metadata';
 
 -- >>> audit_logs.sql
 -- ====================================
@@ -348,21 +354,22 @@ CREATE TABLE audit_logs (
   ip_address VARBINARY(16) NULL COMMENT 'Packed IPv4/IPv6 address',
   user_agent VARCHAR(512) NULL COMMENT 'Client user agent',
   metadata_json JSON NULL COMMENT 'Redacted metadata (no secrets, no raw keys)',
-  occurred_at DATETIME NOT NULL COMMENT 'Logical occurrence time (second precision; ties broken by id)',
+  occurred_at DATETIME(3) NOT NULL COMMENT 'Logical occurrence time (millisecond precision; ties broken by id)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_audit_logs_public_id (public_id),
+  UNIQUE KEY uniq_audit_logs_workspace_public_id (workspace_id, public_id),
   KEY idx_audit_logs_workspace_id_occurred_at (workspace_id, occurred_at),
   KEY idx_audit_logs_workspace_id_action (workspace_id, action),
 
   CONSTRAINT fk_audit_logs_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_audit_logs_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Workspace audit log';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Workspace audit log';
 
 -- >>> auto_action_rules.sql
 -- ====================================
@@ -382,14 +389,15 @@ CREATE TABLE auto_action_rules (
   confidence    DECIMAL(3,2) NOT NULL COMMENT 'Confidence score emitted when this rule fires (0.00-1.00)',
   idle_hours    INT UNSIGNED NOT NULL COMMENT 'Idle threshold in hours. 0 for rules that use due_on (escalate_overdue)',
 
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_auto_action_rules_public_id (public_id),
+  UNIQUE KEY uniq_auto_action_rules_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_auto_action_rules_ws_kind (workspace_id, kind),
 
   CONSTRAINT fk_auto_action_rules_ws FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Per-workspace auto-action rule overrides (kind, confidence, idle threshold)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-workspace auto-action rule overrides (kind, confidence, idle threshold)';
 
 -- >>> calendar_event_attachments.sql
 -- ====================================
@@ -414,10 +422,11 @@ CREATE TABLE calendar_event_attachments (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag (soft delete)',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_calendar_event_attachments_public_id (public_id),
+  UNIQUE KEY uniq_calendar_event_attachments_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_calendar_event_attachments_storage_key (storage_key),
   KEY idx_calendar_event_attachments_event (event_id, enabled),
   KEY idx_calendar_event_attachments_workspace_uploader (workspace_id, uploader_id),
@@ -425,7 +434,7 @@ CREATE TABLE calendar_event_attachments (
   CONSTRAINT fk_calendar_event_attachments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_event_attachments_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_event_attachments_uploader FOREIGN KEY (uploader_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Calendar event file attachments';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Calendar event file attachments';
 
 -- >>> calendar_event_attendees.sql
 -- ====================================
@@ -447,17 +456,18 @@ CREATE TABLE calendar_event_attendees (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_calendar_event_attendees_public_id (public_id),
+  UNIQUE KEY uniq_calendar_event_attendees_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_calendar_event_attendees_event_user (event_id, user_id),
   KEY idx_calendar_event_attendees_workspace_user (workspace_id, user_id),
 
   CONSTRAINT fk_calendar_event_attendees_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_event_attendees_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_event_attendees_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Calendar event attendees with RSVP and edit permission';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Calendar event attendees with RSVP and edit permission';
 
 -- >>> calendar_event_checklist_items.sql
 -- ====================================
@@ -478,17 +488,18 @@ CREATE TABLE calendar_event_checklist_items (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_calendar_event_checklist_items_public_id (public_id),
+  UNIQUE KEY uniq_calendar_event_checklist_items_workspace_public_id (workspace_id, public_id),
   KEY idx_calendar_event_checklist_items_event (workspace_id, event_id, sort_weight),
   KEY idx_calendar_event_checklist_items_creator (workspace_id, created_by_user_id),
 
   CONSTRAINT fk_calendar_event_checklist_items_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_event_checklist_items_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_event_checklist_items_creator FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Calendar event checklist items';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Calendar event checklist items';
 
 -- >>> calendar_event_comments.sql
 -- ====================================
@@ -504,22 +515,23 @@ CREATE TABLE calendar_event_comments (
   author_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
 
   body MEDIUMTEXT NOT NULL COMMENT 'Comment text (markdown)',
-  edited_at DATETIME NULL COMMENT 'Last edit time (null = never edited)',
+  edited_at DATETIME(3) NULL COMMENT 'Last edit time (null = never edited)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_calendar_event_comments_public_id (public_id),
+  UNIQUE KEY uniq_calendar_event_comments_workspace_public_id (workspace_id, public_id),
   KEY idx_calendar_event_comments_event (workspace_id, event_id, created_at),
   KEY idx_calendar_event_comments_workspace_author (workspace_id, author_id),
 
   CONSTRAINT fk_calendar_event_comments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_event_comments_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_event_comments_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Calendar event discussion comments';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Calendar event discussion comments';
 
 -- >>> calendar_event_invites.sql
 -- ====================================
@@ -547,16 +559,17 @@ CREATE TABLE calendar_event_invites (
 
   email VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Recipient email, denormalized from attendee for inbox queries',
   token_hash BINARY(32) NOT NULL COMMENT 'SHA-256 digest of the plaintext magic-link token',
-  expires_at DATETIME(6) NOT NULL COMMENT 'Magic-link expiry',
-  accepted_at DATETIME(6) NULL COMMENT 'Set when the recipient clicks the link',
-  sent_at DATETIME(6) NULL COMMENT 'Set when the invite email is dispatched',
+  expires_at DATETIME(3) NOT NULL COMMENT 'Magic-link expiry',
+  accepted_at DATETIME(3) NULL COMMENT 'Set when the recipient clicks the link',
+  sent_at DATETIME(3) NULL COMMENT 'Set when the invite email is dispatched',
 
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag; disabled rows are revoked invites',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_calendar_event_invites_public_id (public_id),
+  UNIQUE KEY uniq_calendar_event_invites_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_calendar_event_invites_token_hash (token_hash),
   UNIQUE KEY uniq_calendar_event_invites_event_attendee (event_id, attendee_id),
   KEY idx_calendar_event_invites_workspace_expires (workspace_id, expires_at),
@@ -568,7 +581,7 @@ CREATE TABLE calendar_event_invites (
   CONSTRAINT fk_calendar_event_invites_calendar FOREIGN KEY (calendar_id) REFERENCES calendars(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_event_invites_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_event_invites_attendee FOREIGN KEY (attendee_id) REFERENCES calendar_event_attendees(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Magic-link invite rows for calendar event attendees';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Magic-link invite rows for calendar event attendees';
 
 -- >>> calendar_events.sql
 -- ====================================
@@ -590,8 +603,8 @@ CREATE TABLE calendar_events (
 
   title VARCHAR(500) NOT NULL COMMENT 'Event title',
   all_day BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'All-day event flag',
-  start_at DATETIME NULL COMMENT 'Start time (UTC or with timezone context); NULL = undated (planning-stage placeholder)',
-  end_at DATETIME NULL COMMENT 'End time; NULL = undated (planning-stage placeholder)',
+  start_at DATETIME(3) NULL COMMENT 'Start time (UTC or with timezone context); NULL = undated (planning-stage placeholder)',
+  end_at DATETIME(3) NULL COMMENT 'End time; NULL = undated (planning-stage placeholder)',
   timezone VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT 'UTC' COMMENT 'IANA timezone identifier; resolved from event > user > workspace > UTC',
 
   location VARCHAR(500) NULL COMMENT 'Location text',
@@ -607,11 +620,11 @@ CREATE TABLE calendar_events (
 
   -- Recurrence (RFC 5545 subset stored as JSON)
   recurrence_rule JSON NULL COMMENT 'Recurrence rule: {freq, interval, byDay, byMonthDay, bySetPos, until, count}',
-  recurrence_end DATETIME NULL COMMENT 'Computed end date for recurrence expansion queries',
+  recurrence_end DATETIME(3) NULL COMMENT 'Computed end date for recurrence expansion queries',
   recurrence_exceptions JSON DEFAULT NULL COMMENT 'Array of ISO 8601 dates/times to exclude from recurrence',
 
   notification_offset INT NULL COMMENT 'Minutes before event to send notification; NULL = no notification',
-  notified_at DATETIME NULL DEFAULT NULL COMMENT 'Timestamp when notification was sent; NULL = not yet notified',
+  notified_at DATETIME(3) NULL DEFAULT NULL COMMENT 'Timestamp when notification was sent; NULL = not yet notified',
 
   -- Cross-module link to nodate-flow tasks
   task_id INT UNSIGNED NULL COMMENT 'Linked task (optional, for task-calendar sync)',
@@ -621,10 +634,11 @@ CREATE TABLE calendar_events (
   notes TEXT NULL COMMENT 'Admin notes',
   flags JSON NULL COMMENT 'Structured per-event markers (non_working_day, auto_snapped, etc.); unknown keys preserved.',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_calendar_events_public_id (public_id),
+  UNIQUE KEY uniq_calendar_events_workspace_public_id (workspace_id, public_id),
   KEY idx_calendar_events_calendar_range (calendar_id, start_at, end_at),
   KEY idx_calendar_events_workspace_owner (workspace_id, owner_user_id, start_at),
   KEY idx_calendar_events_calendar_recurrence (calendar_id, recurrence_end),
@@ -650,7 +664,7 @@ CREATE TABLE calendar_events (
   CONSTRAINT chk_calendar_events_notification_requires_start CHECK (start_at IS NOT NULL OR notification_offset IS NULL),
   CONSTRAINT chk_calendar_events_chronology CHECK (end_at IS NULL OR start_at IS NULL OR end_at >= start_at),
   CONSTRAINT chk_calendar_events_milestone_no_recurrence CHECK (kind <> 'milestone' OR recurrence_rule IS NULL)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Calendar events with kind/visibility/show_as classification; nullable start/end for planning-stage placeholders; task_role links to task projection (D1).';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Calendar events with kind/visibility/show_as classification; nullable start/end for planning-stage placeholders; task_role links to task projection (D1).';
 
 -- >>> calendar_memos.sql
 -- ====================================
@@ -672,10 +686,11 @@ CREATE TABLE calendar_memos (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_calendar_memos_public_id (public_id),
+  UNIQUE KEY uniq_calendar_memos_workspace_public_id (workspace_id, public_id),
   KEY idx_calendar_memos_calendar (calendar_id, sort_weight),
   KEY idx_calendar_memos_workspace (workspace_id, calendar_id),
   KEY idx_calendar_memos_creator (workspace_id, created_by_user_id),
@@ -683,7 +698,7 @@ CREATE TABLE calendar_memos (
   CONSTRAINT fk_calendar_memos_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_memos_calendar FOREIGN KEY (calendar_id) REFERENCES calendars(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_memos_creator FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Calendar-level shared memos / to-do items';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Calendar-level shared memos / to-do items';
 
 -- >>> calendar_public_share_events.sql
 -- ====================================
@@ -704,17 +719,18 @@ CREATE TABLE calendar_public_share_events (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Override display order on the share page',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag (soft-disable)',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_calendar_public_share_events_public_id (public_id),
+  UNIQUE KEY uniq_calendar_public_share_events_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_calendar_public_share_events_share_event (share_id, event_id, enabled) COMMENT 'At most one enabled publication per (share, event)',
   KEY idx_calendar_public_share_events_workspace_event (workspace_id, event_id, enabled),
 
   CONSTRAINT fk_calendar_public_share_events_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_public_share_events_share FOREIGN KEY (share_id) REFERENCES calendar_public_shares(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_public_share_events_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='M:N: which events appear on which public share pages';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='M:N: which events appear on which public share pages';
 
 -- >>> calendar_public_shares.sql
 -- ====================================
@@ -738,21 +754,22 @@ CREATE TABLE calendar_public_shares (
 
   timezone VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT 'UTC' COMMENT 'Display tz for the public page; defaults to workspace tz at create',
   show_holidays_country CHAR(2) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'ISO 3166-1 alpha-2; NULL = no holiday overlay',
-  expires_at DATETIME NULL COMMENT 'NULL = never expires',
+  expires_at DATETIME(3) NULL COMMENT 'NULL = never expires',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order within workspace admin UI',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag (soft-disable)',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_calendar_public_shares_public_id (public_id),
+  UNIQUE KEY uniq_calendar_public_shares_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_calendar_public_shares_token_hash (token_hash),
   KEY idx_calendar_public_shares_workspace (workspace_id, enabled),
 
   CONSTRAINT fk_calendar_public_shares_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_public_shares_creator FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Workspace-owned publishable read-only share pages';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Workspace-owned publishable read-only share pages';
 
 -- >>> calendar_subscriptions.sql
 -- ====================================
@@ -774,10 +791,11 @@ CREATE TABLE calendar_subscriptions (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order in sidebar',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_calendar_subscriptions_public_id (public_id),
+  UNIQUE KEY uniq_calendar_subscriptions_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_calendar_subscriptions_calendar_user (calendar_id, user_id),
   KEY idx_calendar_subscriptions_user_workspace (user_id, workspace_id),
   KEY idx_calendar_subscriptions_workspace_calendar (workspace_id, calendar_id),
@@ -785,7 +803,7 @@ CREATE TABLE calendar_subscriptions (
   CONSTRAINT fk_calendar_subscriptions_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_subscriptions_calendar FOREIGN KEY (calendar_id) REFERENCES calendars(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_subscriptions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Per-user display preferences for a calendar (color, visibility). Not an ACL axis — event-level visibility is the only ws-internal ACL.';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-user display preferences for a calendar (color, visibility). Not an ACL axis — event-level visibility is the only ws-internal ACL.';
 
 -- >>> calendars.sql
 -- ====================================
@@ -811,16 +829,17 @@ CREATE TABLE calendars (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_calendars_public_id (public_id),
+  UNIQUE KEY uniq_calendars_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_calendars_system_slug (workspace_id, system_slug),
   KEY idx_calendars_workspace_id_kind (workspace_id, kind),
 
   CONSTRAINT fk_calendars_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendars_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Calendar containers (personal layer or system holiday feed). Workspace members share events through event-level visibility (public/private/confidential), not shared-calendar membership.';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Calendar containers (personal layer or system holiday feed). Workspace members share events through event-level visibility (public/private/confidential), not shared-calendar membership.';
 
 -- >>> comments.sql
 -- ====================================
@@ -836,15 +855,16 @@ CREATE TABLE comments (
   author_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
 
   body MEDIUMTEXT NOT NULL COMMENT 'Markdown body',
-  edited_at DATETIME NULL COMMENT 'Last edit time (null = never edited)',
+  edited_at DATETIME(3) NULL COMMENT 'Last edit time (null = never edited)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_comments_public_id (public_id),
+  UNIQUE KEY uniq_comments_workspace_public_id (workspace_id, public_id),
   KEY idx_comments_workspace_id_task_id (workspace_id, task_id),
   KEY idx_comments_workspace_id_author_id (workspace_id, author_id),
   -- Supports keyset pagination on (created_at DESC, public_id DESC) for
@@ -855,7 +875,7 @@ CREATE TABLE comments (
   CONSTRAINT fk_comments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_comments_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
   CONSTRAINT fk_comments_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Task discussion comments';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task discussion comments';
 
 -- >>> dashboard_widgets.sql
 -- ====================================
@@ -880,16 +900,17 @@ CREATE TABLE dashboard_widgets (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_dashboard_widgets_public_id (public_id),
+  UNIQUE KEY uniq_dashboard_widgets_workspace_public_id (workspace_id, public_id),
   KEY idx_dashboard_widgets_workspace_id_enabled_sort_weight (workspace_id, enabled, sort_weight),
   KEY idx_dashboard_widgets_workspace_id_creator_id (workspace_id, creator_id),
 
   CONSTRAINT fk_dashboard_widgets_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_dashboard_widgets_creator FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Dashboard widgets arranged by users';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Dashboard widgets arranged by users';
 
 -- >>> events.sql
 -- ====================================
@@ -907,15 +928,16 @@ CREATE TABLE events (
 
   type VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Event type (e.g., task.created, signal.attached)',
   payload_json JSON NOT NULL CHECK (JSON_VALID(payload_json)) COMMENT 'Event payload',
-  occurred_at DATETIME NOT NULL COMMENT 'Logical time of the event (second precision; ties broken by id)',
+  occurred_at DATETIME(3) NOT NULL COMMENT 'Logical time of the event (millisecond precision; ties broken by id)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_events_public_id (public_id),
+  UNIQUE KEY uniq_events_workspace_public_id (workspace_id, public_id),
   KEY idx_events_workspace_id_occurred_at (workspace_id, occurred_at),
   KEY idx_events_workspace_id_task_id_occurred_at (workspace_id, task_id, occurred_at),
   KEY idx_events_workspace_id_type (workspace_id, type),
@@ -923,7 +945,7 @@ CREATE TABLE events (
   CONSTRAINT fk_events_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_events_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
   CONSTRAINT fk_events_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Append-only event log';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Append-only event log';
 
 -- >>> identities.sql
 -- ====================================
@@ -940,23 +962,23 @@ CREATE TABLE identities (
   subject VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Provider subject / external ID (ASCII)',
   password_hash CHAR(97) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'Argon2id encoded hash, only for provider=local', -- argon2id encoded form (97 chars)
   mfa_secret_ciphertext VARBINARY(512) NULL COMMENT 'Encrypted TOTP secret (AES-256-GCM)',
-  mfa_confirmed_at DATETIME NULL COMMENT 'When the TOTP enrollment was confirmed by submitting a valid code',
+  mfa_confirmed_at DATETIME(3) NULL COMMENT 'When the TOTP enrollment was confirmed by submitting a valid code',
   failed_attempts INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Consecutive failed login attempts',
-  locked_until_at DATETIME NULL COMMENT 'Lockout expiry timestamp',
-  last_used_at DATETIME NULL COMMENT 'Last successful authentication time',
+  locked_until_at DATETIME(3) NULL COMMENT 'Lockout expiry timestamp',
+  last_used_at DATETIME(3) NULL COMMENT 'Last successful authentication time',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_identities_public_id (public_id),
   UNIQUE KEY uniq_identities_provider_subject (provider, subject),
   KEY idx_identities_user_id (user_id),
 
   CONSTRAINT fk_identities_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='User authentication identities';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='User authentication identities';
 
 -- >>> import_jobs.sql
 -- ====================================
@@ -979,22 +1001,23 @@ CREATE TABLE import_jobs (
   failed_items         INT UNSIGNED NOT NULL DEFAULT 0          COMMENT 'Items that failed to import',
   config_json          JSON NOT NULL                            COMMENT 'Source-specific import configuration',
   error_log            TEXT NULL                                COMMENT 'Aggregated error log',
-  started_at           DATETIME NULL                            COMMENT 'When the worker began processing',
-  completed_at         DATETIME NULL                            COMMENT 'When the import finished (success or failure)',
+  started_at           DATETIME(3) NULL                         COMMENT 'When the worker began processing',
+  completed_at         DATETIME(3) NULL                         COMMENT 'When the import finished (success or failure)',
 
   sort_weight          INT NOT NULL DEFAULT 0                   COMMENT 'Display order',
   notes                TEXT NULL                                COMMENT 'Admin notes',
   enabled              BOOLEAN NOT NULL DEFAULT TRUE            COMMENT 'Enabled flag',
-  updated_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at           TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at           DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_import_jobs_public_id (public_id),
+  UNIQUE KEY uniq_import_jobs_workspace_public_id (workspace_id, public_id),
   KEY idx_import_jobs_workspace_id_status (workspace_id, status),
 
   CONSTRAINT fk_import_jobs_workspace FOREIGN KEY (workspace_id)         REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_import_jobs_project   FOREIGN KEY (project_id)           REFERENCES projects(id)   ON DELETE SET NULL,
   CONSTRAINT fk_import_jobs_initiator FOREIGN KEY (initiated_by_user_id) REFERENCES users(id)      ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Bulk import job tracking';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Bulk import job tracking';
 
 -- >>> instance_admins.sql
 -- ====================================
@@ -1008,21 +1031,21 @@ CREATE TABLE instance_admins (
   user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
   granted_by_user_id INT UNSIGNED NULL COMMENT 'Internal FK to users.id (granter, null for bootstrap)',
 
-  granted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Time the grant was created',
-  revoked_at DATETIME NULL COMMENT 'Explicit revocation time',
+  granted_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT 'Time the grant was created',
+  revoked_at DATETIME(3) NULL COMMENT 'Explicit revocation time',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_instance_admins_public_id (public_id),
   UNIQUE KEY uniq_instance_admins_user_id (user_id),
 
   CONSTRAINT fk_instance_admins_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_instance_admins_granted_by FOREIGN KEY (granted_by_user_id) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Instance-wide admin grants';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Instance-wide admin grants';
 
 -- >>> instance_audit_logs.sql
 -- ====================================
@@ -1043,13 +1066,13 @@ CREATE TABLE instance_audit_logs (
   ip_address VARBINARY(16) NULL COMMENT 'Packed IPv4/IPv6 address',
   user_agent VARCHAR(512) NULL COMMENT 'Client user agent',
   payload_json JSON NULL COMMENT 'Redacted payload (no secrets)',
-  occurred_at DATETIME NOT NULL COMMENT 'Logical occurrence time (second precision; ties broken by id)',
+  occurred_at DATETIME(3) NOT NULL COMMENT 'Logical occurrence time (millisecond precision; ties broken by id)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_instance_audit_logs_public_id (public_id),
   KEY idx_instance_audit_logs_occurred_at (occurred_at),
@@ -1058,7 +1081,7 @@ CREATE TABLE instance_audit_logs (
 
   CONSTRAINT fk_instance_audit_logs_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT fk_instance_audit_logs_workspace FOREIGN KEY (target_workspace_id) REFERENCES workspaces(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Instance-wide audit log';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Instance-wide audit log';
 
 -- >>> instance_settings.sql
 -- ====================================
@@ -1075,15 +1098,15 @@ CREATE TABLE instance_settings (
   sort_weight     INT            NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes           TEXT           NULL COMMENT 'Admin notes',
   enabled         BOOLEAN        NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at      TIMESTAMP      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TIMESTAMP(3)   DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at      DATETIME(3)    NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_instance_settings_public_id (public_id),
   UNIQUE KEY uniq_instance_settings_key (setting_key),
 
   CONSTRAINT fk_instance_settings_user
     FOREIGN KEY (updated_by_user_id) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Instance-level dynamic settings';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Instance-level dynamic settings';
 
 -- >>> intake_items.sql
 -- ====================================
@@ -1102,18 +1125,19 @@ CREATE TABLE intake_items (
   title               VARCHAR(500) NOT NULL                   COMMENT 'Item title',
   body                MEDIUMTEXT NULL                         COMMENT 'Item body / details',
   triage_status       ENUM('pending','accepted','rejected','snoozed','duplicate') NOT NULL DEFAULT 'pending' COMMENT 'Current triage state',
-  snooze_until        DATETIME NULL                           COMMENT 'Snooze expiry (NULL = not snoozed)',
+  snooze_until        DATETIME(3) NULL                        COMMENT 'Snooze expiry (NULL = not snoozed)',
   ai_score            DECIMAL(3,2) NULL                       COMMENT '0.00-1.00',
   ai_reasoning        TEXT NULL                               COMMENT 'AI reasoning for the score',
-  scored_at           DATETIME NULL                           COMMENT 'When AI scoring was performed',
+  scored_at           DATETIME(3) NULL                        COMMENT 'When AI scoring was performed',
 
   sort_weight         INT NOT NULL DEFAULT 0                  COMMENT 'Display order',
   notes               TEXT NULL                               COMMENT 'Admin notes',
   enabled             BOOLEAN NOT NULL DEFAULT TRUE           COMMENT 'Enabled flag',
-  updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at          TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at          DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_intake_items_public_id (public_id),
+  UNIQUE KEY uniq_intake_items_workspace_public_id (workspace_id, public_id),
   KEY idx_intake_items_workspace_id_status (workspace_id, triage_status),
   KEY idx_intake_items_workspace_id_snooze (workspace_id, snooze_until),
   KEY idx_intake_items_signal_id (signal_id),
@@ -1122,7 +1146,7 @@ CREATE TABLE intake_items (
   CONSTRAINT fk_intake_items_signal     FOREIGN KEY (signal_id)          REFERENCES signals(id)    ON DELETE SET NULL,
   CONSTRAINT fk_intake_items_task       FOREIGN KEY (task_id)            REFERENCES tasks(id)      ON DELETE SET NULL,
   CONSTRAINT fk_intake_items_triaged_by FOREIGN KEY (triaged_by_user_id) REFERENCES users(id)      ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Intake triage queue';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Intake triage queue';
 
 -- >>> labels.sql
 -- ====================================
@@ -1144,10 +1168,11 @@ CREATE TABLE labels (
   sort_weight     INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes           TEXT NULL COMMENT 'Admin notes',
   enabled         BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at      DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_labels_public_id (public_id),
+  UNIQUE KEY uniq_labels_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_labels_workspace_id_project_id_name_enabled (workspace_id, project_id, name, enabled),
   KEY idx_labels_workspace_id_project_id_enabled (workspace_id, project_id, enabled),
   KEY idx_labels_parent_label_id (parent_label_id),
@@ -1155,7 +1180,7 @@ CREATE TABLE labels (
   CONSTRAINT fk_labels_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_labels_project   FOREIGN KEY (project_id)   REFERENCES projects(id)   ON DELETE CASCADE,
   CONSTRAINT fk_labels_parent    FOREIGN KEY (parent_label_id) REFERENCES labels(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Hierarchical colored labels';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Hierarchical colored labels';
 
 -- >>> lenses.sql
 -- ====================================
@@ -1175,17 +1200,18 @@ CREATE TABLE lenses (
   is_default BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Default lens for the scope',
   is_public BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Whether the lens is publicly shared',
   public_token CHAR(32) CHARACTER SET latin1 NULL COMMENT 'Random hex token for public share URL',
-  shared_at DATETIME NULL COMMENT 'Timestamp when first shared publicly',
-  safety_checked_at DATETIME NULL COMMENT 'Timestamp of last AI safety check',
-  archived_at DATETIME NULL COMMENT 'Set when lens is archived (distinct from enabled)',
+  shared_at DATETIME(3) NULL COMMENT 'Timestamp when first shared publicly',
+  safety_checked_at DATETIME(3) NULL COMMENT 'Timestamp of last AI safety check',
+  archived_at DATETIME(3) NULL COMMENT 'Set when lens is archived (distinct from enabled)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_lenses_public_id (public_id),
+  UNIQUE KEY uniq_lenses_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_lenses_workspace_id_project_id_name_enabled (workspace_id, project_id, name, enabled),
   UNIQUE KEY uniq_lenses_public_token (public_token),
   KEY idx_lenses_workspace_id_archived_at (workspace_id, archived_at),
@@ -1195,7 +1221,7 @@ CREATE TABLE lenses (
   CONSTRAINT fk_lenses_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_lenses_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   CONSTRAINT fk_lenses_creator FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Saved task query views';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Saved task query views';
 
 -- >>> magic_link_tokens.sql
 -- ====================================
@@ -1210,22 +1236,22 @@ CREATE TABLE magic_link_tokens (
   user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
 
   token_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'SHA-256 hex of the token',
-  expires_at DATETIME NOT NULL COMMENT 'Token expiry time',
-  used_at DATETIME NULL COMMENT 'Time the token was consumed',
+  expires_at DATETIME(3) NOT NULL COMMENT 'Token expiry time',
+  used_at DATETIME(3) NULL COMMENT 'Time the token was consumed',
   ip_address VARBINARY(16) NULL COMMENT 'Packed IPv4/IPv6 address at creation',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_magic_link_tokens_public_id (public_id),
   UNIQUE KEY uniq_magic_link_tokens_token_hash (token_hash),
   KEY idx_magic_link_tokens_user_id (user_id),
 
   CONSTRAINT fk_magic_link_tokens_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Passwordless magic-link tokens';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Passwordless magic-link tokens';
 
 -- >>> mcp_invocations.sql
 -- ====================================
@@ -1246,15 +1272,16 @@ CREATE TABLE mcp_invocations (
   status ENUM('ok','error','denied') NOT NULL COMMENT 'Outcome',
   error_code VARCHAR(128) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'Error code when status != ok',
   duration_ms INT UNSIGNED NULL COMMENT 'Wall-clock duration in milliseconds',
-  invoked_at DATETIME NOT NULL COMMENT 'Invocation start time (second precision)',
+  invoked_at DATETIME(3) NOT NULL COMMENT 'Invocation start time (millisecond precision)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_mcp_invocations_public_id (public_id),
+  UNIQUE KEY uniq_mcp_invocations_workspace_public_id (workspace_id, public_id),
   KEY idx_mcp_invocations_workspace_id_invoked_at (workspace_id, invoked_at),
   KEY idx_mcp_invocations_workspace_id_user_id (workspace_id, user_id),
   KEY idx_mcp_invocations_created_at (created_at),
@@ -1262,7 +1289,7 @@ CREATE TABLE mcp_invocations (
   CONSTRAINT fk_mcp_invocations_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_mcp_invocations_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT fk_mcp_invocations_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='MCP tool invocation audit';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='MCP tool invocation audit';
 
 -- >>> mcp_tokens.sql
 -- ====================================
@@ -1281,24 +1308,25 @@ CREATE TABLE mcp_tokens (
   token_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'SHA-256 hex of the bearer token',
   token_prefix CHAR(8) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Leading chars shown as hint',
   scopes_json JSON NOT NULL COMMENT 'Array of granted MCP tool scopes',
-  expires_at DATETIME NULL COMMENT 'Expiry time (null = never)',
-  last_used_at DATETIME NULL COMMENT 'Last successful use',
-  revoked_at DATETIME NULL COMMENT 'Explicit revocation time',
+  expires_at DATETIME(3) NULL COMMENT 'Expiry time (null = never)',
+  last_used_at DATETIME(3) NULL COMMENT 'Last successful use',
+  revoked_at DATETIME(3) NULL COMMENT 'Explicit revocation time',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_mcp_tokens_public_id (public_id),
+  UNIQUE KEY uniq_mcp_tokens_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_mcp_tokens_token_hash (token_hash),
   KEY idx_mcp_tokens_workspace_id_user_id (workspace_id, user_id),
 
   CONSTRAINT fk_mcp_tokens_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_mcp_tokens_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_mcp_tokens_agent FOREIGN KEY (agent_id) REFERENCES ai_agents(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='MCP personal access tokens';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='MCP personal access tokens';
 
 -- >>> mentions.sql
 -- ====================================
@@ -1321,10 +1349,11 @@ CREATE TABLE mentions (
   sort_weight       INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes             TEXT NULL COMMENT 'Admin notes',
   enabled           BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at        DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_mentions_public_id (public_id),
+  UNIQUE KEY uniq_mentions_workspace_public_id (workspace_id, public_id),
   KEY idx_mentions_workspace_mentioned_user (workspace_id, mentioned_user_id),
   KEY idx_mentions_task_id (task_id),
   KEY idx_mentions_comment_id (comment_id),
@@ -1334,7 +1363,7 @@ CREATE TABLE mentions (
   CONSTRAINT fk_mentions_actor     FOREIGN KEY (actor_user_id)     REFERENCES users(id)      ON DELETE SET NULL,
   CONSTRAINT fk_mentions_task      FOREIGN KEY (task_id)           REFERENCES tasks(id)      ON DELETE CASCADE,
   CONSTRAINT fk_mentions_comment   FOREIGN KEY (comment_id)        REFERENCES comments(id)   ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='@mention cache (re-extractable from markdown)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='@mention cache (re-extractable from markdown)';
 
 -- >>> notification_preferences.sql
 -- ====================================
@@ -1356,16 +1385,17 @@ CREATE TABLE notification_preferences (
   sort_weight    INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes          TEXT NULL COMMENT 'Admin notes',
   enabled        BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at     DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_notif_prefs_public_id (public_id),
+  UNIQUE KEY uniq_notif_prefs_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_notif_prefs_user_ws_cat_chan (user_id, workspace_id, event_category, channel),
   KEY idx_notif_prefs_workspace_user (workspace_id, user_id),
 
   CONSTRAINT fk_notif_prefs_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_notif_prefs_user      FOREIGN KEY (user_id)      REFERENCES users(id)      ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Granular per-user notification preferences';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Granular per-user notification preferences';
 
 -- >>> notifications.sql
 -- ====================================
@@ -1388,17 +1418,18 @@ CREATE TABLE notifications (
   body TEXT NULL COMMENT 'Optional longer description',
   severity ENUM('low','normal','high','urgent') NOT NULL DEFAULT 'normal' COMMENT 'AI-inferred or rule-based severity',
   channel ENUM('in_app','email','push') NOT NULL DEFAULT 'in_app' COMMENT 'Delivery channel',
-  read_at DATETIME NULL COMMENT 'When the user marked it read (null = unread)',
-  archived_at DATETIME NULL COMMENT 'When the user archived it (null = active)',
-  delivered_at DATETIME NULL COMMENT 'When email/push was actually sent (null for in_app only)',
+  read_at DATETIME(3) NULL COMMENT 'When the user marked it read (null = unread)',
+  archived_at DATETIME(3) NULL COMMENT 'When the user archived it (null = active)',
+  delivered_at DATETIME(3) NULL COMMENT 'When email/push was actually sent (null for in_app only)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_notifications_public_id (public_id),
+  UNIQUE KEY uniq_notifications_workspace_public_id (workspace_id, public_id),
   -- At-least-once dedup: a single (recipient, source_event, channel) tuple
   -- yields exactly one row even if the fan-out goroutine retries.
   -- MySQL UNIQUE treats NULLs as distinct, so rows with source_event_id IS NULL
@@ -1416,7 +1447,7 @@ CREATE TABLE notifications (
   CONSTRAINT fk_notifications_recipient FOREIGN KEY (recipient_user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_notifications_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT fk_notifications_source_event FOREIGN KEY (source_event_id) REFERENCES events(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Per-user notification entries from eventbus fan-out';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-user notification entries from eventbus fan-out';
 
 -- >>> oauth_states.sql
 -- ====================================
@@ -1435,14 +1466,14 @@ CREATE TABLE oauth_states (
   provider ENUM('github','slack','google_calendar') NOT NULL COMMENT 'Which provider this state belongs to',
   redirect_to VARCHAR(512) NULL COMMENT 'Optional client-supplied return URL to send the user to after the callback completes',
 
-  expires_at DATETIME NOT NULL COMMENT 'Hard expiry; callback handler rejects rows past this timestamp',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at DATETIME(3) NOT NULL COMMENT 'Hard expiry; callback handler rejects rows past this timestamp',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   KEY idx_oauth_states_expires_at (expires_at),
 
   CONSTRAINT fk_oauth_states_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Short-lived OAuth CSRF state tokens for personal integrations';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Short-lived OAuth CSRF state tokens for personal integrations';
 
 -- >>> pages.sql
 -- ====================================
@@ -1462,15 +1493,16 @@ CREATE TABLE pages (
   title VARCHAR(500) NOT NULL COMMENT 'Page title',
   body MEDIUMTEXT NOT NULL COMMENT 'Page content',
   is_ai_generated BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Whether the page was generated by AI',
-  archived_at DATETIME NULL COMMENT 'Set when page is archived (distinct from enabled)',
+  archived_at DATETIME(3) NULL COMMENT 'Set when page is archived (distinct from enabled)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order among siblings',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_pages_public_id (public_id),
+  UNIQUE KEY uniq_pages_workspace_public_id (workspace_id, public_id),
   KEY idx_pages_workspace_id_archived_at (workspace_id, archived_at),
   KEY idx_pages_workspace_id_enabled_sort_weight (workspace_id, enabled, sort_weight),
   KEY idx_pages_workspace_id_project_id (workspace_id, project_id),
@@ -1481,7 +1513,7 @@ CREATE TABLE pages (
   CONSTRAINT fk_pages_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL,
   CONSTRAINT fk_pages_creator FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_pages_parent FOREIGN KEY (parent_page_id) REFERENCES pages(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Wiki/documentation pages with tree structure';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Wiki/documentation pages with tree structure';
 
 -- >>> personal_access_tokens.sql
 -- ====================================
@@ -1500,23 +1532,24 @@ CREATE TABLE personal_access_tokens (
   token_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'SHA-256 hex of the bearer token',
   token_prefix CHAR(8) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Leading chars shown as hint',
   scopes_json JSON NOT NULL COMMENT 'Array of granted API scopes',
-  expires_at DATETIME NULL COMMENT 'Expiry time (null = never)',
-  last_used_at DATETIME NULL COMMENT 'Last successful use',
-  revoked_at DATETIME NULL COMMENT 'Explicit revocation time',
+  expires_at DATETIME(3) NULL COMMENT 'Expiry time (null = never)',
+  last_used_at DATETIME(3) NULL COMMENT 'Last successful use',
+  revoked_at DATETIME(3) NULL COMMENT 'Explicit revocation time',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_personal_access_tokens_public_id (public_id),
+  UNIQUE KEY uniq_personal_access_tokens_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_personal_access_tokens_token_hash (token_hash),
   KEY idx_personal_access_tokens_workspace_id_user_id (workspace_id, user_id),
 
   CONSTRAINT fk_personal_access_tokens_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_personal_access_tokens_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='User personal access tokens for REST/CLI';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='User personal access tokens for REST/CLI';
 
 -- >>> project_members.sql
 -- ====================================
@@ -1531,22 +1564,23 @@ CREATE TABLE project_members (
   user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
 
   role ENUM('lead','editor','commenter','viewer') NOT NULL DEFAULT 'editor' COMMENT 'Project-level role',
-  added_at DATETIME NULL COMMENT 'Time added to project',
+  added_at DATETIME(3) NULL COMMENT 'Time added to project',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_project_members_public_id (public_id),
+  UNIQUE KEY uniq_project_members_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_project_members_project_id_user_id (project_id, user_id),
   KEY idx_project_members_workspace_id_user_id (workspace_id, user_id),
 
   CONSTRAINT fk_project_members_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_project_members_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   CONSTRAINT fk_project_members_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Project membership';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Project membership';
 
 -- >>> projects.sql
 -- ====================================
@@ -1574,16 +1608,17 @@ CREATE TABLE projects (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_projects_public_id (public_id),
+  UNIQUE KEY uniq_projects_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_projects_workspace_id_slug_enabled (workspace_id, slug, enabled),
   KEY idx_projects_workspace_id_enabled (workspace_id, enabled),
   UNIQUE KEY uniq_projects_workspace_id_identifier_enabled (workspace_id, identifier, enabled),
 
   CONSTRAINT fk_projects_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Task container';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task container';
 
 -- >>> reactions.sql
 -- ====================================
@@ -1604,10 +1639,11 @@ CREATE TABLE reactions (
   sort_weight  INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes        TEXT NULL COMMENT 'Admin notes',
   enabled      BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at   DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_reactions_public_id (public_id),
+  UNIQUE KEY uniq_reactions_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_reactions_user_task_emoji (user_id, task_id, emoji, enabled),
   UNIQUE KEY uniq_reactions_user_comment_emoji (user_id, comment_id, emoji, enabled),
   KEY idx_reactions_task_id (task_id),
@@ -1622,7 +1658,7 @@ CREATE TABLE reactions (
     (task_id IS NOT NULL AND comment_id IS NULL) OR
     (comment_id IS NOT NULL AND task_id IS NULL)
   )
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Emoji reactions on tasks and comments';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Emoji reactions on tasks and comments';
 
 -- >>> relation_suggestions.sql
 -- ====================================
@@ -1641,12 +1677,13 @@ CREATE TABLE relation_suggestions (
   confidence DECIMAL(5,4) NOT NULL COMMENT 'Cosine similarity score (0.0000 to 1.0000)',
   status ENUM('pending','accepted','dismissed') NOT NULL DEFAULT 'pending' COMMENT 'Resolution status',
   resolved_by INT UNSIGNED NULL COMMENT 'Internal FK to users.id (who resolved)',
-  resolved_at DATETIME NULL COMMENT 'When the suggestion was accepted or dismissed',
+  resolved_at DATETIME(3) NULL COMMENT 'When the suggestion was accepted or dismissed',
 
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_relation_suggestions_public_id (public_id),
+  UNIQUE KEY uniq_relation_suggestions_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_relation_suggestions_edge (source_task_id, target_task_id, suggested_kind),
   KEY idx_relation_suggestions_workspace_id_status_created_at (workspace_id, status, created_at DESC),
   KEY idx_relation_suggestions_target_task_id_status (target_task_id, status),
@@ -1656,7 +1693,7 @@ CREATE TABLE relation_suggestions (
   CONSTRAINT fk_relation_suggestions_target FOREIGN KEY (target_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
   CONSTRAINT fk_relation_suggestions_resolved_by FOREIGN KEY (resolved_by) REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT chk_relation_suggestions_no_self CHECK (source_task_id != target_task_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI-suggested task relation candidates';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='AI-suggested task relation candidates';
 
 -- >>> repo_workspace_mappings.sql
 -- ====================================
@@ -1680,10 +1717,11 @@ CREATE TABLE repo_workspace_mappings (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_repo_workspace_mappings_public_id (public_id),
+  UNIQUE KEY uniq_repo_workspace_mappings_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_repo_workspace_mappings_workspace_repo (workspace_id, repo_full_name),
   KEY idx_repo_workspace_mappings_repo_id (repo_id),
   KEY idx_repo_workspace_mappings_integration_id (integration_id),
@@ -1692,7 +1730,7 @@ CREATE TABLE repo_workspace_mappings (
   CONSTRAINT fk_repo_workspace_mappings_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_repo_workspace_mappings_integration FOREIGN KEY (integration_id) REFERENCES user_integrations(id) ON DELETE CASCADE,
   CONSTRAINT fk_repo_workspace_mappings_project FOREIGN KEY (default_project_id) REFERENCES projects(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Maps GitHub repositories to workspaces for webhook routing';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Maps GitHub repositories to workspaces for webhook routing';
 
 -- >>> sessions.sql
 -- ====================================
@@ -1708,22 +1746,22 @@ CREATE TABLE sessions (
   refresh_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'SHA-256 hex of refresh token',
   user_agent VARCHAR(512) NULL COMMENT 'Client user agent at issue time',
   ip_address VARBINARY(16) NULL COMMENT 'Packed IPv4/IPv6 address at issue time',
-  expires_at DATETIME NOT NULL COMMENT 'Refresh token expiry',
-  revoked_at DATETIME NULL COMMENT 'Explicit revocation time',
-  last_used_at DATETIME NULL COMMENT 'Last refresh time',
+  expires_at DATETIME(3) NOT NULL COMMENT 'Refresh token expiry',
+  revoked_at DATETIME(3) NULL COMMENT 'Explicit revocation time',
+  last_used_at DATETIME(3) NULL COMMENT 'Last refresh time',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_sessions_public_id (public_id),
   UNIQUE KEY uniq_sessions_refresh_hash (refresh_hash),
   KEY idx_sessions_user_id_expires_at (user_id, expires_at),
 
   CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Refresh-token backed sessions';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Refresh-token backed sessions';
 
 -- >>> signals.sql
 -- ====================================
@@ -1741,22 +1779,23 @@ CREATE TABLE signals (
   kind VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Source-specific event kind (e.g., pull_request.opened)',
   external_id VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'External identifier (delivery id, message ts, ...)',
   payload_json JSON NOT NULL CHECK (JSON_VALID(payload_json)) COMMENT 'Raw normalized payload',
-  received_at DATETIME NOT NULL COMMENT 'Time the signal was received',
+  received_at DATETIME(3) NOT NULL COMMENT 'Time the signal was received',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_signals_public_id (public_id),
+  UNIQUE KEY uniq_signals_workspace_public_id (workspace_id, public_id),
   KEY idx_signals_workspace_id_received_at (workspace_id, received_at),
   KEY idx_signals_workspace_id_task_id (workspace_id, task_id),
   KEY idx_signals_source_external_id (source, external_id),
 
   CONSTRAINT fk_signals_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_signals_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Inbound signals';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Inbound signals';
 
 -- >>> task_actors.sql
 -- ====================================
@@ -1777,10 +1816,11 @@ CREATE TABLE task_actors (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_task_actors_public_id (public_id),
+  UNIQUE KEY uniq_task_actors_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_task_actors_task_id_user_id_role (task_id, user_id, role),
   UNIQUE KEY uniq_task_actors_task_id_agent_id_role (task_id, agent_id, role),
   KEY idx_task_actors_workspace_id_user_id (workspace_id, user_id),
@@ -1794,7 +1834,7 @@ CREATE TABLE task_actors (
     (kind = 'user'  AND user_id  IS NOT NULL AND agent_id IS NULL) OR
     (kind = 'agent' AND agent_id IS NOT NULL AND user_id  IS NULL)
   )
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Task actors (assignees/reviewers/...)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task actors (assignees/reviewers/...)';
 
 -- >>> task_constraints.sql
 -- ====================================
@@ -1810,22 +1850,23 @@ CREATE TABLE task_constraints (
 
   kind ENUM('deadline','dependency','approval','signal','custom') NOT NULL COMMENT 'Constraint kind',
   expression TEXT NOT NULL COMMENT 'Engine-specific expression (JSON-ish DSL)',
-  satisfied_at DATETIME NULL COMMENT 'Time the constraint was first satisfied',
-  failed_at DATETIME NULL COMMENT 'Time the constraint was last evaluated as failing',
+  satisfied_at DATETIME(3) NULL COMMENT 'Time the constraint was first satisfied',
+  failed_at DATETIME(3) NULL COMMENT 'Time the constraint was last evaluated as failing',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_task_constraints_public_id (public_id),
+  UNIQUE KEY uniq_task_constraints_workspace_public_id (workspace_id, public_id),
   KEY idx_task_constraints_workspace_id_task_id (workspace_id, task_id),
   KEY idx_task_constraints_task_id_enabled (task_id, enabled),
 
   CONSTRAINT fk_task_constraints_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_task_constraints_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Task constraints';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task constraints';
 
 -- >>> task_dependencies.sql
 -- ====================================
@@ -1844,10 +1885,11 @@ CREATE TABLE task_dependencies (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_task_dependencies_public_id (public_id),
+  UNIQUE KEY uniq_task_dependencies_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_task_dependencies_edge (from_task_id, to_task_id, kind, enabled),
   KEY idx_task_dependencies_workspace_from (workspace_id, from_task_id),
   KEY idx_task_dependencies_workspace_to (workspace_id, to_task_id),
@@ -1856,7 +1898,7 @@ CREATE TABLE task_dependencies (
   CONSTRAINT fk_task_dependencies_from FOREIGN KEY (from_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
   CONSTRAINT fk_task_dependencies_to FOREIGN KEY (to_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
   CONSTRAINT chk_task_dependencies_no_self CHECK (from_task_id != to_task_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Directed task dependencies';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Directed task dependencies';
 
 -- >>> task_description_versions.sql
 -- ====================================
@@ -1878,17 +1920,18 @@ CREATE TABLE task_description_versions (
   sort_weight    INT NOT NULL DEFAULT 0                  COMMENT 'Display order',
   notes          TEXT NULL                               COMMENT 'Admin notes',
   enabled        BOOLEAN NOT NULL DEFAULT TRUE           COMMENT 'Enabled flag',
-  updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at     DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_task_desc_versions_public_id (public_id),
+  UNIQUE KEY uniq_task_desc_versions_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_task_desc_versions_task_version (task_id, version_number),
   KEY idx_task_desc_versions_workspace_task (workspace_id, task_id, created_at DESC),
 
   CONSTRAINT fk_task_desc_versions_workspace FOREIGN KEY (workspace_id)   REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_task_desc_versions_task      FOREIGN KEY (task_id)        REFERENCES tasks(id)      ON DELETE CASCADE,
   CONSTRAINT fk_task_desc_versions_author    FOREIGN KEY (author_user_id) REFERENCES users(id)      ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Task description version history (full snapshots)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task description version history (full snapshots)';
 
 -- >>> task_embeddings.sql
 -- ====================================
@@ -1913,14 +1956,14 @@ CREATE TABLE task_embeddings (
   content_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'SHA-256 hex of embedded text',
   embedded_at  DATETIME(3)  NOT NULL COMMENT 'Last embed time',
 
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
 
   PRIMARY KEY (task_id, model),
   KEY idx_task_embeddings_workspace_id (workspace_id, task_id),
   INDEX idx_task_embeddings_model_embedded_at (model, embedded_at),
 
   CONSTRAINT fk_task_embeddings_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Task embedding vectors for duplicate detection (ADR 0003)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task embedding vectors for duplicate detection (ADR 0003)';
 
 -- >>> task_event_links.sql
 -- ====================================
@@ -1943,10 +1986,11 @@ CREATE TABLE task_event_links (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order within an event''s linked-task list',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag (soft-disable)',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_task_event_links_public_id (public_id),
+  UNIQUE KEY uniq_task_event_links_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_task_event_links_task_event_relation (task_id, event_id, relation, enabled) COMMENT 'At most one enabled link per (task, event, relation)',
   KEY idx_task_event_links_workspace_event (workspace_id, event_id, enabled),
   KEY idx_task_event_links_workspace_task (workspace_id, task_id, enabled),
@@ -1954,7 +1998,7 @@ CREATE TABLE task_event_links (
   CONSTRAINT fk_task_event_links_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_task_event_links_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
   CONSTRAINT fk_task_event_links_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='M:N task-to-event relationships (umbrella events, milestones)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='M:N task-to-event relationships (umbrella events, milestones)';
 
 -- >>> task_labels.sql
 -- ====================================
@@ -1971,17 +2015,18 @@ CREATE TABLE task_labels (
   sort_weight  INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes        TEXT NULL COMMENT 'Admin notes',
   enabled      BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at   DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_task_labels_public_id (public_id),
+  UNIQUE KEY uniq_task_labels_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_task_labels_task_id_label_id_enabled (task_id, label_id, enabled),
   KEY idx_task_labels_workspace_id_label_id (workspace_id, label_id),
 
   CONSTRAINT fk_task_labels_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_task_labels_task      FOREIGN KEY (task_id)      REFERENCES tasks(id)      ON DELETE CASCADE,
   CONSTRAINT fk_task_labels_label     FOREIGN KEY (label_id)     REFERENCES labels(id)     ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Task-label junction';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task-label junction';
 
 -- >>> tasks.sql
 -- ====================================
@@ -1998,6 +2043,7 @@ CREATE TABLE tasks (
   task_number INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Per-project monotonic counter (1-based)',
   parent_task_id INT UNSIGNED NULL COMMENT 'Self-reference for subtasks',
   created_by_user_id INT UNSIGNED NULL COMMENT 'Creator user.id',
+  updated_by_user_id INT UNSIGNED NULL COMMENT 'Last modifier user.id (audit field; NULL for system writers)',
 
   title VARCHAR(255) NOT NULL COMMENT 'Task title',
   description MEDIUMTEXT NULL COMMENT 'Markdown body',
@@ -2005,17 +2051,18 @@ CREATE TABLE tasks (
   priority INT NOT NULL DEFAULT 0 COMMENT 'LLM-optimized heuristic priority',
   due_on DATE NULL COMMENT 'Deadline for task completion; drives constraint evaluation',
   started_on DATE NULL COMMENT 'Date work began on this task',
-  completed_at DATETIME NULL COMMENT 'Time derived_state transitioned to done',
-  archived_at DATETIME NULL COMMENT 'Set when task is archived (distinct from enabled)',
+  completed_at DATETIME(3) NULL COMMENT 'Time derived_state transitioned to done',
+  archived_at DATETIME(3) NULL COMMENT 'Set when task is archived (distinct from enabled)',
 
   visibility ENUM('public','project','private') NOT NULL DEFAULT 'public' COMMENT 'ACL Layer 4: public=workspace members, project=project members, private=task actors only',
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_tasks_public_id (public_id),
+  UNIQUE KEY uniq_tasks_workspace_public_id (workspace_id, public_id),
   KEY idx_tasks_workspace_id_project_id (workspace_id, project_id),
   KEY idx_tasks_workspace_id_due_on (workspace_id, due_on),
   KEY idx_tasks_workspace_id_derived_state (workspace_id, derived_state),
@@ -2030,8 +2077,9 @@ CREATE TABLE tasks (
   CONSTRAINT fk_tasks_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_tasks_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   CONSTRAINT fk_tasks_parent FOREIGN KEY (parent_task_id) REFERENCES tasks(id) ON DELETE SET NULL,
-  CONSTRAINT fk_tasks_creator FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='nodate-flow core task object';
+  CONSTRAINT fk_tasks_creator FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_tasks_updated_by FOREIGN KEY (updated_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='nodate-flow core task object';
 
 -- >>> timebox_tasks.sql
 -- ====================================
@@ -2049,10 +2097,11 @@ CREATE TABLE timebox_tasks (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_timebox_tasks_public_id (public_id),
+  UNIQUE KEY uniq_timebox_tasks_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_timebox_tasks_timebox_id_task_id_enabled (timebox_id, task_id, enabled),
   KEY idx_timebox_tasks_workspace_id_timebox_id (workspace_id, timebox_id),
   KEY idx_timebox_tasks_task_id (task_id),
@@ -2060,7 +2109,7 @@ CREATE TABLE timebox_tasks (
   CONSTRAINT fk_timebox_tasks_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_timebox_tasks_timebox FOREIGN KEY (timebox_id) REFERENCES timeboxes(id) ON DELETE CASCADE,
   CONSTRAINT fk_timebox_tasks_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Timebox-task associations';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Timebox-task associations';
 
 -- >>> timeboxes.sql
 -- ====================================
@@ -2081,15 +2130,16 @@ CREATE TABLE timeboxes (
   starts_on DATE NOT NULL COMMENT 'Timebox start date',
   ends_on DATE NOT NULL COMMENT 'Timebox end date (must be > starts_on)',
   status ENUM('planned','active','completed','cancelled') NOT NULL DEFAULT 'planned' COMMENT 'Lifecycle status',
-  archived_at DATETIME NULL COMMENT 'Set when timebox is archived (distinct from enabled)',
+  archived_at DATETIME(3) NULL COMMENT 'Set when timebox is archived (distinct from enabled)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_timeboxes_public_id (public_id),
+  UNIQUE KEY uniq_timeboxes_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_timeboxes_workspace_id_name_enabled (workspace_id, name, enabled),
   KEY idx_timeboxes_workspace_id_archived_at (workspace_id, archived_at),
   KEY idx_timeboxes_workspace_id_status_enabled (workspace_id, status, enabled),
@@ -2098,7 +2148,7 @@ CREATE TABLE timeboxes (
   CONSTRAINT fk_timeboxes_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_timeboxes_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL,
   CONSTRAINT fk_timeboxes_creator FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Time-bounded work containers';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Time-bounded work containers';
 
 -- >>> user_favorites.sql
 -- ====================================
@@ -2118,16 +2168,17 @@ CREATE TABLE user_favorites (
   sort_weight      INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes            TEXT NULL COMMENT 'Admin notes',
   enabled          BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at       TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at       DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_user_favorites_public_id (public_id),
+  UNIQUE KEY uniq_user_favorites_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_user_favorites_user_target (user_id, target_type, target_public_id, enabled),
   KEY idx_user_favorites_workspace_user (workspace_id, user_id),
 
   CONSTRAINT fk_user_favorites_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_user_favorites_user      FOREIGN KEY (user_id)      REFERENCES users(id)      ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Per-user starred entities';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-user starred entities';
 
 -- >>> user_integrations.sql
 -- ====================================
@@ -2149,23 +2200,23 @@ CREATE TABLE user_integrations (
 
   access_token_ciphertext VARBINARY(4096) NOT NULL COMMENT 'AES-256-GCM encrypted access token',
   refresh_token_ciphertext VARBINARY(4096) NULL COMMENT 'AES-256-GCM encrypted refresh token (nullable: GitHub OAuth apps do not issue one)',
-  access_token_expires_at DATETIME NULL COMMENT 'Access token expiry (providers that issue long-lived tokens leave this NULL)',
+  access_token_expires_at DATETIME(3) NULL COMMENT 'Access token expiry (providers that issue long-lived tokens leave this NULL)',
 
-  connected_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'When the user first authorised the app',
-  last_refreshed_at DATETIME NULL COMMENT 'Last successful token refresh',
+  connected_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT 'When the user first authorised the app',
+  last_refreshed_at DATETIME(3) NULL COMMENT 'Last successful token refresh',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_user_integrations_public_id (public_id),
   UNIQUE KEY uniq_user_integrations_user_provider (user_id, provider),
   KEY idx_user_integrations_user_id (user_id),
 
   CONSTRAINT fk_user_integrations_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Personal OAuth integrations owned by an individual user';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Personal OAuth integrations owned by an individual user';
 
 -- >>> user_recent_visits.sql
 -- ====================================
@@ -2186,16 +2237,17 @@ CREATE TABLE user_recent_visits (
   sort_weight      INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes            TEXT NULL COMMENT 'Admin notes',
   enabled          BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at       TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at       DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_user_recent_visits_public_id (public_id),
+  UNIQUE KEY uniq_user_recent_visits_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_user_recent_visits_user_entity (user_id, entity_type, entity_public_id),
   KEY idx_user_recent_visits_workspace_user_updated (workspace_id, user_id, updated_at DESC),
 
   CONSTRAINT fk_user_recent_visits_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_user_recent_visits_user      FOREIGN KEY (user_id)      REFERENCES users(id)      ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Per-user recently visited entities';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-user recently visited entities';
 
 -- >>> user_recovery_codes.sql
 -- ====================================
@@ -2209,15 +2261,15 @@ CREATE TABLE user_recovery_codes (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
   user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
   code_hash BINARY(32) NOT NULL COMMENT 'SHA-256 of the normalized recovery code',
-  used_at DATETIME NULL COMMENT 'Set when the code is consumed at login',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  used_at DATETIME(3) NULL COMMENT 'Set when the code is consumed at login',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_user_recovery_codes_user_hash (user_id, code_hash),
   KEY idx_user_recovery_codes_user_used (user_id, used_at),
 
   CONSTRAINT fk_user_recovery_codes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='TOTP recovery codes';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='TOTP recovery codes';
 
 -- >>> user_view_preferences.sql
 -- ====================================
@@ -2238,16 +2290,17 @@ CREATE TABLE user_view_preferences (
   sort_weight     INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes           TEXT NULL COMMENT 'Admin notes',
   enabled         BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at      DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_user_view_prefs_public_id (public_id),
+  UNIQUE KEY uniq_user_view_prefs_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_user_view_prefs_user_scope (user_id, scope_type, scope_public_id),
   KEY idx_user_view_prefs_workspace_user (workspace_id, user_id),
 
   CONSTRAINT fk_user_view_prefs_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_user_view_prefs_user      FOREIGN KEY (user_id)      REFERENCES users(id)      ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Per-user per-scope display preferences';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-user per-scope display preferences';
 
 -- >>> users.sql
 -- ====================================
@@ -2260,7 +2313,7 @@ CREATE TABLE users (
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
 
   email VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Primary email, ASCII only',
-  email_verified_at DATETIME NULL COMMENT 'Email verification timestamp',
+  email_verified_at DATETIME(3) NULL COMMENT 'Email verification timestamp',
   display_name VARCHAR(255) NOT NULL COMMENT 'Human-readable name',
   avatar_url VARCHAR(2048) NULL COMMENT 'Avatar image URL',
   locale VARCHAR(16) NOT NULL DEFAULT 'en' COMMENT 'Preferred locale tag (BCP 47)',
@@ -2274,7 +2327,7 @@ CREATE TABLE users (
   treat_holidays_as_non_working BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'If true, subscribed system (holiday) calendar events count as non-working days',
   theme_preference ENUM('aurora-light','aurora-dark','dotline-light','dotline-dark','glass-light','glass-dark','system') NOT NULL DEFAULT 'system' COMMENT 'UI theme preference',
   calendar_shift_default ENUM('ask','sync_always','task_only_always') NOT NULL DEFAULT 'ask' COMMENT 'Default behaviour when an event linked to safe tasks is shifted: ask=prompt the user every time (current behaviour), sync_always=also shift every linked safe task by the same delta, task_only_always=shift only the event and leave linked tasks alone',
-  last_login_at DATETIME NULL COMMENT 'Last successful login',
+  last_login_at DATETIME(3) NULL COMMENT 'Last successful login',
 
   -- Notification channel toggles (see /settings/notifications).
   notif_email_digest_enabled     BOOLEAN NOT NULL DEFAULT TRUE  COMMENT 'Weekly digest email',
@@ -2286,13 +2339,13 @@ CREATE TABLE users (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_users_public_id (public_id),
   UNIQUE KEY uniq_users_email (email),
   KEY idx_users_enabled (enabled)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Global user accounts';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Global user accounts';
 
 -- >>> webhook_deliveries.sql
 -- ====================================
@@ -2314,24 +2367,25 @@ CREATE TABLE webhook_deliveries (
   response_body TEXT NULL COMMENT 'Truncated response body (first 4KB) for debugging',
   attempts TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Number of delivery attempts so far',
   max_attempts TINYINT UNSIGNED NOT NULL DEFAULT 6 COMMENT 'Maximum retry attempts',
-  next_retry_at DATETIME NULL COMMENT 'When to retry next (null when delivered or dead)',
-  delivered_at DATETIME NULL COMMENT 'When successfully delivered',
-  failed_at DATETIME NULL COMMENT 'When marked dead (all retries exhausted)',
+  next_retry_at DATETIME(3) NULL COMMENT 'When to retry next (null when delivered or dead)',
+  delivered_at DATETIME(3) NULL COMMENT 'When successfully delivered',
+  failed_at DATETIME(3) NULL COMMENT 'When marked dead (all retries exhausted)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_webhook_deliveries_public_id (public_id),
+  UNIQUE KEY uniq_webhook_deliveries_workspace_public_id (workspace_id, public_id),
   KEY idx_webhook_deliveries_workspace_id_subscription_id_created_at (workspace_id, subscription_id, created_at DESC),
   KEY idx_webhook_deliveries_status_next_retry_at (status, next_retry_at),
   KEY idx_webhook_deliveries_workspace_id_status (workspace_id, status),
 
   CONSTRAINT fk_webhook_deliveries_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_webhook_deliveries_subscription FOREIGN KEY (subscription_id) REFERENCES webhook_subscriptions(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Webhook delivery attempts and retry tracking';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Webhook delivery attempts and retry tracking';
 
 -- >>> webhook_subscriptions.sql
 -- ====================================
@@ -2354,16 +2408,17 @@ CREATE TABLE webhook_subscriptions (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_webhook_subscriptions_public_id (public_id),
+  UNIQUE KEY uniq_webhook_subscriptions_workspace_public_id (workspace_id, public_id),
   KEY idx_webhook_subscriptions_workspace_id_is_active (workspace_id, is_active),
   KEY idx_webhook_subscriptions_workspace_id_creator_id (workspace_id, creator_id),
 
   CONSTRAINT fk_webhook_subscriptions_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_webhook_subscriptions_creator FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Workspace-level webhook subscriptions';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Workspace-level webhook subscriptions';
 
 -- >>> workspace_invites.sql
 -- ====================================
@@ -2381,22 +2436,23 @@ CREATE TABLE workspace_invites (
   role ENUM('owner','admin','member','guest') NOT NULL DEFAULT 'member' COMMENT 'Role granted on accept',
   max_uses INT UNSIGNED NULL COMMENT 'NULL = unlimited',
   use_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Number of times this invite has been used',
-  expires_at DATETIME NULL COMMENT 'NULL = never expires',
+  expires_at DATETIME(3) NULL COMMENT 'NULL = never expires',
   label VARCHAR(255) NULL COMMENT 'Optional human label for the invite link',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_workspace_invites_public_id (public_id),
+  UNIQUE KEY uniq_workspace_invites_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_workspace_invites_token_hash (token_hash),
   KEY idx_workspace_invites_workspace_id (workspace_id),
 
   CONSTRAINT fk_workspace_invites_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_workspace_invites_created_by FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Token-based workspace invite links';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Token-based workspace invite links';
 
 -- >>> workspace_members.sql
 -- ====================================
@@ -2411,23 +2467,24 @@ CREATE TABLE workspace_members (
 
   role ENUM('owner','admin','member','guest') NOT NULL DEFAULT 'member' COMMENT 'Workspace-level role',
   invited_by_user_id INT UNSIGNED NULL COMMENT 'Inviter user.id',
-  invited_at DATETIME NULL COMMENT 'Invitation time',
-  joined_at DATETIME NULL COMMENT 'Acceptance time',
+  invited_at DATETIME(3) NULL COMMENT 'Invitation time',
+  joined_at DATETIME(3) NULL COMMENT 'Acceptance time',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_workspace_members_public_id (public_id),
+  UNIQUE KEY uniq_workspace_members_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_workspace_members_workspace_id_user_id (workspace_id, user_id),
   KEY idx_workspace_members_user_id (user_id),
 
   CONSTRAINT fk_workspace_members_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_workspace_members_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_workspace_members_inviter FOREIGN KEY (invited_by_user_id) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Workspace membership';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Workspace membership';
 
 -- >>> workspaces.sql
 -- ====================================
@@ -2453,13 +2510,13 @@ CREATE TABLE workspaces (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_workspaces_public_id (public_id),
   UNIQUE KEY uniq_workspaces_slug (slug),
   KEY idx_workspaces_enabled (enabled)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Tenant boundary';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Tenant boundary';
 
 DROP VIEW IF EXISTS `v_admin_users`;
 DROP VIEW IF EXISTS `v_audit_recent`;

@@ -14,10 +14,11 @@ CREATE TABLE task_dependencies (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_task_dependencies_public_id (public_id),
+  UNIQUE KEY uniq_task_dependencies_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_task_dependencies_edge (from_task_id, to_task_id, kind, enabled),
   KEY idx_task_dependencies_workspace_from (workspace_id, from_task_id),
   KEY idx_task_dependencies_workspace_to (workspace_id, to_task_id),
@@ -26,4 +27,4 @@ CREATE TABLE task_dependencies (
   CONSTRAINT fk_task_dependencies_from FOREIGN KEY (from_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
   CONSTRAINT fk_task_dependencies_to FOREIGN KEY (to_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
   CONSTRAINT chk_task_dependencies_no_self CHECK (from_task_id != to_task_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Directed task dependencies';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Directed task dependencies';

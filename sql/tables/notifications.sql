@@ -18,17 +18,18 @@ CREATE TABLE notifications (
   body TEXT NULL COMMENT 'Optional longer description',
   severity ENUM('low','normal','high','urgent') NOT NULL DEFAULT 'normal' COMMENT 'AI-inferred or rule-based severity',
   channel ENUM('in_app','email','push') NOT NULL DEFAULT 'in_app' COMMENT 'Delivery channel',
-  read_at DATETIME NULL COMMENT 'When the user marked it read (null = unread)',
-  archived_at DATETIME NULL COMMENT 'When the user archived it (null = active)',
-  delivered_at DATETIME NULL COMMENT 'When email/push was actually sent (null for in_app only)',
+  read_at DATETIME(3) NULL COMMENT 'When the user marked it read (null = unread)',
+  archived_at DATETIME(3) NULL COMMENT 'When the user archived it (null = active)',
+  delivered_at DATETIME(3) NULL COMMENT 'When email/push was actually sent (null for in_app only)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_notifications_public_id (public_id),
+  UNIQUE KEY uniq_notifications_workspace_public_id (workspace_id, public_id),
   -- At-least-once dedup: a single (recipient, source_event, channel) tuple
   -- yields exactly one row even if the fan-out goroutine retries.
   -- MySQL UNIQUE treats NULLs as distinct, so rows with source_event_id IS NULL
@@ -46,4 +47,4 @@ CREATE TABLE notifications (
   CONSTRAINT fk_notifications_recipient FOREIGN KEY (recipient_user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_notifications_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT fk_notifications_source_event FOREIGN KEY (source_event_id) REFERENCES events(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Per-user notification entries from eventbus fan-out';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-user notification entries from eventbus fan-out';

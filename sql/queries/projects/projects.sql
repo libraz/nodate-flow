@@ -118,10 +118,31 @@ WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
 
+-- name: DisableProjectChildTasks :exec
+-- Cascade-disable every currently-enabled task that lives under a project.
+-- Must be called inside the same transaction as DisableProject so callers
+-- observe a consistent snapshot. The views (v_task_list, v_task_detail)
+-- already AND-filter projects.enabled, but bypassing the view (raw SELECT
+-- on tasks, MCP tooling, replay jobs) would otherwise still see live rows
+-- under a disabled project. updated_at is bumped explicitly so audit
+-- consumers can see the cascade event even though the column has an
+-- ON UPDATE clause already.
+-- workspace_id is included as the first WHERE clause for defense-in-depth
+-- per project DB conventions, even though project_id is globally unique.
+UPDATE tasks
+SET enabled = FALSE,
+    updated_at = CURRENT_TIMESTAMP(3)
+WHERE workspace_id = ?
+  AND project_id = ?
+  AND enabled = TRUE;
+
 -- name: DisableProject :exec
--- Soft-disable a project.
+-- Soft-disable a project. The handler must call DisableProjectChildTasks
+-- inside the same transaction to cascade enabled = FALSE down to tasks;
+-- this query alone leaves child tasks live on the underlying table.
 UPDATE projects
-SET enabled = FALSE
+SET enabled = FALSE,
+    updated_at = CURRENT_TIMESTAMP(3)
 WHERE workspace_id = ?
   AND public_id = ?;
 

@@ -70,12 +70,12 @@ dev-reset: ## Full reset: nuke volumes, rebuild schema, start fresh, seed
 
 dev-api: ## Run Go flow API against the local MySQL (reads .env)
 	cd apps/flow-api && \
-	  NF_DB_DSN="$${NF_DB_DSN:-$(NF_DB_USER):$(NF_DB_PASSWORD)@tcp($(NF_DB_HOST):$(NF_DB_PORT))/$(NF_DB_NAME)?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci}" \
+	  NF_DB_DSN="$${NF_DB_DSN:-$(NF_DB_USER):$(NF_DB_PASSWORD)@tcp($(NF_DB_HOST):$(NF_DB_PORT))/$(NF_DB_NAME)?parseTime=true&charset=utf8mb4&collation=utf8mb4_0900_ai_ci}" \
 	  go run ./cmd/api
 
 dev-auth-api: ## Run Go auth API against the local MySQL (reads .env)
 	cd apps/auth-api && \
-	  NF_DB_DSN="$${NF_DB_DSN:-$(NF_DB_USER):$(NF_DB_PASSWORD)@tcp($(NF_DB_HOST):$(NF_DB_PORT))/$(NF_DB_NAME)?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci}" \
+	  NF_DB_DSN="$${NF_DB_DSN:-$(NF_DB_USER):$(NF_DB_PASSWORD)@tcp($(NF_DB_HOST):$(NF_DB_PORT))/$(NF_DB_NAME)?parseTime=true&charset=utf8mb4&collation=utf8mb4_0900_ai_ci}" \
 	  go run ./cmd/api
 
 dev-web: ## Run Vite dev server (flow-web, port 5173)
@@ -223,7 +223,7 @@ db-shell: ## Open a mysql shell against the compose mysql
 	docker compose exec mysql mysql -u $(NF_DB_USER) -p$(NF_DB_PASSWORD) $(NF_DB_NAME)
 
 seed-flow: ## Insert dev admin user + demo workspace (idempotent; NF_SEED_LOCALE=en|ja)
-	@dsn="$${NF_DB_DSN:-$(NF_DB_USER):$(NF_DB_PASSWORD)@tcp($(NF_DB_HOST):$(NF_DB_PORT))/$(NF_DB_NAME)?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci}"; \
+	@dsn="$${NF_DB_DSN:-$(NF_DB_USER):$(NF_DB_PASSWORD)@tcp($(NF_DB_HOST):$(NF_DB_PORT))/$(NF_DB_NAME)?parseTime=true&charset=utf8mb4&collation=utf8mb4_0900_ai_ci}"; \
 	cd apps/flow-api && NF_DB_DSN="$$dsn" go run ./cmd/seed-dev
 
 seed-time: ## Seed nodate-time calendar demo data via REST API (NF_SEED_LOCALE=en|ja)

@@ -15,17 +15,18 @@ CREATE TABLE lenses (
   is_default BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Default lens for the scope',
   is_public BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Whether the lens is publicly shared',
   public_token CHAR(32) CHARACTER SET latin1 NULL COMMENT 'Random hex token for public share URL',
-  shared_at DATETIME NULL COMMENT 'Timestamp when first shared publicly',
-  safety_checked_at DATETIME NULL COMMENT 'Timestamp of last AI safety check',
-  archived_at DATETIME NULL COMMENT 'Set when lens is archived (distinct from enabled)',
+  shared_at DATETIME(3) NULL COMMENT 'Timestamp when first shared publicly',
+  safety_checked_at DATETIME(3) NULL COMMENT 'Timestamp of last AI safety check',
+  archived_at DATETIME(3) NULL COMMENT 'Set when lens is archived (distinct from enabled)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_lenses_public_id (public_id),
+  UNIQUE KEY uniq_lenses_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_lenses_workspace_id_project_id_name_enabled (workspace_id, project_id, name, enabled),
   UNIQUE KEY uniq_lenses_public_token (public_token),
   KEY idx_lenses_workspace_id_archived_at (workspace_id, archived_at),
@@ -35,4 +36,4 @@ CREATE TABLE lenses (
   CONSTRAINT fk_lenses_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_lenses_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   CONSTRAINT fk_lenses_creator FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Saved task query views';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Saved task query views';

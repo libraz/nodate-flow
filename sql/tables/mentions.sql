@@ -18,10 +18,11 @@ CREATE TABLE mentions (
   sort_weight       INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes             TEXT NULL COMMENT 'Admin notes',
   enabled           BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at        DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_mentions_public_id (public_id),
+  UNIQUE KEY uniq_mentions_workspace_public_id (workspace_id, public_id),
   KEY idx_mentions_workspace_mentioned_user (workspace_id, mentioned_user_id),
   KEY idx_mentions_task_id (task_id),
   KEY idx_mentions_comment_id (comment_id),
@@ -31,4 +32,4 @@ CREATE TABLE mentions (
   CONSTRAINT fk_mentions_actor     FOREIGN KEY (actor_user_id)     REFERENCES users(id)      ON DELETE SET NULL,
   CONSTRAINT fk_mentions_task      FOREIGN KEY (task_id)           REFERENCES tasks(id)      ON DELETE CASCADE,
   CONSTRAINT fk_mentions_comment   FOREIGN KEY (comment_id)        REFERENCES comments(id)   ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='@mention cache (re-extractable from markdown)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='@mention cache (re-extractable from markdown)';

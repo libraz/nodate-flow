@@ -17,21 +17,22 @@ CREATE TABLE webhook_deliveries (
   response_body TEXT NULL COMMENT 'Truncated response body (first 4KB) for debugging',
   attempts TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Number of delivery attempts so far',
   max_attempts TINYINT UNSIGNED NOT NULL DEFAULT 6 COMMENT 'Maximum retry attempts',
-  next_retry_at DATETIME NULL COMMENT 'When to retry next (null when delivered or dead)',
-  delivered_at DATETIME NULL COMMENT 'When successfully delivered',
-  failed_at DATETIME NULL COMMENT 'When marked dead (all retries exhausted)',
+  next_retry_at DATETIME(3) NULL COMMENT 'When to retry next (null when delivered or dead)',
+  delivered_at DATETIME(3) NULL COMMENT 'When successfully delivered',
+  failed_at DATETIME(3) NULL COMMENT 'When marked dead (all retries exhausted)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_webhook_deliveries_public_id (public_id),
+  UNIQUE KEY uniq_webhook_deliveries_workspace_public_id (workspace_id, public_id),
   KEY idx_webhook_deliveries_workspace_id_subscription_id_created_at (workspace_id, subscription_id, created_at DESC),
   KEY idx_webhook_deliveries_status_next_retry_at (status, next_retry_at),
   KEY idx_webhook_deliveries_workspace_id_status (workspace_id, status),
 
   CONSTRAINT fk_webhook_deliveries_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_webhook_deliveries_subscription FOREIGN KEY (subscription_id) REFERENCES webhook_subscriptions(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Webhook delivery attempts and retry tracking';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Webhook delivery attempts and retry tracking';

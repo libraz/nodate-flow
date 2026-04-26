@@ -19,10 +19,11 @@ CREATE TABLE repo_workspace_mappings (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_repo_workspace_mappings_public_id (public_id),
+  UNIQUE KEY uniq_repo_workspace_mappings_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_repo_workspace_mappings_workspace_repo (workspace_id, repo_full_name),
   KEY idx_repo_workspace_mappings_repo_id (repo_id),
   KEY idx_repo_workspace_mappings_integration_id (integration_id),
@@ -31,4 +32,4 @@ CREATE TABLE repo_workspace_mappings (
   CONSTRAINT fk_repo_workspace_mappings_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_repo_workspace_mappings_integration FOREIGN KEY (integration_id) REFERENCES user_integrations(id) ON DELETE CASCADE,
   CONSTRAINT fk_repo_workspace_mappings_project FOREIGN KEY (default_project_id) REFERENCES projects(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Maps GitHub repositories to workspaces for webhook routing';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Maps GitHub repositories to workspaces for webhook routing';

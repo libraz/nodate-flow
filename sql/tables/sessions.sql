@@ -11,19 +11,19 @@ CREATE TABLE sessions (
   refresh_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'SHA-256 hex of refresh token',
   user_agent VARCHAR(512) NULL COMMENT 'Client user agent at issue time',
   ip_address VARBINARY(16) NULL COMMENT 'Packed IPv4/IPv6 address at issue time',
-  expires_at DATETIME NOT NULL COMMENT 'Refresh token expiry',
-  revoked_at DATETIME NULL COMMENT 'Explicit revocation time',
-  last_used_at DATETIME NULL COMMENT 'Last refresh time',
+  expires_at DATETIME(3) NOT NULL COMMENT 'Refresh token expiry',
+  revoked_at DATETIME(3) NULL COMMENT 'Explicit revocation time',
+  last_used_at DATETIME(3) NULL COMMENT 'Last refresh time',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_sessions_public_id (public_id),
   UNIQUE KEY uniq_sessions_refresh_hash (refresh_hash),
   KEY idx_sessions_user_id_expires_at (user_id, expires_at),
 
   CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Refresh-token backed sessions';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Refresh-token backed sessions';

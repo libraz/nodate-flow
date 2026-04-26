@@ -15,13 +15,14 @@ CREATE TABLE user_favorites (
   sort_weight      INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes            TEXT NULL COMMENT 'Admin notes',
   enabled          BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at       TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at       DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_user_favorites_public_id (public_id),
+  UNIQUE KEY uniq_user_favorites_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_user_favorites_user_target (user_id, target_type, target_public_id, enabled),
   KEY idx_user_favorites_workspace_user (workspace_id, user_id),
 
   CONSTRAINT fk_user_favorites_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_user_favorites_user      FOREIGN KEY (user_id)      REFERENCES users(id)      ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Per-user starred entities';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-user starred entities';

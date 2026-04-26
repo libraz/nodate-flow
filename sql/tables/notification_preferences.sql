@@ -17,13 +17,14 @@ CREATE TABLE notification_preferences (
   sort_weight    INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes          TEXT NULL COMMENT 'Admin notes',
   enabled        BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at     DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_notif_prefs_public_id (public_id),
+  UNIQUE KEY uniq_notif_prefs_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_notif_prefs_user_ws_cat_chan (user_id, workspace_id, event_category, channel),
   KEY idx_notif_prefs_workspace_user (workspace_id, user_id),
 
   CONSTRAINT fk_notif_prefs_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_notif_prefs_user      FOREIGN KEY (user_id)      REFERENCES users(id)      ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Granular per-user notification preferences';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Granular per-user notification preferences';
