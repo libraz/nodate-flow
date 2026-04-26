@@ -5,7 +5,7 @@
 // of a page as an opaque base64url string. The wire format is a tiny
 // JSON object:
 //
-//	{"t": <unix_seconds>, "p": "<canonical-uuid>"}
+//	{"t": <unix_milliseconds>, "p": "<canonical-uuid>"}
 //
 // Choosing JSON-in-base64 over a binary packing keeps the cursor
 // trivially debuggable from a curl session (decode and read), keeps
@@ -33,6 +33,15 @@ import (
 // cursor string. The JSON keys are deliberately one-letter to keep the
 // encoded blob short; this is opaque to clients so brevity costs us
 // nothing in readability and saves bytes per page response.
+//
+// The `t` field is unix MILLISECONDS, not seconds: the underlying
+// timestamp columns are DATETIME(3) and the keyset queries do strict
+// inequality comparisons on the (created_at, public_id) tuple. Encoding
+// at second granularity silently drops the millisecond component and
+// produces a cursor that excludes valid rows whose true timestamp lies
+// between the truncated second and the actual last-row time, which
+// shows up as missing pages on dense fixtures (see
+// TestKeysetHandlerListTasksWorkspace).
 type cursorPayload struct {
 	T int64  `json:"t"`
 	P string `json:"p"`
@@ -42,12 +51,14 @@ type cursorPayload struct {
 // JSON string suitable for round-tripping in a `nextCursor` response
 // field and an opaque `cursor` query parameter on the next request.
 //
-// The time is written as unix seconds; sub-second precision is dropped,
-// which matches the keyset SQL ORDER BY granularity (the public_id
-// tiebreaker disambiguates rows that share the same second).
+// The time is written as unix milliseconds, matching the DATETIME(3)
+// granularity of the timestamp columns the keyset queries order on.
+// Encoding at second granularity loses information and breaks the
+// strict-inequality cursor compare for rows that happen to share the
+// same second as the page boundary.
 func EncodeCursor(t time.Time, pid types.PublicID) string {
 	payload := cursorPayload{
-		T: t.UTC().Unix(),
+		T: t.UTC().UnixMilli(),
 		P: pid.String(),
 	}
 	buf, err := json.Marshal(payload)
@@ -66,6 +77,9 @@ func EncodeCursor(t time.Time, pid types.PublicID) string {
 // into [sql.NullTime]{Valid: false} / zero PublicID without a special
 // case. Any decode error (bad base64, bad JSON, malformed UUID) is
 // returned to the caller so it can map to a 400 / WS.VALIDATION error.
+//
+// The decoded time preserves millisecond precision; see the package
+// doc on the wire format and EncodeCursor for the rationale.
 func DecodeCursor(s string) (time.Time, types.PublicID, error) {
 	if s == "" {
 		return time.Time{}, types.PublicID{}, nil
@@ -82,5 +96,5 @@ func DecodeCursor(s string) (time.Time, types.PublicID, error) {
 	if err != nil {
 		return time.Time{}, types.PublicID{}, fmt.Errorf("cursor: invalid public id: %w", err)
 	}
-	return time.Unix(payload.T, 0).UTC(), pid, nil
+	return time.UnixMilli(payload.T).UTC(), pid, nil
 }

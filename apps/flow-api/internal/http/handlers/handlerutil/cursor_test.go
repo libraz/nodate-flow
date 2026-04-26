@@ -50,6 +50,32 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 	}
 }
 
+// TestEncodeDecodePreservesMilliseconds locks in the wire-format
+// invariant that the cursor carries millisecond precision: the keyset
+// queries compare against DATETIME(3) columns, so dropping the
+// sub-second component (a previous regression) silently skips rows
+// whose true timestamp falls between the truncated cursor second and
+// the actual last-row time. See TestKeysetHandlerListTasksWorkspace.
+func TestEncodeDecodePreservesMilliseconds(t *testing.T) {
+	t.Parallel()
+	// 789 ms after the second boundary — chosen so a seconds-only
+	// encoder would round to *.000 and lose the .789.
+	original := time.Date(2025, 6, 15, 14, 30, 45, 789_000_000, time.UTC)
+	pid := types.New()
+
+	gotTime, _, err := DecodeCursor(EncodeCursor(original, pid))
+	if err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	if !gotTime.Equal(original) {
+		t.Fatalf("ms precision lost: got %v want %v (delta=%v)",
+			gotTime, original, original.Sub(gotTime))
+	}
+	if gotTime.Nanosecond() != 789_000_000 {
+		t.Errorf("expected 789ms preserved, got nanos=%d", gotTime.Nanosecond())
+	}
+}
+
 // TestEncodeIsURLSafe confirms the cursor uses base64url (no '+', '/',
 // or '=' padding) so it can be passed through a query string without
 // percent-escaping.
