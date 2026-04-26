@@ -2261,6 +2261,7 @@ CREATE TABLE users (
   snap_to_working_day ENUM('off','warn','auto') NOT NULL DEFAULT 'warn' COMMENT 'What happens when a task/event lands on a non-working day: off=accept silently, warn=save with badge, auto=itemkit snaps forward to next working day',
   treat_holidays_as_non_working BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'If true, subscribed system (holiday) calendar events count as non-working days',
   theme_preference ENUM('aurora-light','aurora-dark','dotline-light','dotline-dark','glass-light','glass-dark','system') NOT NULL DEFAULT 'system' COMMENT 'UI theme preference',
+  calendar_shift_default ENUM('ask','sync_always','task_only_always') NOT NULL DEFAULT 'ask' COMMENT 'Default behaviour when an event linked to safe tasks is shifted: ask=prompt the user every time (current behaviour), sync_always=also shift every linked safe task by the same delta, task_only_always=shift only the event and leave linked tasks alone',
   last_login_at DATETIME NULL COMMENT 'Last successful login',
 
   -- Notification channel toggles (see /settings/notifications).
@@ -2810,6 +2811,7 @@ SELECT
   u.country,
   u.week_start,
   u.theme_preference,
+  u.calendar_shift_default,
   wm.role AS workspace_role,
   u.last_login_at,
   u.updated_at,
