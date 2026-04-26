@@ -28,5 +28,35 @@
     "archived": "アーカイブしました",
     "snoozed": "スヌーズしました",
     "error": "操作に失敗しました"
+  },
+  "tab": {
+    "inbox": "受信トレイ",
+    "intake": "インテイク"
+  },
+  "intake": {
+    "no_workspace": "インテイクの振り分けにはワークスペースへの参加が必要です。",
+    "empty": "振り分け待ちのインテイクはありません。",
+    "quick_add": {
+      "placeholder": "新しいインテイクを書き留める…",
+      "submit": "追加",
+      "error": "インテイクを追加できませんでした"
+    },
+    "convert": {
+      "action": "タスク化",
+      "title": "タスクに変換",
+      "project_label": "プロジェクト",
+      "project_placeholder": "プロジェクトを選択",
+      "project_required": "プロジェクトを選択してください",
+      "no_projects": "先にプロジェクトを作成してください。",
+      "submit": "タスクを作成",
+      "cancel": "キャンセル",
+      "success": "インテイクからタスクを作成しました",
+      "error": "インテイクをタスクに変換できませんでした"
+    },
+    "dismiss": {
+      "action": "却下",
+      "success": "インテイクを却下しました",
+      "error": "却下に失敗しました"
+    }
   }
 }

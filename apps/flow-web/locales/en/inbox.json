@@ -28,5 +28,35 @@
     "archived": "Archived",
     "snoozed": "Snoozed",
     "error": "Action failed"
+  },
+  "tab": {
+    "inbox": "Inbox",
+    "intake": "Intake"
+  },
+  "intake": {
+    "no_workspace": "Join a workspace to start triaging intake items.",
+    "empty": "No intake items waiting for triage.",
+    "quick_add": {
+      "placeholder": "Capture a new intake item…",
+      "submit": "Add",
+      "error": "Failed to add intake item"
+    },
+    "convert": {
+      "action": "Convert",
+      "title": "Convert to task",
+      "project_label": "Project",
+      "project_placeholder": "Pick a project",
+      "project_required": "Pick a project",
+      "no_projects": "Create a project first to convert intake items.",
+      "submit": "Create task",
+      "cancel": "Cancel",
+      "success": "Task created from intake",
+      "error": "Failed to convert intake item"
+    },
+    "dismiss": {
+      "action": "Dismiss",
+      "success": "Intake item dismissed",
+      "error": "Failed to dismiss intake item"
+    }
   }
 }

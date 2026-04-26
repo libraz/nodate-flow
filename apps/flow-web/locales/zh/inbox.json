@@ -28,5 +28,35 @@
     "archived": "Archived",
     "snoozed": "Snoozed",
     "error": "Action failed"
+  },
+  "tab": {
+    "inbox": "收件箱",
+    "intake": "受理"
+  },
+  "intake": {
+    "no_workspace": "加入工作区后才能处理受理项。",
+    "empty": "暂无待处理的受理项。",
+    "quick_add": {
+      "placeholder": "记录新的受理项…",
+      "submit": "添加",
+      "error": "添加受理项失败"
+    },
+    "convert": {
+      "action": "转为任务",
+      "title": "转为任务",
+      "project_label": "项目",
+      "project_placeholder": "选择项目",
+      "project_required": "请选择项目",
+      "no_projects": "请先创建项目。",
+      "submit": "创建任务",
+      "cancel": "取消",
+      "success": "已根据受理项创建任务",
+      "error": "无法将受理项转为任务"
+    },
+    "dismiss": {
+      "action": "忽略",
+      "success": "已忽略受理项",
+      "error": "忽略失败"
+    }
   }
 }

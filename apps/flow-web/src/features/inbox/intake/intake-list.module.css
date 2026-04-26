@@ -1,0 +1,114 @@
+/**
+ * Intake tab — workspace-scoped triage queue. The body lives inside the
+ * inbox route's tabbed container, so we keep the outer wrapper simple
+ * (column flex with token spacing) and let the route shell handle page
+ * gutters. Tokens only — no hardcoded colour, spacing, or radius.
+ */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--nf-space-2);
+  flex-wrap: wrap;
+}
+
+.workspaceField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.quickAdd {
+  display: flex;
+  align-items: stretch;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-2);
+  border: 1px solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-surface);
+}
+
+.quickAddInput {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-3);
+  border: 1px solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-surface);
+}
+
+.rowMain {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.rowTitle {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+  line-height: var(--nf-leading-tight);
+}
+
+.rowBody {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  line-height: var(--nf-leading-snug);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.rowMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  flex-shrink: 0;
+}
+
+.empty {
+  margin: 0;
+  padding: var(--nf-space-6) var(--nf-space-3);
+  text-align: center;
+  color: var(--nf-color-fg-muted);
+  border: 1px dashed var(--nf-color-border);
+  border-radius: var(--nf-radius-lg);
+  background: var(--nf-color-bg-sunken);
+  font-size: var(--nf-text-sm);
+}

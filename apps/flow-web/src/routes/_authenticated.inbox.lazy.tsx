@@ -1,17 +1,35 @@
 /**
- * /inbox — caller's inbox, signal-backed. Wraps `<InboxList />` in Suspense
- * with a simple themed layout matching the rest of the authenticated shell.
+ * /inbox — caller's inbox shell. Hosts a two-tab layout:
+ *
+ *   - Inbox: cross-workspace signal river surfaced by `<InboxList />`.
+ *   - Intake: workspace-scoped triage queue surfaced by `<IntakeList />`.
+ *
+ * Tabs use the design system primitive so keyboard navigation, ARIA
+ * roles, and the active-tab indicator stay consistent with the rest of
+ * the authenticated shell. Each panel mounts its own Suspense boundary
+ * so a slow workspace fetch in one tab doesn't blank the other.
  */
 
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
+import Tabs from '@nodate-flow/ui/primitives/tabs';
 import { createLazyFileRoute } from '@tanstack/react-router';
 import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import InboxList from '../features/inbox/inbox-list';
+import IntakeList from '../features/inbox/intake/intake-list';
 
 function InboxRoute(): ReactElement {
   const { t } = useTranslation('inbox');
+
+  const fallback = (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
+      <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
+      <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
+    </div>
+  );
+
   return (
     <section
       style={{
@@ -36,17 +54,22 @@ function InboxRoute(): ReactElement {
         </h1>
         <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{t('view.subtitle')}</p>
       </header>
-      <Suspense
-        fallback={
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
-            <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
-            <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
-          </div>
-        }
-      >
-        <InboxList />
-      </Suspense>
+      <Tabs
+        aria-label={t('view.title')}
+        defaultValue="inbox"
+        items={[
+          {
+            value: 'inbox',
+            label: t('tab.inbox'),
+            content: <Suspense fallback={fallback}>{<InboxList />}</Suspense>,
+          },
+          {
+            value: 'intake',
+            label: t('tab.intake'),
+            content: <Suspense fallback={fallback}>{<IntakeList />}</Suspense>,
+          },
+        ]}
+      />
     </section>
   );
 }
