@@ -1,0 +1,167 @@
+/**
+ * SuggestionCard layout — a single AI priority suggestion.
+ * Tokens only; no literal hex / rgb / px.
+ */
+.card {
+  display: flex;
+  align-items: stretch;
+  gap: var(--nf-space-4);
+  padding: var(--nf-space-4);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-surface);
+  transition: opacity var(--nf-duration-base) var(--nf-ease-standard), transform
+    var(--nf-duration-base) var(--nf-ease-standard);
+  list-style: none;
+}
+
+.card:hover {
+  background: var(--nf-color-surface-hover);
+}
+
+.exiting {
+  opacity: 0;
+  transform: translateY(calc(var(--nf-space-1) * -1));
+  pointer-events: none;
+}
+
+.body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  min-inline-size: 0;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  min-inline-size: 0;
+}
+
+.title {
+  font-family: var(--nf-font-sans);
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.title:hover {
+  text-decoration: underline;
+}
+
+.title:focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: var(--nf-focus-ring-offset);
+  border-radius: var(--nf-radius-sm);
+}
+
+.transition {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+  flex-wrap: wrap;
+}
+
+.transitionSide {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.transitionLabel {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.priorityBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+}
+
+.priorityDot {
+  inline-size: var(--nf-space-2);
+  block-size: var(--nf-space-2);
+  border-radius: var(--nf-radius-full, 9999px);
+  flex: 0 0 auto;
+}
+
+.arrow {
+  color: var(--nf-color-fg-muted);
+  flex: 0 0 auto;
+  align-self: center;
+  margin-block-start: var(--nf-space-3);
+}
+
+.confidenceRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.confidenceLabel {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.dots {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+}
+
+.dot {
+  inline-size: var(--nf-space-2);
+  block-size: var(--nf-space-2);
+  border-radius: var(--nf-radius-full, 9999px);
+  background: var(--nf-color-border);
+}
+
+.dotFilled {
+  background: var(--nf-color-accent);
+}
+
+.confidenceText {
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
+}
+
+.reason {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  overflow-wrap: anywhere;
+}
+
+.reasonLabel {
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg-muted);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  align-items: stretch;
+  justify-content: flex-start;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 47.9375rem) {
+  .card {
+    flex-direction: column;
+  }
+
+  .actions {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "page": {
+    "title": "インスタンス統計",
+    "subtitle": "この nodate-flow インスタンスの全体的な状況。"
+  },
+  "kpi": {
+    "users": {
+      "title": "アクティブユーザー",
+      "help": "停止または削除されていないユーザー。"
+    },
+    "workspaces": {
+      "title": "アクティブワークスペース",
+      "help": "アーカイブされていないワークスペース。"
+    }
+  },
+  "actions": {
+    "refresh": "更新",
+    "refreshing": "更新中…",
+    "lastUpdated": "最終更新 {time}"
+  },
+  "placeholder": {
+    "title": "さらに多くの指標を準備中",
+    "body": "日次サインアップ、AI 利用量、監査ログ件数など、プラットフォームの成長に応じてここに表示されます。"
+  },
+  "error": {
+    "fetchFailed": "インスタンス統計を読み込めませんでした。",
+    "retry": "再試行"
+  }
+}

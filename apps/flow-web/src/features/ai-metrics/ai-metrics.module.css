@@ -1,0 +1,219 @@
+/**
+ * Styles for the workspace AI metrics dashboard.
+ *
+ * Token-only: every colour, spacing, radius, and shadow comes from
+ * `var(--nf-*)` so the four themes (aurora / dotline / glass-light /
+ * glass-dark) inherit the correct palette without per-theme overrides.
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-6);
+  inline-size: 100%;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 2.5vw, 2rem);
+  color: var(--nf-color-fg);
+}
+
+.description {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+}
+
+.windowBar {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+  flex-wrap: wrap;
+}
+
+.windowLabel {
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--nf-space-4);
+}
+
+@media (max-width: 48rem) {
+  .kpiGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.kpiCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-4) var(--nf-space-5);
+  min-block-size: 6.5rem;
+}
+
+.kpiLabel {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.kpiValue {
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+  line-height: 1.1;
+  color: var(--nf-color-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.acceptanceCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-4) var(--nf-space-5);
+}
+
+.acceptanceHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nf-space-3);
+}
+
+.acceptanceLabel {
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.acceptanceValue {
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 2.5vw, 2rem);
+  line-height: 1.1;
+  color: var(--nf-color-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.acceptanceTrack {
+  block-size: 0.5rem;
+  inline-size: 100%;
+  border-radius: var(--nf-radius-full, 999px);
+  background: var(--nf-color-bg-sunken, var(--nf-color-border));
+  overflow: hidden;
+}
+
+.acceptanceFill {
+  block-size: 100%;
+  background: var(--nf-color-accent);
+  border-radius: inherit;
+  transition: inline-size var(--nf-duration-medium, 200ms) ease;
+}
+
+.acceptanceHint {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.outboundSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.outboundHeader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.outboundTitle {
+  margin: 0;
+  font-size: var(--nf-text-lg);
+  font-weight: 600;
+  color: var(--nf-color-fg);
+}
+
+.outboundDescription {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.outboundTableWrap {
+  inline-size: 100%;
+  overflow-x: auto;
+  border-radius: var(--nf-radius-md, 0.75rem);
+  border: 1px solid var(--nf-color-border);
+  background: var(--nf-color-bg-elevated, var(--nf-color-bg));
+}
+
+.outboundTable {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: var(--nf-text-sm);
+}
+
+.outboundTable thead th {
+  text-align: start;
+  padding: var(--nf-space-3) var(--nf-space-4);
+  background: var(--nf-color-bg-sunken, transparent);
+  color: var(--nf-color-fg-muted);
+  font-weight: 500;
+  border-block-end: 1px solid var(--nf-color-border);
+  white-space: nowrap;
+}
+
+.outboundTable thead th.numeric,
+.outboundTable tbody td.numeric {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.outboundTable tbody td {
+  padding: var(--nf-space-3) var(--nf-space-4);
+  border-block-end: 1px solid var(--nf-color-border);
+  color: var(--nf-color-fg);
+}
+
+.outboundTable tbody tr:last-child td {
+  border-block-end: none;
+}
+
+.outboundEmpty {
+  padding: var(--nf-space-6) var(--nf-space-4);
+  text-align: center;
+  color: var(--nf-color-fg-muted);
+  border: 1px dashed var(--nf-color-border);
+  border-radius: var(--nf-radius-md, 0.75rem);
+  background: var(--nf-color-bg-sunken, transparent);
+  font-size: var(--nf-text-sm);
+}
+
+.errorPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-5);
+  border: 1px solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md, 0.75rem);
+  background: var(--nf-color-bg-elevated, var(--nf-color-bg));
+}
+
+.errorMessage {
+  margin: 0;
+  color: var(--nf-color-fg);
+  font-size: var(--nf-text-sm);
+}

@@ -1,0 +1,29 @@
+{
+  "page": {
+    "title": "Instance stats",
+    "subtitle": "High-level health of this nodate-flow instance."
+  },
+  "kpi": {
+    "users": {
+      "title": "Active users",
+      "help": "Users who haven't been disabled or deleted."
+    },
+    "workspaces": {
+      "title": "Active workspaces",
+      "help": "Workspaces that aren't archived."
+    }
+  },
+  "actions": {
+    "refresh": "Refresh",
+    "refreshing": "Refreshing…",
+    "lastUpdated": "Last refreshed {time}"
+  },
+  "placeholder": {
+    "title": "More metrics coming soon",
+    "body": "Per-day signups, AI usage, audit volume — these will surface here as the platform grows."
+  },
+  "error": {
+    "fetchFailed": "Couldn't load instance stats.",
+    "retry": "Try again"
+  }
+}

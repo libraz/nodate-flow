@@ -14,6 +14,7 @@ import {
   FileText,
   FolderKanban,
   Inbox,
+  ListOrdered,
   type LucideIcon,
   Menu,
   Settings,
@@ -113,6 +114,27 @@ function WorkspaceTimeboxesLink({ workspaceId }: { workspaceId: string }): React
     >
       <Icon icon={Timer} decorative />
       <span className={styles.label}>{t('nav.timeboxes')}</span>
+    </Link>
+  );
+}
+
+/**
+ * WorkspaceInsightsPriorityLink — single sidebar entry that points at
+ * `/workspaces/{id}/insights/priority`. Renders alongside the workspace
+ * sub-section so the AI priority suggestions surface is reachable
+ * without a dedicated Insights hub. Static label, no data fetch.
+ */
+function WorkspaceInsightsPriorityLink({ workspaceId }: { workspaceId: string }): ReactElement {
+  const { t } = useTranslation('common');
+  return (
+    <Link
+      to="/workspaces/$id/insights/priority"
+      params={{ id: workspaceId }}
+      className={cx(styles.item, styles.subItem)}
+      activeProps={{ className: cx(styles.item, styles.subItem, styles.itemActive) }}
+    >
+      <Icon icon={ListOrdered} decorative />
+      <span className={styles.label}>{t('nav.insightsPriority')}</span>
     </Link>
   );
 }
@@ -348,6 +370,7 @@ export default function Sidebar(): ReactElement {
                 <div key={item.key}>
                   {linkEl}
                   <WorkspaceTimeboxesLink workspaceId={currentWorkspaceId} />
+                  <WorkspaceInsightsPriorityLink workspaceId={currentWorkspaceId} />
                   <Suspense fallback={null}>
                     <WorkspaceProjectsSection workspaceId={currentWorkspaceId} />
                   </Suspense>

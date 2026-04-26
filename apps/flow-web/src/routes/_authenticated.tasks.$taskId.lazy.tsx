@@ -7,7 +7,7 @@
  * title / priority / due edits go through `useUpdateTask`.
  */
 
-import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
+import Badge from '@nodate-flow/ui/primitives/badge';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -39,6 +39,8 @@ import FavoriteButton from '../features/favorites/favorite-button';
 import { useProjectQuery } from '../features/projects/api';
 import { useTaskReactionsQuery } from '../features/reactions/api';
 import ReactionBar from '../features/reactions/reaction-bar';
+import AIAgentsSection from '../features/tasks/ai-agents/section';
+import AIAgentsSkeleton from '../features/tasks/ai-agents/skeleton';
 import {
   TASK_PRIORITIES,
   TRANSITIONS_BY_STATE,
@@ -49,7 +51,6 @@ import {
   useAddTaskComment,
   useRemoveTaskActor,
   useTaskActorsQuery,
-  useTaskAiInvocationsQuery,
   useTaskCommentsQuery,
   useTaskDuplicatesQuery,
   useTaskInferStateQuery,
@@ -70,7 +71,7 @@ import { useTaskTimelineQuery } from '../features/timeline/api';
 import ReplayPanel from '../features/timeline/replay-panel';
 import TaskMiniTimeline from '../features/timeline/task-mini-timeline';
 import { useWorkspaceMembersQuery, useWorkspaceQuery } from '../features/workspaces/api';
-import { formatDate, formatEpochDateTime } from '../lib/format';
+import { formatDate } from '../lib/format';
 import { formatDueDate } from '../lib/format-date';
 
 const routeApi = getRouteApi('/_authenticated/tasks/$taskId');
@@ -995,21 +996,6 @@ function Sidebar({
 
       <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
-          {t('tasks.detail.ai_activity.title')}
-        </h2>
-        <Suspense
-          fallback={
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem' }}>
-              <Spinner label={t('common.loading')} />
-            </div>
-          }
-        >
-          <AiActivitySection taskId={id} />
-        </Suspense>
-      </Card>
-
-      <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
           {t('tasks.detail.activity.title')}
         </h2>
         <Suspense
@@ -1077,80 +1063,6 @@ function RelatedTasksSection({ taskId }: { taskId: string }): ReactElement {
                 {c.score.toFixed(2)}
               </span>
             </a>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-function AiActivitySection({ taskId }: { taskId: string }): ReactElement {
-  const { t, i18n } = useTranslation('common');
-  const { data: invocations } = useTaskAiInvocationsQuery(taskId);
-  const locale = i18n.resolvedLanguage ?? 'en';
-  if (invocations.length === 0) {
-    return (
-      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}>
-        {t('tasks.detail.ai_activity.empty')}
-      </p>
-    );
-  }
-  return (
-    <ul
-      style={{
-        listStyle: 'none',
-        padding: 0,
-        margin: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.625rem',
-      }}
-    >
-      {invocations.map((inv) => {
-        const tone: BadgeTone =
-          inv.status === 'ok' ? 'success' : inv.status === 'blocked' ? 'warning' : 'danger';
-        return (
-          <li key={inv.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Badge tone={tone}>{inv.purpose}</Badge>
-              <span
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 'var(--nf-text-xs)',
-                  color: 'var(--nf-color-fg-muted)',
-                }}
-              >
-                {inv.model}
-              </span>
-              <span
-                style={{
-                  marginInlineStart: 'auto',
-                  fontSize: 'var(--nf-text-xs)',
-                  color: 'var(--nf-color-fg-muted)',
-                  fontVariantNumeric: 'tabular-nums',
-                }}
-              >
-                {formatEpochDateTime(inv.invokedAt, locale)}
-              </span>
-            </div>
-            {inv.promptRedacted ? (
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: '0.8125rem',
-                  color: 'var(--nf-color-fg)',
-                  whiteSpace: 'pre-wrap',
-                  overflow: 'hidden',
-                  display: '-webkit-box',
-                  // biome-ignore lint/style/useNamingConvention: React inline CSS property
-                  WebkitLineClamp: 3,
-                  // biome-ignore lint/style/useNamingConvention: React inline CSS property
-                  WebkitBoxOrient: 'vertical',
-                }}
-              >
-                {inv.promptRedacted}
-              </p>
-            ) : null}
           </li>
         );
       })}
@@ -1323,6 +1235,10 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
         <Separator />
         <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
           <LinkedEventsSection taskId={id} workspaceId={task.workspaceId} locale={locale} />
+        </Suspense>
+        <Separator />
+        <Suspense fallback={<AIAgentsSkeleton />}>
+          <AIAgentsSection taskId={id} locale={locale} />
         </Suspense>
         <Separator />
         <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>

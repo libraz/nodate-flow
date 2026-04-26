@@ -21,6 +21,7 @@ type SectionTitleKey =
   | 'nav.mcp_tokens'
   | 'nav.auto_actions'
   | 'nav.ai_activity'
+  | 'nav.ai_metrics'
   | 'nav.weekly_digest'
   | 'nav.audit_log';
 

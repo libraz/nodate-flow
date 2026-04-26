@@ -4,6 +4,7 @@
     "workspaces": "ワークスペース",
     "audit_logs": "監査ログ",
     "admins": "管理者",
+    "stats": "統計",
     "settings": "設定"
   },
   "users": {

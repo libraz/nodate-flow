@@ -1,0 +1,35 @@
+{
+  "page": {
+    "title": "AI Metrics",
+    "description": "Acceptance and provider rate-limit telemetry for this workspace's AI surfaces."
+  },
+  "window": {
+    "label": "Window",
+    "7d": "Last 7 days",
+    "30d": "Last 30 days",
+    "90d": "Last 90 days"
+  },
+  "kpi": {
+    "proposed": "Proposed",
+    "applied": "Applied",
+    "dismissed": "Dismissed",
+    "acceptanceRate": "Acceptance rate",
+    "acceptanceHint": "{applied} applied of {decided}",
+    "noDecisions": "No decisions yet"
+  },
+  "outbound": {
+    "title": "Provider rate limits",
+    "description": "Outbound egress counters tracked per AI provider over the selected window.",
+    "empty": "No provider limits recorded yet.",
+    "column": {
+      "destination": "Provider",
+      "allowed": "Allowed",
+      "waited": "Waited",
+      "denied": "Denied"
+    }
+  },
+  "error": {
+    "fetchFailed": "Couldn't load metrics.",
+    "retry": "Retry"
+  }
+}

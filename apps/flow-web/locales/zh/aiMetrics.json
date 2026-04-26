@@ -1,0 +1,35 @@
+{
+  "page": {
+    "title": "AI 指标",
+    "description": "此工作区 AI 功能的采纳率和各提供方限流统计。"
+  },
+  "window": {
+    "label": "时间范围",
+    "7d": "过去 7 天",
+    "30d": "过去 30 天",
+    "90d": "过去 90 天"
+  },
+  "kpi": {
+    "proposed": "已建议",
+    "applied": "已采纳",
+    "dismissed": "已拒绝",
+    "acceptanceRate": "采纳率",
+    "acceptanceHint": "{decided} 项中已采纳 {applied} 项",
+    "noDecisions": "尚无决策"
+  },
+  "outbound": {
+    "title": "提供方限流",
+    "description": "在所选时间范围内，按 AI 提供方统计的出站限流计数。",
+    "empty": "尚未记录提供方限流。",
+    "column": {
+      "destination": "提供方",
+      "allowed": "通过",
+      "waited": "等待",
+      "denied": "拒绝"
+    }
+  },
+  "error": {
+    "fetchFailed": "无法加载指标。",
+    "retry": "重试"
+  }
+}

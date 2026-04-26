@@ -1,0 +1,51 @@
+{
+  "page": {
+    "title": "Priority suggestions",
+    "subtitle": "{shown, plural, =0 {No suggestions} one {# suggestion} other {# suggestions}} across {total, plural, =0 {no open tasks} one {# open task} other {# open tasks}}."
+  },
+  "kpi": {
+    "suggestions": "Suggested",
+    "evaluated": "Evaluated"
+  },
+  "action": {
+    "refresh": "Refresh"
+  },
+  "card": {
+    "from": "Current",
+    "to": "Suggested",
+    "confidence": "Confidence",
+    "confidenceAria": "Confidence: {level} ({percent}%)",
+    "confidenceLevel": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    },
+    "reason": "Reason",
+    "apply": "Apply",
+    "dismiss": "Dismiss",
+    "applyAria": "Apply suggested priority for {title}",
+    "dismissAria": "Dismiss suggestion for {title}"
+  },
+  "priority": {
+    "p0": "P0 — None",
+    "p1": "P1 — Low",
+    "p2": "P2 — Medium",
+    "p3": "P3 — High",
+    "p4": "P4 — Critical"
+  },
+  "empty": {
+    "noTasks": "No open tasks to evaluate.",
+    "allOptimised": "All open tasks already match their suggested priority."
+  },
+  "toast": {
+    "applied": "Updated to {priority}.",
+    "applyFailed": "Couldn't update priority.",
+    "dismissed": "Dismissed for now.",
+    "undone": "Undone.",
+    "undo": "Undo"
+  },
+  "error": {
+    "fetchFailed": "Failed to load priority suggestions.",
+    "retry": "Retry"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "page": {
+    "title": "优先级建议",
+    "subtitle": "在 {total, plural, =0 {无可评估任务} other {# 个任务}} 中{shown, plural, =0 {没有建议} other {发现 # 条建议}}。"
+  },
+  "kpi": {
+    "suggestions": "建议",
+    "evaluated": "已评估"
+  },
+  "action": {
+    "refresh": "刷新"
+  },
+  "card": {
+    "from": "当前",
+    "to": "建议",
+    "confidence": "置信度",
+    "confidenceAria": "置信度: {level} ({percent}%)",
+    "confidenceLevel": {
+      "low": "低",
+      "medium": "中",
+      "high": "高"
+    },
+    "reason": "原因",
+    "apply": "应用",
+    "dismiss": "忽略",
+    "applyAria": "对 {title} 应用建议",
+    "dismissAria": "忽略 {title} 的建议"
+  },
+  "priority": {
+    "p0": "P0 — 无",
+    "p1": "P1 — 低",
+    "p2": "P2 — 中",
+    "p3": "P3 — 高",
+    "p4": "P4 — 紧急"
+  },
+  "empty": {
+    "noTasks": "暂无可评估的任务。",
+    "allOptimised": "所有开放任务均已匹配建议的优先级。"
+  },
+  "toast": {
+    "applied": "已更新为 {priority}。",
+    "applyFailed": "无法更新优先级。",
+    "dismissed": "暂时已忽略。",
+    "undone": "已撤销。",
+    "undo": "撤销"
+  },
+  "error": {
+    "fetchFailed": "无法加载优先级建议。",
+    "retry": "重试"
+  }
+}

@@ -15,6 +15,8 @@ export const namespaces = [
   'settings',
   'ai',
   'ai-suggestions',
+  'aiPriority',
+  'aiMetrics',
   'mcp',
   'errors',
   'notifications',
@@ -25,6 +27,7 @@ export const namespaces = [
   'reactions',
   'archive',
   'linkedEvents',
+  'aiAgents',
 ] as const;
 
 /** Union of all known i18n namespace names. */

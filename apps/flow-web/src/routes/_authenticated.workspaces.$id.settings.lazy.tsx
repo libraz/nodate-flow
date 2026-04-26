@@ -22,6 +22,7 @@ type SubNavKey =
   | 'ai_agents'
   | 'auto_actions'
   | 'ai_activity'
+  | 'ai_metrics'
   | 'weekly_digest'
   | 'audit_log';
 
@@ -37,6 +38,7 @@ interface SubNavItem {
     | '/workspaces/$id/settings/ai-agents'
     | '/workspaces/$id/settings/auto-actions'
     | '/workspaces/$id/settings/ai-activity'
+    | '/workspaces/$id/settings/ai/metrics'
     | '/workspaces/$id/settings/weekly-digest'
     | '/workspaces/$id/settings/audit-log';
 }
@@ -60,6 +62,7 @@ const BASE_SUB_NAV: readonly SubNavItem[] = [
   { key: 'ai_agents', to: '/workspaces/$id/settings/ai-agents' },
   { key: 'auto_actions', to: '/workspaces/$id/settings/auto-actions' },
   { key: 'ai_activity', to: '/workspaces/$id/settings/ai-activity' },
+  { key: 'ai_metrics', to: '/workspaces/$id/settings/ai/metrics' },
   { key: 'weekly_digest', to: '/workspaces/$id/settings/weekly-digest' },
 ];
 
@@ -79,6 +82,7 @@ function labelKeyFor(
   | 'nav.ai_agents'
   | 'nav.auto_actions'
   | 'nav.ai_activity'
+  | 'nav.ai_metrics'
   | 'nav.weekly_digest'
   | 'nav.audit_log' {
   switch (key) {
@@ -100,6 +104,8 @@ function labelKeyFor(
       return 'nav.auto_actions';
     case 'ai_activity':
       return 'nav.ai_activity';
+    case 'ai_metrics':
+      return 'nav.ai_metrics';
     case 'weekly_digest':
       return 'nav.weekly_digest';
     case 'audit_log':

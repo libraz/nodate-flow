@@ -1,0 +1,49 @@
+{
+  "section": {
+    "title": "AI activity",
+    "expand": "Expand AI activity",
+    "collapse": "Collapse AI activity",
+    "count": "{count, plural, =0 {no runs} one {# run} other {# runs}}"
+  },
+  "kind": {
+    "priority_suggest": "Priority",
+    "state_infer": "State",
+    "reminder": "Reminder",
+    "digest": "Digest",
+    "duplicates": "Duplicates",
+    "agent": "Agent",
+    "other": "Other"
+  },
+  "column": {
+    "kind": "Kind",
+    "model": "Model",
+    "latency": "Latency",
+    "tokens": "Tokens",
+    "cost": "Cost",
+    "at": "When"
+  },
+  "tokens": {
+    "format": "{in}/{out}"
+  },
+  "cost": {
+    "usd": "${value}"
+  },
+  "latency": {
+    "ms": "{ms}ms"
+  },
+  "status": {
+    "ok": "OK",
+    "error": "Error"
+  },
+  "error": {
+    "detail": "Show details",
+    "hide": "Hide",
+    "empty": "No additional details available.",
+    "fetchFailed": "Failed to load AI activity.",
+    "retry": "Retry"
+  },
+  "empty": {
+    "title": "No AI activity yet",
+    "body": "When an agent works on this task, its run will show up here."
+  }
+}

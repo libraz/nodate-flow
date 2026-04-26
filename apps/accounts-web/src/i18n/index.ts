@@ -6,14 +6,17 @@ import enAdmin from '../../locales/en/admin.json';
 import enAuth from '../../locales/en/auth.json';
 import enCommon from '../../locales/en/common.json';
 import enErrors from '../../locales/en/errors.json';
+import enInstanceStats from '../../locales/en/instanceStats.json';
 import jaAdmin from '../../locales/ja/admin.json';
 import jaAuth from '../../locales/ja/auth.json';
 import jaCommon from '../../locales/ja/common.json';
 import jaErrors from '../../locales/ja/errors.json';
+import jaInstanceStats from '../../locales/ja/instanceStats.json';
 import zhAdmin from '../../locales/zh/admin.json';
 import zhAuth from '../../locales/zh/auth.json';
 import zhCommon from '../../locales/zh/common.json';
 import zhErrors from '../../locales/zh/errors.json';
+import zhInstanceStats from '../../locales/zh/instanceStats.json';
 
 /** Supported UI languages. */
 export const supportedLanguages = ['en', 'ja', 'zh'] as const;
@@ -50,25 +53,28 @@ export function initI18n(): typeof i18n {
       fallbackLng: 'en',
       supportedLngs: supportedLanguages as unknown as string[],
       defaultNS: 'auth',
-      ns: ['auth', 'admin', 'common', 'errors'],
+      ns: ['auth', 'admin', 'common', 'errors', 'instanceStats'],
       resources: {
         en: {
           auth: enAuth,
           admin: enAdmin,
           common: enCommon,
           errors: enErrors,
+          instanceStats: enInstanceStats,
         },
         ja: {
           auth: jaAuth,
           admin: jaAdmin,
           common: jaCommon,
           errors: jaErrors,
+          instanceStats: jaInstanceStats,
         },
         zh: {
           auth: zhAuth,
           admin: zhAdmin,
           common: zhCommon,
           errors: zhErrors,
+          instanceStats: zhInstanceStats,
         },
       },
       interpolation: { escapeValue: false },

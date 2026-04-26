@@ -4,6 +4,7 @@
     "workspaces": "工作区",
     "audit_logs": "审计日志",
     "admins": "管理员",
+    "stats": "统计",
     "settings": "设置"
   },
   "users": {

@@ -1,0 +1,51 @@
+{
+  "page": {
+    "title": "優先度の提案",
+    "subtitle": "{total, plural, =0 {評価対象のタスクはありません} other {# 件のタスクのうち}}{shown, plural, =0 { 提案はありません} other { # 件の提案があります}}。"
+  },
+  "kpi": {
+    "suggestions": "提案",
+    "evaluated": "評価済み"
+  },
+  "action": {
+    "refresh": "再読み込み"
+  },
+  "card": {
+    "from": "現在",
+    "to": "提案",
+    "confidence": "確信度",
+    "confidenceAria": "確信度: {level} ({percent}%)",
+    "confidenceLevel": {
+      "low": "低",
+      "medium": "中",
+      "high": "高"
+    },
+    "reason": "理由",
+    "apply": "適用",
+    "dismiss": "却下",
+    "applyAria": "{title} に提案を適用",
+    "dismissAria": "{title} の提案を却下"
+  },
+  "priority": {
+    "p0": "P0 — なし",
+    "p1": "P1 — 低",
+    "p2": "P2 — 中",
+    "p3": "P3 — 高",
+    "p4": "P4 — 緊急"
+  },
+  "empty": {
+    "noTasks": "評価対象のタスクがありません。",
+    "allOptimised": "オープンなタスクはすべて推奨の優先度と一致しています。"
+  },
+  "toast": {
+    "applied": "{priority} に更新しました。",
+    "applyFailed": "優先度を更新できませんでした。",
+    "dismissed": "一旦却下しました。",
+    "undone": "元に戻しました。",
+    "undo": "元に戻す"
+  },
+  "error": {
+    "fetchFailed": "優先度の提案を取得できませんでした。",
+    "retry": "再試行"
+  }
+}

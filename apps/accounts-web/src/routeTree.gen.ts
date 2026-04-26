@@ -21,6 +21,7 @@ import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authentic
 import { Route as AuthenticatedWorkspacesWsIdRouteImport } from './routes/_authenticated/workspaces_.$wsId';
 import { Route as AuthenticatedAdminWorkspacesRouteImport } from './routes/_authenticated/admin/workspaces';
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users';
+import { Route as AuthenticatedAdminStatsRouteImport } from './routes/_authenticated/admin/stats';
 import { Route as AuthenticatedAdminSettingsRouteImport } from './routes/_authenticated/admin/settings';
 import { Route as AuthenticatedAdminAuditLogsRouteImport } from './routes/_authenticated/admin/audit-logs';
 import { Route as AuthenticatedAdminAdminsRouteImport } from './routes/_authenticated/admin/admins';
@@ -88,6 +89,11 @@ const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any);
+const AuthenticatedAdminStatsRoute = AuthenticatedAdminStatsRouteImport.update({
+  id: '/stats',
+  path: '/stats',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any);
 const AuthenticatedAdminSettingsRoute =
   AuthenticatedAdminSettingsRouteImport.update({
     id: '/settings',
@@ -130,6 +136,7 @@ export interface FileRoutesByFullPath {
   '/admin/admins': typeof AuthenticatedAdminAdminsRoute;
   '/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute;
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute;
+  '/admin/stats': typeof AuthenticatedAdminStatsRoute;
   '/admin/users': typeof AuthenticatedAdminUsersRoute;
   '/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute;
   '/workspaces/$wsId': typeof AuthenticatedWorkspacesWsIdRoute;
@@ -147,6 +154,7 @@ export interface FileRoutesByTo {
   '/admin/admins': typeof AuthenticatedAdminAdminsRoute;
   '/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute;
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute;
+  '/admin/stats': typeof AuthenticatedAdminStatsRoute;
   '/admin/users': typeof AuthenticatedAdminUsersRoute;
   '/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute;
   '/workspaces/$wsId': typeof AuthenticatedWorkspacesWsIdRoute;
@@ -167,6 +175,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/admins': typeof AuthenticatedAdminAdminsRoute;
   '/_authenticated/admin/audit-logs': typeof AuthenticatedAdminAuditLogsRoute;
   '/_authenticated/admin/settings': typeof AuthenticatedAdminSettingsRoute;
+  '/_authenticated/admin/stats': typeof AuthenticatedAdminStatsRoute;
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute;
   '/_authenticated/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute;
   '/_authenticated/workspaces_/$wsId': typeof AuthenticatedWorkspacesWsIdRoute;
@@ -187,6 +196,7 @@ export interface FileRouteTypes {
     | '/admin/admins'
     | '/admin/audit-logs'
     | '/admin/settings'
+    | '/admin/stats'
     | '/admin/users'
     | '/admin/workspaces'
     | '/workspaces/$wsId'
@@ -204,6 +214,7 @@ export interface FileRouteTypes {
     | '/admin/admins'
     | '/admin/audit-logs'
     | '/admin/settings'
+    | '/admin/stats'
     | '/admin/users'
     | '/admin/workspaces'
     | '/workspaces/$wsId'
@@ -223,6 +234,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/admins'
     | '/_authenticated/admin/audit-logs'
     | '/_authenticated/admin/settings'
+    | '/_authenticated/admin/stats'
     | '/_authenticated/admin/users'
     | '/_authenticated/admin/workspaces'
     | '/_authenticated/workspaces_/$wsId'
@@ -324,6 +336,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminUsersRouteImport;
       parentRoute: typeof AuthenticatedAdminRoute;
     };
+    '/_authenticated/admin/stats': {
+      id: '/_authenticated/admin/stats';
+      path: '/stats';
+      fullPath: '/admin/stats';
+      preLoaderRoute: typeof AuthenticatedAdminStatsRouteImport;
+      parentRoute: typeof AuthenticatedAdminRoute;
+    };
     '/_authenticated/admin/settings': {
       id: '/_authenticated/admin/settings';
       path: '/settings';
@@ -366,6 +385,7 @@ interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminAdminsRoute: typeof AuthenticatedAdminAdminsRoute;
   AuthenticatedAdminAuditLogsRoute: typeof AuthenticatedAdminAuditLogsRoute;
   AuthenticatedAdminSettingsRoute: typeof AuthenticatedAdminSettingsRoute;
+  AuthenticatedAdminStatsRoute: typeof AuthenticatedAdminStatsRoute;
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute;
   AuthenticatedAdminWorkspacesRoute: typeof AuthenticatedAdminWorkspacesRoute;
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute;
@@ -377,6 +397,7 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminAdminsRoute: AuthenticatedAdminAdminsRoute,
   AuthenticatedAdminAuditLogsRoute: AuthenticatedAdminAuditLogsRoute,
   AuthenticatedAdminSettingsRoute: AuthenticatedAdminSettingsRoute,
+  AuthenticatedAdminStatsRoute: AuthenticatedAdminStatsRoute,
   AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
   AuthenticatedAdminWorkspacesRoute: AuthenticatedAdminWorkspacesRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,

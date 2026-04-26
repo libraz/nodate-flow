@@ -4,6 +4,9 @@ import { initReactI18next } from 'react-i18next';
 
 import enAiSuggestions from '../../locales/en/ai-suggestions.json';
 import enAi from '../../locales/en/ai.json';
+import enAiAgents from '../../locales/en/aiAgents.json';
+import enAiMetrics from '../../locales/en/aiMetrics.json';
+import enAiPriority from '../../locales/en/aiPriority.json';
 import enArchive from '../../locales/en/archive.json';
 import enAuth from '../../locales/en/auth.json';
 import enCalendarEvents from '../../locales/en/calendar-events.json';
@@ -22,6 +25,9 @@ import enSettings from '../../locales/en/settings.json';
 import enTimeline from '../../locales/en/timeline.json';
 import jaAiSuggestions from '../../locales/ja/ai-suggestions.json';
 import jaAi from '../../locales/ja/ai.json';
+import jaAiAgents from '../../locales/ja/aiAgents.json';
+import jaAiMetrics from '../../locales/ja/aiMetrics.json';
+import jaAiPriority from '../../locales/ja/aiPriority.json';
 import jaArchive from '../../locales/ja/archive.json';
 import jaAuth from '../../locales/ja/auth.json';
 import jaCalendarEvents from '../../locales/ja/calendar-events.json';
@@ -40,6 +46,9 @@ import jaSettings from '../../locales/ja/settings.json';
 import jaTimeline from '../../locales/ja/timeline.json';
 import zhAiSuggestions from '../../locales/zh/ai-suggestions.json';
 import zhAi from '../../locales/zh/ai.json';
+import zhAiAgents from '../../locales/zh/aiAgents.json';
+import zhAiMetrics from '../../locales/zh/aiMetrics.json';
+import zhAiPriority from '../../locales/zh/aiPriority.json';
 import zhArchive from '../../locales/zh/archive.json';
 import zhAuth from '../../locales/zh/auth.json';
 import zhCalendarEvents from '../../locales/zh/calendar-events.json';
@@ -101,6 +110,9 @@ export function initI18n(): typeof i18n {
         'calendar-events',
         'ai',
         'ai-suggestions',
+        'aiAgents',
+        'aiMetrics',
+        'aiPriority',
         'constraints',
         'errors',
         'notifications',
@@ -123,6 +135,9 @@ export function initI18n(): typeof i18n {
           'calendar-events': enCalendarEvents,
           ai: enAi,
           'ai-suggestions': enAiSuggestions,
+          aiAgents: enAiAgents,
+          aiMetrics: enAiMetrics,
+          aiPriority: enAiPriority,
           constraints: enConstraints,
           errors: enErrors,
           notifications: enNotifications,
@@ -143,6 +158,9 @@ export function initI18n(): typeof i18n {
           'calendar-events': jaCalendarEvents,
           ai: jaAi,
           'ai-suggestions': jaAiSuggestions,
+          aiAgents: jaAiAgents,
+          aiMetrics: jaAiMetrics,
+          aiPriority: jaAiPriority,
           constraints: jaConstraints,
           errors: jaErrors,
           notifications: jaNotifications,
@@ -163,6 +181,9 @@ export function initI18n(): typeof i18n {
           'calendar-events': zhCalendarEvents,
           ai: zhAi,
           'ai-suggestions': zhAiSuggestions,
+          aiAgents: zhAiAgents,
+          aiMetrics: zhAiMetrics,
+          aiPriority: zhAiPriority,
           constraints: zhConstraints,
           errors: zhErrors,
           notifications: zhNotifications,

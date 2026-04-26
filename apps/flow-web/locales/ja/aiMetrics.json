@@ -1,0 +1,35 @@
+{
+  "page": {
+    "title": "AI メトリクス",
+    "description": "このワークスペースの AI 機能における採用率とプロバイダのレート制限統計です。"
+  },
+  "window": {
+    "label": "期間",
+    "7d": "直近 7 日",
+    "30d": "直近 30 日",
+    "90d": "直近 90 日"
+  },
+  "kpi": {
+    "proposed": "提案",
+    "applied": "採用",
+    "dismissed": "却下",
+    "acceptanceRate": "採用率",
+    "acceptanceHint": "{decided} 件中 {applied} 件採用",
+    "noDecisions": "まだ判定がありません"
+  },
+  "outbound": {
+    "title": "プロバイダ別レート制限",
+    "description": "選択した期間内に AI プロバイダごとに計測した送信側のレート制限カウンタです。",
+    "empty": "プロバイダのレート制限はまだ記録されていません。",
+    "column": {
+      "destination": "プロバイダ",
+      "allowed": "許可",
+      "waited": "待機",
+      "denied": "拒否"
+    }
+  },
+  "error": {
+    "fetchFailed": "メトリクスを読み込めませんでした。",
+    "retry": "再試行"
+  }
+}

@@ -71,6 +71,9 @@ function AdminLayout(): ReactElement | null {
         <Link to="/admin/admins" style={navLinkStyle}>
           {t('nav.admins')}
         </Link>
+        <Link to="/admin/stats" style={navLinkStyle}>
+          {t('nav.stats')}
+        </Link>
         <Link to="/admin/settings" style={navLinkStyle}>
           {t('nav.settings')}
         </Link>

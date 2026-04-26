@@ -1,0 +1,49 @@
+{
+  "section": {
+    "title": "AI の活動",
+    "expand": "AI の活動を展開",
+    "collapse": "AI の活動を折りたたむ",
+    "count": "{count, plural, =0 {実行なし} other {# 件}}"
+  },
+  "kind": {
+    "priority_suggest": "優先度",
+    "state_infer": "状態推定",
+    "reminder": "リマインダー",
+    "digest": "ダイジェスト",
+    "duplicates": "重複検出",
+    "agent": "エージェント",
+    "other": "その他"
+  },
+  "column": {
+    "kind": "種別",
+    "model": "モデル",
+    "latency": "応答時間",
+    "tokens": "トークン",
+    "cost": "コスト",
+    "at": "時刻"
+  },
+  "tokens": {
+    "format": "{in}/{out}"
+  },
+  "cost": {
+    "usd": "${value}"
+  },
+  "latency": {
+    "ms": "{ms}ms"
+  },
+  "status": {
+    "ok": "成功",
+    "error": "失敗"
+  },
+  "error": {
+    "detail": "詳細を表示",
+    "hide": "閉じる",
+    "empty": "追加の詳細はありません。",
+    "fetchFailed": "AI の活動を読み込めませんでした。",
+    "retry": "再試行"
+  },
+  "empty": {
+    "title": "AI の活動はまだありません",
+    "body": "エージェントがこのタスクで動作すると、ここに実行履歴が表示されます。"
+  }
+}

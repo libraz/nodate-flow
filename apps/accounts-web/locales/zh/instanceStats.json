@@ -1,0 +1,29 @@
+{
+  "page": {
+    "title": "实例统计",
+    "subtitle": "该 nodate-flow 实例的整体运行状况。"
+  },
+  "kpi": {
+    "users": {
+      "title": "活跃用户",
+      "help": "未被停用或删除的用户。"
+    },
+    "workspaces": {
+      "title": "活跃工作区",
+      "help": "未被归档的工作区。"
+    }
+  },
+  "actions": {
+    "refresh": "刷新",
+    "refreshing": "刷新中…",
+    "lastUpdated": "最后更新 {time}"
+  },
+  "placeholder": {
+    "title": "更多指标即将推出",
+    "body": "每日注册数、AI 使用量、审计日志数量等将随着平台的发展在此呈现。"
+  },
+  "error": {
+    "fetchFailed": "无法加载实例统计。",
+    "retry": "重试"
+  }
+}

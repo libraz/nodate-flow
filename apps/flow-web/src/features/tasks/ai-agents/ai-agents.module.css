@@ -1,0 +1,341 @@
+/*
+ * Quiet Agents — discreet sub-section listing AI invocations against a task.
+ *
+ * Mirrors the visual language of the linked-events section so both
+ * collapsibles read as siblings on the task detail page. All colours,
+ * spacing, radii, shadows and durations come from design tokens
+ * (see /docs/conventions/design-tokens.md). No hex literals, no
+ * Tailwind grays. Translucent layers are produced via `color-mix()`
+ * so the four themes (aurora / dotline / glass-light / glass-dark)
+ * inherit the right accent without per-theme overrides.
+ *
+ * Motion respects `prefers-reduced-motion`: caret rotation is
+ * skipped, error-detail expansion becomes a flat opacity step.
+ */
+
+/* ── Section ─────────────────────────────────────────────────── */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  background: var(--nf-color-bg);
+  border-radius: var(--nf-radius-md);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-3) var(--nf-space-4);
+  border-radius: var(--nf-radius-md);
+}
+
+.disclosure {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-1) var(--nf-space-2);
+  margin-inline-start: calc(var(--nf-space-2) * -1);
+  border-radius: var(--nf-radius-sm);
+  color: var(--nf-color-fg);
+  font: inherit;
+  cursor: pointer;
+  flex: 1;
+  min-inline-size: 0;
+  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.disclosure:hover {
+  background: color-mix(in oklab, var(--nf-color-bg-elevated) 50%, transparent);
+}
+
+.disclosure:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.caret {
+  inline-size: 0.75rem;
+  block-size: 0.75rem;
+  transition: transform var(--nf-duration-fast) var(--nf-ease-standard);
+  color: var(--nf-color-fg-subtle);
+  flex-shrink: 0;
+}
+
+.caret[data-open="true"] {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caret {
+    transition: none;
+  }
+}
+
+.title {
+  margin: 0;
+  font-size: var(--nf-text-base);
+  font-weight: 600;
+  color: var(--nf-color-fg);
+}
+
+.count {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-subtle);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+}
+
+.body[hidden] {
+  display: none;
+}
+
+/* ── List ────────────────────────────────────────────────────── */
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: grid;
+  grid-template-columns:
+    minmax(8rem, auto)
+    minmax(0, 1fr)
+    minmax(4rem, auto)
+    minmax(4rem, auto)
+    minmax(8rem, auto)
+    minmax(2.5rem, auto);
+  align-items: center;
+  column-gap: var(--nf-space-3);
+  row-gap: var(--nf-space-1);
+  padding: var(--nf-space-3) var(--nf-space-4);
+  border-block-end: 1px solid var(--nf-color-border-subtle, var(--nf-color-hairline));
+  font-size: var(--nf-text-sm);
+}
+
+.row:last-child {
+  border-block-end-color: transparent;
+}
+
+.row:hover {
+  background: color-mix(in oklab, var(--nf-color-bg-elevated) 60%, transparent);
+}
+
+.kindCell {
+  display: inline-flex;
+  align-items: center;
+  min-inline-size: 0;
+}
+
+.modelCell {
+  color: var(--nf-color-fg);
+  font-family: var(--font-mono);
+  font-size: var(--nf-text-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-inline-size: 0;
+}
+
+.numericCell {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  text-align: end;
+  white-space: nowrap;
+}
+
+.timeCell {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-subtle);
+  text-align: end;
+  white-space: nowrap;
+}
+
+.statusCell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.statusGlyph {
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.statusGlyph[data-tone="ok"] {
+  background: var(--nf-color-success);
+}
+
+.statusGlyph[data-tone="warning"] {
+  background: var(--nf-color-warning);
+}
+
+.statusGlyph[data-tone="danger"] {
+  background: var(--nf-color-danger);
+}
+
+.statusLabel {
+  margin-inline-start: var(--nf-space-2);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+/* ── Error expansion ─────────────────────────────────────────── */
+
+.errorRow {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  padding-block-start: var(--nf-space-2);
+}
+
+.errorToggle {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--nf-color-danger);
+  font: inherit;
+  font-size: var(--nf-text-xs);
+  cursor: pointer;
+  padding: var(--nf-space-1) 0;
+  text-align: start;
+  align-self: flex-start;
+  border-radius: var(--nf-radius-sm);
+}
+
+.errorToggle:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.errorToggle:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.errorDetail {
+  margin: 0;
+  padding: var(--nf-space-2) var(--nf-space-3);
+  border-radius: var(--nf-radius-sm);
+  background: color-mix(in oklab, var(--nf-color-danger) 6%, transparent);
+  color: var(--nf-color-fg);
+  font-family: var(--font-mono);
+  font-size: var(--nf-text-xs);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Empty state ─────────────────────────────────────────────── */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-5) var(--nf-space-4);
+  color: var(--nf-color-fg-muted);
+  text-align: center;
+}
+
+.emptyTitle {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  font-weight: 600;
+  color: var(--nf-color-fg);
+}
+
+.emptyBody {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+  max-inline-size: 28rem;
+}
+
+/* ── Skeleton ────────────────────────────────────────────────── */
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+}
+
+.skeletonRow {
+  display: grid;
+  grid-template-columns: 6rem 1fr 5rem 5rem 5rem;
+  align-items: center;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-3) var(--nf-space-4);
+  border-block-end: 1px solid var(--nf-color-border-subtle, var(--nf-color-hairline));
+}
+
+.skeletonRow:last-child {
+  border-block-end-color: transparent;
+}
+
+.skeletonChip {
+  block-size: 0.75rem;
+  border-radius: var(--nf-radius-sm);
+  background: color-mix(in oklab, var(--nf-color-bg-elevated) 80%, transparent);
+}
+
+/* ── Kind badge tones ────────────────────────────────────────── */
+
+.kindBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--nf-space-2);
+  border-radius: var(--nf-radius-pill);
+  font-size: var(--nf-text-xs);
+  font-weight: 500;
+  line-height: 1.5rem;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.kindBadge[data-tone="accent"] {
+  background: color-mix(in oklab, var(--nf-color-accent) 12%, transparent);
+  color: var(--nf-color-accent);
+  border-color: color-mix(in oklab, var(--nf-color-accent) 24%, transparent);
+}
+
+.kindBadge[data-tone="success"] {
+  background: color-mix(in oklab, var(--nf-color-success) 12%, transparent);
+  color: var(--nf-color-success);
+  border-color: color-mix(in oklab, var(--nf-color-success) 24%, transparent);
+}
+
+.kindBadge[data-tone="warning"] {
+  background: color-mix(in oklab, var(--nf-color-warning) 14%, transparent);
+  color: var(--nf-color-warning);
+  border-color: color-mix(in oklab, var(--nf-color-warning) 28%, transparent);
+}
+
+.kindBadge[data-tone="info"] {
+  background: color-mix(in oklab, var(--nf-color-info, var(--nf-color-accent)) 12%, transparent);
+  color: var(--nf-color-info, var(--nf-color-accent));
+  border-color: color-mix(in oklab, var(--nf-color-info, var(--nf-color-accent)) 24%, transparent);
+}
+
+.kindBadge[data-tone="neutral"] {
+  background: color-mix(in oklab, var(--nf-color-bg-elevated) 80%, transparent);
+  color: var(--nf-color-fg-muted);
+  border-color: var(--nf-color-border-subtle, var(--nf-color-hairline));
+}

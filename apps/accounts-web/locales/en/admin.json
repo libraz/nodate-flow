@@ -4,6 +4,7 @@
     "workspaces": "Workspaces",
     "audit_logs": "Audit Logs",
     "admins": "Admins",
+    "stats": "Stats",
     "settings": "Settings"
   },
   "users": {
