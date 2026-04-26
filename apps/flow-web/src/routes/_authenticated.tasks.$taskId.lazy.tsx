@@ -34,7 +34,11 @@ import Markdown from '@nodate-flow/ui/primitives/markdown';
 import { selectUser, useAuth } from '../features/auth/auth-store';
 import ConstraintEditor from '../features/constraints/constraint-editor';
 import StateGraph from '../features/constraints/state-graph';
+import { useFavoritesQuery } from '../features/favorites/api';
+import FavoriteButton from '../features/favorites/favorite-button';
 import { useProjectQuery } from '../features/projects/api';
+import { useTaskReactionsQuery } from '../features/reactions/api';
+import ReactionBar from '../features/reactions/reaction-bar';
 import {
   TASK_PRIORITIES,
   TRANSITIONS_BY_STATE,
@@ -129,6 +133,31 @@ interface TaskDetailPanelProps {
 }
 
 /**
+ * TaskFavoriteStar resolves the existing favorite entry (if any) for
+ * the current task and renders the FavoriteButton in the correct
+ * toggle state. Uses `useFavoritesQuery` (suspense) so the caller must
+ * wrap it in a `<Suspense fallback={null}>` boundary.
+ */
+function TaskFavoriteStar({
+  taskId,
+  workspaceId,
+}: {
+  taskId: string;
+  workspaceId: string;
+}): ReactElement {
+  const { data: favorites } = useFavoritesQuery(workspaceId);
+  const existing = favorites.find((f) => f.targetType === 'task' && f.targetId === taskId);
+  return (
+    <FavoriteButton
+      workspaceId={workspaceId}
+      targetType="task"
+      targetId={taskId}
+      {...(existing ? { favoriteId: existing.id } : {})}
+    />
+  );
+}
+
+/**
  * TitleEditor renders the task title as a page-level `<h1>` landmark and
  * swaps to an inline text input for editing. The heading element is
  * rendered in both states so assistive technology always observes exactly
@@ -141,7 +170,15 @@ interface TaskDetailPanelProps {
  * message instead of silently closing the editor. This mirrors the
  * project rename guard established in commit a8cae17.
  */
-function TitleEditor({ id, initial }: { id: string; initial: string }): ReactElement {
+function TitleEditor({
+  id,
+  initial,
+  workspaceId,
+}: {
+  id: string;
+  initial: string;
+  workspaceId: string;
+}): ReactElement {
   const { t } = useTranslation('common');
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(initial);
@@ -182,6 +219,9 @@ function TitleEditor({ id, initial }: { id: string; initial: string }): ReactEle
     return (
       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
         <h1 style={{ ...headingStyle, flex: 1, minInlineSize: 0 }}>{initial}</h1>
+        <Suspense fallback={null}>
+          <TaskFavoriteStar taskId={id} workspaceId={workspaceId} />
+        </Suspense>
         <Button
           type="button"
           variant="ghost"
@@ -383,6 +423,14 @@ function DescriptionEditor({
         </Button>
       </div>
     </div>
+  );
+}
+
+function ReactionsSection({ taskId }: { taskId: string }): ReactElement {
+  const currentUser = useAuth(selectUser);
+  const { data: reactions } = useTaskReactionsQuery(taskId);
+  return (
+    <ReactionBar taskId={taskId} reactions={reactions} currentUserId={currentUser?.id ?? ''} />
   );
 }
 
@@ -1165,10 +1213,13 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
         <Suspense fallback={null}>
           <TaskBreadcrumb workspaceId={task.workspaceId} projectId={task.projectId} />
         </Suspense>
-        <TitleEditor id={id} initial={task.title} />
+        <TitleEditor id={id} initial={task.title} workspaceId={task.workspaceId} />
         <Card style={{ padding: '1rem' }}>
           <DescriptionEditor id={id} initial={task.description ?? ''} />
         </Card>
+        <Suspense fallback={<Skeleton style={{ blockSize: '2rem', inlineSize: '12rem' }} />}>
+          <ReactionsSection taskId={id} />
+        </Suspense>
         <Separator />
         <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
           <DependenciesSection taskId={id} workspaceId={task.workspaceId} />

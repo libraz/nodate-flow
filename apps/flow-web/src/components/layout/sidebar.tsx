@@ -7,8 +7,10 @@ import {
   Briefcase,
   CalendarDays,
   CalendarRange,
+  CheckSquare,
   ChevronsLeft,
   ChevronsRight,
+  Eye,
   FileText,
   FolderKanban,
   Inbox,
@@ -20,6 +22,7 @@ import {
 import { type ReactElement, Suspense, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { type Favorite, useFavoritesQuery } from '../../features/favorites/api';
 import { useProjectsQuery } from '../../features/projects/api';
 import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
 import styles from './sidebar.module.css';
@@ -87,6 +90,90 @@ function WorkspaceProjectsSection({ workspaceId }: { workspaceId: string }): Rea
           <Icon icon={FolderKanban} decorative />
           <span className={styles.label}>{p.name}</span>
         </Link>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Map a favorite target type to its sidebar icon. Lens / page /
+ * timebox surfaces are a near-future addition; default to the same
+ * icon used for lenses for any unknown type so the row still renders
+ * recognisably.
+ */
+function favoriteIconFor(targetType: string): LucideIcon {
+  switch (targetType) {
+    case 'task':
+      return CheckSquare;
+    case 'project':
+      return FolderKanban;
+    case 'lens':
+      return Eye;
+    default:
+      return Eye;
+  }
+}
+
+/**
+ * Render a single favorite as a sidebar Link. Returns `null` when the
+ * favorite's target type does not yet have a resolvable route (page /
+ * timebox / unknown), so the section quietly skips them rather than
+ * crashing the router with an invalid `to`.
+ */
+function FavoriteRow({
+  favorite,
+  workspaceId,
+}: {
+  favorite: Favorite;
+  workspaceId: string;
+}): ReactElement | null {
+  const icon = favoriteIconFor(favorite.targetType);
+  const className = cx(styles.item, styles.subItem);
+  const activeClassName = cx(styles.item, styles.subItem, styles.itemActive);
+  if (favorite.targetType === 'task') {
+    return (
+      <Link
+        to="/tasks/$taskId"
+        params={{ taskId: favorite.targetId }}
+        className={className}
+        activeProps={{ className: activeClassName }}
+      >
+        <Icon icon={icon} decorative />
+        <span className={styles.label}>{favorite.targetId}</span>
+      </Link>
+    );
+  }
+  if (favorite.targetType === 'project') {
+    return (
+      <Link
+        to="/workspaces/$id/projects/$projectId"
+        params={{ id: workspaceId, projectId: favorite.targetId }}
+        className={className}
+        activeProps={{ className: activeClassName }}
+      >
+        <Icon icon={icon} decorative />
+        <span className={styles.label}>{favorite.targetId}</span>
+      </Link>
+    );
+  }
+  return null;
+}
+
+/**
+ * FavoritesSection — renders the user's favorite tasks / projects as
+ * Sidebar entries scoped to the current workspace. Suspends on first
+ * load; the outer Sidebar wraps this in a Suspense with a null
+ * fallback so the rest of the nav renders immediately.
+ */
+function FavoritesSection({ workspaceId }: { workspaceId: string }): ReactElement {
+  const { t } = useTranslation('labels');
+  const { data: favorites } = useFavoritesQuery(workspaceId);
+  if (favorites.length === 0) return <></>;
+  return (
+    <div className={styles.section}>
+      <div className={styles.sectionLabel}>{t('favorites.sidebar_title')}</div>
+      {favorites.map((f) => (
+        <FavoriteRow key={f.id} favorite={f} workspaceId={workspaceId} />
       ))}
     </div>
   );
@@ -228,12 +315,17 @@ export default function Sidebar(): ReactElement {
             );
             // Render the project tree directly beneath the Workspaces
             // nav entry when we are inside a workspace-scoped route.
+            // The Favorites section is mounted alongside so starred
+            // tasks / projects sit under the same workspace header.
             if (item.key === 'workspaces' && currentWorkspaceId && !collapsed) {
               return (
                 <div key={item.key}>
                   {linkEl}
                   <Suspense fallback={null}>
                     <WorkspaceProjectsSection workspaceId={currentWorkspaceId} />
+                  </Suspense>
+                  <Suspense fallback={null}>
+                    <FavoritesSection workspaceId={currentWorkspaceId} />
                   </Suspense>
                 </div>
               );

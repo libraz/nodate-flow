@@ -14,10 +14,12 @@
  */
 
 import { Link, Outlet, createFileRoute } from '@tanstack/react-router';
-import type { ReactElement } from 'react';
+import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import Forbidden from '../components/forbidden';
+import { useFavoritesQuery } from '../features/favorites/api';
+import FavoriteButton from '../features/favorites/favorite-button';
 import { useProjectQuery } from '../features/projects/api';
 import { ApiError } from '../lib/api-error';
 import { sdk } from '../lib/sdk';
@@ -64,6 +66,31 @@ function labelKeyFor(
   }
 }
 
+/**
+ * ProjectFavoriteStar resolves the existing favorite entry (if any)
+ * for the current project and renders the FavoriteButton in the
+ * correct toggle state. Uses `useFavoritesQuery` (suspense) so the
+ * caller must wrap it in a `<Suspense fallback={null}>` boundary.
+ */
+function ProjectFavoriteStar({
+  projectId,
+  workspaceId,
+}: {
+  projectId: string;
+  workspaceId: string;
+}): ReactElement {
+  const { data: favorites } = useFavoritesQuery(workspaceId);
+  const existing = favorites.find((f) => f.targetType === 'project' && f.targetId === projectId);
+  return (
+    <FavoriteButton
+      workspaceId={workspaceId}
+      targetType="project"
+      targetId={projectId}
+      {...(existing ? { favoriteId: existing.id } : {})}
+    />
+  );
+}
+
 function ProjectLayout(): ReactElement {
   const { t } = useTranslation('common');
   const { id, projectId } = Route.useParams();
@@ -87,15 +114,22 @@ function ProjectLayout(): ReactElement {
         padding: 'clamp(1rem, 3vw, 2rem) clamp(1rem, 3vw, 2rem) 0',
       }}
     >
-      <h1
-        style={{
-          fontFamily: 'var(--font-display)',
-          fontSize: 'clamp(1.5rem, 2.5vw, 2rem)',
-          margin: 0,
-        }}
-      >
-        {project.name}
-      </h1>
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <h1
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 'clamp(1.5rem, 2.5vw, 2rem)',
+            margin: 0,
+            flex: 1,
+            minInlineSize: 0,
+          }}
+        >
+          {project.name}
+        </h1>
+        <Suspense fallback={null}>
+          <ProjectFavoriteStar projectId={projectId} workspaceId={id} />
+        </Suspense>
+      </div>
       {project.description ? (
         <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{project.description}</p>
       ) : null}
