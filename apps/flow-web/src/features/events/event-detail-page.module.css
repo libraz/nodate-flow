@@ -385,3 +385,107 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Shift event dialog ───────────────────────────────────────── */
+
+.headerActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nf-space-2);
+}
+
+.shiftForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.shiftActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nf-space-2);
+  padding-block-start: var(--nf-space-2);
+}
+
+.shiftSummary {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg);
+}
+
+.shiftGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-3);
+  border-radius: var(--nf-radius-md);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  background: var(--nf-color-bg);
+}
+
+.shiftGroupHeader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.shiftGroupTitle {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  font-weight: 600;
+  color: var(--nf-color-fg);
+}
+
+.shiftGroupHint {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.shiftCandidateList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.shiftCandidateRow {
+  display: flex;
+  align-items: flex-start;
+}
+
+.shiftCandidateLabel {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nf-space-2);
+  inline-size: 100%;
+  padding: var(--nf-space-2);
+  border-radius: var(--nf-radius-sm);
+  cursor: pointer;
+}
+
+.shiftCandidateLabel:hover {
+  background: var(--nf-color-bg-muted, var(--nf-color-bg));
+}
+
+.shiftCandidateBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.shiftCandidateTitle {
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg);
+  word-break: break-word;
+}
+
+.shiftCandidateMeta {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  word-break: break-word;
+}

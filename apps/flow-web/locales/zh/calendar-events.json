@@ -238,6 +238,39 @@
         "accepted": "已接受",
         "expired": "已过期"
       }
+    },
+    "shift": {
+      "trigger": "调整事件时间",
+      "dialog": {
+        "title": "调整事件并联动任务",
+        "cancel": "取消",
+        "back": "返回"
+      },
+      "pick": {
+        "label": "新的开始时间",
+        "hint": "应用前会显示哪些关联任务可以一起调整。",
+        "preview": "预览调整",
+        "preview_error": "预览调整失败"
+      },
+      "confirm": {
+        "summary": "调整 {delta}。已选择 {total} 个关联任务中的 {selected} 个。",
+        "no_links": "此事件没有关联任务——仅事件本身将被移动。",
+        "safe_title": "可安全调整",
+        "safe_hint": "这些关联任务可以安全调整。",
+        "conflict_title": "冲突",
+        "conflict_hint": "调整后将与其他项目冲突。",
+        "row_time": "{old} → {new}",
+        "apply": "应用调整",
+        "applying": "正在应用…",
+        "success": "已调整 {delta}（{count} 个任务）",
+        "error": "应用调整失败",
+        "delta_seconds": "{seconds} 秒",
+        "delta_minutes": "{minutes} 分钟",
+        "delta_hours": "{hours} 小时",
+        "delta_days": "{days} 天",
+        "delta_negative": "提前 {value}",
+        "delta_positive": "推迟 {value}"
+      }
     }
   }
 }

@@ -238,6 +238,39 @@
         "accepted": "承諾済み",
         "expired": "期限切れ"
       }
+    },
+    "shift": {
+      "trigger": "イベントをシフト",
+      "dialog": {
+        "title": "リンクされたタスクごとイベントをシフト",
+        "cancel": "キャンセル",
+        "back": "戻る"
+      },
+      "pick": {
+        "label": "新しい開始時刻",
+        "hint": "適用前にリンクされたタスクのうちシフトできるものを表示します。",
+        "preview": "シフトをプレビュー",
+        "preview_error": "プレビューに失敗しました"
+      },
+      "confirm": {
+        "summary": "{delta} シフト。リンクされたタスク {total} 件のうち {selected} 件を選択中。",
+        "no_links": "このイベントにはリンクされたタスクがありません — イベントのみ移動します。",
+        "safe_title": "安全にシフト可能",
+        "safe_hint": "これらのタスクはシフトしても余裕があります。",
+        "conflict_title": "競合",
+        "conflict_hint": "シフトすると他の予定と競合します。",
+        "row_time": "{old} → {new}",
+        "apply": "シフトを適用",
+        "applying": "適用中…",
+        "success": "{delta} シフトしました（{count} 件）",
+        "error": "シフトの適用に失敗しました",
+        "delta_seconds": "{seconds}秒",
+        "delta_minutes": "{minutes}分",
+        "delta_hours": "{hours}時間",
+        "delta_days": "{days}日",
+        "delta_negative": "{value} 早く",
+        "delta_positive": "{value} 後ろに"
+      }
     }
   }
 }

@@ -22,10 +22,11 @@
  */
 
 import Badge from '@nodate-flow/ui/primitives/badge';
+import Button from '@nodate-flow/ui/primitives/button';
 import Spinner from '@nodate-flow/ui/primitives/spinner';
 import Tabs, { type TabItem } from '@nodate-flow/ui/primitives/tabs';
 import { Link, getRouteApi } from '@tanstack/react-router';
-import { type ReactElement, Suspense } from 'react';
+import { type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useEventQuery } from './api';
@@ -35,6 +36,7 @@ import ChecklistTab from './checklist-tab';
 import CommentsTab from './comments-tab';
 import styles from './event-detail-page.module.css';
 import InvitesTab from './invites-tab';
+import ShiftEventDialog from './shift-event-dialog';
 
 const routeApi = getRouteApi('/_authenticated/workspaces/$id/calendars/$calId/events/$evtId');
 
@@ -86,6 +88,8 @@ function EventHeader({ workspaceId, calendarId, eventId }: EventHeaderProps): Re
   const locale = i18n.resolvedLanguage ?? 'en';
   const { data: event } = useEventQuery(workspaceId, calendarId, eventId);
 
+  const [shiftOpen, setShiftOpen] = useState(false);
+
   const allDay = event.allDay ?? false;
   const startDisplay =
     event.startAt !== undefined ? formatEpoch(event.startAt, locale, allDay) : '';
@@ -123,6 +127,31 @@ function EventHeader({ workspaceId, calendarId, eventId }: EventHeaderProps): Re
           </div>
         ) : null}
       </dl>
+      {event.startAt !== undefined ? (
+        <div className={styles.headerActions}>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => {
+              setShiftOpen(true);
+            }}
+          >
+            {t('event.shift.trigger')}
+          </Button>
+        </div>
+      ) : null}
+      {event.startAt !== undefined ? (
+        <ShiftEventDialog
+          open={shiftOpen}
+          onClose={() => {
+            setShiftOpen(false);
+          }}
+          workspaceId={workspaceId}
+          calendarId={calendarId}
+          eventId={eventId}
+          currentStartAt={event.startAt}
+        />
+      ) : null}
     </header>
   );
 }

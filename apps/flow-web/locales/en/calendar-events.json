@@ -238,6 +238,39 @@
         "accepted": "Accepted",
         "expired": "Expired"
       }
+    },
+    "shift": {
+      "trigger": "Shift event",
+      "dialog": {
+        "title": "Shift event with linked tasks",
+        "cancel": "Cancel",
+        "back": "Back"
+      },
+      "pick": {
+        "label": "New start time",
+        "hint": "We'll show which linked tasks could shift along before applying.",
+        "preview": "Preview shift",
+        "preview_error": "Failed to preview the shift"
+      },
+      "confirm": {
+        "summary": "Shifting by {delta}. {selected} of {total} linked tasks selected.",
+        "no_links": "This event has no linked tasks — only the event will move.",
+        "safe_title": "Safe to shift",
+        "safe_hint": "These linked tasks have room to shift along.",
+        "conflict_title": "Conflicts",
+        "conflict_hint": "These tasks would clash with other items if shifted.",
+        "row_time": "{old} → {new}",
+        "apply": "Apply shift",
+        "applying": "Applying…",
+        "success": "Shifted by {delta} ({count} tasks)",
+        "error": "Failed to apply shift",
+        "delta_seconds": "{seconds}s",
+        "delta_minutes": "{minutes}m",
+        "delta_hours": "{hours}h",
+        "delta_days": "{days}d",
+        "delta_negative": "−{value} earlier",
+        "delta_positive": "+{value} later"
+      }
     }
   }
 }
