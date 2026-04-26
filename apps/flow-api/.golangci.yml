@@ -13,6 +13,7 @@ linters:
     - depguard
     - revive
     - gosec
+    - forbidigo
 
 linters-settings:
   depguard:
@@ -28,6 +29,17 @@ linters-settings:
         deny:
           - pkg: "github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
             desc: "crypto package may only be imported from internal/ai, internal/http/handlers/ai, cmd/api, cmd/secrets-rotate, and tests"
+  forbidigo:
+    # CLAUDE.md convention 18: internal `id INT UNSIGNED` is for FK / JOIN
+    # only. Only `public_id BINARY(16)` (UUID v7) may be exposed externally —
+    # including in structured logs. Use logutil.LogEntity instead of
+    # slog.Int64("<entity>_id", ...).
+    analyze-types: false
+    forbid:
+      - p: 'slog\.Int64\("(workspace|task|user|actor|project|page|label|comment|event|calendar|share|invite|reaction|widget|timebox|signal|suggestion|attachment|constraint|dependency|favorite|import_job|intake_item|version|widget_id)_id"'
+        msg: "log public_id (UUID string), not internal int id; convention 18"
+      - p: 'slog\.Uint64\("(workspace|task|user|actor|project|page|label|comment|event|calendar|share|invite|reaction|widget|timebox|signal|suggestion|attachment|constraint|dependency|favorite|import_job|intake_item|version|widget_id)_id"'
+        msg: "log public_id (UUID string), not internal int id; convention 18"
 
 issues:
   exclude-dirs:
