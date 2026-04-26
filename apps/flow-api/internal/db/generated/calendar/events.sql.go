@@ -14,25 +14,6 @@ import (
 	types "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 )
 
-const countActiveCalendarEventsByTaskId = `-- name: CountActiveCalendarEventsByTaskId :one
-SELECT COUNT(*)
-FROM calendar_events
-WHERE task_id = ?
-  AND enabled = TRUE
-`
-
-// Count enabled calendar events linked to a specific task (internal id).
-// workspace_id is intentionally omitted: task.id is internal and already
-// scoped to its owning workspace, so the FK on calendar_events.task_id
-// transitively constrains the count. Direct table query (no view) because
-// this is a simple single-row count on a hot path during task GET.
-func (q *Queries) CountActiveCalendarEventsByTaskId(ctx context.Context, taskID sql.NullInt32) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countActiveCalendarEventsByTaskId, taskID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const createCalendarEvent = `-- name: CreateCalendarEvent :execlastid
 INSERT INTO calendar_events (
   public_id,

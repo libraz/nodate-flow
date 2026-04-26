@@ -139,6 +139,9 @@ type Querier interface {
 	// still check expires_at against CURRENT_TIMESTAMP before trusting
 	// the returned row.
 	ConsumeOauthState(ctx context.Context, state string) (ConsumeOauthStateRow, error)
+	// Cross-domain count of active calendar events linked to a task.
+	// Lives in the tasks query package so the task GET hot path keeps a single
+	// generated Queries surface even when the calendars query glob narrows.
 	// Count enabled calendar events linked to a specific task (internal id).
 	// workspace_id is intentionally omitted: task.id is internal and already
 	// scoped to its owning workspace, so the FK on calendar_events.task_id
