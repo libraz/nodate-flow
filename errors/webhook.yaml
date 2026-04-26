@@ -11,6 +11,7 @@ resources:
         status: 404
         message: "Webhook subscription not found"
         message_ja: "Webhook 購読が見つかりません"
+        message_zh: "未找到 Webhook 订阅"
         description: "Returned when a webhook subscription with the given public_id does not exist or the actor does not have access to it."
         userAction: "Verify the subscription ID, or refresh the list to see current webhook subscriptions."
 
@@ -19,6 +20,7 @@ resources:
         status: 400
         message: "Webhook URL is not reachable"
         message_ja: "Webhook の URL に接続できません"
+        message_zh: "无法访问 Webhook URL"
         description: "Returned when a test delivery to the configured webhook URL fails because the endpoint cannot be reached or does not respond with a success status."
         userAction: "Check the webhook URL is correct, publicly accessible, and returns a 2xx status."
 
@@ -27,6 +29,7 @@ resources:
         status: 409
         message: "Maximum webhook subscriptions per workspace reached"
         message_ja: "ワークスペースの Webhook 購読数が上限に達しました"
+        message_zh: "工作区的 Webhook 订阅数量已达上限"
         description: "Returned when the workspace has already reached the maximum number of allowed webhook subscriptions."
         userAction: "Remove unused webhook subscriptions before adding a new one."
 
@@ -38,6 +41,7 @@ resources:
         status: 404
         message: "Webhook delivery not found"
         message_ja: "Webhook 配信が見つかりません"
+        message_zh: "未找到 Webhook 投递记录"
         description: "Returned when a webhook delivery with the given public_id does not exist or the actor does not have access to it."
         userAction: "Verify the delivery ID, or refresh the list to see recent deliveries."
 
@@ -46,5 +50,6 @@ resources:
         status: 409
         message: "Webhook delivery has already been completed"
         message_ja: "この Webhook 配信は既に完了しています"
+        message_zh: "该 Webhook 投递已完成"
         description: "Returned when attempting to re-deliver a webhook delivery that has already been successfully completed."
         userAction: "No action needed; the delivery has already been sent. Create a new delivery if needed."

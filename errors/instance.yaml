@@ -10,6 +10,7 @@ resources:
         status: 409
         message: "Instance has already been initialized"
         message_ja: "インスタンスは既に初期化済みです"
+        message_zh: "实例已完成初始化"
         description: "Returned when the initial setup endpoint is called after the instance has already been bootstrapped with an admin account."
         userAction: "Sign in with the existing admin account instead of running setup again."
 
@@ -21,6 +22,7 @@ resources:
         status: 403
         message: "Instance administrator privileges are required"
         message_ja: "インスタンス管理者権限が必要です"
+        message_zh: "此操作需要实例管理员权限"
         description: "Returned when an endpoint that requires the instance-admin role is called by a non-admin user."
         userAction: "Ask an instance administrator to perform this operation."
       not_found:
@@ -28,6 +30,7 @@ resources:
         status: 404
         message: "User is not an instance administrator"
         message_ja: "このユーザーはインスタンス管理者ではありません"
+        message_zh: "该用户不是实例管理员"
         description: "Returned when attempting to revoke admin privileges from a user who is not an instance admin."
         userAction: "Verify the user is listed as an instance administrator."
       self_revoke:
@@ -35,6 +38,7 @@ resources:
         status: 409
         message: "Cannot revoke your own administrator privileges"
         message_ja: "自身の管理者権限は取り消せません"
+        message_zh: "无法撤销自己的管理员权限"
         description: "Returned when an instance admin tries to revoke their own admin grant."
         userAction: "Ask another instance administrator to revoke your privileges."
       last_admin:
@@ -42,6 +46,7 @@ resources:
         status: 409
         message: "Cannot revoke the last remaining administrator"
         message_ja: "最後の管理者は取り消せません"
+        message_zh: "无法撤销最后一位管理员"
         description: "Returned when revoking would leave the instance with zero admins."
         userAction: "Grant admin privileges to another user first."
 
@@ -53,6 +58,7 @@ resources:
         status: 404
         message: "User not found"
         message_ja: "ユーザーが見つかりません"
+        message_zh: "未找到用户"
         description: "Returned when an admin endpoint references a user that does not exist."
         userAction: "Verify the user ID."
 
@@ -64,6 +70,7 @@ resources:
         status: 404
         message: "Workspace not found"
         message_ja: "ワークスペースが見つかりません"
+        message_zh: "未找到工作区"
         description: "Returned when an admin endpoint references a workspace that does not exist."
         userAction: "Verify the workspace ID."
 
@@ -75,6 +82,7 @@ resources:
         status: 400
         message: "Unknown setting key"
         message_ja: "未知の設定キーです"
+        message_zh: "未知的设置键"
         description: "Returned when a PATCH /admin/settings request references a setting key that is not recognized."
         userAction: "Use one of the supported setting keys."
       invalid_value:
@@ -82,6 +90,7 @@ resources:
         status: 400
         message: "Invalid value for setting"
         message_ja: "設定値が不正です"
+        message_zh: "设置值无效"
         description: "Returned when a setting value does not pass validation for its key."
         userAction: "Check the expected format for this setting."
 
@@ -93,5 +102,6 @@ resources:
         status: 429
         message: "Instance quota has been exceeded"
         message_ja: "インスタンスの利用上限を超えました"
+        message_zh: "实例使用配额已超出"
         description: "Returned when an instance-wide resource quota (workspaces, users, storage) is exhausted."
         userAction: "Contact your instance administrator to raise the quota."

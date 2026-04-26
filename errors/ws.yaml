@@ -10,6 +10,7 @@ resources:
         status: 404
         message: "Workspace not found"
         message_ja: "ワークスペースが見つかりません"
+        message_zh: "未找到工作区"
         description: "Returned when a workspace with the given public_id does not exist or the actor has no visibility into it."
         userAction: "Verify the workspace ID, or ask an admin to add you as a member."
 
@@ -18,6 +19,7 @@ resources:
         status: 403
         message: "You do not have access to this workspace"
         message_ja: "このワークスペースへのアクセス権がありません"
+        message_zh: "您没有访问此工作区的权限"
         description: "Returned when the actor is authenticated but is not a member of the target workspace."
         userAction: "Ask a workspace admin to invite you."
 
@@ -26,6 +28,7 @@ resources:
         status: 409
         message: "Workspace slug is already taken"
         message_ja: "このワークスペース slug は既に使用されています"
+        message_zh: "该工作区 slug 已被使用"
         description: "Returned when the requested workspace slug conflicts with an existing workspace on the same instance."
         userAction: "Choose a different slug."
 
@@ -37,6 +40,7 @@ resources:
         status: 404
         message: "Project not found"
         message_ja: "プロジェクトが見つかりません"
+        message_zh: "未找到项目"
         description: "Returned when a project does not exist or when the actor cannot access it (404 to avoid leaking existence)."
         userAction: "Verify the project ID, or contact a workspace admin if you should have access."
 
@@ -45,6 +49,7 @@ resources:
         status: 403
         message: "You do not have access to this project"
         message_ja: "このプロジェクトへのアクセス権がありません"
+        message_zh: "您没有访问此项目的权限"
         description: "Returned when the actor is a workspace member but lacks the required project role."
         userAction: "Ask a project lead to grant you access."
 
@@ -53,6 +58,7 @@ resources:
         status: 409
         message: "Project slug is already taken"
         message_ja: "このプロジェクト slug は既に使用されています"
+        message_zh: "该项目 slug 已被使用"
         description: "Returned when the requested project slug already exists within the workspace."
         userAction: "Choose a different slug."
 
@@ -61,6 +67,7 @@ resources:
         status: 409
         message: "Project identifier is already taken"
         message_ja: "このプロジェクト識別子は既に使用されています"
+        message_zh: "该项目标识符已被使用"
         description: "Returned when the requested project identifier already exists within the workspace."
         userAction: "Choose a different identifier."
 
@@ -69,6 +76,7 @@ resources:
         status: 403
         message: "This feature is disabled for the project"
         message_ja: "この機能はプロジェクトで無効化されています"
+        message_zh: "此功能在该项目中已被禁用"
         description: "Returned when a request targets a feature that has been disabled in the project settings."
         userAction: "Enable the feature in project settings, or contact a project admin."
 
@@ -80,6 +88,7 @@ resources:
         status: 404
         message: "Task not found"
         message_ja: "タスクが見つかりません"
+        message_zh: "未找到任务"
         description: "Returned when a task with the given public_id does not exist or has been deleted in the current workspace."
         userAction: "Verify the task ID, or refresh the list to see current tasks."
 
@@ -88,6 +97,7 @@ resources:
         status: 403
         message: "You do not have access to this task"
         message_ja: "このタスクへのアクセス権がありません"
+        message_zh: "您没有访问此任务的权限"
         description: "Returned when the actor lacks the required project role to read or modify the task."
         userAction: "Ask a project lead to grant you access."
 
@@ -96,6 +106,7 @@ resources:
         status: 409
         message: "Task was modified by someone else"
         message_ja: "このタスクは他のユーザーに更新されました"
+        message_zh: "该任务已被其他用户更新"
         description: "Returned when an optimistic concurrency check (version or updated_at) fails during update."
         userAction: "Reload the task to see the latest version, then re-apply your changes."
 
@@ -104,6 +115,7 @@ resources:
         status: 422
         message: "Task title is too long"
         message_ja: "タスクのタイトルが長すぎます"
+        message_zh: "任务标题过长"
         description: "Returned when the submitted title exceeds the maximum allowed length."
         userAction: "Shorten the title and retry."
 
@@ -112,6 +124,7 @@ resources:
         status: 422
         message: "Task cannot transition to the requested state"
         message_ja: "タスクを指定した状態に遷移できません"
+        message_zh: "任务无法转换为指定状态"
         description: "Returned when an unsatisfied constraint blocks the requested lifecycle transition."
         userAction: "Review unmet constraints in the task detail panel and resolve them before retrying."
 
@@ -120,6 +133,7 @@ resources:
         status: 400
         message: "Unknown task transition"
         message_ja: "未知のタスク遷移です"
+        message_zh: "未知的任务状态转换"
         description: "Returned when the client submits a transition name that is not one of {start|block|unblock|submit|complete|reopen|cancel}. Rejected at the HTTP layer before the constraint engine runs."
         userAction: "Use one of the supported transition names defined by the API."
 
@@ -128,6 +142,7 @@ resources:
         status: 422
         message: "Task transition not allowed in current state"
         message_ja: "現在の状態ではこのタスク遷移は許可されていません"
+        message_zh: "当前状态不允许该任务状态转换"
         description: "Returned by the constraint engine when the requested transition is illegal for the task's current lifecycle state."
         userAction: "Refresh the task to see its current state and choose a valid transition."
 
@@ -136,6 +151,7 @@ resources:
         status: 409
         message: "Task is already archived"
         message_ja: "このタスクは既にアーカイブ済みです"
+        message_zh: "该任务已归档"
         description: "Returned when attempting to archive a task that is already in the archived state."
         userAction: "The task is already archived."
 
@@ -144,6 +160,7 @@ resources:
         status: 409
         message: "Task is not archived"
         message_ja: "このタスクはアーカイブされていません"
+        message_zh: "该任务尚未归档"
         description: "Returned when attempting to unarchive a task that is not in the archived state."
         userAction: "The task is not archived."
 
@@ -155,6 +172,7 @@ resources:
         status: 403
         message: "Your role does not permit this action"
         message_ja: "現在の役割ではこの操作を実行できません"
+        message_zh: "当前角色无法执行此操作"
         description: "Returned when the actor's workspace role is insufficient for the attempted operation."
         userAction: "Ask a workspace admin to elevate your role."
 
@@ -163,6 +181,7 @@ resources:
         status: 404
         message: "Workspace member not found"
         message_ja: "ワークスペースメンバーが見つかりません"
+        message_zh: "未找到工作区成员"
         description: "Returned when the target user is not a member of the workspace."
         userAction: "Invite the user to the workspace first."
 
@@ -174,6 +193,7 @@ resources:
         status: 404
         message: "Notification not found"
         message_ja: "通知が見つかりません"
+        message_zh: "未找到通知"
         description: "Returned when a notification with the given public_id does not exist or belongs to another user."
         userAction: "Verify the notification ID."
 
@@ -185,6 +205,7 @@ resources:
         status: 404
         message: "Saved view not found"
         message_ja: "保存済みビューが見つかりません"
+        message_zh: "未找到保存的视图"
         description: "Returned when a lens with the given public_id does not exist or has been deleted."
         userAction: "Verify the view ID, or refresh the list to see current saved views."
 
@@ -193,6 +214,7 @@ resources:
         status: 409
         message: "A saved view with this name already exists"
         message_ja: "同名の保存済みビューが既に存在します"
+        message_zh: "已存在同名的保存视图"
         description: "Returned when the requested lens name already exists within the same workspace/project scope."
         userAction: "Choose a different name."
 
@@ -201,6 +223,7 @@ resources:
         status: 409
         message: "This saved view is already published"
         message_ja: "この保存済みビューは既に公開されています"
+        message_zh: "该保存视图已发布"
         description: "Returned when attempting to publish a lens that is already shared publicly."
         userAction: "The view is already public. Use the existing share link."
 
@@ -209,6 +232,7 @@ resources:
         status: 409
         message: "This saved view is already private"
         message_ja: "この保存済みビューは既に非公開です"
+        message_zh: "该保存视图已为私有"
         description: "Returned when attempting to unpublish a lens that is not currently shared."
         userAction: "The view is already private."
 
@@ -217,6 +241,7 @@ resources:
         status: 404
         message: "Public share link not found or expired"
         message_ja: "公開共有リンクが見つからないか期限切れです"
+        message_zh: "公开分享链接不存在或已过期"
         description: "Returned when a public lens token does not match any published lens."
         userAction: "Verify the share link is correct and the view is still published."
 
@@ -228,6 +253,7 @@ resources:
         status: 404
         message: "Label not found"
         message_ja: "ラベルが見つかりません"
+        message_zh: "未找到标签"
         description: "Returned when a label with the given public_id does not exist or has been deleted."
         userAction: "Verify the label ID, or refresh the list to see current labels."
 
@@ -236,6 +262,7 @@ resources:
         status: 409
         message: "A label with this name already exists"
         message_ja: "同名のラベルが既に存在します"
+        message_zh: "已存在同名的标签"
         description: "Returned when the requested label name already exists within the same workspace/project scope."
         userAction: "Choose a different name."
 
@@ -247,6 +274,7 @@ resources:
         status: 404
         message: "Favorite not found"
         message_ja: "お気に入りが見つかりません"
+        message_zh: "未找到收藏"
         description: "Returned when a favorite with the given public_id does not exist or belongs to another user."
         userAction: "Verify the favorite ID."
 
@@ -255,6 +283,7 @@ resources:
         status: 409
         message: "This item is already in your favorites"
         message_ja: "このアイテムは既にお気に入りに追加されています"
+        message_zh: "该项目已加入收藏"
         description: "Returned when the actor attempts to add an item that is already in their favorites list."
         userAction: "The item is already favorited."
 
@@ -266,6 +295,7 @@ resources:
         status: 404
         message: "Reaction not found"
         message_ja: "リアクションが見つかりません"
+        message_zh: "未找到反应"
         description: "Returned when a reaction with the given public_id does not exist or has been removed."
         userAction: "Verify the reaction ID."
 
@@ -274,6 +304,7 @@ resources:
         status: 409
         message: "You already reacted with this emoji"
         message_ja: "この絵文字では既にリアクション済みです"
+        message_zh: "您已使用此表情进行过反应"
         description: "Returned when the actor attempts to add a duplicate reaction with the same emoji to the same target."
         userAction: "Remove the existing reaction first if you want to change it."
 
@@ -285,6 +316,7 @@ resources:
         status: 404
         message: "Mention not found"
         message_ja: "メンションが見つかりません"
+        message_zh: "未找到提及"
         description: "Returned when a mention with the given public_id does not exist or has been removed."
         userAction: "Verify the mention ID."
 
@@ -296,6 +328,7 @@ resources:
         status: 404
         message: "View preference not found"
         message_ja: "ビュー設定が見つかりません"
+        message_zh: "未找到视图偏好设置"
         description: "Returned when a view preference with the given public_id does not exist for the current user."
         userAction: "Verify the view preference ID, or create a new one."
 
@@ -307,6 +340,7 @@ resources:
         status: 404
         message: "Notification preference not found"
         message_ja: "通知設定が見つかりません"
+        message_zh: "未找到通知偏好设置"
         description: "Returned when a notification preference with the given public_id does not exist for the current user."
         userAction: "Verify the notification preference ID, or create a new one."
 
@@ -318,6 +352,7 @@ resources:
         status: 404
         message: "Intake item not found"
         message_ja: "インテークアイテムが見つかりません"
+        message_zh: "未找到收件项"
         description: "Returned when an intake item with the given public_id does not exist or has been removed."
         userAction: "Verify the intake item ID, or refresh the list to see current items."
 
@@ -326,6 +361,7 @@ resources:
         status: 409
         message: "This intake item has already been triaged"
         message_ja: "このインテークアイテムは既に振り分け済みです"
+        message_zh: "该收件项已分流"
         description: "Returned when attempting to triage an intake item that has already been triaged."
         userAction: "The item has already been triaged. No further action is needed."
 
@@ -334,6 +370,7 @@ resources:
         status: 409
         message: "This intake item has already been converted to a task"
         message_ja: "このインテークアイテムは既にタスクに変換済みです"
+        message_zh: "该收件项已转换为任务"
         description: "Returned when attempting to convert an intake item that has already been converted to a task."
         userAction: "The item has already been converted. Open the linked task instead."
 
@@ -345,6 +382,7 @@ resources:
         status: 404
         message: "Description version not found"
         message_ja: "説明文のバージョンが見つかりません"
+        message_zh: "未找到描述版本"
         description: "Returned when a description version with the given public_id does not exist or has been removed."
         userAction: "Verify the version ID, or refresh the version history."
 
@@ -356,6 +394,7 @@ resources:
         status: 404
         message: "Import job not found"
         message_ja: "インポートジョブが見つかりません"
+        message_zh: "未找到导入任务"
         description: "Returned when an import job with the given public_id does not exist or belongs to a different workspace."
         userAction: "Verify the import job ID, or refresh the list to see current imports."
 
@@ -364,6 +403,7 @@ resources:
         status: 409
         message: "An import job is already running for this project"
         message_ja: "このプロジェクトでは既にインポートジョブが実行中です"
+        message_zh: "该项目已有正在执行的导入任务"
         description: "Returned when a new import is requested while another import job is still in progress for the same project."
         userAction: "Wait for the current import to finish, or cancel it before starting a new one."
 
@@ -372,5 +412,6 @@ resources:
         status: 409
         message: "Only pending or running import jobs can be cancelled"
         message_ja: "キャンセルできるのは待機中または実行中のインポートジョブのみです"
+        message_zh: "仅可取消待处理或运行中的导入任务"
         description: "Returned when attempting to cancel an import job that has already completed, failed, or been cancelled."
         userAction: "The import job is no longer in a cancellable state."

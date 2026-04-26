@@ -10,6 +10,7 @@ resources:
         status: 401
         message: "GitHub webhook signature is invalid"
         message_ja: "GitHub Webhook の署名が無効です"
+        message_zh: "GitHub Webhook 签名无效"
         description: "Returned when the X-Hub-Signature-256 header does not match the HMAC computed from the configured webhook secret."
         userAction: "Verify that the webhook secret in GitHub matches the one configured in the integration settings."
 
@@ -18,6 +19,7 @@ resources:
         status: 400
         message: "GitHub webhook payload could not be parsed"
         message_ja: "GitHub Webhook のペイロードを解析できませんでした"
+        message_zh: "无法解析 GitHub Webhook 载荷"
         description: "Returned when the webhook body is not valid JSON or does not match the expected event schema."
         userAction: "Check the webhook delivery in GitHub for the failing payload."
 
@@ -26,6 +28,7 @@ resources:
         status: 400
         message: "GitHub webhook event type is not supported"
         message_ja: "GitHub Webhook のイベント種別は未対応です"
+        message_zh: "不支持的 GitHub Webhook 事件类型"
         description: "Returned when the X-GitHub-Event header indicates an event that this integration does not handle."
         userAction: "Disable unsupported event types in the GitHub webhook configuration."
 
@@ -37,6 +40,7 @@ resources:
         status: 429
         message: "GitHub API rate limit exceeded"
         message_ja: "GitHub API のレート制限を超えました"
+        message_zh: "GitHub API 速率限制已超过"
         description: "Returned when the GitHub REST or GraphQL API rejected the request because the integration token has hit its rate limit."
         userAction: "Wait for the rate limit window to reset, or use a token with higher quota."
 
@@ -45,5 +49,6 @@ resources:
         status: 401
         message: "GitHub API token is invalid"
         message_ja: "GitHub API トークンが無効です"
+        message_zh: "GitHub API 令牌无效"
         description: "Returned when GitHub rejects the integration's installation or PAT credentials."
         userAction: "Re-authorize the GitHub integration."

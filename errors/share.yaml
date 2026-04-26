@@ -15,6 +15,7 @@ resources:
         status: 404
         message: "Share page not found"
         message_ja: "共有ページが見つかりません"
+        message_zh: "未找到分享页面"
         description: "Returned when a share with the given public_id or token hash does not exist."
         userAction: "Verify the URL; if you rotated the token recently, use the new URL returned at rotate time."
 
@@ -23,6 +24,7 @@ resources:
         status: 410
         message: "Share page has expired"
         message_ja: "共有ページの有効期限が切れました"
+        message_zh: "分享页面已过期"
         description: "Returned when the share's expires_at is in the past. The row still exists but the public render refuses to serve it."
         userAction: "Ask a workspace member to extend or rotate the share, then use the new URL."
 
@@ -31,6 +33,7 @@ resources:
         status: 404
         message: "Share token is invalid"
         message_ja: "共有トークンが無効です"
+        message_zh: "分享令牌无效"
         description: "Returned when the URL token does not match any token_hash. Deliberately 404 (not 401) so the existence of any share is not leaked by the status code."
         userAction: "Verify the URL was copied correctly. Rotation invalidates prior tokens."
 
@@ -39,6 +42,7 @@ resources:
         status: 403
         message: "Only workspace admins or owners can delete a share"
         message_ja: "共有の削除はワークスペースの管理者またはオーナーのみ可能です"
+        message_zh: "仅工作区管理员或所有者可删除分享"
         description: "Returned when a non-admin tries to delete a share. Create / edit / rotate / add events are open to all non-guest workspace members; delete is restricted to admin/owner to prevent accidental URL loss."
         userAction: "Ask a workspace admin or owner to delete the share on your behalf."
 
@@ -50,6 +54,7 @@ resources:
         status: 422
         message: "Event cannot be published"
         message_ja: "このイベントは公開できません"
+        message_zh: "此事件无法发布"
         description: "Returned when attaching an event with visibility='confidential' to a share page. Confidential events are gated from the public surface."
         userAction: "Change the event's visibility to public or private before attaching, or pick a different event."
 
@@ -58,5 +63,6 @@ resources:
         status: 400
         message: "Reorder input must be a permutation of the share's current events"
         message_ja: "並び替えは現在の共有イベント全体を過不足なく指定してください"
+        message_zh: "排序请求必须包含分享当前的全部事件且不重复"
         description: "Returned when a batch reorder request supplies a linkPublicIds array that is missing an existing link, references a link that does not belong to the share, or contains duplicates. The reorder is atomic and requires the full current set."
         userAction: "Refetch the share's event list and resubmit the reorder with every current link exactly once."

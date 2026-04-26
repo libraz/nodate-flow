@@ -10,5 +10,6 @@ resources:
         status: 429
         message: "Request rate limit exceeded"
         message_ja: "リクエストのレート制限を超えました"
+        message_zh: "请求速率限制已超过"
         description: "Returned when the global, per-IP, or per-user request rate limit has been exceeded for the called endpoint."
         userAction: "Wait for the Retry-After interval before retrying."

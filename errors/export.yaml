@@ -11,6 +11,7 @@ resources:
         status: 400
         message: "Unsupported export format"
         message_ja: "対応していないエクスポート形式です"
+        message_zh: "不支持的导出格式"
         description: "Returned when the requested export format is not one of the supported types (csv, json)."
         userAction: "Use csv or json as the export format."
 
@@ -19,6 +20,7 @@ resources:
         status: 404
         message: "Lens referenced for export not found"
         message_ja: "エクスポート対象のビューが見つかりません"
+        message_zh: "未找到导出所引用的视图"
         description: "Returned when the saved view (lens) specified as the source for the export does not exist or has been deleted."
         userAction: "Verify the lens ID, or choose a different saved view."
 
@@ -27,6 +29,7 @@ resources:
         status: 422
         message: "Export exceeds maximum row limit"
         message_ja: "エクスポート件数が上限を超えています"
+        message_zh: "导出条数超出上限"
         description: "Returned when the result set for the export exceeds the configured maximum number of rows."
         userAction: "Apply filters or narrow the lens to reduce the number of rows."
 

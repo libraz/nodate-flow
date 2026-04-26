@@ -15,6 +15,7 @@ resources:
         status: 404
         message: "Notification not found"
         message_ja: "通知が見つかりません"
+        message_zh: "未找到通知"
         description: "Returned when a notification with the given public_id does not exist or the actor does not have access to it."
         userAction: "Verify the notification ID, or refresh the list to see current notifications."
 
@@ -23,6 +24,7 @@ resources:
         status: 409
         message: "Notification has already been marked as read"
         message_ja: "この通知は既に既読です"
+        message_zh: "该通知已被标记为已读"
         description: "Returned when attempting to mark a notification as read that has already been read."
         userAction: "No action needed; the notification is already in the read state."
 
@@ -31,6 +33,7 @@ resources:
         status: 409
         message: "Notification has already been archived"
         message_ja: "この通知は既にアーカイブ済みです"
+        message_zh: "该通知已被归档"
         description: "Returned when attempting to archive a notification that has already been archived."
         userAction: "No action needed; the notification is already archived."
 
@@ -42,5 +45,6 @@ resources:
         status: 500
         message: "Notification delivery channel is unreachable"
         message_ja: "通知の配信チャネルに接続できません"
+        message_zh: "无法连接到通知投递通道"
         description: "Returned when the server fails to deliver a notification via email or push because the delivery channel is unavailable or returned an error."
         userAction: "Retry in a moment; contact your administrator if the problem persists."

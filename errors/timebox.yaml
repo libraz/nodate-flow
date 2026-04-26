@@ -10,6 +10,7 @@ resources:
         status: 404
         message: "Timebox not found"
         message_ja: "タイムボックスが見つかりません"
+        message_zh: "未找到时间盒"
         description: "Returned when a timebox with the given public_id does not exist or the actor has no visibility into it."
         userAction: "Verify the timebox ID, or refresh the list to see current timeboxes."
 
@@ -18,6 +19,7 @@ resources:
         status: 409
         message: "A timebox with this name already exists in the workspace"
         message_ja: "このワークスペースに同名のタイムボックスが既に存在します"
+        message_zh: "工作区中已存在同名的时间盒"
         description: "Returned when the requested timebox name conflicts with an existing timebox in the same workspace."
         userAction: "Choose a different name."
 
@@ -26,6 +28,7 @@ resources:
         status: 422
         message: "Timebox end date must be after start date"
         message_ja: "終了日は開始日より後にしてください"
+        message_zh: "结束日期必须晚于开始日期"
         description: "Returned when ends_on is not strictly after starts_on."
         userAction: "Adjust the start or end date so that the end date comes after the start date."
 
@@ -34,6 +37,7 @@ resources:
         status: 409
         message: "Cannot modify a completed timebox"
         message_ja: "完了済みのタイムボックスは変更できません"
+        message_zh: "已完成的时间盒无法修改"
         description: "Returned when an update or state change is attempted on a timebox that has already been marked as completed."
         userAction: "Reopen the timebox before making changes, or create a new one."
 
@@ -45,6 +49,7 @@ resources:
         status: 409
         message: "Task is already in this timebox"
         message_ja: "このタスクは既にタイムボックスに追加されています"
+        message_zh: "该任务已在此时间盒中"
         description: "Returned when the task has already been added to the target timebox."
         userAction: "No action needed; the task is already present in the timebox."
 
@@ -53,5 +58,6 @@ resources:
         status: 404
         message: "Task not found in this timebox"
         message_ja: "このタイムボックスにタスクが見つかりません"
+        message_zh: "此时间盒中未找到该任务"
         description: "Returned when attempting to remove or reference a task that is not a member of the specified timebox."
         userAction: "Verify the task ID and the timebox it belongs to."

@@ -10,5 +10,6 @@ resources:
         status: 401
         message: "Google push channel token verification failed"
         message_ja: "Google プッシュチャネルのトークン検証に失敗しました"
+        message_zh: "Google 推送通道令牌验证失败"
         description: "Returned when the X-Goog-Channel-Token header does not match the expected channel token configured for the integration."
         userAction: "Verify that the channel token matches the one registered during push notification setup."
