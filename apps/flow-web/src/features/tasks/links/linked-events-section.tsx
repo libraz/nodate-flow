@@ -18,25 +18,28 @@
  * apply optimistic updates to the linked-events query cache. The
  * section surfaces success / failure via the global `toaster`.
  *
- * The component itself does not provide an ErrorBoundary — the parent
- * Suspense boundary on the task detail page hands errors up to the
- * route-level boundary; `linked-events-error.tsx` is exported for
- * future wiring without committing to a layout here.
+ * The component scopes a local ErrorBoundary around the suspense query
+ * so a failed initial GET renders `LinkedEventsError` in place of the
+ * section body — escalations to the route-level FatalFallback are
+ * reserved for genuinely fatal failures elsewhere on the page.
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import { useQueryClient } from '@tanstack/react-query';
 import { type ReactElement, useRef, useState } from 'react';
+import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 
 import { ApiError } from '../../../lib/api-error';
 import EventPicker from './event-picker';
 import { useCollapsibleState } from './hooks/use-collapsible-state';
 import { useLinkEvent } from './hooks/use-link-event';
-import { useLinkedEventsQuery } from './hooks/use-linked-events';
+import { linkedEventsKeys, useLinkedEventsQuery } from './hooks/use-linked-events';
 import { useUnlinkEvent } from './hooks/use-unlink-event';
 import LinkedEventRow from './linked-event-row';
 import LinkedEventsEmpty from './linked-events-empty';
+import LinkedEventsError from './linked-events-error';
 import styles from './linked-events.module.css';
 import type { CalendarEventListItem, LinkKind, TaskEventLink } from './types';
 
@@ -62,7 +65,28 @@ function isAlreadyLinkedError(error: unknown): boolean {
   return ALREADY_LINKED_CODE_FRAGMENTS.some((fragment) => code.includes(fragment));
 }
 
-export default function LinkedEventsSection({
+/**
+ * Public wrapper that scopes a local ErrorBoundary around the suspense
+ * query so a failed initial GET renders the section's own
+ * `LinkedEventsError` fallback instead of escalating to the route-level
+ * FatalFallback. Resetting the boundary invalidates the query so the
+ * Retry button refetches transparently.
+ */
+export default function LinkedEventsSection(props: LinkedEventsSectionProps): ReactElement {
+  const queryClient = useQueryClient();
+  return (
+    <ErrorBoundary
+      FallbackComponent={LinkedEventsError}
+      onReset={() => {
+        queryClient.invalidateQueries({ queryKey: linkedEventsKeys.list(props.taskId) });
+      }}
+    >
+      <LinkedEventsSectionImpl {...props} />
+    </ErrorBoundary>
+  );
+}
+
+function LinkedEventsSectionImpl({
   taskId,
   workspaceId,
   locale,

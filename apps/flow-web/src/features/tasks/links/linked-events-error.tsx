@@ -14,18 +14,26 @@ import styles from './linked-events.module.css';
 
 export interface LinkedEventsErrorProps {
   error: Error;
-  onRetry: () => void;
+  /**
+   * Reset handler. Compatible with react-error-boundary's FallbackProps
+   * (`resetErrorBoundary`). The legacy `onRetry` alias remains for
+   * direct callers that bypass the boundary.
+   */
+  resetErrorBoundary?: () => void;
+  onRetry?: () => void;
 }
 
 export default function LinkedEventsError({
   error,
+  resetErrorBoundary,
   onRetry,
 }: LinkedEventsErrorProps): ReactElement {
   const { t } = useTranslation('linkedEvents');
+  const handleRetry = resetErrorBoundary ?? onRetry ?? ((): void => {});
   return (
     <div className={styles.errorState} role="alert">
       <p className={styles.errorMessage}>{t('error.fetchFailed')}</p>
-      <Button type="button" variant="ghost" size="sm" onClick={onRetry}>
+      <Button type="button" variant="ghost" size="sm" onClick={handleRetry}>
         {t('error.retry')}
       </Button>
       {/*
