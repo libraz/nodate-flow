@@ -1,3 +1,4 @@
+import { ApiError } from '@nodate-flow/sdk';
 import { Link, Outlet, createRootRouteWithContext, useRouterState } from '@tanstack/react-router';
 import { type ReactElement, Suspense, lazy, useEffect, useRef } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
@@ -39,8 +40,15 @@ function FatalFallback({
   error: unknown;
   resetErrorBoundary: () => void;
 }): ReactElement {
-  const { t } = useTranslation('common');
-  const message = error instanceof Error ? error.message : String(error);
+  const { t } = useTranslation(['common', 'errors']);
+  let message: string;
+  if (error instanceof ApiError && error.code) {
+    message = t(error.code, { ns: 'errors', defaultValue: error.message });
+  } else if (error instanceof Error) {
+    message = error.message;
+  } else {
+    message = String(error);
+  }
   // Subscribe to pathname inside the fallback so the router store forces
   // this component to re-render on navigation. `resetKeys` on the parent
   // ErrorBoundary is unreliable because the parent subtree is frozen
