@@ -6551,6 +6551,11 @@ export interface components {
              */
             readonly $schema?: string;
             avatarUrl?: string;
+            /**
+             * @description Controls how shifting a calendar event behaves by default when the event has linked tasks. "ask" prompts the user each time, "sync_always" shifts every linked task by the same delta, "task_only_always" shifts only the event and leaves the linked tasks in place.
+             * @enum {string}
+             */
+            calendarShiftDefault: "ask" | "sync_always" | "task_only_always";
             country: string;
             displayName: string;
             email: string;
@@ -6913,6 +6918,11 @@ export interface components {
              */
             readonly $schema?: string;
             avatarUrl?: string;
+            /**
+             * @description Controls how shifting a calendar event behaves by default when the event has linked tasks. "ask" prompts the user each time, "sync_always" shifts every linked task by the same delta, "task_only_always" shifts only the event and leaves the linked tasks in place.
+             * @enum {string}
+             */
+            calendarShiftDefault?: "ask" | "sync_always" | "task_only_always";
             country?: string;
             displayName?: string;
             locale?: string;

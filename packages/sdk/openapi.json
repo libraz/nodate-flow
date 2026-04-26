@@ -6511,6 +6511,11 @@
           "avatarUrl": {
             "type": "string"
           },
+          "calendarShiftDefault": {
+            "description": "Controls how shifting a calendar event behaves by default when the event has linked tasks. \"ask\" prompts the user each time, \"sync_always\" shifts every linked task by the same delta, \"task_only_always\" shifts only the event and leaves the linked tasks in place.",
+            "enum": ["ask", "sync_always", "task_only_always"],
+            "type": "string"
+          },
           "country": {
             "type": "string"
           },
@@ -6573,6 +6578,7 @@
           "country",
           "weekStart",
           "themePreference",
+          "calendarShiftDefault",
           "notifEmailDigest",
           "notifEmailMention",
           "notifEmailAssignment",
@@ -7430,6 +7436,11 @@
           },
           "avatarUrl": {
             "maxLength": 1024,
+            "type": "string"
+          },
+          "calendarShiftDefault": {
+            "description": "Controls how shifting a calendar event behaves by default when the event has linked tasks. \"ask\" prompts the user each time, \"sync_always\" shifts every linked task by the same delta, \"task_only_always\" shifts only the event and leaves the linked tasks in place.",
+            "enum": ["ask", "sync_always", "task_only_always"],
             "type": "string"
           },
           "country": {

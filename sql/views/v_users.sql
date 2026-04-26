@@ -13,6 +13,7 @@ SELECT
   u.country,
   u.week_start,
   u.theme_preference,
+  u.calendar_shift_default,
   wm.role AS workspace_role,
   u.last_login_at,
   u.updated_at,

@@ -241,6 +241,9 @@
     },
     "shift": {
       "trigger": "Shift event",
+      "default_remember": "Always use this choice for shift",
+      "default_saved_toast": "Default updated. We'll skip this dialog next time.",
+      "default_save_error": "Could not save the default. Please retry.",
       "dialog": {
         "title": "Shift event with linked tasks",
         "cancel": "Cancel",

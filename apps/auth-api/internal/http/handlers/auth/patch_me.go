@@ -59,6 +59,18 @@ func PatchMe(deps Deps) func(context.Context, *PatchMeInput) (*PatchMeOutput, er
 				Valid:                true,
 			}
 		}
+		if in.Body.CalendarShiftDefault != nil {
+			switch *in.Body.CalendarShiftDefault {
+			case "ask", "sync_always", "task_only_always":
+				// ok
+			default:
+				return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+			}
+			params.CalendarShiftDefault = generated.NullUsersCalendarShiftDefault{
+				UsersCalendarShiftDefault: generated.UsersCalendarShiftDefault(*in.Body.CalendarShiftDefault),
+				Valid:                     true,
+			}
+		}
 		if in.Body.AvatarURL != nil {
 			params.AvatarUrl = sql.NullString{String: *in.Body.AvatarURL, Valid: true}
 		}

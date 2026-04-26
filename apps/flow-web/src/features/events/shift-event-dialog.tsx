@@ -21,12 +21,22 @@
  *   submit button calls {@link useApplyShiftMutation} with the selected
  *   ids. Apply invalidates the event-detail / calendar / agenda caches.
  *
- * Deferred:
- *   The plan also calls for a `me.calendar_shift_default ENUM('ask',
- *   'always_sync','always_task_only')` user preference exposed as an
- *   "always remember" toggle. The backend does not yet expose this
- *   column, so the toggle is intentionally omitted until @api + @sql
- *   land it.
+ * User preference (`me.calendarShiftDefault`):
+ *   The dialog respects the current actor's `calendarShiftDefault`
+ *   preference (`'ask' | 'sync_always' | 'task_only_always'`) read via
+ *   {@link useMeQuery}. `'ask'` (the default for missing/unset values)
+ *   keeps the original two-phase flow. `'sync_always'` auto-runs the
+ *   proposal at mount with every safe task pre-ticked and jumps
+ *   straight to the confirm phase. `'task_only_always'` does the same
+ *   but with zero tasks pre-ticked. In both shortcut modes the user
+ *   can still toggle individual rows or use Back to change the time.
+ *
+ *   A trailing "remember this" checkbox lives below the task list in
+ *   both phases. When ticked, Apply derives a new preference from the
+ *   current safeTask selection state (all = `sync_always`, none =
+ *   `task_only_always`, mixed = `ask`) and fires a fire-and-forget
+ *   PATCH /me through {@link useUpdateMe}. Success / failure surface
+ *   as quiet toasts but never block the apply path.
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
@@ -39,6 +49,7 @@ import type { TFunction } from 'i18next';
 import { type FormEvent, type ReactElement, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { type PatchMeInput, useMeQuery, useUpdateMe } from '../settings/api';
 import styles from './event-detail-page.module.css';
 import {
   type ShiftCandidate,
@@ -46,6 +57,8 @@ import {
   useApplyShiftMutation,
   useProposeShiftMutation,
 } from './shift-api';
+
+type CalendarShiftDefault = 'ask' | 'sync_always' | 'task_only_always';
 
 export interface ShiftEventDialogProps {
   /** Whether the dialog is open. */
@@ -181,22 +194,57 @@ export default function ShiftEventDialog({
 
   const proposeMutation = useProposeShiftMutation();
   const applyMutation = useApplyShiftMutation();
+  const meQuery = useMeQuery();
+  const updateMe = useUpdateMe();
+
+  const shiftPref: CalendarShiftDefault = meQuery.data.calendarShiftDefault ?? 'ask';
 
   const [phase, setPhase] = useState<Phase>('pick');
   const [pickValue, setPickValue] = useState<string>(() => epochToLocalInput(currentStartAt));
   const [proposal, setProposal] = useState<ShiftProposal | null>(null);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [rememberDefault, setRememberDefault] = useState<boolean>(false);
 
   // Reset phase + pre-filled input whenever the dialog reopens against
-  // a different event or after a previous flow finished.
+  // a different event or after a previous flow finished. When the user
+  // has a non-`'ask'` `calendarShiftDefault` preference, fire the
+  // proposal automatically with the current start time and jump
+  // straight to the confirm phase with the appropriate pre-selection.
   useEffect(() => {
-    if (open) {
-      setPhase('pick');
-      setPickValue(epochToLocalInput(currentStartAt));
-      setProposal(null);
-      setSelected(new Set());
-    }
-  }, [open, currentStartAt]);
+    if (!open) return;
+    setPhase('pick');
+    setPickValue(epochToLocalInput(currentStartAt));
+    setProposal(null);
+    setSelected(new Set());
+    setRememberDefault(false);
+
+    if (shiftPref === 'ask') return;
+
+    let cancelled = false;
+    void (async (): Promise<void> => {
+      try {
+        const result = await proposeMutation.mutateAsync({
+          wsId: workspaceId,
+          evtId: eventId,
+          newStartAt: currentStartAt,
+        });
+        if (cancelled) return;
+        const initial = new Set<string>();
+        if (shiftPref === 'sync_always') {
+          for (const c of asList(result.safeTasks)) initial.add(c.taskId);
+        }
+        setProposal(result);
+        setSelected(initial);
+        setPhase('confirm');
+      } catch {
+        if (cancelled) return;
+        // Fall back to manual pick on failure; the user can retry.
+      }
+    })();
+    return (): void => {
+      cancelled = true;
+    };
+  }, [open, currentStartAt, workspaceId, eventId, shiftPref, proposeMutation.mutateAsync]);
 
   const dateTimeFormatter = useMemo(
     () => new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short' }),
@@ -242,6 +290,29 @@ export default function ShiftEventDialog({
     });
   };
 
+  /**
+   * Derive the new `calendarShiftDefault` preference from the current
+   * selection state. `safeTasksList` is the ordered list of safe task
+   * candidates from the active proposal.
+   *   - all safeTasks ticked  → 'sync_always'
+   *   - zero safeTasks ticked → 'task_only_always'
+   *   - mixed                 → 'ask' (don't pretend mixed maps to a
+   *                             fixed pref)
+   */
+  const deriveShiftDefault = (
+    safeTasksList: ShiftCandidate[],
+    sel: Set<string>,
+  ): CalendarShiftDefault => {
+    if (safeTasksList.length === 0) return 'ask';
+    let ticked = 0;
+    for (const c of safeTasksList) {
+      if (sel.has(c.taskId)) ticked += 1;
+    }
+    if (ticked === safeTasksList.length) return 'sync_always';
+    if (ticked === 0) return 'task_only_always';
+    return 'ask';
+  };
+
   const handleApply = async (): Promise<void> => {
     if (!proposal) return;
     try {
@@ -259,6 +330,24 @@ export default function ShiftEventDialog({
           count: result.shiftedTasks,
         }),
       });
+
+      // Fire-and-forget preference write. Failures must not block or
+      // roll back the apply path — surface a quiet danger toast only.
+      // The `...(cond ? { ... } : {})` spread keeps the body compatible
+      // with `exactOptionalPropertyTypes` when extending this in future.
+      if (rememberDefault) {
+        const derived = deriveShiftDefault(asList(proposal.safeTasks), selected);
+        const patch: PatchMeInput = { ...{ calendarShiftDefault: derived } };
+        updateMe.mutate(patch, {
+          onSuccess: () => {
+            toaster.show({ tone: 'info', message: t('event.shift.default_saved_toast') });
+          },
+          onError: () => {
+            toaster.show({ tone: 'danger', message: t('event.shift.default_save_error') });
+          },
+        });
+      }
+
       onClose();
     } catch {
       toaster.show({ tone: 'danger', message: t('event.shift.confirm.error') });
@@ -271,6 +360,19 @@ export default function ShiftEventDialog({
   const selectedCount = selected.size;
 
   const canPreview = pickValue.length > 0 && !proposeMutation.isPending;
+
+  const rememberDefaultRow = (
+    <label htmlFor="shift-event-remember-default" className={styles.defaultPrefRow}>
+      <Checkbox
+        id="shift-event-remember-default"
+        checked={rememberDefault}
+        onChange={(e) => {
+          setRememberDefault(e.target.checked);
+        }}
+      />
+      <span>{t('event.shift.default_remember')}</span>
+    </label>
+  );
 
   return (
     <Dialog
@@ -295,6 +397,7 @@ export default function ShiftEventDialog({
               />
             )}
           </FormField>
+          {rememberDefaultRow}
           <div className={styles.shiftActions}>
             <Button type="button" variant="ghost" onClick={onClose}>
               {t('event.shift.dialog.cancel')}
@@ -357,6 +460,8 @@ export default function ShiftEventDialog({
               </ul>
             </section>
           ) : null}
+
+          {rememberDefaultRow}
 
           <div className={styles.shiftActions}>
             <Button

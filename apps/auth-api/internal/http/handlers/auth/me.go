@@ -67,6 +67,7 @@ func rowToMe(row generated.FindUserProfileByIdRow, publicBaseURL string) MeBody 
 		Country:              country,
 		WeekStart:            string(row.WeekStart),
 		ThemePreference:      string(row.ThemePreference),
+		CalendarShiftDefault: string(row.CalendarShiftDefault),
 		AvatarURL:            avatar,
 		NotifEmailDigest:     row.NotifEmailDigestEnabled,
 		NotifEmailMention:    row.NotifEmailMentionEnabled,

@@ -23,6 +23,7 @@ SELECT
   timezone,
   country,
   theme_preference,
+  calendar_shift_default,
   last_login_at,
   enabled,
   updated_at,
@@ -45,6 +46,7 @@ SELECT
   timezone,
   country,
   theme_preference,
+  calendar_shift_default,
   last_login_at,
   enabled,
   updated_at,
@@ -195,7 +197,7 @@ LIMIT 1;
 
 -- name: FindUserProfileById :one
 -- Fetch the minimal profile for the /me endpoint by internal id.
-SELECT public_id, email, display_name, locale, timezone, country, week_start, theme_preference, avatar_url,
+SELECT public_id, email, display_name, locale, timezone, country, week_start, theme_preference, calendar_shift_default, avatar_url,
        notif_email_digest_enabled, notif_email_mention_enabled,
        notif_email_assignment_enabled, notif_email_due_soon_enabled,
        notif_web_push_enabled
@@ -213,6 +215,7 @@ SET display_name                   = COALESCE(sqlc.narg('display_name'), display
     country                        = COALESCE(sqlc.narg('country'), country),
     week_start                     = COALESCE(sqlc.narg('week_start'), week_start),
     theme_preference               = COALESCE(sqlc.narg('theme_preference'), theme_preference),
+    calendar_shift_default         = COALESCE(sqlc.narg('calendar_shift_default'), calendar_shift_default),
     avatar_url                     = COALESCE(sqlc.narg('avatar_url'), avatar_url),
     notif_email_digest_enabled     = COALESCE(sqlc.narg('notif_email_digest_enabled'), notif_email_digest_enabled),
     notif_email_mention_enabled    = COALESCE(sqlc.narg('notif_email_mention_enabled'), notif_email_mention_enabled),

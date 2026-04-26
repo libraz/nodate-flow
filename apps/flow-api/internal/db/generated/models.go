@@ -1637,6 +1637,49 @@ func (ns NullUserViewPreferencesScopeType) Value() (driver.Value, error) {
 	return string(ns.UserViewPreferencesScopeType), nil
 }
 
+type UsersCalendarShiftDefault string
+
+const (
+	UsersCalendarShiftDefaultAsk            UsersCalendarShiftDefault = "ask"
+	UsersCalendarShiftDefaultSyncAlways     UsersCalendarShiftDefault = "sync_always"
+	UsersCalendarShiftDefaultTaskOnlyAlways UsersCalendarShiftDefault = "task_only_always"
+)
+
+func (e *UsersCalendarShiftDefault) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = UsersCalendarShiftDefault(s)
+	case string:
+		*e = UsersCalendarShiftDefault(s)
+	default:
+		return fmt.Errorf("unsupported scan type for UsersCalendarShiftDefault: %T", src)
+	}
+	return nil
+}
+
+type NullUsersCalendarShiftDefault struct {
+	UsersCalendarShiftDefault UsersCalendarShiftDefault `json:"usersCalendarShiftDefault"`
+	Valid                     bool                      `json:"valid"` // Valid is true if UsersCalendarShiftDefault is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullUsersCalendarShiftDefault) Scan(value interface{}) error {
+	if value == nil {
+		ns.UsersCalendarShiftDefault, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.UsersCalendarShiftDefault.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullUsersCalendarShiftDefault) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.UsersCalendarShiftDefault), nil
+}
+
 type UsersSnapToWorkingDay string
 
 const (
@@ -3679,6 +3722,8 @@ type User struct {
 	TreatHolidaysAsNonWorking bool `json:"treatHolidaysAsNonWorking"`
 	// UI theme preference
 	ThemePreference UsersThemePreference `json:"themePreference"`
+	// Default behaviour when an event linked to safe tasks is shifted: ask=prompt the user every time (current behaviour), sync_always=also shift every linked safe task by the same delta, task_only_always=shift only the event and leave linked tasks alone
+	CalendarShiftDefault UsersCalendarShiftDefault `json:"calendarShiftDefault"`
 	// Last successful login
 	LastLoginAt sql.NullTime `json:"lastLoginAt"`
 	// Weekly digest email
@@ -4054,20 +4099,21 @@ type VTaskTimeline struct {
 }
 
 type VUser struct {
-	WorkspaceID     uint32               `json:"-"`
-	PublicID        types.PublicID       `json:"publicId"`
-	Email           string               `json:"email"`
-	DisplayName     string               `json:"displayName"`
-	AvatarUrl       sql.NullString       `json:"avatarUrl"`
-	Locale          string               `json:"locale"`
-	Timezone        string               `json:"timezone"`
-	Country         sql.NullString       `json:"country"`
-	WeekStart       UsersWeekStart       `json:"weekStart"`
-	ThemePreference UsersThemePreference `json:"themePreference"`
-	WorkspaceRole   WorkspaceMembersRole `json:"workspaceRole"`
-	LastLoginAt     sql.NullTime         `json:"lastLoginAt"`
-	UpdatedAt       sql.NullTime         `json:"updatedAt"`
-	CreatedAt       time.Time            `json:"createdAt"`
+	WorkspaceID          uint32                    `json:"-"`
+	PublicID             types.PublicID            `json:"publicId"`
+	Email                string                    `json:"email"`
+	DisplayName          string                    `json:"displayName"`
+	AvatarUrl            sql.NullString            `json:"avatarUrl"`
+	Locale               string                    `json:"locale"`
+	Timezone             string                    `json:"timezone"`
+	Country              sql.NullString            `json:"country"`
+	WeekStart            UsersWeekStart            `json:"weekStart"`
+	ThemePreference      UsersThemePreference      `json:"themePreference"`
+	CalendarShiftDefault UsersCalendarShiftDefault `json:"calendarShiftDefault"`
+	WorkspaceRole        WorkspaceMembersRole      `json:"workspaceRole"`
+	LastLoginAt          sql.NullTime              `json:"lastLoginAt"`
+	UpdatedAt            sql.NullTime              `json:"updatedAt"`
+	CreatedAt            time.Time                 `json:"createdAt"`
 }
 
 type VWorkspaceMember struct {

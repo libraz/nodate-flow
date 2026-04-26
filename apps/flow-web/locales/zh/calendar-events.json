@@ -241,6 +241,9 @@
     },
     "shift": {
       "trigger": "调整事件时间",
+      "default_remember": "下次始终使用此选择",
+      "default_saved_toast": "设置已保存。下次将跳过此对话框。",
+      "default_save_error": "无法保存设置。请重试。",
       "dialog": {
         "title": "调整事件并联动任务",
         "cancel": "取消",

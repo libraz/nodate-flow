@@ -241,6 +241,9 @@
     },
     "shift": {
       "trigger": "イベントをシフト",
+      "default_remember": "次回からこの選択を使う",
+      "default_saved_toast": "設定を保存しました。次回からこのダイアログはスキップされます。",
+      "default_save_error": "設定を保存できませんでした。もう一度お試しください。",
       "dialog": {
         "title": "リンクされたタスクごとイベントをシフト",
         "cancel": "キャンセル",

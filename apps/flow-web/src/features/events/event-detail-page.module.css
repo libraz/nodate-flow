@@ -489,3 +489,14 @@
   color: var(--nf-color-fg-muted);
   word-break: break-word;
 }
+
+.defaultPrefRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-2);
+  border-block-start: var(--nf-space-px) solid var(--nf-color-border);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+  cursor: pointer;
+}

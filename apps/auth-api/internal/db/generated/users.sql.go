@@ -448,6 +448,7 @@ SELECT
   timezone,
   country,
   theme_preference,
+  calendar_shift_default,
   last_login_at,
   enabled,
   updated_at,
@@ -459,20 +460,21 @@ LIMIT 1
 `
 
 type FindUserByEmailRow struct {
-	ID              uint32               `json:"-"`
-	PublicID        types.PublicID       `json:"publicId"`
-	Email           string               `json:"email"`
-	EmailVerifiedAt sql.NullTime         `json:"emailVerifiedAt"`
-	DisplayName     string               `json:"displayName"`
-	AvatarUrl       sql.NullString       `json:"avatarUrl"`
-	Locale          string               `json:"locale"`
-	Timezone        string               `json:"timezone"`
-	Country         sql.NullString       `json:"country"`
-	ThemePreference UsersThemePreference `json:"themePreference"`
-	LastLoginAt     sql.NullTime         `json:"lastLoginAt"`
-	Enabled         bool                 `json:"enabled"`
-	UpdatedAt       sql.NullTime         `json:"updatedAt"`
-	CreatedAt       time.Time            `json:"createdAt"`
+	ID                   uint32                    `json:"-"`
+	PublicID             types.PublicID            `json:"publicId"`
+	Email                string                    `json:"email"`
+	EmailVerifiedAt      sql.NullTime              `json:"emailVerifiedAt"`
+	DisplayName          string                    `json:"displayName"`
+	AvatarUrl            sql.NullString            `json:"avatarUrl"`
+	Locale               string                    `json:"locale"`
+	Timezone             string                    `json:"timezone"`
+	Country              sql.NullString            `json:"country"`
+	ThemePreference      UsersThemePreference      `json:"themePreference"`
+	CalendarShiftDefault UsersCalendarShiftDefault `json:"calendarShiftDefault"`
+	LastLoginAt          sql.NullTime              `json:"lastLoginAt"`
+	Enabled              bool                      `json:"enabled"`
+	UpdatedAt            sql.NullTime              `json:"updatedAt"`
+	CreatedAt            time.Time                 `json:"createdAt"`
 }
 
 // Lookup a user by email for login. Returns internal id for the auth pipeline.
@@ -490,6 +492,7 @@ func (q *Queries) FindUserByEmail(ctx context.Context, email string) (FindUserBy
 		&i.Timezone,
 		&i.Country,
 		&i.ThemePreference,
+		&i.CalendarShiftDefault,
 		&i.LastLoginAt,
 		&i.Enabled,
 		&i.UpdatedAt,
@@ -510,6 +513,7 @@ SELECT
   timezone,
   country,
   theme_preference,
+  calendar_shift_default,
   last_login_at,
   enabled,
   updated_at,
@@ -520,20 +524,21 @@ LIMIT 1
 `
 
 type FindUserByEmailIncludingDisabledRow struct {
-	ID              uint32               `json:"-"`
-	PublicID        types.PublicID       `json:"publicId"`
-	Email           string               `json:"email"`
-	EmailVerifiedAt sql.NullTime         `json:"emailVerifiedAt"`
-	DisplayName     string               `json:"displayName"`
-	AvatarUrl       sql.NullString       `json:"avatarUrl"`
-	Locale          string               `json:"locale"`
-	Timezone        string               `json:"timezone"`
-	Country         sql.NullString       `json:"country"`
-	ThemePreference UsersThemePreference `json:"themePreference"`
-	LastLoginAt     sql.NullTime         `json:"lastLoginAt"`
-	Enabled         bool                 `json:"enabled"`
-	UpdatedAt       sql.NullTime         `json:"updatedAt"`
-	CreatedAt       time.Time            `json:"createdAt"`
+	ID                   uint32                    `json:"-"`
+	PublicID             types.PublicID            `json:"publicId"`
+	Email                string                    `json:"email"`
+	EmailVerifiedAt      sql.NullTime              `json:"emailVerifiedAt"`
+	DisplayName          string                    `json:"displayName"`
+	AvatarUrl            sql.NullString            `json:"avatarUrl"`
+	Locale               string                    `json:"locale"`
+	Timezone             string                    `json:"timezone"`
+	Country              sql.NullString            `json:"country"`
+	ThemePreference      UsersThemePreference      `json:"themePreference"`
+	CalendarShiftDefault UsersCalendarShiftDefault `json:"calendarShiftDefault"`
+	LastLoginAt          sql.NullTime              `json:"lastLoginAt"`
+	Enabled              bool                      `json:"enabled"`
+	UpdatedAt            sql.NullTime              `json:"updatedAt"`
+	CreatedAt            time.Time                 `json:"createdAt"`
 }
 
 // Lookup a user by email regardless of enabled flag (for invitation reuse).
@@ -551,6 +556,7 @@ func (q *Queries) FindUserByEmailIncludingDisabled(ctx context.Context, email st
 		&i.Timezone,
 		&i.Country,
 		&i.ThemePreference,
+		&i.CalendarShiftDefault,
 		&i.LastLoginAt,
 		&i.Enabled,
 		&i.UpdatedAt,
@@ -560,7 +566,7 @@ func (q *Queries) FindUserByEmailIncludingDisabled(ctx context.Context, email st
 }
 
 const findUserByPublicId = `-- name: FindUserByPublicId :one
-SELECT workspace_id, public_id, email, display_name, avatar_url, locale, timezone, country, week_start, theme_preference, workspace_role, last_login_at, updated_at, created_at
+SELECT workspace_id, public_id, email, display_name, avatar_url, locale, timezone, country, week_start, theme_preference, calendar_shift_default, workspace_role, last_login_at, updated_at, created_at
 FROM v_users
 WHERE public_id = ?
 LIMIT 1
@@ -581,6 +587,7 @@ func (q *Queries) FindUserByPublicId(ctx context.Context, publicID types.PublicI
 		&i.Country,
 		&i.WeekStart,
 		&i.ThemePreference,
+		&i.CalendarShiftDefault,
 		&i.WorkspaceRole,
 		&i.LastLoginAt,
 		&i.UpdatedAt,
@@ -606,7 +613,7 @@ func (q *Queries) FindUserInternalIdByPublicId(ctx context.Context, publicID typ
 }
 
 const findUserProfileById = `-- name: FindUserProfileById :one
-SELECT public_id, email, display_name, locale, timezone, country, week_start, theme_preference, avatar_url,
+SELECT public_id, email, display_name, locale, timezone, country, week_start, theme_preference, calendar_shift_default, avatar_url,
        notif_email_digest_enabled, notif_email_mention_enabled,
        notif_email_assignment_enabled, notif_email_due_soon_enabled,
        notif_web_push_enabled
@@ -617,20 +624,21 @@ LIMIT 1
 `
 
 type FindUserProfileByIdRow struct {
-	PublicID                    types.PublicID       `json:"publicId"`
-	Email                       string               `json:"email"`
-	DisplayName                 string               `json:"displayName"`
-	Locale                      string               `json:"locale"`
-	Timezone                    string               `json:"timezone"`
-	Country                     sql.NullString       `json:"country"`
-	WeekStart                   UsersWeekStart       `json:"weekStart"`
-	ThemePreference             UsersThemePreference `json:"themePreference"`
-	AvatarUrl                   sql.NullString       `json:"avatarUrl"`
-	NotifEmailDigestEnabled     bool                 `json:"notifEmailDigestEnabled"`
-	NotifEmailMentionEnabled    bool                 `json:"notifEmailMentionEnabled"`
-	NotifEmailAssignmentEnabled bool                 `json:"notifEmailAssignmentEnabled"`
-	NotifEmailDueSoonEnabled    bool                 `json:"notifEmailDueSoonEnabled"`
-	NotifWebPushEnabled         bool                 `json:"notifWebPushEnabled"`
+	PublicID                    types.PublicID            `json:"publicId"`
+	Email                       string                    `json:"email"`
+	DisplayName                 string                    `json:"displayName"`
+	Locale                      string                    `json:"locale"`
+	Timezone                    string                    `json:"timezone"`
+	Country                     sql.NullString            `json:"country"`
+	WeekStart                   UsersWeekStart            `json:"weekStart"`
+	ThemePreference             UsersThemePreference      `json:"themePreference"`
+	CalendarShiftDefault        UsersCalendarShiftDefault `json:"calendarShiftDefault"`
+	AvatarUrl                   sql.NullString            `json:"avatarUrl"`
+	NotifEmailDigestEnabled     bool                      `json:"notifEmailDigestEnabled"`
+	NotifEmailMentionEnabled    bool                      `json:"notifEmailMentionEnabled"`
+	NotifEmailAssignmentEnabled bool                      `json:"notifEmailAssignmentEnabled"`
+	NotifEmailDueSoonEnabled    bool                      `json:"notifEmailDueSoonEnabled"`
+	NotifWebPushEnabled         bool                      `json:"notifWebPushEnabled"`
 }
 
 // Fetch the minimal profile for the /me endpoint by internal id.
@@ -646,6 +654,7 @@ func (q *Queries) FindUserProfileById(ctx context.Context, id uint32) (FindUserP
 		&i.Country,
 		&i.WeekStart,
 		&i.ThemePreference,
+		&i.CalendarShiftDefault,
 		&i.AvatarUrl,
 		&i.NotifEmailDigestEnabled,
 		&i.NotifEmailMentionEnabled,
@@ -680,6 +689,7 @@ SET display_name                   = COALESCE(?, display_name),
     country                        = COALESCE(?, country),
     week_start                     = COALESCE(?, week_start),
     theme_preference               = COALESCE(?, theme_preference),
+    calendar_shift_default         = COALESCE(?, calendar_shift_default),
     avatar_url                     = COALESCE(?, avatar_url),
     notif_email_digest_enabled     = COALESCE(?, notif_email_digest_enabled),
     notif_email_mention_enabled    = COALESCE(?, notif_email_mention_enabled),
@@ -691,19 +701,20 @@ WHERE id = ?
 `
 
 type PatchMeParams struct {
-	DisplayName                 sql.NullString           `json:"displayName"`
-	Locale                      sql.NullString           `json:"locale"`
-	Timezone                    sql.NullString           `json:"timezone"`
-	Country                     sql.NullString           `json:"country"`
-	WeekStart                   NullUsersWeekStart       `json:"weekStart"`
-	ThemePreference             NullUsersThemePreference `json:"themePreference"`
-	AvatarUrl                   sql.NullString           `json:"avatarUrl"`
-	NotifEmailDigestEnabled     sql.NullBool             `json:"notifEmailDigestEnabled"`
-	NotifEmailMentionEnabled    sql.NullBool             `json:"notifEmailMentionEnabled"`
-	NotifEmailAssignmentEnabled sql.NullBool             `json:"notifEmailAssignmentEnabled"`
-	NotifEmailDueSoonEnabled    sql.NullBool             `json:"notifEmailDueSoonEnabled"`
-	NotifWebPushEnabled         sql.NullBool             `json:"notifWebPushEnabled"`
-	ID                          uint32                   `json:"-"`
+	DisplayName                 sql.NullString                `json:"displayName"`
+	Locale                      sql.NullString                `json:"locale"`
+	Timezone                    sql.NullString                `json:"timezone"`
+	Country                     sql.NullString                `json:"country"`
+	WeekStart                   NullUsersWeekStart            `json:"weekStart"`
+	ThemePreference             NullUsersThemePreference      `json:"themePreference"`
+	CalendarShiftDefault        NullUsersCalendarShiftDefault `json:"calendarShiftDefault"`
+	AvatarUrl                   sql.NullString                `json:"avatarUrl"`
+	NotifEmailDigestEnabled     sql.NullBool                  `json:"notifEmailDigestEnabled"`
+	NotifEmailMentionEnabled    sql.NullBool                  `json:"notifEmailMentionEnabled"`
+	NotifEmailAssignmentEnabled sql.NullBool                  `json:"notifEmailAssignmentEnabled"`
+	NotifEmailDueSoonEnabled    sql.NullBool                  `json:"notifEmailDueSoonEnabled"`
+	NotifWebPushEnabled         sql.NullBool                  `json:"notifWebPushEnabled"`
+	ID                          uint32                        `json:"-"`
 }
 
 // Patch the authenticated user's profile. NULL params leave the column untouched.
@@ -715,6 +726,7 @@ func (q *Queries) PatchMe(ctx context.Context, arg PatchMeParams) error {
 		arg.Country,
 		arg.WeekStart,
 		arg.ThemePreference,
+		arg.CalendarShiftDefault,
 		arg.AvatarUrl,
 		arg.NotifEmailDigestEnabled,
 		arg.NotifEmailMentionEnabled,
