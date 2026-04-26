@@ -14,6 +14,12 @@ export type { ThemeId, UseThemeOptions, UseThemeResult } from './hooks/use-theme
 
 export { useControllableState } from './hooks/use-controllable-state';
 export { useFocusTrap } from './hooks/use-focus-trap';
+export { useZodForm } from './hooks/use-zod-form';
+export type {
+  ApiFieldError,
+  UseZodFormOptions,
+  UseZodFormReturn,
+} from './hooks/use-zod-form';
 
 export { default as SkipLink } from './a11y/skip-link';
 export { default as VisuallyHidden } from './a11y/visually-hidden';

@@ -102,3 +102,13 @@ export type { DataGridProps } from './data-grid/data-grid';
 
 export { default as AuthCard } from './auth-card/auth-card';
 export type { AuthCardProps } from './auth-card/auth-card';
+
+export { default as EmptyState } from './empty-state/empty-state';
+export type { EmptyStateProps } from './empty-state/empty-state';
+
+export { default as ErrorFallback } from './error-fallback/error-fallback';
+export type {
+  ErrorFallbackAction,
+  ErrorFallbackProps,
+  ErrorFallbackTone,
+} from './error-fallback/error-fallback';

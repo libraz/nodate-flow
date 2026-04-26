@@ -1,0 +1,51 @@
+/*
+ * ErrorFallback — section-level error placeholder.
+ *
+ * Token-only: every colour, spacing, radius, and shadow comes from
+ * `var(--nf-*)` so the four themes (aurora / dotline / glass-light /
+ * glass-dark) inherit the correct palette without per-theme overrides.
+ *
+ * Designed for per-section use — sized to fit inside a card / list /
+ * sub-section body, not the full viewport. Pair with a per-section
+ * suspense / error boundary (see commit 5bf9eca).
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--nf-space-2);
+  color: var(--nf-color-fg-muted);
+}
+
+.card {
+  padding: var(--nf-space-4);
+  background: var(--nf-color-bg-elevated);
+  border: 1px solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+}
+
+.inline {
+  padding: var(--nf-space-3) var(--nf-space-4);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
+}
+
+.description {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+  max-inline-size: 36rem;
+}
+
+.actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  margin-block-start: var(--nf-space-1);
+}

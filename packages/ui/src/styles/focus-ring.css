@@ -1,0 +1,38 @@
+/*
+ * @nodate-flow/ui — focus-ring utility.
+ *
+ * One global, low-specificity rule that paints the standard nodate-flow focus
+ * ring on any element carrying the `nf-focus-ring` class while it is focused
+ * via the keyboard (`:focus-visible`). The selector is wrapped in `:where()`
+ * so it stays at specificity (0,0,0) and never beats a feature-specific
+ * `:focus-visible` rule that intentionally overrides the ring (e.g. the
+ * primitives' `box-shadow` ring on Button, Input, etc.).
+ *
+ * Consumers add the class alongside their CSS-module class:
+ *   <button className={`${styles.searchButton} nf-focus-ring`}>...</button>
+ *
+ * The class is intentionally global (NOT a CSS module class) so it survives
+ * scoped-name hashing and can be applied from JSX without a `composes` dance.
+ *
+ * Import this stylesheet exactly once from your app entry CSS, e.g.:
+ *   @import "@nodate-flow/ui/styles/focus-ring.css";
+ *
+ * Token references match `packages/ui/src/tokens/semantic.css`. If both the
+ * token and a feature-specific override are absent, browsers will paint the
+ * default UA outline as a final fallback.
+ */
+
+:where(.nf-focus-ring):focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: var(--nf-focus-ring-offset);
+}
+
+/*
+ * Inset variant — for buttons/menu items where the ring should sit *inside*
+ * the element (e.g. dense list rows whose outer border would otherwise be
+ * eaten by the offset). Mirrors the `calc(... * -1)` trick used inline today.
+ */
+:where(.nf-focus-ring-inset):focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: calc(var(--nf-focus-ring-offset) * -1);
+}

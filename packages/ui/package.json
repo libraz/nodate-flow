@@ -20,6 +20,8 @@
     "./hooks/use-theme": "./src/hooks/use-theme.ts",
     "./hooks/use-controllable-state": "./src/hooks/use-controllable-state.ts",
     "./hooks/use-focus-trap": "./src/hooks/use-focus-trap.ts",
+    "./hooks/use-zod-form": "./src/hooks/use-zod-form.ts",
+    "./styles/focus-ring.css": "./src/styles/focus-ring.css",
     "./a11y/skip-link": "./src/a11y/skip-link.tsx",
     "./a11y/visually-hidden": "./src/a11y/visually-hidden.tsx",
     "./a11y/live-region": "./src/a11y/live-region.tsx",
@@ -58,6 +60,7 @@
     "./primitives/markdown": "./src/primitives/markdown/markdown.tsx",
     "./primitives/empty-state": "./src/primitives/empty-state/empty-state.tsx",
     "./primitives/error-boundary": "./src/primitives/error-boundary/error-boundary.tsx",
+    "./primitives/error-fallback": "./src/primitives/error-fallback/error-fallback.tsx",
     "./primitives/page-skeleton": "./src/primitives/page-skeleton/page-skeleton.tsx",
     "./primitives/auth-card": "./src/primitives/auth-card/auth-card.tsx",
     "./primitives/theme-picker": "./src/primitives/theme-picker/theme-picker.tsx",
@@ -81,16 +84,23 @@
     "luxon": "^3.5.0"
   },
   "peerDependencies": {
+    "@hookform/resolvers": ">=3.0.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",
+    "react-hook-form": ">=7.50.0",
     "react-markdown": ">=10.0.0",
-    "remark-gfm": ">=4.0.0"
+    "remark-gfm": ">=4.0.0",
+    "zod": ">=3.20.0"
   },
   "peerDependenciesMeta": {
+    "@hookform/resolvers": { "optional": true },
+    "react-hook-form": { "optional": true },
     "react-markdown": { "optional": true },
-    "remark-gfm": { "optional": true }
+    "remark-gfm": { "optional": true },
+    "zod": { "optional": true }
   },
   "devDependencies": {
+    "@hookform/resolvers": "3.9.1",
     "@testing-library/react": "16.0.1",
     "@testing-library/user-event": "14.5.2",
     "@types/luxon": "^3.4.2",
@@ -99,9 +109,11 @@
     "happy-dom": "^20.8.9",
     "react": "19.0.0",
     "react-dom": "19.0.0",
+    "react-hook-form": "7.53.2",
     "tsx": "4.19.2",
     "typescript": "5.6.3",
     "vitest": "^4.1.3",
-    "vitest-axe": "0.1.0"
+    "vitest-axe": "0.1.0",
+    "zod": "3.23.8"
   }
 }
