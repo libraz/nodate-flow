@@ -38,14 +38,16 @@ import { sdk } from '../../lib/sdk';
 import { type RailCalendar, usePatchOwnSubscriptionMutation, useUnsubscribeMutation } from './api';
 import styles from './calendars-rail.module.css';
 import DiscoverList from './discover-list';
+import HolidaysList from './holidays-list';
 
 interface CalendarsRailProps {
   /**
    * Workspaces the actor belongs to. Pass through `useWorkspacesQuery`
-   * data — the rail only needs `id` and `name` so the prop is kept
-   * narrow to avoid coupling to the full workspace schema.
+   * data — the rail needs `id`, `name`, and the optional `country` so
+   * the holiday-subscription picker can pre-select the workspace's own
+   * configured country. `country` is empty string when unset.
    */
-  workspaces: { id: string; name: string }[];
+  workspaces: { id: string; name: string; country?: string }[];
   /**
    * Actor's own user public id, used as the `userId` path segment when
    * leaving a calendar via `members-remove`.
@@ -104,13 +106,13 @@ export default function CalendarsRail({
 }
 
 interface CalendarsSectionProps {
-  workspace: { id: string; name: string };
+  workspace: { id: string; name: string; country?: string };
   calendars: RailCalendar[];
   selfUserId: string;
   showHeader: boolean;
 }
 
-type SectionMode = 'list' | 'discover';
+type SectionMode = 'list' | 'discover' | 'holidays';
 
 /**
  * Single workspace section. Owns a per-section morph state:
@@ -158,6 +160,32 @@ function CalendarsSection({
     );
   }
 
+  if (mode === 'holidays') {
+    const titleId = `calendars-rail-holidays-title-${workspace.id}`;
+    return (
+      <section className={styles.section} aria-labelledby={titleId}>
+        <header className={styles.sectionHeaderDiscover}>
+          <button
+            type="button"
+            className={styles.backButton}
+            onClick={() => setMode('list')}
+            aria-label={t('calendars_rail.title')}
+          >
+            <ChevronLeft size={16} aria-hidden />
+          </button>
+          <h3 id={titleId} className={styles.discoverTitle}>
+            {t('calendars_rail.holidays.title')}
+          </h3>
+        </header>
+        <HolidaysList
+          workspaceId={workspace.id}
+          {...(workspace.country ? { defaultCountry: workspace.country } : {})}
+          onClose={() => setMode('list')}
+        />
+      </section>
+    );
+  }
+
   return (
     <section className={styles.section}>
       {showHeader ? <h3 className={styles.sectionHeader}>{workspace.name}</h3> : null}
@@ -175,15 +203,26 @@ function CalendarsSection({
           ))}
         </ul>
       )}
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className={styles.addButton}
-        onClick={() => setMode('discover')}
-      >
-        {t('calendars_rail.add_teammate')}
-      </Button>
+      <div className={styles.triggerStack}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className={styles.addButton}
+          onClick={() => setMode('discover')}
+        >
+          {t('calendars_rail.add_teammate')}
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className={styles.addButton}
+          onClick={() => setMode('holidays')}
+        >
+          {t('calendars_rail.holidays.trigger')}
+        </Button>
+      </div>
     </section>
   );
 }

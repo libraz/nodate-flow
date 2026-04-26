@@ -170,6 +170,38 @@ export function usePatchOwnSubscriptionMutation(): UseMutationResult<
   });
 }
 
+export interface SubscribeSystemCalendarArgs {
+  wsId: string;
+  /** ISO 3166-1 alpha-2 country code (uppercase). */
+  country: string;
+}
+
+/**
+ * useSubscribeSystemCalendarMutation — POST
+ * `/workspaces/{wsId}/calendars/subscribe-system`. Idempotent: subscribing
+ * to the same country twice is a no-op on the backend; the rail simply
+ * invalidates its caches so the new holiday calendar shows up in the list.
+ */
+export function useSubscribeSystemCalendarMutation(): UseMutationResult<
+  void,
+  ApiError,
+  SubscribeSystemCalendarArgs
+> {
+  const qc = useQueryClient();
+  return useMutation<void, ApiError, SubscribeSystemCalendarArgs>({
+    mutationFn: async ({ wsId, country }): Promise<void> => {
+      const { error } = await sdk.POST('/workspaces/{wsId}/calendars/subscribe-system', {
+        params: { path: { wsId } },
+        body: { country },
+      });
+      if (error) throw toApiError(error, 'Failed to subscribe to holiday calendar');
+    },
+    onSuccess: (_void, { wsId }) => {
+      invalidateRailCaches(qc, wsId);
+    },
+  });
+}
+
 export interface UnsubscribeArgs {
   wsId: string;
   calId: string;

@@ -230,6 +230,16 @@
       "empty": "No teammate calendars to subscribe to",
       "subscribe": "Subscribe",
       "subscribed_toast": "Subscribed to {name}"
+    },
+    "holidays": {
+      "trigger": "订阅节假日日历...",
+      "title": "订阅节假日日历",
+      "country_label": "国家",
+      "country_placeholder": "选择一个国家...",
+      "default_hint": "{flag} {code} 是工作区默认值。",
+      "subscribe": "订阅",
+      "subscribed_toast": "已订阅 {name} 节假日。",
+      "error": "无法订阅。请重试。"
     }
   },
   "not_found": {

@@ -160,7 +160,14 @@
 
 .addButton {
   align-self: flex-start;
+}
+
+.triggerStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-px);
   margin-block-start: var(--nf-space-1);
+  align-items: flex-start;
 }
 
 .empty {
@@ -309,4 +316,36 @@
   margin: 0;
   color: var(--nf-color-danger);
   font-size: var(--nf-text-sm);
+}
+
+/* ---------------------------------------------------------------------------
+ * Holidays mode — country picker + subscribe affordance. Reuses the
+ * `.discoverBody` flex column so the back-arrow header lines up with
+ * the discovery view, then adds a labelled field block and an action
+ * row to keep the form rhythm distinct from a list.
+ * ------------------------------------------------------------------------- */
+
+.holidaysField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.holidaysLabel {
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.holidaysHint {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.holidaysActions {
+  display: flex;
+  justify-content: flex-end;
 }

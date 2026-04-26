@@ -254,10 +254,12 @@ function CalendarRoute(): ReactElement {
   const { data: me } = useMeQuery();
   const country = me.country;
   const selfUserId = me.id;
-  // Narrow workspace shape for the rail — id + name only — so the
-  // component does not depend on the full Workspace schema.
+  // Narrow workspace shape for the rail — id, name, and the optional
+  // country code (so the holidays-mode picker can pre-select the
+  // workspace's own configured country) — without coupling the rail to
+  // the full Workspace schema.
   const railWorkspaces = useMemo(
-    () => workspaces.map((w) => ({ id: w.id, name: w.name })),
+    () => workspaces.map((w) => ({ id: w.id, name: w.name, country: w.country })),
     [workspaces],
   );
   // `weekStart` may be undefined when the running auth-api binary predates
