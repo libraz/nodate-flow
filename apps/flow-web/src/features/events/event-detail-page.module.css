@@ -180,3 +180,208 @@
     margin-inline-start: 0;
   }
 }
+
+/* ── Comments / Checklist / Attachments shared layout ─────────── */
+
+.empty {
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+  padding-block: var(--nf-space-3);
+}
+
+.itemList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.commentCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-3);
+  border-radius: var(--nf-radius-md);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  background: var(--nf-color-bg);
+}
+
+.commentHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nf-space-2);
+}
+
+.commentAuthor {
+  font-weight: 600;
+  color: var(--nf-color-fg);
+}
+
+.commentTimestamp {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.commentEdited {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  font-style: italic;
+  margin-inline-start: var(--nf-space-1);
+}
+
+.commentBody {
+  color: var(--nf-color-fg);
+  font-size: var(--nf-text-sm);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.commentActions {
+  display: flex;
+  gap: var(--nf-space-2);
+  justify-content: flex-end;
+}
+
+.addRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  padding-block-start: var(--nf-space-3);
+}
+
+.addRowControls {
+  display: flex;
+  gap: var(--nf-space-2);
+  justify-content: flex-end;
+}
+
+.checklistRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-2) var(--nf-space-3);
+  border-radius: var(--nf-radius-md);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  background: var(--nf-color-bg);
+}
+
+.checklistTitle {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg);
+  word-break: break-word;
+}
+
+.checklistTitleDone {
+  text-decoration: line-through;
+  color: var(--nf-color-fg-muted);
+}
+
+.checklistProgress {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.checklistAddInline {
+  display: flex;
+  gap: var(--nf-space-2);
+  align-items: center;
+}
+
+.checklistAddInline > :first-child {
+  flex: 1 1 auto;
+}
+
+.attachmentRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-2) var(--nf-space-3);
+  border-radius: var(--nf-radius-md);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  background: var(--nf-color-bg);
+}
+
+.attachmentIdentity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.attachmentName {
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachmentMeta {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nf-space-2);
+}
+
+.attachmentControls {
+  display: flex;
+  gap: var(--nf-space-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.attachmentForm {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-3);
+  border-radius: var(--nf-radius-md);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  background: var(--nf-color-bg);
+}
+
+.attachmentFormFull {
+  grid-column: 1 / -1;
+}
+
+.attachmentFieldLabel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.tabHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nf-space-2);
+}
+
+.tabHeaderTitle {
+  margin: 0;
+  font-size: var(--nf-text-base);
+  color: var(--nf-color-fg);
+}
+
+@media (max-width: 640px) {
+  .attachmentRow,
+  .checklistRow {
+    flex-wrap: wrap;
+  }
+  .attachmentForm {
+    grid-template-columns: 1fr;
+  }
+}

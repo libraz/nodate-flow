@@ -7,14 +7,18 @@
  *   - Header card: kind badge, title, formatted start/end, all-day flag,
  *     calendar color dot. Owner is intentionally not surfaced because
  *     `EventResponse` does not expose `ownerUserId`.
- *   - Tabs ({@link Tabs}) with two panes — Attendees, Invites — each
- *     wrapped in its own {@link Suspense} boundary so a failure or load
- *     in one pane does not blank the other.
+ *   - Tabs ({@link Tabs}) with five panes — Attendees, Invites,
+ *     Comments, Checklist, Attachments — each wrapped in its own
+ *     {@link Suspense} boundary so a failure or load in one pane does
+ *     not blank the other. The default tab stays on `attendees`.
  *
  * Hooks consumed:
  *   - {@link useEventQuery}              — suspense single-event read
  *   - {@link useAttendeesQuery}          — via {@link AttendeesTab}
  *   - {@link useEventInvitesQuery}       — via {@link InvitesTab}
+ *   - {@link useEventCommentsQuery}      — via {@link CommentsTab}
+ *   - {@link useEventChecklistQuery}     — via {@link ChecklistTab}
+ *   - {@link useEventAttachmentsQuery}   — via {@link AttachmentsTab}
  */
 
 import Badge from '@nodate-flow/ui/primitives/badge';
@@ -25,7 +29,10 @@ import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useEventQuery } from './api';
+import AttachmentsTab from './attachments-tab';
 import AttendeesTab from './attendees-tab';
+import ChecklistTab from './checklist-tab';
+import CommentsTab from './comments-tab';
 import styles from './event-detail-page.module.css';
 import InvitesTab from './invites-tab';
 
@@ -158,6 +165,33 @@ export default function EventDetailPage(): ReactElement {
       content: (
         <Suspense fallback={<PaneFallback />}>
           <InvitesTab workspaceId={workspaceId} calendarId={calendarId} eventId={eventId} />
+        </Suspense>
+      ),
+    },
+    {
+      value: 'comments',
+      label: t('event.detail.tab.comments'),
+      content: (
+        <Suspense fallback={<PaneFallback />}>
+          <CommentsTab workspaceId={workspaceId} calendarId={calendarId} eventId={eventId} />
+        </Suspense>
+      ),
+    },
+    {
+      value: 'checklist',
+      label: t('event.detail.tab.checklist'),
+      content: (
+        <Suspense fallback={<PaneFallback />}>
+          <ChecklistTab workspaceId={workspaceId} calendarId={calendarId} eventId={eventId} />
+        </Suspense>
+      ),
+    },
+    {
+      value: 'attachments',
+      label: t('event.detail.tab.attachments'),
+      content: (
+        <Suspense fallback={<PaneFallback />}>
+          <AttachmentsTab workspaceId={workspaceId} calendarId={calendarId} eventId={eventId} />
         </Suspense>
       ),
     },

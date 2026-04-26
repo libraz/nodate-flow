@@ -157,7 +157,10 @@
       "back": "返回日历",
       "tab": {
         "attendees": "参与者",
-        "invites": "邀请"
+        "invites": "邀请",
+        "comments": "评论",
+        "checklist": "清单",
+        "attachments": "附件"
       },
       "kind": {
         "event": "事件",
@@ -166,6 +169,59 @@
         "busy": "忙碌"
       },
       "all_day": "全天"
+    },
+    "comments": {
+      "empty": "暂无评论",
+      "add_placeholder": "添加评论…",
+      "add": "评论",
+      "add_error": "添加评论失败",
+      "edit": "编辑",
+      "edit_save": "保存",
+      "edit_cancel": "取消",
+      "edit_error": "保存评论失败",
+      "delete": "删除",
+      "delete_confirm": "删除此评论？",
+      "delete_success": "已删除评论",
+      "delete_error": "删除评论失败"
+    },
+    "checklist": {
+      "empty": "暂无清单项",
+      "add_placeholder": "添加项…",
+      "add": "添加",
+      "add_error": "添加项失败",
+      "toggle_label": "将 {title} 标记为完成",
+      "update_error": "更新项失败",
+      "delete": "删除",
+      "delete_confirm": "删除此项？",
+      "delete_success": "已删除项",
+      "delete_error": "删除项失败",
+      "progress": "完成 {done}/{total}"
+    },
+    "attachments": {
+      "empty": "暂无附件",
+      "add": "添加附件",
+      "add_error": "添加附件失败",
+      "delete": "删除",
+      "delete_confirm": "删除此附件？",
+      "delete_success": "已删除附件",
+      "delete_error": "删除附件失败",
+      "upload": "上传",
+      "uploading": "正在上传…",
+      "upload_success": "已上传附件",
+      "upload_error": "上传失败",
+      "download": "下载",
+      "size_unit": {
+        "b": "B",
+        "kb": "KB",
+        "mb": "MB",
+        "gb": "GB"
+      },
+      "field": {
+        "filename": "文件名",
+        "storage_key": "存储键",
+        "content_type": "内容类型",
+        "byte_size": "字节大小"
+      }
     },
     "invites": {
       "empty": "暂无邀请",

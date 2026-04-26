@@ -157,7 +157,10 @@
       "back": "カレンダーに戻る",
       "tab": {
         "attendees": "参加者",
-        "invites": "招待"
+        "invites": "招待",
+        "comments": "コメント",
+        "checklist": "チェックリスト",
+        "attachments": "添付ファイル"
       },
       "kind": {
         "event": "予定",
@@ -166,6 +169,59 @@
         "busy": "ビジー"
       },
       "all_day": "終日"
+    },
+    "comments": {
+      "empty": "コメントはまだありません",
+      "add_placeholder": "コメントを追加…",
+      "add": "コメント",
+      "add_error": "コメントの追加に失敗しました",
+      "edit": "編集",
+      "edit_save": "保存",
+      "edit_cancel": "キャンセル",
+      "edit_error": "コメントの保存に失敗しました",
+      "delete": "削除",
+      "delete_confirm": "このコメントを削除しますか？",
+      "delete_success": "コメントを削除しました",
+      "delete_error": "コメントの削除に失敗しました"
+    },
+    "checklist": {
+      "empty": "チェックリスト項目はまだありません",
+      "add_placeholder": "項目を追加…",
+      "add": "追加",
+      "add_error": "項目の追加に失敗しました",
+      "toggle_label": "{title} を完了にする",
+      "update_error": "項目の更新に失敗しました",
+      "delete": "削除",
+      "delete_confirm": "この項目を削除しますか？",
+      "delete_success": "項目を削除しました",
+      "delete_error": "項目の削除に失敗しました",
+      "progress": "完了 {done}/{total}"
+    },
+    "attachments": {
+      "empty": "添付ファイルはまだありません",
+      "add": "添付を追加",
+      "add_error": "添付の追加に失敗しました",
+      "delete": "削除",
+      "delete_confirm": "この添付を削除しますか？",
+      "delete_success": "添付を削除しました",
+      "delete_error": "添付の削除に失敗しました",
+      "upload": "アップロード",
+      "uploading": "アップロード中…",
+      "upload_success": "添付をアップロードしました",
+      "upload_error": "アップロードに失敗しました",
+      "download": "ダウンロード",
+      "size_unit": {
+        "b": "B",
+        "kb": "KB",
+        "mb": "MB",
+        "gb": "GB"
+      },
+      "field": {
+        "filename": "ファイル名",
+        "storage_key": "ストレージキー",
+        "content_type": "MIME タイプ",
+        "byte_size": "バイト数"
+      }
     },
     "invites": {
       "empty": "招待はまだありません",

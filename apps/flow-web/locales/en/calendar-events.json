@@ -157,7 +157,10 @@
       "back": "Back to calendar",
       "tab": {
         "attendees": "Attendees",
-        "invites": "Invites"
+        "invites": "Invites",
+        "comments": "Comments",
+        "checklist": "Checklist",
+        "attachments": "Attachments"
       },
       "kind": {
         "event": "Event",
@@ -166,6 +169,59 @@
         "busy": "Busy"
       },
       "all_day": "All day"
+    },
+    "comments": {
+      "empty": "No comments yet",
+      "add_placeholder": "Add a comment…",
+      "add": "Comment",
+      "add_error": "Failed to add comment",
+      "edit": "Edit",
+      "edit_save": "Save",
+      "edit_cancel": "Cancel",
+      "edit_error": "Failed to save comment",
+      "delete": "Delete",
+      "delete_confirm": "Delete this comment?",
+      "delete_success": "Comment deleted",
+      "delete_error": "Failed to delete comment"
+    },
+    "checklist": {
+      "empty": "No checklist items yet",
+      "add_placeholder": "Add an item…",
+      "add": "Add",
+      "add_error": "Failed to add item",
+      "toggle_label": "Mark {title} as done",
+      "update_error": "Failed to update item",
+      "delete": "Delete",
+      "delete_confirm": "Delete this item?",
+      "delete_success": "Item deleted",
+      "delete_error": "Failed to delete item",
+      "progress": "{done}/{total} done"
+    },
+    "attachments": {
+      "empty": "No attachments yet",
+      "add": "Add attachment",
+      "add_error": "Failed to add attachment",
+      "delete": "Delete",
+      "delete_confirm": "Delete this attachment?",
+      "delete_success": "Attachment deleted",
+      "delete_error": "Failed to delete attachment",
+      "upload": "Upload",
+      "uploading": "Uploading…",
+      "upload_success": "Attachment uploaded",
+      "upload_error": "Upload failed",
+      "download": "Download",
+      "size_unit": {
+        "b": "B",
+        "kb": "KB",
+        "mb": "MB",
+        "gb": "GB"
+      },
+      "field": {
+        "filename": "Filename",
+        "storage_key": "Storage key",
+        "content_type": "Content type",
+        "byte_size": "Byte size"
+      }
     },
     "invites": {
       "empty": "No invites yet",
