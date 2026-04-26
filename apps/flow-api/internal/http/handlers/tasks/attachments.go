@@ -4,13 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"log/slog"
-	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
@@ -80,7 +80,7 @@ func AddAttachment(deps Deps) func(context.Context, *AddTaskAttachmentInput) (*A
 			ContentType: in.Body.ContentType,
 			ByteSize:    in.Body.ByteSize,
 			StorageKey:  in.Body.StorageKey,
-			CreatedAt:   time.Now().Unix(),
+			CreatedAt:   handlerutil.NowUnix(),
 		}}, nil
 	}
 }

@@ -4,13 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
 // --- Input/Output types ---
@@ -159,7 +159,7 @@ func CreateMemo(deps Deps) func(context.Context, *CreateMemoInput) (*CreateMemoO
 			Title:      input.Body.Title,
 			Done:       false,
 			SortWeight: input.Body.SortWeight,
-			CreatedAt:  time.Now().UTC().Unix(),
+			CreatedAt:  handlerutil.NowUnix(),
 		}
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.memo.created", &actorID, map[string]any{

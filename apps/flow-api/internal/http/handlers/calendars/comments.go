@@ -4,13 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
 // --- Input/Output types ---
@@ -174,7 +174,7 @@ func CreateComment(deps Deps) func(context.Context, *CreateCommentInput) (*Creat
 			UserID:      profile.PublicID.String(),
 			DisplayName: profile.DisplayName,
 			Body:        input.Body.Body,
-			CreatedAt:   time.Now().UTC().Unix(),
+			CreatedAt:   handlerutil.NowUnix(),
 		}
 		if profile.AvatarUrl.Valid {
 			out.Body.AvatarUrl = &profile.AvatarUrl.String

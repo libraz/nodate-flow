@@ -51,8 +51,15 @@ type NotificationDTO struct {
 // --- List ---
 
 // ListInput is the query for GET /me/notifications.
+//
+// `cursor` opt-in routes through ListNotificationsForUserKeyset (or the
+// per-workspace variant). The keyset queries always pass `read_filter
+// = 'all'` since the historical OFFSET endpoint exposes no read-state
+// filter; callers wanting to filter by read/unread should keep using
+// the OFFSET path until a `state` query parameter is added.
 type ListInput struct {
 	WorkspaceID string `query:"workspaceId" doc:"Optional workspace public id to filter by"`
+	Cursor      string `query:"cursor" doc:"Opaque cursor returned by previous page; pass to fetch next page. Empty when at end."`
 	Limit       int32  `query:"limit" minimum:"1" maximum:"200" default:"50"`
 	Offset      int32  `query:"offset" minimum:"0" default:"0"`
 }

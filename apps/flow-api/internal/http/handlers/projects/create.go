@@ -102,7 +102,7 @@ func Create(deps Deps) func(context.Context, *CreateProjectInput) (*CreateProjec
 			FeatureTimeboxes: true,
 			FeatureLenses:    true,
 			FeatureCalendar:  true,
-			CreatedAt:        time.Now().Unix(),
+			CreatedAt:        handlerutil.NowUnix(),
 		}}, nil
 	}
 }

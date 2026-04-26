@@ -3,13 +3,13 @@ package calendars
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
 // --- Input/Output types ---
@@ -163,7 +163,7 @@ func CreateChecklistItem(deps Deps) func(context.Context, *CreateChecklistItemIn
 			Title:      input.Body.Title,
 			Done:       false,
 			SortWeight: input.Body.SortWeight,
-			CreatedAt:  time.Now().UTC().Unix(),
+			CreatedAt:  handlerutil.NowUnix(),
 		}
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.checklist.created", &actorID, map[string]any{

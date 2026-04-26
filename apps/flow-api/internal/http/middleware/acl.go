@@ -2,92 +2,67 @@
 // nodate-flow API, including authentication and ACL (access control list)
 // enforcement. ACL is intentionally implemented as middleware so that route
 // handlers never perform ad-hoc permission checks (see @acl agent rules).
+//
+// The actual access decisions live in
+// apps/flow-api/internal/acl. This file is a thin chi adapter that
+// extracts URL params + actor from the request, delegates to the
+// shared package, and translates returned [apierrors.APIError] values
+// into JSON error responses.
 package middleware
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"errors"
+	stderrors "errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 )
 
-// Error code locals re-exported from the generated errors package so the
-// rest of this file can keep its original symbol names.
-var (
-	errCodeInstanceAdminRequired = apierrors.InstanceAdminRequired.Code
-	errCodeWorkspaceNotFound     = apierrors.WsWorkspaceNotFound.Code
-	errCodeWorkspaceAccessDenied = apierrors.WsWorkspaceAccessDenied.Code
-	errCodeProjectNotFound       = apierrors.WsProjectNotFound.Code
-	errCodeProjectAccessDenied   = apierrors.WsProjectAccessDenied.Code
-	errCodeMemberRoleDenied      = apierrors.WsMemberRoleDenied.Code
-	errCodeTaskNotFound          = apierrors.WsTaskNotFound.Code
-	errCodeTaskAccessDenied      = apierrors.WsTaskAccessDenied.Code
-)
-
 // ----------------------------------------------------------------------------
-// Roles
+// Roles -- re-exported aliases for backward compatibility with handlers
+// that imported these names from this package before the acl/ refactor.
 // ----------------------------------------------------------------------------
 
-// WorkspaceRole is the role of a user inside a workspace. The hierarchy is
-// owner > admin > member > guest.
-type WorkspaceRole string
+// WorkspaceRole aliases [acl.WorkspaceRole].
+type WorkspaceRole = acl.WorkspaceRole
 
-// Workspace role constants. Order matters for [WorkspaceRole.AtLeast].
+// Workspace role constants. These mirror [acl] for callers that
+// historically reached for the middleware package.
 const (
-	WorkspaceRoleGuest  WorkspaceRole = "guest"
-	WorkspaceRoleMember WorkspaceRole = "member"
-	WorkspaceRoleAdmin  WorkspaceRole = "admin"
-	WorkspaceRoleOwner  WorkspaceRole = "owner"
+	WorkspaceRoleGuest  = acl.WorkspaceRoleGuest
+	WorkspaceRoleMember = acl.WorkspaceRoleMember
+	WorkspaceRoleAdmin  = acl.WorkspaceRoleAdmin
+	WorkspaceRoleOwner  = acl.WorkspaceRoleOwner
 )
 
-var workspaceRoleRank = map[WorkspaceRole]int{
-	WorkspaceRoleGuest:  1,
-	WorkspaceRoleMember: 2,
-	WorkspaceRoleAdmin:  3,
-	WorkspaceRoleOwner:  4,
-}
+// ProjectRole aliases [acl.ProjectRole].
+type ProjectRole = acl.ProjectRole
 
-// AtLeast reports whether the receiver role meets or exceeds the given
-// minimum role in the workspace hierarchy.
-func (r WorkspaceRole) AtLeast(min WorkspaceRole) bool {
-	return workspaceRoleRank[r] >= workspaceRoleRank[min]
-}
-
-// ProjectRole is the role of a user inside a project. The hierarchy is
-// lead > editor > commenter > viewer.
-type ProjectRole string
-
-// Project role constants. Order matters for [ProjectRole.AtLeast].
+// Project role constants.
 const (
-	// ProjectRoleElevated indicates that the caller has elevated workspace-level
-	// access (owner or admin) and is not scoped to a specific project role.
-	ProjectRoleElevated  ProjectRole = ""
-	ProjectRoleViewer    ProjectRole = "viewer"
-	ProjectRoleCommenter ProjectRole = "commenter"
-	ProjectRoleEditor    ProjectRole = "editor"
-	ProjectRoleLead      ProjectRole = "lead"
+	ProjectRoleElevated  = acl.ProjectRoleElevated
+	ProjectRoleViewer    = acl.ProjectRoleViewer
+	ProjectRoleCommenter = acl.ProjectRoleCommenter
+	ProjectRoleEditor    = acl.ProjectRoleEditor
+	ProjectRoleLead      = acl.ProjectRoleLead
 )
 
-var projectRoleRank = map[ProjectRole]int{
-	ProjectRoleViewer:    1,
-	ProjectRoleCommenter: 2,
-	ProjectRoleEditor:    3,
-	ProjectRoleLead:      4,
-}
+// TaskVisibility aliases [acl.TaskVisibility].
+type TaskVisibility = acl.TaskVisibility
 
-// AtLeast reports whether the receiver role meets or exceeds the given
-// minimum role in the project hierarchy.
-func (r ProjectRole) AtLeast(min ProjectRole) bool {
-	return projectRoleRank[r] >= projectRoleRank[min]
-}
+// Task visibility constants.
+const (
+	TaskVisibilityPublic  = acl.TaskVisibilityPublic
+	TaskVisibilityProject = acl.TaskVisibilityProject
+	TaskVisibilityPrivate = acl.TaskVisibilityPrivate
+)
 
 // ----------------------------------------------------------------------------
 // Context plumbing
@@ -231,16 +206,34 @@ func writeError(w http.ResponseWriter, status int, code, message string) {
 	_ = json.NewEncoder(w).Encode(errorBody{Code: code, Message: message})
 }
 
+// writeAPIError converts an *apierrors.APIError into a JSON error
+// response using the spec's status code. Non-APIError values are
+// written as a generic 500 INTERNAL.UNEXPECTED to avoid leaking
+// internal error strings.
+func writeAPIError(w http.ResponseWriter, err error) {
+	var ae *apierrors.APIError
+	if stderrors.As(err, &ae) && ae.Spec != nil {
+		writeError(w, ae.Spec.Status, ae.Spec.Code, ae.Spec.Message)
+		return
+	}
+	writeError(w, http.StatusInternalServerError, apierrors.InternalUnexpected.Code, apierrors.InternalUnexpected.Message)
+}
+
+// hasSpec reports whether err is an APIError carrying the given spec.
+func hasSpec(err error, spec *apierrors.Spec) bool {
+	var ae *apierrors.APIError
+	return stderrors.As(err, &ae) && ae.Spec == spec
+}
+
 // ----------------------------------------------------------------------------
 // Database surface
 // ----------------------------------------------------------------------------
 
 // ACLDB is the minimal subset of *sql.DB that the ACL middleware needs.
-// Defining it as an interface keeps the middleware testable without a live
-// database connection.
-type ACLDB interface {
-	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
-}
+// Defining it as an interface keeps the middleware testable without a
+// live database connection. It is identical to [acl.DB] and accepted by
+// the same shared check functions.
+type ACLDB = acl.DB
 
 // ----------------------------------------------------------------------------
 // Instance-level
@@ -252,26 +245,16 @@ type ACLDB interface {
 //
 // On failure it responds 403 INSTANCE.ADMIN.REQUIRED.
 func RequireInstanceAdmin(db ACLDB) func(http.Handler) http.Handler {
-	const q = `SELECT 1 FROM instance_admins
-WHERE user_id = ? AND enabled = TRUE AND revoked_at IS NULL LIMIT 1`
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			userID, ok := ActorFromContext(r.Context())
 			if !ok {
-				writeError(w, http.StatusForbidden, errCodeInstanceAdminRequired,
-					"Instance administrator privileges are required")
+				writeError(w, http.StatusForbidden, apierrors.InstanceAdminRequired.Code,
+					apierrors.InstanceAdminRequired.Message)
 				return
 			}
-			var one int
-			err := db.QueryRowContext(r.Context(), q, userID).Scan(&one)
-			if err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					writeError(w, http.StatusForbidden, errCodeInstanceAdminRequired,
-						"Instance administrator privileges are required")
-					return
-				}
-				writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED",
-					"Internal error")
+			if err := acl.CheckInstanceAdmin(r.Context(), db, userID); err != nil {
+				writeAPIError(w, err)
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -293,48 +276,29 @@ WHERE user_id = ? AND enabled = TRUE AND revoked_at IS NULL LIMIT 1`
 //     path parameter is not a valid UUID.
 //   - 403 WS.WORKSPACE.ACCESS_DENIED when the actor is not a member.
 func RequireWorkspaceMember(db ACLDB) func(http.Handler) http.Handler {
-	const wsQuery = `SELECT id FROM workspaces
-WHERE public_id = ? AND enabled = TRUE LIMIT 1`
-	const memQuery = `SELECT role FROM workspace_members
-WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			userID, ok := ActorFromContext(r.Context())
 			if !ok {
-				writeError(w, http.StatusForbidden, errCodeWorkspaceAccessDenied,
-					"You do not have access to this workspace")
+				writeError(w, http.StatusForbidden, apierrors.WsWorkspaceAccessDenied.Code,
+					apierrors.WsWorkspaceAccessDenied.Message)
 				return
 			}
 			raw := chi.URLParam(r, "wsId")
 			pub, err := uuid.Parse(raw)
 			if err != nil {
-				writeError(w, http.StatusNotFound, errCodeWorkspaceNotFound,
-					"Workspace not found")
+				writeError(w, http.StatusNotFound, apierrors.WsWorkspaceNotFound.Code,
+					apierrors.WsWorkspaceNotFound.Message)
 				return
 			}
-			var wsID uint32
-			if err := db.QueryRowContext(r.Context(), wsQuery, types.FromUUID(pub)).Scan(&wsID); err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					writeError(w, http.StatusNotFound, errCodeWorkspaceNotFound,
-						"Workspace not found")
-					return
-				}
-				writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Internal error")
+			access, err := acl.ResolveWorkspaceAccess(r.Context(), db, pub, userID)
+			if err != nil {
+				writeAPIError(w, err)
 				return
 			}
-			var role string
-			if err := db.QueryRowContext(r.Context(), memQuery, wsID, userID).Scan(&role); err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					writeError(w, http.StatusForbidden, errCodeWorkspaceAccessDenied,
-						"You do not have access to this workspace")
-					return
-				}
-				writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Internal error")
-				return
-			}
-			ctx := context.WithValue(r.Context(), ctxKeyWorkspaceID, wsID)
+			ctx := context.WithValue(r.Context(), ctxKeyWorkspaceID, access.ID)
 			ctx = context.WithValue(ctx, ctxKeyWorkspaceIDPublic, pub)
-			ctx = context.WithValue(ctx, ctxKeyWorkspaceRole, WorkspaceRole(role))
+			ctx = context.WithValue(ctx, ctxKeyWorkspaceRole, access.Role)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -348,8 +312,8 @@ func RequireWorkspaceRole(min WorkspaceRole) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ws, ok := WorkspaceFromContext(r.Context())
 			if !ok || !ws.Role.AtLeast(min) {
-				writeError(w, http.StatusForbidden, errCodeMemberRoleDenied,
-					"Your role does not permit this action")
+				writeError(w, http.StatusForbidden, apierrors.WsMemberRoleDenied.Code,
+					apierrors.WsMemberRoleDenied.Message)
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -378,58 +342,35 @@ func RequireWorkspaceRole(min WorkspaceRole) func(http.Handler) http.Handler {
 // (list endpoints). This middleware only covers instance/workspace/project
 // layers.
 func RequireProjectMember(db ACLDB) func(http.Handler) http.Handler {
-	const prjQuery = `SELECT id FROM projects
-WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE LIMIT 1`
-	const memQuery = `SELECT role FROM project_members
-WHERE workspace_id = ? AND project_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			userID, ok := ActorFromContext(r.Context())
 			if !ok {
-				writeError(w, http.StatusForbidden, errCodeProjectAccessDenied,
-					"You do not have access to this project")
+				writeError(w, http.StatusForbidden, apierrors.WsProjectAccessDenied.Code,
+					apierrors.WsProjectAccessDenied.Message)
 				return
 			}
 			ws, ok := WorkspaceFromContext(r.Context())
 			if !ok {
-				writeError(w, http.StatusNotFound, errCodeProjectNotFound,
-					"Project not found")
+				writeError(w, http.StatusNotFound, apierrors.WsProjectNotFound.Code,
+					apierrors.WsProjectNotFound.Message)
 				return
 			}
 			raw := chi.URLParam(r, "prjId")
 			pub, err := uuid.Parse(raw)
 			if err != nil {
-				writeError(w, http.StatusNotFound, errCodeProjectNotFound,
-					"Project not found")
+				writeError(w, http.StatusNotFound, apierrors.WsProjectNotFound.Code,
+					apierrors.WsProjectNotFound.Message)
 				return
 			}
-			var prjID uint32
-			if err := db.QueryRowContext(r.Context(), prjQuery, ws.ID, types.FromUUID(pub)).Scan(&prjID); err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					writeError(w, http.StatusNotFound, errCodeProjectNotFound,
-						"Project not found")
-					return
-				}
-				writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Internal error")
+			prjID, err := acl.ResolveProjectInWorkspace(r.Context(), db, ws.ID, pub)
+			if err != nil {
+				writeAPIError(w, err)
 				return
 			}
-			var role ProjectRole
-			var roleStr string
-			err = db.QueryRowContext(r.Context(), memQuery, ws.ID, prjID, userID).Scan(&roleStr)
-			switch {
-			case err == nil:
-				role = ProjectRole(roleStr)
-			case errors.Is(err, sql.ErrNoRows):
-				// Workspace owners and admins can act on every project.
-				if !ws.Role.AtLeast(WorkspaceRoleAdmin) {
-					writeError(w, http.StatusForbidden, errCodeProjectAccessDenied,
-						"You do not have access to this project")
-					return
-				}
-				// Elevated access: not scoped to a specific project role.
-				role = ProjectRoleElevated
-			default:
-				writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Internal error")
+			role, _, err := acl.CheckProjectMembership(r.Context(), db, ws.ID, prjID, userID, ws.Role, nil)
+			if err != nil {
+				writeAPIError(w, err)
 				return
 			}
 			ctx := context.WithValue(r.Context(), ctxKeyProjectID, prjID)
@@ -446,107 +387,60 @@ WHERE workspace_id = ? AND project_id = ? AND user_id = ? AND enabled = TRUE LIM
 // workspace membership, then applies the same project membership / workspace
 // elevation logic as [RequireProjectMember]. Both workspace and project
 // contexts are injected for downstream handlers.
-//
-// TODO(@query): Replace the inline SELECTs with a generated
-// FindProjectByPublicIdGlobal query once available.
 func RequireProjectMemberByGlobalId(db ACLDB) func(http.Handler) http.Handler {
-	const prjQuery = `SELECT id, workspace_id FROM projects
-WHERE public_id = ? AND enabled = TRUE LIMIT 1`
-	const wsQuery = `SELECT public_id FROM workspaces
-WHERE id = ? AND enabled = TRUE LIMIT 1`
-	const wsMemQuery = `SELECT role FROM workspace_members
-WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
-	const prjMemQuery = `SELECT role FROM project_members
-WHERE workspace_id = ? AND project_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			userID, ok := ActorFromContext(r.Context())
 			if !ok {
-				writeError(w, http.StatusForbidden, errCodeProjectAccessDenied,
-					"You do not have access to this project")
+				writeError(w, http.StatusForbidden, apierrors.WsProjectAccessDenied.Code,
+					apierrors.WsProjectAccessDenied.Message)
 				return
 			}
 			raw := chi.URLParam(r, "prjId")
 			pub, err := uuid.Parse(raw)
 			if err != nil {
-				writeError(w, http.StatusNotFound, errCodeProjectNotFound,
-					"Project not found")
+				writeError(w, http.StatusNotFound, apierrors.WsProjectNotFound.Code,
+					apierrors.WsProjectNotFound.Message)
 				return
 			}
-			var prjID, wsID uint32
-			if err := db.QueryRowContext(r.Context(), prjQuery, types.FromUUID(pub)).Scan(&prjID, &wsID); err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					writeError(w, http.StatusNotFound, errCodeProjectNotFound,
-						"Project not found")
+			prj, err := acl.ResolveProjectByPublicID(r.Context(), db, pub)
+			if err != nil {
+				writeAPIError(w, err)
+				return
+			}
+			wsPubID, err := acl.ResolveWorkspacePublicByID(r.Context(), db, prj.WorkspaceID)
+			if err != nil {
+				// Workspace-not-found leaks here as project-not-found to
+				// match the historical surface of this middleware. Transport
+				// errors propagate as INTERNAL.UNEXPECTED via writeAPIError.
+				if hasSpec(err, apierrors.WsWorkspaceNotFound) {
+					writeError(w, http.StatusNotFound, apierrors.WsProjectNotFound.Code,
+						apierrors.WsProjectNotFound.Message)
 					return
 				}
-				writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Internal error")
+				writeAPIError(w, err)
 				return
 			}
-			var wsPubID types.PublicID
-			if err := db.QueryRowContext(r.Context(), wsQuery, wsID).Scan(&wsPubID); err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					writeError(w, http.StatusNotFound, errCodeProjectNotFound,
-						"Project not found")
-					return
-				}
-				writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Internal error")
+			wsRole, err := acl.CheckWorkspaceMember(r.Context(), db, prj.WorkspaceID, userID, apierrors.WsProjectAccessDenied)
+			if err != nil {
+				writeAPIError(w, err)
 				return
 			}
-			var wsRoleStr string
-			if err := db.QueryRowContext(r.Context(), wsMemQuery, wsID, userID).Scan(&wsRoleStr); err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					writeError(w, http.StatusForbidden, errCodeProjectAccessDenied,
-						"You do not have access to this project")
-					return
-				}
-				writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Internal error")
+			role, _, err := acl.CheckProjectMembership(r.Context(), db, prj.WorkspaceID, prj.ID, userID, wsRole, nil)
+			if err != nil {
+				writeAPIError(w, err)
 				return
 			}
-			wsRole := WorkspaceRole(wsRoleStr)
-			var role ProjectRole
-			var roleStr string
-			err = db.QueryRowContext(r.Context(), prjMemQuery, wsID, prjID, userID).Scan(&roleStr)
-			switch {
-			case err == nil:
-				role = ProjectRole(roleStr)
-			case errors.Is(err, sql.ErrNoRows):
-				if !wsRole.AtLeast(WorkspaceRoleAdmin) {
-					writeError(w, http.StatusForbidden, errCodeProjectAccessDenied,
-						"You do not have access to this project")
-					return
-				}
-				role = ProjectRoleElevated
-			default:
-				writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Internal error")
-				return
-			}
-			ctx := context.WithValue(r.Context(), ctxKeyWorkspaceID, wsID)
+			ctx := context.WithValue(r.Context(), ctxKeyWorkspaceID, prj.WorkspaceID)
 			ctx = context.WithValue(ctx, ctxKeyWorkspaceIDPublic, wsPubID.UUID())
 			ctx = context.WithValue(ctx, ctxKeyWorkspaceRole, wsRole)
-			ctx = context.WithValue(ctx, ctxKeyProjectID, prjID)
+			ctx = context.WithValue(ctx, ctxKeyProjectID, prj.ID)
 			ctx = context.WithValue(ctx, ctxKeyProjectIDPublic, pub)
 			ctx = context.WithValue(ctx, ctxKeyProjectRole, role)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
-
-// TaskVisibility represents the Layer 4 task-level visibility setting.
-type TaskVisibility string
-
-// Task visibility constants.
-const (
-	// TaskVisibilityPublic means any workspace member can see the task.
-	TaskVisibilityPublic TaskVisibility = "public"
-	// TaskVisibilityProject means only members of the task's parent project
-	// (or workspace admins/owners) can see the task.
-	TaskVisibilityProject TaskVisibility = "project"
-	// TaskVisibilityPrivate means only users who are actors on the task
-	// (assignee, reviewer, watcher, approver, or creator) can see it.
-	// Workspace admins/owners are also granted access.
-	TaskVisibilityPrivate TaskVisibility = "private"
-)
 
 // RequireTaskAccess returns a middleware that resolves the task from the
 // {id} path parameter (a UUID v7), verifies the actor has access to the
@@ -567,133 +461,68 @@ const (
 //   - 403 WS.TASK.ACCESS_DENIED when the actor cannot access the task's
 //     project / workspace, or when task visibility denies access.
 func RequireTaskAccess(db ACLDB) func(http.Handler) http.Handler {
-	const taskQuery = `SELECT id, workspace_id, project_id, visibility, created_by_user_id FROM tasks
-WHERE public_id = ? AND enabled = TRUE LIMIT 1`
-	const wsQuery = `SELECT public_id FROM workspaces
-WHERE id = ? AND enabled = TRUE LIMIT 1`
-	const wsMemQuery = `SELECT role FROM workspace_members
-WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
-	const prjQuery = `SELECT public_id FROM projects
-WHERE id = ? AND enabled = TRUE LIMIT 1`
-	const prjMemQuery = `SELECT role FROM project_members
-WHERE workspace_id = ? AND project_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
-	const taskActorQuery = `SELECT 1 FROM task_actors
-WHERE task_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			userID, ok := ActorFromContext(r.Context())
 			if !ok {
-				writeError(w, http.StatusForbidden, errCodeTaskAccessDenied,
-					"You do not have access to this task")
+				writeError(w, http.StatusForbidden, apierrors.WsTaskAccessDenied.Code,
+					apierrors.WsTaskAccessDenied.Message)
 				return
 			}
 			raw := chi.URLParam(r, "id")
 			pub, err := uuid.Parse(raw)
 			if err != nil {
-				writeError(w, http.StatusNotFound, errCodeTaskNotFound, "Task not found")
+				writeError(w, http.StatusNotFound, apierrors.WsTaskNotFound.Code,
+					apierrors.WsTaskNotFound.Message)
 				return
 			}
-			var taskID, wsID, prjID uint32
-			var visibility string
-			var createdByUserID sql.NullInt32
-			if err := db.QueryRowContext(r.Context(), taskQuery, types.FromUUID(pub)).Scan(&taskID, &wsID, &prjID, &visibility, &createdByUserID); err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					writeError(w, http.StatusNotFound, errCodeTaskNotFound, "Task not found")
-					return
-				}
-				writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Internal error")
+			rec, err := acl.ResolveTaskByPublicID(r.Context(), db, pub)
+			if err != nil {
+				writeAPIError(w, err)
 				return
 			}
-			var wsPubID types.PublicID
-			if err := db.QueryRowContext(r.Context(), wsQuery, wsID).Scan(&wsPubID); err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					writeError(w, http.StatusNotFound, errCodeTaskNotFound, "Task not found")
+			wsPubID, err := acl.ResolveWorkspacePublicByID(r.Context(), db, rec.WorkspaceID)
+			if err != nil {
+				// Workspace-not-found leaks as task-not-found to avoid
+				// disclosing existence of cross-tenant tasks. Transport
+				// errors propagate as INTERNAL.UNEXPECTED via writeAPIError.
+				if hasSpec(err, apierrors.WsWorkspaceNotFound) {
+					writeError(w, http.StatusNotFound, apierrors.WsTaskNotFound.Code,
+						apierrors.WsTaskNotFound.Message)
 					return
 				}
-				writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Internal error")
+				writeAPIError(w, err)
 				return
 			}
-			var wsRoleStr string
-			if err := db.QueryRowContext(r.Context(), wsMemQuery, wsID, userID).Scan(&wsRoleStr); err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					writeError(w, http.StatusForbidden, errCodeTaskAccessDenied,
-						"You do not have access to this task")
-					return
-				}
-				writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Internal error")
+			wsRole, err := acl.CheckWorkspaceMember(r.Context(), db, rec.WorkspaceID, userID, apierrors.WsTaskAccessDenied)
+			if err != nil {
+				writeAPIError(w, err)
 				return
 			}
-			wsRole := WorkspaceRole(wsRoleStr)
-
-			// Layer 3: project membership check.
-			var prjPubID types.PublicID
-			if err := db.QueryRowContext(r.Context(), prjQuery, prjID).Scan(&prjPubID); err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					writeError(w, http.StatusNotFound, errCodeTaskNotFound, "Task not found")
-					return
-				}
-				writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Internal error")
+			prjPubID, err := acl.ResolveProjectPublicByID(r.Context(), db, rec.ProjectID, apierrors.WsTaskNotFound)
+			if err != nil {
+				writeAPIError(w, err)
 				return
 			}
-			var prjRole ProjectRole
-			var prjRoleStr string
-			isProjectMember := false
-			err = db.QueryRowContext(r.Context(), prjMemQuery, wsID, prjID, userID).Scan(&prjRoleStr)
-			switch {
-			case err == nil:
-				prjRole = ProjectRole(prjRoleStr)
-				isProjectMember = true
-			case errors.Is(err, sql.ErrNoRows):
-				if !wsRole.AtLeast(WorkspaceRoleAdmin) {
-					writeError(w, http.StatusForbidden, errCodeTaskAccessDenied,
-						"You do not have access to this task")
-					return
-				}
-				prjRole = ProjectRoleElevated
-			default:
-				writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Internal error")
+			prjRole, isProjectMember, err := acl.CheckProjectMembership(
+				r.Context(), db, rec.WorkspaceID, rec.ProjectID, userID, wsRole, apierrors.WsTaskAccessDenied,
+			)
+			if err != nil {
+				writeAPIError(w, err)
+				return
+			}
+			if err := acl.CheckTaskVisibility(r.Context(), db, rec, userID, wsRole, isProjectMember); err != nil {
+				writeAPIError(w, err)
 				return
 			}
 
-			// Layer 4: task visibility enforcement.
-			isElevated := wsRole.AtLeast(WorkspaceRoleAdmin)
-			switch TaskVisibility(visibility) {
-			case TaskVisibilityPublic:
-				// Any workspace member can access -- already verified above.
-			case TaskVisibilityProject:
-				// Requires project membership or workspace admin/owner elevation.
-				if !isProjectMember && !isElevated {
-					// Return 404 to avoid leaking existence of private tasks.
-					writeError(w, http.StatusNotFound, errCodeTaskNotFound, "Task not found")
-					return
-				}
-			case TaskVisibilityPrivate:
-				// Requires being a task actor (or creator), unless ws admin/owner.
-				if !isElevated {
-					isCreator := createdByUserID.Valid && uint32(createdByUserID.Int32) == userID
-					if !isCreator {
-						var one int
-						actorErr := db.QueryRowContext(r.Context(), taskActorQuery, taskID, userID).Scan(&one)
-						if actorErr != nil {
-							if !errors.Is(actorErr, sql.ErrNoRows) {
-								writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Internal error")
-								return
-							}
-							// User is not a task actor — return 404 to avoid leaking existence.
-							writeError(w, http.StatusNotFound, errCodeTaskNotFound, "Task not found")
-							return
-						}
-					}
-				}
-			}
-
-			ctx := context.WithValue(r.Context(), ctxKeyWorkspaceID, wsID)
+			ctx := context.WithValue(r.Context(), ctxKeyWorkspaceID, rec.WorkspaceID)
 			ctx = context.WithValue(ctx, ctxKeyWorkspaceIDPublic, wsPubID.UUID())
 			ctx = context.WithValue(ctx, ctxKeyWorkspaceRole, wsRole)
-			ctx = context.WithValue(ctx, ctxKeyProjectID, prjID)
+			ctx = context.WithValue(ctx, ctxKeyProjectID, rec.ProjectID)
 			ctx = context.WithValue(ctx, ctxKeyProjectIDPublic, prjPubID.UUID())
 			ctx = context.WithValue(ctx, ctxKeyProjectRole, prjRole)
-			ctx = context.WithValue(ctx, ctxKeyTaskID, taskID)
+			ctx = context.WithValue(ctx, ctxKeyTaskID, rec.ID)
 			ctx = context.WithValue(ctx, ctxKeyTaskIDPublic, pub)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -701,45 +530,10 @@ WHERE task_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 }
 
 // TaskVisibilityFilter returns a SQL WHERE fragment and associated bind
-// arguments that enforce Layer 4 task visibility in list queries. The
-// fragment references v_task_list columns and should be ANDed into an
-// existing WHERE clause.
-//
-// The userID is the actor's internal id. wsRole is the actor's workspace
-// role (from context). When the actor is a workspace admin or owner, no
-// additional filtering is applied (all tasks are visible regardless of
-// visibility setting).
-//
-// The returned fragment uses the v_task_list aliases:
-//   - v.visibility, v.project_id, v.task_internal_id, v.created_by_user_id
+// arguments that enforce Layer 4 task visibility in list queries.
+// See [acl.TaskVisibilityFilter] for the full contract.
 func TaskVisibilityFilter(userID uint32, wsRole WorkspaceRole) (fragment string, args []any) {
-	if wsRole.AtLeast(WorkspaceRoleAdmin) {
-		// Admins/owners see everything.
-		return "", nil
-	}
-	// For non-elevated users, filter out tasks they cannot see:
-	// - public: always visible (workspace membership already checked)
-	// - project: visible if user is a project member
-	// - private: visible if user is a task actor or creator
-	const frag = `(
-    v.visibility = 'public'
-    OR (v.visibility = 'project' AND EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = v.project_id
-        AND pm.user_id = ?
-        AND pm.enabled = TRUE
-    ))
-    OR (v.visibility = 'private' AND (
-      v.created_by_user_id = ?
-      OR EXISTS (
-        SELECT 1 FROM task_actors ta
-        WHERE ta.task_id = v.task_internal_id
-          AND ta.user_id = ?
-          AND ta.enabled = TRUE
-      )
-    ))
-  )`
-	return frag, []any{userID, userID, userID}
+	return acl.TaskVisibilityFilter(userID, wsRole)
 }
 
 // RequireProjectRole returns a middleware that asserts the actor's project
@@ -753,18 +547,17 @@ func RequireProjectRole(min ProjectRole) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			prj, ok := ProjectFromContext(r.Context())
 			if !ok {
-				writeError(w, http.StatusForbidden, errCodeProjectAccessDenied,
-					"You do not have access to this project")
+				writeError(w, http.StatusForbidden, apierrors.WsProjectAccessDenied.Code,
+					apierrors.WsProjectAccessDenied.Message)
 				return
 			}
 			if prj.Role == ProjectRoleElevated {
-				// Elevated workspace access established by RequireProjectMember.
 				next.ServeHTTP(w, r)
 				return
 			}
 			if !prj.Role.AtLeast(min) {
-				writeError(w, http.StatusForbidden, errCodeProjectAccessDenied,
-					"You do not have access to this project")
+				writeError(w, http.StatusForbidden, apierrors.WsProjectAccessDenied.Code,
+					apierrors.WsProjectAccessDenied.Message)
 				return
 			}
 			next.ServeHTTP(w, r)

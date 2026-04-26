@@ -1,7 +1,8 @@
-// Package mcp ACL helpers. These are intentionally duplicated from
-// internal/http/middleware/acl.go (Path A) rather than refactored into
-// a shared package, to avoid churn in the REST handlers. The lookups
-// are small (workspace_members / project_members) and stable.
+// Package mcp ACL helpers. The actual access decisions live in
+// apps/flow-api/internal/acl so they cannot drift between the HTTP
+// middleware and the MCP transport. This file is the thin MCP-side
+// wrapper that handles bearer-token / session extraction and resource
+// resolution that is specific to MCP (calendar, page).
 package mcp
 
 import (
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
@@ -99,60 +101,50 @@ func parseScopes(raw []byte) []string {
 
 // requireWorkspaceMember verifies the acting user is an enabled member
 // of the session workspace. Returns the workspace role on success.
+//
+// Delegates to the shared [acl.CheckWorkspaceMember] so the rule
+// cannot drift from the HTTP middleware's behavior.
 func requireWorkspaceMember(ctx context.Context, deps Deps, s *session) (string, error) {
-	row, err := deps.Queries.FindWorkspaceMemberByUserId(ctx, generated.FindWorkspaceMemberByUserIdParams{
-		WorkspaceID: s.workspaceID,
-		UserID:      s.userID,
-	})
+	role, err := acl.CheckWorkspaceMember(ctx, deps.DB, s.workspaceID, s.userID, nil)
 	if err != nil {
-		if stderrors.Is(err, sql.ErrNoRows) {
-			return "", apierrors.New(apierrors.WsWorkspaceAccessDenied)
-		}
 		return "", err
 	}
-	return string(row.Role), nil
+	return string(role), nil
 }
 
 // resolveProject resolves a project public id to its internal id and
 // verifies it belongs to the session workspace. Returns the internal
 // project id.
+//
+// Delegates to [acl.ResolveProjectByPublicID] for the lookup and
+// applies the workspace-binding check that is specific to MCP tokens.
 func resolveProject(ctx context.Context, deps Deps, s *session, publicID string) (uint32, error) {
 	pub, err := types.Parse(publicID)
 	if err != nil {
 		return 0, apierrors.New(apierrors.WsProjectNotFound)
 	}
-	row, err := deps.Queries.FindProjectByPublicIdGlobal(ctx, pub)
+	prj, err := acl.ResolveProjectByPublicID(ctx, deps.DB, pub.UUID())
 	if err != nil {
-		if stderrors.Is(err, sql.ErrNoRows) {
-			return 0, apierrors.New(apierrors.WsProjectNotFound)
-		}
 		return 0, err
 	}
-	if row.WorkspaceID != s.workspaceID {
+	if prj.WorkspaceID != s.workspaceID {
 		return 0, apierrors.New(apierrors.McpTokenWorkspaceMismatch)
 	}
-	return row.ID, nil
+	return prj.ID, nil
 }
 
 // resolveTask resolves a task public id to its internal id and verifies
 // it belongs to the session workspace.
 //
-// NOTE: raw SQL is intentional here. The only sqlc query that resolves a
-// task by public_id (FindTaskByPublicId) queries v_task_detail and does
-// not expose the internal id column — it is designed for the API response
-// mapper. This helper only needs the internal id for downstream sqlc
-// calls, so a lightweight single-column lookup is appropriate.
+// Delegates to [acl.ResolveTaskInWorkspace] which performs the bounded
+// "by workspace + public id" lookup the MCP transport expects.
 func resolveTask(ctx context.Context, deps Deps, s *session, publicID string) (uint32, types.PublicID, error) {
 	pub, err := types.Parse(publicID)
 	if err != nil {
 		return 0, types.PublicID{}, apierrors.New(apierrors.WsTaskNotFound)
 	}
-	const q = `SELECT id FROM tasks WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE LIMIT 1`
-	var id uint32
-	if err := deps.DB.QueryRowContext(ctx, q, s.workspaceID, pub).Scan(&id); err != nil {
-		if stderrors.Is(err, sql.ErrNoRows) {
-			return 0, types.PublicID{}, apierrors.New(apierrors.WsTaskNotFound)
-		}
+	id, err := acl.ResolveTaskInWorkspace(ctx, deps.DB, s.workspaceID, pub.UUID())
+	if err != nil {
 		return 0, types.PublicID{}, err
 	}
 	return id, pub, nil

@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/taskstate"
 )
 
 // ExecutorConfig controls the background auto-action loop. These values
@@ -90,6 +91,15 @@ func (e *Executor) Stop() {
 			close(e.stopCh)
 		}
 	})
+}
+
+// RunOnce performs a single evaluation pass synchronously, mirroring
+// what the background loop does on every ticker tick. It exists for
+// integration tests that need deterministic execution without waiting
+// on the interval, and for one-shot CLI invocations. Production code
+// uses [Start] / [Stop].
+func (e *Executor) RunOnce(ctx context.Context) {
+	e.tick(ctx)
 }
 
 // taskRow holds the fields needed for evaluation and mutation.
@@ -367,41 +377,13 @@ func (e *Executor) escalate(ctx context.Context, r taskRow, act *Action) {
 	)
 }
 
-// closeStaleReview transitions a stale review task to done.
+// closeStaleReview transitions a stale review task to done by going
+// through the canonical state-machine helper. The executor never
+// touches tasks.derived_state directly: writing the column is reserved
+// to taskstate.ApplyTransitionTx, which also appends the matching
+// task.transition.complete event in the same transaction.
 func (e *Executor) closeStaleReview(ctx context.Context, r taskRow, act *Action) {
-	tx, err := e.DB.BeginTx(ctx, nil)
-	if err != nil {
-		e.Logger.Error("auto-action executor: begin tx", "err", err)
-		return
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if _, err := tx.ExecContext(ctx,
-		"UPDATE tasks SET derived_state = 'done', updated_at = NOW() WHERE id = ?",
-		r.id,
-	); err != nil {
-		e.Logger.Error("auto-action executor: transition state", "task", r.publicID.String(), "err", err)
-		return
-	}
-
-	payload, _ := json.Marshal(map[string]any{
-		"auto_action": string(act.Kind),
-		"from":        r.derivedState,
-		"to":          "done",
-		"reason":      act.Reason,
-	})
-	if err := e.appendEvent(ctx, tx, r, "task.transition.complete", payload); err != nil {
-		return
-	}
-
-	if err := tx.Commit(); err != nil {
-		e.Logger.Error("auto-action executor: commit", "task", r.publicID.String(), "err", err)
-		return
-	}
-	e.Logger.Info("auto-action applied: close stale review",
-		"task", r.publicID.String(),
-		"from", r.derivedState,
-	)
+	e.applyStateTransition(ctx, r, act, taskstate.TransitionComplete)
 }
 
 // recordProposal writes an event recording the AI proposal without
@@ -485,8 +467,25 @@ func (e *Executor) autoArchive(ctx context.Context, r taskRow, act *Action) {
 }
 
 // autoClose cancels a stale open task that has had no activity beyond
-// the configured threshold.
+// the configured threshold. Like closeStaleReview, the actual
+// derived_state UPDATE and matching task.transition.cancel event are
+// performed by the canonical taskstate helper.
 func (e *Executor) autoClose(ctx context.Context, r taskRow, act *Action) {
+	e.applyStateTransition(ctx, r, act, taskstate.TransitionCancel)
+}
+
+// applyStateTransition is the shared body of [closeStaleReview] and
+// [autoClose]. It opens a transaction, runs the canonical
+// taskstate.ApplyTransitionTx helper (which acquires a row lock,
+// validates the transition against the v1 state machine, persists the
+// new derived_state, and appends the matching task.transition.<name>
+// event) and commits.
+//
+// The executor runs as a system component, not on behalf of a user,
+// so ActorUserID is left nil; the via="auto_action" tag and
+// auto_action / confidence keys on the event payload mark the event
+// origin so audit consumers can distinguish it from human transitions.
+func (e *Executor) applyStateTransition(ctx context.Context, r taskRow, act *Action, transition string) {
 	tx, err := e.DB.BeginTx(ctx, nil)
 	if err != nil {
 		e.Logger.Error("auto-action executor: begin tx", "err", err)
@@ -494,21 +493,29 @@ func (e *Executor) autoClose(ctx context.Context, r taskRow, act *Action) {
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if _, err := tx.ExecContext(ctx,
-		"UPDATE tasks SET derived_state = 'cancelled', updated_at = NOW() WHERE id = ?",
-		r.id,
-	); err != nil {
-		e.Logger.Error("auto-action executor: close stale task", "task", r.publicID.String(), "err", err)
-		return
-	}
-
-	payload, _ := json.Marshal(map[string]any{
-		"auto_action": string(act.Kind),
-		"from":        r.derivedState,
-		"to":          "cancelled",
-		"reason":      act.Reason,
+	result, spec, cause := taskstate.ApplyTransitionTx(ctx, tx, taskstate.ApplyParams{
+		WorkspaceID: r.workspaceID,
+		TaskID:      r.id,
+		PublicID:    r.publicID,
+		Transition:  transition,
+		ActorUserID: nil, // system / auto-action, not a real user
+		Reason:      act.Reason,
+		Via:         "auto_action",
+		ExtraPayload: map[string]any{
+			"auto_action": string(act.Kind),
+			"confidence":  act.Confidence,
+		},
 	})
-	if err := e.appendEvent(ctx, tx, r, "task.transition.cancel", payload); err != nil {
+	if spec != nil {
+		// Validation rejection (TRANSITION_REJECTED / NOT_FOUND) means
+		// the task drifted out of the matching state between query and
+		// apply; this is benign — log and skip.
+		e.Logger.Warn("auto-action executor: transition rejected",
+			"task", r.publicID.String(),
+			"transition", transition,
+			"code", spec.Code,
+			"cause", cause,
+		)
 		return
 	}
 
@@ -516,9 +523,11 @@ func (e *Executor) autoClose(ctx context.Context, r taskRow, act *Action) {
 		e.Logger.Error("auto-action executor: commit", "task", r.publicID.String(), "err", err)
 		return
 	}
-	e.Logger.Info("auto-action applied: auto-close stale",
+	e.Logger.Info("auto-action applied: state transition",
 		"task", r.publicID.String(),
-		"from", r.derivedState,
+		"kind", string(act.Kind),
+		"from", string(result.FromState),
+		"to", string(result.ToState),
 	)
 }
 

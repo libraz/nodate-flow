@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
@@ -96,7 +95,7 @@ func Create(deps Deps) func(context.Context, *CreateWidgetInput) (*CreateWidgetO
 			Height:             in.Body.Height,
 			SortWeight:         0,
 			UpdatedAt:          0,
-			CreatedAt:          time.Now().Unix(),
+			CreatedAt:          handlerutil.NowUnix(),
 		}}, nil
 	}
 }

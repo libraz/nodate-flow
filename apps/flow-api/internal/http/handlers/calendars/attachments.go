@@ -4,13 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
 // --- Input/Output types ---
@@ -169,7 +169,7 @@ func CreateAttachment(deps Deps) func(context.Context, *CreateAttachmentInput) (
 			StorageKey:   input.Body.StorageKey,
 			UploaderID:   profile.PublicID.String(),
 			UploaderName: profile.DisplayName,
-			CreatedAt:    time.Now().UTC().Unix(),
+			CreatedAt:    handlerutil.NowUnix(),
 		}
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.attachment.created", &actorID, map[string]any{

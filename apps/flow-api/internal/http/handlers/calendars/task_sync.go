@@ -12,6 +12,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/itemkit"
 )
 
@@ -135,7 +136,7 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 			StartAt:    &startUnix,
 			EndAt:      &endUnix,
 			Timezone:   tzName,
-			CreatedAt:  time.Now().UTC().Unix(),
+			CreatedAt:  handlerutil.NowUnix(),
 		}
 
 		// itemkit already emitted item.scheduled + legacy calendar.event.created.

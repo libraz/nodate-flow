@@ -1,0 +1,251 @@
+package e2e
+
+import (
+	"context"
+	"database/sql"
+	"log/slog"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/autoactions"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/tests/helpers"
+)
+
+// TestAutoActionExecutorClosesStaleReviewViaCanonicalPath verifies the
+// fix for the "executor bypasses derived_state engine" bug: the
+// auto-action executor must transition tasks through the canonical
+// taskstate helper rather than UPDATE-ing tasks.derived_state directly.
+//
+// Setup: seed a task that has been sitting in review for longer than
+// the close_stale_review idle threshold, with no other signals that
+// would beat it in urgency order.
+//
+// Expectation: after a single executor pass, the task is in done and a
+// task.transition.complete event has been appended carrying the
+// auto_action / via=auto_action provenance keys. No
+// ai.auto_action.proposed event is emitted (the executor applied the
+// action instead of merely proposing it).
+func TestAutoActionExecutorClosesStaleReviewViaCanonicalPath(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tenant := newTenant(t)
+	t.Cleanup(func() { helpers.PurgeWorkspace(t, testDB, tenant.WorkspacePublicID) })
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	wsID, userID := lookupWorkspaceAndOwner(t, ctx, tenant.WorkspacePublicID)
+
+	// The per-workspace auto_action_threshold COALESCEs to 0.80, which
+	// is above the close_stale_review default confidence (0.70). Lower
+	// the workspace threshold so the action is allowed to apply.
+	setWorkspaceAutoActionThreshold(t, ctx, wsID, "0.50")
+
+	// Seed a task in review state that has been idle long enough to
+	// trigger close_stale_review (default idle = 120 hours = 5 days).
+	taskID := seedTask(t, ctx, wsID, userID, "stale review task", "")
+	setTaskStateAndUpdatedAt(t, ctx, taskID,
+		"review",
+		time.Now().Add(-10*24*time.Hour),
+	)
+
+	exec := &autoactions.Executor{
+		DB: testDB,
+		Config: autoactions.ExecutorConfig{
+			// 1ns is non-zero so the executor passes the disabled check;
+			// we drive the loop manually via RunOnce so the value never
+			// triggers an actual ticker.
+			Interval:            time.Nanosecond,
+			ConfidenceThreshold: 0.5,
+			DryRun:              false,
+		},
+		Logger: slog.Default(),
+	}
+	exec.RunOnce(ctx)
+
+	// Assert: derived_state moved to done.
+	derived := readDerivedState(t, ctx, taskID)
+	require.Equal(t, "done", derived,
+		"close_stale_review must transition the task through the canonical state machine")
+
+	// Assert: a task.transition.complete event row was appended in the
+	// same transaction, with the auto_action provenance keys.
+	requireExactlyOneTransitionEvent(t, ctx, taskID, "task.transition.complete",
+		"close_stale_review", "auto_action")
+
+	// Assert: no leftover proposal event was emitted; the executor
+	// applied the action rather than only proposing it.
+	requireNoProposalEvent(t, ctx, taskID)
+}
+
+// TestAutoActionExecutorAutoClosesStaleViaCanonicalPath is the cancel-
+// path mirror of the close_stale_review test. It seeds an ancient
+// idle open task with auto_close_stale enabled at the workspace level
+// and asserts the executor cancels the task via the canonical helper.
+func TestAutoActionExecutorAutoClosesStaleViaCanonicalPath(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tenant := newTenant(t)
+	t.Cleanup(func() { helpers.PurgeWorkspace(t, testDB, tenant.WorkspacePublicID) })
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	wsID, userID := lookupWorkspaceAndOwner(t, ctx, tenant.WorkspacePublicID)
+
+	// Drop the workspace-level threshold below the auto_close_stale
+	// rule confidence (0.80) so the action is allowed to apply.
+	setWorkspaceAutoActionThreshold(t, ctx, wsID, "0.50")
+
+	// The rule engine evaluates kinds in urgency order (escalate,
+	// assign_owner, nudge_assignee, close_stale_review,
+	// auto_close_stale) and the first match wins. To force the cancel
+	// path we disable every kind that would otherwise outrank
+	// auto_close_stale on an idle open task, then opt this workspace
+	// into auto_close_stale with a short idle threshold.
+	enableAutoActionRule(t, ctx, wsID, "escalate_overdue", false, "0.85", 0)
+	enableAutoActionRule(t, ctx, wsID, "assign_owner", false, "0.75", 24)
+	enableAutoActionRule(t, ctx, wsID, "nudge_assignee", false, "0.70", 72)
+	enableAutoActionRule(t, ctx, wsID, "close_stale_review", false, "0.70", 120)
+	enableAutoActionRule(t, ctx, wsID, "auto_close_stale", true, "0.80", 24)
+
+	// Seed an open task that has been idle for 30+ days, no assignee.
+	taskID := seedTask(t, ctx, wsID, userID, "ancient idle task", "")
+	setTaskStateAndUpdatedAt(t, ctx, taskID,
+		"open",
+		time.Now().Add(-31*24*time.Hour),
+	)
+
+	exec := &autoactions.Executor{
+		DB: testDB,
+		Config: autoactions.ExecutorConfig{
+			Interval:            time.Nanosecond,
+			ConfidenceThreshold: 0.5,
+			DryRun:              false,
+		},
+		Logger: slog.Default(),
+	}
+	exec.RunOnce(ctx)
+
+	derived := readDerivedState(t, ctx, taskID)
+	require.Equal(t, "cancelled", derived,
+		"auto_close_stale must transition the task through the canonical state machine")
+
+	requireExactlyOneTransitionEvent(t, ctx, taskID, "task.transition.cancel",
+		"auto_close_stale", "auto_action")
+	requireNoProposalEvent(t, ctx, taskID)
+}
+
+// ---- local seed / assertion helpers ---------------------------------------
+
+// setTaskStateAndUpdatedAt force-writes derived_state and back-dates
+// updated_at via raw SQL so the executor sees a task that matches its
+// idle thresholds. This bypasses the state machine on purpose: the
+// system under test is the executor's transition path, not the seeding
+// path.
+func setTaskStateAndUpdatedAt(t *testing.T, ctx context.Context, taskID uint32, state string, updatedAt time.Time) {
+	t.Helper()
+	_, err := testDB.ExecContext(ctx,
+		`UPDATE tasks SET derived_state = ?, updated_at = ? WHERE id = ?`,
+		state, updatedAt.UTC(), taskID,
+	)
+	require.NoError(t, err)
+}
+
+// setWorkspaceAutoActionThreshold upserts an ai_settings row that
+// lowers the per-workspace auto_action_threshold so test rules can
+// fire below the production default (0.80).
+func setWorkspaceAutoActionThreshold(t *testing.T, ctx context.Context, wsID uint32, threshold string) {
+	t.Helper()
+	_, err := testDB.ExecContext(ctx,
+		`INSERT INTO ai_settings (workspace_id, auto_action_threshold)
+		 VALUES (?, ?)
+		 ON DUPLICATE KEY UPDATE auto_action_threshold = VALUES(auto_action_threshold)`,
+		wsID, threshold,
+	)
+	require.NoError(t, err)
+}
+
+// enableAutoActionRule upserts a per-workspace rule override into
+// auto_action_rules so the executor reads non-default thresholds.
+func enableAutoActionRule(t *testing.T, ctx context.Context, wsID uint32, kind string, enabled bool, confidence string, idleHours uint32) {
+	t.Helper()
+	_, err := testDB.ExecContext(ctx,
+		`INSERT INTO auto_action_rules (public_id, workspace_id, kind, enabled, confidence, idle_hours)
+		 VALUES (UUID_TO_BIN(UUID(), 0), ?, ?, ?, ?, ?)
+		 ON DUPLICATE KEY UPDATE enabled=VALUES(enabled), confidence=VALUES(confidence), idle_hours=VALUES(idle_hours)`,
+		wsID, kind, enabled, confidence, idleHours,
+	)
+	require.NoError(t, err)
+}
+
+// readDerivedState reads tasks.derived_state directly so the assertion
+// is independent of any sqlc-mapped enum type.
+func readDerivedState(t *testing.T, ctx context.Context, taskID uint32) string {
+	t.Helper()
+	var s string
+	err := testDB.QueryRowContext(ctx,
+		`SELECT derived_state FROM tasks WHERE id = ?`, taskID).Scan(&s)
+	require.NoError(t, err)
+	return s
+}
+
+// requireExactlyOneTransitionEvent asserts that exactly one event of
+// the given canonical type was appended for the task and that its
+// payload carries the auto-action provenance keys (auto_action, via).
+// The actionKindPayload arg is the expected value of the
+// `auto_action` key on the payload (e.g. "close_stale_review").
+func requireExactlyOneTransitionEvent(t *testing.T, ctx context.Context, taskID uint32, eventType, actionKindPayload, viaPayload string) {
+	t.Helper()
+	var (
+		count       int
+		auto        sql.NullString
+		via         sql.NullString
+		fromState   sql.NullString
+		toState     sql.NullString
+		actorUserID sql.NullInt32
+	)
+	err := testDB.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM events WHERE task_id = ? AND type = ?`,
+		taskID, eventType).Scan(&count)
+	require.NoError(t, err)
+	require.Equal(t, 1, count,
+		"expected exactly one %s event for task %d", eventType, taskID)
+
+	err = testDB.QueryRowContext(ctx,
+		`SELECT JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.auto_action')),
+		        JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.via')),
+		        JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.fromState')),
+		        JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.toState')),
+		        actor_user_id
+		 FROM events WHERE task_id = ? AND type = ? LIMIT 1`,
+		taskID, eventType).Scan(&auto, &via, &fromState, &toState, &actorUserID)
+	require.NoError(t, err)
+	require.True(t, auto.Valid, "event payload missing auto_action key")
+	require.Equal(t, actionKindPayload, auto.String)
+	require.True(t, via.Valid, "event payload missing via key")
+	require.Equal(t, viaPayload, via.String)
+	require.True(t, fromState.Valid, "event payload missing fromState")
+	require.True(t, toState.Valid, "event payload missing toState")
+	require.False(t, actorUserID.Valid,
+		"auto-action transitions must record NULL actor_user_id (system origin), got %d",
+		actorUserID.Int32)
+}
+
+// requireNoProposalEvent asserts the executor did NOT also write a
+// stale ai.auto_action.proposed row for this task; auto-applied
+// actions are recorded as the canonical task.transition.<name> event,
+// not as a proposal.
+func requireNoProposalEvent(t *testing.T, ctx context.Context, taskID uint32) {
+	t.Helper()
+	var n int
+	err := testDB.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM events WHERE task_id = ? AND type = 'ai.auto_action.proposed'`,
+		taskID).Scan(&n)
+	require.NoError(t, err)
+	require.Zero(t, n, "executor must not also emit ai.auto_action.proposed when it applies the action")
+}

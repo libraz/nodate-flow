@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/itemkit"
 )
 
@@ -284,8 +284,8 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 		}
 		var startAtNT, endAtNT sql.NullTime
 		if input.Body.StartAt != nil {
-			startAtNT = sql.NullTime{Time: time.Unix(*input.Body.StartAt, 0).UTC(), Valid: true}
-			endAtNT = sql.NullTime{Time: time.Unix(*input.Body.EndAt, 0).UTC(), Valid: true}
+			startAtNT = sql.NullTime{Time: handlerutil.UnixToTime(*input.Body.StartAt), Valid: true}
+			endAtNT = sql.NullTime{Time: handlerutil.UnixToTime(*input.Body.EndAt), Valid: true}
 		}
 		params := calendar.CreateCalendarEventParams{
 			PublicID:        eventPublicID,
@@ -318,7 +318,7 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 			params.RecurrenceRule = json.RawMessage(*input.Body.RecurrenceRule)
 		}
 		if input.Body.RecurrenceEnd != nil {
-			params.RecurrenceEnd = sql.NullTime{Time: time.Unix(*input.Body.RecurrenceEnd, 0).UTC(), Valid: true}
+			params.RecurrenceEnd = sql.NullTime{Time: handlerutil.UnixToTime(*input.Body.RecurrenceEnd), Valid: true}
 		}
 		if input.Body.NotificationOffset != nil {
 			params.NotificationOffset = sql.NullInt32{Int32: *input.Body.NotificationOffset, Valid: true}
@@ -344,7 +344,7 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 			Memo:       input.Body.Memo,
 			Url:        input.Body.Url,
 			BlockLabel: input.Body.BlockLabel,
-			CreatedAt:  time.Now().UTC().Unix(),
+			CreatedAt:  handlerutil.NowUnix(),
 		}
 		if input.Body.RecurrenceRule != nil {
 			out.Body.RecurrenceRule = input.Body.RecurrenceRule
@@ -499,8 +499,8 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 				WorkspaceID: wsID,
 				EventID:     evt.ID,
 				ActorUserID: actorID,
-				StartAt:     time.Unix(*input.Body.StartAt, 0).UTC(),
-				EndAt:       time.Unix(*input.Body.EndAt, 0).UTC(),
+				StartAt:     handlerutil.UnixToTime(*input.Body.StartAt),
+				EndAt:       handlerutil.UnixToTime(*input.Body.EndAt),
 			}); err != nil {
 				return nil, translateItemkitError(ctx, "itemkit.RescheduleEvent", err)
 			}
@@ -538,10 +538,10 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 			params.AllDay = sql.NullBool{Bool: *input.Body.AllDay, Valid: true}
 		}
 		if input.Body.StartAt != nil {
-			params.StartAt = sql.NullTime{Time: time.Unix(*input.Body.StartAt, 0).UTC(), Valid: true}
+			params.StartAt = sql.NullTime{Time: handlerutil.UnixToTime(*input.Body.StartAt), Valid: true}
 		}
 		if input.Body.EndAt != nil {
-			params.EndAt = sql.NullTime{Time: time.Unix(*input.Body.EndAt, 0).UTC(), Valid: true}
+			params.EndAt = sql.NullTime{Time: handlerutil.UnixToTime(*input.Body.EndAt), Valid: true}
 		}
 		if input.Body.Timezone != nil {
 			params.Timezone = sql.NullString{String: *input.Body.Timezone, Valid: true}
@@ -568,7 +568,7 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 			params.RecurrenceRule = json.RawMessage(*input.Body.RecurrenceRule)
 		}
 		if input.Body.RecurrenceEnd != nil {
-			params.RecurrenceEnd = sql.NullTime{Time: time.Unix(*input.Body.RecurrenceEnd, 0).UTC(), Valid: true}
+			params.RecurrenceEnd = sql.NullTime{Time: handlerutil.UnixToTime(*input.Body.RecurrenceEnd), Valid: true}
 		}
 		if input.Body.RecurrenceExceptions != nil {
 			params.RecurrenceExceptions = json.RawMessage(*input.Body.RecurrenceExceptions)
@@ -616,39 +616,23 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 }
 
 // translateItemkitError maps itemkit invariant / generic errors to the
-// calendar apierrors spec set. The original error is logged at
-// ErrorContext level so schema drift or other low-level failures do
-// not disappear into a generic 500. Known sentinels (sql.ErrNoRows)
-// are surfaced as 404. Invariant / recurrence messages are mapped to
-// their dedicated 4xx codes. Anything else falls through to the
-// generic store-write / store-delete 500 decided by the caller via
-// fallback.
+// calendar apierrors spec set. The original error is logged via the
+// shared classifier in handlerutil so schema drift or other low-level
+// failures do not disappear into a generic 500. Known sentinels
+// (sql.ErrNoRows) are surfaced as 404. Invariant / recurrence
+// messages are mapped to their dedicated 4xx codes. Anything else
+// falls through to the op-specific 5xx (delete vs. write) — DELETE
+// reports a delete-failure and PATCH/POST reports a write-failure.
+//
+// Implementation detail: the classifier itself lives in handlerutil
+// so the task-domain translator stays in lockstep on which itemkit
+// messages map to public codes.
 func translateItemkitError(ctx context.Context, op string, err error) error {
-	if err == nil {
-		return nil
-	}
-	slog.ErrorContext(ctx, "itemkit error", "component", "calendar", "op", op, "error", err.Error())
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return httpErr(apierrors.CalendarEventNotFound)
-	}
-
-	msg := err.Error()
-	switch {
-	case strings.Contains(msg, "not found"):
-		return httpErr(apierrors.CalendarEventNotFound)
-	case strings.Contains(msg, "recurrence"):
-		return httpErr(apierrors.ItemItemkitRecurrenceWithTaskLink)
-	case strings.Contains(msg, "itemkit invariant"):
-		return httpErr(apierrors.ItemItemkitInvariantViolation)
-	}
-
-	// Pick the fallback status based on the op so DELETE reports a
-	// delete-failure and PATCH/POST reports a write-failure.
+	fallback := apierrors.CalendarEventStoreWriteInterrupted
 	if strings.Contains(op, "DeleteEvent") {
-		return httpErr(apierrors.CalendarEventStoreDeleteInterrupted)
+		fallback = apierrors.CalendarEventStoreDeleteInterrupted
 	}
-	return httpErr(apierrors.CalendarEventStoreWriteInterrupted)
+	return handlerutil.TranslateCalendarItemkitError(ctx, op, err, fallback)
 }
 
 // DeleteEvent soft-deletes a calendar event. Requires edit permission.

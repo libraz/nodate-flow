@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/region"
 )
 
@@ -771,7 +771,7 @@ func nullTimeFromUnixPtr(p *int64) sql.NullTime {
 	if p == nil {
 		return sql.NullTime{}
 	}
-	return sql.NullTime{Time: time.Unix(*p, 0).UTC(), Valid: true}
+	return sql.NullTime{Time: handlerutil.UnixToTime(*p), Valid: true}
 }
 
 func nullInt32FromPtr(p *int32) sql.NullInt32 {

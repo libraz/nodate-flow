@@ -119,6 +119,64 @@ func rowToTaskListItemFromProject(r generated.ListTasksForProjectRow) TaskListIt
 	}
 }
 
+// rowToTaskListItemFromProjectKeyset is the keyset-pagination twin of
+// rowToTaskListItemFromProject. The Row shape differs only in that it
+// drops the COUNT(*) OVER() Total column (keyset queries never carry
+// total since the response is "more pages or not", not "page X of Y"),
+// so the projection is otherwise identical.
+func rowToTaskListItemFromProjectKeyset(r generated.ListTasksForProjectKeysetRow) TaskListItem {
+	return TaskListItem{
+		ID:                r.PublicID.String(),
+		ProjectID:         bytesToUUIDString(r.ProjectPublicID),
+		ProjectName:       r.ProjectName,
+		ProjectIdentifier: r.ProjectIdentifier.String,
+		TaskNumber:        int32(r.TaskNumber),
+		ParentTaskID:      nullBytesToUUIDString(r.ParentTaskPublicID),
+		Title:             r.Title,
+		Visibility:        string(r.Visibility),
+		DerivedState:      string(r.DerivedState),
+		Priority:          r.Priority,
+		DueOn:             nullDate(r.DueOn),
+		StartedOn:         nullDate(r.StartedOn),
+		CompletedAt:       nullTimeUnix(r.CompletedAt),
+		ArchivedAt:        nullTimeUnix(r.ArchivedAt),
+		LabelIDs:          nullStr(r.LabelIds),
+		SortWeight:        r.SortWeight,
+		PrimaryAssigneeID: rawBytesToUUIDPtr(r.PrimaryAssigneePublicID),
+		AssigneeCount:     r.AssigneeCount,
+		UpdatedAt:         nullTimeUnix(r.UpdatedAt),
+		CreatedAt:         r.CreatedAt.Unix(),
+	}
+}
+
+// rowToTaskListItemFromWorkspaceKeyset is the keyset-pagination twin of
+// rowToTaskListItemFromWorkspace, structurally identical bar the Total
+// column.
+func rowToTaskListItemFromWorkspaceKeyset(r generated.ListTasksForWorkspaceKeysetRow) TaskListItem {
+	return TaskListItem{
+		ID:                r.PublicID.String(),
+		ProjectID:         bytesToUUIDString(r.ProjectPublicID),
+		ProjectName:       r.ProjectName,
+		ProjectIdentifier: r.ProjectIdentifier.String,
+		TaskNumber:        int32(r.TaskNumber),
+		ParentTaskID:      nullBytesToUUIDString(r.ParentTaskPublicID),
+		Title:             r.Title,
+		Visibility:        string(r.Visibility),
+		DerivedState:      string(r.DerivedState),
+		Priority:          r.Priority,
+		DueOn:             nullDate(r.DueOn),
+		StartedOn:         nullDate(r.StartedOn),
+		CompletedAt:       nullTimeUnix(r.CompletedAt),
+		ArchivedAt:        nullTimeUnix(r.ArchivedAt),
+		LabelIDs:          nullStr(r.LabelIds),
+		SortWeight:        r.SortWeight,
+		PrimaryAssigneeID: rawBytesToUUIDPtr(r.PrimaryAssigneePublicID),
+		AssigneeCount:     r.AssigneeCount,
+		UpdatedAt:         nullTimeUnix(r.UpdatedAt),
+		CreatedAt:         r.CreatedAt.Unix(),
+	}
+}
+
 func rowToTaskListItemFromWorkspace(r generated.ListTasksForWorkspaceRow) TaskListItem {
 	return TaskListItem{
 		ID:                r.PublicID.String(),

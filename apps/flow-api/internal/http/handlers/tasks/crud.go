@@ -398,6 +398,12 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 
 // List handles GET /tasks. When projectId is provided the list is scoped
 // to that project; otherwise workspaceId must be provided.
+//
+// Pagination: when `cursor` is non-empty AND no filters are active AND
+// the actor has admin/owner role (i.e. needsDynamicQuery == false), the
+// keyset path is used and the response carries a `nextCursor`. In every
+// other case the historical OFFSET path runs and `nextCursor` stays nil,
+// matching the additive contract from the keyset rollout plan.
 func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, error) {
 	return func(ctx context.Context, in *ListTasksInput) (*ListTasksOutput, error) {
 		actorID, ok := middleware.ActorFromContext(ctx)
@@ -447,6 +453,41 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 				out.Body.Total = total
 				return out, nil
 			}
+			// Keyset path — only when caller opted in via ?cursor=...
+			// (an empty string conflicts with the OFFSET-default
+			// behaviour, so we gate on non-empty). We fetch limit+1
+			// rows and use the (limit+1)-th as a "has more" sentinel
+			// so callers can stop on the page that emits a nil
+			// nextCursor instead of needing one extra empty round-trip.
+			if in.Cursor != "" {
+				cursorAt, cursorPID, derr := handlerutil.DecodeCursor(in.Cursor)
+				if derr != nil {
+					return nil, httpErr(apierrors.ValidationQueryFieldInvalid)
+				}
+				rows, qerr := deps.Queries.ListTasksForProjectKeyset(ctx, generated.ListTasksForProjectKeysetParams{
+					WorkspaceID:     prj.WorkspaceID,
+					ProjectPublicID: pubBytes[:],
+					CursorCreatedAt: sql.NullTime{Time: cursorAt, Valid: !cursorAt.IsZero()},
+					CursorPublicID:  cursorPID,
+					Limit:           limit + 1,
+				})
+				if qerr != nil {
+					return nil, httpErr(apierrors.InternalUnexpected)
+				}
+				hasMore := int32(len(rows)) > limit
+				if hasMore {
+					rows = rows[:limit]
+				}
+				for _, r := range rows {
+					out.Body.Tasks = append(out.Body.Tasks, rowToTaskListItemFromProjectKeyset(r))
+				}
+				if hasMore {
+					last := rows[len(rows)-1]
+					nc := handlerutil.EncodeCursor(last.CreatedAt, last.PublicID)
+					out.Body.NextCursor = &nc
+				}
+				return out, nil
+			}
 			rows, err := deps.Queries.ListTasksForProject(ctx, generated.ListTasksForProjectParams{
 				WorkspaceID:     prj.WorkspaceID,
 				ProjectPublicID: pubBytes[:],
@@ -461,6 +502,15 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 			}
 			if len(rows) > 0 {
 				out.Body.Total = totalAsInt64(rows[0].Total)
+				// Bridge for first-page callers: the OFFSET path also
+				// emits a nextCursor when more rows exist so callers
+				// can switch to the keyset path on the second request
+				// without ever needing a sentinel "first page" cursor.
+				if int64(in.Offset+limit) < out.Body.Total {
+					last := rows[len(rows)-1]
+					nc := handlerutil.EncodeCursor(last.CreatedAt, last.PublicID)
+					out.Body.NextCursor = &nc
+				}
 			}
 			return out, nil
 		}
@@ -502,6 +552,39 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 			out.Body.Total = total
 			return out, nil
 		}
+		// Keyset path — workspace scope, opted in via non-empty cursor.
+		// limit+1 fetch lets us emit a nil nextCursor on the terminal
+		// page without forcing an extra empty round-trip (see the
+		// project-scope branch above for the full rationale).
+		if in.Cursor != "" {
+			cursorAt, cursorPID, derr := handlerutil.DecodeCursor(in.Cursor)
+			if derr != nil {
+				return nil, httpErr(apierrors.ValidationQueryFieldInvalid)
+			}
+			rows, qerr := deps.Queries.ListTasksForWorkspaceKeyset(ctx, generated.ListTasksForWorkspaceKeysetParams{
+				WorkspaceID:     wsInternal,
+				StateFilter:     "", // empty string skips the filter (see SQL comment)
+				CursorCreatedAt: sql.NullTime{Time: cursorAt, Valid: !cursorAt.IsZero()},
+				CursorPublicID:  cursorPID,
+				Limit:           limit + 1,
+			})
+			if qerr != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			hasMore := int32(len(rows)) > limit
+			if hasMore {
+				rows = rows[:limit]
+			}
+			for _, r := range rows {
+				out.Body.Tasks = append(out.Body.Tasks, rowToTaskListItemFromWorkspaceKeyset(r))
+			}
+			if hasMore {
+				last := rows[len(rows)-1]
+				nc := handlerutil.EncodeCursor(last.CreatedAt, last.PublicID)
+				out.Body.NextCursor = &nc
+			}
+			return out, nil
+		}
 		rows, err := deps.Queries.ListTasksForWorkspace(ctx, generated.ListTasksForWorkspaceParams{
 			WorkspaceID: wsInternal,
 			Limit:       limit,
@@ -515,6 +598,11 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 		}
 		if len(rows) > 0 {
 			out.Body.Total = totalAsInt64(rows[0].Total)
+			if int64(in.Offset+limit) < out.Body.Total {
+				last := rows[len(rows)-1]
+				nc := handlerutil.EncodeCursor(last.CreatedAt, last.PublicID)
+				out.Body.NextCursor = &nc
+			}
 		}
 		return out, nil
 	}
@@ -740,17 +828,11 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 
 // translateItemkitTaskError converts an itemkit invariant into the
 // public error code so PATCH /tasks returns 422 instead of 500 when
-// the call violates a cross-table invariant.
-func translateItemkitTaskError(err error) error {
-	if err == nil {
-		return nil
-	}
-	msg := err.Error()
-	if strings.Contains(msg, "itemkit invariant") {
-		return httpErr(apierrors.ItemItemkitInvariantViolation)
-	}
-	return httpErr(apierrors.InternalUnexpected)
-}
+// the call violates a cross-table invariant. Thin alias over the
+// shared classifier in handlerutil so the task and calendar
+// translators stay in lockstep on which itemkit messages map to
+// public codes.
+var translateItemkitTaskError = handlerutil.TranslateTaskItemkitError
 
 // Disable handles DELETE /tasks/{id}. The write routes through
 // itemkit.DeleteTask so any linked calendar_events cascade

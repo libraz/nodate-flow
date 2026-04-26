@@ -15,6 +15,11 @@ import (
 
 // ListTaskAiInvocationsInput is the query for
 // GET /tasks/{id}/ai/invocations.
+//
+// Limit override: AI invocations are cost-bounded artefacts the UI
+// renders as a chronological audit log; both the cap (100) and
+// default (20) are deliberately tighter than handlerutil.MaxListLimit
+// to discourage accidental wide scans of the AI cost surface.
 type ListTaskAiInvocationsInput struct {
 	ID     string `path:"id"`
 	Limit  int32  `query:"limit" minimum:"1" maximum:"100" default:"20"`

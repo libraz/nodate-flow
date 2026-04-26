@@ -3,13 +3,13 @@ package inbox
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/resolve"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 )
@@ -138,7 +138,7 @@ func Snooze(deps Deps) func(context.Context, *SnoozeInboxInput) (*SnoozeInboxOut
 		if in.Body.SnoozeUntil <= 0 {
 			return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
 		}
-		until := time.Unix(in.Body.SnoozeUntil, 0).UTC()
+		until := handlerutil.UnixToTime(in.Body.SnoozeUntil)
 		if err := deps.Queries.SnoozeInboxItem(ctx, generated.SnoozeInboxItemParams{
 			ReceivedAt:  until,
 			WorkspaceID: wsID,

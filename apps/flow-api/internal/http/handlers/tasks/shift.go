@@ -9,6 +9,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/itemkit"
 )
@@ -51,7 +52,7 @@ func ProposeShift(deps Deps) func(context.Context, *ProposeShiftInput) (*Propose
 		if err != nil {
 			return nil, err
 		}
-		newStart := time.Unix(in.Body.NewStartAt, 0).UTC()
+		newStart := handlerutil.UnixToTime(in.Body.NewStartAt)
 
 		tx, err := deps.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 		if err != nil {
@@ -90,7 +91,7 @@ func ApplyShift(deps Deps) func(context.Context, *ApplyShiftInput) (*ApplyShiftO
 		if err != nil {
 			return nil, err
 		}
-		newStart := time.Unix(in.Body.NewStartAt, 0).UTC()
+		newStart := handlerutil.UnixToTime(in.Body.NewStartAt)
 
 		confirmedInternal, err := resolveConfirmedTaskIDs(ctx, deps, ws.ID, in.Body.ConfirmedTaskIDs)
 		if err != nil {

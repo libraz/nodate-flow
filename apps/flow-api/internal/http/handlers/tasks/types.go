@@ -216,12 +216,21 @@ type CreateTaskOutput struct {
 }
 
 // ListTasksInput is the query for GET /tasks.
+//
+// Pagination has two modes that coexist for the v1.0 deprecation
+// runway: when `cursor` is non-empty the handler uses the keyset path
+// (ListTasksForProjectKeyset / ListTasksForWorkspaceKeyset) and emits
+// `nextCursor` in the response; otherwise the historical OFFSET path
+// is used and `nextCursor` is empty. Mixing `cursor` with filters
+// (`q`, `state`, `assignee`) keeps the OFFSET path because the keyset
+// queries do not express those predicates.
 type ListTasksInput struct {
 	ProjectID   string   `query:"projectId" doc:"Optional project public id (UUID v7) to scope the list"`
 	WorkspaceID string   `query:"workspaceId" doc:"Workspace public id (UUID v7); required when projectId is not given"`
 	Q           string   `query:"q" doc:"Case-insensitive substring match on title"`
 	State       []string `query:"state" doc:"Filter by derived_state; repeat to OR multiple values"`
 	Assignee    string   `query:"assignee" doc:"Filter to tasks with this user as an assignee (user public id UUID v7)"`
+	Cursor      string   `query:"cursor" doc:"Opaque cursor returned by previous page; pass to fetch next page. Empty when at end."`
 	Limit       int32    `query:"limit" minimum:"1" maximum:"200" default:"50"`
 	Offset      int32    `query:"offset" minimum:"0" default:"0"`
 }
@@ -258,15 +267,28 @@ type MyTaskListItem struct {
 }
 
 // ListMyTasksInput is the query for GET /me/tasks.
+//
+// Limit override: this is a unified cross-workspace dashboard list
+// where clients (notably the home / "today" view) typically want a
+// single round-trip across every workspace the actor belongs to;
+// the per-workspace cap of 200 (handlerutil.MaxListLimit) would
+// force pagination on power users with 5+ workspaces. Cap raised to
+// 500 with a default of 200.
+//
+// `cursor` opt-in: when non-empty the handler uses
+// ListMyTasksGlobalKeyset and emits `nextCursor`; the OFFSET path
+// remains the default for backward compatibility.
 type ListMyTasksInput struct {
-	Limit  int32 `query:"limit" minimum:"1" maximum:"500" default:"200"`
-	Offset int32 `query:"offset" minimum:"0" default:"0"`
+	Cursor string `query:"cursor" doc:"Opaque cursor returned by previous page; pass to fetch next page. Empty when at end."`
+	Limit  int32  `query:"limit" minimum:"1" maximum:"500" default:"200"`
+	Offset int32  `query:"offset" minimum:"0" default:"0"`
 }
 
 // ListMyTasksBody is the response payload for GET /me/tasks.
 type ListMyTasksBody struct {
-	Total int64            `json:"total"`
-	Tasks []MyTaskListItem `json:"tasks"`
+	Total      int64            `json:"total"`
+	Tasks      []MyTaskListItem `json:"tasks"`
+	NextCursor *string          `json:"nextCursor"`
 }
 
 // ListMyTasksOutput is the response for GET /me/tasks.
@@ -279,17 +301,25 @@ type ListMyTasksOutput struct {
 // cross-workspace calendar. `from` / `to` are inclusive dates on the
 // server-side clock; the client should send the widest range it plans
 // to render.
+//
+// Limit override: the calendar grid renders every dated task the
+// actor sees across all workspaces in a single month, which can
+// realistically exceed 500 for shared / project-heavy installs.
+// Cap raised to 1000 with a default of 500. Higher than
+// handlerutil.MaxListLimit by design.
 type ListMyTasksWithDatesInput struct {
 	From   string `query:"from" required:"true" doc:"Range start YYYY-MM-DD (inclusive)"`
 	To     string `query:"to" required:"true" doc:"Range end YYYY-MM-DD (inclusive)"`
+	Cursor string `query:"cursor" doc:"Opaque cursor returned by previous page; pass to fetch next page. Empty when at end."`
 	Limit  int32  `query:"limit" minimum:"1" maximum:"1000" default:"500"`
 	Offset int32  `query:"offset" minimum:"0" default:"0"`
 }
 
 // ListMyTasksWithDatesBody is the response payload for GET /me/tasks-with-dates.
 type ListMyTasksWithDatesBody struct {
-	Total int64            `json:"total"`
-	Tasks []MyTaskListItem `json:"tasks"`
+	Total      int64            `json:"total"`
+	Tasks      []MyTaskListItem `json:"tasks"`
+	NextCursor *string          `json:"nextCursor"`
 }
 
 // ListMyTasksWithDatesOutput is the response for GET /me/tasks-with-dates.
@@ -553,6 +583,10 @@ type AddTaskActorOutput struct {
 }
 
 // ListTaskActorsInput is the query for GET /tasks/{id}/actors.
+//
+// Default override: the actor count per task is bounded (typically
+// well under 50), so a default of 100 lets the UI render the full
+// roster in one round-trip. Cap stays at handlerutil.MaxListLimit.
 type ListTaskActorsInput struct {
 	ID     string `path:"id"`
 	Limit  int32  `query:"limit" minimum:"1" maximum:"200" default:"100"`
@@ -617,6 +651,10 @@ type AddTaskAgentActorOutput struct {
 }
 
 // ListTaskAgentActorsInput is the query for GET /tasks/{id}/agents.
+//
+// Default override: same reasoning as [ListTaskActorsInput] — bounded
+// per-task population, so default 100 avoids forced pagination for the
+// common roster-view use case. Cap stays at handlerutil.MaxListLimit.
 type ListTaskAgentActorsInput struct {
 	ID     string `path:"id"`
 	Limit  int32  `query:"limit" minimum:"1" maximum:"200" default:"100"`
@@ -653,8 +691,14 @@ type AddTaskCommentOutput struct {
 }
 
 // ListTaskCommentsInput is the query for GET /tasks/{id}/comments.
+//
+// `cursor` opt-in routes through ListCommentsForTaskKeyset. The keyset
+// variant orders newest-first (DESC), which is the inverse of the
+// OFFSET path's chronological order — UI consumers that want oldest-
+// first must reverse client-side, or stay on the OFFSET path.
 type ListTaskCommentsInput struct {
 	ID     string `path:"id"`
+	Cursor string `query:"cursor" doc:"Opaque cursor returned by previous page; pass to fetch next page. Empty when at end."`
 	Limit  int32  `query:"limit" minimum:"1" maximum:"200" default:"50"`
 	Offset int32  `query:"offset" minimum:"0" default:"0"`
 }
@@ -828,16 +872,23 @@ type UnarchiveTaskOutput struct {
 }
 
 // ListArchivedTasksInput is the query for GET /workspaces/{wsId}/tasks/archived.
+//
+// `cursor` opt-in routes the request through
+// ListArchivedTasksForWorkspaceKeyset, which keys on
+// (archived_at, public_id) — note that's `archived_at`, not
+// `created_at`, since archived rows are sorted newest-archived-first.
 type ListArchivedTasksInput struct {
 	WsID   string `path:"wsId"`
+	Cursor string `query:"cursor" doc:"Opaque cursor returned by previous page; pass to fetch next page. Empty when at end."`
 	Limit  int32  `query:"limit" minimum:"1" maximum:"200" default:"50"`
 	Offset int32  `query:"offset" minimum:"0" default:"0"`
 }
 
 // ListArchivedTasksBody is the response payload for GET /workspaces/{wsId}/tasks/archived.
 type ListArchivedTasksBody struct {
-	Total int64          `json:"total"`
-	Tasks []TaskListItem `json:"tasks"`
+	Total      int64          `json:"total"`
+	Tasks      []TaskListItem `json:"tasks"`
+	NextCursor *string        `json:"nextCursor"`
 }
 
 // ListArchivedTasksOutput is the response for GET /workspaces/{wsId}/tasks/archived.
@@ -964,6 +1015,11 @@ type DeleteTaskEventLinkOutput struct {
 }
 
 // ListLinkedEventsInput is the path for GET /tasks/{id}/linked-events.
+//
+// Limit override: link graphs around a single umbrella task can
+// span hundreds of contributing events; the timeline view paginates
+// internally but expects a generous initial fetch, so cap is raised
+// to 500 with a default of 100.
 type ListLinkedEventsInput struct {
 	ID       string `path:"id"`
 	Relation string `query:"relation" enum:"contributes_to,blocks,depends_on,prep_for" doc:"Optional filter; empty = all relations"`
@@ -980,6 +1036,9 @@ type ListLinkedEventsOutput struct {
 }
 
 // ListLinkedTasksInput is the path for GET /calendar-events/{evtId}/linked-tasks.
+//
+// Limit override: mirror of [ListLinkedEventsInput] for the
+// reverse-direction lookup. Cap raised to 500 with a default of 100.
 type ListLinkedTasksInput struct {
 	EventID  string `path:"evtId"`
 	Relation string `query:"relation" enum:"contributes_to,blocks,depends_on,prep_for"`

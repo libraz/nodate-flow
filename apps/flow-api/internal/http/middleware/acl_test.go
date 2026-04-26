@@ -7,56 +7,25 @@ import (
 	"github.com/google/uuid"
 )
 
-func TestWorkspaceRoleAtLeast(t *testing.T) {
+// The canonical role / visibility tests live in
+// apps/flow-api/internal/acl/acl_test.go. The wrapper tests below only
+// verify that the chi-side context plumbing exposes the same shape via
+// the re-exported aliases.
+
+func TestWorkspaceRoleAlias(t *testing.T) {
 	t.Parallel()
-	cases := []struct {
-		name string
-		have WorkspaceRole
-		min  WorkspaceRole
-		want bool
-	}{
-		{"owner>=admin", WorkspaceRoleOwner, WorkspaceRoleAdmin, true},
-		{"admin>=admin", WorkspaceRoleAdmin, WorkspaceRoleAdmin, true},
-		{"member>=admin", WorkspaceRoleMember, WorkspaceRoleAdmin, false},
-		{"guest>=member", WorkspaceRoleGuest, WorkspaceRoleMember, false},
-		{"owner>=guest", WorkspaceRoleOwner, WorkspaceRoleGuest, true},
-		{"unknown<<member", WorkspaceRole("nope"), WorkspaceRoleMember, false},
+	if !WorkspaceRoleOwner.AtLeast(WorkspaceRoleAdmin) {
+		t.Fatal("alias WorkspaceRole.AtLeast not wired to acl package")
 	}
-	for _, tc := range cases {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			if got := tc.have.AtLeast(tc.min); got != tc.want {
-				t.Fatalf("AtLeast(%q,%q)=%v want %v", tc.have, tc.min, got, tc.want)
-			}
-		})
+	if WorkspaceRoleMember.AtLeast(WorkspaceRoleAdmin) {
+		t.Fatal("alias WorkspaceRole.AtLeast inverted")
 	}
 }
 
-func TestProjectRoleAtLeast(t *testing.T) {
+func TestProjectRoleAlias(t *testing.T) {
 	t.Parallel()
-	cases := []struct {
-		name string
-		have ProjectRole
-		min  ProjectRole
-		want bool
-	}{
-		{"lead>=editor", ProjectRoleLead, ProjectRoleEditor, true},
-		{"editor>=lead", ProjectRoleEditor, ProjectRoleLead, false},
-		{"commenter>=viewer", ProjectRoleCommenter, ProjectRoleViewer, true},
-		{"viewer>=commenter", ProjectRoleViewer, ProjectRoleCommenter, false},
-		{"lead>=lead", ProjectRoleLead, ProjectRoleLead, true},
-		{"unknown<<viewer", ProjectRole("nope"), ProjectRoleViewer, false},
-		{"empty<<viewer", ProjectRole(""), ProjectRoleViewer, false},
-	}
-	for _, tc := range cases {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			if got := tc.have.AtLeast(tc.min); got != tc.want {
-				t.Fatalf("AtLeast(%q,%q)=%v want %v", tc.have, tc.min, got, tc.want)
-			}
-		})
+	if !ProjectRoleLead.AtLeast(ProjectRoleEditor) {
+		t.Fatal("alias ProjectRole.AtLeast not wired to acl package")
 	}
 }
 
@@ -102,53 +71,16 @@ func TestProjectFromContext(t *testing.T) {
 	}
 }
 
-func TestTaskVisibilityFilterAdmin(t *testing.T) {
+func TestTaskVisibilityFilterDelegation(t *testing.T) {
 	t.Parallel()
+	// Admin sees everything -> empty fragment.
 	frag, args := TaskVisibilityFilter(1, WorkspaceRoleAdmin)
-	if frag != "" {
-		t.Fatalf("expected empty fragment for admin, got %q", frag)
+	if frag != "" || len(args) != 0 {
+		t.Fatalf("admin: got frag=%q args=%v", frag, args)
 	}
-	if len(args) != 0 {
-		t.Fatalf("expected no args for admin, got %v", args)
-	}
-}
-
-func TestTaskVisibilityFilterOwner(t *testing.T) {
-	t.Parallel()
-	frag, args := TaskVisibilityFilter(1, WorkspaceRoleOwner)
-	if frag != "" {
-		t.Fatalf("expected empty fragment for owner, got %q", frag)
-	}
-	if len(args) != 0 {
-		t.Fatalf("expected no args for owner, got %v", args)
-	}
-}
-
-func TestTaskVisibilityFilterMember(t *testing.T) {
-	t.Parallel()
-	frag, args := TaskVisibilityFilter(42, WorkspaceRoleMember)
-	if frag == "" {
-		t.Fatal("expected non-empty fragment for member")
-	}
-	if len(args) != 3 {
-		t.Fatalf("expected 3 args for member, got %d: %v", len(args), args)
-	}
-	// All three args should be the userID.
-	for i, a := range args {
-		uid, ok := a.(uint32)
-		if !ok || uid != 42 {
-			t.Fatalf("args[%d]=%v want uint32(42)", i, a)
-		}
-	}
-}
-
-func TestTaskVisibilityFilterGuest(t *testing.T) {
-	t.Parallel()
-	frag, args := TaskVisibilityFilter(99, WorkspaceRoleGuest)
-	if frag == "" {
-		t.Fatal("expected non-empty fragment for guest")
-	}
-	if len(args) != 3 {
-		t.Fatalf("expected 3 args for guest, got %d", len(args))
+	// Member -> non-empty fragment with three bound args.
+	frag, args = TaskVisibilityFilter(42, WorkspaceRoleMember)
+	if frag == "" || len(args) != 3 {
+		t.Fatalf("member: got frag=%q args=%v", frag, args)
 	}
 }

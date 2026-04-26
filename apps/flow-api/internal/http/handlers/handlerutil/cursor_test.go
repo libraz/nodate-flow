@@ -1,0 +1,97 @@
+package handlerutil
+
+import (
+	"encoding/base64"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+)
+
+// TestDecodeCursorEmpty verifies the documented "empty string =
+// first page" contract: zero values, nil error.
+func TestDecodeCursorEmpty(t *testing.T) {
+	t.Parallel()
+	tt, pid, err := DecodeCursor("")
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if !tt.IsZero() {
+		t.Errorf("expected zero time, got %v", tt)
+	}
+	var zero types.PublicID
+	if pid != zero {
+		t.Errorf("expected zero public id, got %s", pid)
+	}
+}
+
+// TestEncodeDecodeRoundTrip verifies that an arbitrary pair survives a
+// round-trip without losing precision at the second granularity.
+func TestEncodeDecodeRoundTrip(t *testing.T) {
+	t.Parallel()
+	original := time.Date(2025, 6, 15, 14, 30, 45, 0, time.UTC)
+	pid := types.New()
+
+	encoded := EncodeCursor(original, pid)
+	if encoded == "" {
+		t.Fatal("encoded cursor unexpectedly empty")
+	}
+
+	gotTime, gotPID, err := DecodeCursor(encoded)
+	if err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	if !gotTime.Equal(original) {
+		t.Errorf("time mismatch: got %v want %v", gotTime, original)
+	}
+	if gotPID != pid {
+		t.Errorf("public id mismatch: got %s want %s", gotPID, pid)
+	}
+}
+
+// TestEncodeIsURLSafe confirms the cursor uses base64url (no '+', '/',
+// or '=' padding) so it can be passed through a query string without
+// percent-escaping.
+func TestEncodeIsURLSafe(t *testing.T) {
+	t.Parallel()
+	encoded := EncodeCursor(time.Now().UTC(), types.New())
+	for _, ch := range []string{"+", "/", "="} {
+		if strings.Contains(encoded, ch) {
+			t.Errorf("encoded cursor contains URL-unsafe %q: %s", ch, encoded)
+		}
+	}
+}
+
+// TestDecodeCursorInvalidBase64 rejects garbage that fails base64
+// decoding before we even get to JSON.
+func TestDecodeCursorInvalidBase64(t *testing.T) {
+	t.Parallel()
+	_, _, err := DecodeCursor("!!!not-base64!!!")
+	if err == nil {
+		t.Fatal("expected decode error for invalid base64")
+	}
+}
+
+// TestDecodeCursorInvalidJSON rejects a base64 blob that decodes to
+// non-JSON bytes.
+func TestDecodeCursorInvalidJSON(t *testing.T) {
+	t.Parallel()
+	bad := base64.RawURLEncoding.EncodeToString([]byte("not json"))
+	_, _, err := DecodeCursor(bad)
+	if err == nil {
+		t.Fatal("expected decode error for invalid json payload")
+	}
+}
+
+// TestDecodeCursorInvalidPublicID rejects a payload whose `p` field is
+// not a parseable UUID — the keyset query would otherwise see a zero
+// public id which silently changes pagination semantics.
+func TestDecodeCursorInvalidPublicID(t *testing.T) {
+	t.Parallel()
+	bad := base64.RawURLEncoding.EncodeToString([]byte(`{"t":1700000000,"p":"not-a-uuid"}`))
+	_, _, err := DecodeCursor(bad)
+	if err == nil {
+		t.Fatal("expected decode error for invalid public id")
+	}
+}

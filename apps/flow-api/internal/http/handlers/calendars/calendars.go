@@ -3,13 +3,13 @@ package calendars
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
 // --- Input/Output types ---
@@ -201,7 +201,7 @@ func CreateCalendar(deps Deps) func(context.Context, *CreateCalendarInput) (*Cre
 			DisplayColor:           input.Body.Color,
 			Visible:                true,
 			SubscriptionSortWeight: 0,
-			CreatedAt:              time.Now().UTC().Unix(),
+			CreatedAt:              handlerutil.NowUnix(),
 		}
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.created", &actorID, map[string]any{

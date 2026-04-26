@@ -4,13 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
 // --- Input/Output types ---
@@ -197,7 +197,7 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 				DisplayName: profile.DisplayName,
 				Rsvp:        string(calendar.CalendarEventAttendeesRsvpPending),
 				CanEdit:     false,
-				CreatedAt:   time.Now().UTC().Unix(),
+				CreatedAt:   handlerutil.NowUnix(),
 			}
 			if profile.AvatarUrl.Valid {
 				resp.AvatarUrl = &profile.AvatarUrl.String

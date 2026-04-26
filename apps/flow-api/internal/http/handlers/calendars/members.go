@@ -4,13 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
 var memberColors = []string{
@@ -156,7 +156,7 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 			DisplayName: user.DisplayName,
 			MemberColor: color,
 			Role:        input.Body.Role,
-			CreatedAt:   time.Now().UTC().Unix(),
+			CreatedAt:   handlerutil.NowUnix(),
 		}
 		if user.AvatarUrl.Valid {
 			out.Body.AvatarUrl = &user.AvatarUrl.String

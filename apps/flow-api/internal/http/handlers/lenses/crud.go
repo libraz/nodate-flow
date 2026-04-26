@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
@@ -82,7 +81,7 @@ func Create(deps Deps) func(context.Context, *CreateLensInput) (*CreateLensOutpu
 			Sort:      in.Body.Sort,
 			GroupBy:   in.Body.GroupBy,
 			IsDefault: in.Body.IsDefault,
-			CreatedAt: time.Now().Unix(),
+			CreatedAt: handlerutil.NowUnix(),
 		}}, nil
 	}
 }

@@ -197,7 +197,7 @@ func Create(deps Deps) func(context.Context, *CreateTimeboxInput) (*CreateTimebo
 			EndsOn:             in.Body.EndsOn,
 			Status:             string(generated.TimeboxesStatusPlanned),
 			UpdatedAt:          0,
-			CreatedAt:          time.Now().Unix(),
+			CreatedAt:          handlerutil.NowUnix(),
 		}}, nil
 	}
 }

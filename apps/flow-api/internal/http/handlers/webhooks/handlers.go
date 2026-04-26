@@ -11,6 +11,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/webhook"
 )
@@ -59,7 +60,7 @@ func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error
 			ResourceID:   pubID.String(),
 		})
 
-		now := time.Now().Unix()
+		now := handlerutil.NowUnix()
 		out := &CreateOutput{}
 		out.Body.Webhook = WebhookSubscriptionDetailDTO{
 			WebhookSubscriptionDTO: WebhookSubscriptionDTO{
@@ -319,7 +320,7 @@ func TestDelivery(deps Deps) func(context.Context, *TestDeliveryInput) (*TestDel
 		// Build a test ping payload.
 		payload, _ := json.Marshal(map[string]any{
 			"eventType":  "webhook.test",
-			"occurredAt": time.Now().Unix(),
+			"occurredAt": handlerutil.NowUnix(),
 		})
 
 		deliveryPub := types.New()

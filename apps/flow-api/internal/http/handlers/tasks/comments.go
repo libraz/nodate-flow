@@ -5,13 +5,13 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
-	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
@@ -71,12 +71,19 @@ func AddComment(deps Deps) func(context.Context, *AddTaskCommentInput) (*AddTask
 		return &AddTaskCommentOutput{Body: TaskComment{
 			ID:        pub.String(),
 			Body:      in.Body.Body,
-			CreatedAt: time.Now().Unix(),
+			CreatedAt: handlerutil.NowUnix(),
 		}}, nil
 	}
 }
 
 // ListComments handles GET /tasks/{id}/comments.
+//
+// Pagination: when `cursor` is non-empty the keyset path runs
+// (ListCommentsForTaskKeyset, ORDER BY created_at DESC) and emits
+// `nextCursor`; otherwise the OFFSET path runs unchanged
+// (ORDER BY created_at ASC). The two paths have opposite chronological
+// direction by design — callers that want oldest-first must keep using
+// OFFSET, callers that want newest-first should use the cursor path.
 func ListComments(deps Deps) func(context.Context, *ListTaskCommentsInput) (*ListTaskCommentsOutput, error) {
 	return func(ctx context.Context, in *ListTaskCommentsInput) (*ListTaskCommentsOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
@@ -91,6 +98,40 @@ func ListComments(deps Deps) func(context.Context, *ListTaskCommentsInput) (*Lis
 		if limit <= 0 {
 			limit = 50
 		}
+
+		out := &ListTaskCommentsOutput{}
+
+		if in.Cursor != "" {
+			cursorAt, cursorPID, derr := handlerutil.DecodeCursor(in.Cursor)
+			if derr != nil {
+				return nil, httpErr(apierrors.ValidationQueryFieldInvalid)
+			}
+			rows, qerr := deps.Queries.ListCommentsForTaskKeyset(ctx, generated.ListCommentsForTaskKeysetParams{
+				WorkspaceID:     ws.ID,
+				PublicID:        types.FromUUID(task.PublicID),
+				CursorCreatedAt: sql.NullTime{Time: cursorAt, Valid: !cursorAt.IsZero()},
+				CursorPublicID:  cursorPID,
+				Limit:           limit + 1,
+			})
+			if qerr != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			hasMore := int32(len(rows)) > limit
+			if hasMore {
+				rows = rows[:limit]
+			}
+			out.Body.Comments = make([]TaskComment, 0, len(rows))
+			for _, r := range rows {
+				out.Body.Comments = append(out.Body.Comments, rowToCommentKeyset(r))
+			}
+			if hasMore {
+				last := rows[len(rows)-1]
+				nc := handlerutil.EncodeCursor(last.CreatedAt, last.PublicID)
+				out.Body.NextCursor = &nc
+			}
+			return out, nil
+		}
+
 		rows, err := deps.Queries.ListCommentsForTask(ctx, generated.ListCommentsForTaskParams{
 			WorkspaceID: ws.ID,
 			PublicID:    types.FromUUID(task.PublicID),
@@ -100,15 +141,39 @@ func ListComments(deps Deps) func(context.Context, *ListTaskCommentsInput) (*Lis
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		out := &ListTaskCommentsOutput{}
 		out.Body.Comments = make([]TaskComment, 0, len(rows))
 		for _, r := range rows {
 			out.Body.Comments = append(out.Body.Comments, rowToComment(r))
 		}
 		if len(rows) > 0 {
 			out.Body.Total = totalAsInt64(rows[0].Total)
+			if int64(in.Offset+limit) < out.Body.Total {
+				// NOTE: the OFFSET path orders comments ASC; the keyset
+				// path orders DESC. Bridging from OFFSET → keyset
+				// inverts direction, so callers that genuinely want
+				// chronological order must stay on OFFSET. The cursor
+				// is still emitted so newest-first consumers can opt in.
+				last := rows[len(rows)-1]
+				nc := handlerutil.EncodeCursor(last.CreatedAt, last.PublicID)
+				out.Body.NextCursor = &nc
+			}
 		}
 		return out, nil
+	}
+}
+
+// rowToCommentKeyset is the keyset twin of rowToComment — same DTO, no
+// Total column on the source row.
+func rowToCommentKeyset(r generated.ListCommentsForTaskKeysetRow) TaskComment {
+	return TaskComment{
+		ID:                r.PublicID.String(),
+		AuthorID:          r.AuthorPublicID.String(),
+		AuthorDisplayName: r.AuthorDisplayName,
+		AuthorAvatarURL:   nullStr(r.AuthorAvatarUrl),
+		Body:              r.Body,
+		EditedAt:          nullTimeUnix(r.EditedAt),
+		UpdatedAt:         nullTimeUnix(r.UpdatedAt),
+		CreatedAt:         r.CreatedAt.Unix(),
 	}
 }
 
@@ -190,7 +255,7 @@ func EditComment(deps Deps) func(context.Context, *EditTaskCommentInput) (*EditT
 		return &EditTaskCommentOutput{Body: TaskComment{
 			ID:       cid.String(),
 			Body:     in.Body.Body,
-			EditedAt: int64Ptr(time.Now().Unix()),
+			EditedAt: int64Ptr(handlerutil.NowUnix()),
 		}}, nil
 	}
 }
