@@ -152,6 +152,36 @@
       "title": "Attendees",
       "you": "you",
       "your_response": "Your response"
+    },
+    "detail": {
+      "back": "返回日历",
+      "tab": {
+        "attendees": "参与者",
+        "invites": "邀请"
+      },
+      "kind": {
+        "event": "事件",
+        "holiday": "假日",
+        "task": "任务",
+        "busy": "忙碌"
+      },
+      "all_day": "全天"
+    },
+    "invites": {
+      "empty": "暂无邀请",
+      "revoke": "撤销",
+      "revoke_confirm_title": "撤销此邀请？",
+      "revoke_confirm": "链接将立即失效。",
+      "revoke_success": "已撤销邀请",
+      "revoke_error": "撤销邀请失败",
+      "expires_at": "{date} 过期",
+      "create_hint": "请从“参与者”标签页创建邀请。",
+      "status": {
+        "pending": "待发送",
+        "sent": "已发送",
+        "accepted": "已接受",
+        "expired": "已过期"
+      }
     }
   }
 }

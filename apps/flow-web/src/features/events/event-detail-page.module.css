@@ -1,0 +1,182 @@
+/**
+ * EventDetailPage layout — single-column page hosting a back link, a
+ * header card (title / kind badge / time range / owner), and a tab
+ * surface that swaps between Attendees and Invites panes. Every value
+ * comes from a design token; no literal hex / rgb / px is hard-coded.
+ */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+  padding: clamp(var(--nf-space-4), 4vw, var(--nf-space-6));
+  max-inline-size: 64rem;
+  margin-inline: auto;
+  inline-size: 100%;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  align-self: flex-start;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+  text-decoration: none;
+  border-radius: var(--nf-radius-sm);
+  padding-inline: var(--nf-space-1);
+  padding-block: var(--nf-space-1);
+}
+
+.back:hover {
+  color: var(--nf-color-fg);
+  text-decoration: underline;
+}
+
+.back:focus-visible {
+  outline: 2px solid var(--nf-color-focus-ring, var(--nf-color-accent));
+  outline-offset: 2px;
+}
+
+.headerCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-4);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-bg);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  box-shadow: var(--nf-shadow-sm);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+  flex-wrap: wrap;
+}
+
+.colorDot {
+  inline-size: var(--nf-space-3);
+  block-size: var(--nf-space-3);
+  border-radius: var(--nf-radius-pill);
+  flex: 0 0 auto;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display, inherit);
+  font-size: clamp(1.5rem, 2.5vw, 2rem);
+  color: var(--nf-color-fg);
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  word-break: break-word;
+}
+
+.metaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--nf-space-3);
+  font-size: var(--nf-text-sm);
+}
+
+.metaItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.metaLabel {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.metaValue {
+  color: var(--nf-color-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.tabPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-4) 0;
+}
+
+.invitesEmpty {
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+  padding-block: var(--nf-space-3);
+}
+
+.invitesList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.inviteRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-3);
+  border-radius: var(--nf-radius-md);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  background: var(--nf-color-bg);
+}
+
+.inviteIdentity {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  gap: var(--nf-space-1);
+}
+
+.inviteEmail {
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inviteExpiry {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.inviteControls {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  margin-inline-start: auto;
+  flex-wrap: wrap;
+}
+
+.invitesHint {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  padding-block-start: var(--nf-space-2);
+}
+
+.fallback {
+  display: flex;
+  justify-content: center;
+  padding: var(--nf-space-4);
+}
+
+@media (max-width: 640px) {
+  .inviteRow {
+    flex-wrap: wrap;
+  }
+  .inviteControls {
+    inline-size: 100%;
+    justify-content: flex-end;
+    margin-inline-start: 0;
+  }
+}

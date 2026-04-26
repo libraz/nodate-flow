@@ -152,6 +152,36 @@
       "title": "Attendees",
       "you": "you",
       "your_response": "Your response"
+    },
+    "detail": {
+      "back": "Back to calendar",
+      "tab": {
+        "attendees": "Attendees",
+        "invites": "Invites"
+      },
+      "kind": {
+        "event": "Event",
+        "holiday": "Holiday",
+        "task": "Task",
+        "busy": "Busy"
+      },
+      "all_day": "All day"
+    },
+    "invites": {
+      "empty": "No invites yet",
+      "revoke": "Revoke",
+      "revoke_confirm_title": "Revoke this invite?",
+      "revoke_confirm": "The link will stop working immediately.",
+      "revoke_success": "Invite revoked",
+      "revoke_error": "Failed to revoke invite",
+      "expires_at": "Expires {date}",
+      "create_hint": "Issue invites from the Attendees tab.",
+      "status": {
+        "pending": "Pending",
+        "sent": "Sent",
+        "accepted": "Accepted",
+        "expired": "Expired"
+      }
     }
   }
 }

@@ -152,6 +152,36 @@
       "title": "参加者",
       "you": "あなた",
       "your_response": "あなたの返事"
+    },
+    "detail": {
+      "back": "カレンダーに戻る",
+      "tab": {
+        "attendees": "参加者",
+        "invites": "招待"
+      },
+      "kind": {
+        "event": "予定",
+        "holiday": "祝日",
+        "task": "タスク",
+        "busy": "ビジー"
+      },
+      "all_day": "終日"
+    },
+    "invites": {
+      "empty": "招待はまだありません",
+      "revoke": "取り消す",
+      "revoke_confirm_title": "この招待を取り消しますか？",
+      "revoke_confirm": "リンクは直ちに無効になります。",
+      "revoke_success": "招待を取り消しました",
+      "revoke_error": "招待の取り消しに失敗しました",
+      "expires_at": "{date} に期限切れ",
+      "create_hint": "招待は「参加者」タブから発行できます。",
+      "status": {
+        "pending": "未送信",
+        "sent": "送信済み",
+        "accepted": "承諾済み",
+        "expired": "期限切れ"
+      }
     }
   }
 }
