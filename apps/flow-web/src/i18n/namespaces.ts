@@ -4,11 +4,6 @@
  */
 export const namespaces = [
   'common',
-  'auth',
-  'workspaces',
-  'projects',
-  'tasks',
-  'comments',
   'timeline',
   'calendar-events',
   'inbox',
@@ -17,7 +12,6 @@ export const namespaces = [
   'ai-suggestions',
   'aiPriority',
   'aiMetrics',
-  'mcp',
   'errors',
   'notifications',
   'relations',
@@ -28,6 +22,8 @@ export const namespaces = [
   'archive',
   'linkedEvents',
   'aiAgents',
+  'sharing',
+  'export',
 ] as const;
 
 /** Union of all known i18n namespace names. */

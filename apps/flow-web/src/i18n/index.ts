@@ -13,6 +13,7 @@ import enCommon from '../../locales/en/common.json';
 import enConstraints from '../../locales/en/constraints.json';
 import enDashboard from '../../locales/en/dashboard.json';
 import enErrors from '../../locales/en/errors.json';
+import enExport from '../../locales/en/export.json';
 import enInbox from '../../locales/en/inbox.json';
 import enLabels from '../../locales/en/labels.json';
 import enLinkedEvents from '../../locales/en/linkedEvents.json';
@@ -21,6 +22,7 @@ import enPages from '../../locales/en/pages.json';
 import enReactions from '../../locales/en/reactions.json';
 import enRelations from '../../locales/en/relations.json';
 import enSettings from '../../locales/en/settings.json';
+import enSharing from '../../locales/en/sharing.json';
 import enTimeline from '../../locales/en/timeline.json';
 import jaAiSuggestions from '../../locales/ja/ai-suggestions.json';
 import jaAi from '../../locales/ja/ai.json';
@@ -33,6 +35,7 @@ import jaCommon from '../../locales/ja/common.json';
 import jaConstraints from '../../locales/ja/constraints.json';
 import jaDashboard from '../../locales/ja/dashboard.json';
 import jaErrors from '../../locales/ja/errors.json';
+import jaExport from '../../locales/ja/export.json';
 import jaInbox from '../../locales/ja/inbox.json';
 import jaLabels from '../../locales/ja/labels.json';
 import jaLinkedEvents from '../../locales/ja/linkedEvents.json';
@@ -41,6 +44,7 @@ import jaPages from '../../locales/ja/pages.json';
 import jaReactions from '../../locales/ja/reactions.json';
 import jaRelations from '../../locales/ja/relations.json';
 import jaSettings from '../../locales/ja/settings.json';
+import jaSharing from '../../locales/ja/sharing.json';
 import jaTimeline from '../../locales/ja/timeline.json';
 import zhAiSuggestions from '../../locales/zh/ai-suggestions.json';
 import zhAi from '../../locales/zh/ai.json';
@@ -53,6 +57,7 @@ import zhCommon from '../../locales/zh/common.json';
 import zhConstraints from '../../locales/zh/constraints.json';
 import zhDashboard from '../../locales/zh/dashboard.json';
 import zhErrors from '../../locales/zh/errors.json';
+import zhExport from '../../locales/zh/export.json';
 import zhInbox from '../../locales/zh/inbox.json';
 import zhLabels from '../../locales/zh/labels.json';
 import zhLinkedEvents from '../../locales/zh/linkedEvents.json';
@@ -61,6 +66,7 @@ import zhPages from '../../locales/zh/pages.json';
 import zhReactions from '../../locales/zh/reactions.json';
 import zhRelations from '../../locales/zh/relations.json';
 import zhSettings from '../../locales/zh/settings.json';
+import zhSharing from '../../locales/zh/sharing.json';
 import zhTimeline from '../../locales/zh/timeline.json';
 import { defaultNamespace } from './namespaces';
 
@@ -112,6 +118,7 @@ export function initI18n(): typeof i18n {
         'aiPriority',
         'constraints',
         'errors',
+        'export',
         'notifications',
         'relations',
         'dashboard',
@@ -120,6 +127,7 @@ export function initI18n(): typeof i18n {
         'reactions',
         'archive',
         'linkedEvents',
+        'sharing',
       ],
       resources: {
         en: {
@@ -136,6 +144,7 @@ export function initI18n(): typeof i18n {
           aiPriority: enAiPriority,
           constraints: enConstraints,
           errors: enErrors,
+          export: enExport,
           notifications: enNotifications,
           relations: enRelations,
           dashboard: enDashboard,
@@ -143,6 +152,7 @@ export function initI18n(): typeof i18n {
           labels: enLabels,
           linkedEvents: enLinkedEvents,
           reactions: enReactions,
+          sharing: enSharing,
         },
         ja: {
           archive: jaArchive,
@@ -158,6 +168,7 @@ export function initI18n(): typeof i18n {
           aiPriority: jaAiPriority,
           constraints: jaConstraints,
           errors: jaErrors,
+          export: jaExport,
           notifications: jaNotifications,
           relations: jaRelations,
           dashboard: jaDashboard,
@@ -165,6 +176,7 @@ export function initI18n(): typeof i18n {
           labels: jaLabels,
           linkedEvents: jaLinkedEvents,
           reactions: jaReactions,
+          sharing: jaSharing,
         },
         zh: {
           archive: zhArchive,
@@ -180,6 +192,7 @@ export function initI18n(): typeof i18n {
           aiPriority: zhAiPriority,
           constraints: zhConstraints,
           errors: zhErrors,
+          export: zhExport,
           notifications: zhNotifications,
           relations: zhRelations,
           dashboard: zhDashboard,
@@ -187,6 +200,7 @@ export function initI18n(): typeof i18n {
           labels: zhLabels,
           linkedEvents: zhLinkedEvents,
           reactions: zhReactions,
+          sharing: zhSharing,
         },
       },
       interpolation: { escapeValue: false },
