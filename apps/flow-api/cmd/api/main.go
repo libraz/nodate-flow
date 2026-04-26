@@ -24,6 +24,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/config"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/router"
 	nflog "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/log"
@@ -98,6 +99,7 @@ func main() {
 	obs.StartDBStatsCollector(db, dbStatsDone)
 
 	queries := generated.New(db)
+	calendarQueries := calendar.New(db)
 
 	// Cipher is optional at scaffold time: if NF_SECRET_KEY is unset the
 	// AI provider endpoints will return AI.PROVIDER.NOT_CONFIGURED for
@@ -308,6 +310,7 @@ func main() {
 	inner := router.Build(router.Deps{
 		DB:                    db,
 		Queries:               queries,
+		CalendarQueries:       calendarQueries,
 		JWT:                   jwtIssuer,
 		Cipher:                cipher,
 		GhWebhookSecret:       cfg.GhWebhookSecret,

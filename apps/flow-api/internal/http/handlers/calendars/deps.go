@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	generated "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
@@ -13,7 +14,12 @@ import (
 // Deps holds the dependencies required by calendar handlers.
 type Deps struct {
 	Queries *generated.Queries
-	DB      *sql.DB
+	// CalendarQueries is the dedicated sqlc subpackage handle that emits
+	// every calendar-domain query. Calendar handlers reach for it instead
+	// of [generated.Queries] for any *_calendar_*, *_event_*, *_invite_*,
+	// *_attendee_*, *_memo_* operation.
+	CalendarQueries *calendar.Queries
+	DB              *sql.DB
 	// EmailSender dispatches transactional emails (e.g. event-invite
 	// magic links). Nil-safe: when unset, handlers fall back to
 	// [email.NoopSender] so the invite row is still created but no

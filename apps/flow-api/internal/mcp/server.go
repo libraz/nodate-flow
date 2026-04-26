@@ -41,6 +41,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/nlquery"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 )
 
@@ -48,6 +49,11 @@ import (
 type Deps struct {
 	DB      *sql.DB
 	Queries *generated.Queries
+	// CalendarQueries is the dedicated sqlc subpackage handle that emits
+	// every calendar-domain query. Calendar-aware MCP tools reach for it
+	// instead of [Queries] for any *_calendar_*, *_event_*, *_invite_*,
+	// *_attendee_*, *_memo_* operation.
+	CalendarQueries *calendar.Queries
 	// AI is the optional LLM orchestrator. When nil, the propose_* tools
 	// return AI.PROVIDER.NOT_CONFIGURED.
 	AI *ai.Orchestrator

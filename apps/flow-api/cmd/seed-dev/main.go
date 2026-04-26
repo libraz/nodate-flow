@@ -61,6 +61,7 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 )
 
@@ -176,6 +177,10 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	}
 
 	q := generated.New(db)
+	// cq is the dedicated calendar sqlc subpackage handle, used by the
+	// calendar-event seed steps below. Shares the same *sql.DB pool as q.
+	cq := calendar.New(db)
+	_ = cq
 
 	// 1. Owner user (idempotent on email).
 	ownerID, created, err := ensureUser(ctx, q, cfg.email, cfg.displayName, cfg.locale)

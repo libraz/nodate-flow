@@ -55,6 +55,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	aihandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/ai"
@@ -96,6 +97,11 @@ type Deps struct {
 	// Queries is a sqlc Queries handle wrapping DB. Callers should pass
 	// generated.New(DB) so both handles share the same connection pool.
 	Queries *generated.Queries
+	// CalendarQueries is the dedicated sqlc subpackage handle that emits
+	// every calendar-domain query. Callers should pass calendar.New(DB)
+	// so it shares the same connection pool as Queries. Threaded into
+	// calendars.Deps and mcp.Deps for any calendar-domain query.
+	CalendarQueries *calendar.Queries
 	// JWT is the access-token issuer used by RequireAuth.
 	JWT *auth.JWTIssuer
 	// Cipher is optional: when nil, the AI provider endpoints return
@@ -492,11 +498,12 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 			DefaultWorkspaceID: deps.DefaultWorkspaceID,
 		},
 		calDeps: calendars.Deps{
-			Queries:     deps.Queries,
-			DB:          deps.DB,
-			EmailSender: deps.EmailSender,
-			EmailFrom:   deps.EmailFrom,
-			FlowWebURL:  deps.FlowWebURL,
+			Queries:         deps.Queries,
+			CalendarQueries: deps.CalendarQueries,
+			DB:              deps.DB,
+			EmailSender:     deps.EmailSender,
+			EmailFrom:       deps.EmailFrom,
+			FlowWebURL:      deps.FlowWebURL,
 		},
 	}
 }
@@ -769,7 +776,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 	// is registered so workspace events are broadcast to connected MCP
 	// clients in real time. The /mcp endpoint enforces auth itself
 	// (Bearer mcp_ tokens) so it lives outside the Huma sub-API surface.
-	mcpHandler := mcp.NewHandler(mcp.Deps{DB: deps.DB, Queries: deps.Queries, AI: shared.aiOrch, Embedder: shared.embedClient, NlQuery: shared.nlQueryCompiler})
+	mcpHandler := mcp.NewHandler(mcp.Deps{DB: deps.DB, Queries: deps.Queries, CalendarQueries: deps.CalendarQueries, AI: shared.aiOrch, Embedder: shared.embedClient, NlQuery: shared.nlQueryCompiler})
 	eventbus.AddNotifyHook(mcpHandler.RegisterEventHook())
 	r.Handle("/mcp", mcpHandler)
 

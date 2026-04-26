@@ -15,6 +15,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/testutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	calgen "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/router"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/stream"
@@ -70,6 +71,7 @@ func StartTestServer(t *testing.T, db *sql.DB) *TestServer {
 	require.NoError(t, err, "derive jwt key")
 
 	queries := generated.New(db)
+	calendarQueries := calgen.New(db)
 
 	jwtIssuer, err := auth.NewJWTIssuer(jwtKey, "nodate-flow", "api", 15*time.Minute)
 	require.NoError(t, err, "init flow jwt issuer")
@@ -84,6 +86,7 @@ func StartTestServer(t *testing.T, db *sql.DB) *TestServer {
 	flowHandler := router.Build(router.Deps{
 		DB:                 db,
 		Queries:            queries,
+		CalendarQueries:    calendarQueries,
 		JWT:                jwtIssuer,
 		Cipher:             cipher,
 		GhWebhookSecret:    "",
@@ -121,6 +124,7 @@ func NewTestServer(db *sql.DB) (*TestServer, func(), error) {
 		return nil, nil, fmt.Errorf("derive jwt key: %w", err)
 	}
 	queries := generated.New(db)
+	calendarQueries := calgen.New(db)
 	jwtIssuer, err := auth.NewJWTIssuer(jwtKey, "nodate-flow", "api", 15*time.Minute)
 	if err != nil {
 		return nil, nil, fmt.Errorf("init jwt issuer: %w", err)
@@ -136,6 +140,7 @@ func NewTestServer(db *sql.DB) (*TestServer, func(), error) {
 	flowHandler := router.Build(router.Deps{
 		DB:                 db,
 		Queries:            queries,
+		CalendarQueries:    calendarQueries,
 		JWT:                jwtIssuer,
 		Cipher:             cipher,
 		GhWebhookSecret:    "",
