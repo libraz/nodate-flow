@@ -2,8 +2,6 @@ package tasks
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"log/slog"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
@@ -12,6 +10,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
@@ -94,10 +93,7 @@ func RemoveConstraint(deps Deps) func(context.Context, *RemoveTaskConstraintInpu
 			WorkspaceID: ws.ID,
 			PublicID:    cid,
 		}); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsTaskNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsTaskNotFound, apierrors.InternalUnexpected))
 		}
 		taskInternal := int64(task.ID)
 		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{

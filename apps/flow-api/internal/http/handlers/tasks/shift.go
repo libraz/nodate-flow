@@ -12,6 +12,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/itemkit"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 )
 
 // resolveEventInWorkspace looks up the internal id of a calendar
@@ -30,10 +31,7 @@ func resolveEventInWorkspace(ctx context.Context, deps Deps, workspaceID uint32,
 		workspaceID, pub,
 	).Scan(&id)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, httpErr(apierrors.CalendarEventNotFound)
-		}
-		return 0, httpErr(apierrors.InternalUnexpected)
+		return 0, httpErr(apierr.SpecForErrNoRows(err, apierrors.CalendarEventNotFound, apierrors.InternalUnexpected))
 	}
 	return id, nil
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
 )
@@ -93,10 +94,7 @@ func MagicLinkVerify(deps Deps) func(context.Context, *MagicLinkVerifyInput) (*M
 		hash := authpkg.HashOpaque(in.Token)
 		row, err := deps.Queries.FindMagicLinkByTokenHash(ctx, hash)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.AuthMagicLinkInvalidOrExpired)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.AuthMagicLinkInvalidOrExpired, apierrors.InternalUnexpected))
 		}
 		if row.UsedAt.Valid {
 			return nil, httpErr(apierrors.AuthMagicLinkAlreadyUsed)

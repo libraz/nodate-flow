@@ -2,8 +2,6 @@ package calendars
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 
 	"github.com/google/uuid"
 
@@ -11,6 +9,8 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
 )
 
 // --- Input/Output types ---
@@ -122,12 +122,8 @@ func ListComments(deps Deps) func(context.Context, *ListCommentsInput) (*ListCom
 				Body:        r.Body,
 				CreatedAt:   r.CreatedAt.Unix(),
 			}
-			if r.AvatarUrl.Valid {
-				resp.AvatarUrl = &r.AvatarUrl.String
-			}
-			if r.EditedAt.Valid {
-				resp.EditedAt = int64Ptr(r.EditedAt.Time.Unix())
-			}
+			resp.AvatarUrl = dbtype.PtrFromNullString(r.AvatarUrl)
+			resp.EditedAt = dbtype.UnixSecondsFromNullTime(r.EditedAt)
 			out.Body.Comments[i] = resp
 		}
 		return out, nil
@@ -176,9 +172,7 @@ func CreateComment(deps Deps) func(context.Context, *CreateCommentInput) (*Creat
 			Body:        input.Body.Body,
 			CreatedAt:   handlerutil.NowUnix(),
 		}
-		if profile.AvatarUrl.Valid {
-			out.Body.AvatarUrl = &profile.AvatarUrl.String
-		}
+		out.Body.AvatarUrl = dbtype.PtrFromNullString(profile.AvatarUrl)
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.comment.created", &actorID, map[string]any{
 			"eventId":    input.EvtId,
@@ -263,10 +257,7 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteCommentInput) (*Delet
 			WorkspaceID: wsID,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.CalendarCommentNotFound)
-			}
-			return nil, httpErr(apierrors.CalendarCommentStoreReadInterrupted)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.CalendarCommentNotFound, apierrors.CalendarCommentStoreReadInterrupted))
 		}
 
 		isAuthor := comment.AuthorID == actorID

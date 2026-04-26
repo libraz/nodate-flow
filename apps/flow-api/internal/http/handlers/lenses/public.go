@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
-	"errors"
 	"log/slog"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
@@ -14,6 +13,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 )
 
 // Publish handles POST /workspaces/{wsId}/lenses/{lensId}/publish.
@@ -41,10 +41,7 @@ func Publish(deps Deps) func(context.Context, *PublishLensInput) (*PublishLensOu
 			PublicID:    lid,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsLensNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsLensNotFound, apierrors.InternalUnexpected))
 		}
 
 		// Generate a cryptographically random 32-char hex token.
@@ -129,10 +126,7 @@ func Unpublish(deps Deps) func(context.Context, *UnpublishLensInput) (*Unpublish
 			PublicID:    lid,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsLensNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsLensNotFound, apierrors.InternalUnexpected))
 		}
 
 		// SetLensPrivate is a no-op when is_public = FALSE (WHERE guard).
@@ -191,10 +185,7 @@ func GetPublic(deps Deps) func(context.Context, *GetPublicLensInput) (*GetPublic
 			Valid:  true,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsLensPublicTokenInvalid)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsLensPublicTokenInvalid, apierrors.InternalUnexpected))
 		}
 
 		return &GetPublicLensOutput{Body: rowToPublicLens(row)}, nil

@@ -14,6 +14,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
@@ -37,10 +38,7 @@ func resolvePageInternal(ctx context.Context, db *sql.DB, wsID uint32, pub types
 	const q = `SELECT id FROM pages WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE LIMIT 1`
 	var id uint32
 	if err := db.QueryRowContext(ctx, q, wsID, pub).Scan(&id); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, httpErr(apierrors.PagePageNotFound)
-		}
-		return 0, httpErr(apierrors.InternalUnexpected)
+		return 0, httpErr(apierr.SpecForErrNoRows(err, apierrors.PagePageNotFound, apierrors.InternalUnexpected))
 	}
 	return id, nil
 }
@@ -95,10 +93,7 @@ func resolveProjectInternal(ctx context.Context, q *generated.Queries, wsID uint
 		PublicID:    pid,
 	})
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return sql.NullInt32{}, httpErr(apierrors.WsProjectNotFound)
-		}
-		return sql.NullInt32{}, httpErr(apierrors.InternalUnexpected)
+		return sql.NullInt32{}, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
 	}
 	return sql.NullInt32{Int32: int32(row.ID), Valid: true}, nil
 }
@@ -294,10 +289,7 @@ func Get(deps Deps) func(context.Context, *GetPageInput) (*GetPageOutput, error)
 			PublicID:    pub,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.PagePageNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.PagePageNotFound, apierrors.InternalUnexpected))
 		}
 		return &GetPageOutput{Body: mapGetRow(row)}, nil
 	}
@@ -321,10 +313,7 @@ func Update(deps Deps) func(context.Context, *UpdatePageInput) (*UpdatePageOutpu
 			PublicID:    pub,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.PagePageNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.PagePageNotFound, apierrors.InternalUnexpected))
 		}
 
 		// Build update params with COALESCE-compatible nullables.

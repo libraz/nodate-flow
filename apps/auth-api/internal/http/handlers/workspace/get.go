@@ -2,12 +2,11 @@ package workspace
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 )
 
 // Get handles GET /workspaces/{wsId}. Workspace context has already been
@@ -20,10 +19,7 @@ func Get(deps Deps) func(context.Context, *GetWorkspaceInput) (*GetWorkspaceOutp
 		}
 		row, err := deps.Queries.FindWorkspaceByPublicId(ctx, types.FromUUID(ws.PublicID))
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsWorkspaceNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsWorkspaceNotFound, apierrors.InternalUnexpected))
 		}
 		dto := rowToWorkspaceFromFind(row)
 		dto.Role = string(ws.Role)

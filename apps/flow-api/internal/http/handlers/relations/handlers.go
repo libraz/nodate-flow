@@ -3,7 +3,6 @@ package relations
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"log/slog"
 	"strconv"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 )
 
 // ListForWorkspace handles GET /workspaces/{wsId}/relation-suggestions.
@@ -112,10 +112,7 @@ INNER JOIN workspace_members wm ON wm.workspace_id = rs.workspace_id AND wm.user
 WHERE rs.public_id = ?
 LIMIT 1`
 		if err := deps.DB.QueryRowContext(ctx, wsFindQuery, actorID, pub).Scan(&wsID); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.RelationSuggestionNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.RelationSuggestionNotFound, apierrors.InternalUnexpected))
 		}
 
 		// Fetch the full suggestion row (scoped to the resolved workspace).
@@ -124,10 +121,7 @@ LIMIT 1`
 			PublicID:    pub,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.RelationSuggestionNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.RelationSuggestionNotFound, apierrors.InternalUnexpected))
 		}
 
 		if suggestion.Status != generated.RelationSuggestionsStatusPending {

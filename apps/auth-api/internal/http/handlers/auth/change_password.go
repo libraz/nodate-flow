@@ -7,11 +7,11 @@ package auth
 import (
 	"context"
 	"database/sql"
-	"errors"
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 )
 
@@ -27,10 +27,7 @@ func ChangePassword(deps Deps) func(context.Context, *ChangePasswordInput) (*Cha
 		}
 		row, err := deps.Queries.FindLocalIdentityByUserId(ctx, uid)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.AuthPasswordNoLocalIdentity)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.AuthPasswordNoLocalIdentity, apierrors.InternalUnexpected))
 		}
 		if !row.PasswordHash.Valid {
 			return nil, httpErr(apierrors.AuthPasswordNoLocalIdentity)

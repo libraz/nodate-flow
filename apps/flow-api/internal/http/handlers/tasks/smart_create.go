@@ -17,6 +17,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 )
 
 // SmartCreateDeps is the dependency bundle for the propose-smart and
@@ -135,10 +136,7 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 			PublicID:    prjPub,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsProjectNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
 		}
 
 		// Begin transaction.
@@ -277,10 +275,7 @@ func addActorByPublicID(ctx context.Context, qtx *generated.Queries, db *sql.DB,
 	const q = `SELECT id FROM users WHERE public_id = ? AND enabled = TRUE LIMIT 1`
 	var uid uint32
 	if err := db.QueryRowContext(ctx, q, userPub).Scan(&uid); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return httpErr(apierrors.WsMemberNotFound)
-		}
-		return httpErr(apierrors.InternalUnexpected)
+		return httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
 	}
 	pub := types.New()
 	if _, err := qtx.AddActor(ctx, generated.AddActorParams{

@@ -11,6 +11,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/memberkit"
 )
@@ -162,10 +163,7 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateWorkspaceMemberRol
 		}
 		uid, err := resolveUserInternalID(ctx, deps.Queries, userPub)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsMemberNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
 		}
 
 		tx, err := deps.DB.BeginTx(ctx, nil)
@@ -179,10 +177,7 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateWorkspaceMemberRol
 			NewRole:     memberkit.Role(in.Body.Role),
 			ActorUserID: actorID,
 		}); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsMemberNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
 		}
 		if err := tx.Commit(); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -220,10 +215,7 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveWorkspaceMemberInput) 
 		}
 		uid, err := resolveUserInternalID(ctx, deps.Queries, userPub)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsMemberNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
 		}
 
 		tx, err := deps.DB.BeginTx(ctx, nil)
@@ -236,10 +228,7 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveWorkspaceMemberInput) 
 			UserID:      uid,
 			ActorUserID: actorID,
 		}); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsMemberNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
 		}
 		if err := tx.Commit(); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)

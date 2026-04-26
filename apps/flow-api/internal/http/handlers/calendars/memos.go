@@ -3,7 +3,6 @@ package calendars
 import (
 	"context"
 	"database/sql"
-	"errors"
 
 	"github.com/google/uuid"
 
@@ -11,6 +10,8 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
 )
 
 // --- Input/Output types ---
@@ -119,9 +120,7 @@ func ListMemos(deps Deps) func(context.Context, *ListMemosInput) (*ListMemosOutp
 				UserDisplayName: r.DisplayName,
 				CreatedAt:       r.CreatedAt.Unix(),
 			}
-			if r.UpdatedAt.Valid {
-				resp.UpdatedAt = int64Ptr(r.UpdatedAt.Time.Unix())
-			}
+			resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
 			out.Body.Memos[i] = resp
 		}
 		return out, nil
@@ -195,10 +194,7 @@ func UpdateMemo(deps Deps) func(context.Context, *UpdateMemoInput) (*UpdateMemoO
 			WorkspaceID: wsID,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.CalendarMemoNotFound)
-			}
-			return nil, httpErr(apierrors.CalendarMemoStoreReadInterrupted)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.CalendarMemoNotFound, apierrors.CalendarMemoStoreReadInterrupted))
 		}
 
 		params := calendar.UpdateCalendarMemoParams{
@@ -256,10 +252,7 @@ func DeleteMemo(deps Deps) func(context.Context, *DeleteMemoInput) (*DeleteMemoO
 			WorkspaceID: wsID,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.CalendarMemoNotFound)
-			}
-			return nil, httpErr(apierrors.CalendarMemoStoreReadInterrupted)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.CalendarMemoNotFound, apierrors.CalendarMemoStoreReadInterrupted))
 		}
 
 		err = deps.CalendarQueries.DisableCalendarMemo(ctx, calendar.DisableCalendarMemoParams{

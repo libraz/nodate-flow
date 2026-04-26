@@ -3,7 +3,6 @@ package labels
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"log/slog"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
@@ -12,6 +11,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
@@ -40,10 +40,7 @@ func Create(deps Deps) func(context.Context, *CreateLabelInput) (*CreateLabelOut
 				PublicID:    pid,
 			})
 			if err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					return nil, httpErr(apierrors.WsProjectNotFound)
-				}
-				return nil, httpErr(apierrors.InternalUnexpected)
+				return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
 			}
 			projectID = sql.NullInt32{Int32: int32(proj.ID), Valid: true}
 		}
@@ -59,10 +56,7 @@ func Create(deps Deps) func(context.Context, *CreateLabelInput) (*CreateLabelOut
 				PublicID:    plid,
 			})
 			if err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					return nil, httpErr(apierrors.WsLabelNotFound)
-				}
-				return nil, httpErr(apierrors.InternalUnexpected)
+				return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsLabelNotFound, apierrors.InternalUnexpected))
 			}
 			parentLabelID = sql.NullInt32{Int32: int32(parent.ID), Valid: true}
 		}
@@ -146,10 +140,7 @@ func List(deps Deps) func(context.Context, *ListLabelsInput) (*ListLabelsOutput,
 				PublicID:    pid,
 			})
 			if err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					return nil, httpErr(apierrors.WsProjectNotFound)
-				}
-				return nil, httpErr(apierrors.InternalUnexpected)
+				return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
 			}
 			rows, err := deps.Queries.ListLabelsForProject(ctx, generated.ListLabelsForProjectParams{
 				WorkspaceID: ws.ID,
@@ -210,10 +201,7 @@ func Get(deps Deps) func(context.Context, *GetLabelInput) (*GetLabelOutput, erro
 			PublicID:    pub,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsLabelNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsLabelNotFound, apierrors.InternalUnexpected))
 		}
 
 		return &GetLabelOutput{Body: mapLabel(row)}, nil
@@ -238,10 +226,7 @@ func Patch(deps Deps) func(context.Context, *PatchLabelInput) (*PatchLabelOutput
 			PublicID:    pub,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsLabelNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsLabelNotFound, apierrors.InternalUnexpected))
 		}
 
 		name := row.Name
@@ -270,10 +255,7 @@ func Patch(deps Deps) func(context.Context, *PatchLabelInput) (*PatchLabelOutput
 					PublicID:    plid,
 				})
 				if findErr != nil {
-					if errors.Is(findErr, sql.ErrNoRows) {
-						return nil, httpErr(apierrors.WsLabelNotFound)
-					}
-					return nil, httpErr(apierrors.InternalUnexpected)
+					return nil, httpErr(apierr.SpecForErrNoRows(findErr, apierrors.WsLabelNotFound, apierrors.InternalUnexpected))
 				}
 				parentID = sql.NullInt32{Int32: int32(parent.ID), Valid: true}
 			}
@@ -412,10 +394,7 @@ func AddTaskLabel(deps Deps) func(context.Context, *AddTaskLabelInput) (*AddTask
 			PublicID:    labelPub,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsLabelNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsLabelNotFound, apierrors.InternalUnexpected))
 		}
 
 		pub := types.New()
@@ -512,10 +491,7 @@ func RemoveTaskLabel(deps Deps) func(context.Context, *RemoveTaskLabelInput) (*R
 			PublicID:    labelPub,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsLabelNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsLabelNotFound, apierrors.InternalUnexpected))
 		}
 
 		if err := deps.Queries.DisableTaskLabel(ctx, generated.DisableTaskLabelParams{

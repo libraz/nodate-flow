@@ -3,11 +3,11 @@ package resolve
 import (
 	"context"
 	"database/sql"
-	"errors"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 )
 
 // httpErr delegates to handlerutil.HTTPErr.
@@ -27,16 +27,10 @@ func WorkspaceMember(ctx context.Context, db *sql.DB, wsPublic string, actorID u
 	const wsLookup = `SELECT id FROM workspaces WHERE public_id = ? AND enabled = TRUE LIMIT 1`
 	var wsID uint32
 	if err := db.QueryRowContext(ctx, wsLookup, pub).Scan(&wsID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, httpErr(apierrors.WsWorkspaceNotFound)
-		}
-		return 0, httpErr(apierrors.InternalUnexpected)
+		return 0, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsWorkspaceNotFound, apierrors.InternalUnexpected))
 	}
 	if err := handlerutil.CheckWorkspaceMember(ctx, db, wsID, actorID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, httpErr(apierrors.WsWorkspaceAccessDenied)
-		}
-		return 0, httpErr(apierrors.InternalUnexpected)
+		return 0, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsWorkspaceAccessDenied, apierrors.InternalUnexpected))
 	}
 	return wsID, nil
 }

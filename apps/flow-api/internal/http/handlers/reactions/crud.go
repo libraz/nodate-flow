@@ -12,6 +12,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
@@ -170,10 +171,7 @@ func Delete(deps Deps) func(context.Context, *DeleteReactionInput) (*DeleteReact
 		// Verify the reaction exists and belongs to this user.
 		row, err := deps.Queries.FindReactionByPublicId(ctx, pub)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsReactionNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsReactionNotFound, apierrors.InternalUnexpected))
 		}
 		if row.UserID != actorID {
 			return nil, httpErr(apierrors.WsReactionNotFound)

@@ -2,8 +2,6 @@ package calendars
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 
 	"github.com/google/uuid"
 
@@ -11,6 +9,8 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
 )
 
 var memberColors = []string{
@@ -112,10 +112,7 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 
 		user, err := deps.Queries.FindUserByEmail(ctx, input.Body.Email)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.CalendarMemberUserNotFound)
-			}
-			return nil, httpErr(apierrors.CalendarMemberStoreReadInterrupted)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.CalendarMemberUserNotFound, apierrors.CalendarMemberStoreReadInterrupted))
 		}
 
 		// Check if already subscribed.
@@ -158,9 +155,7 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 			Role:        input.Body.Role,
 			CreatedAt:   handlerutil.NowUnix(),
 		}
-		if user.AvatarUrl.Valid {
-			out.Body.AvatarUrl = &user.AvatarUrl.String
-		}
+		out.Body.AvatarUrl = dbtype.PtrFromNullString(user.AvatarUrl)
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.member.added", &actorID, map[string]any{
 			"calendarId": input.CalId,
@@ -206,9 +201,7 @@ func ListMembers(deps Deps) func(context.Context, *ListMembersInput) (*ListMembe
 				Role:        "editor",
 				CreatedAt:   r.CreatedAt.Unix(),
 			}
-			if r.AvatarUrl.Valid {
-				resp.AvatarUrl = &r.AvatarUrl.String
-			}
+			resp.AvatarUrl = dbtype.PtrFromNullString(r.AvatarUrl)
 			out.Body.Members[i] = resp
 		}
 		return out, nil
@@ -296,10 +289,7 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 			UserID:     targetUserID,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.CalendarMemberNotFound)
-			}
-			return nil, httpErr(apierrors.CalendarMemberStoreReadInterrupted)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.CalendarMemberNotFound, apierrors.CalendarMemberStoreReadInterrupted))
 		}
 
 		// Last-owner protection now lives on calendars.owner_user_id

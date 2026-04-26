@@ -10,6 +10,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 )
 
 func resolveUserInternalID(ctx context.Context, db *sql.DB, pub types.PublicID) (uint32, error) {
@@ -74,20 +75,14 @@ func AddMember(deps Deps) func(context.Context, *AddProjectMemberInput) (*AddPro
 		}
 		uid, err := resolveUserInternalID(ctx, deps.DB, userPub)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsMemberNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
 		}
 		// User must already be a workspace member.
 		if _, err := deps.Queries.FindWorkspaceMemberByUserId(ctx, generated.FindWorkspaceMemberByUserIdParams{
 			WorkspaceID: ws.ID,
 			UserID:      uid,
 		}); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsMemberNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
 		}
 		// Idempotency.
 		if existing, err := deps.Queries.FindProjectMemberByUserId(ctx, generated.FindProjectMemberByUserIdParams{
@@ -141,10 +136,7 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveProjectMemberInput) (*
 		}
 		uid, err := resolveUserInternalID(ctx, deps.DB, userPub)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsMemberNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
 		}
 		if err := deps.Queries.RemoveProjectMemberByUserId(ctx, generated.RemoveProjectMemberByUserIdParams{
 			ProjectID: prj.ID,

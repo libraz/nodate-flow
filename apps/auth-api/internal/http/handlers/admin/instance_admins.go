@@ -9,6 +9,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 )
 
@@ -55,10 +56,7 @@ func GrantAdmin(deps Deps) func(context.Context, *GrantAdminInput) (*GrantAdminO
 		// Resolve internal user id.
 		targetID, err := deps.Queries.AdminFindUserIdByPublicId(ctx, pid)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.InstanceUserNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.InstanceUserNotFound, apierrors.InternalUnexpected))
 		}
 
 		// Check the user is not already an active admin.
@@ -110,10 +108,7 @@ func RevokeAdmin(deps Deps) func(context.Context, *RevokeAdminInput) (*RevokeAdm
 		// Resolve internal user id.
 		targetID, err := deps.Queries.AdminFindUserIdByPublicId(ctx, pid)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.InstanceAdminNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.InstanceAdminNotFound, apierrors.InternalUnexpected))
 		}
 
 		// Prevent self-revocation.
@@ -124,10 +119,7 @@ func RevokeAdmin(deps Deps) func(context.Context, *RevokeAdminInput) (*RevokeAdm
 		// Verify the target is actually an active admin.
 		_, err = deps.Queries.AdminFindInstanceAdminByUserId(ctx, targetID)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.InstanceAdminNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.InstanceAdminNotFound, apierrors.InternalUnexpected))
 		}
 
 		// Guard against removing the last admin.

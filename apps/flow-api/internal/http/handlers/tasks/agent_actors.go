@@ -6,7 +6,6 @@ package tasks
 
 import (
 	"context"
-	stderrors "errors"
 	"log/slog"
 
 	"database/sql"
@@ -17,6 +16,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 )
 
 // AddAgentActor handles POST /tasks/{id}/agents. Attaches an AI agent
@@ -40,10 +40,7 @@ func AddAgentActor(deps Deps) func(context.Context, *AddTaskAgentActorInput) (*A
 			PublicID:    agentPub,
 		})
 		if err != nil {
-			if stderrors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.AiProviderNotConfigured)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.AiProviderNotConfigured, apierrors.InternalUnexpected))
 		}
 		pub := types.New()
 		if _, err := deps.Queries.AddAgentActor(ctx, generated.AddAgentActorParams{

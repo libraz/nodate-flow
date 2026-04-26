@@ -13,6 +13,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
 )
@@ -132,10 +133,7 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 		}
 		ident, err := deps.Queries.FindLocalIdentityByUserId(ctx, uid)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.AuthLoginInvalidCredentials)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.AuthLoginInvalidCredentials, apierrors.InternalUnexpected))
 		}
 		if ident.LockedUntilAt.Valid && ident.LockedUntilAt.Time.After(time.Now()) {
 			return nil, httpErr(apierrors.AuthLoginAccountLocked)

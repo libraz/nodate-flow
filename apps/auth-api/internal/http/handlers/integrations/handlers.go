@@ -17,7 +17,9 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/handlerutil"
 	integrationspkg "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/integrations"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
 )
 
 // oauthStateTTL is how long a state row remains valid. Short enough
@@ -202,10 +204,7 @@ func Disconnect(deps Deps) func(context.Context, *DisconnectInput) (*DisconnectO
 			UserID:   uid,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.IntegrationConnectionNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.IntegrationConnectionNotFound, apierrors.InternalUnexpected))
 		}
 
 		// Best-effort provider-side revoke before local deletion.
@@ -234,14 +233,8 @@ func rowToConnectionSummary(r generated.ListUserIntegrationsRow) ConnectionSumma
 		Scopes:               r.Scopes,
 		ConnectedAt:          r.ConnectedAt.Unix(),
 	}
-	if r.LastRefreshedAt.Valid {
-		ts := r.LastRefreshedAt.Time.Unix()
-		c.LastRefreshedAt = &ts
-	}
-	if r.AccessTokenExpiresAt.Valid {
-		ts := r.AccessTokenExpiresAt.Time.Unix()
-		c.AccessTokenExpiresAt = &ts
-	}
+	c.LastRefreshedAt = dbtype.UnixSecondsFromNullTime(r.LastRefreshedAt)
+	c.AccessTokenExpiresAt = dbtype.UnixSecondsFromNullTime(r.AccessTokenExpiresAt)
 	return c
 }
 

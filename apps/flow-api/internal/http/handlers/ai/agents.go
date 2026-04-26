@@ -15,6 +15,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 )
 
 // AgentSummary is the public DTO for an ai_agents row. Secrets and
@@ -229,10 +230,7 @@ func CreateAgent(deps Deps) func(context.Context, *CreateAgentInput) (*CreateAge
 		const q = `SELECT id, name FROM ai_models
 			WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE LIMIT 1`
 		if err := deps.DB.QueryRowContext(ctx, q, ws.ID, modelPub).Scan(&modelID, &modelName); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.AiModelNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.AiModelNotFound, apierrors.InternalUnexpected))
 		}
 		temp := in.Body.Temperature
 		if temp == 0 {
@@ -411,10 +409,7 @@ func TriggerAgent(deps Deps, queue agentruntime.Queue, runner agentruntime.Runne
 		const sel = `SELECT id, paused FROM ai_agents
 			WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE LIMIT 1`
 		if err := deps.DB.QueryRowContext(ctx, sel, ws.ID, agentPub).Scan(&agentID, &paused); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.AiAgentNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.AiAgentNotFound, apierrors.InternalUnexpected))
 		}
 		if paused {
 			return nil, httpErr(apierrors.AiAgentPaused)

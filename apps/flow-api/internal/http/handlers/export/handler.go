@@ -18,6 +18,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
@@ -276,10 +277,7 @@ func fetchForLens(
 		PublicID:    lid,
 	})
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, httpErr(apierrors.ExportTaskLensNotFound)
-		}
-		return nil, httpErr(apierrors.ExportTaskDatasetQueryFailed)
+		return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.ExportTaskLensNotFound, apierrors.ExportTaskDatasetQueryFailed))
 	}
 
 	// If the lens has a project scope, use the project-scoped query.

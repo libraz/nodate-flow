@@ -8,6 +8,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
 )
 
 // MyInviteResponse is a single row in the /me/invites inbox. It carries
@@ -85,10 +86,7 @@ func ListMyInvites(deps Deps) func(context.Context, *struct{}) (*ListMyInvitesOu
 				ExpiresAt:         r.ExpiresAt.Unix(),
 				CreatedAt:         r.CreatedAt.Unix(),
 			}
-			if r.EventLocation.Valid {
-				loc := r.EventLocation.String
-				item.EventLocation = &loc
-			}
+			item.EventLocation = dbtype.PtrFromNullString(r.EventLocation)
 			out.Body.Invites = append(out.Body.Invites, item)
 		}
 		return out, nil
@@ -207,15 +205,9 @@ func ListMyCalendarEvents(deps Deps) func(context.Context, *ListMyCalendarEvents
 				Timezone:        r.Timezone,
 				CreatedAt:       r.CreatedAt.Unix(),
 			}
-			if r.Location.Valid {
-				resp.Location = &r.Location.String
-			}
-			if r.BlockLabel.Valid {
-				resp.BlockLabel = &r.BlockLabel.String
-			}
-			if r.UpdatedAt.Valid {
-				resp.UpdatedAt = int64Ptr(r.UpdatedAt.Time.Unix())
-			}
+			resp.Location = dbtype.PtrFromNullString(r.Location)
+			resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)
+			resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
 			out.Body.Events = append(out.Body.Events, resp)
 		}
 
@@ -238,26 +230,18 @@ func ListMyCalendarEvents(deps Deps) func(context.Context, *ListMyCalendarEvents
 				Timezone:        r.Timezone,
 				CreatedAt:       r.CreatedAt.Unix(),
 			}
-			if r.Location.Valid {
-				resp.Location = &r.Location.String
-			}
-			if r.BlockLabel.Valid {
-				resp.BlockLabel = &r.BlockLabel.String
-			}
+			resp.Location = dbtype.PtrFromNullString(r.Location)
+			resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)
 			if r.RecurrenceRule != nil {
 				raw := json.RawMessage(r.RecurrenceRule)
 				resp.RecurrenceRule = &raw
 			}
-			if r.RecurrenceEnd.Valid {
-				resp.RecurrenceEnd = int64Ptr(r.RecurrenceEnd.Time.Unix())
-			}
+			resp.RecurrenceEnd = dbtype.UnixSecondsFromNullTime(r.RecurrenceEnd)
 			if r.RecurrenceExceptions != nil {
 				raw := json.RawMessage(r.RecurrenceExceptions)
 				resp.RecurrenceExceptions = &raw
 			}
-			if r.UpdatedAt.Valid {
-				resp.UpdatedAt = int64Ptr(r.UpdatedAt.Time.Unix())
-			}
+			resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
 			out.Body.Events = append(out.Body.Events, resp)
 		}
 

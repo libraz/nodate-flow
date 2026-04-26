@@ -2,13 +2,12 @@ package admin
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 )
 
@@ -64,10 +63,7 @@ func GetWorkspace(deps Deps) func(context.Context, *AdminGetWorkspaceInput) (*Ad
 
 		row, err := deps.Queries.AdminGetWorkspace(ctx, pid)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.InstanceWorkspaceNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.InstanceWorkspaceNotFound, apierrors.InternalUnexpected))
 		}
 
 		return &AdminGetWorkspaceOutput{Body: rowToAdminWorkspaceDetail(row)}, nil

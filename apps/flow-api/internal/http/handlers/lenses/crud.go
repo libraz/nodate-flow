@@ -3,7 +3,6 @@ package lenses
 import (
 	"context"
 	"database/sql"
-	"errors"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
@@ -11,6 +10,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 )
 
 // Create handles POST /workspaces/{wsId}/lenses.
@@ -37,10 +37,7 @@ func Create(deps Deps) func(context.Context, *CreateLensInput) (*CreateLensOutpu
 				PublicID:    pid,
 			})
 			if err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					return nil, httpErr(apierrors.WsProjectNotFound)
-				}
-				return nil, httpErr(apierrors.InternalUnexpected)
+				return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
 			}
 			projectID = sql.NullInt32{Int32: int32(row.ID), Valid: true}
 		}
@@ -106,10 +103,7 @@ func List(deps Deps) func(context.Context, *ListLensesInput) (*ListLensesOutput,
 				PublicID:    pid,
 			})
 			if err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					return nil, httpErr(apierrors.WsProjectNotFound)
-				}
-				return nil, httpErr(apierrors.InternalUnexpected)
+				return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
 			}
 			projectID = sql.NullInt32{Int32: int32(row.ID), Valid: true}
 		}
@@ -157,10 +151,7 @@ func Get(deps Deps) func(context.Context, *GetLensInput) (*GetLensOutput, error)
 			PublicID:    lid,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsLensNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsLensNotFound, apierrors.InternalUnexpected))
 		}
 		return &GetLensOutput{Body: rowToLensFromGet(row)}, nil
 	}
@@ -184,10 +175,7 @@ func Update(deps Deps) func(context.Context, *UpdateLensInput) (*UpdateLensOutpu
 			PublicID:    lid,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsLensNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsLensNotFound, apierrors.InternalUnexpected))
 		}
 
 		// Parse existing lens_json for merge.

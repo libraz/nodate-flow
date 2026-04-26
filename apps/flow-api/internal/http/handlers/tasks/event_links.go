@@ -11,6 +11,8 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/itemkit"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
 )
 
 // CreateTaskEventLink handles POST /tasks/{id}/links. Delegates the
@@ -40,10 +42,7 @@ func CreateTaskEventLink(deps Deps) func(context.Context, *CreateTaskEventLinkIn
 			 LIMIT 1`,
 			ws.ID, eventPub,
 		).Scan(&eventID); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.CalendarEventNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.CalendarEventNotFound, apierrors.InternalUnexpected))
 		}
 
 		tx, err := deps.DB.BeginTx(ctx, nil)
@@ -185,12 +184,8 @@ func ListLinkedEvents(deps Deps) func(context.Context, *ListLinkedEventsInput) (
 				CalendarID:    r.CalendarPublicID.String(),
 				CalendarName:  r.CalendarName,
 			}
-			if r.StartAt.Valid {
-				link.EventStartAt = int64Ptr(r.StartAt.Time.Unix())
-			}
-			if r.EndAt.Valid {
-				link.EventEndAt = int64Ptr(r.EndAt.Time.Unix())
-			}
+			link.EventStartAt = dbtype.UnixSecondsFromNullTime(r.StartAt)
+			link.EventEndAt = dbtype.UnixSecondsFromNullTime(r.EndAt)
 			out.Body.Links = append(out.Body.Links, link)
 		}
 		if len(rows) > 0 {

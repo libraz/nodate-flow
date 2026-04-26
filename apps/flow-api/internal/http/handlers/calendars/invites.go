@@ -14,6 +14,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
 )
 
@@ -414,10 +415,7 @@ func AcceptEventInvite(deps Deps) func(context.Context, *AcceptEventInviteInput)
 		sum := sha256.Sum256([]byte(input.Body.Token))
 		invite, err := deps.CalendarQueries.FindCalendarEventInviteByTokenHash(ctx, sum[:])
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.CalendarInviteNotFound)
-			}
-			return nil, httpErr(apierrors.CalendarInviteStoreLookupInterrupted)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.CalendarInviteNotFound, apierrors.CalendarInviteStoreLookupInterrupted))
 		}
 		if !invite.ExpiresAt.After(time.Now().UTC()) {
 			// Expired invites are surfaced as NOT_FOUND per the code
@@ -521,10 +519,7 @@ func RevokeEventInvite(deps Deps) func(context.Context, *RevokeEventInviteInput)
 		}
 		invite, err := deps.CalendarQueries.FindCalendarEventInviteByPublicId(ctx, invitePID)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.CalendarInviteNotFound)
-			}
-			return nil, httpErr(apierrors.CalendarInviteStoreLookupInterrupted)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.CalendarInviteNotFound, apierrors.CalendarInviteStoreLookupInterrupted))
 		}
 		// Guard against cross-event revoke: the invite must belong to
 		// the event path parameter the caller supplied. Without this

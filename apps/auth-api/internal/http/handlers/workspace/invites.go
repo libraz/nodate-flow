@@ -3,7 +3,6 @@ package workspace
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
@@ -11,6 +10,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/memberkit"
@@ -173,10 +173,7 @@ func AcceptInvite(deps InviteDeps) func(context.Context, *AcceptWorkspaceInviteI
 		hash := auth.HashOpaque(in.Token)
 		invite, err := deps.Queries.FindWorkspaceInviteByTokenHash(ctx, hash)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsWorkspaceNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsWorkspaceNotFound, apierrors.InternalUnexpected))
 		}
 
 		// Validate expiry.
@@ -257,10 +254,7 @@ func InviteInfo(deps InviteDeps) func(context.Context, *InviteInfoInput) (*Invit
 
 		invite, err := deps.Queries.FindWorkspaceInviteByTokenHash(ctx, hash)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsWorkspaceNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsWorkspaceNotFound, apierrors.InternalUnexpected))
 		}
 
 		// Validate expiry.

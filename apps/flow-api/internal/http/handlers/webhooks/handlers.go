@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
@@ -14,6 +13,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/webhook"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 )
 
 // Create handles POST /workspaces/{wsId}/webhooks. It creates a new
@@ -138,10 +138,7 @@ func Get(deps Deps) func(context.Context, *GetInput) (*GetOutput, error) {
 			PublicID:    pub,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WebhookSubscriptionNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WebhookSubscriptionNotFound, apierrors.InternalUnexpected))
 		}
 
 		out := &GetOutput{}
@@ -310,10 +307,7 @@ func TestDelivery(deps Deps) func(context.Context, *TestDeliveryInput) (*TestDel
 			PublicID:    pub,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WebhookSubscriptionNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WebhookSubscriptionNotFound, apierrors.InternalUnexpected))
 		}
 		_ = sub // subscription is valid
 

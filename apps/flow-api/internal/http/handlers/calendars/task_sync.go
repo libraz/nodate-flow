@@ -2,8 +2,6 @@ package calendars
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"strings"
 	"time"
 
@@ -14,6 +12,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/itemkit"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 )
 
 // --- Input/Output types ---
@@ -68,10 +67,7 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 			taskPublicID, wsID,
 		).Scan(&taskID, &title, &dueOn)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.CalendarTaskSyncTaskNotFound)
-			}
-			return nil, httpErr(apierrors.CalendarTaskSyncTaskLookupInterrupted)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.CalendarTaskSyncTaskNotFound, apierrors.CalendarTaskSyncTaskLookupInterrupted))
 		}
 
 		// Determine timezone from request or caller/workspace preference.

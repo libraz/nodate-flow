@@ -21,12 +21,12 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base32"
-	"errors"
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 )
 
@@ -254,10 +254,7 @@ func TotpDisable(deps Deps) func(context.Context, *TotpDisableInput) (*TotpDisab
 func loadLocalIdentity(ctx context.Context, deps Deps, uid uint32) (generated.FindLocalIdentityByUserIdRow, error) {
 	row, err := deps.Queries.FindLocalIdentityByUserId(ctx, uid)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return row, httpErr(apierrors.AuthPasswordNoLocalIdentity)
-		}
-		return row, httpErr(apierrors.InternalUnexpected)
+		return row, httpErr(apierr.SpecForErrNoRows(err, apierrors.AuthPasswordNoLocalIdentity, apierrors.InternalUnexpected))
 	}
 	return row, nil
 }

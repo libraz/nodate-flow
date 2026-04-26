@@ -2,6 +2,7 @@ package audit
 
 import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
 )
 
 // mapListRow converts a ListWorkspaceAuditLogsRow to the AuditLogEntryDTO.
@@ -30,10 +31,7 @@ func mapListRow(r generated.ListWorkspaceAuditLogsRow) AuditLogEntryDTO {
 	if s := publicIDOrNilString(r.ActorUserPublicID); s != "" {
 		dto.ActorUserPublicID = &s
 	}
-	if r.ActorDisplayName.Valid {
-		v := r.ActorDisplayName.String
-		dto.ActorDisplayName = &v
-	}
+	dto.ActorDisplayName = dbtype.PtrFromNullString(r.ActorDisplayName)
 
 	// resource_public_id is BINARY(16) NULL at the column level; sqlc
 	// emits a non-nullable PublicID because the overrides force that

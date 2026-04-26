@@ -13,6 +13,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
@@ -36,10 +37,7 @@ func Create(deps Deps) func(context.Context, *CreateImportInput) (*CreateImportO
 				PublicID:    prjPub,
 			})
 			if err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					return nil, httpErr(apierrors.WsProjectNotFound)
-				}
-				return nil, httpErr(apierrors.InternalUnexpected)
+				return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
 			}
 			projectID = sql.NullInt32{Int32: int32(prj.ID), Valid: true}
 
@@ -166,10 +164,7 @@ func Get(deps Deps) func(context.Context, *GetImportInput) (*GetImportOutput, er
 			PublicID:    pub,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsImportNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsImportNotFound, apierrors.InternalUnexpected))
 		}
 
 		return &GetImportOutput{Body: mapFindRow(row)}, nil
@@ -194,10 +189,7 @@ func Cancel(deps Deps) func(context.Context, *CancelImportInput) (*CancelImportO
 			PublicID:    pub,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsImportNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsImportNotFound, apierrors.InternalUnexpected))
 		}
 
 		// Only pending or running jobs can be cancelled.

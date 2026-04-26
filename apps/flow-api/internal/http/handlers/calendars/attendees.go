@@ -11,6 +11,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
 )
 
 // --- Input/Output types ---
@@ -199,9 +200,7 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 				CanEdit:     false,
 				CreatedAt:   handlerutil.NowUnix(),
 			}
-			if profile.AvatarUrl.Valid {
-				resp.AvatarUrl = &profile.AvatarUrl.String
-			}
+			resp.AvatarUrl = dbtype.PtrFromNullString(profile.AvatarUrl)
 			out.Body.Attendees = append(out.Body.Attendees, resp)
 		}
 
@@ -250,9 +249,7 @@ func ListAttendees(deps Deps) func(context.Context, *ListAttendeesInput) (*ListA
 				CanEdit:     r.CanEdit,
 				CreatedAt:   r.CreatedAt.Unix(),
 			}
-			if r.AvatarUrl.Valid {
-				resp.AvatarUrl = &r.AvatarUrl.String
-			}
+			resp.AvatarUrl = dbtype.PtrFromNullString(r.AvatarUrl)
 			out.Body.Attendees[i] = resp
 		}
 		return out, nil

@@ -3,7 +3,6 @@ package timeboxes
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"log/slog"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
@@ -34,10 +34,7 @@ func resolveTaskInternal(ctx context.Context, db *sql.DB, wsID uint32, pub types
 	const q = `SELECT id FROM tasks WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE LIMIT 1`
 	var id uint32
 	if err := db.QueryRowContext(ctx, q, wsID, pub).Scan(&id); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, httpErr(apierrors.WsTaskNotFound)
-		}
-		return 0, httpErr(apierrors.InternalUnexpected)
+		return 0, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsTaskNotFound, apierrors.InternalUnexpected))
 	}
 	return id, nil
 }
@@ -133,10 +130,7 @@ func Create(deps Deps) func(context.Context, *CreateTimeboxInput) (*CreateTimebo
 				PublicID:    pid,
 			})
 			if err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					return nil, httpErr(apierrors.WsProjectNotFound)
-				}
-				return nil, httpErr(apierrors.InternalUnexpected)
+				return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
 			}
 			projectID = sql.NullInt32{Int32: int32(row.ID), Valid: true}
 		}
@@ -260,10 +254,7 @@ func Get(deps Deps) func(context.Context, *GetTimeboxInput) (*GetTimeboxOutput, 
 			PublicID:    pub,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.TimeboxTimeboxNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.TimeboxTimeboxNotFound, apierrors.InternalUnexpected))
 		}
 		return &GetTimeboxOutput{Body: mapGetRow(row)}, nil
 	}
@@ -287,10 +278,7 @@ func Update(deps Deps) func(context.Context, *UpdateTimeboxInput) (*UpdateTimebo
 			PublicID:    pub,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.TimeboxTimeboxNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.TimeboxTimeboxNotFound, apierrors.InternalUnexpected))
 		}
 
 		// Block updates on completed timeboxes.
@@ -396,10 +384,7 @@ func UpdateStatus(deps Deps) func(context.Context, *UpdateTimeboxStatusInput) (*
 			PublicID:    pub,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.TimeboxTimeboxNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.TimeboxTimeboxNotFound, apierrors.InternalUnexpected))
 		}
 
 		if existing.Status == generated.TimeboxesStatusCompleted {
@@ -517,10 +502,7 @@ func AddTask(deps Deps) func(context.Context, *AddTaskInput) (*AddTaskOutput, er
 			PublicID:    tbPub,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.TimeboxTimeboxNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.TimeboxTimeboxNotFound, apierrors.InternalUnexpected))
 		}
 
 		if tb.Status == generated.TimeboxesStatusCompleted {
@@ -604,10 +586,7 @@ func RemoveTask(deps Deps) func(context.Context, *RemoveTaskInput) (*RemoveTaskO
 			PublicID:    tbPub,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.TimeboxTimeboxNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.TimeboxTimeboxNotFound, apierrors.InternalUnexpected))
 		}
 
 		// Resolve task.
@@ -681,10 +660,7 @@ func ListTasks(deps Deps) func(context.Context, *ListTimeboxTasksInput) (*ListTi
 			PublicID:    tbPub,
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.TimeboxTimeboxNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.TimeboxTimeboxNotFound, apierrors.InternalUnexpected))
 		}
 
 		limit := in.Limit

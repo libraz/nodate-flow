@@ -10,6 +10,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
 )
 
 // --- Input/Output types ---
@@ -359,18 +360,10 @@ func calendarFromListRow(r calendar.ListCalendarsForUserRow) CalendarResponse {
 		SubscriptionSortWeight: r.SubscriptionSortWeight,
 		CreatedAt:              r.CreatedAt.Unix(),
 	}
-	if r.Description.Valid {
-		resp.Description = &r.Description.String
-	}
-	if r.CoverUrl.Valid {
-		resp.CoverUrl = &r.CoverUrl.String
-	}
-	if r.SystemSlug.Valid {
-		resp.SystemSlug = &r.SystemSlug.String
-	}
-	if r.UpdatedAt.Valid {
-		resp.UpdatedAt = int64Ptr(r.UpdatedAt.Time.Unix())
-	}
+	resp.Description = dbtype.PtrFromNullString(r.Description)
+	resp.CoverUrl = dbtype.PtrFromNullString(r.CoverUrl)
+	resp.SystemSlug = dbtype.PtrFromNullString(r.SystemSlug)
+	resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
 	return resp
 }
 
@@ -393,17 +386,9 @@ func calendarFromRow(c calendar.FindCalendarByPublicIdRow, s calendar.FindCalend
 		SubscriptionSortWeight: s.SortWeight,
 		CreatedAt:              c.CreatedAt.Unix(),
 	}
-	if c.Description.Valid {
-		resp.Description = &c.Description.String
-	}
-	if c.CoverUrl.Valid {
-		resp.CoverUrl = &c.CoverUrl.String
-	}
-	if c.SystemSlug.Valid {
-		resp.SystemSlug = &c.SystemSlug.String
-	}
-	if c.UpdatedAt.Valid {
-		resp.UpdatedAt = int64Ptr(c.UpdatedAt.Time.Unix())
-	}
+	resp.Description = dbtype.PtrFromNullString(c.Description)
+	resp.CoverUrl = dbtype.PtrFromNullString(c.CoverUrl)
+	resp.SystemSlug = dbtype.PtrFromNullString(c.SystemSlug)
+	resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(c.UpdatedAt)
 	return resp
 }

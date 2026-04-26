@@ -3,12 +3,11 @@ package calendars
 import (
 	"context"
 	"crypto/sha256"
-	"database/sql"
 	"encoding/hex"
-	"errors"
 	"time"
 
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 )
 
 // --- Public render (unauthenticated) ---
@@ -77,10 +76,7 @@ func RenderPublicShare(deps Deps) func(context.Context, *RenderPublicShareInput)
 
 		page, err := deps.CalendarQueries.FindPublicShareByTokenHash(ctx, hash)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.ShareShareTokenInvalid)
-			}
-			return nil, httpErr(apierrors.CalendarCalendarStoreReadInterrupted)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.ShareShareTokenInvalid, apierrors.CalendarCalendarStoreReadInterrupted))
 		}
 		if page.ExpiresAt.Valid && page.ExpiresAt.Time.Before(time.Now()) {
 			return nil, httpErr(apierrors.ShareShareExpired)

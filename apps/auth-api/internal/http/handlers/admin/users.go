@@ -2,13 +2,12 @@ package admin
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 )
 
@@ -64,10 +63,7 @@ func GetUser(deps Deps) func(context.Context, *GetUserInput) (*GetUserOutput, er
 
 		row, err := deps.Queries.AdminGetUser(ctx, pid)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.InstanceUserNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.InstanceUserNotFound, apierrors.InternalUnexpected))
 		}
 
 		return &GetUserOutput{Body: rowToAdminUserDetail(row)}, nil

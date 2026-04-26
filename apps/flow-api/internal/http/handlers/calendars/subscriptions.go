@@ -10,6 +10,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
 )
 
 // --- Input/Output types ---
@@ -115,12 +116,8 @@ func ListDiscoverableCalendars(deps Deps) func(context.Context, *ListDiscoverabl
 				OwnerDisplayName: r.OwnerDisplayName,
 				CreatedAt:        r.CreatedAt.Unix(),
 			}
-			if r.Description.Valid {
-				resp.Description = &r.Description.String
-			}
-			if r.OwnerAvatarUrl.Valid {
-				resp.OwnerAvatarUrl = &r.OwnerAvatarUrl.String
-			}
+			resp.Description = dbtype.PtrFromNullString(r.Description)
+			resp.OwnerAvatarUrl = dbtype.PtrFromNullString(r.OwnerAvatarUrl)
 			out.Body.Calendars[i] = resp
 		}
 		return out, nil

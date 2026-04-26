@@ -2,14 +2,13 @@ package tasks
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 )
 
 // Reorder handles POST /tasks/reorder. It accepts a batch of task
@@ -29,18 +28,12 @@ func Reorder(deps Deps) func(context.Context, *ReorderTasksInput) (*ReorderTasks
 		}
 		prj, err := deps.Queries.FindProjectByPublicIdGlobal(ctx, prjPub)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsProjectNotFound)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
 		}
 
 		// Workspace membership check.
 		if err := handlerutil.CheckWorkspaceMember(ctx, deps.DB, prj.WorkspaceID, actorID); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsProjectAccessDenied)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectAccessDenied, apierrors.InternalUnexpected))
 		}
 
 		// Resolve all public IDs to internal IDs and verify project membership.
@@ -60,10 +53,7 @@ WHERE public_id = ? AND workspace_id = ? AND enabled = TRUE LIMIT 1`
 			var taskID uint32
 			var taskProjectID uint32
 			if err := deps.DB.QueryRowContext(ctx, taskLookup, pub, prj.WorkspaceID).Scan(&taskID, &taskProjectID); err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					return nil, httpErr(apierrors.WsTaskNotFound)
-				}
-				return nil, httpErr(apierrors.InternalUnexpected)
+				return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsTaskNotFound, apierrors.InternalUnexpected))
 			}
 			if taskProjectID != prj.ID {
 				return nil, httpErr(apierrors.WsTaskNotFound)
