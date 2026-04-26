@@ -723,6 +723,25 @@
       "restore_success": "Description restored",
       "restore_error": "Could not restore the version. Please try again."
     },
+    "actions": {
+      "title": "Actions",
+      "create_event": {
+        "trigger": "Create calendar event",
+        "title": "Create event from task",
+        "workspace_label": "Workspace",
+        "workspace_placeholder": "Pick a workspace",
+        "calendar_label": "Calendar",
+        "calendar_placeholder": "Pick a calendar",
+        "calendar_required": "Pick a calendar",
+        "calendars_loading": "Loading calendars…",
+        "no_calendars": "This workspace has no writable calendars.",
+        "hint": "The event start and end times are derived from this task's due date.",
+        "submit": "Create event",
+        "cancel": "Cancel",
+        "success": "Calendar event created",
+        "error": "Could not create the calendar event."
+      }
+    },
     "steps": {
       "title": "Step decomposition",
       "propose_button": "Decompose into steps",

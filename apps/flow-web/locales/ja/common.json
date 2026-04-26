@@ -723,6 +723,25 @@
       "restore_success": "説明文を復元しました",
       "restore_error": "復元に失敗しました。もう一度お試しください。"
     },
+    "actions": {
+      "title": "アクション",
+      "create_event": {
+        "trigger": "カレンダーイベントを作成",
+        "title": "タスクからイベントを作成",
+        "workspace_label": "ワークスペース",
+        "workspace_placeholder": "ワークスペースを選択",
+        "calendar_label": "カレンダー",
+        "calendar_placeholder": "カレンダーを選択",
+        "calendar_required": "カレンダーを選択してください",
+        "calendars_loading": "カレンダーを読み込み中…",
+        "no_calendars": "このワークスペースに書き込み可能なカレンダーがありません。",
+        "hint": "イベントの開始・終了時刻はタスクの期限から自動で決まります。",
+        "submit": "イベントを作成",
+        "cancel": "キャンセル",
+        "success": "カレンダーイベントを作成しました",
+        "error": "カレンダーイベントを作成できませんでした"
+      }
+    },
     "steps": {
       "title": "ステップ分解",
       "propose_button": "ステップに分解する",

@@ -61,6 +61,7 @@ import CommentRow from '../features/tasks/comment-row';
 import { PRIORITY_COLOR, PRIORITY_KEY, STATE_KEY, STATE_TONE } from '../features/tasks/constants';
 import DependenciesSection from '../features/tasks/dependencies-section';
 import DescriptionHistoryDrawer from '../features/tasks/description-history/description-history-drawer';
+import EventFromTaskDialog from '../features/tasks/event-from-task/event-from-task-dialog';
 import MarkdownEditor from '../features/tasks/markdown-editor';
 import TaskAttachments from '../features/tasks/task-attachments';
 import TaskStepsPanel from '../features/tasks/task-steps-panel';
@@ -479,6 +480,41 @@ function ReactionsSection({ taskId }: { taskId: string }): ReactElement {
   );
 }
 
+/**
+ * TaskActionsCard hosts secondary task actions that don't belong to the
+ * state transition cluster. Currently surfaces the
+ * "Create calendar event" affordance — the dialog mounts lazily once
+ * the actor opens it.
+ */
+function TaskActionsCard({
+  taskId,
+  workspaceId,
+}: {
+  taskId: string;
+  workspaceId: string;
+}): ReactElement {
+  const { t } = useTranslation('common');
+  const [eventDialogOpen, setEventDialogOpen] = useState(false);
+  return (
+    <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <h2 style={{ margin: 0, fontSize: '1rem' }}>{t('tasks.actions.title')}</h2>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <Button type="button" variant="default" onClick={() => setEventDialogOpen(true)}>
+          {t('tasks.actions.create_event.trigger')}
+        </Button>
+      </div>
+      {eventDialogOpen ? (
+        <EventFromTaskDialog
+          taskId={taskId}
+          defaultWorkspaceId={workspaceId}
+          open={eventDialogOpen}
+          onClose={() => setEventDialogOpen(false)}
+        />
+      ) : null}
+    </Card>
+  );
+}
+
 function CommentsFeed({ taskId }: { taskId: string }): ReactElement {
   const { t, i18n } = useTranslation('common');
   const { data: comments } = useTaskCommentsQuery(taskId);
@@ -860,6 +896,8 @@ function Sidebar({
           ))}
         </div>
       </Card>
+
+      <TaskActionsCard taskId={id} workspaceId={workspaceId} />
 
       <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         <h2 style={{ margin: 0, fontSize: '1rem' }}>{t('tasks.detail.assignees.title')}</h2>

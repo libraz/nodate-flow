@@ -723,6 +723,25 @@
       "restore_success": "已恢复描述",
       "restore_error": "恢复失败，请重试。"
     },
+    "actions": {
+      "title": "操作",
+      "create_event": {
+        "trigger": "创建日历事件",
+        "title": "从任务创建事件",
+        "workspace_label": "工作区",
+        "workspace_placeholder": "选择工作区",
+        "calendar_label": "日历",
+        "calendar_placeholder": "选择日历",
+        "calendar_required": "请选择日历",
+        "calendars_loading": "正在加载日历…",
+        "no_calendars": "该工作区没有可写日历。",
+        "hint": "事件开始和结束时间将根据任务截止时间自动设置。",
+        "submit": "创建事件",
+        "cancel": "取消",
+        "success": "已创建日历事件",
+        "error": "无法创建日历事件"
+      }
+    },
     "steps": {
       "title": "Step decomposition",
       "propose_button": "Decompose into steps",
