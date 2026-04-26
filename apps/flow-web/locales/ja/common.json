@@ -712,6 +712,17 @@
         "cancel": "キャンセル"
       }
     },
+    "history": {
+      "title": "説明文の履歴",
+      "open": "履歴",
+      "empty": "保存されている履歴はありません。",
+      "no_changes": "選択した版と現在の説明は同一です。",
+      "version_label": "バージョン {number}",
+      "unknown_author": "不明",
+      "restore": "この版に戻す",
+      "restore_success": "説明文を復元しました",
+      "restore_error": "復元に失敗しました。もう一度お試しください。"
+    },
     "steps": {
       "title": "ステップ分解",
       "propose_button": "ステップに分解する",

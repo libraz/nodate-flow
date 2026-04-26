@@ -60,6 +60,7 @@ import {
 import CommentRow from '../features/tasks/comment-row';
 import { PRIORITY_COLOR, PRIORITY_KEY, STATE_KEY, STATE_TONE } from '../features/tasks/constants';
 import DependenciesSection from '../features/tasks/dependencies-section';
+import DescriptionHistoryDrawer from '../features/tasks/description-history/description-history-drawer';
 import MarkdownEditor from '../features/tasks/markdown-editor';
 import TaskAttachments from '../features/tasks/task-attachments';
 import TaskStepsPanel from '../features/tasks/task-steps-panel';
@@ -423,6 +424,50 @@ function DescriptionEditor({
         </Button>
       </div>
     </div>
+  );
+}
+
+/**
+ * DescriptionSection wraps the description card so we can compose the
+ * editor with a History trigger that opens the
+ * {@link DescriptionHistoryDrawer}. The drawer is mounted lazily — it
+ * stays unmounted until the user opens it for the first time, after
+ * which the standard react-query cache governs revisits.
+ */
+function DescriptionSection({ id, initial }: { id: string; initial: string }): ReactElement {
+  const { t } = useTranslation('common');
+  const [historyOpen, setHistoryOpen] = useState(false);
+  return (
+    <Card style={{ padding: '1rem' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          gap: '0.5rem',
+          marginBlockEnd: '0.5rem',
+        }}
+      >
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setHistoryOpen(true)}
+          aria-label={t('tasks.history.title')}
+        >
+          {t('tasks.history.open')}
+        </Button>
+      </div>
+      <DescriptionEditor id={id} initial={initial} />
+      {historyOpen ? (
+        <DescriptionHistoryDrawer
+          taskId={id}
+          currentBody={initial}
+          open={historyOpen}
+          onClose={() => setHistoryOpen(false)}
+        />
+      ) : null}
+    </Card>
   );
 }
 
@@ -1214,9 +1259,7 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
           <TaskBreadcrumb workspaceId={task.workspaceId} projectId={task.projectId} />
         </Suspense>
         <TitleEditor id={id} initial={task.title} workspaceId={task.workspaceId} />
-        <Card style={{ padding: '1rem' }}>
-          <DescriptionEditor id={id} initial={task.description ?? ''} />
-        </Card>
+        <DescriptionSection id={id} initial={task.description ?? ''} />
         <Suspense fallback={<Skeleton style={{ blockSize: '2rem', inlineSize: '12rem' }} />}>
           <ReactionsSection taskId={id} />
         </Suspense>

@@ -712,6 +712,17 @@
         "cancel": "Cancel"
       }
     },
+    "history": {
+      "title": "Description history",
+      "open": "History",
+      "empty": "No previous versions yet.",
+      "no_changes": "Selected version is identical to the current description.",
+      "version_label": "Version {number}",
+      "unknown_author": "Unknown",
+      "restore": "Restore this version",
+      "restore_success": "Description restored",
+      "restore_error": "Could not restore the version. Please try again."
+    },
     "steps": {
       "title": "Step decomposition",
       "propose_button": "Decompose into steps",

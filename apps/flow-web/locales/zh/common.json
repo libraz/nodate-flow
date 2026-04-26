@@ -712,6 +712,17 @@
         "cancel": "Cancel"
       }
     },
+    "history": {
+      "title": "描述历史",
+      "open": "历史",
+      "empty": "暂无历史版本。",
+      "no_changes": "所选版本与当前描述相同。",
+      "version_label": "版本 {number}",
+      "unknown_author": "未知",
+      "restore": "恢复此版本",
+      "restore_success": "已恢复描述",
+      "restore_error": "恢复失败，请重试。"
+    },
     "steps": {
       "title": "Step decomposition",
       "propose_button": "Decompose into steps",
