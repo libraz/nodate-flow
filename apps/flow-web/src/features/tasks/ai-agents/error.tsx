@@ -5,30 +5,27 @@
  * can wire it directly via the `FallbackComponent` prop. Clicking the
  * Retry button calls `resetErrorBoundary()` which the section wires to a
  * query invalidation, so the next render refetches the list.
+ *
+ * Thin wrapper around the shared {@link ErrorFallback} primitive — the
+ * raw `error.message` is forwarded to the primitive's hidden diagnostic
+ * span so the translated copy is the only thing announced to users. The
+ * `tone="inline"` variant fits the agents section body which already
+ * sits inside a card-like surface.
  */
 
-import Button from '@nodate-flow/ui/primitives/button';
+import ErrorFallback from '@nodate-flow/ui/primitives/error-fallback';
 import type { ReactElement } from 'react';
 import type { FallbackProps } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 
-import styles from './ai-agents.module.css';
-
 export default function AIAgentsError({ error, resetErrorBoundary }: FallbackProps): ReactElement {
   const { t } = useTranslation('aiAgents');
   return (
-    <div className={styles.errorState} role="alert">
-      <p className={styles.errorMessage}>{t('error.fetchFailed')}</p>
-      <Button type="button" variant="ghost" size="sm" onClick={resetErrorBoundary}>
-        {t('error.retry')}
-      </Button>
-      {/*
-        The raw `error.message` is intentionally not surfaced — the
-        translated copy is enough for the user, and the SDK already
-        forwards the structured error to the route-level boundary for
-        diagnostics.
-      */}
-      <span hidden>{error instanceof Error ? error.message : ''}</span>
-    </div>
+    <ErrorFallback
+      tone="inline"
+      title={t('error.fetchFailed')}
+      action={{ label: t('error.retry'), onClick: resetErrorBoundary }}
+      error={error}
+    />
   );
 }

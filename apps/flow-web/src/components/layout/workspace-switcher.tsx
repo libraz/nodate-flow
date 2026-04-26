@@ -18,6 +18,7 @@
  * treatment is consistent across the two mount points.
  */
 
+import { cx } from '@nodate-flow/ui/lib/cx';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -41,7 +42,7 @@ export default function WorkspaceSwitcher(): ReactElement {
   return (
     <select
       aria-label={t('topbar.workspace.switcher')}
-      className={styles.workspaceSelect}
+      className={cx(styles.workspaceSelect, 'nf-focus-ring')}
       value={currentId}
       onChange={(e) => {
         const id = e.target.value;

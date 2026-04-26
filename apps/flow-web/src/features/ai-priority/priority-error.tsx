@@ -5,30 +5,25 @@
  * Clicking Retry calls `resetErrorBoundary()`, which the wrapper bridges
  * to a query invalidation so the next render refetches the suggestion
  * list transparently.
+ *
+ * Thin wrapper around the shared {@link ErrorFallback} primitive. The
+ * `tone="inline"` variant fits the priority page surface which already
+ * provides its own page-level chrome.
  */
 
-import Button from '@nodate-flow/ui/primitives/button';
+import ErrorFallback from '@nodate-flow/ui/primitives/error-fallback';
 import type { ReactElement } from 'react';
 import type { FallbackProps } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 
-import styles from './priority-page.module.css';
-
 export default function PriorityError({ error, resetErrorBoundary }: FallbackProps): ReactElement {
   const { t } = useTranslation('aiPriority');
   return (
-    <div className={styles.errorState} role="alert">
-      <p className={styles.errorMessage}>{t('error.fetchFailed')}</p>
-      <Button type="button" variant="ghost" size="sm" onClick={resetErrorBoundary}>
-        {t('error.retry')}
-      </Button>
-      {/*
-        The raw `error.message` is intentionally not surfaced — the
-        translated copy is enough for the user, and the SDK already
-        forwards the structured error to the route-level boundary for
-        diagnostics.
-      */}
-      <span hidden>{error instanceof Error ? error.message : ''}</span>
-    </div>
+    <ErrorFallback
+      tone="inline"
+      title={t('error.fetchFailed')}
+      action={{ label: t('error.retry'), onClick: resetErrorBoundary }}
+      error={error}
+    />
   );
 }

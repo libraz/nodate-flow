@@ -202,18 +202,3 @@
   font-size: var(--nf-text-sm);
 }
 
-.errorPanel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-3);
-  padding: var(--nf-space-5);
-  border: 1px solid var(--nf-color-border);
-  border-radius: var(--nf-radius-md, 0.75rem);
-  background: var(--nf-color-bg-elevated, var(--nf-color-bg));
-}
-
-.errorMessage {
-  margin: 0;
-  color: var(--nf-color-fg);
-  font-size: var(--nf-text-sm);
-}

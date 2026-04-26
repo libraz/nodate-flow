@@ -3,15 +3,14 @@
  * Authenticated-only, guarded by the _authenticated layout route.
  */
 
-import { zodResolver } from '@hookform/resolvers/zod';
 import type { components } from '@nodate-flow/sdk';
+import { useZodForm } from '@nodate-flow/ui/hooks/use-zod-form';
 import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import { Link, createFileRoute } from '@tanstack/react-router';
 import QRCode from 'qrcode';
 import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
 import AuthCard from '../../components/auth-card';
@@ -166,9 +165,9 @@ function SecurityPage(): ReactElement {
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm<ChangePasswordFormValues>({
-    resolver: zodResolver(changePasswordSchema),
-    defaultValues: { currentPassword: '', newPassword: '' },
+  } = useZodForm<typeof changePasswordSchema>(changePasswordSchema, {
+    currentPassword: '',
+    newPassword: '',
   });
 
   const onChangePassword = async (values: ChangePasswordFormValues): Promise<void> => {

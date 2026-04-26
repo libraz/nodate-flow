@@ -73,10 +73,7 @@
   background: var(--nf-color-surface-hover);
 }
 
-.workspaceSelect:focus-visible {
-  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
-  outline-offset: var(--nf-focus-ring-offset);
-}
+/* Focus ring supplied by the global `.nf-focus-ring` utility (added in JSX). */
 
 .center {
   display: flex;
@@ -149,10 +146,7 @@
   color: var(--nf-color-fg);
 }
 
-.searchButton:focus-visible {
-  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
-  outline-offset: var(--nf-focus-ring-offset);
-}
+/* Focus ring supplied by the global `.nf-focus-ring` utility (added in JSX). */
 
 .searchLabel {
   min-inline-size: 0;
@@ -214,10 +208,7 @@
   color: var(--nf-color-fg);
 }
 
-.iconButton:focus-visible {
-  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
-  outline-offset: var(--nf-focus-ring-offset);
-}
+/* Focus ring supplied by the global `.nf-focus-ring` utility (added in JSX). */
 
 .avatarTrigger {
   display: inline-flex;
@@ -242,10 +233,7 @@
   border-color: var(--nf-color-border);
 }
 
-.avatarTrigger:focus-visible {
-  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
-  outline-offset: var(--nf-focus-ring-offset);
-}
+/* Focus ring supplied by the global `.nf-focus-ring` utility (added in JSX). */
 
 /*
  * When the user has a profile picture the trigger renders an <img>
@@ -324,10 +312,7 @@
   background: var(--nf-color-surface-hover);
 }
 
-.userMenuItem:focus-visible {
-  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
-  outline-offset: calc(var(--nf-focus-ring-offset) * -1);
-}
+/* Focus ring supplied by the global `.nf-focus-ring-inset` utility (added in JSX). */
 
 .userMenuItemMeta {
   margin-inline-start: auto;

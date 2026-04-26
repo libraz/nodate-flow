@@ -92,7 +92,7 @@ function NotificationRow({
         {isUnread && (
           <button
             type="button"
-            className={styles.actionButton}
+            className={cx(styles.actionButton, 'nf-focus-ring')}
             onClick={handleMarkRead}
             aria-label={t('action.mark_read')}
           >
@@ -101,7 +101,7 @@ function NotificationRow({
         )}
         <button
           type="button"
-          className={styles.actionButton}
+          className={cx(styles.actionButton, 'nf-focus-ring')}
           onClick={handleArchive}
           aria-label={t('action.archive')}
         >
@@ -146,7 +146,7 @@ export default function NotificationDropdown({
           <h2 className={styles.dropdownTitle}>{t('view.title')}</h2>
           <button
             type="button"
-            className={styles.markAllButton}
+            className={cx(styles.markAllButton, 'nf-focus-ring')}
             onClick={handleMarkAll}
             disabled={!hasUnread || !wsId}
           >
@@ -166,7 +166,7 @@ export default function NotificationDropdown({
           <div className={styles.loadMoreRow}>
             <button
               type="button"
-              className={styles.loadMoreButton}
+              className={cx(styles.loadMoreButton, 'nf-focus-ring')}
               onClick={handleLoadMore}
               disabled={isFetchingNextPage}
               aria-busy={isFetchingNextPage}

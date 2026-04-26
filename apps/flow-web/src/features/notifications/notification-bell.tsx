@@ -4,6 +4,7 @@
  */
 
 import Icon from '@nodate-flow/ui/icon';
+import { cx } from '@nodate-flow/ui/lib/cx';
 import { Bell } from 'lucide-react';
 import { type MouseEvent, type ReactElement, Suspense, useId, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
@@ -38,7 +39,7 @@ function NotificationBellImpl(): ReactElement {
     <div className={styles.bellWrapper}>
       <button
         type="button"
-        className={topBarStyles.iconButton}
+        className={cx(topBarStyles.iconButton, 'nf-focus-ring')}
         onClick={handleToggle}
         aria-label={count > 0 ? t('badge.unread', { count }) : t('view.title')}
         aria-haspopup="dialog"

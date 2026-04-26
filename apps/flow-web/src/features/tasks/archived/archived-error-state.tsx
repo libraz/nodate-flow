@@ -1,19 +1,18 @@
 /**
  * ArchivedErrorState — fallback shown when the archived-tasks query
- * fails. Centered card-like surface with a single "Retry" CTA that
- * delegates to the parent (which knows whether to refetch the
- * suspense query, reset the error boundary, or both).
+ * fails. Delegates to the shared {@link ErrorFallback} primitive so the
+ * surface degrades per-section (commit 5bf9eca: compact intent), the
+ * same way every other section-level error uses the primitive.
  *
- * The illustration mirrors the empty-state SVG language (stroke only,
- * accent line) so the four themes paint the surface coherently
- * without bespoke per-theme art.
+ * The bespoke centred SVG illustration that lived here previously was
+ * dropped in favour of the primitive — the page already owns its own
+ * chrome and the priority is consistent rendering across themes, not a
+ * dedicated illustration for the failure path.
  */
 
-import Button from '@nodate-flow/ui/primitives/button';
+import ErrorFallback from '@nodate-flow/ui/primitives/error-fallback';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import styles from './archived.module.css';
 
 export interface ArchivedErrorStateProps {
   onRetry: () => void;
@@ -22,25 +21,10 @@ export interface ArchivedErrorStateProps {
 export default function ArchivedErrorState({ onRetry }: ArchivedErrorStateProps): ReactElement {
   const { t } = useTranslation('archive');
   return (
-    <div className={styles.emptyWrap} role="alert" aria-live="assertive">
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 96 96"
-        className={styles.emptyIllustration}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <circle cx="48" cy="48" r="32" />
-        <path d="M48 32v20" style={{ stroke: 'var(--nf-color-accent)' }} strokeWidth={2} />
-        <path d="M48 62v2" style={{ stroke: 'var(--nf-color-accent)' }} strokeWidth={2} />
-      </svg>
-      <h2 className={styles.emptyTitle}>{t('error.fetchFailed')}</h2>
-      <Button type="button" variant="primary" onClick={onRetry}>
-        {t('error.retry')}
-      </Button>
-    </div>
+    <ErrorFallback
+      tone="card"
+      title={t('error.fetchFailed')}
+      action={{ label: t('error.retry'), onClick: onRetry }}
+    />
   );
 }

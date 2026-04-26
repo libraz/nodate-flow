@@ -1,4 +1,5 @@
 import Icon from '@nodate-flow/ui/icon';
+import { cx } from '@nodate-flow/ui/lib/cx';
 import Avatar from '@nodate-flow/ui/primitives/avatar';
 import Popover from '@nodate-flow/ui/primitives/popover';
 import { useNavigate } from '@tanstack/react-router';
@@ -67,7 +68,7 @@ export default function TopBar(): ReactElement {
           <button
             role="menuitem"
             type="button"
-            className={styles.userMenuItem}
+            className={cx(styles.userMenuItem, 'nf-focus-ring-inset')}
             onClick={() => {
               setUserMenuOpen(false);
               void navigate({ to: '/settings/profile' });
@@ -81,7 +82,7 @@ export default function TopBar(): ReactElement {
           <button
             role="menuitem"
             type="button"
-            className={styles.userMenuItem}
+            className={cx(styles.userMenuItem, 'nf-focus-ring-inset')}
             onClick={() => {
               setUserMenuOpen(false);
               void navigate({ to: '/settings/notifications' });
@@ -96,7 +97,7 @@ export default function TopBar(): ReactElement {
           <button
             role="menuitem"
             type="button"
-            className={styles.userMenuItem}
+            className={cx(styles.userMenuItem, 'nf-focus-ring-inset')}
             onClick={() => {
               setUserMenuOpen(false);
               void handleLogout();
@@ -130,7 +131,7 @@ export default function TopBar(): ReactElement {
             <div className={styles.search}>
               <button
                 type="button"
-                className={styles.searchButton}
+                className={cx(styles.searchButton, 'nf-focus-ring')}
                 aria-label={t('topbar.search.placeholder')}
                 data-search-trigger
                 onClick={() => {
@@ -160,7 +161,7 @@ export default function TopBar(): ReactElement {
             >
               <button
                 type="button"
-                className={styles.avatarTrigger}
+                className={cx(styles.avatarTrigger, 'nf-focus-ring')}
                 aria-label={t('topbar.user_menu.open')}
                 aria-haspopup="menu"
                 title={user?.displayName ?? ''}

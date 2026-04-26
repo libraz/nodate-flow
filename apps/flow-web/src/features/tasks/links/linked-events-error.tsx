@@ -4,13 +4,15 @@
  * expects so callers can wire it up directly via the
  * `FallbackComponent` prop, but it's also usable as a plain element
  * (the `error` argument is the `Error` thrown by the suspense query).
+ *
+ * Thin wrapper around the shared {@link ErrorFallback} primitive. The
+ * `resetErrorBoundary ?? onRetry` shim is preserved so direct callers
+ * that bypass the boundary keep working.
  */
 
-import Button from '@nodate-flow/ui/primitives/button';
+import ErrorFallback from '@nodate-flow/ui/primitives/error-fallback';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import styles from './linked-events.module.css';
 
 export interface LinkedEventsErrorProps {
   error: Error;
@@ -31,18 +33,11 @@ export default function LinkedEventsError({
   const { t } = useTranslation('linkedEvents');
   const handleRetry = resetErrorBoundary ?? onRetry ?? ((): void => {});
   return (
-    <div className={styles.errorState} role="alert">
-      <p className={styles.errorMessage}>{t('error.fetchFailed')}</p>
-      <Button type="button" variant="ghost" size="sm" onClick={handleRetry}>
-        {t('error.retry')}
-      </Button>
-      {/*
-        The raw `error.message` is intentionally not surfaced — the
-        translated copy is enough for the user, and the SDK already
-        forwards the structured error to the route-level boundary for
-        diagnostics.
-      */}
-      <span hidden>{error.message}</span>
-    </div>
+    <ErrorFallback
+      tone="inline"
+      title={t('error.fetchFailed')}
+      action={{ label: t('error.retry'), onClick: handleRetry }}
+      error={error}
+    />
   );
 }
