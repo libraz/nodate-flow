@@ -35,6 +35,7 @@ import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { sdk } from '../../lib/sdk';
+import CalendarSettingsDrawer from '../calendars/calendar-settings-drawer';
 import { type RailCalendar, usePatchOwnSubscriptionMutation, useUnsubscribeMutation } from './api';
 import styles from './calendars-rail.module.css';
 import DiscoverList from './discover-list';
@@ -244,8 +245,10 @@ function CalendarRow({ workspaceId, calendar, selfUserId }: CalendarRowProps): R
   const patchSub = usePatchOwnSubscriptionMutation();
   const leaveCal = useUnsubscribeMutation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const isPersonal = calendar.kind === 'personal';
+  const isManager = calendar.role === 'owner' || calendar.role === 'manager';
   const pending = patchSub.isPending || leaveCal.isPending;
   const Icon = calendar.visible ? Eye : EyeOff;
 
@@ -278,6 +281,21 @@ function CalendarRow({ workspaceId, calendar, selfUserId }: CalendarRowProps): R
           {calendar.visible ? t('calendars_rail.actions.hide') : t('calendars_rail.actions.show')}
         </button>
       </li>
+      {isManager ? (
+        <li>
+          <button
+            type="button"
+            role="menuitem"
+            className={styles.menuItem}
+            onClick={() => {
+              setMenuOpen(false);
+              setSettingsOpen(true);
+            }}
+          >
+            {t('calendars_rail.actions.settings')}
+          </button>
+        </li>
+      ) : null}
       {isPersonal ? null : (
         <li>
           <button
@@ -328,6 +346,14 @@ function CalendarRow({ workspaceId, calendar, selfUserId }: CalendarRowProps): R
           </button>
         </Popover>
       </span>
+      {settingsOpen ? (
+        <CalendarSettingsDrawer
+          workspaceId={workspaceId}
+          calendarId={calendar.id}
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+        />
+      ) : null}
     </li>
   );
 }

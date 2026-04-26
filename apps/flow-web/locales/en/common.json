@@ -212,6 +212,63 @@
       "deleted": "Event deleted",
       "delete_failed": "Could not delete the event. Please try again.",
       "open_label": "Open event: {title} in {workspace}"
+    },
+    "settings": {
+      "title": "Calendar settings",
+      "tab": {
+        "general": "General",
+        "members": "Members",
+        "sync": "Sync"
+      },
+      "general": {
+        "name_label": "Name",
+        "color_label": "Color",
+        "description_label": "Description",
+        "save": "Save changes",
+        "saved": "Calendar updated",
+        "save_error": "Could not save changes. Please try again.",
+        "name_required": "Name is required."
+      },
+      "delete": {
+        "title": "Danger zone",
+        "hint": "Deleting a calendar removes it for everyone and erases its events.",
+        "cannot_delete": "Personal and system calendars cannot be deleted.",
+        "trigger": "Delete calendar",
+        "confirm_title": "Delete {name}?",
+        "confirm_count": "{count, plural, =0 {No events will be removed.} one {# event will be removed alongside the calendar.} other {# events will be removed alongside the calendar.}}",
+        "confirm": "Delete",
+        "cancel": "Cancel",
+        "success": "Calendar deleted",
+        "error": "Could not delete the calendar."
+      },
+      "sync": {
+        "placeholder": "Sync settings will appear here in a future release."
+      },
+      "members": {
+        "empty": "No members yet.",
+        "add": "Add",
+        "add_email_label": "Email",
+        "add_email_placeholder": "teammate@example.com",
+        "add_role_label": "Role",
+        "add_success": "Member added",
+        "add_error": "Could not add the member.",
+        "update_error": "Could not update the role.",
+        "remove": "Remove",
+        "remove_confirm_title": "Remove member?",
+        "remove_confirm": "{name} will lose access to this calendar.",
+        "remove_confirm_action": "Remove",
+        "remove_cancel": "Cancel",
+        "remove_success": "Member removed",
+        "remove_error": "Could not remove the member.",
+        "last_owner_block": "At least one owner must remain.",
+        "role_select_label": "Role for {name}",
+        "role": {
+          "owner": "Owner",
+          "manager": "Manager",
+          "editor": "Editor",
+          "viewer": "Viewer"
+        }
+      }
     }
   },
   "calendars_rail": {
@@ -221,6 +278,7 @@
       "show": "Show",
       "hide": "Hide",
       "leave": "Leave calendar",
+      "settings": "Settings…",
       "menu": "Calendar actions",
       "toggle_visibility": "Toggle visibility"
     },

@@ -212,6 +212,63 @@
       "deleted": "イベントを削除しました",
       "delete_failed": "イベントを削除できませんでした。もう一度お試しください。",
       "open_label": "イベントを開く: {title}（{workspace}）"
+    },
+    "settings": {
+      "title": "カレンダー設定",
+      "tab": {
+        "general": "一般",
+        "members": "メンバー",
+        "sync": "同期"
+      },
+      "general": {
+        "name_label": "名前",
+        "color_label": "色",
+        "description_label": "説明",
+        "save": "変更を保存",
+        "saved": "カレンダーを更新しました",
+        "save_error": "保存に失敗しました。もう一度お試しください。",
+        "name_required": "名前を入力してください。"
+      },
+      "delete": {
+        "title": "危険な操作",
+        "hint": "削除すると全員にアクセス不可となり、イベントも消えます。",
+        "cannot_delete": "個人カレンダーやシステムカレンダーは削除できません。",
+        "trigger": "カレンダーを削除",
+        "confirm_title": "{name} を削除しますか？",
+        "confirm_count": "{count, plural, =0 {削除されるイベントはありません。} other {このカレンダーと一緒に {count} 件のイベントが削除されます。}}",
+        "confirm": "削除する",
+        "cancel": "キャンセル",
+        "success": "カレンダーを削除しました",
+        "error": "カレンダーを削除できませんでした"
+      },
+      "sync": {
+        "placeholder": "同期設定は今後のリリースで提供されます。"
+      },
+      "members": {
+        "empty": "メンバーがまだいません。",
+        "add": "追加",
+        "add_email_label": "メールアドレス",
+        "add_email_placeholder": "teammate@example.com",
+        "add_role_label": "ロール",
+        "add_success": "メンバーを追加しました",
+        "add_error": "メンバーを追加できませんでした",
+        "update_error": "ロールを変更できませんでした",
+        "remove": "削除",
+        "remove_confirm_title": "メンバーを削除しますか？",
+        "remove_confirm": "{name} はこのカレンダーへアクセスできなくなります。",
+        "remove_confirm_action": "削除する",
+        "remove_cancel": "キャンセル",
+        "remove_success": "メンバーを削除しました",
+        "remove_error": "メンバーを削除できませんでした",
+        "last_owner_block": "オーナーは少なくとも1人必要です。",
+        "role_select_label": "{name} のロール",
+        "role": {
+          "owner": "オーナー",
+          "manager": "マネージャー",
+          "editor": "編集者",
+          "viewer": "閲覧者"
+        }
+      }
     }
   },
   "calendars_rail": {
@@ -221,6 +278,7 @@
       "show": "表示",
       "hide": "非表示",
       "leave": "カレンダーから抜ける",
+      "settings": "設定…",
       "menu": "カレンダーの操作",
       "toggle_visibility": "表示を切替"
     },

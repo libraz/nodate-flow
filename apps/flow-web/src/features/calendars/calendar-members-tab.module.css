@@ -1,0 +1,85 @@
+/**
+ * Members tab — list of calendar members + add row. Lives inside the
+ * Calendar Settings Drawer so we only style the body. Tokens only.
+ */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-2);
+  border: 1px solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-surface);
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-px);
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.displayName {
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  flex-shrink: 0;
+}
+
+.addRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-3);
+  border: 1px solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-bg);
+}
+
+.addEmail {
+  flex: 1 1 auto;
+}
+
+.addRole {
+  inline-size: 8rem;
+  flex-shrink: 0;
+}
+
+.empty {
+  margin: 0;
+  padding: var(--nf-space-3);
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+  text-align: center;
+}

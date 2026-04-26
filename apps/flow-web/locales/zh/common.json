@@ -212,6 +212,63 @@
       "deleted": "Event deleted",
       "delete_failed": "Could not delete the event. Please try again.",
       "open_label": "Open event: {title} in {workspace}"
+    },
+    "settings": {
+      "title": "日历设置",
+      "tab": {
+        "general": "常规",
+        "members": "成员",
+        "sync": "同步"
+      },
+      "general": {
+        "name_label": "名称",
+        "color_label": "颜色",
+        "description_label": "描述",
+        "save": "保存更改",
+        "saved": "日历已更新",
+        "save_error": "保存失败，请重试。",
+        "name_required": "请填写名称。"
+      },
+      "delete": {
+        "title": "危险操作",
+        "hint": "删除日历将对所有成员生效，且事件不可恢复。",
+        "cannot_delete": "个人日历和系统日历不可删除。",
+        "trigger": "删除日历",
+        "confirm_title": "删除 {name}？",
+        "confirm_count": "{count, plural, =0 {不会删除任何事件。} other {将与日历一同删除 {count} 个事件。}}",
+        "confirm": "删除",
+        "cancel": "取消",
+        "success": "已删除日历",
+        "error": "无法删除日历"
+      },
+      "sync": {
+        "placeholder": "同步设置将于后续版本提供。"
+      },
+      "members": {
+        "empty": "暂无成员。",
+        "add": "添加",
+        "add_email_label": "邮箱",
+        "add_email_placeholder": "teammate@example.com",
+        "add_role_label": "角色",
+        "add_success": "已添加成员",
+        "add_error": "无法添加成员",
+        "update_error": "无法更新角色",
+        "remove": "移除",
+        "remove_confirm_title": "移除该成员？",
+        "remove_confirm": "{name} 将无法访问该日历。",
+        "remove_confirm_action": "移除",
+        "remove_cancel": "取消",
+        "remove_success": "已移除成员",
+        "remove_error": "无法移除成员",
+        "last_owner_block": "至少需要保留一名所有者。",
+        "role_select_label": "{name} 的角色",
+        "role": {
+          "owner": "所有者",
+          "manager": "管理员",
+          "editor": "编辑者",
+          "viewer": "查看者"
+        }
+      }
     }
   },
   "calendars_rail": {
@@ -221,6 +278,7 @@
       "show": "Show",
       "hide": "Hide",
       "leave": "Leave calendar",
+      "settings": "设置…",
       "menu": "Calendar actions",
       "toggle_visibility": "Toggle visibility"
     },

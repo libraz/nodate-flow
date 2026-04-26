@@ -1,0 +1,106 @@
+/**
+ * Calendar settings drawer — internal layout. Drawer chrome (overlay,
+ * focus trap, header) is owned by the design system primitive; this
+ * module only styles the body. Tokens only.
+ */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  min-block-size: 0;
+}
+
+.tabs {
+  margin-block-start: var(--nf-space-2);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.fieldLabel {
+  font-size: var(--nf-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--nf-color-fg-muted);
+  font-weight: var(--nf-weight-medium);
+}
+
+.swatchGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nf-space-2);
+}
+
+.swatch {
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  border-radius: var(--nf-radius-pill);
+  border: 2px solid var(--nf-color-border);
+  cursor: pointer;
+  padding: 0;
+  background-clip: content-box;
+  background-origin: content-box;
+  transition: transform var(--nf-duration-fast), border-color var(--nf-duration-fast);
+}
+
+.swatch:hover {
+  transform: scale(1.08);
+}
+
+.swatch:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.swatchActive {
+  border-color: var(--nf-color-fg);
+  border-width: 3px;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nf-space-2);
+}
+
+.dangerZone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  padding: var(--nf-space-3);
+  border: 1px solid var(--nf-color-danger-border, var(--nf-color-border));
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-danger-bg, transparent);
+  margin-block-start: var(--nf-space-3);
+}
+
+.dangerTitle {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-danger);
+}
+
+.dangerHint {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.error {
+  margin: 0;
+  color: var(--nf-color-danger);
+  font-size: var(--nf-text-sm);
+}
+
+.placeholder {
+  margin: 0;
+  padding: var(--nf-space-4);
+  text-align: center;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+}
