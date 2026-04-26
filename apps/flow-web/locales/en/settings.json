@@ -6,6 +6,7 @@
     "data": "Data",
     "public_shares": "Public share pages",
     "mcp_tokens": "MCP tokens",
+    "webhooks": "Webhooks",
     "ai_providers": "AI providers",
     "ai_agents": "AI agents",
     "ai_activity": "AI activity",
@@ -576,6 +577,94 @@
           "submit": "Start import",
           "success": "Import job started",
           "error": "Failed to start import"
+        }
+      }
+    },
+    "webhooks": {
+      "title": "Webhooks",
+      "description": "Outbound HTTP delivery for workspace events.",
+      "empty": "No webhooks yet",
+      "new": "New webhook",
+      "col": {
+        "url": "URL",
+        "description": "Description",
+        "event_types": "Event types",
+        "active": "Active",
+        "actions": "Actions"
+      },
+      "action": {
+        "menu_label": "Webhook actions",
+        "deliveries": "View deliveries",
+        "test": "Send test",
+        "show_secret": "Show secret",
+        "delete": "Delete"
+      },
+      "toggle": {
+        "activate": "Activated",
+        "deactivate": "Deactivated",
+        "error": "Failed to toggle webhook"
+      },
+      "delete": {
+        "confirm": {
+          "title": "Delete this webhook?",
+          "message": "Future deliveries will stop immediately and the secret will be unrecoverable."
+        },
+        "success": "Webhook deleted",
+        "error": "Failed to delete webhook"
+      },
+      "test": {
+        "success": "Test queued ({id})",
+        "error": "Failed to send test"
+      },
+      "create": {
+        "title": "New webhook",
+        "url": {
+          "label": "Delivery URL",
+          "placeholder": "https://example.com/hooks/nodate-flow"
+        },
+        "description": {
+          "label": "Description",
+          "placeholder": "What this webhook is for"
+        },
+        "event_types": {
+          "label": "Event types",
+          "hint": "Comma-separated patterns (e.g. task.created, task.updated)"
+        },
+        "submit": "Create webhook",
+        "cancel": "Cancel",
+        "success": {
+          "title": "Webhook created"
+        },
+        "secret": {
+          "label": "Signing secret",
+          "warning": "Copy this now or come back via Show secret to retrieve it again.",
+          "copy": "Copy",
+          "copied": "Secret copied",
+          "copy_failed": "Failed to copy secret"
+        },
+        "done": "Done",
+        "error": "Failed to create webhook"
+      },
+      "show_secret": {
+        "title": "Webhook secret",
+        "close": "Close"
+      },
+      "deliveries": {
+        "title": "Deliveries",
+        "close": "Close",
+        "empty": "No deliveries yet",
+        "col": {
+          "timestamp": "Timestamp",
+          "event": "Event",
+          "status": "Status",
+          "http": "HTTP",
+          "attempts": "Attempts"
+        },
+        "status": {
+          "pending": "Pending",
+          "delivered": "Delivered",
+          "failed": "Failed",
+          "dead": "Dead"
         }
       }
     }

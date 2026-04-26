@@ -6,6 +6,7 @@
     "data": "データ",
     "public_shares": "公開シェアページ",
     "mcp_tokens": "MCP トークン",
+    "webhooks": "Webhook",
     "ai_providers": "AI プロバイダ",
     "ai_agents": "AI エージェント",
     "ai_activity": "AI アクティビティ",
@@ -576,6 +577,94 @@
           "submit": "インポート開始",
           "success": "インポートジョブを開始しました",
           "error": "インポートの開始に失敗しました"
+        }
+      }
+    },
+    "webhooks": {
+      "title": "Webhook",
+      "description": "ワークスペースイベントの外部 HTTP 配信。",
+      "empty": "Webhook はまだありません",
+      "new": "新規 Webhook",
+      "col": {
+        "url": "URL",
+        "description": "説明",
+        "event_types": "イベントタイプ",
+        "active": "有効",
+        "actions": "操作"
+      },
+      "action": {
+        "menu_label": "Webhook の操作",
+        "deliveries": "配信履歴を表示",
+        "test": "テスト送信",
+        "show_secret": "シークレットを表示",
+        "delete": "削除"
+      },
+      "toggle": {
+        "activate": "有効化しました",
+        "deactivate": "無効化しました",
+        "error": "Webhook の切り替えに失敗しました"
+      },
+      "delete": {
+        "confirm": {
+          "title": "この Webhook を削除しますか？",
+          "message": "今後の配信は直ちに停止され、シークレットは復元できなくなります。"
+        },
+        "success": "Webhook を削除しました",
+        "error": "Webhook の削除に失敗しました"
+      },
+      "test": {
+        "success": "テストを送信しました（{id}）",
+        "error": "テスト送信に失敗しました"
+      },
+      "create": {
+        "title": "新規 Webhook",
+        "url": {
+          "label": "配信 URL",
+          "placeholder": "https://example.com/hooks/nodate-flow"
+        },
+        "description": {
+          "label": "説明",
+          "placeholder": "この Webhook の用途"
+        },
+        "event_types": {
+          "label": "イベントタイプ",
+          "hint": "カンマ区切りのパターン（例: task.created, task.updated）"
+        },
+        "submit": "Webhook を作成",
+        "cancel": "キャンセル",
+        "success": {
+          "title": "Webhook を作成しました"
+        },
+        "secret": {
+          "label": "署名シークレット",
+          "warning": "ここでコピーするか、後で「シークレットを表示」から取得できます。",
+          "copy": "コピー",
+          "copied": "シークレットをコピーしました",
+          "copy_failed": "シークレットのコピーに失敗しました"
+        },
+        "done": "完了",
+        "error": "Webhook の作成に失敗しました"
+      },
+      "show_secret": {
+        "title": "Webhook シークレット",
+        "close": "閉じる"
+      },
+      "deliveries": {
+        "title": "配信履歴",
+        "close": "閉じる",
+        "empty": "配信履歴がありません",
+        "col": {
+          "timestamp": "時刻",
+          "event": "イベント",
+          "status": "ステータス",
+          "http": "HTTP",
+          "attempts": "試行"
+        },
+        "status": {
+          "pending": "保留中",
+          "delivered": "配信済み",
+          "failed": "失敗",
+          "dead": "破棄"
         }
       }
     }

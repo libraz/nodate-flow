@@ -6,6 +6,7 @@
     "data": "数据",
     "public_shares": "Public share pages",
     "mcp_tokens": "MCP tokens",
+    "webhooks": "Webhook",
     "ai_providers": "AI providers",
     "ai_agents": "AI agents",
     "ai_activity": "AI activity",
@@ -576,6 +577,94 @@
           "submit": "开始导入",
           "success": "已开始导入任务",
           "error": "开始导入失败"
+        }
+      }
+    },
+    "webhooks": {
+      "title": "Webhook",
+      "description": "工作区事件的外部 HTTP 投递。",
+      "empty": "暂无 Webhook",
+      "new": "新建 Webhook",
+      "col": {
+        "url": "URL",
+        "description": "描述",
+        "event_types": "事件类型",
+        "active": "启用",
+        "actions": "操作"
+      },
+      "action": {
+        "menu_label": "Webhook 操作",
+        "deliveries": "查看投递记录",
+        "test": "发送测试",
+        "show_secret": "显示密钥",
+        "delete": "删除"
+      },
+      "toggle": {
+        "activate": "已启用",
+        "deactivate": "已停用",
+        "error": "切换 Webhook 失败"
+      },
+      "delete": {
+        "confirm": {
+          "title": "删除此 Webhook？",
+          "message": "未来的投递将立即停止，密钥也将无法恢复。"
+        },
+        "success": "已删除 Webhook",
+        "error": "删除 Webhook 失败"
+      },
+      "test": {
+        "success": "已发送测试（{id}）",
+        "error": "发送测试失败"
+      },
+      "create": {
+        "title": "新建 Webhook",
+        "url": {
+          "label": "投递 URL",
+          "placeholder": "https://example.com/hooks/nodate-flow"
+        },
+        "description": {
+          "label": "描述",
+          "placeholder": "此 Webhook 的用途"
+        },
+        "event_types": {
+          "label": "事件类型",
+          "hint": "用逗号分隔的模式（例如 task.created, task.updated）"
+        },
+        "submit": "创建 Webhook",
+        "cancel": "取消",
+        "success": {
+          "title": "Webhook 已创建"
+        },
+        "secret": {
+          "label": "签名密钥",
+          "warning": "请立即复制，或稍后通过\"显示密钥\"再次获取。",
+          "copy": "复制",
+          "copied": "已复制密钥",
+          "copy_failed": "复制密钥失败"
+        },
+        "done": "完成",
+        "error": "创建 Webhook 失败"
+      },
+      "show_secret": {
+        "title": "Webhook 密钥",
+        "close": "关闭"
+      },
+      "deliveries": {
+        "title": "投递记录",
+        "close": "关闭",
+        "empty": "暂无投递记录",
+        "col": {
+          "timestamp": "时间",
+          "event": "事件",
+          "status": "状态",
+          "http": "HTTP",
+          "attempts": "尝试"
+        },
+        "status": {
+          "pending": "等待中",
+          "delivered": "已投递",
+          "failed": "失败",
+          "dead": "已死亡"
         }
       }
     }

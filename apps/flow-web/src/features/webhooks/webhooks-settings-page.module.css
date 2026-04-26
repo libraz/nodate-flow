@@ -1,0 +1,270 @@
+/**
+ * WebhooksSettingsPage layout — single column hosting one card with a
+ * header, the webhook list (table), and an inline empty state. All values
+ * resolve to design tokens; no hex / rgb / px is hard-coded.
+ */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-5);
+  inline-size: 100%;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--nf-space-3);
+  flex-wrap: wrap;
+}
+
+.headerText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display, inherit);
+  font-size: clamp(1.25rem, 2vw, 1.5rem);
+  color: var(--nf-color-fg);
+}
+
+.description {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.tableWrap {
+  inline-size: 100%;
+  overflow-x: auto;
+}
+
+.table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: var(--nf-text-sm);
+}
+
+.table thead th {
+  text-align: start;
+  font-size: var(--nf-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--nf-color-fg-muted);
+  padding: var(--nf-space-2) var(--nf-space-3);
+  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.table tbody td {
+  padding: var(--nf-space-2) var(--nf-space-3);
+  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
+  color: var(--nf-color-fg);
+  vertical-align: top;
+}
+
+.table tbody tr:last-child td {
+  border-block-end: none;
+}
+
+.urlCell {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--nf-text-xs);
+  max-inline-size: 18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.descriptionCell {
+  max-inline-size: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eventTypesCell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nf-space-1);
+  max-inline-size: 16rem;
+}
+
+.actionsCell {
+  white-space: nowrap;
+  text-align: end;
+}
+
+.menuList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-px);
+  margin: calc(-1 * var(--nf-space-4));
+  padding: var(--nf-space-2);
+  min-inline-size: 12rem;
+}
+
+.menuItem {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-1) var(--nf-space-2);
+  border-radius: var(--nf-radius-sm);
+  cursor: pointer;
+  font-size: var(--nf-text-sm);
+  line-height: 1.4;
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.menuItem:hover,
+.menuItem:focus-visible {
+  background: var(--nf-color-bg-hover);
+}
+
+.menuItemDanger {
+  color: var(--nf-color-danger);
+}
+
+.menuTrigger {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  border-radius: var(--nf-radius-sm);
+  color: var(--nf-color-fg-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.menuTrigger:hover,
+.menuTrigger:focus-visible {
+  background: var(--nf-color-bg-hover);
+}
+
+.dialogForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nf-space-2);
+}
+
+.secretPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-3);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-surface-alt, var(--nf-color-bg));
+}
+
+.secretWarning {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-warning);
+}
+
+.secretValue {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--nf-text-sm);
+}
+
+.secretRow {
+  display: flex;
+  gap: var(--nf-space-2);
+  align-items: center;
+}
+
+.deliveriesList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.deliveryItem {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--nf-space-1) var(--nf-space-3);
+  padding: var(--nf-space-2) var(--nf-space-3);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-surface-alt, var(--nf-color-bg));
+  font-size: var(--nf-text-sm);
+}
+
+.deliveryHeader {
+  display: flex;
+  gap: var(--nf-space-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.deliveryTimestamp {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.deliveryEvent {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg);
+}
+
+.deliveryMeta {
+  display: flex;
+  gap: var(--nf-space-3);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+  justify-content: flex-end;
+}
+
+.deliveriesEmpty {
+  margin: 0;
+  padding: var(--nf-space-4);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+  border: var(--nf-space-px) dashed var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  text-align: center;
+}
+
+.spinnerRow {
+  display: flex;
+  justify-content: center;
+  padding: var(--nf-space-4);
+}
+
+.activeCell {
+  white-space: nowrap;
+}
+
+.eventTypesList {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}

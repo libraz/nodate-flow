@@ -17,6 +17,7 @@ type SubNavKey =
   | 'data'
   | 'public_shares'
   | 'mcp_tokens'
+  | 'webhooks'
   | 'ai_providers'
   | 'ai_agents'
   | 'auto_actions'
@@ -31,6 +32,7 @@ interface SubNavItem {
     | '/workspaces/$id/settings/data'
     | '/workspaces/$id/settings/public-shares'
     | '/workspaces/$id/settings/mcp-tokens'
+    | '/workspaces/$id/settings/webhooks'
     | '/workspaces/$id/settings/ai-providers'
     | '/workspaces/$id/settings/ai-agents'
     | '/workspaces/$id/settings/auto-actions'
@@ -44,6 +46,7 @@ const SUB_NAV: readonly SubNavItem[] = [
   { key: 'data', to: '/workspaces/$id/settings/data' },
   { key: 'public_shares', to: '/workspaces/$id/settings/public-shares' },
   { key: 'mcp_tokens', to: '/workspaces/$id/settings/mcp-tokens' },
+  { key: 'webhooks', to: '/workspaces/$id/settings/webhooks' },
   { key: 'ai_providers', to: '/workspaces/$id/settings/ai-providers' },
   { key: 'ai_agents', to: '/workspaces/$id/settings/ai-agents' },
   { key: 'auto_actions', to: '/workspaces/$id/settings/auto-actions' },
@@ -59,6 +62,7 @@ function labelKeyFor(
   | 'nav.data'
   | 'nav.public_shares'
   | 'nav.mcp_tokens'
+  | 'nav.webhooks'
   | 'nav.ai_providers'
   | 'nav.ai_agents'
   | 'nav.auto_actions'
@@ -74,6 +78,8 @@ function labelKeyFor(
       return 'nav.public_shares';
     case 'mcp_tokens':
       return 'nav.mcp_tokens';
+    case 'webhooks':
+      return 'nav.webhooks';
     case 'ai_providers':
       return 'nav.ai_providers';
     case 'ai_agents':
