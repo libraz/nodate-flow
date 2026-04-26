@@ -1,77 +1,65 @@
 /**
- * Timeboxes feature — query key factory, types, and hooks for
- * timebox CRUD, status transitions, and task management.
+ * @file Timeboxes feature — typed queries, mutations, and a fan-out
+ * helper for the persistent app-shell active-timebox bar.
  *
- * Types are defined inline because the SDK may not yet include these
- * endpoints. API calls use raw fetch via the shared base URL and auth
- * store token (same pattern as notifications).
+ * The endpoints surfaced here are workspace-scoped and back the
+ * `/workspaces/{wsId}/timeboxes` route plus the always-on
+ * `<ActiveTimeboxBar />` mounted in the app shell.
+ *
+ * Day-granularity is intentional: the backend models a timebox as a
+ * named span between two `YYYY-MM-DD` dates with a status lifecycle
+ * (`planned -> active -> completed | cancelled`). There is no
+ * sub-day timer field, so the "active" surface is a currently-running
+ * indicator, not a stopwatch.
+ *
+ * All hooks normalise errors via the shared {@link ApiError} helper so
+ * route-level boundaries can branch on `code`.
  */
 
+import type { components } from '@nodate-flow/sdk';
 import {
   type UseMutationResult,
+  type UseQueryResult,
   type UseSuspenseQueryResult,
   useMutation,
+  useQueries,
+  useQuery,
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
 
-import { apiBaseUrl } from '../../lib/sdk';
-import { authStore } from '../auth/auth-store';
+import { ApiError, toApiError } from '../../lib/api-error';
+import { sdk } from '../../lib/sdk';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-/** Status lifecycle: planned -> active -> completed | cancelled. */
+/** Single timebox DTO as returned by list / detail / mutation endpoints. */
+export type Timebox = components['schemas']['TimeboxDTO'];
+/** Lightweight task projection inside a timebox (id + state + dates). */
+export type TimeboxTask = components['schemas']['TimeboxTaskDTO'];
+/** Status lifecycle: `planned -> active -> completed | cancelled`. */
 export type TimeboxStatus = 'planned' | 'active' | 'completed' | 'cancelled';
 
-/** Timebox item returned by the list / detail API. Timestamps are unix seconds. */
-export interface TimeboxItem {
-  id: string;
-  projectId?: string;
-  projectName?: string;
-  creatorId: string;
-  creatorDisplayName: string;
-  name: string;
-  description?: string;
-  startsOn: string; // YYYY-MM-DD
-  endsOn: string; // YYYY-MM-DD
-  status: TimeboxStatus;
-  updatedAt: number;
-  createdAt: number;
-  total: number;
-}
+/** Body for `POST /workspaces/{wsId}/timeboxes`. */
+export type CreateTimeboxInput = components['schemas']['CreateTimeboxBody'];
+/** Body for `PATCH /workspaces/{wsId}/timeboxes/{timeboxId}`. */
+export type UpdateTimeboxInput = components['schemas']['UpdateTimeboxBody'];
 
-/** Body for POST /workspaces/{wsId}/timeboxes. */
-export interface CreateTimeboxInput {
-  name: string;
-  description?: string;
-  startsOn: string;
-  endsOn: string;
-  projectId?: string;
-}
+export { ApiError as TimeboxApiError };
 
-/** Body for PATCH /workspaces/{wsId}/timeboxes/{timeboxId}. */
-export interface UpdateTimeboxInput {
-  name?: string;
-  description?: string;
-  startsOn?: string;
-  endsOn?: string;
-}
+/** Allowed lifecycle states. Mirrors the API's `UpdateTimeboxStatusBody.status`. */
+const STATUS_VALUES: readonly TimeboxStatus[] = [
+  'planned',
+  'active',
+  'completed',
+  'cancelled',
+] as const;
 
-/** Body for POST /workspaces/{wsId}/timeboxes/{timeboxId}/status. */
-export interface UpdateTimeboxStatusInput {
-  status: TimeboxStatus;
-}
-
-/** Lightweight task reference returned by the timebox tasks endpoint. */
-export interface TimeboxTaskItem {
-  id: string;
-  name: string;
-  derivedState: string;
-  assigneeId?: string;
-  assigneeDisplayName?: string;
-  total: number;
+/** Narrow the API's loose `status: string` field to the typed union. */
+export function asTimeboxStatus(raw: string): TimeboxStatus {
+  return (STATUS_VALUES as readonly string[]).includes(raw) ? (raw as TimeboxStatus) : 'planned';
 }
 
 // ---------------------------------------------------------------------------
@@ -81,236 +69,292 @@ export interface TimeboxTaskItem {
 /** Query key factory for the timeboxes feature. */
 export const timeboxKeys = {
   all: ['timeboxes'] as const,
-  list: (wsId: string) => [...timeboxKeys.all, 'list', wsId] as const,
-  detail: (id: string) => [...timeboxKeys.all, 'detail', id] as const,
-  tasks: (id: string) => [...timeboxKeys.all, 'detail', id, 'tasks'] as const,
+  list: (wsId: string) => ['timeboxes', wsId] as const,
+  detail: (wsId: string, timeboxId: string) => ['timeboxes', wsId, 'detail', timeboxId] as const,
+  tasks: (wsId: string, timeboxId: string) => ['timeboxes', wsId, 'tasks', timeboxId] as const,
 };
-
-// ---------------------------------------------------------------------------
-// Error helper
-// ---------------------------------------------------------------------------
-
-import { ApiError, toApiError } from '../../lib/api-error';
-
-export { ApiError as TimeboxApiError };
-
-// ---------------------------------------------------------------------------
-// Fetch helpers
-// ---------------------------------------------------------------------------
-
-function authHeaders(): HeadersInit {
-  const token = authStore.getState().accessToken;
-  // biome-ignore lint/style/useNamingConvention: HTTP header name
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    ...init,
-    credentials: 'include',
-    headers: {
-      ...authHeaders(),
-      ...init?.headers,
-    },
-  });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as unknown;
-    throw toApiError(body, `Request failed with status ${String(res.status)}`);
-  }
-  return (await res.json()) as T;
-}
-
-async function fetchVoid(url: string, init?: RequestInit): Promise<void> {
-  const res = await fetch(url, {
-    ...init,
-    credentials: 'include',
-    headers: {
-      ...authHeaders(),
-      ...init?.headers,
-    },
-  });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as unknown;
-    throw toApiError(body, `Request failed with status ${String(res.status)}`);
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Query hooks
 // ---------------------------------------------------------------------------
 
-/** GET /workspaces/{wsId}/timeboxes — suspense query for the timebox list. */
-export function useTimeboxesQuery(wsId: string): UseSuspenseQueryResult<TimeboxItem[]> {
+/** GET /workspaces/{wsId}/timeboxes — workspace timebox list (suspense). */
+export function useTimeboxesQuery(wsId: string): UseSuspenseQueryResult<Timebox[]> {
   return useSuspenseQuery({
     queryKey: timeboxKeys.list(wsId),
-    queryFn: async (): Promise<TimeboxItem[]> => {
-      const data = await fetchJson<{ items?: TimeboxItem[] }>(
-        `${apiBaseUrl}/workspaces/${wsId}/timeboxes?limit=200`,
-      );
-      return data.items ?? [];
+    queryFn: async (): Promise<Timebox[]> => {
+      if (!wsId) return [];
+      const { data, error } = await sdk.GET('/workspaces/{wsId}/timeboxes', {
+        params: { path: { wsId }, query: { limit: 200 } },
+      });
+      if (error || !data) throw toApiError(error, 'Failed to load timeboxes');
+      return data.timeboxes ?? [];
     },
   });
 }
 
-/** GET /workspaces/{wsId}/timeboxes/{timeboxId} — suspense query for a single timebox. */
-export function useTimeboxQuery(
-  wsId: string,
-  timeboxId: string,
-): UseSuspenseQueryResult<TimeboxItem> {
+/** GET /workspaces/{wsId}/timeboxes/{timeboxId} — single timebox (suspense). */
+export function useTimeboxQuery(wsId: string, timeboxId: string): UseSuspenseQueryResult<Timebox> {
   return useSuspenseQuery({
-    queryKey: timeboxKeys.detail(timeboxId),
-    queryFn: async (): Promise<TimeboxItem> => {
-      return fetchJson<TimeboxItem>(`${apiBaseUrl}/workspaces/${wsId}/timeboxes/${timeboxId}`);
+    queryKey: timeboxKeys.detail(wsId, timeboxId),
+    queryFn: async (): Promise<Timebox> => {
+      const { data, error } = await sdk.GET('/workspaces/{wsId}/timeboxes/{timeboxId}', {
+        params: { path: { wsId, timeboxId } },
+      });
+      if (error || !data) throw toApiError(error, 'Failed to load timebox');
+      return data;
     },
   });
 }
 
-/** GET /workspaces/{wsId}/timeboxes/{timeboxId}/tasks — suspense query for timebox tasks. */
+/**
+ * GET /workspaces/{wsId}/timeboxes/{timeboxId}/tasks — list of tasks
+ * linked to a single timebox. Non-suspense + gated by `enabled` so
+ * collapsible cards can defer the fetch until the user expands them.
+ */
 export function useTimeboxTasksQuery(
   wsId: string,
   timeboxId: string,
-): UseSuspenseQueryResult<TimeboxTaskItem[]> {
-  return useSuspenseQuery({
-    queryKey: timeboxKeys.tasks(timeboxId),
-    queryFn: async (): Promise<TimeboxTaskItem[]> => {
-      const data = await fetchJson<{ items?: TimeboxTaskItem[] }>(
-        `${apiBaseUrl}/workspaces/${wsId}/timeboxes/${timeboxId}/tasks?limit=200`,
-      );
-      return data.items ?? [];
+  enabled = true,
+): UseQueryResult<TimeboxTask[], ApiError> {
+  return useQuery<TimeboxTask[], ApiError>({
+    queryKey: timeboxKeys.tasks(wsId, timeboxId),
+    enabled: enabled && wsId.length > 0 && timeboxId.length > 0,
+    queryFn: async (): Promise<TimeboxTask[]> => {
+      const { data, error } = await sdk.GET('/workspaces/{wsId}/timeboxes/{timeboxId}/tasks', {
+        params: { path: { wsId, timeboxId }, query: { limit: 200 } },
+      });
+      if (error || !data) throw toApiError(error, 'Failed to load timebox tasks');
+      return data.tasks ?? [];
     },
   });
 }
 
 // ---------------------------------------------------------------------------
-// Mutation hooks
+// Active-timebox fan-out (drives the app-shell bar)
+// ---------------------------------------------------------------------------
+
+/** Active-timebox row with its owning workspace id, used by the persistent bar. */
+export interface ActiveTimeboxRow {
+  workspaceId: string;
+  timebox: Timebox;
+}
+
+/**
+ * Fans out a list query per workspace and returns the flat set of
+ * timeboxes whose `status === 'active'`. Powers the always-on
+ * app-shell bar without requiring a dedicated "current session"
+ * endpoint.
+ *
+ * Uses `useQueries` so a slow workspace does not hold up the rest, and
+ * silences errors per-workspace so a single ACL failure does not
+ * collapse the bar.
+ */
+export function useActiveTimeboxesQuery(workspaceIds: readonly string[]): {
+  active: ActiveTimeboxRow[];
+  isLoading: boolean;
+} {
+  const queries = useQueries({
+    queries: workspaceIds.map((wsId) => ({
+      queryKey: timeboxKeys.list(wsId),
+      // Polling cadence stays at the QueryClient default — invalidations
+      // from the create/update mutations push fresh data into the cache
+      // so the bar reacts without a refetch interval.
+      enabled: wsId.length > 0,
+      throwOnError: false,
+      queryFn: async (): Promise<Timebox[]> => {
+        const { data, error } = await sdk.GET('/workspaces/{wsId}/timeboxes', {
+          params: { path: { wsId }, query: { limit: 200 } },
+        });
+        if (error || !data) return [];
+        return data.timeboxes ?? [];
+      },
+    })),
+  });
+
+  const active: ActiveTimeboxRow[] = [];
+  let isLoading = false;
+  queries.forEach((q, idx) => {
+    if (q.isPending) isLoading = true;
+    const wsId = workspaceIds[idx];
+    if (!wsId || !q.data) return;
+    for (const tb of q.data) {
+      if (asTimeboxStatus(tb.status) === 'active') {
+        active.push({ workspaceId: wsId, timebox: tb });
+      }
+    }
+  });
+  return { active, isLoading };
+}
+
+// ---------------------------------------------------------------------------
+// Mutations
 // ---------------------------------------------------------------------------
 
 export interface CreateTimeboxArgs {
-  input: CreateTimeboxInput;
+  wsId: string;
+  body: CreateTimeboxInput;
 }
 
 /** POST /workspaces/{wsId}/timeboxes — create a new timebox. */
-export function useCreateTimebox(
-  wsId: string,
-): UseMutationResult<TimeboxItem, ApiError, CreateTimeboxArgs> {
+export function useCreateTimeboxMutation(): UseMutationResult<
+  Timebox,
+  ApiError,
+  CreateTimeboxArgs
+> {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ input }: CreateTimeboxArgs): Promise<TimeboxItem> => {
-      return fetchJson<TimeboxItem>(`${apiBaseUrl}/workspaces/${wsId}/timeboxes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
+    mutationFn: async ({ wsId, body }: CreateTimeboxArgs): Promise<Timebox> => {
+      const { data, error } = await sdk.POST('/workspaces/{wsId}/timeboxes', {
+        params: { path: { wsId } },
+        body,
       });
+      if (error || !data) throw toApiError(error, 'Failed to create timebox');
+      return data;
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: timeboxKeys.list(wsId) });
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: timeboxKeys.list(vars.wsId) });
     },
   });
 }
 
 export interface UpdateTimeboxArgs {
+  wsId: string;
   timeboxId: string;
-  patch: UpdateTimeboxInput;
+  body: UpdateTimeboxInput;
 }
 
-/** PATCH /workspaces/{wsId}/timeboxes/{timeboxId} — update a timebox. */
-export function useUpdateTimebox(
-  wsId: string,
-): UseMutationResult<TimeboxItem, ApiError, UpdateTimeboxArgs> {
+/** PATCH /workspaces/{wsId}/timeboxes/{timeboxId} — patch metadata. */
+export function useUpdateTimeboxMutation(): UseMutationResult<
+  Timebox,
+  ApiError,
+  UpdateTimeboxArgs
+> {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ timeboxId, patch }: UpdateTimeboxArgs): Promise<TimeboxItem> => {
-      return fetchJson<TimeboxItem>(`${apiBaseUrl}/workspaces/${wsId}/timeboxes/${timeboxId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
+    mutationFn: async ({ wsId, timeboxId, body }: UpdateTimeboxArgs): Promise<Timebox> => {
+      const { data, error } = await sdk.PATCH('/workspaces/{wsId}/timeboxes/{timeboxId}', {
+        params: { path: { wsId, timeboxId } },
+        body,
       });
+      if (error || !data) throw toApiError(error, 'Failed to update timebox');
+      return data;
     },
     onSuccess: (_data, vars) => {
-      void qc.invalidateQueries({ queryKey: timeboxKeys.list(wsId) });
-      void qc.invalidateQueries({ queryKey: timeboxKeys.detail(vars.timeboxId) });
+      void qc.invalidateQueries({ queryKey: timeboxKeys.list(vars.wsId) });
+      void qc.invalidateQueries({
+        queryKey: timeboxKeys.detail(vars.wsId, vars.timeboxId),
+      });
+    },
+  });
+}
+
+export interface DeleteTimeboxArgs {
+  wsId: string;
+  timeboxId: string;
+}
+
+/** DELETE /workspaces/{wsId}/timeboxes/{timeboxId} — soft delete. */
+export function useDeleteTimeboxMutation(): UseMutationResult<void, ApiError, DeleteTimeboxArgs> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ wsId, timeboxId }: DeleteTimeboxArgs): Promise<void> => {
+      const { error } = await sdk.DELETE('/workspaces/{wsId}/timeboxes/{timeboxId}', {
+        params: { path: { wsId, timeboxId } },
+      });
+      if (error) throw toApiError(error, 'Failed to delete timebox');
+    },
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: timeboxKeys.list(vars.wsId) });
     },
   });
 }
 
 export interface UpdateTimeboxStatusArgs {
+  wsId: string;
   timeboxId: string;
   status: TimeboxStatus;
 }
 
-/** POST /workspaces/{wsId}/timeboxes/{timeboxId}/status — transition status. */
-export function useUpdateTimeboxStatus(
-  wsId: string,
-): UseMutationResult<void, ApiError, UpdateTimeboxStatusArgs> {
+/** POST /workspaces/{wsId}/timeboxes/{timeboxId}/status — transition state. */
+export function useUpdateTimeboxStatusMutation(): UseMutationResult<
+  Timebox,
+  ApiError,
+  UpdateTimeboxStatusArgs
+> {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ timeboxId, status }: UpdateTimeboxStatusArgs): Promise<void> => {
-      await fetchJson<unknown>(`${apiBaseUrl}/workspaces/${wsId}/timeboxes/${timeboxId}/status`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+    mutationFn: async ({ wsId, timeboxId, status }: UpdateTimeboxStatusArgs): Promise<Timebox> => {
+      const { data, error } = await sdk.POST('/workspaces/{wsId}/timeboxes/{timeboxId}/status', {
+        params: { path: { wsId, timeboxId } },
+        body: { status },
       });
+      if (error || !data) throw toApiError(error, 'Failed to update status');
+      return data;
     },
     onSuccess: (_data, vars) => {
-      void qc.invalidateQueries({ queryKey: timeboxKeys.list(wsId) });
-      void qc.invalidateQueries({ queryKey: timeboxKeys.detail(vars.timeboxId) });
-    },
-  });
-}
-
-/** DELETE /workspaces/{wsId}/timeboxes/{timeboxId} — soft delete. */
-export function useDeleteTimebox(wsId: string): UseMutationResult<void, ApiError, string> {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (timeboxId: string): Promise<void> => {
-      await fetchVoid(`${apiBaseUrl}/workspaces/${wsId}/timeboxes/${timeboxId}`, {
-        method: 'DELETE',
+      void qc.invalidateQueries({ queryKey: timeboxKeys.list(vars.wsId) });
+      void qc.invalidateQueries({
+        queryKey: timeboxKeys.detail(vars.wsId, vars.timeboxId),
       });
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: timeboxKeys.list(wsId) });
-    },
   });
 }
 
-export interface AddTaskToTimeboxArgs {
+export interface AddTimeboxTaskArgs {
+  wsId: string;
+  timeboxId: string;
   taskId: string;
 }
 
-/** POST /workspaces/{wsId}/timeboxes/{timeboxId}/tasks — add a task. */
-export function useAddTaskToTimebox(
-  wsId: string,
-  timeboxId: string,
-): UseMutationResult<void, ApiError, AddTaskToTimeboxArgs> {
+/** POST /workspaces/{wsId}/timeboxes/{timeboxId}/tasks — link a task. */
+export function useAddTimeboxTaskMutation(): UseMutationResult<void, ApiError, AddTimeboxTaskArgs> {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ taskId }: AddTaskToTimeboxArgs): Promise<void> => {
-      await fetchJson<unknown>(`${apiBaseUrl}/workspaces/${wsId}/timeboxes/${timeboxId}/tasks`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId }),
+    mutationFn: async ({ wsId, timeboxId, taskId }: AddTimeboxTaskArgs): Promise<void> => {
+      const { error } = await sdk.POST('/workspaces/{wsId}/timeboxes/{timeboxId}/tasks', {
+        params: { path: { wsId, timeboxId } },
+        body: { taskId },
       });
+      if (error) throw toApiError(error, 'Failed to add task to timebox');
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: timeboxKeys.tasks(timeboxId) });
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({
+        queryKey: timeboxKeys.tasks(vars.wsId, vars.timeboxId),
+      });
+      // Progress numerator depends on the linked task list — refresh
+      // the workspace list as well so derived UI counters update.
+      void qc.invalidateQueries({ queryKey: timeboxKeys.list(vars.wsId) });
     },
   });
 }
 
-/** DELETE /workspaces/{wsId}/timeboxes/{timeboxId}/tasks/{taskId} — remove a task. */
-export function useRemoveTaskFromTimebox(
-  wsId: string,
-  timeboxId: string,
-): UseMutationResult<void, ApiError, string> {
+export interface RemoveTimeboxTaskArgs {
+  wsId: string;
+  timeboxId: string;
+  taskId: string;
+}
+
+/** DELETE /workspaces/{wsId}/timeboxes/{timeboxId}/tasks/{taskId} — unlink a task. */
+export function useRemoveTimeboxTaskMutation(): UseMutationResult<
+  void,
+  ApiError,
+  RemoveTimeboxTaskArgs
+> {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (taskId: string): Promise<void> => {
-      await fetchVoid(`${apiBaseUrl}/workspaces/${wsId}/timeboxes/${timeboxId}/tasks/${taskId}`, {
-        method: 'DELETE',
-      });
+    mutationFn: async ({ wsId, timeboxId, taskId }: RemoveTimeboxTaskArgs): Promise<void> => {
+      const { error } = await sdk.DELETE(
+        '/workspaces/{wsId}/timeboxes/{timeboxId}/tasks/{taskId}',
+        { params: { path: { wsId, timeboxId, taskId } } },
+      );
+      if (error) throw toApiError(error, 'Failed to remove task from timebox');
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: timeboxKeys.tasks(timeboxId) });
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({
+        queryKey: timeboxKeys.tasks(vars.wsId, vars.timeboxId),
+      });
+      void qc.invalidateQueries({ queryKey: timeboxKeys.list(vars.wsId) });
     },
   });
 }

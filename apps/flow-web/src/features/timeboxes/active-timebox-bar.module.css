@@ -1,0 +1,91 @@
+/**
+ * Active timebox bar — persistent strip mounted in the app shell
+ * directly under the top bar. Token-only colors. The accent stripe
+ * uses `accent-subtle` for the field with a `accent` left border so
+ * the bar reads as "in-flight" without screaming.
+ */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+  padding-block: var(--nf-space-2);
+  padding-inline: var(--nf-space-4);
+  background: var(--nf-color-accent-subtle);
+  color: var(--nf-color-fg);
+  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
+  border-inline-start: 3px solid var(--nf-color-accent);
+  min-inline-size: 0;
+}
+
+.label {
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.body {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  min-inline-size: 0;
+  flex: 1 1 auto;
+}
+
+.name {
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-inline-size: 0;
+}
+
+.workspace {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progress {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.actions {
+  display: flex;
+  gap: var(--nf-space-2);
+  flex: 0 0 auto;
+}
+
+/*
+ * Compact: collapse the workspace caption first; on very narrow
+ * viewports drop the progress chip too. The bar always keeps the name
+ * and the two actions visible so the user can stop the timebox from
+ * any device width.
+ */
+@media (max-width: 767px) {
+  .workspace {
+    display: none;
+  }
+}
+
+@media (max-width: 479px) {
+  .progress {
+    display: none;
+  }
+
+  .label {
+    display: none;
+  }
+}

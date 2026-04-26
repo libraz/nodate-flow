@@ -42,6 +42,7 @@
     "workspaceProjects": "Projects in this workspace",
     "pages": "Pages",
     "settings": "Settings",
+    "timeboxes": "Timeboxes",
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar"
   },
@@ -1027,5 +1028,89 @@
     "go_workspaces": "Go to Workspaces",
     "go_settings": "Go to Settings",
     "show_help": "Show shortcuts"
+  },
+  "timeboxes": {
+    "title": "Timeboxes",
+    "description": "Group tasks into focused work sessions.",
+    "new": "New timebox",
+    "empty": "No timeboxes yet",
+    "section": {
+      "active": "Active",
+      "planned": "Planned",
+      "archive": "Completed and cancelled"
+    },
+    "status": {
+      "planned": "Planned",
+      "active": "Active",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "action": {
+      "start": "Start",
+      "stop": "Stop",
+      "cancel": "Cancel",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "delete": {
+      "confirm": "Delete this timebox? Linked tasks remain in the workspace.",
+      "success": "Timebox deleted",
+      "error": "Failed to delete timebox"
+    },
+    "transition": {
+      "error": "Failed to update status"
+    },
+    "progress": "{done}/{total} tasks done",
+    "no_tasks": "No tasks linked yet",
+    "add_task": {
+      "label": "Link a task",
+      "success": "Task linked",
+      "error": "Failed to link task"
+    },
+    "add_task_id": {
+      "label": "Task ID",
+      "hint": "Paste the task's UUID. Workspace task picker is on the way."
+    },
+    "remove_task": {
+      "label": "Remove",
+      "success": "Task removed",
+      "error": "Failed to remove task"
+    },
+    "dialog": {
+      "create": {
+        "title": "New timebox",
+        "success": "Timebox created",
+        "error": "Failed to create timebox"
+      },
+      "edit": {
+        "title": "Edit timebox",
+        "success": "Timebox saved",
+        "error": "Failed to save timebox"
+      },
+      "submit": {
+        "create": "Create timebox",
+        "edit": "Save changes"
+      },
+      "cancel": "Cancel",
+      "invalid_dates": "End date must be on or after start date."
+    },
+    "field": {
+      "name": "Name",
+      "description": "Description",
+      "starts_on": "Starts on",
+      "ends_on": "Ends on",
+      "project": {
+        "label": "Project (optional)",
+        "placeholder": "Workspace-wide"
+      }
+    }
+  },
+  "active_timebox_bar": {
+    "label": "Active timebox",
+    "workspace": "in {workspace}",
+    "open": "Open",
+    "stop": "Stop",
+    "stop_confirm": "Stop this timebox? It will be marked as completed.",
+    "stop_success": "Timebox stopped"
   }
 }

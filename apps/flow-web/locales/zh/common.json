@@ -42,6 +42,7 @@
     "workspaceProjects": "Projects in this workspace",
     "pages": "Pages",
     "settings": "Settings",
+    "timeboxes": "时间盒",
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar"
   },
@@ -1027,5 +1028,89 @@
     "go_workspaces": "Go to Workspaces",
     "go_settings": "Go to Settings",
     "show_help": "Show shortcuts"
+  },
+  "timeboxes": {
+    "title": "时间盒",
+    "description": "将任务整理为专注工作会话。",
+    "new": "新建时间盒",
+    "empty": "暂无时间盒",
+    "section": {
+      "active": "进行中",
+      "planned": "已计划",
+      "archive": "已完成与已取消"
+    },
+    "status": {
+      "planned": "已计划",
+      "active": "进行中",
+      "completed": "已完成",
+      "cancelled": "已取消"
+    },
+    "action": {
+      "start": "开始",
+      "stop": "停止",
+      "cancel": "取消",
+      "edit": "编辑",
+      "delete": "删除"
+    },
+    "delete": {
+      "confirm": "删除此时间盒？关联任务将保留在工作区中。",
+      "success": "已删除时间盒",
+      "error": "删除时间盒失败"
+    },
+    "transition": {
+      "error": "更新状态失败"
+    },
+    "progress": "完成 {done}/{total} 个任务",
+    "no_tasks": "尚未关联任务",
+    "add_task": {
+      "label": "添加任务",
+      "success": "已关联任务",
+      "error": "关联任务失败"
+    },
+    "add_task_id": {
+      "label": "任务 ID",
+      "hint": "请粘贴任务 UUID。任务选择器即将推出。"
+    },
+    "remove_task": {
+      "label": "移除",
+      "success": "已移除任务",
+      "error": "移除任务失败"
+    },
+    "dialog": {
+      "create": {
+        "title": "新建时间盒",
+        "success": "已创建时间盒",
+        "error": "创建时间盒失败"
+      },
+      "edit": {
+        "title": "编辑时间盒",
+        "success": "已保存时间盒",
+        "error": "保存时间盒失败"
+      },
+      "submit": {
+        "create": "创建时间盒",
+        "edit": "保存更改"
+      },
+      "cancel": "取消",
+      "invalid_dates": "结束日期必须在开始日期之后或同一天。"
+    },
+    "field": {
+      "name": "名称",
+      "description": "描述",
+      "starts_on": "开始日期",
+      "ends_on": "结束日期",
+      "project": {
+        "label": "项目（可选）",
+        "placeholder": "整个工作区"
+      }
+    }
+  },
+  "active_timebox_bar": {
+    "label": "进行中的时间盒",
+    "workspace": "在 {workspace} 中",
+    "open": "打开",
+    "stop": "停止",
+    "stop_confirm": "停止此时间盒？将标记为已完成。",
+    "stop_success": "已停止时间盒"
   }
 }

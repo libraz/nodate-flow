@@ -17,6 +17,7 @@ import {
   type LucideIcon,
   Menu,
   Settings,
+  Timer,
   X,
 } from 'lucide-react';
 import { type ReactElement, Suspense, useCallback, useEffect, useState } from 'react';
@@ -92,6 +93,27 @@ function WorkspaceProjectsSection({ workspaceId }: { workspaceId: string }): Rea
         </Link>
       ))}
     </div>
+  );
+}
+
+/**
+ * WorkspaceTimeboxesLink — single sidebar entry that points at
+ * `/workspaces/{id}/timeboxes`. Rendered inline beneath the
+ * workspaces nav root so the route is reachable without opening the
+ * top-bar workspace switcher first. Static label, no data fetch.
+ */
+function WorkspaceTimeboxesLink({ workspaceId }: { workspaceId: string }): ReactElement {
+  const { t } = useTranslation('common');
+  return (
+    <Link
+      to="/workspaces/$id/timeboxes"
+      params={{ id: workspaceId }}
+      className={cx(styles.item, styles.subItem)}
+      activeProps={{ className: cx(styles.item, styles.subItem, styles.itemActive) }}
+    >
+      <Icon icon={Timer} decorative />
+      <span className={styles.label}>{t('nav.timeboxes')}</span>
+    </Link>
   );
 }
 
@@ -317,10 +339,15 @@ export default function Sidebar(): ReactElement {
             // nav entry when we are inside a workspace-scoped route.
             // The Favorites section is mounted alongside so starred
             // tasks / projects sit under the same workspace header.
+            // The Timeboxes link is hand-coded so it is always visible
+            // even when the workspace has zero projects and the
+            // suspense-driven `WorkspaceProjectsSection` returns
+            // nothing.
             if (item.key === 'workspaces' && currentWorkspaceId && !collapsed) {
               return (
                 <div key={item.key}>
                   {linkEl}
+                  <WorkspaceTimeboxesLink workspaceId={currentWorkspaceId} />
                   <Suspense fallback={null}>
                     <WorkspaceProjectsSection workspaceId={currentWorkspaceId} />
                   </Suspense>

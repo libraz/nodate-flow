@@ -42,6 +42,7 @@
     "workspaceProjects": "このワークスペースのプロジェクト",
     "pages": "ページ",
     "settings": "設定",
+    "timeboxes": "タイムボックス",
     "collapse": "サイドバーを折りたたむ",
     "expand": "サイドバーを展開する"
   },
@@ -1027,5 +1028,89 @@
     "go_workspaces": "ワークスペースへ移動",
     "go_settings": "設定へ移動",
     "show_help": "ショートカットを表示"
+  },
+  "timeboxes": {
+    "title": "タイムボックス",
+    "description": "タスクを集中作業セッションにまとめます。",
+    "new": "新規タイムボックス",
+    "empty": "タイムボックスはまだありません",
+    "section": {
+      "active": "進行中",
+      "planned": "予定",
+      "archive": "完了・中止"
+    },
+    "status": {
+      "planned": "予定",
+      "active": "進行中",
+      "completed": "完了",
+      "cancelled": "中止"
+    },
+    "action": {
+      "start": "開始",
+      "stop": "停止",
+      "cancel": "中止",
+      "edit": "編集",
+      "delete": "削除"
+    },
+    "delete": {
+      "confirm": "このタイムボックスを削除しますか？ リンクされたタスクはワークスペースに残ります。",
+      "success": "タイムボックスを削除しました",
+      "error": "タイムボックスの削除に失敗しました"
+    },
+    "transition": {
+      "error": "ステータスの更新に失敗しました"
+    },
+    "progress": "完了 {done}/{total}",
+    "no_tasks": "リンクされたタスクはありません",
+    "add_task": {
+      "label": "タスクを追加",
+      "success": "タスクをリンクしました",
+      "error": "タスクのリンクに失敗しました"
+    },
+    "add_task_id": {
+      "label": "タスク ID",
+      "hint": "タスクの UUID を貼り付けてください。タスクピッカーは追って実装予定。"
+    },
+    "remove_task": {
+      "label": "解除",
+      "success": "タスクを解除しました",
+      "error": "タスクの解除に失敗しました"
+    },
+    "dialog": {
+      "create": {
+        "title": "新規タイムボックス",
+        "success": "タイムボックスを作成しました",
+        "error": "タイムボックスの作成に失敗しました"
+      },
+      "edit": {
+        "title": "タイムボックスを編集",
+        "success": "タイムボックスを保存しました",
+        "error": "タイムボックスの保存に失敗しました"
+      },
+      "submit": {
+        "create": "タイムボックスを作成",
+        "edit": "変更を保存"
+      },
+      "cancel": "キャンセル",
+      "invalid_dates": "終了日は開始日以降にしてください。"
+    },
+    "field": {
+      "name": "名前",
+      "description": "説明",
+      "starts_on": "開始日",
+      "ends_on": "終了日",
+      "project": {
+        "label": "プロジェクト（任意）",
+        "placeholder": "ワークスペース全体"
+      }
+    }
+  },
+  "active_timebox_bar": {
+    "label": "進行中のタイムボックス",
+    "workspace": "{workspace} 内",
+    "open": "開く",
+    "stop": "停止",
+    "stop_confirm": "このタイムボックスを停止しますか？ 完了として記録されます。",
+    "stop_success": "タイムボックスを停止しました"
   }
 }

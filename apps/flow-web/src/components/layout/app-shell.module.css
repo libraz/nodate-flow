@@ -1,7 +1,13 @@
 .shell {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr);
+  /*
+   * Three rows: top-bar (auto), optional active-timebox bar (auto, collapses to
+   * 0 when the bar component returns `null`), main content (flex). Putting the
+   * bar in its own track keeps the sticky top-bar untouched and lets the
+   * shell stay symmetric when the bar is hidden.
+   */
+  grid-template-rows: auto auto minmax(0, 1fr);
   block-size: 100dvh;
   inline-size: 100%;
   background: var(--nf-color-bg);
@@ -11,13 +17,19 @@
 
 .sidebarSlot {
   grid-column: 1;
-  grid-row: 1 / span 2;
+  grid-row: 1 / span 3;
   min-block-size: 0;
 }
 
 .topBarSlot {
   grid-column: 2;
   grid-row: 1;
+  min-inline-size: 0;
+}
+
+.activeTimeboxSlot {
+  grid-column: 2;
+  grid-row: 2;
   min-inline-size: 0;
 }
 
@@ -34,7 +46,7 @@
  */
 .main {
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 3;
   overflow-y: auto;
   min-inline-size: 0;
   min-block-size: 0;
@@ -65,6 +77,10 @@
   }
 
   .topBarSlot {
+    grid-column: 1;
+  }
+
+  .activeTimeboxSlot {
     grid-column: 1;
   }
 
