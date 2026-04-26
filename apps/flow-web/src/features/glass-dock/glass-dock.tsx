@@ -12,7 +12,7 @@ import { useFocusTrap } from '@nodate-flow/ui/hooks/use-focus-trap';
 import Icon from '@nodate-flow/ui/icon';
 import Badge from '@nodate-flow/ui/primitives/badge';
 import Card from '@nodate-flow/ui/primitives/card';
-import { useMatches, useNavigate } from '@tanstack/react-router';
+import { Link, useMatches, useNavigate } from '@tanstack/react-router';
 import type { TFunction } from 'i18next';
 import { Sparkles, X } from 'lucide-react';
 import { type ReactElement, useRef, useState } from 'react';
@@ -480,6 +480,23 @@ function RemindersPanel({
           );
         })}
       </ul>
+      {workspaceId ? (
+        <Link
+          to="/workspaces/$id/reminders"
+          params={{ id: workspaceId }}
+          style={{
+            alignSelf: 'flex-end',
+            padding: '0.25rem 0.5rem',
+            borderRadius: 'var(--nf-radius-sm)',
+            color: 'var(--nf-color-fg-muted)',
+            textDecoration: 'none',
+            fontSize: '0.6875rem',
+            fontWeight: 500,
+          }}
+        >
+          {t('reminders.view_all')}
+        </Link>
+      ) : null}
     </div>
   );
 }

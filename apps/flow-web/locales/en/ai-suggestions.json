@@ -94,6 +94,25 @@
       "overdue": "Overdue",
       "due_today": "Due today",
       "due_soon": "Due soon"
+    },
+    "page_title": "Reminders",
+    "page_subtitle": "Tasks the engine flagged based on your due dates and progress.",
+    "view_all": "View all",
+    "empty": "No reminders right now.",
+    "error": "Failed to load reminders",
+    "retry": "Retry",
+    "count": "{count, plural, one {# reminder} other {# reminders}}",
+    "bucket": {
+      "overdue": "Overdue",
+      "today": "Today",
+      "soon": "Soon",
+      "later": "Later"
+    },
+    "due": "Due {date}",
+    "days": {
+      "overdue": "{count} days overdue",
+      "today": "Due today",
+      "future": "{count} days left"
     }
   },
   "auto_actions": {

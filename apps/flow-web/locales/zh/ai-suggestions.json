@@ -94,6 +94,25 @@
       "overdue": "Overdue",
       "due_today": "Due today",
       "due_soon": "Due soon"
+    },
+    "page_title": "提醒",
+    "page_subtitle": "引擎根据您的截止日期和进度标记的任务。",
+    "view_all": "查看全部",
+    "empty": "目前没有提醒。",
+    "error": "无法加载提醒",
+    "retry": "重试",
+    "count": "{count, plural, other {{count} 个提醒}}",
+    "bucket": {
+      "overdue": "已逾期",
+      "today": "今日",
+      "soon": "即将",
+      "later": "稍后"
+    },
+    "due": "截止 {date}",
+    "days": {
+      "overdue": "已逾期 {count} 天",
+      "today": "今日截止",
+      "future": "还剩 {count} 天"
     }
   },
   "auto_actions": {

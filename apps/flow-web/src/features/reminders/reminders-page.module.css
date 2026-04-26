@@ -1,0 +1,160 @@
+/**
+ * RemindersPage layout — workspace-scoped reminders surface (R6 W4).
+ * Renders a header followed by urgency-bucketed groups (Overdue,
+ * Today, Soon, Later). Tokens only — no literal hex / rgb / px.
+ */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-5);
+  inline-size: 100%;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display, inherit);
+  font-size: clamp(1.25rem, 2vw, 1.5rem);
+  color: var(--nf-color-fg);
+}
+
+.subtitle {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.count {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.groupHeader {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nf-space-2);
+}
+
+.groupTitle {
+  margin: 0;
+  font-size: var(--nf-text-base);
+  font-weight: 600;
+  color: var(--nf-color-fg);
+}
+
+.groupCount {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-3);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-surface);
+}
+
+.rowMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.rowHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  flex-wrap: wrap;
+}
+
+.rowTitle {
+  font-size: var(--nf-text-sm);
+  font-weight: 600;
+  color: var(--nf-color-fg);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.rowTitle:hover {
+  text-decoration: underline;
+}
+
+.rowMessage {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  overflow-wrap: anywhere;
+}
+
+.rowMeta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--nf-space-1);
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.empty {
+  margin: 0;
+  padding: var(--nf-space-5);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+  border: var(--nf-space-px) dashed var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  text-align: center;
+}
+
+.errorBox {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-4);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-surface);
+}
+
+.errorMessage {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg);
+}

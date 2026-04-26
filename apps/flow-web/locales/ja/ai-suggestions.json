@@ -94,6 +94,25 @@
       "overdue": "期限超過",
       "due_today": "本日期限",
       "due_soon": "期限間近"
+    },
+    "page_title": "リマインダー",
+    "page_subtitle": "期日と進捗からエンジンがフラグしたタスク。",
+    "view_all": "すべて表示",
+    "empty": "リマインダーはありません。",
+    "error": "リマインダーを読み込めませんでした",
+    "retry": "再試行",
+    "count": "{count, plural, other {{count} 件}}",
+    "bucket": {
+      "overdue": "期限切れ",
+      "today": "今日",
+      "soon": "間もなく",
+      "later": "今後"
+    },
+    "due": "期日 {date}",
+    "days": {
+      "overdue": "{count} 日経過",
+      "today": "今日が期日",
+      "future": "残り {count} 日"
     }
   },
   "auto_actions": {
