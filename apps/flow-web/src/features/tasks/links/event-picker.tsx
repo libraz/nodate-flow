@@ -187,6 +187,15 @@ export default function EventPicker({
     onLink({ event: entry.event, kind });
   };
 
+  // Restore focus to the popover's anchor (the section header trigger)
+  // when the user dismisses via keyboard. Outside-click dismissal lets
+  // the browser's default focus rules apply so we don't steal focus
+  // from wherever the user just clicked.
+  const closeAndRestoreFocus = (): void => {
+    onClose();
+    anchorRef.current?.focus();
+  };
+
   const handleInputKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
     switch (event.key) {
       case 'ArrowDown':
@@ -203,7 +212,7 @@ export default function EventPicker({
         break;
       case 'Escape':
         event.preventDefault();
-        onClose();
+        closeAndRestoreFocus();
         break;
       default:
     }
@@ -212,7 +221,7 @@ export default function EventPicker({
   const handlePopoverKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
     if (event.key === 'Escape') {
       event.preventDefault();
-      onClose();
+      closeAndRestoreFocus();
     }
   };
 
