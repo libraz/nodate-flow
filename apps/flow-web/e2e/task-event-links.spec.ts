@@ -19,6 +19,20 @@
  *      the "Unlinked" toast.
  *   E. switching the kind selector flips `aria-checked` on the segmented
  *      control as a smoke check that the radiogroup is wired correctly.
+ *   F. typing a query + pressing Enter on the keyboard-active row
+ *      commits the link via the WAI-ARIA combobox + activedescendant
+ *      pattern (no mouse events).
+ *   G. pressing Escape inside the open picker closes the dialog and
+ *      restores focus to the section header trigger.
+ *   H. when the initial linked-events GET fails the section mounts the
+ *      local LinkedEventsError fallback (role=alert + the localised
+ *      `error.fetchFailed` copy) instead of escalating to the route
+ *      FatalFallback.
+ *   I. registering the tenant with locale='ja' surfaces the Japanese
+ *      `section.title` on the empty-state task detail page.
+ *   J. (nested describe) on a 375x812 mobile viewport the section
+ *      header title and the "Link event" trigger both stay visible
+ *      without overflow clipping them off-screen.
  *
  * Each test creates its own tenant + task via REST so the suite stays
  * parallel-safe.
@@ -27,6 +41,7 @@
 import { type Page, expect, test } from '@playwright/test';
 
 import enLinkedEvents from '../locales/en/linkedEvents.json' with { type: 'json' };
+import jaLinkedEvents from '../locales/ja/linkedEvents.json' with { type: 'json' };
 import {
   API_BASE_URL,
   type TestTenant,
@@ -44,6 +59,8 @@ const copy = {
   contributesTo: enLinkedEvents.kind.contributesTo,
   blocks: enLinkedEvents.kind.blocks,
   searchPlaceholder: enLinkedEvents.picker.searchPlaceholder,
+  errorFetchFailed: enLinkedEvents.error.fetchFailed,
+  jaSectionTitle: jaLinkedEvents.section.title,
   toastLinkedPrefix: 'Linked',
   toastUnlinkedPrefix: 'Unlinked',
 } as const;
@@ -239,5 +256,175 @@ test.describe('task ↔ event manual links', () => {
     await blocksPill.click();
     await expect(blocksPill).toHaveAttribute('aria-checked', 'true');
     await expect(contributesPill).toHaveAttribute('aria-checked', 'false');
+  });
+
+  test('F: ArrowDown + Enter commits the link via keyboard navigation', async ({ page }) => {
+    tenant = await createTestTenant();
+    const task = await seedTask(tenant, `Links F ${Date.now().toString(36)}`);
+    const calendar = await ensurePersonalCalendar(tenant);
+    const eventTitle = `Keynote ${Date.now().toString(36)}`;
+    const window = tomorrowEventWindow();
+    await createCalendarEvent(tenant, calendar.id, {
+      title: eventTitle,
+      startAt: window.startAt,
+      endAt: window.endAt,
+    });
+
+    await injectAuth(page.context(), tenant);
+    await openTaskDetail(page, task.id, task.title);
+
+    await page.getByRole('button', { name: copy.trigger }).first().click();
+    const picker = page.getByRole('dialog', { name: copy.trigger });
+    const combobox = picker.getByRole('combobox');
+    await expect(combobox).toBeVisible({ timeout: 5_000 });
+    await expect(combobox).toBeFocused();
+
+    // Type ~6 chars so the listbox debounces down to a single match.
+    await combobox.fill(eventTitle.slice(0, 6));
+    const optionRow = picker.getByRole('option', { name: new RegExp(eventTitle) });
+    await expect(optionRow).toBeVisible({ timeout: 5_000 });
+
+    // The combobox has a literal `aria-expanded` so it always serialises
+    // to "true" while the popover is mounted.
+    await expect(combobox).toHaveAttribute('aria-expanded', 'true');
+
+    // Auto-pick effect sets aria-activedescendant to the first selectable
+    // option once results arrive. Poll because it lands a tick after the
+    // listbox renders.
+    await expect
+      .poll(async () => combobox.getAttribute('aria-activedescendant'), { timeout: 5_000 })
+      .not.toBeNull();
+
+    // The picker's `moveActive` cycles modulo `selectableIds.length`, so
+    // ArrowDown on a single-row listbox lands on the same row that the
+    // auto-highlight effect already chose. Either way the active option
+    // must be the seeded event. The active row also carries
+    // `aria-selected="true"`, which is the cross-check we use here
+    // (the option id is a `useId()` token and would need CSS-escaping).
+    await page.keyboard.press('ArrowDown');
+    const activeId = await combobox.getAttribute('aria-activedescendant');
+    expect(activeId).not.toBeNull();
+    const activeOption = picker.getByRole('option', { selected: true });
+    await expect(activeOption).toHaveAttribute('id', activeId ?? '');
+    await expect(activeOption).toHaveText(new RegExp(eventTitle));
+
+    // Enter commits via the activedescendant — no click on the row.
+    await page.keyboard.press('Enter');
+
+    await expect(page.getByText(new RegExp(copy.toastLinkedPrefix))).toBeVisible({
+      timeout: 5_000,
+    });
+    await expect(
+      page.getByRole('button', { name: new RegExp(`Unlink ${eventTitle.slice(0, 6)}`) }),
+    ).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('G: Escape closes the picker and restores focus to the trigger', async ({ page }) => {
+    tenant = await createTestTenant();
+    const task = await seedTask(tenant, `Links G ${Date.now().toString(36)}`);
+
+    await injectAuth(page.context(), tenant);
+    await openTaskDetail(page, task.id, task.title);
+
+    const trigger = page.getByRole('button', { name: copy.trigger }).first();
+    await trigger.click();
+
+    const picker = page.getByRole('dialog', { name: copy.trigger });
+    await expect(picker).toBeVisible({ timeout: 5_000 });
+    await expect(picker.getByRole('combobox')).toBeFocused();
+
+    await page.keyboard.press('Escape');
+
+    await expect(picker).toBeHidden({ timeout: 5_000 });
+    await expect(trigger).toBeFocused();
+  });
+
+  /** H: error state — initial GET fails => local LinkedEventsError mounts. */
+  test('H: failed initial GET mounts the LinkedEventsError fallback (role=alert)', async ({
+    page,
+  }) => {
+    tenant = await createTestTenant();
+    const task = await seedTask(tenant, `Links H ${Date.now().toString(36)}`);
+
+    // Intercept the linked-events list GET only. The SDK path is
+    // `/tasks/{id}/linked-events` (no workspace prefix), so the glob
+    // is scoped narrowly enough to avoid catching POST /tasks or any
+    // other unrelated endpoint while still matching the failure target.
+    await page.route('**/tasks/*/linked-events', async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: '{"code":"server_error","message":"forced for E2E"}',
+        });
+        return;
+      }
+      await route.continue();
+    });
+
+    await injectAuth(page.context(), tenant);
+    await page.goto(`/tasks/${task.id}`);
+
+    // The task title still renders (the task GET is untouched), so wait
+    // on it as the readiness signal before asserting on the section.
+    await expect(page.getByText(task.title).first()).toBeVisible({ timeout: 15_000 });
+
+    // The section's local ErrorBoundary mounts LinkedEventsError, which
+    // exposes role="alert" and the localised `error.fetchFailed` copy.
+    const alert = page.getByRole('alert').filter({ hasText: copy.errorFetchFailed });
+    await expect(alert).toBeVisible({ timeout: 10_000 });
+  });
+
+  /** I: locale ja — empty state renders the Japanese section title. */
+  test('I: ja locale renders the Japanese section title on empty state', async ({ browser }) => {
+    // The web app's auth bootstrap calls `setLanguage(user.locale)` after
+    // login, which overrides any localStorage value `addInitScript` could
+    // pre-set. Registration-time locale is the proven knob — same pattern
+    // used by the calendar-event-dialog ja spec.
+    tenant = await createTestTenant({ locale: 'ja' });
+    const task = await seedTask(tenant, `Links I ${Date.now().toString(36)}`);
+
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    try {
+      await injectAuth(context, tenant);
+      const page = await context.newPage();
+      await page.goto(`/tasks/${task.id}`);
+      await expect(page.getByText(task.title).first()).toBeVisible({ timeout: 15_000 });
+
+      // The Japanese section.title is "関連イベント".
+      await expect(page.getByRole('heading', { name: copy.jaSectionTitle })).toBeVisible({
+        timeout: 10_000,
+      });
+    } finally {
+      await context.close();
+    }
+  });
+
+  /* ─────────────────────────────────────────────────────────── */
+
+  test.describe('mobile viewport', () => {
+    test.use({ viewport: { width: 375, height: 812 } });
+
+    /** J: 375x812 mobile — header title + Link event trigger both visible. */
+    test('J: mobile renders section header and trigger without overflow', async ({ page }) => {
+      tenant = await createTestTenant();
+      const task = await seedTask(tenant, `Links J ${Date.now().toString(36)}`);
+
+      await injectAuth(page.context(), tenant);
+      await openTaskDetail(page, task.id, task.title);
+
+      // The disclosure heading must stay visible at iPhone-class widths
+      // (no clipping into a hidden overflow column).
+      await expect(page.getByRole('heading', { name: copy.sectionTitle })).toBeVisible({
+        timeout: 5_000,
+      });
+
+      // The header "Link event" trigger button must also remain reachable.
+      // `.first()` because the empty state CTA shares the same accessible
+      // name and matches twice on a freshly-seeded task.
+      await expect(page.getByRole('button', { name: copy.trigger }).first()).toBeVisible({
+        timeout: 5_000,
+      });
+    });
   });
 });

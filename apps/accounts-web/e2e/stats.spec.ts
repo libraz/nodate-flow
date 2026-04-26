@@ -29,6 +29,7 @@ import { expect, test } from '@playwright/test';
 
 import enAdmin from '../locales/en/admin.json' with { type: 'json' };
 import enInstanceStats from '../locales/en/instanceStats.json' with { type: 'json' };
+import jaInstanceStats from '../locales/ja/instanceStats.json' with { type: 'json' };
 import { loadTenants } from './fixtures/load-tenants';
 import { injectAuth } from './fixtures/tenant';
 
@@ -43,7 +44,10 @@ const copy = {
   refreshing: enInstanceStats.actions.refreshing,
   placeholderTitle: enInstanceStats.placeholder.title,
   placeholderBody: enInstanceStats.placeholder.body,
+  errorFetchFailed: enInstanceStats.error.fetchFailed,
+  errorRetry: enInstanceStats.error.retry,
   navStats: enAdmin.nav.stats,
+  jaPageTitle: jaInstanceStats.page.title,
 } as const;
 
 /**
@@ -180,5 +184,92 @@ test.describe('admin instance stats dashboard', () => {
 
     await expect(page).toHaveURL(/\/admin\/stats$/);
     await expect(page.getByRole('heading', { name: copy.pageTitle, level: 1 })).toBeVisible();
+  });
+
+  /** E: 500 from /admin/instance-stats surfaces an inline alert with retry. */
+  test('E: error response surfaces inline alert with fetchFailed copy', async ({ page }) => {
+    const { admin } = loadTenants();
+    await injectAuth(page.context(), admin);
+
+    // Stub the stats endpoint to fail before any navigation so the
+    // very first fetch from the page resolves to 500. The route file
+    // renders an inline `role="alert"` with `error.fetchFailed` and a
+    // `error.retry` button when `query.isError` is true.
+    await page.route('**/admin/instance-stats', (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: '{"code":"server_error"}',
+      }),
+    );
+
+    await page.goto('/admin/stats');
+    await page.waitForLoadState('networkidle');
+
+    const alert = page.getByRole('alert');
+    await expect(alert).toBeVisible();
+    await expect(alert).toContainText(copy.errorFetchFailed);
+    await expect(alert.getByRole('button', { name: copy.errorRetry })).toBeVisible();
+  });
+
+  /** F: i18n locale=ja renders the Japanese page title from the bundle. */
+  test('F: locale=ja renders Japanese page title', async ({ page }) => {
+    const { admin } = loadTenants();
+    await injectAuth(page.context(), admin);
+
+    // Force the i18next language *before* the SPA boots. Both keys are
+    // needed because the app reads `nf.lang` for its own selector and
+    // `i18nextLng` for the i18next detector.
+    await page.addInitScript(() => {
+      localStorage.setItem('i18nextLng', 'ja');
+      localStorage.setItem('nf.lang', 'ja');
+    });
+
+    await page.goto('/admin/stats');
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.getByRole('heading', { name: copy.jaPageTitle, level: 1 })).toBeVisible();
+  });
+
+  test.describe('mobile viewport', () => {
+    test.use({ viewport: { width: 375, height: 812 } });
+
+    test.beforeEach(() => {
+      // Nested describes run their own `beforeEach` chain, but the
+      // outer skip guard still fires first (Playwright walks parent
+      // hooks). Re-asserting here keeps the case self-contained and
+      // matches the "skip when admin grant failed" pattern used above.
+      const { adminGranted } = loadTenants();
+      test.skip(
+        !adminGranted,
+        'Admin grant failed — instance already has an admin from a prior run',
+      );
+    });
+
+    /** G: 375x812 viewport still renders both KPI labels without overflow. */
+    test('G: mobile renders both KPI labels without overflow', async ({ page }) => {
+      const { admin } = loadTenants();
+      await injectAuth(page.context(), admin);
+
+      await page.goto('/admin/stats');
+      await page.waitForLoadState('networkidle');
+
+      const usersLabel = page.getByText(copy.usersTitle, { exact: true });
+      const workspacesLabel = page.getByText(copy.workspacesTitle, { exact: true });
+      await expect(usersLabel).toBeVisible();
+      await expect(workspacesLabel).toBeVisible();
+
+      // Overflow check: the rendered box of each KPI label must fit
+      // inside the 375px viewport. We allow a small tolerance for
+      // sub-pixel layout rounding.
+      for (const label of [usersLabel, workspacesLabel]) {
+        const box = await label.boundingBox();
+        expect(box).not.toBeNull();
+        if (box) {
+          expect(box.x).toBeGreaterThanOrEqual(-1);
+          expect(box.x + box.width).toBeLessThanOrEqual(375 + 1);
+        }
+      }
+    });
   });
 });

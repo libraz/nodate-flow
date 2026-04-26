@@ -197,18 +197,44 @@ export async function cleanupTenant(tenant: TestTenant): Promise<void> {
 }
 
 /**
+ * Optional shaping arguments accepted by {@link createTask}.
+ *
+ * @property priority Initial task priority (0..4). Defaults to whatever
+ *   the backend assigns (currently 0). Useful for E2E tests that need
+ *   to coerce the deterministic AI priority engine into producing a
+ *   suggestion (a low current priority + an overdue dueOn maximises
+ *   the score delta — see priorityopt.go).
+ * @property dueOn Due date in `YYYY-MM-DD` form. Pass yesterday's
+ *   date to mark the task as overdue, which adds +2.5 to the engine
+ *   score and guarantees a priority-bump suggestion in a fresh tenant.
+ */
+export interface CreateTaskOptions {
+  priority?: number;
+  dueOn?: string;
+}
+
+/**
  * Creates a task inside the tenant's default project via REST and
  * returns its title. Used by the smoke spec to seed a row whose title
  * the UI must then render.
+ *
+ * Pass {@link CreateTaskOptions} when a test needs to control the
+ * task's initial priority and/or due date — for example, the AI
+ * priority suggestion E2E seeds an overdue P0 task to guarantee one
+ * deterministic suggestion surfaces in the freshly-created tenant.
  */
 export async function createTask(
   tenant: TestTenant,
   title: string,
+  options: CreateTaskOptions = {},
 ): Promise<{ id: string; title: string }> {
+  const body: Record<string, unknown> = { title, projectId: tenant.projectId };
+  if (typeof options.priority === 'number') body.priority = options.priority;
+  if (typeof options.dueOn === 'string') body.dueOn = options.dueOn;
   const res = await postJson<{ id: string; title: string }>(
     API_BASE_URL,
     '/tasks',
-    { title, projectId: tenant.projectId },
+    body,
     tenant.accessToken,
   );
   return res;
