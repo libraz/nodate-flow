@@ -8,7 +8,6 @@ import enAiAgents from '../../locales/en/aiAgents.json';
 import enAiMetrics from '../../locales/en/aiMetrics.json';
 import enAiPriority from '../../locales/en/aiPriority.json';
 import enArchive from '../../locales/en/archive.json';
-import enAuth from '../../locales/en/auth.json';
 import enCalendarEvents from '../../locales/en/calendar-events.json';
 import enCommon from '../../locales/en/common.json';
 import enConstraints from '../../locales/en/constraints.json';
@@ -29,7 +28,6 @@ import jaAiAgents from '../../locales/ja/aiAgents.json';
 import jaAiMetrics from '../../locales/ja/aiMetrics.json';
 import jaAiPriority from '../../locales/ja/aiPriority.json';
 import jaArchive from '../../locales/ja/archive.json';
-import jaAuth from '../../locales/ja/auth.json';
 import jaCalendarEvents from '../../locales/ja/calendar-events.json';
 import jaCommon from '../../locales/ja/common.json';
 import jaConstraints from '../../locales/ja/constraints.json';
@@ -50,7 +48,6 @@ import zhAiAgents from '../../locales/zh/aiAgents.json';
 import zhAiMetrics from '../../locales/zh/aiMetrics.json';
 import zhAiPriority from '../../locales/zh/aiPriority.json';
 import zhArchive from '../../locales/zh/archive.json';
-import zhAuth from '../../locales/zh/auth.json';
 import zhCalendarEvents from '../../locales/zh/calendar-events.json';
 import zhCommon from '../../locales/zh/common.json';
 import zhConstraints from '../../locales/zh/constraints.json';
@@ -127,7 +124,6 @@ export function initI18n(): typeof i18n {
       resources: {
         en: {
           archive: enArchive,
-          auth: enAuth,
           common: enCommon,
           settings: enSettings,
           inbox: enInbox,
@@ -150,7 +146,6 @@ export function initI18n(): typeof i18n {
         },
         ja: {
           archive: jaArchive,
-          auth: jaAuth,
           common: jaCommon,
           settings: jaSettings,
           inbox: jaInbox,
@@ -173,7 +168,6 @@ export function initI18n(): typeof i18n {
         },
         zh: {
           archive: zhArchive,
-          auth: zhAuth,
           common: zhCommon,
           settings: zhSettings,
           inbox: zhInbox,
