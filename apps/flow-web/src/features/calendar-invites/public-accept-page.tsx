@@ -15,7 +15,7 @@ import { useTranslation } from 'react-i18next';
 import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
 
-import { ApiError, toApiError } from '../../lib/api-error';
+import { ApiError, formatApiError, toApiError } from '../../lib/api-error';
 import { sdk } from '../../lib/sdk';
 
 type RsvpChoice = 'accepted' | 'tentative' | 'declined';
@@ -142,7 +142,9 @@ function AcceptInviteForm({ token }: AcceptInviteFormProps): ReactElement {
               }}
               role="alert"
             >
-              {isNotFound ? t('invites.accept.not_found') : t('invites.accept.error_generic')}
+              {isNotFound
+                ? t('invites.accept.not_found')
+                : formatApiError(error, t, 'invites.accept.error_generic')}
             </p>
           ) : null}
 

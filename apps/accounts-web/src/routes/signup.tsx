@@ -21,6 +21,7 @@ import {
   selectIsAuthenticated,
   useAuth,
 } from '../features/auth/auth-store';
+import OAuthButtonRow from '../features/oauth/oauth-button-row';
 import type { ProblemJson } from '../lib/api-error';
 import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../lib/auth-errors';
 import { sdk } from '../lib/sdk';
@@ -180,6 +181,8 @@ function SignupPage(): ReactElement {
         <Button type="submit" variant="primary" disabled={isSubmitting}>
           {isSubmitting ? t('signup.submitting') : t('signup.submit')}
         </Button>
+
+        <OAuthButtonRow mode="signup" onError={setServerError} />
 
         <p
           style={{

@@ -60,7 +60,7 @@ export default function TriageSuggestionRow({
               {suggestion.recommendedAction}
             </span>
           </div>
-          <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--nf-color-fg)' }}>
+          <p style={{ margin: 0, fontSize: 'var(--nf-text-sm)', color: 'var(--nf-color-fg)' }}>
             {suggestion.reasoning}
           </p>
         </div>

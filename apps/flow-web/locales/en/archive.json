@@ -1,0 +1,58 @@
+{
+  "page": {
+    "title": "Archive",
+    "subtitle": "Tasks you've stored away. Nothing is gone.",
+    "countWithLast": "{count, plural, one {# task} other {# tasks}} · last archived {ago}"
+  },
+  "filters": {
+    "searchPlaceholder": "Search archived tasks…",
+    "range": {
+      "7d": "7 days",
+      "30d": "30 days",
+      "90d": "90 days",
+      "all": "All"
+    },
+    "project": "Project",
+    "archiver": "Archiver",
+    "anyProject": "Any project",
+    "anyArchiver": "Any teammate"
+  },
+  "chapter": {
+    "thisWeek": "This week",
+    "earlierThisMonth": "Earlier this month",
+    "thisQuarter": "This quarter",
+    "thisYear": "This year",
+    "older": "Older"
+  },
+  "row": {
+    "archivedAgo": "archived {ago}",
+    "unarchive": "Unarchive",
+    "viewDetail": "View detail",
+    "selectAria": "Select task {title}"
+  },
+  "list": {
+    "loadingMore": "Loading more…"
+  },
+  "bulk": {
+    "selectedCount": "{count, plural, one {# selected} other {# selected}}",
+    "unarchiveCount": "{count, plural, one {Unarchive 1 task} other {Unarchive # tasks}}",
+    "cancel": "Cancel"
+  },
+  "empty": {
+    "noneTitle": "Nothing stored yet",
+    "noneBody": "When you archive a task, it'll be safely kept here.",
+    "noneCta": "Browse open tasks",
+    "filteredTitle": "Couldn't find any matching archive",
+    "filteredBody": "Try widening your time range or clearing project filter.",
+    "filteredCta": "Clear filters"
+  },
+  "error": {
+    "fetchFailed": "Couldn't load your archive. Please try again.",
+    "unarchiveFailed": "Couldn't unarchive \"{title}\". Please retry.",
+    "retry": "Retry"
+  },
+  "toast": {
+    "unarchivedOne": "Restored \"{title}\".",
+    "unarchivedMany": "Restored {count} tasks."
+  }
+}

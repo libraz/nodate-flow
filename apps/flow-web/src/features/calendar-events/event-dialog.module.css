@@ -26,6 +26,26 @@
   padding-inline-end: var(--nf-space-1);
 }
 
+/*
+ * Wrapper around the kind-specific morph zone. Each kind ('task',
+ * 'event', 'block', 'free', 'milestone') renders a different field set
+ * with substantially different intrinsic heights — task needs project +
+ * priority, event needs showAs + location, block needs preset chips +
+ * optional custom label. Without a fixed `min-block-size` on the
+ * wrapper, the whole dialog body reflows during the 180 ms fade as the
+ * outgoing block collapses to 0 and the incoming block expands from 0.
+ *
+ * The value below is sized for the tallest variant (Block, when the
+ * 'custom' preset is selected and reveals the secondary input). It is
+ * declared in `rem` so it scales with the user's root font size, and
+ * the bottom is allowed to grow naturally (`min-block-size`, not
+ * `block-size`) so an unusually tall variant — or a future kind — does
+ * not get clipped.
+ */
+.kindMorphZone {
+  min-block-size: 8rem;
+}
+
 .kindBlock {
   animation: morphIn var(--nf-duration-base) var(--nf-ease-emphasized);
 }

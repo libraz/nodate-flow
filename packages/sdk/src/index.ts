@@ -55,3 +55,6 @@ export {
   groupTimezonesByRegion,
   formatTimezoneLabel,
 } from './region.js';
+
+// Avatar URL helpers (auth-api proxy)
+export { buildAvatarUrl } from './avatar.js';

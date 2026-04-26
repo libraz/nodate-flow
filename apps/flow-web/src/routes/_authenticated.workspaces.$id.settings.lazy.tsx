@@ -41,7 +41,16 @@ interface SubNavItem {
     | '/workspaces/$id/settings/audit-log';
 }
 
-const SUB_NAV: readonly SubNavItem[] = [
+/**
+ * Audit log is a forward-looking section: the backend handler isn't
+ * registered yet, so the sidebar link is hidden by default and only
+ * shown when the build advertises the capability via
+ * `VITE_NF_FEATURE_AUDIT_LOG=1`. The route itself remains reachable by
+ * direct URL for early dev preview.
+ */
+const AUDIT_LOG_ENABLED = (import.meta.env.VITE_NF_FEATURE_AUDIT_LOG as string | undefined) === '1';
+
+const BASE_SUB_NAV: readonly SubNavItem[] = [
   { key: 'general', to: '/workspaces/$id/settings/general' },
   { key: 'data', to: '/workspaces/$id/settings/data' },
   { key: 'public_shares', to: '/workspaces/$id/settings/public-shares' },
@@ -52,8 +61,11 @@ const SUB_NAV: readonly SubNavItem[] = [
   { key: 'auto_actions', to: '/workspaces/$id/settings/auto-actions' },
   { key: 'ai_activity', to: '/workspaces/$id/settings/ai-activity' },
   { key: 'weekly_digest', to: '/workspaces/$id/settings/weekly-digest' },
-  { key: 'audit_log', to: '/workspaces/$id/settings/audit-log' },
 ];
+
+const SUB_NAV: readonly SubNavItem[] = AUDIT_LOG_ENABLED
+  ? [...BASE_SUB_NAV, { key: 'audit_log', to: '/workspaces/$id/settings/audit-log' }]
+  : BASE_SUB_NAV;
 
 function labelKeyFor(
   key: SubNavKey,

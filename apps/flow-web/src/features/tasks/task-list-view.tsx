@@ -7,6 +7,7 @@
  * inline editing for title (double-click), priority (click), and due date (click).
  */
 
+import Button from '@nodate-flow/ui/primitives/button';
 import DataGrid from '@nodate-flow/ui/primitives/data-grid';
 import DatePicker from '@nodate-flow/ui/primitives/date-picker';
 import Input from '@nodate-flow/ui/primitives/input';
@@ -26,7 +27,7 @@ import {
   type TaskPriority,
   useDeleteTask,
   useReorderTasks,
-  useTasksQuery,
+  useTasksInfiniteQuery,
   useUpdateTask,
 } from './api';
 import { PRIORITY_COLOR, PRIORITY_KEY, STATE_COLOR, STATE_KEY } from './constants';
@@ -82,29 +83,18 @@ function BulkActionBar({
     }
   }, [selectedIds, deleteTask, onClear, t]);
 
-  const btnStyle: React.CSSProperties = {
-    padding: '0.375rem 0.75rem',
-    borderRadius: '0.375rem',
-    border: '1px solid var(--nf-color-border, var(--nf-color-hairline))',
-    background: 'var(--nf-color-surface))',
-    color: 'var(--nf-color-fg)',
-    fontSize: '0.8125rem',
-    cursor: busy ? 'wait' : 'pointer',
-    opacity: busy ? 0.5 : 1,
-  };
-
   return (
     <div
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '0.5rem',
-        padding: '0.5rem 0.75rem',
-        borderRadius: '0.5rem',
-        background: 'var(--nf-color-accent, var(--nf-color-accent))',
-        color: 'white',
-        fontSize: '0.8125rem',
-        marginBottom: '0.5rem',
+        gap: 'var(--nf-space-2)',
+        padding: 'var(--nf-space-2) var(--nf-space-3)',
+        borderRadius: 'var(--nf-radius-md)',
+        background: 'var(--nf-color-accent)',
+        color: 'var(--nf-color-fg-on-accent)',
+        fontSize: 'var(--nf-text-sm)',
+        marginBottom: 'var(--nf-space-2)',
       }}
     >
       <span style={{ fontWeight: 600 }}>
@@ -112,13 +102,9 @@ function BulkActionBar({
       </span>
       <span style={{ flex: 1 }} />
 
-      <select
+      <Select
         aria-label={t('tasks.bulk.set_priority')}
         disabled={busy}
-        style={{
-          ...btnStyle,
-          appearance: 'auto',
-        }}
         defaultValue=""
         onChange={(e) => {
           if (e.target.value) {
@@ -135,25 +121,29 @@ function BulkActionBar({
         <option value="2">{t('tasks.priority.medium')}</option>
         <option value="3">{t('tasks.priority.high')}</option>
         <option value="4">{t('tasks.priority.urgent')}</option>
-      </select>
+      </Select>
 
-      <button
+      <Button
         type="button"
+        variant="danger"
+        size="sm"
         disabled={busy}
-        style={{ ...btnStyle, color: 'var(--nf-color-danger, #c0392b)' }}
+        aria-busy={busy}
         onClick={() => void handleBulkDelete()}
       >
         {t('tasks.bulk.delete')}
-      </button>
+      </Button>
 
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="sm"
         disabled={busy}
-        style={{ ...btnStyle, border: 'none', background: 'transparent', color: 'inherit' }}
+        aria-busy={busy}
         onClick={onClear}
       >
         {t('tasks.bulk.clear')}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -426,7 +416,7 @@ function InlineDueCell({
         }
       }}
       style={{
-        color: overdue ? 'var(--nf-color-danger, #c0392b)' : undefined,
+        color: overdue ? 'var(--nf-color-danger)' : undefined,
         fontWeight: overdue ? 600 : undefined,
         cursor: 'pointer',
       }}
@@ -441,7 +431,13 @@ function InlineDueCell({
 export default function TaskListView({ projectId }: TaskListViewProps): ReactElement {
   const { t, i18n } = useTranslation('common');
   const filters = useTaskFilters(projectId);
-  const { data: tasks } = useTasksQuery(projectId, filters);
+  // Cursor-paginated infinite list. We flat-map pages here — the order is
+  // stable because the cursor is keyset (created_at, id) on the server.
+  const { data, hasNextPage, isFetchingNextPage, fetchNextPage } = useTasksInfiniteQuery(
+    projectId,
+    filters,
+  );
+  const tasks = data.pages.flatMap((p) => p.tasks);
   const { data: edges } = useProjectDependenciesQuery(projectId);
   const blockedByOpen = computeBlockedByOpen(edges);
   const locale = i18n.resolvedLanguage ?? 'en';
@@ -449,6 +445,37 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
   const reorderTasks = useReorderTasks();
   const navigate = useNavigate();
   const inlineEdit = useInlineEdit();
+  const gridRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Auto-fetch the next page when the sentinel below the grid enters the
+  // grid's own scroll viewport. The sentinel is placed inside the same
+  // scroll container so a stable IntersectionObserver root suffices.
+  useEffect(() => {
+    if (!hasNextPage) return;
+    const root = gridRef.current;
+    const sentinel = sentinelRef.current;
+    if (!root || !sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
+            void fetchNextPage();
+          }
+        }
+      },
+      { root, rootMargin: '200px 0px', threshold: 0 },
+    );
+    observer.observe(sentinel);
+    return () => {
+      observer.disconnect();
+    };
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  const handleLoadMore = useCallback((): void => {
+    if (!hasNextPage || isFetchingNextPage) return;
+    void fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
@@ -554,7 +581,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
             userSelect: 'none',
             opacity: dragIdx === row.index ? 0.4 : 1,
             color: 'var(--nf-color-fg-muted)',
-            fontSize: '0.75rem',
+            fontSize: 'var(--nf-text-xs)',
             lineHeight: 1,
           }}
         >
@@ -594,7 +621,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
               display: 'inline-flex',
               alignItems: 'center',
               gap: '0.25rem',
-              fontSize: '0.75rem',
+              fontSize: 'var(--nf-text-xs)',
               fontWeight: 500,
               padding: '0.125rem 0.5rem',
               borderRadius: '999px',
@@ -632,7 +659,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
               display: 'inline-flex',
               alignItems: 'center',
               gap: '0.25rem',
-              color: 'var(--nf-color-danger, #c0392b)',
+              color: 'var(--nf-color-danger)',
               fontVariantNumeric: 'tabular-nums',
             }}
             title={t('tasks.card.blockedBy', { count })}
@@ -665,7 +692,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
                 inlineSize: '0.5rem',
                 blockSize: '0.5rem',
                 borderRadius: '999px',
-                background: 'var(--nf-color-accent, #9b59b6)',
+                background: 'var(--nf-color-accent)',
               }}
             />
             {t('tasks.assignee.count', { count })}
@@ -723,6 +750,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
         <BulkActionBar selectedIds={selectedIds} onClear={handleClearSelection} />
       )}
       <DataGrid<TaskListItem>
+        ref={gridRef}
         aria-label={t('tasks.title')}
         columns={columns}
         data={tasks}
@@ -734,6 +762,38 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
         selectRowLabel={(index) => t('tasks.list.select_row', { index })}
         style={{ minBlockSize: '20rem' }}
       />
+      {/*
+        Sentinel + manual fallback. The IntersectionObserver above watches
+        this div inside the grid's own scroll viewport so we trigger the
+        next page when the user scrolls within ~200px of the end.
+        The button is shown as a fallback for keyboard users / when the
+        observer doesn't fire (e.g. very short lists).
+      */}
+      {hasNextPage ? (
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            padding: 'var(--nf-space-3)',
+          }}
+        >
+          <div
+            ref={sentinelRef}
+            aria-hidden="true"
+            style={{ inlineSize: '100%', blockSize: '1px' }}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={isFetchingNextPage}
+            aria-busy={isFetchingNextPage}
+            onClick={handleLoadMore}
+          >
+            {isFetchingNextPage ? t('tasks.list.loading_more') : t('tasks.list.load_more')}
+          </Button>
+        </div>
+      ) : null}
     </>
   );
 }

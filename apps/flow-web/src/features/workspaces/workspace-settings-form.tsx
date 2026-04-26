@@ -9,7 +9,6 @@
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
-import { confirm } from '@nodate-flow/ui/primitives/confirm';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
@@ -18,6 +17,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { type FormEvent, Fragment, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { confirmAction } from '../../lib/confirm-action';
 import { clearActiveWorkspaceId } from '../../lib/use-current-workspace';
 import { selectUser, useAuth } from '../auth/auth-store';
 import {
@@ -87,7 +87,7 @@ export default function WorkspaceSettingsForm({
   };
 
   const handleDelete = async (): Promise<void> => {
-    const ok = await confirm.ask({
+    const ok = await confirmAction({
       title: t('workspace.general.danger.confirm.title'),
       message: t('workspace.general.danger.confirm.body', { name: workspace.name }),
       confirmLabel: t('workspace.general.danger.confirm.submit'),
@@ -149,8 +149,12 @@ export default function WorkspaceSettingsForm({
         style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}
       >
         <header style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <h1 style={{ margin: 0, fontSize: '1.5rem' }}>{t('workspace.general.title')}</h1>
-          <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
+          <h1 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)' }}>
+            {t('workspace.general.title')}
+          </h1>
+          <p
+            style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}
+          >
             {t('workspace.general.description')}
           </p>
         </header>
@@ -242,10 +246,19 @@ export default function WorkspaceSettingsForm({
             }}
           />
           <header style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-            <h2 id="workspace-danger-zone-heading" style={{ margin: 0, fontSize: '1.25rem' }}>
+            <h2
+              id="workspace-danger-zone-heading"
+              style={{ margin: 0, fontSize: 'var(--nf-text-xl)' }}
+            >
               {t('workspace.general.danger.title')}
             </h2>
-            <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
+            <p
+              style={{
+                margin: 0,
+                color: 'var(--nf-color-fg-muted)',
+                fontSize: 'var(--nf-text-sm)',
+              }}
+            >
               {t('workspace.general.danger.description')}
             </p>
           </header>

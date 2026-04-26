@@ -86,6 +86,12 @@
       "page_of": "第 {current} / {total} 页"
     }
   },
+  "audit": {
+    "empty": {
+      "title": "敬请期待",
+      "body": "此服务器尚不支持审计日志，请在下次更新后再来查看。"
+    }
+  },
   "sections_label": "工作区设置板块",
   "settings_sections_label": "设置板块",
   "access_restricted": {
@@ -111,9 +117,12 @@
   "profile": {
     "title": "个人资料",
     "display_name": "显示名称",
-    "locale": "语言",
-    "locale_en": "English",
-    "locale_ja": "日本語",
+    "locale": {
+      "label": "语言",
+      "en": "English",
+      "ja": "日本語",
+      "zh": "中文"
+    },
     "timezone": "时区",
     "country": "国家/地区",
     "country_help": "用于在日历中显示对应的法定假日。留空则不显示。",
@@ -153,7 +162,10 @@
       "removed": "已移除头像。",
       "updated": "已更新头像。",
       "alt": "{name} 的头像",
-      "empty_alt": "暂无头像"
+      "empty_alt": "暂无头像",
+      "upload_aria": "上传头像",
+      "replace_aria": "更换头像",
+      "delete_aria": "删除头像"
     },
     "validation": {
       "display_name_required": "请填写显示名称。",

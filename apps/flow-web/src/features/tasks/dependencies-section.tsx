@@ -101,7 +101,9 @@ export default function DependenciesSection({
       style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
     >
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h2 style={{ margin: 0, fontSize: '1.125rem' }}>{t('tasks.detail.dependencies.title')}</h2>
+        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-lg)' }}>
+          {t('tasks.detail.dependencies.title')}
+        </h2>
         {!picking ? (
           <Button
             type="button"
@@ -205,7 +207,7 @@ function DependencyGroup({
           display: 'flex',
           alignItems: 'center',
           gap: '0.5rem',
-          fontSize: '0.75rem',
+          fontSize: 'var(--nf-text-xs)',
           textTransform: 'uppercase',
           letterSpacing: '0.05em',
           color: 'var(--nf-color-fg-muted)',

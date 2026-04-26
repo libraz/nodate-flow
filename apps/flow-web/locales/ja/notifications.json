@@ -2,7 +2,9 @@
   "view": {
     "title": "通知",
     "empty": "通知はありません",
-    "mark_all_read": "すべて既読にする"
+    "mark_all_read": "すべて既読にする",
+    "load_more": "さらに読み込む",
+    "loading_more": "通知を読み込んでいます…"
   },
   "action": {
     "mark_read": "既読にする",

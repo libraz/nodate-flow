@@ -8,6 +8,21 @@
  * calendar list. The create/edit dialog does — it must bind a `calId`
  * to POST / PATCH `/workspaces/{wsId}/calendars/{calId}/events[/{evtId}]`.
  * These hooks isolate that lookup and the "remember last used" policy.
+ *
+ * Cache invalidation policy (W5)
+ * ------------------------------
+ *   - Event Create / Update / Delete → invalidate the two calendar
+ *     aggregate roots (`['calendar', 'me-events']` and
+ *     `['calendar', 'me-tasks']`) via {@link invalidateCalendarAggregates}.
+ *     Event-detail key invalidation lives in `events/api.ts`; this
+ *     module focuses on the grid.
+ *   - {@link useCreateCalendarTask} → invalidate
+ *     `['calendar', 'me-tasks']` and `['me', 'tasks']` so both the
+ *     calendar grid and any "my tasks" surface pick up the new row.
+ *     This is intentionally narrower than the cross-project list nuke
+ *     in tasks/api.ts because the dialog only ever creates a task in
+ *     a single project at a time and the grid is the only surface
+ *     that observes the result.
  */
 
 import type { components } from '@nodate-flow/sdk';

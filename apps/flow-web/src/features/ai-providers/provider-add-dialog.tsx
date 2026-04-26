@@ -110,7 +110,7 @@ export default function ProviderAddDialog({
         }}
         style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
       >
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}>
           {t('providers.write_only_notice')}
         </p>
 

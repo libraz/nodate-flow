@@ -1,0 +1,56 @@
+{
+  "section": {
+    "title": "关联日程",
+    "expand": "展开关联日程",
+    "collapse": "收起关联日程",
+    "count": "{count, plural, other {#个关联}}"
+  },
+  "trigger": {
+    "linkEvent": "关联日程"
+  },
+  "kind": {
+    "contributesTo": "服务于",
+    "blocks": "阻塞",
+    "label": "关联方式"
+  },
+  "row": {
+    "unlink": "取消关联",
+    "unlinkAria": "取消关联「{title}」",
+    "openEvent": "打开「{title}」"
+  },
+  "time": {
+    "today": "今天 {time}",
+    "tomorrow": "明天 {time}",
+    "yesterday": "昨天",
+    "inDays": "{days, plural, other {#天后 · {time}}}",
+    "lastWeekday": "上{weekday}",
+    "absolute": "{date} {time}",
+    "absoluteAllDay": "{date}",
+    "allDay": "全天"
+  },
+  "picker": {
+    "searchPlaceholder": "搜索日程…",
+    "noResults": "未找到匹配「{q}」的日程。",
+    "alreadyLinked": "已关联",
+    "pastDivider": "过去",
+    "esc": "Esc",
+    "loading": "搜索中…"
+  },
+  "empty": {
+    "title": "尚未关联日程",
+    "body": "把这个任务与会议或截止时间连接起来吧。",
+    "cta": "关联日程"
+  },
+  "toast": {
+    "linked": "已关联「{title}」。",
+    "unlinked": "已取消关联「{title}」。",
+    "undo": "撤销",
+    "linkFailed": "未能关联日程，请重试。",
+    "unlinkFailed": "未能取消关联，请重试。",
+    "alreadyLinkedError": "该日程已经关联过了。"
+  },
+  "error": {
+    "fetchFailed": "未能加载关联日程。",
+    "retry": "重试"
+  }
+}

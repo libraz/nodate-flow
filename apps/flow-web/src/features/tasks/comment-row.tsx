@@ -124,7 +124,7 @@ export default function CommentRow({
             style={{
               color: 'var(--nf-color-fg-muted)',
               fontVariantNumeric: 'tabular-nums',
-              fontSize: '0.875rem',
+              fontSize: 'var(--nf-text-sm)',
             }}
           >
             {formatEpochDateTime(comment.createdAt, locale)}
@@ -133,7 +133,7 @@ export default function CommentRow({
             <span
               style={{
                 color: 'var(--nf-color-fg-muted)',
-                fontSize: '0.75rem',
+                fontSize: 'var(--nf-text-xs)',
                 fontStyle: 'italic',
               }}
             >

@@ -62,6 +62,7 @@ import { PRIORITY_COLOR, PRIORITY_KEY, STATE_KEY, STATE_TONE } from '../features
 import DependenciesSection from '../features/tasks/dependencies-section';
 import DescriptionHistoryDrawer from '../features/tasks/description-history/description-history-drawer';
 import EventFromTaskDialog from '../features/tasks/event-from-task/event-from-task-dialog';
+import LinkedEventsSection from '../features/tasks/links/linked-events-section';
 import MarkdownEditor from '../features/tasks/markdown-editor';
 import TaskAttachments from '../features/tasks/task-attachments';
 import TaskStepsPanel from '../features/tasks/task-steps-panel';
@@ -316,7 +317,7 @@ function TitleEditor({
         <p
           id={errorId}
           role="alert"
-          style={{ margin: 0, color: 'var(--nf-color-danger)', fontSize: '0.875rem' }}
+          style={{ margin: 0, color: 'var(--nf-color-danger)', fontSize: 'var(--nf-text-sm)' }}
         >
           {t('tasks.validation.title_required')}
         </p>
@@ -497,7 +498,7 @@ function TaskActionsCard({
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
   return (
     <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-      <h2 style={{ margin: 0, fontSize: '1rem' }}>{t('tasks.actions.title')}</h2>
+      <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>{t('tasks.actions.title')}</h2>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
         <Button type="button" variant="default" onClick={() => setEventDialogOpen(true)}>
           {t('tasks.actions.create_event.trigger')}
@@ -537,7 +538,7 @@ function CommentsFeed({ taskId }: { taskId: string }): ReactElement {
 
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <h2 style={{ margin: 0, fontSize: '1.125rem' }}>{t('tasks.comments.title')}</h2>
+      <h2 style={{ margin: 0, fontSize: 'var(--nf-text-lg)' }}>{t('tasks.comments.title')}</h2>
       {comments.length === 0 ? (
         <p style={{ color: 'var(--nf-color-fg-muted)', margin: 0 }}>{t('tasks.comments.empty')}</p>
       ) : (
@@ -880,7 +881,9 @@ function Sidebar({
       </Card>
 
       <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <h2 style={{ margin: 0, fontSize: '1rem' }}>{t('tasks.detail.transitions.title')}</h2>
+        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
+          {t('tasks.detail.transitions.title')}
+        </h2>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
           {legal.map((name) => (
             <Button
@@ -900,7 +903,9 @@ function Sidebar({
       <TaskActionsCard taskId={id} workspaceId={workspaceId} />
 
       <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <h2 style={{ margin: 0, fontSize: '1rem' }}>{t('tasks.detail.assignees.title')}</h2>
+        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
+          {t('tasks.detail.assignees.title')}
+        </h2>
         <Suspense
           fallback={
             <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem' }}>
@@ -949,7 +954,9 @@ function Sidebar({
       </Card>
 
       <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <h2 style={{ margin: 0, fontSize: '1rem' }}>{t('tasks.detail.infer_state.title')}</h2>
+        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
+          {t('tasks.detail.infer_state.title')}
+        </h2>
         <Suspense
           fallback={
             <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem' }}>
@@ -972,7 +979,9 @@ function Sidebar({
       </Suspense>
 
       <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <h2 style={{ margin: 0, fontSize: '1rem' }}>{t('tasks.detail.duplicates.title')}</h2>
+        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
+          {t('tasks.detail.duplicates.title')}
+        </h2>
         <Suspense
           fallback={
             <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem' }}>
@@ -985,7 +994,9 @@ function Sidebar({
       </Card>
 
       <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <h2 style={{ margin: 0, fontSize: '1rem' }}>{t('tasks.detail.ai_activity.title')}</h2>
+        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
+          {t('tasks.detail.ai_activity.title')}
+        </h2>
         <Suspense
           fallback={
             <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem' }}>
@@ -998,7 +1009,9 @@ function Sidebar({
       </Card>
 
       <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <h2 style={{ margin: 0, fontSize: '1rem' }}>{t('tasks.detail.activity.title')}</h2>
+        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
+          {t('tasks.detail.activity.title')}
+        </h2>
         <Suspense
           fallback={
             <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem' }}>
@@ -1018,7 +1031,7 @@ function RelatedTasksSection({ taskId }: { taskId: string }): ReactElement {
   const { data } = useTaskDuplicatesQuery(taskId);
   if (data.candidates.length === 0) {
     return (
-      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
+      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}>
         {t('tasks.detail.duplicates.empty')}
       </p>
     );
@@ -1057,7 +1070,7 @@ function RelatedTasksSection({ taskId }: { taskId: string }): ReactElement {
               <span
                 style={{
                   fontFamily: 'var(--font-mono)',
-                  fontSize: '0.75rem',
+                  fontSize: 'var(--nf-text-xs)',
                   color: 'var(--nf-color-fg-muted)',
                 }}
               >
@@ -1077,7 +1090,7 @@ function AiActivitySection({ taskId }: { taskId: string }): ReactElement {
   const locale = i18n.resolvedLanguage ?? 'en';
   if (invocations.length === 0) {
     return (
-      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
+      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}>
         {t('tasks.detail.ai_activity.empty')}
       </p>
     );
@@ -1103,7 +1116,7 @@ function AiActivitySection({ taskId }: { taskId: string }): ReactElement {
               <span
                 style={{
                   fontFamily: 'var(--font-mono)',
-                  fontSize: '0.75rem',
+                  fontSize: 'var(--nf-text-xs)',
                   color: 'var(--nf-color-fg-muted)',
                 }}
               >
@@ -1112,7 +1125,7 @@ function AiActivitySection({ taskId }: { taskId: string }): ReactElement {
               <span
                 style={{
                   marginInlineStart: 'auto',
-                  fontSize: '0.75rem',
+                  fontSize: 'var(--nf-text-xs)',
                   color: 'var(--nf-color-fg-muted)',
                   fontVariantNumeric: 'tabular-nums',
                 }}
@@ -1176,7 +1189,7 @@ function InferStateSection({ taskId }: { taskId: string }): ReactElement {
   const { data } = useTaskInferStateQuery(taskId);
   if (!data.proposal) {
     return (
-      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
+      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}>
         {t('tasks.detail.infer_state.empty')}
       </p>
     );
@@ -1191,7 +1204,7 @@ function InferStateSection({ taskId }: { taskId: string }): ReactElement {
         <span
           style={{
             fontFamily: 'var(--font-mono)',
-            fontSize: '0.75rem',
+            fontSize: 'var(--nf-text-xs)',
             color: 'var(--nf-color-fg-muted)',
           }}
         >
@@ -1279,9 +1292,11 @@ function useIsNarrow(): boolean {
 
 function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
   const { data: task } = useTaskQuery(id);
+  const { i18n } = useTranslation();
   const state = task.derivedState as TaskDerivedState;
   const priority = (task.priority as TaskPriority) ?? 0;
   const isNarrow = useIsNarrow();
+  const locale = i18n.resolvedLanguage ?? i18n.language ?? 'en';
 
   return (
     <section
@@ -1304,6 +1319,10 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
         <Separator />
         <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
           <DependenciesSection taskId={id} workspaceId={task.workspaceId} />
+        </Suspense>
+        <Separator />
+        <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
+          <LinkedEventsSection taskId={id} workspaceId={task.workspaceId} locale={locale} />
         </Suspense>
         <Separator />
         <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>

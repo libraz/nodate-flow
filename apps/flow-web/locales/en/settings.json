@@ -86,6 +86,12 @@
       "page_of": "Page {current} of {total}"
     }
   },
+  "audit": {
+    "empty": {
+      "title": "Coming soon",
+      "body": "The audit log isn't available yet on this server. Check back after the next update."
+    }
+  },
   "sections_label": "Workspace settings sections",
   "settings_sections_label": "Settings sections",
   "access_restricted": {
@@ -111,9 +117,12 @@
   "profile": {
     "title": "Profile",
     "display_name": "Display name",
-    "locale": "Language",
-    "locale_en": "English",
-    "locale_ja": "日本語",
+    "locale": {
+      "label": "Language",
+      "en": "English",
+      "ja": "日本語",
+      "zh": "中文"
+    },
     "timezone": "Timezone",
     "country": "Country",
     "country_help": "Used to show the right public holidays on your calendar. Leave unset for none.",
@@ -153,7 +162,10 @@
       "removed": "Profile picture removed.",
       "updated": "Profile picture updated.",
       "alt": "{name}'s profile picture",
-      "empty_alt": "No profile picture"
+      "empty_alt": "No profile picture",
+      "upload_aria": "Upload profile picture",
+      "replace_aria": "Replace profile picture",
+      "delete_aria": "Remove profile picture"
     },
     "validation": {
       "display_name_required": "Display name is required.",

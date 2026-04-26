@@ -65,7 +65,7 @@ export default function ProjectMembersTable({ projectId }: ProjectMembersTablePr
         <h2
           style={{
             fontFamily: 'var(--font-display)',
-            fontSize: '1.25rem',
+            fontSize: 'var(--nf-text-xl)',
             margin: 0,
           }}
         >

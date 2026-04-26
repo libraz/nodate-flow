@@ -14,6 +14,18 @@
  *
  * All hooks normalise errors via the shared {@link ApiError} helper so
  * route-level boundaries can branch on `code`.
+ *
+ * Cache invalidation policy (W5)
+ * ------------------------------
+ *   - Create  → invalidate the per-workspace list key.
+ *   - Update / Status transition → invalidate the per-workspace list
+ *               key (so the active-bar fan-out picks up the change)
+ *               + the timebox detail key.
+ *   - Delete  → invalidate the per-workspace list key. The detail
+ *               and tasks sub-keys disappear with the route unmount.
+ *   - Add / Remove task → invalidate the per-timebox tasks list key
+ *               + the per-workspace list key (the progress numerator
+ *               on the parent timebox depends on the task list).
  */
 
 import type { components } from '@nodate-flow/sdk';

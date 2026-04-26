@@ -58,7 +58,7 @@ const rowStyle: CSSProperties = {
 
 const labelStyle: CSSProperties = {
   margin: 0,
-  fontSize: '0.75rem',
+  fontSize: 'var(--nf-text-xs)',
   fontWeight: 500,
   color: 'var(--nf-color-fg-muted)',
   textTransform: 'uppercase',

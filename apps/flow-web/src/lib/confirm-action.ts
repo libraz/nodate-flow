@@ -14,6 +14,18 @@ export interface ConfirmActionOptions {
   message: ReactNode;
   title?: ReactNode;
   tone?: 'neutral' | 'danger';
+  /**
+   * Override the default {@code common.confirm} label on the affirmative
+   * button. Pass an already-translated string. Optional; defaults to
+   * {@code t('common.confirm')}.
+   */
+  confirmLabel?: ReactNode;
+  /**
+   * Override the default {@code common.cancel} label on the dismissive
+   * button. Pass an already-translated string. Optional; defaults to
+   * {@code t('common.cancel')}.
+   */
+  cancelLabel?: ReactNode;
 }
 
 export function confirmAction(options: ConfirmActionOptions): Promise<boolean> {
@@ -21,8 +33,8 @@ export function confirmAction(options: ConfirmActionOptions): Promise<boolean> {
   return confirm.ask({
     title: options.title ?? t('common.confirm_title'),
     message: options.message,
-    confirmLabel: t('common.confirm'),
-    cancelLabel: t('common.cancel'),
+    confirmLabel: options.confirmLabel ?? t('common.confirm'),
+    cancelLabel: options.cancelLabel ?? t('common.cancel'),
     tone: options.tone ?? 'danger',
   });
 }

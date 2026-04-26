@@ -228,7 +228,7 @@ export default function LensPicker({ workspaceId, projectId }: LensPickerProps):
                       padding: '0.125rem 0.25rem',
                       cursor: 'pointer',
                       color: 'var(--nf-color-fg-muted)',
-                      fontSize: '0.75rem',
+                      fontSize: 'var(--nf-text-xs)',
                       lineHeight: 1,
                     }}
                   >

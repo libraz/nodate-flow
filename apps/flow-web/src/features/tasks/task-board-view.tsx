@@ -1,17 +1,19 @@
 /**
  * TaskBoardView — Kanban board grouped by `derivedState`.
  *
- * Native HTML5 drag-and-drop: a task id is set on the dataTransfer payload
- * during dragstart and read during drop. The drop handler invokes
- * `useMoveTask` which currently surfaces a "not yet implemented" toast
- * (see api.ts — backend transitions go through the constraint engine).
+ * Drag-and-drop is currently disabled: until the constraint engine fully
+ * supports D&D state transitions, cards are non-draggable (`draggable=false`)
+ * and the per-column drop targets are inert. State changes go through the
+ * keyboard / pointer-accessible move menu on each card, which posts to
+ * `POST /tasks/{id}/transitions`. A short hint near each column header
+ * advertises this. Re-enabling is a one-line revert: drop the
+ * `dndDisabled` flag and pass the drag handlers back to TaskCard.
  */
 
-import { cx } from '@nodate-flow/ui/lib/cx';
 import Card from '@nodate-flow/ui/primitives/card';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { useNavigate } from '@tanstack/react-router';
-import { type DragEvent, type ReactElement, useCallback, useRef, useState } from 'react';
+import { type ReactElement, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { computeBlockedByOpen, useProjectDependenciesQuery } from '../projects/api';
@@ -21,7 +23,6 @@ import {
   type TaskDerivedState,
   type TaskListItem,
   type TransitionName,
-  transitionForDrop,
   useTasksQuery,
   useTransitionTask,
 } from './api';
@@ -33,8 +34,6 @@ import { useTaskFilters } from './use-task-filters';
 export interface TaskBoardViewProps {
   projectId: string;
 }
-
-const DRAG_MIME = 'application/x-nodate-task-id';
 
 function groupByState(tasks: readonly TaskListItem[]): Record<TaskDerivedState, TaskListItem[]> {
   const groups: Record<TaskDerivedState, TaskListItem[]> = {
@@ -61,89 +60,7 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
   const blockedByOpen = computeBlockedByOpen(edges);
   const transition = useTransitionTask();
 
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [hoverState, setHoverState] = useState<TaskDerivedState | null>(null);
-  // Counter per column to track nested dragenter/dragleave pairs. Native
-  // HTML5 D&D fires leave/enter when moving between child elements inside
-  // the same drop zone, which would otherwise cause the hover highlight to
-  // flicker on and off as the cursor crosses card boundaries.
-  const enterCountRef = useRef<Partial<Record<TaskDerivedState, number>>>({});
-
   const groups = groupByState(tasks);
-
-  const handleDragStart = (e: DragEvent<HTMLDivElement>, taskId: string): void => {
-    e.dataTransfer.setData(DRAG_MIME, taskId);
-    e.dataTransfer.effectAllowed = 'move';
-    setDraggingId(taskId);
-  };
-
-  const handleDragEnd = (): void => {
-    setDraggingId(null);
-    setHoverState(null);
-    enterCountRef.current = {};
-  };
-
-  const handleDragEnter = useCallback(
-    (e: DragEvent<HTMLElement>, state: TaskDerivedState): void => {
-      e.preventDefault();
-      const count = (enterCountRef.current[state] ?? 0) + 1;
-      enterCountRef.current[state] = count;
-      if (count === 1) setHoverState(state);
-    },
-    [],
-  );
-
-  const handleDragOver = (e: DragEvent<HTMLElement>, _state: TaskDerivedState): void => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
-
-  const handleDragLeave = useCallback((state: TaskDerivedState): void => {
-    const count = Math.max(0, (enterCountRef.current[state] ?? 0) - 1);
-    enterCountRef.current[state] = count;
-    if (count === 0) setHoverState((prev) => (prev === state ? null : prev));
-  }, []);
-
-  const handleDrop = (e: DragEvent<HTMLElement>, toState: TaskDerivedState): void => {
-    e.preventDefault();
-    const taskId = e.dataTransfer.getData(DRAG_MIME) || draggingId;
-    setDraggingId(null);
-    setHoverState(null);
-    enterCountRef.current = {};
-    if (!taskId) return;
-    const current = tasks.find((task) => task.id === taskId);
-    if (!current) return;
-    const fromState = current.derivedState as TaskDerivedState;
-    if (fromState === toState) return;
-    const resolution = transitionForDrop(fromState, toState);
-    if (!resolution) {
-      toaster.show({ tone: 'warning', message: t('tasks.errors.illegal_transition') });
-      return;
-    }
-    // When the lenient resolver routes the drop to a column other than the
-    // one the user dropped onto (e.g. dropping a `done` card on `open` lands
-    // it in `waiting`), tell the user where it actually went so the card
-    // jumping columns isn't a surprise.
-    if (resolution.landingState !== toState) {
-      toaster.show({
-        tone: 'info',
-        message: t('tasks.board.moved_to', { state: t(STATE_KEY[resolution.landingState]) }),
-      });
-    }
-    transition.mutate(
-      {
-        id: taskId,
-        transition: resolution.transition,
-        projectId,
-        optimisticState: resolution.landingState,
-      },
-      {
-        onError: () => {
-          toaster.show({ tone: 'warning', message: t('tasks.errors.move_failed') });
-        },
-      },
-    );
-  };
 
   const handleTransition = useCallback(
     (taskId: string, transitionName: TransitionName, landingState: TaskDerivedState): void => {
@@ -175,44 +92,35 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
       className={css.board}
       style={{ '--col-count': TASK_STATES.length } as React.CSSProperties}
     >
-      {TASK_STATES.map((state) => {
+      {TASK_STATES.map((state, index) => {
         const items = groups[state];
-        const isHover = hoverState === state;
         return (
-          <section
-            key={state}
-            aria-label={t(STATE_KEY[state])}
-            className={css.column}
-            onDragEnter={(e) => {
-              handleDragEnter(e, state);
-            }}
-            onDragOver={(e) => {
-              handleDragOver(e, state);
-            }}
-            onDragLeave={() => {
-              handleDragLeave(state);
-            }}
-            onDrop={(e) => {
-              handleDrop(e, state);
-            }}
-          >
+          <section key={state} aria-label={t(STATE_KEY[state])} className={css.column}>
             <Card
               style={{
                 padding: '0.75rem 1rem',
-                background: isHover ? 'var(--nf-color-bg-elevated)' : 'var(--nf-color-surface)',
-                borderColor: isHover ? 'var(--nf-color-accent)' : undefined,
+                background: 'var(--nf-color-surface)',
               }}
             >
               <header className={css.columnHeader}>
                 <span className={css.columnHeaderLabel}>{t(STATE_KEY[state])}</span>
                 <span className={css.columnHeaderCount}>{items.length}</span>
               </header>
+              {/* Show the D&D-disabled hint once, on the first column,
+                  so it isn't repeated five times across the board. */}
+              {index === 0 ? (
+                <p
+                  style={{
+                    margin: '0.5rem 0 0',
+                    fontSize: '0.75rem',
+                    color: 'var(--nf-color-fg-muted)',
+                  }}
+                >
+                  {t('tasks.board.dnd_disabled_hint')}
+                </p>
+              ) : null}
             </Card>
-            <div
-              role="list"
-              aria-label={t(STATE_KEY[state])}
-              className={cx(css.dropZone, isHover && css.dropZoneHover)}
-            >
+            <div role="list" aria-label={t(STATE_KEY[state])} className={css.dropZone}>
               {items.length === 0 ? (
                 <p className={css.emptyColumn}>{t('tasks.board.empty_column')}</p>
               ) : (
@@ -221,8 +129,6 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
                     <TaskCard
                       task={task}
                       blockedByOpenCount={blockedByOpen.get(task.id) ?? 0}
-                      onDragStart={handleDragStart}
-                      onDragEnd={handleDragEnd}
                       onSelect={handleSelect}
                       onTransition={handleTransition}
                     />

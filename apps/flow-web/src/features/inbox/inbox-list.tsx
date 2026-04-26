@@ -182,7 +182,7 @@ export default function InboxList(): ReactElement {
             display: 'flex',
             flexDirection: 'column',
             gap: '0.375rem',
-            fontSize: '0.875rem',
+            fontSize: 'var(--nf-text-sm)',
             color: 'var(--nf-color-fg-muted)',
           }}
         >
@@ -227,7 +227,7 @@ export default function InboxList(): ReactElement {
           <h2
             style={{
               margin: 0,
-              fontSize: '0.875rem',
+              fontSize: 'var(--nf-text-sm)',
               fontWeight: 600,
               color: 'var(--nf-color-fg-muted)',
               textTransform: 'uppercase',

@@ -144,10 +144,15 @@ export default function ProfileForm(): ReactElement {
     return list;
   }, [i18n.language, t]);
 
+  // The label for each segment is the language's *own* native name. Even
+  // though we route the strings through `t()` so every visible token
+  // remains explicit i18n-compliant, the values match across en/ja/zh
+  // locales: a language picker should always read "English / 日本語 / 中文",
+  // never "English / Japanese / Chinese".
   const localeOptions: SegmentedControlOption<SupportedLanguage>[] = [
-    { value: 'en', label: 'English' },
-    { value: 'ja', label: '日本語' },
-    { value: 'zh', label: '中文' },
+    { value: 'en', label: t('profile.locale.en') },
+    { value: 'ja', label: t('profile.locale.ja') },
+    { value: 'zh', label: t('profile.locale.zh') },
   ];
 
   const weekStartOptions: SegmentedControlOption<WeekStart>[] = [
@@ -293,7 +298,7 @@ export default function ProfileForm(): ReactElement {
           }}
         </FormField>
 
-        <FormField label={t('profile.locale')}>
+        <FormField label={t('profile.locale.label')}>
           {() => (
             <Controller
               name="locale"
@@ -304,7 +309,7 @@ export default function ProfileForm(): ReactElement {
                   value={field.value}
                   onChange={handleLocaleChange}
                   options={localeOptions}
-                  ariaLabel={t('profile.locale')}
+                  ariaLabel={t('profile.locale.label')}
                 />
               )}
             />

@@ -1,0 +1,58 @@
+{
+  "page": {
+    "title": "アーカイブ",
+    "subtitle": "保管したタスクはここに残ります。消えていません。",
+    "countWithLast": "{count, plural, other {#件のタスク}} · 最終アーカイブ {ago}"
+  },
+  "filters": {
+    "searchPlaceholder": "アーカイブを検索…",
+    "range": {
+      "7d": "7日",
+      "30d": "30日",
+      "90d": "90日",
+      "all": "すべて"
+    },
+    "project": "プロジェクト",
+    "archiver": "アーカイブした人",
+    "anyProject": "すべてのプロジェクト",
+    "anyArchiver": "すべてのメンバー"
+  },
+  "chapter": {
+    "thisWeek": "今週",
+    "earlierThisMonth": "今月（今週より前）",
+    "thisQuarter": "今四半期",
+    "thisYear": "今年",
+    "older": "それ以前"
+  },
+  "row": {
+    "archivedAgo": "{ago}にアーカイブ",
+    "unarchive": "アーカイブ解除",
+    "viewDetail": "詳細を表示",
+    "selectAria": "タスク「{title}」を選択"
+  },
+  "list": {
+    "loadingMore": "さらに読み込み中…"
+  },
+  "bulk": {
+    "selectedCount": "{count, plural, other {#件選択中}}",
+    "unarchiveCount": "{count, plural, other {#件のアーカイブを解除}}",
+    "cancel": "キャンセル"
+  },
+  "empty": {
+    "noneTitle": "まだ何も保管されていません",
+    "noneBody": "タスクをアーカイブすると、ここに安全に保管されます。",
+    "noneCta": "進行中のタスクを見る",
+    "filteredTitle": "条件に合うアーカイブが見つかりませんでした",
+    "filteredBody": "期間を広げるか、プロジェクトの絞り込みを解除してみてください。",
+    "filteredCta": "絞り込みをクリア"
+  },
+  "error": {
+    "fetchFailed": "アーカイブを読み込めませんでした。もう一度お試しください。",
+    "unarchiveFailed": "「{title}」のアーカイブを解除できませんでした。もう一度お試しください。",
+    "retry": "再試行"
+  },
+  "toast": {
+    "unarchivedOne": "「{title}」を復元しました。",
+    "unarchivedMany": "{count}件のタスクを復元しました。"
+  }
+}

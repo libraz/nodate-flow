@@ -32,7 +32,6 @@ import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
 import Combobox, { type ComboboxOption } from '@nodate-flow/ui/primitives/combobox';
-import { confirm } from '@nodate-flow/ui/primitives/confirm';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Select from '@nodate-flow/ui/primitives/select';
 import Spinner from '@nodate-flow/ui/primitives/spinner';
@@ -43,6 +42,7 @@ import { type ChangeEvent, type FormEvent, type ReactElement, Suspense, useState
 import { useTranslation } from 'react-i18next';
 
 import { ApiError } from '../../lib/api-error';
+import { confirmAction } from '../../lib/confirm-action';
 import { type Project, useProjectsQuery } from '../projects/api';
 import {
   type ExportFormat,
@@ -379,7 +379,7 @@ function ImportsCard({ workspaceId }: ImportsCardProps): ReactElement {
 
   const handleCancelImport = (job: ImportJob): void => {
     void (async (): Promise<void> => {
-      const ok = await confirm.ask({
+      const ok = await confirmAction({
         title: t('settings.data.imports.cancel'),
         message: t('settings.data.imports.cancel_confirm'),
         confirmLabel: t('settings.data.imports.cancel'),

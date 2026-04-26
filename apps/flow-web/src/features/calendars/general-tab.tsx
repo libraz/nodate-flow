@@ -13,7 +13,6 @@
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
-import { confirm } from '@nodate-flow/ui/primitives/confirm';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
@@ -22,6 +21,7 @@ import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ApiError } from '../../lib/api-error';
+import { confirmAction } from '../../lib/confirm-action';
 import {
   useCalendarEventCountQuery,
   useCalendarQuery,
@@ -111,7 +111,7 @@ export default function GeneralTab({
 
   const handleDelete = async (): Promise<void> => {
     const count = eventCountQuery.data ?? 0;
-    const ok = await confirm.ask({
+    const ok = await confirmAction({
       title: t('calendar.settings.delete.confirm_title', { name: calendar.name }),
       message: t('calendar.settings.delete.confirm_count', { count }),
       tone: 'danger',

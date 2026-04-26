@@ -3,6 +3,23 @@
  *
  * All hooks are suspense-ready where applicable and participate in the
  * shared QueryClient (throwOnError, route-level ErrorBoundary).
+ *
+ * Cache invalidation policy (W5)
+ * ------------------------------
+ *   - Create  → invalidate the parent list key for the workspace.
+ *   - Update  → invalidate the project's detail key + every list key
+ *               (`[...projectsKeys.all, 'list']`) because the project
+ *               appears in workspace-scoped lists that may filter on
+ *               name / archived state. Avoids `projectsKeys.all`
+ *               (which would also nuke members / dependencies).
+ *   - Delete  → same as Update; we additionally rely on the route
+ *               unmount to clear sub-queries.
+ *   - Members → invalidate the per-project members key only. The
+ *               Project DTO does not embed member counts, so the
+ *               detail key does not need to refresh.
+ *
+ * Project dependencies are read-only here (the writes live in the
+ * tasks feature), so no invalidation matrix entries are needed.
  */
 
 import type { components } from '@nodate-flow/sdk';
@@ -185,8 +202,10 @@ export function useUpdateProject(): UseMutationResult<Project, ApiError, UpdateP
       return data;
     },
     onSuccess: (_data, vars) => {
+      // Scope to detail + list keys (not `projectsKeys.all`) so we do
+      // not nuke members / dependencies sub-queries that didn't change.
       void qc.invalidateQueries({ queryKey: projectsKeys.detail(vars.id) });
-      void qc.invalidateQueries({ queryKey: projectsKeys.all });
+      void qc.invalidateQueries({ queryKey: [...projectsKeys.all, 'list'] });
     },
   });
 }
@@ -201,8 +220,10 @@ export function useDisableProject(): UseMutationResult<void, ApiError, string> {
       if (error) throw toError(error, 'Failed to disable project');
     },
     onSuccess: (_data, id) => {
+      // Same scope as Update — list keys catch any workspace-level
+      // filtering on archived state.
       void qc.invalidateQueries({ queryKey: projectsKeys.detail(id) });
-      void qc.invalidateQueries({ queryKey: projectsKeys.all });
+      void qc.invalidateQueries({ queryKey: [...projectsKeys.all, 'list'] });
     },
   });
 }

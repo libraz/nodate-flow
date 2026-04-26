@@ -1,0 +1,56 @@
+{
+  "section": {
+    "title": "関連イベント",
+    "expand": "関連イベントを展開",
+    "collapse": "関連イベントを折りたたむ",
+    "count": "{count, plural, other {#件}}"
+  },
+  "trigger": {
+    "linkEvent": "イベントを紐付け"
+  },
+  "kind": {
+    "contributesTo": "準備対象",
+    "blocks": "ブロック対象",
+    "label": "紐付け種別"
+  },
+  "row": {
+    "unlink": "解除",
+    "unlinkAria": "「{title}」の紐付けを解除",
+    "openEvent": "「{title}」を開く"
+  },
+  "time": {
+    "today": "今日 {time}",
+    "tomorrow": "明日 {time}",
+    "yesterday": "昨日",
+    "inDays": "{days, plural, other {#日後 · {time}}}",
+    "lastWeekday": "先週の{weekday}",
+    "absolute": "{date} {time}",
+    "absoluteAllDay": "{date}",
+    "allDay": "終日"
+  },
+  "picker": {
+    "searchPlaceholder": "イベントを検索…",
+    "noResults": "「{q}」に一致するイベントはありません。",
+    "alreadyLinked": "紐付け済み",
+    "pastDivider": "過去",
+    "esc": "Esc",
+    "loading": "検索中…"
+  },
+  "empty": {
+    "title": "まだイベントは紐付いていません",
+    "body": "会議や締め切りとこのタスクをつなぎましょう。",
+    "cta": "イベントを紐付け"
+  },
+  "toast": {
+    "linked": "「{title}」を紐付けました。",
+    "unlinked": "「{title}」の紐付けを解除しました。",
+    "undo": "元に戻す",
+    "linkFailed": "イベントを紐付けできませんでした。もう一度お試しください。",
+    "unlinkFailed": "紐付けを解除できませんでした。もう一度お試しください。",
+    "alreadyLinkedError": "このイベントはすでに紐付けられています。"
+  },
+  "error": {
+    "fetchFailed": "関連イベントを読み込めませんでした。",
+    "retry": "再試行"
+  }
+}

@@ -28,7 +28,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ChangeEvent, type KeyboardEvent, type ReactElement, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ApiError } from '../../lib/api-error';
+import { formatApiError } from '../../lib/api-error';
 import {
   type DiscoverableCalendar,
   useDiscoverableCalendarsQuery,
@@ -114,8 +114,7 @@ export default function DiscoverList({ workspaceId, onClose }: DiscoverListProps
           });
         },
         onError: (err) => {
-          const message =
-            err instanceof ApiError ? err.message : t('calendars_rail.discover.empty');
+          const message = formatApiError(err, t, 'calendars_rail.discover.subscribe_error');
           toaster.show({ tone: 'danger', message });
         },
       },
@@ -142,7 +141,7 @@ export default function DiscoverList({ workspaceId, onClose }: DiscoverListProps
         </div>
       ) : error ? (
         <p className={styles.discoverError} role="alert">
-          {error instanceof ApiError ? error.message : String(error)}
+          {formatApiError(error, t, 'calendars_rail.discover.load_error')}
         </p>
       ) : filtered.length === 0 ? (
         <p className={styles.empty}>{t('calendars_rail.discover.empty')}</p>

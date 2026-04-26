@@ -86,6 +86,12 @@
       "page_of": "{total} ページ中 {current} ページ"
     }
   },
+  "audit": {
+    "empty": {
+      "title": "近日対応",
+      "body": "このサーバーでは監査ログをまだご利用いただけません。次回のアップデート以降に再度ご確認ください。"
+    }
+  },
   "sections_label": "ワークスペース設定セクション",
   "settings_sections_label": "設定セクション",
   "access_restricted": {
@@ -111,9 +117,12 @@
   "profile": {
     "title": "プロフィール",
     "display_name": "表示名",
-    "locale": "言語",
-    "locale_en": "English",
-    "locale_ja": "日本語",
+    "locale": {
+      "label": "言語",
+      "en": "English",
+      "ja": "日本語",
+      "zh": "中文"
+    },
     "timezone": "タイムゾーン",
     "country": "国",
     "country_help": "カレンダーに表示する祝日の国を指定します。未設定の場合は祝日を表示しません。",
@@ -153,7 +162,10 @@
       "removed": "プロフィール画像を削除しました。",
       "updated": "プロフィール画像を更新しました。",
       "alt": "{name} のプロフィール画像",
-      "empty_alt": "プロフィール画像なし"
+      "empty_alt": "プロフィール画像なし",
+      "upload_aria": "プロフィール画像をアップロード",
+      "replace_aria": "プロフィール画像を変更",
+      "delete_aria": "プロフィール画像を削除"
     },
     "validation": {
       "display_name_required": "表示名は必須です。",

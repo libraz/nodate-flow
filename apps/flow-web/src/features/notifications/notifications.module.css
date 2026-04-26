@@ -14,7 +14,7 @@
   padding-inline: 0.25rem;
   border-radius: var(--nf-radius-pill);
   background: var(--nf-color-danger);
-  color: var(--nf-color-on-danger, #fff);
+  color: var(--nf-color-on-danger);
   font-family: var(--nf-font-mono);
   font-size: 0.625rem;
   font-weight: var(--nf-weight-semibold);
@@ -204,4 +204,41 @@
   position: fixed;
   inset: 0;
   z-index: 40;
+}
+
+.loadMoreRow {
+  display: flex;
+  justify-content: center;
+  padding-block: var(--nf-space-3);
+  padding-inline: var(--nf-space-4);
+  border-block-start: var(--nf-space-px) solid var(--nf-color-border);
+  background: var(--nf-color-bg-elevated);
+  position: sticky;
+  inset-block-end: 0;
+}
+
+.loadMoreButton {
+  padding-block: var(--nf-space-1);
+  padding-inline: var(--nf-space-3);
+  font-family: var(--nf-font-sans);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-accent);
+  background: transparent;
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-sm);
+  cursor: pointer;
+}
+
+.loadMoreButton:hover {
+  background: var(--nf-color-surface-hover);
+}
+
+.loadMoreButton:focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: var(--nf-focus-ring-offset);
+}
+
+.loadMoreButton:disabled {
+  opacity: 0.5;
+  cursor: default;
 }

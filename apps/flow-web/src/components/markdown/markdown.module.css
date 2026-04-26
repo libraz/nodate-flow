@@ -50,7 +50,7 @@
 }
 
 .md a {
-  color: var(--nf-color-link, var(--nf-color-accent, #4f6cff));
+  color: var(--nf-color-link, var(--nf-color-accent));
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -82,7 +82,7 @@
   margin-block: 0.75em;
   padding-inline-start: 0.9em;
   border-inline-start: 3px solid var(--nf-color-border, rgba(127, 127, 127, 0.3));
-  color: var(--nf-color-fg-muted, #666);
+  color: var(--nf-color-fg-muted);
 }
 
 .md hr {

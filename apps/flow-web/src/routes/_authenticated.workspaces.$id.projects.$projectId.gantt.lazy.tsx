@@ -44,7 +44,7 @@ const LABEL_WIDTH = 220;
  * and the `ToggleChip` legend. Kept as a single source of truth so the
  * toggle visually doubles as a legend for the chart highlight.
  */
-const CRITICAL_PATH_COLOR = 'var(--nf-color-danger, #c0392b)';
+const CRITICAL_PATH_COLOR = 'var(--nf-color-danger)';
 
 /** Zoom presets: pixel width per day. */
 const ZOOM_LEVELS = [4, 6, 8, 12, 18, 24, 36, 48, 64] as const;
@@ -395,7 +395,7 @@ function GanttView(): ReactElement {
     <section style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <style>{`
         .gantt-label-row:hover { background: var(--nf-color-bg-sunken, rgba(127,127,127,0.06)); }
-        .gantt-label-row:focus-visible { outline: 2px solid var(--nf-color-accent, #9b59b6); outline-offset: -2px; }
+        .gantt-label-row:focus-visible { outline: 2px solid var(--nf-color-accent); outline-offset: -2px; }
       `}</style>
       <header
         style={{
@@ -406,7 +406,9 @@ function GanttView(): ReactElement {
           flexWrap: 'wrap',
         }}
       >
-        <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600 }}>{t('gantt.title')}</h2>
+        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)', fontWeight: 600 }}>
+          {t('gantt.title')}
+        </h2>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
           {/* Navigation */}
           <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>

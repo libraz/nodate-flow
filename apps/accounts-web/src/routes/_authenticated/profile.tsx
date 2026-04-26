@@ -12,6 +12,7 @@ import {
   groupTimezonesByRegion,
 } from '@nodate-flow/sdk';
 import Button from '@nodate-flow/ui/primitives/button';
+import Card from '@nodate-flow/ui/primitives/card';
 import Combobox, { type ComboboxOption } from '@nodate-flow/ui/primitives/combobox';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
@@ -19,7 +20,7 @@ import SegmentedControl, {
   type SegmentedControlOption,
 } from '@nodate-flow/ui/primitives/segmented-control';
 import { Link, createFileRoute } from '@tanstack/react-router';
-import { type ReactElement, useMemo, useState } from 'react';
+import { type ReactElement, useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
@@ -73,12 +74,87 @@ function countryFlag(code: string): string {
   return String.fromCodePoint(A + code.charCodeAt(0) - base, A + code.charCodeAt(1) - base);
 }
 
-function ProfilePage(): ReactElement {
+/**
+ * Resolves the count of workspaces the user belongs to so the page can
+ * surface a first-run CTA when the value is zero.
+ *
+ * The auth store does not currently track workspaces, so we honour an
+ * optional `workspaces` field if the caller (or a test) populated it
+ * inline on the user record, and otherwise lazily fetch GET /workspaces
+ * once. Returns `undefined` while loading so the caller can treat the
+ * "unknown" state as "do not flash the CTA".
+ */
+function useWorkspaceCount(user: AuthUser | null): number | undefined {
+  // Honour an inline override on the user object first. This keeps the
+  // contract documented in the task (`user.workspaces.length === 0`)
+  // working even when the auth store has not been extended with the
+  // field, and makes the CTA trivially testable by mounting the page
+  // with a stubbed user.
+  const inline = (user as Partial<{ workspaces: readonly unknown[] }> | null)?.workspaces;
+  const inlineLen = Array.isArray(inline) ? inline.length : null;
+
+  const [fetched, setFetched] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    // Skip the network call when the answer is already on the user
+    // record or when there is no authenticated user yet.
+    if (inlineLen != null) return;
+    if (!user) return;
+    let cancelled = false;
+    void sdk
+      .GET('/workspaces', { params: { query: { limit: 1, offset: 0 } } })
+      .then((result) => {
+        if (cancelled) return;
+        if (result.error || !result.data) {
+          // Treat fetch errors as "unknown" so we never falsely promote
+          // the empty-state CTA when the user already has workspaces
+          // but the request happened to fail.
+          setFetched(undefined);
+          return;
+        }
+        const body = result.data as { total?: number; workspaces?: readonly unknown[] };
+        const total =
+          typeof body.total === 'number'
+            ? body.total
+            : Array.isArray(body.workspaces)
+              ? body.workspaces.length
+              : 0;
+        setFetched(total);
+      })
+      .catch(() => {
+        if (!cancelled) setFetched(undefined);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [inlineLen, user]);
+
+  return inlineLen ?? fetched;
+}
+
+/**
+ * Origin of the flow-web app where /setup lives. Configurable via the
+ * `VITE_FLOW_WEB_URL` env var; defaults to a same-origin path so the
+ * common mono-deploy case "just works".
+ */
+function flowWebSetupUrl(): string {
+  const base = import.meta.env.VITE_FLOW_WEB_URL as string | undefined;
+  if (typeof base === 'string' && base.length > 0) {
+    return `${base.replace(/\/$/, '')}/setup`;
+  }
+  return '/setup';
+}
+
+export function ProfilePage(): ReactElement {
   const { t, i18n } = useTranslation('auth');
   const user = useAuth(selectUser);
   const { setPreference } = useTheme();
   const [serverError, setServerError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const workspaceCount = useWorkspaceCount(user);
+  // Only show the CTA once we know the count is exactly zero. While the
+  // count is `undefined` we render nothing so the page does not flash
+  // the empty-state for users who actually have workspaces.
+  const showEmptyWorkspacesCta = workspaceCount === 0;
 
   // Flatten the IANA-region-grouped timezone list into Combobox options so
   // users can search by region (`Asia`), city (`Tokyo`), or full id
@@ -122,10 +198,15 @@ function ProfilePage(): ReactElement {
     return list;
   }, [i18n.language, t]);
 
+  // The label for each segment is the language's *own* native name. Even
+  // though we route the strings through `t()` so every visible token
+  // remains explicit i18n-compliant, the values match across en/ja/zh
+  // locales: a language picker should always read "English / 日本語 / 中文",
+  // never "English / Japanese / Chinese".
   const localeOptions: SegmentedControlOption<SupportedLanguage>[] = [
-    { value: 'en', label: 'English' },
-    { value: 'ja', label: '日本語' },
-    { value: 'zh', label: '中文' },
+    { value: 'en', label: t('profile.locale.en') },
+    { value: 'ja', label: t('profile.locale.ja') },
+    { value: 'zh', label: t('profile.locale.zh') },
   ];
 
   const weekStartOptions: SegmentedControlOption<WeekStart>[] = [
@@ -260,6 +341,47 @@ function ProfilePage(): ReactElement {
           {t('profile.title')}
         </h1>
 
+        {showEmptyWorkspacesCta ? (
+          <Card
+            data-testid="empty-workspaces-cta"
+            elevated
+            style={{
+              padding: 'var(--nf-space-5, 1.5rem)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'var(--nf-space-3, 0.75rem)',
+            }}
+          >
+            <h2
+              style={{
+                margin: 0,
+                fontFamily: 'var(--nf-font-display, var(--font-display))',
+                fontSize: 'var(--nf-text-lg, 1.125rem)',
+              }}
+            >
+              {t('profile.empty_workspaces.title')}
+            </h2>
+            <output
+              style={{
+                margin: 0,
+                color: 'var(--nf-color-fg-muted)',
+                fontSize: 'var(--nf-text-sm, 0.875rem)',
+              }}
+            >
+              {t('profile.empty_workspaces.body')}
+            </output>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => {
+                window.location.href = flowWebSetupUrl();
+              }}
+            >
+              {t('profile.empty_workspaces.cta')}
+            </Button>
+          </Card>
+        ) : null}
+
         <FormField
           label={t('profile.display_name')}
           required
@@ -271,7 +393,7 @@ function ProfilePage(): ReactElement {
           }}
         </FormField>
 
-        <FormField label={t('profile.locale')}>
+        <FormField label={t('profile.locale.label')}>
           {() => (
             <Controller
               name="locale"
@@ -282,7 +404,7 @@ function ProfilePage(): ReactElement {
                   value={field.value}
                   onChange={handleLocaleChange}
                   options={localeOptions}
-                  ariaLabel={t('profile.locale')}
+                  ariaLabel={t('profile.locale.label')}
                 />
               )}
             />

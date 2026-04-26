@@ -1,14 +1,17 @@
 /**
  * TaskCard — compact card used inside the board columns.
  *
- * Shows title, priority badge, and due date pill. The card is draggable
- * (HTML5 native) so the parent board can intercept dragstart/drop events.
+ * Shows title, priority badge, and due date pill. Drag-and-drop is
+ * currently disabled (`draggable=false`); state changes happen through
+ * the keyboard-accessible move menu. When D&D is re-enabled in the
+ * future, accept `onDragStart` / `onDragEnd` props again and pass
+ * `draggable` back to the underlying Card.
  */
 
 import Badge from '@nodate-flow/ui/primitives/badge';
 import Card from '@nodate-flow/ui/primitives/card';
 import { Link } from '@tanstack/react-router';
-import { type DragEvent, type ReactElement, useRef } from 'react';
+import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatDate, isOverdue } from '../../lib/format';
@@ -20,8 +23,6 @@ export interface TaskCardProps {
   task: TaskListItem;
   /** Count of open `blocks` edges pointing AT this task. 0 hides the badge. */
   blockedByOpenCount?: number;
-  onDragStart: (e: DragEvent<HTMLDivElement>, taskId: string) => void;
-  onDragEnd: () => void;
   onSelect: (taskId: string) => void;
   /** Keyboard-accessible transition handler (from the move menu). */
   onTransition: (
@@ -34,8 +35,6 @@ export interface TaskCardProps {
 export default function TaskCard({
   task,
   blockedByOpenCount = 0,
-  onDragStart,
-  onDragEnd,
   onSelect,
   onTransition,
 }: TaskCardProps): ReactElement {
@@ -51,38 +50,15 @@ export default function TaskCard({
   const tone = PRIORITY_TONE[priority] ?? 'neutral';
   const priorityLabel = t(PRIORITY_KEY[priority] ?? 'tasks.priority.none');
 
-  // HTML5 D&D fires a stray `click` on the drag source after a drag that
-  // didn't move far enough, which would otherwise navigate the user into
-  // the task detail page mid-drag. We track "did a drag actually start"
-  // and suppress the next click on the card body when it did.
-  const draggedRef = useRef(false);
-
   return (
     <Card
-      draggable
-      onDragStart={(e) => {
-        draggedRef.current = true;
-        onDragStart(e, task.id);
-      }}
-      onDragEnd={() => {
-        // Reset on the next tick so the synthetic click that fires
-        // immediately after dragend (in some browsers) is still
-        // suppressed by the click handler below.
-        setTimeout(() => {
-          draggedRef.current = false;
-        }, 0);
-        onDragEnd();
-      }}
-      onClick={(e) => {
-        if (draggedRef.current) {
-          e.preventDefault();
-          return;
-        }
+      draggable={false}
+      onClick={() => {
         // Title <Link> handles its own navigation and stops propagation;
         // clicks that reach here come from the card's padding / badges.
         onSelect(task.id);
       }}
-      className="flex flex-col gap-2 cursor-grab p-3.5"
+      className="flex flex-col gap-2 p-3.5"
     >
       <div className="flex items-start gap-1">
         {ext.projectIdentifier && ext.taskNumber ? (

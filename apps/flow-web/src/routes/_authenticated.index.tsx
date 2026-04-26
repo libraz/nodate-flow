@@ -82,9 +82,15 @@ function StatCard({
         <Icon icon={icon} decorative />
       </div>
       <div>
-        <div style={{ fontSize: '1.5rem', fontWeight: 700, lineHeight: 1.1 }}>{value}</div>
+        <div style={{ fontSize: 'var(--nf-text-2xl)', fontWeight: 700, lineHeight: 1.1 }}>
+          {value}
+        </div>
         <div
-          style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)', marginTop: '0.125rem' }}
+          style={{
+            fontSize: 'var(--nf-text-xs)',
+            color: 'var(--nf-color-fg-muted)',
+            marginTop: '0.125rem',
+          }}
         >
           {label}
         </div>
@@ -142,25 +148,25 @@ function TaskSummary(): ReactElement {
           icon={FolderKanban}
           label={t('home.stat_open')}
           value={counts.open}
-          accent="var(--nf-color-accent, #3498db)"
+          accent="var(--nf-color-accent)"
         />
         <StatCard
           icon={Clock}
           label={t('home.stat_overdue')}
           value={counts.overdue}
-          accent="var(--nf-color-danger, #c0392b)"
+          accent="var(--nf-color-danger)"
         />
         <StatCard
           icon={CalendarDays}
           label={t('home.stat_due_today')}
           value={counts.dueToday}
-          accent="var(--nf-color-warning, #e67e22)"
+          accent="var(--nf-color-warning)"
         />
         <StatCard
           icon={CheckCircle2}
           label={t('home.stat_done')}
           value={counts.done}
-          accent="var(--nf-color-success, #27ae60)"
+          accent="var(--nf-color-success)"
         />
       </div>
 
@@ -216,7 +222,7 @@ function TaskSummary(): ReactElement {
                 </Link>
                 <span
                   style={{
-                    fontSize: '0.75rem',
+                    fontSize: 'var(--nf-text-xs)',
                     color: 'var(--nf-color-fg-muted)',
                     whiteSpace: 'nowrap',
                   }}
@@ -252,7 +258,7 @@ function WorkspaceLinks(): ReactElement {
 
   if (workspaces.length === 0) {
     return (
-      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
+      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}>
         {t('workspaces.empty')}
       </p>
     );
@@ -275,7 +281,7 @@ function WorkspaceLinks(): ReactElement {
             border: '1px solid var(--nf-color-border, var(--nf-color-hairline))',
             color: 'inherit',
             textDecoration: 'none',
-            fontSize: '0.875rem',
+            fontSize: 'var(--nf-text-sm)',
           }}
         >
           <Icon icon={FolderKanban} decorative />
@@ -335,7 +341,7 @@ function LanguageSwitcher(): ReactElement {
               paddingBlock: '0.375rem',
               paddingInline: '0.75rem',
               fontFamily: 'var(--font-mono)',
-              fontSize: '0.75rem',
+              fontSize: 'var(--nf-text-xs)',
               cursor: 'pointer',
             }}
           >
@@ -389,7 +395,7 @@ function ThemeSwitcher(): ReactElement {
               paddingBlock: '0.375rem',
               paddingInline: '0.75rem',
               fontFamily: 'var(--font-mono)',
-              fontSize: '0.75rem',
+              fontSize: 'var(--nf-text-xs)',
               cursor: 'pointer',
             }}
           >
@@ -487,7 +493,7 @@ function HomePage(): ReactElement {
             color: 'white',
             border: 'none',
             cursor: 'pointer',
-            fontSize: '0.875rem',
+            fontSize: 'var(--nf-text-sm)',
             fontWeight: 500,
           }}
         >
@@ -510,7 +516,7 @@ function HomePage(): ReactElement {
             color: 'var(--nf-color-fg)',
             border: '1px solid var(--nf-color-border, var(--nf-color-hairline))',
             cursor: 'pointer',
-            fontSize: '0.875rem',
+            fontSize: 'var(--nf-text-sm)',
           }}
         >
           <Icon icon={Search} decorative />
@@ -528,7 +534,7 @@ function HomePage(): ReactElement {
             color: 'var(--nf-color-fg)',
             border: '1px solid var(--nf-color-border, var(--nf-color-hairline))',
             textDecoration: 'none',
-            fontSize: '0.875rem',
+            fontSize: 'var(--nf-text-sm)',
           }}
         >
           <Icon icon={Inbox} decorative />

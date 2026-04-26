@@ -158,7 +158,7 @@ function TodayRoute(): ReactElement {
               color: 'white',
               border: 'none',
               cursor: 'pointer',
-              fontSize: '0.875rem',
+              fontSize: 'var(--nf-text-sm)',
               fontWeight: 500,
             }}
           >
@@ -183,7 +183,7 @@ function TodayRoute(): ReactElement {
                 fontSize: '0.85rem',
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
-                color: isOverdue ? 'var(--nf-color-danger, #c0392b)' : 'var(--nf-color-fg-muted)',
+                color: isOverdue ? 'var(--nf-color-danger)' : 'var(--nf-color-fg-muted)',
               }}
             >
               {t(`today.sections.${key}`)} ({items.length})
@@ -213,7 +213,7 @@ function TodayRoute(): ReactElement {
                         ? 'var(--nf-color-danger-subtle, rgba(192,57,43,0.08))'
                         : 'var(--nf-color-surface))',
                       borderInlineStart: isOverdue
-                        ? '3px solid var(--nf-color-danger, #c0392b)'
+                        ? '3px solid var(--nf-color-danger)'
                         : '3px solid transparent',
                     }}
                   >
@@ -262,7 +262,7 @@ function TodayRoute(): ReactElement {
                     ) : null}
                     <span
                       style={{
-                        fontSize: '0.75rem',
+                        fontSize: 'var(--nf-text-xs)',
                         color: 'var(--nf-color-fg-muted)',
                         whiteSpace: 'nowrap',
                       }}
@@ -273,7 +273,7 @@ function TodayRoute(): ReactElement {
                     </span>
                     <span
                       style={{
-                        fontSize: '0.75rem',
+                        fontSize: 'var(--nf-text-xs)',
                         color: 'var(--nf-color-fg-muted)',
                         whiteSpace: 'nowrap',
                         minWidth: '5.5rem',

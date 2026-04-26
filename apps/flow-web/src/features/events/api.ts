@@ -7,6 +7,16 @@
  * The cache shape mirrors the calendar-events feature's existing keys
  * so changes here invalidate the calendar grid in lockstep with the
  * detail page's own queries.
+ *
+ * Cache invalidation policy (W5)
+ * ------------------------------
+ * Centralised through the local `invalidate()` helper:
+ *
+ *   - Update / Delete → invalidate
+ *       1. the event detail key,
+ *       2. the per-calendar event list (owned by calendar-events),
+ *       3. the cross-workspace `me-events` aggregate that drives the
+ *          main grid.
  */
 
 import type { components } from '@nodate-flow/sdk';

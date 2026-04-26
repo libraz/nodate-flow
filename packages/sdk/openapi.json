@@ -4733,6 +4733,9 @@
             "readOnly": true,
             "type": "string"
           },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
           "tasks": {
             "items": {
               "$ref": "#/components/schemas/TaskListItem"
@@ -4744,7 +4747,7 @@
             "type": "integer"
           }
         },
-        "required": ["total", "tasks"],
+        "required": ["total", "tasks", "nextCursor"],
         "type": "object"
       },
       "ListAttachmentsOutputBody": {
@@ -5522,6 +5525,9 @@
             "readOnly": true,
             "type": "string"
           },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
           "tasks": {
             "items": {
               "$ref": "#/components/schemas/MyTaskListItem"
@@ -5533,7 +5539,7 @@
             "type": "integer"
           }
         },
-        "required": ["total", "tasks"],
+        "required": ["total", "tasks", "nextCursor"],
         "type": "object"
       },
       "ListMyTasksWithDatesBody": {
@@ -5546,6 +5552,9 @@
             "readOnly": true,
             "type": "string"
           },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
           "tasks": {
             "items": {
               "$ref": "#/components/schemas/MyTaskListItem"
@@ -5557,7 +5566,7 @@
             "type": "integer"
           }
         },
-        "required": ["total", "tasks"],
+        "required": ["total", "tasks", "nextCursor"],
         "type": "object"
       },
       "ListPagesBody": {
@@ -13927,6 +13936,16 @@
             }
           },
           {
+            "description": "Opaque cursor returned by previous page; pass to fetch next page. Empty when at end.",
+            "explode": false,
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "description": "Opaque cursor returned by previous page; pass to fetch next page. Empty when at end.",
+              "type": "string"
+            }
+          },
+          {
             "explode": false,
             "in": "query",
             "name": "limit",
@@ -14179,6 +14198,16 @@
         "operationId": "me-tasks-list",
         "parameters": [
           {
+            "description": "Opaque cursor returned by previous page; pass to fetch next page. Empty when at end.",
+            "explode": false,
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "description": "Opaque cursor returned by previous page; pass to fetch next page. Empty when at end.",
+              "type": "string"
+            }
+          },
+          {
             "explode": false,
             "in": "query",
             "name": "limit",
@@ -14250,6 +14279,16 @@
             "required": true,
             "schema": {
               "description": "Range end YYYY-MM-DD (inclusive)",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Opaque cursor returned by previous page; pass to fetch next page. Empty when at end.",
+            "explode": false,
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "description": "Opaque cursor returned by previous page; pass to fetch next page. Empty when at end.",
               "type": "string"
             }
           },
@@ -15300,6 +15339,16 @@
             }
           },
           {
+            "description": "Opaque cursor returned by previous page; pass to fetch next page. Empty when at end.",
+            "explode": false,
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "description": "Opaque cursor returned by previous page; pass to fetch next page. Empty when at end.",
+              "type": "string"
+            }
+          },
+          {
             "explode": false,
             "in": "query",
             "name": "limit",
@@ -16205,6 +16254,16 @@
             "name": "id",
             "required": true,
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Opaque cursor returned by previous page; pass to fetch next page. Empty when at end.",
+            "explode": false,
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "description": "Opaque cursor returned by previous page; pass to fetch next page. Empty when at end.",
               "type": "string"
             }
           },
@@ -25468,6 +25527,16 @@
             "name": "wsId",
             "required": true,
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Opaque cursor returned by previous page; pass to fetch next page. Empty when at end.",
+            "explode": false,
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "description": "Opaque cursor returned by previous page; pass to fetch next page. Empty when at end.",
               "type": "string"
             }
           },

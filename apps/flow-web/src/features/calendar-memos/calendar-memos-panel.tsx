@@ -39,7 +39,6 @@
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
-import { confirm } from '@nodate-flow/ui/primitives/confirm';
 import Input from '@nodate-flow/ui/primitives/input';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
@@ -47,6 +46,7 @@ import { type FormEvent, type ReactElement, useCallback, useEffect, useRef, useS
 import { useTranslation } from 'react-i18next';
 
 import { ApiError } from '../../lib/api-error';
+import { confirmAction } from '../../lib/confirm-action';
 import {
   type Memo,
   useCreateMemoMutation,
@@ -147,7 +147,7 @@ export default function CalendarMemosPanel({
               }
               onDelete={() => {
                 void (async () => {
-                  const ok = await confirm.ask({
+                  const ok = await confirmAction({
                     title: t('calendar.memos.title'),
                     message: t('calendar.memos.delete_confirm'),
                     tone: 'danger',

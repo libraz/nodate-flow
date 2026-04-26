@@ -23,6 +23,8 @@ export const namespaces = [
   'pages',
   'labels',
   'reactions',
+  'archive',
+  'linkedEvents',
 ] as const;
 
 /** Union of all known i18n namespace names. */

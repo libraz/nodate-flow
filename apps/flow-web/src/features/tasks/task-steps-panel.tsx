@@ -192,7 +192,7 @@ export default function TaskStepsPanel({ taskId }: TaskStepsPanelProps): ReactEl
 
   return (
     <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-      <h2 style={{ margin: 0, fontSize: '1rem' }}>{t('tasks.steps.title')}</h2>
+      <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>{t('tasks.steps.title')}</h2>
 
       {!hasProposed ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -256,7 +256,13 @@ export default function TaskStepsPanel({ taskId }: TaskStepsPanelProps): ReactEl
       ) : (
         <>
           {steps.length === 0 ? (
-            <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
+            <p
+              style={{
+                margin: 0,
+                color: 'var(--nf-color-fg-muted)',
+                fontSize: 'var(--nf-text-sm)',
+              }}
+            >
               {t('tasks.steps.empty')}
             </p>
           ) : (

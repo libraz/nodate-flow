@@ -305,7 +305,9 @@
       "search_placeholder": "按姓名搜索…",
       "empty": "暂无可订阅的同事日历",
       "subscribe": "订阅",
-      "subscribed_toast": "已订阅 {name}"
+      "subscribed_toast": "已订阅 {name}",
+      "load_error": "无法加载同事日历，请重试。",
+      "subscribe_error": "无法订阅，请重试。"
     },
     "holidays": {
       "trigger": "订阅节假日日历...",
@@ -586,7 +588,9 @@
     },
     "list": {
       "select_row": "选择第 {index} 行",
-      "select_all": "选择全部行"
+      "select_all": "选择全部行",
+      "load_more": "加载更多",
+      "loading_more": "正在加载更多任务…"
     },
     "columns": {
       "title": "标题",
@@ -663,7 +667,8 @@
       "drop_hint": "拖放到此处以移动",
       "moved_to": "已移至 {state}",
       "move_menu": "移动任务",
-      "move_to": "移至 {state}"
+      "move_to": "移至 {state}",
+      "dnd_disabled_hint": "请使用状态下拉菜单更改任务状态。"
     },
     "assignee": {
       "plus_n": "+{n, plural, other {# 人}}",

@@ -216,7 +216,7 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
     >
       <label
         htmlFor="nl-query-input"
-        style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}
+        style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-fg-muted)' }}
       >
         {t('nl_query.label')}
       </label>
@@ -246,7 +246,7 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
           border: '1px solid var(--nf-color-border)',
           background: 'var(--nf-color-surface)',
           color: 'var(--nf-color-fg)',
-          fontSize: '0.75rem',
+          fontSize: 'var(--nf-text-xs)',
           cursor: disabled ? 'not-allowed' : 'pointer',
           opacity: disabled ? 0.6 : 1,
         }}
@@ -254,7 +254,10 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
         {mutation.isPending ? t('nl_query.compiling') : t('nl_query.submit')}
       </button>
       {errorMsg ? (
-        <p role="alert" style={{ margin: 0, fontSize: '0.75rem', color: 'var(--nf-color-danger)' }}>
+        <p
+          role="alert"
+          style={{ margin: 0, fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-danger)' }}
+        >
           {errorMsg}
         </p>
       ) : null}
@@ -317,7 +320,7 @@ function GlassDockSuggestionRow({
           </Badge>
           <span
             style={{
-              fontSize: '0.75rem',
+              fontSize: 'var(--nf-text-xs)',
               color: 'var(--nf-color-fg-muted)',
             }}
           >
@@ -370,7 +373,7 @@ function StateSuggestionsPanel({
         borderBlockEnd: '1px solid var(--nf-color-border)',
       }}
     >
-      <strong style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}>
+      <strong style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-fg-muted)' }}>
         {t('state_suggestions.title')}
       </strong>
       <ul
@@ -393,7 +396,7 @@ function StateSuggestionsPanel({
                 gap: '0.5rem',
                 color: 'var(--nf-color-fg)',
                 textDecoration: 'none',
-                fontSize: '0.75rem',
+                fontSize: 'var(--nf-text-xs)',
               }}
             >
               <Badge tone="accent">
@@ -434,7 +437,7 @@ function RemindersPanel({
         borderBlockEnd: '1px solid var(--nf-color-border)',
       }}
     >
-      <strong style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}>
+      <strong style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-fg-muted)' }}>
         {t('reminders.title')}
       </strong>
       <ul
@@ -460,7 +463,7 @@ function RemindersPanel({
                   gap: '0.5rem',
                   color: 'var(--nf-color-fg)',
                   textDecoration: 'none',
-                  fontSize: '0.75rem',
+                  fontSize: 'var(--nf-text-xs)',
                 }}
               >
                 <Badge tone={tone}>{t(`reminders.kind.${r.kind}`)}</Badge>
@@ -520,7 +523,7 @@ function AutoActionsPanel({
         borderBlockEnd: '1px solid var(--nf-color-border)',
       }}
     >
-      <strong style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}>
+      <strong style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-fg-muted)' }}>
         {t('auto_actions.title')}
       </strong>
       <ul
@@ -550,7 +553,7 @@ function AutoActionsPanel({
                   gap: '0.5rem',
                   color: 'var(--nf-color-fg)',
                   textDecoration: 'none',
-                  fontSize: '0.75rem',
+                  fontSize: 'var(--nf-text-xs)',
                 }}
               >
                 <Badge tone={tone}>{t(`auto_actions.kind.${a.kind}`)}</Badge>
@@ -664,7 +667,7 @@ function GlassDockImpl(): ReactElement {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <Icon icon={Sparkles} decorative />
-          <strong style={{ fontSize: '0.875rem' }}>{t('glass_dock.title')}</strong>
+          <strong style={{ fontSize: 'var(--nf-text-sm)' }}>{t('glass_dock.title')}</strong>
           {suggestions.length > 0 ? <Badge tone="accent">{suggestions.length}</Badge> : null}
         </div>
         <button

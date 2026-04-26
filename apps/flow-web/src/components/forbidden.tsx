@@ -46,7 +46,7 @@ export default function Forbidden(): ReactElement {
         style={{
           fontFamily: 'var(--font-display)',
           margin: 0,
-          fontSize: '1.5rem',
+          fontSize: 'var(--nf-text-2xl)',
           color: 'var(--nf-color-fg)',
         }}
       >

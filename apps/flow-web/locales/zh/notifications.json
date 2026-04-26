@@ -2,7 +2,9 @@
   "view": {
     "title": "通知",
     "empty": "暂无通知",
-    "mark_all_read": "全部标为已读"
+    "mark_all_read": "全部标为已读",
+    "load_more": "加载更多",
+    "loading_more": "正在加载更多通知…"
   },
   "action": {
     "mark_read": "标为已读",

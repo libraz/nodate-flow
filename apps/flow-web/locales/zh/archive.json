@@ -1,0 +1,58 @@
+{
+  "page": {
+    "title": "归档",
+    "subtitle": "你存放的任务都在这里。它们没有消失。",
+    "countWithLast": "{count, plural, other {# 个任务}} · 最近归档于 {ago}"
+  },
+  "filters": {
+    "searchPlaceholder": "搜索已归档的任务…",
+    "range": {
+      "7d": "7天",
+      "30d": "30天",
+      "90d": "90天",
+      "all": "全部"
+    },
+    "project": "项目",
+    "archiver": "归档者",
+    "anyProject": "所有项目",
+    "anyArchiver": "所有成员"
+  },
+  "chapter": {
+    "thisWeek": "本周",
+    "earlierThisMonth": "本月较早",
+    "thisQuarter": "本季度",
+    "thisYear": "今年",
+    "older": "更早"
+  },
+  "row": {
+    "archivedAgo": "{ago}归档",
+    "unarchive": "取消归档",
+    "viewDetail": "查看详情",
+    "selectAria": "选择任务 {title}"
+  },
+  "list": {
+    "loadingMore": "正在加载更多…"
+  },
+  "bulk": {
+    "selectedCount": "{count, plural, other {已选 # 个}}",
+    "unarchiveCount": "{count, plural, other {取消归档 # 个任务}}",
+    "cancel": "取消"
+  },
+  "empty": {
+    "noneTitle": "还没有任何归档",
+    "noneBody": "归档任务后，它会安全地保存在这里。",
+    "noneCta": "浏览进行中的任务",
+    "filteredTitle": "未找到匹配的归档",
+    "filteredBody": "尝试扩大时间范围，或清除项目筛选。",
+    "filteredCta": "清除筛选"
+  },
+  "error": {
+    "fetchFailed": "无法加载归档，请重试。",
+    "unarchiveFailed": "无法取消归档「{title}」，请重试。",
+    "retry": "重试"
+  },
+  "toast": {
+    "unarchivedOne": "已恢复「{title}」。",
+    "unarchivedMany": "已恢复 {count} 个任务。"
+  }
+}

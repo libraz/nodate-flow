@@ -16,7 +16,7 @@ import {
   useArchiveNotification,
   useMarkAllRead,
   useMarkNotificationRead,
-  useNotificationsQuery,
+  useNotificationsInfiniteQuery,
 } from './api';
 import styles from './notifications.module.css';
 
@@ -118,7 +118,10 @@ export default function NotificationDropdown({
 }: NotificationDropdownProps): ReactElement {
   const { t, i18n } = useTranslation('notifications');
   const locale = i18n.resolvedLanguage ?? 'en';
-  const { data: items } = useNotificationsQuery();
+  const { data, hasNextPage, isFetchingNextPage, fetchNextPage } = useNotificationsInfiniteQuery();
+  // Flat-map cached pages into a single ordered list. TanStack threads
+  // the cursor through `pageParam` so the order is stable across loads.
+  const items = data.pages.flatMap((p) => p.notifications);
   const wsId = useCurrentWorkspaceId();
   const markAll = useMarkAllRead(wsId);
 
@@ -126,6 +129,11 @@ export default function NotificationDropdown({
 
   const handleMarkAll = (): void => {
     markAll.mutate();
+  };
+
+  const handleLoadMore = (): void => {
+    if (!hasNextPage || isFetchingNextPage) return;
+    void fetchNextPage();
   };
 
   return (
@@ -154,6 +162,19 @@ export default function NotificationDropdown({
             ))}
           </ul>
         )}
+        {hasNextPage ? (
+          <div className={styles.loadMoreRow}>
+            <button
+              type="button"
+              className={styles.loadMoreButton}
+              onClick={handleLoadMore}
+              disabled={isFetchingNextPage}
+              aria-busy={isFetchingNextPage}
+            >
+              {isFetchingNextPage ? t('view.loading_more') : t('view.load_more')}
+            </button>
+          </div>
+        ) : null}
       </div>
     </>
   );

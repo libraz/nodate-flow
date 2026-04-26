@@ -5,12 +5,15 @@ import { initReactI18next } from 'react-i18next';
 import enAdmin from '../../locales/en/admin.json';
 import enAuth from '../../locales/en/auth.json';
 import enCommon from '../../locales/en/common.json';
+import enErrors from '../../locales/en/errors.json';
 import jaAdmin from '../../locales/ja/admin.json';
 import jaAuth from '../../locales/ja/auth.json';
 import jaCommon from '../../locales/ja/common.json';
+import jaErrors from '../../locales/ja/errors.json';
 import zhAdmin from '../../locales/zh/admin.json';
 import zhAuth from '../../locales/zh/auth.json';
 import zhCommon from '../../locales/zh/common.json';
+import zhErrors from '../../locales/zh/errors.json';
 
 /** Supported UI languages. */
 export const supportedLanguages = ['en', 'ja', 'zh'] as const;
@@ -47,22 +50,25 @@ export function initI18n(): typeof i18n {
       fallbackLng: 'en',
       supportedLngs: supportedLanguages as unknown as string[],
       defaultNS: 'auth',
-      ns: ['auth', 'admin', 'common'],
+      ns: ['auth', 'admin', 'common', 'errors'],
       resources: {
         en: {
           auth: enAuth,
           admin: enAdmin,
           common: enCommon,
+          errors: enErrors,
         },
         ja: {
           auth: jaAuth,
           admin: jaAdmin,
           common: jaCommon,
+          errors: jaErrors,
         },
         zh: {
           auth: zhAuth,
           admin: zhAdmin,
           common: zhCommon,
+          errors: zhErrors,
         },
       },
       interpolation: { escapeValue: false },

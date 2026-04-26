@@ -305,7 +305,9 @@
       "search_placeholder": "名前で絞り込み...",
       "empty": "購読できるメンバーのカレンダーがありません",
       "subscribe": "購読",
-      "subscribed_toast": "{name} を購読しました"
+      "subscribed_toast": "{name} を購読しました",
+      "load_error": "メンバーのカレンダーを読み込めませんでした。もう一度お試しください。",
+      "subscribe_error": "購読できませんでした。もう一度お試しください。"
     },
     "holidays": {
       "trigger": "祝日カレンダーを購読...",
@@ -586,7 +588,9 @@
     },
     "list": {
       "select_row": "{index} 行目を選択",
-      "select_all": "すべての行を選択"
+      "select_all": "すべての行を選択",
+      "load_more": "さらに読み込む",
+      "loading_more": "タスクを読み込んでいます…"
     },
     "columns": {
       "title": "タイトル",
@@ -663,7 +667,8 @@
       "drop_hint": "ここにドロップして移動",
       "moved_to": "{state} に移動しました",
       "move_menu": "タスクを移動",
-      "move_to": "{state} に移動"
+      "move_to": "{state} に移動",
+      "dnd_disabled_hint": "状態を変更するにはドロップダウンを使ってください。"
     },
     "assignee": {
       "plus_n": "+他{n}件",

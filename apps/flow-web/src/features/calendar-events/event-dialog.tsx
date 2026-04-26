@@ -904,106 +904,116 @@ export default function EventDialog({
             )}
           </div>
 
-          {/* Kind-specific morph zone */}
-          {showTaskFields ? (
-            <div className={styles.kindBlock}>
-              <div className={styles.inlineRow}>
-                {projects.length > 0 ? (
-                  <FormField
-                    label={t('field.project')}
-                    error={projectError ?? undefined}
-                    className={styles.inlineGrow}
-                  >
-                    {(control) => (
-                      <Select
-                        {...control}
-                        value={projectId}
-                        onChange={(e) => setProjectId(e.currentTarget.value)}
-                      >
-                        {projects.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </Select>
+          {/*
+           * Kind-specific morph zone. The wrapper has a fixed
+           * `min-block-size` matching the tallest variant so the
+           * dialog body does not reflow as the user flips the kind
+           * picker — the inner `.kindBlock` fades in over the same
+           * footprint regardless of which variant is mounted. See
+           * `.kindMorphZone` in event-dialog.module.css for the
+           * reasoning.
+           */}
+          <div className={styles.kindMorphZone}>
+            {showTaskFields ? (
+              <div className={styles.kindBlock}>
+                <div className={styles.inlineRow}>
+                  {projects.length > 0 ? (
+                    <FormField
+                      label={t('field.project')}
+                      error={projectError ?? undefined}
+                      className={styles.inlineGrow}
+                    >
+                      {(control) => (
+                        <Select
+                          {...control}
+                          value={projectId}
+                          onChange={(e) => setProjectId(e.currentTarget.value)}
+                        >
+                          {projects.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </Select>
+                      )}
+                    </FormField>
+                  ) : null}
+                  <FormField label={t('field.priority')} className={styles.inlineGrow}>
+                    {() => (
+                      <SegmentedControl
+                        ariaLabel={t('field.priority')}
+                        options={TASK_PRIORITIES.map((p) => ({
+                          value: String(p) as `${TaskPriority}`,
+                          label: tCommon(PRIORITY_KEY[p]),
+                        }))}
+                        value={String(priority) as `${TaskPriority}`}
+                        onChange={(v) => setPriority(Number(v) as TaskPriority)}
+                      />
                     )}
                   </FormField>
-                ) : null}
-                <FormField label={t('field.priority')} className={styles.inlineGrow}>
+                </div>
+              </div>
+            ) : null}
+
+            {showEventFields ? (
+              <div className={styles.kindBlock}>
+                <FormField label={t('field.showAs')}>
                   {() => (
                     <SegmentedControl
-                      ariaLabel={t('field.priority')}
-                      options={TASK_PRIORITIES.map((p) => ({
-                        value: String(p) as `${TaskPriority}`,
-                        label: tCommon(PRIORITY_KEY[p]),
+                      ariaLabel={t('field.showAs')}
+                      fullWidth
+                      options={(['busy', 'free', 'tentative', 'oof'] as const).map((v) => ({
+                        value: v,
+                        label: t(SHOW_AS_KEYS[v]),
                       }))}
-                      value={String(priority) as `${TaskPriority}`}
-                      onChange={(v) => setPriority(Number(v) as TaskPriority)}
+                      value={showAs}
+                      onChange={setShowAs}
+                    />
+                  )}
+                </FormField>
+                <FormField label={t('field.location')}>
+                  {(control) => (
+                    <Input
+                      {...control}
+                      value={location}
+                      onChange={(e) => setLocation(e.currentTarget.value)}
                     />
                   )}
                 </FormField>
               </div>
-            </div>
-          ) : null}
+            ) : null}
 
-          {showEventFields ? (
-            <div className={styles.kindBlock}>
-              <FormField label={t('field.showAs')}>
-                {() => (
-                  <SegmentedControl
-                    ariaLabel={t('field.showAs')}
-                    fullWidth
-                    options={(['busy', 'free', 'tentative', 'oof'] as const).map((v) => ({
-                      value: v,
-                      label: t(SHOW_AS_KEYS[v]),
-                    }))}
-                    value={showAs}
-                    onChange={setShowAs}
-                  />
-                )}
-              </FormField>
-              <FormField label={t('field.location')}>
-                {(control) => (
-                  <Input
-                    {...control}
-                    value={location}
-                    onChange={(e) => setLocation(e.currentTarget.value)}
-                  />
-                )}
-              </FormField>
-            </div>
-          ) : null}
-
-          {showBlockFields ? (
-            <div className={styles.kindBlock}>
-              <FormField label={t('field.blockLabel')}>
-                {() => (
-                  <>
-                    <ToggleChipGroup label={t('field.blockLabel')}>
-                      {(['working', 'focus', 'oof', 'custom'] as const).map((preset) => (
-                        <ToggleChip
-                          key={preset}
-                          pressed={blockPreset === preset}
-                          onPressedChange={(v) => {
-                            if (v) setBlockPreset(preset);
-                          }}
-                        >
-                          {t(BLOCK_PRESET_KEYS[preset])}
-                        </ToggleChip>
-                      ))}
-                    </ToggleChipGroup>
-                    {blockPreset === 'custom' ? (
-                      <Input
-                        value={blockCustomLabel}
-                        onChange={(e) => setBlockCustomLabel(e.currentTarget.value)}
-                        style={{ marginBlockStart: 'var(--nf-space-2)' }}
-                      />
-                    ) : null}
-                  </>
-                )}
-              </FormField>
-            </div>
-          ) : null}
+            {showBlockFields ? (
+              <div className={styles.kindBlock}>
+                <FormField label={t('field.blockLabel')}>
+                  {() => (
+                    <>
+                      <ToggleChipGroup label={t('field.blockLabel')}>
+                        {(['working', 'focus', 'oof', 'custom'] as const).map((preset) => (
+                          <ToggleChip
+                            key={preset}
+                            pressed={blockPreset === preset}
+                            onPressedChange={(v) => {
+                              if (v) setBlockPreset(preset);
+                            }}
+                          >
+                            {t(BLOCK_PRESET_KEYS[preset])}
+                          </ToggleChip>
+                        ))}
+                      </ToggleChipGroup>
+                      {blockPreset === 'custom' ? (
+                        <Input
+                          value={blockCustomLabel}
+                          onChange={(e) => setBlockCustomLabel(e.currentTarget.value)}
+                          style={{ marginBlockStart: 'var(--nf-space-2)' }}
+                        />
+                      ) : null}
+                    </>
+                  )}
+                </FormField>
+              </div>
+            ) : null}
+          </div>
 
           {/* More options disclosure */}
           <Button

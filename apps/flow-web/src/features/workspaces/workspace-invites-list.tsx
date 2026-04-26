@@ -103,7 +103,7 @@ export default function WorkspaceInvitesList({
       <h3
         style={{
           fontFamily: 'var(--font-display)',
-          fontSize: '1rem',
+          fontSize: 'var(--nf-text-base)',
           margin: 0,
         }}
       >

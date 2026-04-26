@@ -36,10 +36,10 @@ function CountsRow({ counts }: { counts: WeeklyDigestCounts }): ReactElement {
       {items.map((item) => (
         <li key={item.key}>
           <Card style={{ padding: '0.625rem 0.75rem' }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}>
+            <div style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-fg-muted)' }}>
               {item.label}
             </div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>{counts[item.key]}</div>
+            <div style={{ fontSize: 'var(--nf-text-xl)', fontWeight: 600 }}>{counts[item.key]}</div>
           </Card>
         </li>
       ))}
@@ -93,7 +93,7 @@ export default function DigestView({ workspaceId }: { workspaceId: string }): Re
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <header style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-        <h1 style={{ margin: 0, fontSize: '1.5rem' }}>{t('weekly_digest.title')}</h1>
+        <h1 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)' }}>{t('weekly_digest.title')}</h1>
         <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.8125rem' }}>
           {t('weekly_digest.description')}
         </p>
@@ -120,7 +120,7 @@ export default function DigestView({ workspaceId }: { workspaceId: string }): Re
             style={{
               margin: 0,
               fontFamily: 'var(--font-mono)',
-              fontSize: '0.75rem',
+              fontSize: 'var(--nf-text-xs)',
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
             }}

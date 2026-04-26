@@ -83,7 +83,9 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
           gap: '1rem',
         }}
       >
-        <h1 style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: '1.5rem' }}>
+        <h1
+          style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 'var(--nf-text-2xl)' }}
+        >
           {t('providers.title')}
         </h1>
         <Button
@@ -97,7 +99,7 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
         </Button>
       </header>
 
-      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
+      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}>
         {t('providers.write_only_notice')}
       </p>
 
@@ -159,7 +161,9 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
                 >
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                     <strong>{p.name}</strong>
-                    <span style={{ color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
+                    <span
+                      style={{ color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}
+                    >
                       {kindLabel(p.kind)}
                       {p.defaultModel ? ` · ${p.defaultModel}` : ''}
                     </span>

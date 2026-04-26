@@ -93,8 +93,10 @@ export default function AutoActionSettingsPage({
       style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}
     >
       <header style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-        <h1 style={{ margin: 0, fontSize: '1.5rem' }}>{t('workspace.auto_actions.title')}</h1>
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
+        <h1 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)' }}>
+          {t('workspace.auto_actions.title')}
+        </h1>
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}>
           {t('workspace.auto_actions.description')}
         </p>
       </header>
@@ -144,7 +146,7 @@ export default function AutoActionSettingsPage({
             />
             <span
               style={{
-                fontSize: '0.875rem',
+                fontSize: 'var(--nf-text-sm)',
                 color: 'var(--nf-color-fg-muted)',
               }}
             >
@@ -179,7 +181,7 @@ export default function AutoActionSettingsPage({
               />
               <span
                 style={{
-                  fontSize: '0.875rem',
+                  fontSize: 'var(--nf-text-sm)',
                   fontVariantNumeric: 'tabular-nums',
                   minInlineSize: '3rem',
                   textAlign: 'end',
@@ -365,10 +367,10 @@ function AutoActionRulesSection({
     // inside the outer <form>, we rely on the button's onClick instead.
     <section style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
       <header style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-        <h2 style={{ margin: 0, fontSize: '1.125rem' }}>
+        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-lg)' }}>
           {t('workspace.auto_actions.rules.title')}
         </h2>
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}>
           {t('workspace.auto_actions.rules.description')}
         </p>
       </header>
@@ -378,7 +380,7 @@ function AutoActionRulesSection({
           style={{
             inlineSize: '100%',
             borderCollapse: 'collapse',
-            fontSize: '0.875rem',
+            fontSize: 'var(--nf-text-sm)',
           }}
         >
           <thead>
@@ -415,7 +417,7 @@ function AutoActionRulesSection({
                       </span>
                       <span
                         style={{
-                          fontSize: '0.75rem',
+                          fontSize: 'var(--nf-text-xs)',
                           color: 'var(--nf-color-fg-muted)',
                         }}
                       >

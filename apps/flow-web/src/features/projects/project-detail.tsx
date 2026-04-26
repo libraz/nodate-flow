@@ -224,7 +224,7 @@ function OverviewPanel({
         <div
           style={{
             marginInlineStart: 'auto',
-            fontSize: '0.875rem',
+            fontSize: 'var(--nf-text-sm)',
             color: 'var(--nf-color-fg-muted)',
           }}
         >
@@ -275,11 +275,15 @@ function OverviewPanel({
               gap: '0.125rem',
             }}
           >
-            <span style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}>
+            <span style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-fg-muted)' }}>
               {t(`tasks.status.${s}`)}
             </span>
             <span
-              style={{ fontSize: '1.25rem', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}
+              style={{
+                fontSize: 'var(--nf-text-xl)',
+                fontWeight: 600,
+                fontVariantNumeric: 'tabular-nums',
+              }}
             >
               {counts[s]}
             </span>
@@ -291,7 +295,7 @@ function OverviewPanel({
         params={{ id: workspaceId, projectId: id }}
         style={{
           alignSelf: 'flex-start',
-          fontSize: '0.875rem',
+          fontSize: 'var(--nf-text-sm)',
           color: 'var(--nf-color-accent)',
           textDecoration: 'none',
         }}

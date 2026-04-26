@@ -1,0 +1,56 @@
+{
+  "section": {
+    "title": "Linked events",
+    "expand": "Expand linked events",
+    "collapse": "Collapse linked events",
+    "count": "{count, plural, one {# linked} other {# linked}}"
+  },
+  "trigger": {
+    "linkEvent": "Link event"
+  },
+  "kind": {
+    "contributesTo": "Contributes to",
+    "blocks": "Blocks",
+    "label": "Link as"
+  },
+  "row": {
+    "unlink": "Unlink",
+    "unlinkAria": "Unlink {title}",
+    "openEvent": "Open {title}"
+  },
+  "time": {
+    "today": "today, {time}",
+    "tomorrow": "tomorrow, {time}",
+    "yesterday": "yesterday",
+    "inDays": "in {days, plural, one {# day} other {# days}} · {time}",
+    "lastWeekday": "last {weekday}",
+    "absolute": "{date}, {time}",
+    "absoluteAllDay": "{date}",
+    "allDay": "all-day"
+  },
+  "picker": {
+    "searchPlaceholder": "Search events…",
+    "noResults": "No events match \"{q}\".",
+    "alreadyLinked": "Already linked",
+    "pastDivider": "Past",
+    "esc": "Esc",
+    "loading": "Searching…"
+  },
+  "empty": {
+    "title": "No events linked yet",
+    "body": "Connect this task to a meeting or deadline.",
+    "cta": "Link event"
+  },
+  "toast": {
+    "linked": "Linked \"{title}\".",
+    "unlinked": "Unlinked \"{title}\".",
+    "undo": "Undo",
+    "linkFailed": "Couldn't link event. Please retry.",
+    "unlinkFailed": "Couldn't unlink. Please retry.",
+    "alreadyLinkedError": "This event is already linked."
+  },
+  "error": {
+    "fetchFailed": "Couldn't load linked events.",
+    "retry": "Retry"
+  }
+}

@@ -58,8 +58,12 @@ export default function TokenList({ workspaceId }: TokenListProps): ReactElement
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <h1 style={{ margin: 0, fontSize: '1.5rem' }}>{t('workspace.mcp_tokens.title')}</h1>
-          <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
+          <h1 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)' }}>
+            {t('workspace.mcp_tokens.title')}
+          </h1>
+          <p
+            style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}
+          >
             {t('workspace.mcp_tokens.description')}
           </p>
         </div>
@@ -84,7 +88,7 @@ export default function TokenList({ workspaceId }: TokenListProps): ReactElement
             style={{
               inlineSize: '100%',
               borderCollapse: 'collapse',
-              fontSize: '0.875rem',
+              fontSize: 'var(--nf-text-sm)',
             }}
           >
             <thead>

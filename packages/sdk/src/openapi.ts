@@ -5816,6 +5816,7 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
+            nextCursor: string | null;
             tasks: components["schemas"]["TaskListItem"][] | null;
             /** Format: int64 */
             total: number;
@@ -6137,6 +6138,7 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
+            nextCursor: string | null;
             tasks: components["schemas"]["MyTaskListItem"][] | null;
             /** Format: int64 */
             total: number;
@@ -6147,6 +6149,7 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
+            nextCursor: string | null;
             tasks: components["schemas"]["MyTaskListItem"][] | null;
             /** Format: int64 */
             total: number;
@@ -10358,6 +10361,8 @@ export interface operations {
             query?: {
                 /** @description Optional workspace public id to filter by */
                 workspaceId?: string;
+                /** @description Opaque cursor returned by previous page; pass to fetch next page. Empty when at end. */
+                cursor?: string;
                 limit?: number;
                 offset?: number;
             };
@@ -10551,6 +10556,8 @@ export interface operations {
     "me-tasks-list": {
         parameters: {
             query?: {
+                /** @description Opaque cursor returned by previous page; pass to fetch next page. Empty when at end. */
+                cursor?: string;
                 limit?: number;
                 offset?: number;
             };
@@ -10587,6 +10594,8 @@ export interface operations {
                 from: string;
                 /** @description Range end YYYY-MM-DD (inclusive) */
                 to: string;
+                /** @description Opaque cursor returned by previous page; pass to fetch next page. Empty when at end. */
+                cursor?: string;
                 limit?: number;
                 offset?: number;
             };
@@ -11346,6 +11355,8 @@ export interface operations {
                 state?: string[] | null;
                 /** @description Filter to tasks with this user as an assignee (user public id UUID v7) */
                 assignee?: string;
+                /** @description Opaque cursor returned by previous page; pass to fetch next page. Empty when at end. */
+                cursor?: string;
                 limit?: number;
                 offset?: number;
             };
@@ -11979,6 +11990,8 @@ export interface operations {
     "tasks-comments-list": {
         parameters: {
             query?: {
+                /** @description Opaque cursor returned by previous page; pass to fetch next page. Empty when at end. */
+                cursor?: string;
                 limit?: number;
                 offset?: number;
             };
@@ -18037,6 +18050,8 @@ export interface operations {
     "tasks-archived-list": {
         parameters: {
             query?: {
+                /** @description Opaque cursor returned by previous page; pass to fetch next page. Empty when at end. */
+                cursor?: string;
                 limit?: number;
                 offset?: number;
             };

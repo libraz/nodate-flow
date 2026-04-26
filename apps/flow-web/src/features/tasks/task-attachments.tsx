@@ -159,7 +159,7 @@ export default function TaskAttachments({ taskId }: TaskAttachmentsProps): React
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h2 style={{ margin: 0, fontSize: '1.125rem' }}>{t('tasks.attachments.title')}</h2>
+        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-lg)' }}>{t('tasks.attachments.title')}</h2>
         <div>
           <input
             ref={fileInputRef}

@@ -3,16 +3,52 @@
  *
  * All hooks are suspense-ready where applicable and participate in the
  * shared QueryClient (throwOnError, route-level ErrorBoundary).
+ *
+ * Cache invalidation policy (W5)
+ * ------------------------------
+ * Every mutation in this module follows the same matrix so the UI never
+ * goes stale after concurrent operations and we never broadcast a
+ * `tasksKeys.all` nuke without justification:
+ *
+ *   - Create  → invalidate the parent list key only
+ *               (`[...tasksKeys.all, 'list', projectId]`).
+ *   - Update  → setQueryData(detail) + invalidate(detail) +
+ *               invalidate every list key (`[...tasksKeys.all, 'list']`)
+ *               because the patch may move the task between filtered
+ *               views, plus the task timeline.
+ *   - Delete  → removeQueries(detail) + invalidate every list key.
+ *   - State transition → optimistic detail/list update,
+ *               then invalidate detail + every list key (or the
+ *               project-scoped list when projectId is known) +
+ *               replay panel + task timeline + project stats are
+ *               picked up via the list invalidation.
+ *   - Comments / actors / dependencies / attachments / steps →
+ *               invalidate that sub-key + the parent task detail +
+ *               the task timeline. They never invalidate the list
+ *               because the list payload does not embed any of these
+ *               sub-resources.
+ *
+ * Wherever a mutation broadcasts `[...tasksKeys.all, 'list']`
+ * (i.e. across all projects) the use site is documented inline.
+ *
+ * Cursor-paginated lists (W7)
+ * ---------------------------
+ * `tasksKeys.infinite(projectId, filters)` and `tasksKeys.myInfinite()`
+ * both sit under the `[...tasksKeys.all, 'list']` prefix, so every
+ * mutation that broadcasts list invalidation also refreshes the
+ * cursor-paginated surfaces. No new mutation paths are required.
  */
 
 import type { components } from '@nodate-flow/sdk';
 import {
   type UseMutationResult,
   type UseQueryResult,
+  type UseSuspenseInfiniteQueryResult,
   type UseSuspenseQueryResult,
   useMutation,
   useQuery,
   useQueryClient,
+  useSuspenseInfiniteQuery,
   useSuspenseQuery,
 } from '@tanstack/react-query';
 
@@ -22,6 +58,7 @@ import { replayKeys } from '../timeline/replay-api';
 
 export type Task = components['schemas']['Task'];
 export type TaskListItem = components['schemas']['TaskListItem'];
+export type MyTaskListItem = components['schemas']['MyTaskListItem'];
 export type TaskComment = components['schemas']['TaskComment'];
 export type TaskActor = components['schemas']['TaskActor'];
 export type TaskAttachment = components['schemas']['TaskAttachment'];
@@ -61,11 +98,28 @@ export interface TaskFilters {
   priority?: readonly TaskPriority[];
 }
 
-/** Query key factory for the tasks feature. */
+/**
+ * Query key factory for the tasks feature.
+ *
+ * Keyset pagination keys (W7)
+ * ---------------------------
+ * `infinite` is the cursor-paginated key used by `useTasksInfiniteQuery`,
+ * threading the cursor via TanStack's `pageParam` (NOT into the key
+ * itself — see W7 phase-3 plan). It shares the `[...tasksKeys.all, 'list']`
+ * prefix with `list`, so a mutation that broadcasts
+ * `invalidateQueries({ queryKey: [...tasksKeys.all, 'list'] })` refreshes
+ * both surfaces atomically.
+ *
+ * `myInfinite` is the cross-workspace `/me/tasks` infinite list. It is
+ * scoped under `tasksKeys.all` so it picks up the same broadcast.
+ */
 export const tasksKeys = {
   all: ['tasks'] as const,
   list: (projectId: string, filters?: TaskFilters) =>
     [...tasksKeys.all, 'list', projectId, filters ?? {}] as const,
+  infinite: (projectId: string, filters?: TaskFilters) =>
+    [...tasksKeys.all, 'list', projectId, 'infinite', filters ?? {}] as const,
+  myInfinite: () => [...tasksKeys.all, 'list', 'me', 'infinite'] as const,
   detail: (id: string) => [...tasksKeys.all, 'detail', id] as const,
   comments: (id: string) => [...tasksKeys.all, 'detail', id, 'comments'] as const,
   actors: (id: string) => [...tasksKeys.all, 'detail', id, 'actors'] as const,
@@ -223,6 +277,112 @@ export function useTasksQuery(
       }
       return tasks;
     },
+  });
+}
+
+/** Page size requested per call against `GET /tasks` for the infinite list. */
+const TASKS_PAGE_SIZE = 100;
+
+/** Shape of one page returned by `GET /tasks`. */
+export interface TasksPage {
+  tasks: TaskListItem[];
+  nextCursor: string | null;
+}
+
+/**
+ * GET /tasks — cursor-paginated infinite query for a project.
+ *
+ * Pre-v1 contract: an empty cursor fetches the first page; the response
+ * carries `nextCursor: string | null`, where `null` means no more pages.
+ * The cursor is threaded through `pageParam` and MUST NOT be folded into
+ * the queryKey explicitly.
+ *
+ * Mirrors `useTasksQuery` in shape (same project + filter args, same
+ * client-side priority filter) but exposes the standard infinite-query
+ * surface so virtualizers can call `fetchNextPage()` near the scroll end.
+ *
+ * Lives under the `[...tasksKeys.all, 'list']` invalidation prefix so the
+ * existing W5 mutation policy (create / update / delete / transition all
+ * broadcast list invalidation) refreshes both surfaces atomically.
+ */
+export function useTasksInfiniteQuery(
+  projectId: string,
+  filters?: TaskFilters,
+): UseSuspenseInfiniteQueryResult<
+  { pages: TasksPage[]; pageParams: readonly (string | undefined)[] },
+  ApiError
+> {
+  return useSuspenseInfiniteQuery({
+    queryKey: tasksKeys.infinite(projectId, filters),
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam }): Promise<TasksPage> => {
+      const search = filters?.search?.trim() ?? '';
+      const states = filters?.states ?? [];
+      const assignee = filters?.assigneeId?.trim() ?? '';
+      const priorities = filters?.priority ?? [];
+      const query: {
+        projectId: string;
+        limit: number;
+        cursor?: string;
+        q?: string;
+        state?: string[];
+        assignee?: string;
+      } = {
+        projectId,
+        limit: TASKS_PAGE_SIZE,
+      };
+      if (pageParam) query.cursor = pageParam;
+      if (search.length > 0) query.q = search;
+      if (states.length > 0) query.state = [...states];
+      if (assignee.length > 0) query.assignee = assignee;
+      const { data, error } = await sdk.GET('/tasks', { params: { query } });
+      if (error || !data) throw toApiError(error, 'Failed to load tasks');
+      let tasks = data.tasks ?? [];
+      // Client-side priority filter (API does not support priority param yet).
+      // Applied per page so subsequent pages use the same predicate.
+      if (priorities.length > 0) {
+        const allowed = new Set<number>(priorities);
+        tasks = tasks.filter((t) => allowed.has(t.priority));
+      }
+      return {
+        tasks,
+        nextCursor: data.nextCursor ?? null,
+      };
+    },
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+  });
+}
+
+/** Shape of one page returned by `GET /me/tasks`. */
+export interface MyTasksPage {
+  tasks: MyTaskListItem[];
+  nextCursor: string | null;
+}
+
+/**
+ * GET /me/tasks — cursor-paginated infinite list of tasks where the
+ * authenticated user is an actor across every workspace.
+ *
+ * Same pageParam convention as {@link useTasksInfiniteQuery}.
+ */
+export function useMyTasksInfiniteQuery(): UseSuspenseInfiniteQueryResult<
+  { pages: MyTasksPage[]; pageParams: readonly (string | undefined)[] },
+  ApiError
+> {
+  return useSuspenseInfiniteQuery({
+    queryKey: tasksKeys.myInfinite(),
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam }): Promise<MyTasksPage> => {
+      const query: { limit: number; cursor?: string } = { limit: TASKS_PAGE_SIZE };
+      if (pageParam) query.cursor = pageParam;
+      const { data, error } = await sdk.GET('/me/tasks', { params: { query } });
+      if (error || !data) throw toApiError(error, 'Failed to load my tasks');
+      return {
+        tasks: data.tasks ?? [],
+        nextCursor: data.nextCursor ?? null,
+      };
+    },
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
 }
 

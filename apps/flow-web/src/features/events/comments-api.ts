@@ -14,6 +14,13 @@
  * `CommentResponse` exposes `userId` + `displayName` (not `authorId` /
  * `authorDisplayName`), so consumers must not assume the task-side
  * shape.
+ *
+ * Cache invalidation policy (W5)
+ * ------------------------------
+ *   - Add / Edit / Delete → invalidate the comments list key only.
+ *
+ * The event detail DTO does not embed a comment count, so the detail
+ * key is intentionally not refreshed here.
  */
 
 import type { components } from '@nodate-flow/sdk';

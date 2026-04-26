@@ -166,6 +166,13 @@ export default function AvatarUpload({ user }: AvatarUploadProps): ReactElement 
   const primaryInFlight = uploadMut.isPending
     ? t('settings:profile.avatar.uploading')
     : primaryLabel;
+  // The circular preview is an icon-only file-picker trigger (it
+  // composites an avatar/initials with a centered Camera glyph), so
+  // its accessible name needs to read fully on its own — the visible
+  // sibling button is the textual fallback for sighted users.
+  const previewAriaLabel = hasImage
+    ? t('settings:profile.avatar.replace_aria')
+    : t('settings:profile.avatar.upload_aria');
 
   return (
     <section className={styles.root} aria-describedby={descriptionId}>
@@ -182,7 +189,7 @@ export default function AvatarUpload({ user }: AvatarUploadProps): ReactElement 
           className={styles.preview}
           onClick={openPicker}
           disabled={busy}
-          aria-label={primaryLabel}
+          aria-label={previewAriaLabel}
         >
           {previewSrc ? (
             <img

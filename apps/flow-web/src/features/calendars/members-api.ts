@@ -8,10 +8,20 @@
  *   - {@link useUpdateCalendarMemberRoleMutation} PATCH  .../members/{userId}
  *   - {@link useRemoveCalendarMemberMutation}      DELETE .../members/{userId}
  *
- * Mutations invalidate the calendar members list and the calendars-rail
- * caches (the rail depends on membership for the leave action's
- * eligibility), plus the cross-workspace event aggregate so the grid
- * refreshes if a removed member's events should disappear.
+ * Cache invalidation policy (W5)
+ * ------------------------------
+ * Centralised through the local `invalidate()` helper:
+ *
+ *   - Add / Update role / Remove → invalidate
+ *       1. the per-calendar members list,
+ *       2. the per-workspace calendar list owned by `calendar-events`,
+ *       3. the cross-workspace `me-events` aggregate that drives the
+ *          main grid,
+ *       4. the per-workspace `discoverable` list shown by the rail.
+ *
+ * The rail depends on membership for the leave action's eligibility
+ * and the grid depends on it for "should this member's events be
+ * visible". This is intentionally broader than the members list alone.
  */
 
 import type { components } from '@nodate-flow/sdk';

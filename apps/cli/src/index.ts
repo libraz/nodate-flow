@@ -5,6 +5,16 @@ import { c, createCLI, prompt, table } from '@libraz/node-cli';
 
 import { createAuthClient, createFlowClient } from './api.js';
 import { clearCredentials, getFlowApiUrl, loadCredentials, saveCredentials } from './config.js';
+import {
+  STATE_TRANSITIONS,
+  type SdkClientLike,
+  type SearchOptions as SearchOptionsInput,
+  type UpdateOptions as UpdateOptionsInput,
+  buildSearchQuery,
+  buildUpdatePlan,
+  executeSearch,
+  executeUpdate,
+} from './task-builders.js';
 
 const cli = createCLI({
   name: 'tnk',
@@ -257,6 +267,13 @@ task
 // ---------------------------------------------------------------------------
 // tnk task update <id>
 // ---------------------------------------------------------------------------
+//
+// The `--state` flag accepts a state-machine transition name (see
+// STATE_TRANSITIONS). State changes are not part of `PATCH /tasks/{id}`
+// on the server, so when both patch fields and a state transition are
+// supplied we issue the patch first and the transition second. See
+// `task-builders.ts` for the pure builder + executor used here.
+
 task
   .command('update <id>')
   .description('Update a task')
@@ -280,6 +297,12 @@ task
     description: 'Priority (0-3)',
     type: 'number',
   })
+  .option('--state <state>', {
+    description:
+      'Apply a state-machine transition: start, block, unblock, submit, complete, reopen, cancel',
+    type: 'string',
+    choices: [...STATE_TRANSITIONS],
+  })
   .option('--visibility <visibility>', {
     description: 'Visibility: public, project, or private',
     type: 'string',
@@ -288,27 +311,32 @@ task
   .action(async ({ args, options, stdout, stderr }) => {
     const id = args.id as string;
 
-    const body: Record<string, unknown> = {};
-    if (options.title !== undefined) body.title = options.title;
-    if (options.description !== undefined) body.description = options.description;
-    if (options.due !== undefined) body.dueOn = options.due;
-    if (options.start !== undefined) body.startOn = options.start;
-    if (options.priority !== undefined) body.priority = options.priority;
-    if (options.visibility !== undefined) body.visibility = options.visibility;
+    // Build the options object with `exactOptionalPropertyTypes`-friendly
+    // property assignments so each key is omitted entirely when the user
+    // didn't pass the matching flag.
+    const updateOptions: UpdateOptionsInput = {};
+    if (options.title !== undefined) updateOptions.title = options.title as string;
+    if (options.description !== undefined)
+      updateOptions.description = options.description as string;
+    if (options.due !== undefined) updateOptions.due = options.due as string;
+    if (options.start !== undefined) updateOptions.start = options.start as string;
+    if (options.priority !== undefined) updateOptions.priority = options.priority as number;
+    if (options.state !== undefined) updateOptions.state = options.state as string;
+    if (options.visibility !== undefined)
+      updateOptions.visibility = options.visibility as 'public' | 'project' | 'private';
 
-    if (Object.keys(body).length === 0) {
+    const plan = buildUpdatePlan(updateOptions);
+
+    if (!plan) {
       stderr.write(
-        'No fields to update. Use --title, --description, --due, --start, --priority, or --visibility.\n',
+        'No fields to update. Use --title, --description, --due, --start, --priority, --state, or --visibility.\n',
       );
       process.exitCode = 1;
       return;
     }
 
-    const client = createFlowClient();
-
-    const patchOpts = { params: { path: { id } }, body };
-    // biome-ignore lint/suspicious/noExplicitAny: body is built dynamically
-    const { data, error } = await client.PATCH('/tasks/{id}', patchOpts as any);
+    const client = createFlowClient() as unknown as SdkClientLike;
+    const { data, error } = await executeUpdate(client, id, plan);
 
     if (error) {
       const msg =
@@ -320,9 +348,116 @@ task
       return;
     }
 
-    stdout.write(c`{green Updated} task ${data.id}\n`);
-    stdout.write(`Title: ${data.title}\n`);
-    stdout.write(`State: ${data.derivedState}\n`);
+    const latest = data as
+      | {
+          id: string;
+          title: string;
+          derivedState: string;
+        }
+      | undefined;
+    if (!latest) {
+      stderr.write(c`{red Error}: No update applied\n`);
+      process.exitCode = 1;
+      return;
+    }
+
+    stdout.write(c`{green Updated} task ${latest.id}\n`);
+    stdout.write(`Title: ${latest.title}\n`);
+    stdout.write(`State: ${latest.derivedState}\n`);
+  });
+
+// ---------------------------------------------------------------------------
+// tnk task search <query>
+// ---------------------------------------------------------------------------
+task
+  .command('search <query>')
+  .description('Search tasks by title (case-insensitive substring match)')
+  .option('-w, --workspace <workspaceId>', {
+    description: 'Workspace public id (required when --project is not given)',
+    type: 'string',
+  })
+  .option('-p, --project <projectId>', {
+    description: 'Project public id (alternative to --workspace)',
+    type: 'string',
+  })
+  .option('-l, --limit <limit>', {
+    description: 'Maximum number of tasks to return',
+    type: 'number',
+    default: 20,
+  })
+  .action(async ({ args, options, stdout, stderr }) => {
+    const searchOptions: SearchOptionsInput = {};
+    if (options.workspace !== undefined) searchOptions.workspaceId = options.workspace as string;
+    if (options.project !== undefined) searchOptions.projectId = options.project as string;
+    if (options.limit !== undefined) searchOptions.limit = options.limit as number;
+
+    const result = buildSearchQuery(args.query as string, searchOptions);
+
+    if (result === 'empty_query') {
+      stderr.write('Search query must not be empty.\n');
+      process.exitCode = 1;
+      return;
+    }
+    if (result === 'missing_scope') {
+      stderr.write('Either --workspace or --project must be provided to scope the search.\n');
+      process.exitCode = 1;
+      return;
+    }
+
+    const client = createFlowClient() as unknown as SdkClientLike;
+    const { data, error } = await executeSearch(client, result);
+
+    if (error) {
+      const msg =
+        typeof error === 'object' && error !== null && 'detail' in error
+          ? String((error as Record<string, unknown>).detail)
+          : 'Failed to search tasks';
+      stderr.write(c`{red Error}: ${msg}\n`);
+      process.exitCode = 1;
+      return;
+    }
+
+    const payload = data as
+      | {
+          tasks?: Array<{
+            id: string;
+            title: string;
+            derivedState: string;
+            priority: number;
+            dueOn?: string | null;
+          }>;
+          total?: number;
+        }
+      | undefined;
+
+    const tasks = payload?.tasks;
+    if (!tasks || tasks.length === 0) {
+      stdout.write('No tasks found.\n');
+      return;
+    }
+
+    const rows = tasks.map((t) => ({
+      id: t.id.slice(0, 8),
+      title: t.title.length > 50 ? `${t.title.slice(0, 47)}...` : t.title,
+      state: t.derivedState,
+      priority: String(t.priority),
+      due: t.dueOn ?? '-',
+    }));
+
+    const output = table(rows, {
+      columns: ['id', 'title', 'state', 'priority', 'due'],
+      headerLabels: {
+        id: 'ID',
+        title: 'Title',
+        state: 'State',
+        priority: 'Pri',
+        due: 'Due',
+      },
+      border: 'simple',
+    });
+
+    stdout.write(output);
+    stdout.write(`\n${payload?.total ?? tasks.length} task(s) total\n`);
   });
 
 // ---------------------------------------------------------------------------

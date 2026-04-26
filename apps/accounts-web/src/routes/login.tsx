@@ -26,6 +26,7 @@ import {
   selectIsAuthenticated,
   useAuth,
 } from '../features/auth/auth-store';
+import OAuthButtonRow from '../features/oauth/oauth-button-row';
 import type { ProblemJson } from '../lib/api-error';
 import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../lib/auth-errors';
 import { sdk } from '../lib/sdk';
@@ -176,21 +177,6 @@ function LoginPage(): ReactElement {
     setRecoveryCode('');
     setUseRecovery(false);
     setServerError(null);
-  };
-
-  const handleSSOStart = async (provider: 'google' | 'github' | 'microsoft'): Promise<void> => {
-    setServerError(null);
-    try {
-      const { data, error } = await sdk.GET(`/auth/oidc/${provider}/start` as never);
-      if (error || !data) {
-        setServerError(mapAuthError(error as ProblemJson | undefined));
-        return;
-      }
-      const result = data as { authorizationUrl: string };
-      window.location.href = result.authorizationUrl;
-    } catch (err) {
-      setServerError(mapAuthThrown(err));
-    }
   };
 
   const handleMagicLinkSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
@@ -510,69 +496,7 @@ function LoginPage(): ReactElement {
           {isSubmitting ? t('login.submitting') : t('login.submit')}
         </Button>
 
-        {caps && (caps.oidcGoogle || caps.oidcGithub || caps.oidcMicrosoft) && (
-          <>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--nf-space-3, 0.75rem)',
-                color: 'var(--nf-color-fg-muted)',
-                fontSize: 'var(--nf-text-sm, 0.875rem)',
-              }}
-            >
-              <hr
-                style={{ flex: 1, border: 'none', borderTop: '1px solid var(--nf-color-border)' }}
-              />
-              <span>{t('login.sso_divider')}</span>
-              <hr
-                style={{ flex: 1, border: 'none', borderTop: '1px solid var(--nf-color-border)' }}
-              />
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 'var(--nf-space-3, 0.75rem)',
-              }}
-            >
-              {caps.oidcGoogle && (
-                <Button
-                  type="button"
-                  variant="default"
-                  onClick={() => {
-                    void handleSSOStart('google');
-                  }}
-                >
-                  {t('login.sso_google')}
-                </Button>
-              )}
-              {caps.oidcGithub && (
-                <Button
-                  type="button"
-                  variant="default"
-                  onClick={() => {
-                    void handleSSOStart('github');
-                  }}
-                >
-                  {t('login.sso_github')}
-                </Button>
-              )}
-              {caps.oidcMicrosoft && (
-                <Button
-                  type="button"
-                  variant="default"
-                  onClick={() => {
-                    void handleSSOStart('microsoft');
-                  }}
-                >
-                  {t('login.sso_microsoft')}
-                </Button>
-              )}
-            </div>
-          </>
-        )}
+        <OAuthButtonRow mode="login" onError={setServerError} />
 
         {caps?.magicLink && (
           <>

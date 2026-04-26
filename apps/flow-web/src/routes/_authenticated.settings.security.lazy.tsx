@@ -25,7 +25,7 @@ const sectionStyle = {
 
 const sectionHeadingStyle = {
   margin: 0,
-  fontSize: '1rem',
+  fontSize: 'var(--nf-text-base)',
   fontWeight: 600,
   color: 'var(--nf-color-fg)',
   paddingBlockEnd: '0.75rem',
@@ -36,7 +36,7 @@ function SecurityRoute(): ReactElement {
   const { t } = useTranslation('settings');
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      <h1 style={{ margin: 0, fontSize: '1.5rem' }}>{t('security.title')}</h1>
+      <h1 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)' }}>{t('security.title')}</h1>
 
       <section style={sectionStyle}>
         <h2 style={sectionHeadingStyle}>{t('security.password.title')}</h2>

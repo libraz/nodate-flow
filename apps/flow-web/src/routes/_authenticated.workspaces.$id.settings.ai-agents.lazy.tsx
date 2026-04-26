@@ -131,7 +131,7 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
                 </div>
                 <code
                   style={{
-                    fontSize: '0.75rem',
+                    fontSize: 'var(--nf-text-xs)',
                     color: 'var(--nf-color-fg-muted)',
                     fontFamily: 'var(--font-mono)',
                   }}
@@ -140,7 +140,13 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
                 </code>
               </header>
               {agent.description ? (
-                <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
+                <p
+                  style={{
+                    margin: 0,
+                    color: 'var(--nf-color-fg-muted)',
+                    fontSize: 'var(--nf-text-sm)',
+                  }}
+                >
                   {agent.description}
                 </p>
               ) : null}
@@ -157,7 +163,7 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
                     display: 'flex',
                     gap: '0.5rem',
                     alignItems: 'center',
-                    fontSize: '0.875rem',
+                    fontSize: 'var(--nf-text-sm)',
                   }}
                 >
                   <label
@@ -263,7 +269,7 @@ function EventTriggersEditor({
         display: 'flex',
         gap: '0.5rem',
         alignItems: 'center',
-        fontSize: '0.875rem',
+        fontSize: 'var(--nf-text-sm)',
       }}
     >
       <label htmlFor={`agent-events-${agentId}`} style={{ color: 'var(--nf-color-fg-muted)' }}>
@@ -364,7 +370,7 @@ function CreateAgentForm({
         gap: '0.75rem',
       }}
     >
-      <h2 style={{ margin: 0, fontSize: '1rem' }}>{t('agents.create.title')}</h2>
+      <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>{t('agents.create.title')}</h2>
       <FormField label={t('agents.create.name')}>
         {(control) => (
           <Input
@@ -472,7 +478,7 @@ function AiAgentsRoute(): ReactElement {
         }}
       >
         <div>
-          <h1 style={{ margin: 0, fontSize: '1.25rem' }}>{t('agents.title')}</h1>
+          <h1 style={{ margin: 0, fontSize: 'var(--nf-text-xl)' }}>{t('agents.title')}</h1>
           <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{t('agents.subtitle')}</p>
         </div>
         {creating ? null : (

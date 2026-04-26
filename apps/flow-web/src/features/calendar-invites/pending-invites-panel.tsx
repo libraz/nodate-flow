@@ -16,7 +16,7 @@ import { Calendar as CalendarIcon, Clock, MapPin } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ApiError, toApiError } from '../../lib/api-error';
+import { formatApiError, toApiError } from '../../lib/api-error';
 import { formatEpochDateTime } from '../../lib/format';
 import { sdk } from '../../lib/sdk';
 import styles from './pending-invites-panel.module.css';
@@ -179,7 +179,7 @@ export default function PendingInvitesPanel(): ReactElement {
   }
 
   if (error) {
-    const message = error instanceof ApiError ? error.message : t('invites.inbox.load_error');
+    const message = formatApiError(error, t, 'invites.inbox.load_error');
     return (
       <aside aria-label={t('invites.inbox.title')} className={styles.panel}>
         <PanelHeader count={null} />

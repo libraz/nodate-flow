@@ -1,4 +1,5 @@
 import Icon from '@nodate-flow/ui/icon';
+import Avatar from '@nodate-flow/ui/primitives/avatar';
 import Popover from '@nodate-flow/ui/primitives/popover';
 import { useNavigate } from '@tanstack/react-router';
 
@@ -33,22 +34,8 @@ export default function TopBar(): ReactElement {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const user = useAuth(selectUser);
   const initials = initialsFrom(user?.displayName);
-  // Fall back to initials when the image fails to load (e.g. the proxy
-  // 404s after a stale `?v=` token, or an external OIDC URL is down).
-  // Reset whenever the avatarUrl itself changes so a new upload is
-  // given a fresh shot at loading.
   const avatarUrl = user?.avatarUrl ?? null;
-  const [trackedAvatarUrl, setTrackedAvatarUrl] = useState<string | null>(avatarUrl);
-  const [avatarFailed, setAvatarFailed] = useState(false);
-  // Derived-state reset: when the avatarUrl changes (new upload,
-  // removal, or user switch), clear the cached failure flag so the
-  // new URL gets a fresh load attempt. Setting state during render
-  // is explicitly allowed for this "reset on prop change" pattern.
-  if (avatarUrl !== trackedAvatarUrl) {
-    setTrackedAvatarUrl(avatarUrl);
-    setAvatarFailed(false);
-  }
-  const showAvatarImage = Boolean(avatarUrl) && !avatarFailed;
+  const avatarLabel = t('topbar.user_menu.avatar_alt', { name: user?.displayName ?? '' });
 
   const handleLogout = async (): Promise<void> => {
     try {
@@ -178,16 +165,12 @@ export default function TopBar(): ReactElement {
                 aria-haspopup="menu"
                 title={user?.displayName ?? ''}
               >
-                {showAvatarImage && avatarUrl ? (
-                  <img
-                    className={styles.avatarImage}
-                    src={avatarUrl}
-                    alt={t('topbar.user_menu.avatar_alt', { name: user?.displayName ?? '' })}
-                    onError={() => setAvatarFailed(true)}
-                  />
-                ) : (
-                  <span aria-hidden="true">{initials}</span>
-                )}
+                <Avatar
+                  alt={avatarLabel}
+                  initials={initials}
+                  size="md"
+                  {...(avatarUrl ? { src: avatarUrl } : {})}
+                />
               </button>
             </Popover>
           </div>

@@ -157,7 +157,7 @@ function AuthenticatedLayout(): ReactElement | null {
                   background: 'var(--nf-color-accent)',
                   color: 'var(--nf-color-fg-on-accent)',
                   textDecoration: 'none',
-                  fontSize: '0.875rem',
+                  fontSize: 'var(--nf-text-sm)',
                 }}
               >
                 {t('tasks.quick_create.no_projects.cta')}

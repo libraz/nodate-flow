@@ -35,7 +35,7 @@ function InvocationRow({ row }: { row: AiInvocation }): ReactElement {
             <span
               style={{
                 fontFamily: 'var(--font-mono)',
-                fontSize: '0.75rem',
+                fontSize: 'var(--nf-text-xs)',
                 color: 'var(--nf-color-fg-muted)',
               }}
             >
@@ -44,7 +44,7 @@ function InvocationRow({ row }: { row: AiInvocation }): ReactElement {
             <span
               style={{
                 marginInlineStart: 'auto',
-                fontSize: '0.75rem',
+                fontSize: 'var(--nf-text-xs)',
                 color: 'var(--nf-color-fg-muted)',
               }}
             >
@@ -54,7 +54,7 @@ function InvocationRow({ row }: { row: AiInvocation }): ReactElement {
           <p
             style={{
               margin: 0,
-              fontSize: '0.75rem',
+              fontSize: 'var(--nf-text-xs)',
               color: 'var(--nf-color-fg-muted)',
               whiteSpace: 'pre-wrap',
               overflow: 'hidden',
@@ -68,7 +68,7 @@ function InvocationRow({ row }: { row: AiInvocation }): ReactElement {
             {row.promptRedacted}
           </p>
           {row.errorCode ? (
-            <span style={{ fontSize: '0.75rem', color: 'var(--nf-color-danger)' }}>
+            <span style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-danger)' }}>
               {t('ai_activity.error_code', { code: row.errorCode })}
             </span>
           ) : null}
@@ -88,8 +88,8 @@ export default function InvocationsList({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <header style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-        <h1 style={{ margin: 0, fontSize: '1.5rem' }}>{t('ai_activity.title')}</h1>
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
+        <h1 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)' }}>{t('ai_activity.title')}</h1>
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}>
           {t('ai_activity.description')}
         </p>
       </header>
@@ -102,7 +102,7 @@ export default function InvocationsList({
             border: '1px dashed var(--nf-color-border, var(--nf-color-border))',
             borderRadius: '0.75rem',
             background: 'var(--nf-color-bg-sunken, transparent)',
-            fontSize: '0.875rem',
+            fontSize: 'var(--nf-text-sm)',
           }}
         >
           {t('ai_activity.empty')}

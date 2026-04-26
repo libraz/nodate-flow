@@ -4,11 +4,13 @@
  * `<details>` block when non-empty.
  */
 
+import { buildAvatarUrl } from '@nodate-flow/sdk';
 import Avatar from '@nodate-flow/ui/primitives/avatar';
 import type { TFunction } from 'i18next';
 import type { ReactElement, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { authApiBaseUrl } from '../../lib/sdk';
 import type { TimelineEvent } from './api';
 
 export interface EventCardProps {
@@ -273,7 +275,7 @@ function humanizePayload(type: string, payload: unknown, t: TFunction, locale: s
         padding: '0.5rem',
         background: 'var(--nf-color-surface))',
         borderRadius: '0.25rem',
-        fontSize: '0.75rem',
+        fontSize: 'var(--nf-text-xs)',
         display: 'flex',
         flexDirection: 'column',
         gap: '0.125rem',
@@ -323,6 +325,14 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
   const payloadVisible = hasPayload(event.payload);
   const tag = eventSourceTag(event.type, event.payload);
 
+  // Actor avatar URL: only resolve when the event carries a real user
+  // id. AI/MCP/system events have no user behind them, so they fall
+  // through to the initials placeholder rendered by the Avatar primitive.
+  const actorAvatarSrc =
+    event.actorUserId && event.actorUserId.length > 0
+      ? buildAvatarUrl(event.actorUserId, authApiBaseUrl)
+      : undefined;
+
   return (
     <div
       style={{
@@ -359,7 +369,12 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
             zIndex: 1,
           }}
         >
-          <Avatar alt={actorLabel} initials={initials} size="sm" />
+          <Avatar
+            alt={actorLabel}
+            initials={initials}
+            size="sm"
+            {...(actorAvatarSrc ? { src: actorAvatarSrc } : {})}
+          />
         </div>
       </div>
 
@@ -400,7 +415,7 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
             style={{
               marginInlineStart: 'auto',
               color: 'var(--nf-color-fg-muted)',
-              fontSize: '0.75rem',
+              fontSize: 'var(--nf-text-xs)',
               fontVariantNumeric: 'tabular-nums',
             }}
           >
@@ -410,7 +425,11 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
         {payloadVisible ? (
           <details>
             <summary
-              style={{ cursor: 'pointer', color: 'var(--nf-color-fg-muted)', fontSize: '0.75rem' }}
+              style={{
+                cursor: 'pointer',
+                color: 'var(--nf-color-fg-muted)',
+                fontSize: 'var(--nf-text-xs)',
+              }}
             >
               {kindLabel}
             </summary>

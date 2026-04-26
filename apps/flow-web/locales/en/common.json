@@ -305,7 +305,9 @@
       "search_placeholder": "Search by name...",
       "empty": "No teammate calendars to subscribe to",
       "subscribe": "Subscribe",
-      "subscribed_toast": "Subscribed to {name}"
+      "subscribed_toast": "Subscribed to {name}",
+      "load_error": "Could not load teammate calendars. Please try again.",
+      "subscribe_error": "Could not subscribe. Please try again."
     },
     "holidays": {
       "trigger": "Subscribe holiday calendar...",
@@ -586,7 +588,9 @@
     },
     "list": {
       "select_row": "Select row {index}",
-      "select_all": "Select all rows"
+      "select_all": "Select all rows",
+      "load_more": "Load more",
+      "loading_more": "Loading more tasks…"
     },
     "columns": {
       "title": "Title",
@@ -663,7 +667,8 @@
       "drop_hint": "Drop here to move",
       "moved_to": "Moved to {state}",
       "move_menu": "Move task",
-      "move_to": "Move to {state}"
+      "move_to": "Move to {state}",
+      "dnd_disabled_hint": "Use the state dropdown to change a task's state."
     },
     "assignee": {
       "plus_n": "+{n, plural, one {# more} other {# more}}",

@@ -35,7 +35,7 @@ export default function ShortcutsHelpDialog({
           <div key={sectionKey}>
             <h3
               style={{
-                fontSize: '0.75rem',
+                fontSize: 'var(--nf-text-xs)',
                 fontWeight: 600,
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
@@ -56,7 +56,7 @@ export default function ShortcutsHelpDialog({
                     padding: '0.25rem 0',
                   }}
                 >
-                  <span style={{ fontSize: '0.875rem' }}>{t(b.labelKey)}</span>
+                  <span style={{ fontSize: 'var(--nf-text-sm)' }}>{t(b.labelKey)}</span>
                   <span style={{ display: 'flex', gap: '0.25rem' }}>
                     {b.keys.split(' ').map((k) => (
                       <kbd
@@ -71,7 +71,7 @@ export default function ShortcutsHelpDialog({
                           borderRadius: '0.25rem',
                           border: '1px solid var(--nf-color-border))',
                           backgroundColor: 'var(--nf-color-bg-elevated))',
-                          fontSize: '0.75rem',
+                          fontSize: 'var(--nf-text-xs)',
                           fontFamily: 'inherit',
                         }}
                       >

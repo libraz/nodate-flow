@@ -36,8 +36,6 @@ function aTaskItem(overrides: Partial<TaskListItem> = {}): TaskListItem {
 function defaultProps(overrides: Partial<TaskCardProps> = {}): TaskCardProps {
   return {
     task: aTaskItem(),
-    onDragStart: vi.fn(),
-    onDragEnd: vi.fn(),
     onSelect: vi.fn(),
     onTransition: vi.fn(),
     ...overrides,
@@ -110,14 +108,25 @@ describe('<TaskCard>', () => {
     renderWithProviders(<TaskCard {...defaultProps({ onSelect })} />);
 
     const user = userEvent.setup();
-    // Click on the card area (not the title link).
-    // The Card component wraps everything; find it by its class.
-    const card = screen.getByRole('link', { name: 'Design auth flow' }).closest('[draggable]');
+    // Click on the card area (not the title link). The Card component
+    // wraps everything; locate it via its non-draggable attribute.
+    const card = screen
+      .getByRole('link', { name: 'Design auth flow' })
+      .closest('[draggable="false"]');
     expect(card).toBeDefined();
     if (card) {
       await user.click(card);
       expect(onSelect).toHaveBeenCalledWith('task-001');
     }
+  });
+
+  it('is not draggable while D&D is disabled', () => {
+    renderWithProviders(<TaskCard {...defaultProps()} />);
+    const card = screen
+      .getByRole('link', { name: 'Design auth flow' })
+      .closest('[draggable="false"]');
+    expect(card).not.toBeNull();
+    expect(card?.getAttribute('draggable')).toBe('false');
   });
 
   it('has no a11y violations', async () => {

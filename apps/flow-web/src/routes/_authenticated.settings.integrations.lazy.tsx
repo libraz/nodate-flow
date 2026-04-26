@@ -47,7 +47,7 @@ function IntegrationsRoute(): ReactElement {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <h1 style={{ margin: 0, fontSize: '1.5rem' }}>{t('integrations.title')}</h1>
+      <h1 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)' }}>{t('integrations.title')}</h1>
       <Suspense
         fallback={
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>

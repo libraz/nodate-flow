@@ -13,7 +13,6 @@
 import Avatar from '@nodate-flow/ui/primitives/avatar';
 import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
-import { confirm } from '@nodate-flow/ui/primitives/confirm';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import Select from '@nodate-flow/ui/primitives/select';
@@ -22,6 +21,7 @@ import { type ChangeEvent, type FormEvent, type ReactElement, useState } from 'r
 import { useTranslation } from 'react-i18next';
 
 import { ApiError } from '../../lib/api-error';
+import { confirmAction } from '../../lib/confirm-action';
 import styles from './calendar-members-tab.module.css';
 import {
   type AddableRole,
@@ -85,7 +85,7 @@ export default function CalendarMembersTab({
       toaster.show({ tone: 'warning', message: t('calendar.settings.members.last_owner_block') });
       return;
     }
-    const ok = await confirm.ask({
+    const ok = await confirmAction({
       title: t('calendar.settings.members.remove_confirm_title'),
       message: t('calendar.settings.members.remove_confirm', { name: member.displayName }),
       tone: 'danger',

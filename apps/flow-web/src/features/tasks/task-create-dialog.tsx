@@ -413,7 +413,7 @@ function SmartCreateSection({
       {proposalError && !proposing && (
         <p
           role="alert"
-          style={{ color: 'var(--nf-color-danger)', margin: 0, fontSize: '0.875rem' }}
+          style={{ color: 'var(--nf-color-danger)', margin: 0, fontSize: 'var(--nf-text-sm)' }}
         >
           {t('tasks.smart_create.error')}
         </p>
@@ -428,7 +428,7 @@ function SmartCreateSection({
               <legend
                 style={{
                   fontWeight: 600,
-                  fontSize: '0.875rem',
+                  fontSize: 'var(--nf-text-sm)',
                   marginBlockEnd: '0.5rem',
                 }}
               >
@@ -455,7 +455,7 @@ function SmartCreateSection({
               <legend
                 style={{
                   fontWeight: 600,
-                  fontSize: '0.875rem',
+                  fontSize: 'var(--nf-text-sm)',
                   marginBlockEnd: '0.5rem',
                 }}
               >
@@ -478,7 +478,13 @@ function SmartCreateSection({
 
           {/* No suggestions */}
           {proposal.suggestedAssignees.length === 0 && proposal.subtasks.length === 0 && (
-            <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--nf-color-fg-muted)' }}>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 'var(--nf-text-sm)',
+                color: 'var(--nf-color-fg-muted)',
+              }}
+            >
               {t('tasks.smart_create.no_suggestions')}
             </p>
           )}
@@ -522,20 +528,23 @@ function AssigneeSuggestionRow({
       }}
     >
       <Checkbox id={checkboxId} checked={checked} onChange={onToggle} />
-      <label htmlFor={checkboxId} style={{ flex: 1, cursor: 'pointer', fontSize: '0.875rem' }}>
+      <label
+        htmlFor={checkboxId}
+        style={{ flex: 1, cursor: 'pointer', fontSize: 'var(--nf-text-sm)' }}
+      >
         <span style={{ fontWeight: 500 }}>{assignee.displayName}</span>
         <span
           style={{
             marginInlineStart: '0.5rem',
             color: 'var(--nf-color-fg-muted)',
-            fontSize: '0.75rem',
+            fontSize: 'var(--nf-text-xs)',
           }}
         >
           {t('tasks.smart_create.confidence', { value: String(confidence) })}
         </span>
       </label>
       <span
-        style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}
+        style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-fg-muted)' }}
         title={assignee.reason}
       >
         {t('tasks.smart_create.reason', { reason: assignee.reason })}
@@ -568,7 +577,10 @@ function SubtaskProposalRow({ subtask, checked, onToggle }: SubtaskProposalRowPr
         onChange={onToggle}
         style={{ marginBlockStart: '0.125rem' }}
       />
-      <label htmlFor={checkboxId} style={{ flex: 1, cursor: 'pointer', fontSize: '0.875rem' }}>
+      <label
+        htmlFor={checkboxId}
+        style={{ flex: 1, cursor: 'pointer', fontSize: 'var(--nf-text-sm)' }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
           <span style={{ fontWeight: 500 }}>{subtask.title}</span>
           <Badge tone={priorityTone(subtask.priority)}>{subtask.priority}</Badge>
@@ -577,7 +589,7 @@ function SubtaskProposalRow({ subtask, checked, onToggle }: SubtaskProposalRowPr
           <p
             style={{
               margin: '0.25rem 0 0',
-              fontSize: '0.75rem',
+              fontSize: 'var(--nf-text-xs)',
               color: 'var(--nf-color-fg-muted)',
             }}
           >
@@ -587,7 +599,7 @@ function SubtaskProposalRow({ subtask, checked, onToggle }: SubtaskProposalRowPr
         {subtask.assignee && (
           <span
             style={{
-              fontSize: '0.75rem',
+              fontSize: 'var(--nf-text-xs)',
               color: 'var(--nf-color-fg-muted)',
               marginBlockStart: '0.125rem',
               display: 'block',

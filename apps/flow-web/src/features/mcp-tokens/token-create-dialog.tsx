@@ -154,7 +154,7 @@ export default function TokenCreateDialog({
             style={{
               margin: 0,
               color: 'var(--nf-color-warning))',
-              fontSize: '0.875rem',
+              fontSize: 'var(--nf-text-sm)',
             }}
           >
             {t('workspace.mcp_tokens.dialog.reveal_warning')}

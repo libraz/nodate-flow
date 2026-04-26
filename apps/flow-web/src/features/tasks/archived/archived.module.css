@@ -1,0 +1,499 @@
+/*
+ * Archive Room — editorial / library stack styles.
+ *
+ * Every colour, spacing, radius, and shadow comes from a design token.
+ * No hex literals, no Tailwind-style utilities, no gray-* references.
+ * Colours that need a translucent variant compose with `color-mix()` so
+ * the four themes (aurora / dotline / glass-light / glass-dark) inherit
+ * the right accent without per-theme overrides.
+ *
+ * The slide-up bulk-action bar and the row shake-out animation both
+ * branch on `prefers-reduced-motion`: motion ships only when the user
+ * has not asked the OS for reduced animation.
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-6);
+  padding: clamp(1.5rem, 4vw, 2.5rem);
+  padding-block-end: clamp(6rem, 12vh, 9rem);
+  background: var(--nf-color-bg);
+  min-block-size: 100%;
+}
+
+/* ── Header ──────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+  margin: 0;
+  color: var(--nf-color-fg);
+  letter-spacing: -0.01em;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+  max-inline-size: 42rem;
+}
+
+.countLine {
+  margin: 0;
+  color: var(--nf-color-fg-subtle);
+  font-size: var(--nf-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Filter bar ──────────────────────────────────────────────── */
+
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nf-space-3);
+  align-items: center;
+  padding: var(--nf-space-3) var(--nf-space-4);
+  border-radius: var(--nf-radius-md);
+  border: 1px solid var(--nf-color-hairline);
+  background: color-mix(in oklab, var(--nf-color-bg-elevated) 88%, transparent);
+  backdrop-filter: blur(var(--nf-surface-blur));
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+}
+
+.filterSearch {
+  flex: 1 1 16rem;
+  min-inline-size: 12rem;
+}
+
+.filterGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.filterGroup label {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* ── Range pills (radiogroup) ────────────────────────────────── */
+
+.rangeGroup {
+  display: inline-flex;
+  gap: var(--nf-space-1);
+  padding: var(--nf-space-1);
+  border-radius: var(--nf-radius-pill);
+  border: 1px solid var(--nf-color-hairline);
+  background: color-mix(in oklab, var(--nf-color-bg-elevated) 60%, transparent);
+}
+
+.rangePill {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-xs);
+  font-weight: 500;
+  padding: var(--nf-space-1) var(--nf-space-3);
+  border-radius: var(--nf-radius-pill);
+  cursor: pointer;
+  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard), color
+    var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.rangePill:hover {
+  background: color-mix(in oklab, var(--nf-color-bg-elevated) 60%, transparent);
+  color: var(--nf-color-fg);
+}
+
+.rangePill[aria-checked="true"] {
+  background: var(--nf-color-bg-elevated);
+  color: var(--nf-color-fg);
+  box-shadow: var(--nf-shadow-sm);
+}
+
+.rangePill:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+/* ── List + chapter ─────────────────────────────────────────── */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-8);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.chapter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.chapterHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nf-space-3);
+  position: sticky;
+  inset-block-start: 4rem;
+  background: color-mix(in oklab, var(--nf-color-bg) 92%, transparent);
+  backdrop-filter: blur(var(--nf-surface-blur));
+  padding-block: var(--nf-space-2);
+  border-block-end: 1px solid var(--nf-color-hairline);
+  z-index: 1;
+}
+
+.chapterTitle {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nf-color-fg-subtle);
+  font-feature-settings: "smcp";
+}
+
+.chapterCount {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.chapterRows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Row ─────────────────────────────────────────────────────── */
+
+.row {
+  display: grid;
+  grid-template-columns: 1.25rem 1fr auto auto auto auto;
+  align-items: center;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-3) var(--nf-space-4);
+  border-block-end: 1px solid var(--nf-color-hairline);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg);
+  cursor: default;
+  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard), transform
+    var(--nf-duration-base) var(--nf-ease-standard), opacity var(--nf-duration-base)
+    var(--nf-ease-standard);
+}
+
+.row:hover {
+  background: color-mix(in oklab, var(--nf-color-bg-elevated) 60%, transparent);
+  border-radius: var(--nf-radius-md);
+  border-block-end-color: transparent;
+}
+
+.row[data-selected="true"] {
+  background: color-mix(in oklab, var(--nf-color-accent) 6%, transparent);
+  border-radius: var(--nf-radius-md);
+  border-block-end-color: transparent;
+}
+
+.row:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+  border-radius: var(--nf-radius-md);
+  border-block-end-color: transparent;
+}
+
+.row[data-removing="true"] {
+  animation: shake-out var(--nf-duration-base) var(--nf-ease-standard) forwards;
+}
+
+@keyframes shake-out {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  35% {
+    transform: translateX(0.5rem);
+    opacity: 0.8;
+  }
+  70% {
+    transform: translateX(0);
+    opacity: 0.4;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row {
+    transition: none;
+  }
+  .row[data-removing="true"] {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+.rowTitle {
+  display: block;
+  color: var(--nf-color-fg);
+  text-decoration: none;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-inline-size: 0;
+}
+
+.rowTitle:hover,
+.rowTitle:focus-visible {
+  color: var(--nf-color-accent);
+}
+
+.rowMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  white-space: nowrap;
+}
+
+.rowProject {
+  color: var(--nf-color-fg-muted);
+}
+
+.rowAgo {
+  color: var(--nf-color-fg-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.rowActions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  opacity: 0;
+  transition: opacity var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.row:hover .rowActions,
+.row:focus-within .rowActions {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rowActions {
+    transition: none;
+  }
+}
+
+/* ── Bulk action bar ────────────────────────────────────────── */
+
+.bulkBarWrap {
+  position: fixed;
+  inset-block-end: var(--nf-space-6);
+  inset-inline: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.bulkBar {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-2) var(--nf-space-4);
+  border-radius: var(--nf-radius-pill);
+  background: var(--nf-color-fg);
+  color: var(--nf-color-fg-on-accent);
+  box-shadow: var(--nf-shadow-lg);
+  pointer-events: auto;
+  animation: slide-up var(--nf-duration-base) var(--nf-ease-emphasized);
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(1.5rem);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bulkBar {
+    animation: none;
+  }
+}
+
+.bulkBarCount {
+  font-weight: 600;
+  font-size: var(--nf-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.bulkBarSep {
+  inline-size: 1px;
+  block-size: 1.25rem;
+  background: color-mix(in oklab, var(--nf-color-fg-on-accent) 25%, transparent);
+}
+
+.bulkBarBtn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: var(--nf-space-1) var(--nf-space-3);
+  border-radius: var(--nf-radius-pill);
+  font-size: var(--nf-text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.bulkBarBtn:hover {
+  background: color-mix(in oklab, var(--nf-color-fg-on-accent) 12%, transparent);
+}
+
+.bulkBarBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.bulkBarBtnPrimary {
+  background: var(--nf-color-accent);
+  color: var(--nf-color-fg-on-accent);
+}
+
+.bulkBarBtnPrimary:hover {
+  background: var(--nf-color-accent-hover);
+}
+
+/* ── Empty state ─────────────────────────────────────────────── */
+
+.emptyWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--nf-space-4);
+  padding: var(--nf-space-8) var(--nf-space-6);
+  color: var(--nf-color-fg-muted);
+  text-align: center;
+}
+
+.emptyIllustration {
+  inline-size: 5.5rem;
+  block-size: 5.5rem;
+  color: var(--nf-color-fg-subtle);
+}
+
+.emptyTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--nf-text-xl);
+  color: var(--nf-color-fg);
+}
+
+.emptyBody {
+  margin: 0;
+  max-inline-size: 32rem;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+}
+
+/* ── Virtualized scroll viewport ─────────────────────────────── */
+
+.virtualScroll {
+  position: relative;
+  block-size: clamp(20rem, 70vh, 56rem);
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-radius: var(--nf-radius-md);
+  border: 1px solid var(--nf-color-hairline);
+  background: var(--nf-color-bg);
+}
+
+.virtualScroll:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.virtualInner {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  inline-size: 100%;
+}
+
+.virtualRowWrap {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 0;
+  list-style: none;
+}
+
+.stickyChapter {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-2) var(--nf-space-4);
+  background: color-mix(in oklab, var(--nf-color-bg) 92%, transparent);
+  backdrop-filter: blur(var(--nf-surface-blur));
+  border-block-end: 1px solid var(--nf-color-hairline);
+  pointer-events: none;
+}
+
+.loadingMore {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--nf-space-3) var(--nf-space-4);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Skeleton ────────────────────────────────────────────────── */
+
+.skeletonChapter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.skeletonHeader {
+  block-size: 1rem;
+  inline-size: 8rem;
+}
+
+.skeletonRow {
+  display: grid;
+  grid-template-columns: 1.25rem 1fr 5rem 5rem;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-3) var(--nf-space-4);
+  border-block-end: 1px solid var(--nf-color-hairline);
+}

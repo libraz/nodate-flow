@@ -156,7 +156,7 @@ function TimelineInner({
                   zIndex: 2,
                   margin: 0,
                   padding: '0.375rem 0.75rem',
-                  fontSize: '0.75rem',
+                  fontSize: 'var(--nf-text-xs)',
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
                   color: 'var(--nf-color-fg-muted)',

@@ -9,10 +9,19 @@
  *   - {@link useDeleteCalendarMutation}     DELETE /workspaces/{wsId}/calendars/{calId}
  *   - {@link useCalendarEventCountQuery}    GET    /workspaces/{wsId}/calendars/{calId}/events/count
  *
- * Both writes invalidate the per-workspace calendar list (shared with
- * the rail and the calendar route) plus the cross-workspace event
- * aggregate so the user's main calendar grid refreshes if a delete
- * changes which events should be visible.
+ * Cache invalidation policy (W5)
+ * ------------------------------
+ * Centralised through {@link invalidateCalendarCaches}:
+ *
+ *   - Update / Delete → invalidate
+ *       1. the calendar's own detail key (this module),
+ *       2. the per-workspace calendar list owned by `calendar-events`,
+ *       3. the cross-workspace `me-events` aggregate that drives the
+ *          main grid,
+ *       4. the per-workspace `discoverable` list shown by the rail.
+ *
+ * Membership writes (`./members-api.ts`) follow the same fan-out so
+ * the rail and the grid pick up role / removal changes immediately.
  */
 
 import type { components } from '@nodate-flow/sdk';

@@ -1,0 +1,144 @@
+/**
+ * Shared OAuth provider button row used by both /login and /signup.
+ *
+ * Reads {@link useCapabilities}'s `oidc*` flags to render at most one
+ * button per enabled provider. The divider above the row mirrors the
+ * styling that previously lived inline in {@code login.tsx} so the
+ * extracted component preserves the original visual contract.
+ *
+ * The provider list and labels are identical between modes; only the
+ * post-success flow differs (login resolves `?redirect=`, signup lands
+ * on /profile after the OIDC callback completes server-side). The
+ * difference is therefore purely a copy concern -- we do not branch on
+ * `mode` for the network call itself, since the auth-api end-point is
+ * symmetric.
+ */
+
+import Button from '@nodate-flow/ui/primitives/button';
+import type { ReactElement } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import type { ProblemJson } from '../../lib/api-error';
+import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../../lib/auth-errors';
+import { sdk } from '../../lib/sdk';
+import { useCapabilities } from '../auth/use-capabilities';
+
+/**
+ * Operating mode of the row.
+ *
+ * Today both modes call the same `/auth/oidc/{provider}/start` endpoint,
+ * so the prop only documents the caller's intent and is reserved for a
+ * future divergence (e.g. analytics labelling). Keep it required so we
+ * cannot accidentally drop the discriminator if a future provider
+ * needs different flags.
+ */
+export type OAuthMode = 'login' | 'signup';
+
+/** Supported OIDC providers, mirrored from the auth-api capabilities flags. */
+export type OAuthProvider = 'google' | 'github' | 'microsoft';
+
+export interface OAuthButtonRowProps {
+  /** Discriminator -- which page this row is rendered on. */
+  mode: OAuthMode;
+  /**
+   * Optional callback so the parent can surface the auth-api error in
+   * its own banner. The component does not render its own error UI.
+   */
+  onError?: (key: AuthErrorI18nKey) => void;
+}
+
+/**
+ * Renders the OAuth provider buttons + divider for sign-in / sign-up.
+ *
+ * Returns `null` when capabilities have not loaded yet or when no OIDC
+ * provider is enabled, so the caller can drop it in unconditionally.
+ */
+function OAuthButtonRow({ mode, onError }: OAuthButtonRowProps): ReactElement | null {
+  const { t } = useTranslation('auth');
+  const caps = useCapabilities();
+
+  // Caps are still loading -- defer rendering until we know whether any
+  // provider is actually enabled. A flicker of the divider would be
+  // worse than a tiny delay here since this row is below the fold.
+  if (!caps) return null;
+  if (!caps.oidcGoogle && !caps.oidcGithub && !caps.oidcMicrosoft) return null;
+
+  const handleStart = async (provider: OAuthProvider): Promise<void> => {
+    try {
+      const { data, error } = await sdk.GET(`/auth/oidc/${provider}/start` as never);
+      if (error || !data) {
+        onError?.(mapAuthError(error as ProblemJson | undefined));
+        return;
+      }
+      const result = data as { authorizationUrl: string };
+      window.location.href = result.authorizationUrl;
+    } catch (err) {
+      onError?.(mapAuthThrown(err));
+    }
+  };
+
+  // `data-mode` is a stable hook for parent CSS / E2E selectors but
+  // does not influence rendering today.
+  return (
+    <div data-mode={mode}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--nf-space-3, 0.75rem)',
+          color: 'var(--nf-color-fg-muted)',
+          fontSize: 'var(--nf-text-sm, 0.875rem)',
+        }}
+      >
+        <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--nf-color-border)' }} />
+        <span>{t('login.sso_divider')}</span>
+        <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--nf-color-border)' }} />
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--nf-space-3, 0.75rem)',
+          marginTop: 'var(--nf-space-3, 0.75rem)',
+        }}
+      >
+        {caps.oidcGoogle && (
+          <Button
+            type="button"
+            variant="default"
+            onClick={() => {
+              void handleStart('google');
+            }}
+          >
+            {t('login.sso_google')}
+          </Button>
+        )}
+        {caps.oidcGithub && (
+          <Button
+            type="button"
+            variant="default"
+            onClick={() => {
+              void handleStart('github');
+            }}
+          >
+            {t('login.sso_github')}
+          </Button>
+        )}
+        {caps.oidcMicrosoft && (
+          <Button
+            type="button"
+            variant="default"
+            onClick={() => {
+              void handleStart('microsoft');
+            }}
+          >
+            {t('login.sso_microsoft')}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default OAuthButtonRow;

@@ -216,7 +216,7 @@
   padding-inline: var(--nf-space-4);
   border-radius: var(--nf-radius-md);
   background: var(--nf-color-accent);
-  color: var(--nf-color-accent-fg, #fff);
+  color: var(--nf-color-accent-fg);
   font-size: var(--nf-text-sm);
 }
 
