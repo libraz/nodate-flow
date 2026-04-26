@@ -28,6 +28,7 @@
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
+import Drawer from '@nodate-flow/ui/primitives/drawer';
 import Popover from '@nodate-flow/ui/primitives/popover';
 import { useQueries } from '@tanstack/react-query';
 import { ChevronLeft, Eye, EyeOff, MoreVertical } from 'lucide-react';
@@ -35,6 +36,7 @@ import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { sdk } from '../../lib/sdk';
+import CalendarMemosPanel from '../calendar-memos/calendar-memos-panel';
 import CalendarSettingsDrawer from '../calendars/calendar-settings-drawer';
 import { type RailCalendar, usePatchOwnSubscriptionMutation, useUnsubscribeMutation } from './api';
 import styles from './calendars-rail.module.css';
@@ -246,6 +248,7 @@ function CalendarRow({ workspaceId, calendar, selfUserId }: CalendarRowProps): R
   const leaveCal = useUnsubscribeMutation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [memosOpen, setMemosOpen] = useState(false);
 
   const isPersonal = calendar.kind === 'personal';
   const isManager = calendar.role === 'owner' || calendar.role === 'manager';
@@ -279,6 +282,19 @@ function CalendarRow({ workspaceId, calendar, selfUserId }: CalendarRowProps): R
           disabled={pending}
         >
           {calendar.visible ? t('calendars_rail.actions.hide') : t('calendars_rail.actions.show')}
+        </button>
+      </li>
+      <li>
+        <button
+          type="button"
+          role="menuitem"
+          className={styles.menuItem}
+          onClick={() => {
+            setMenuOpen(false);
+            setMemosOpen(true);
+          }}
+        >
+          {t('calendar.memos.menu_item')}
         </button>
       </li>
       {isManager ? (
@@ -353,6 +369,16 @@ function CalendarRow({ workspaceId, calendar, selfUserId }: CalendarRowProps): R
           open={settingsOpen}
           onClose={() => setSettingsOpen(false)}
         />
+      ) : null}
+      {memosOpen ? (
+        <Drawer
+          open={memosOpen}
+          onClose={() => setMemosOpen(false)}
+          title={`${t('calendar.memos.title')} — ${calendar.name}`}
+          side="inline-end"
+        >
+          <CalendarMemosPanel workspaceId={workspaceId} calendarId={calendar.id} />
+        </Drawer>
       ) : null}
     </li>
   );

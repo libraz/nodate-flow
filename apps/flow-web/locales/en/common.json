@@ -269,6 +269,23 @@
           "viewer": "Viewer"
         }
       }
+    },
+    "memos": {
+      "title": "Memos",
+      "menu_item": "Memos",
+      "empty": "No memos yet",
+      "add_placeholder": "Add a memo…",
+      "add": "Add",
+      "add_error": "Failed to add memo",
+      "update_error": "Failed to save memo",
+      "delete": "Delete",
+      "delete_confirm": "Delete this memo?",
+      "delete_success": "Memo deleted",
+      "delete_error": "Failed to delete memo",
+      "title_label": "Memo title",
+      "checkbox_label": "Mark {title} as done",
+      "autosaved": "Saved",
+      "author_attribution": "by {name}"
     }
   },
   "calendars_rail": {

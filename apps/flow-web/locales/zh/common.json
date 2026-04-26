@@ -269,6 +269,23 @@
           "viewer": "查看者"
         }
       }
+    },
+    "memos": {
+      "title": "备忘",
+      "menu_item": "备忘",
+      "empty": "暂无备忘",
+      "add_placeholder": "添加备忘…",
+      "add": "添加",
+      "add_error": "添加备忘失败",
+      "update_error": "保存备忘失败",
+      "delete": "删除",
+      "delete_confirm": "删除此备忘？",
+      "delete_success": "已删除备忘",
+      "delete_error": "删除备忘失败",
+      "title_label": "备忘标题",
+      "checkbox_label": "将 {title} 标记为完成",
+      "autosaved": "已保存",
+      "author_attribution": "由 {name} 创建"
     }
   },
   "calendars_rail": {

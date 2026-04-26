@@ -269,6 +269,23 @@
           "viewer": "閲覧者"
         }
       }
+    },
+    "memos": {
+      "title": "メモ",
+      "menu_item": "メモ",
+      "empty": "メモはまだありません",
+      "add_placeholder": "メモを追加…",
+      "add": "追加",
+      "add_error": "メモの追加に失敗しました",
+      "update_error": "メモの保存に失敗しました",
+      "delete": "削除",
+      "delete_confirm": "このメモを削除しますか？",
+      "delete_success": "メモを削除しました",
+      "delete_error": "メモの削除に失敗しました",
+      "title_label": "メモのタイトル",
+      "checkbox_label": "{title} を完了にする",
+      "autosaved": "保存しました",
+      "author_attribution": "{name} 作成"
     }
   },
   "calendars_rail": {
