@@ -83,13 +83,19 @@ export function formatDateNullable(iso: string | null | undefined, locale: strin
 /**
  * Check whether a date string represents a Go zero time or an invalid date.
  *
+ * The "year before 2000" cutoff is evaluated in UTC so the result is
+ * stable across timezones. Using `getFullYear()` would otherwise flip
+ * `1999-12-31T23:59:59Z` to "year 2000" in any timezone east of UTC,
+ * causing the function to return `false` and tests to fail
+ * non-deterministically depending on where they run.
+ *
  * @param iso - ISO datetime string.
- * @returns `true` when the value is the Go zero time sentinel or has a year before 2000.
+ * @returns `true` when the value is the Go zero time sentinel or has a UTC year before 2000.
  */
 export function isZeroTime(iso: string): boolean {
   if (iso === '0001-01-01T00:00:00Z') return true;
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) || d.getFullYear() < 2000;
+  return Number.isNaN(d.getTime()) || d.getUTCFullYear() < 2000;
 }
 
 /**

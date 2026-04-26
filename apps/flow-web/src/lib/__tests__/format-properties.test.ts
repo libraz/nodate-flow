@@ -31,9 +31,15 @@ describe('formatDate properties', () => {
     );
   });
 
-  it('returns a non-empty string for any input', () => {
+  it('returns a non-empty string for any non-empty input', () => {
+    // formatDate is documented to return the raw input when parsing
+    // fails. For an empty input that is also an empty output, which is
+    // a legal pass-through and not a contract violation. Constrain the
+    // generator to non-empty strings so the property describes the
+    // intended invariant ("output preserves at least one character of
+    // recognisable input").
     fc.assert(
-      fc.property(fc.string(), (input) => {
+      fc.property(fc.string({ minLength: 1 }), (input) => {
         const result = formatDate(input, 'en-US');
         expect(result.length).toBeGreaterThan(0);
       }),

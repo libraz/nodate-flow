@@ -10,6 +10,12 @@
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  RouterContextProvider,
+  createMemoryHistory,
+  createRootRoute,
+  createRouter,
+} from '@tanstack/react-router';
 import { type RenderOptions, type RenderResult, render } from '@testing-library/react';
 import i18n from 'i18next';
 import ICU from 'i18next-icu';
@@ -41,9 +47,12 @@ function ensureTestI18n(): ReturnType<typeof i18n.createInstance> {
       ns: ['common', 'inbox', 'settings', 'ai', 'constraints', 'errors'],
       resources: {},
       interpolation: { escapeValue: false },
-      // Return the key itself when no translation is found — makes
-      // assertions readable without maintaining a test-only copy file.
-      parseMissingKeyHandler: (key: string) => key,
+      // Return the explicit defaultValue when one is provided (e.g.
+      // `t('foo', { defaultValue: '404' })`), otherwise return the key
+      // itself so assertions stay readable without a test-only copy
+      // bundle.
+      parseMissingKeyHandler: (key: string, defaultValue?: string) =>
+        defaultValue !== undefined ? defaultValue : key,
       react: { useSuspense: false },
     });
 
@@ -86,10 +95,26 @@ export function renderWithProviders(
 
   const testI18n = ensureTestI18n();
 
+  // Components under test may use TanStack Router's <Link> / useRouter,
+  // which crash with "Cannot read properties of null (reading 'isServer')"
+  // when rendered outside a RouterProvider. We construct a throwaway
+  // in-memory router and place it into the React context via
+  // RouterContextProvider — the lower-level provider that does NOT render
+  // matched routes. This keeps the children rendered synchronously (so
+  // existing tests using getByRole / queryByText keep working) while
+  // giving any nested <Link> a real router to call useRouter() on.
+  const rootRoute = createRootRoute();
+  const router = createRouter({
+    routeTree: rootRoute,
+    history: createMemoryHistory({ initialEntries: ['/'] }),
+  });
+
   function Wrapper({ children }: { children: ReactNode }): ReactElement {
     return (
       <QueryClientProvider client={queryClient}>
-        <I18nextProvider i18n={testI18n}>{children}</I18nextProvider>
+        <I18nextProvider i18n={testI18n}>
+          <RouterContextProvider router={router}>{children}</RouterContextProvider>
+        </I18nextProvider>
       </QueryClientProvider>
     );
   }

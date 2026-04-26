@@ -29,6 +29,7 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	calendarq "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 )
 
 // stubDeps returns the minimal Deps the router needs to build with
@@ -37,6 +38,10 @@ import (
 // generic 500 instead of panicking on a nil Queries dereference, which
 // keeps the static check focused on whether the auth middleware ran
 // rather than whether each handler short-circuits on validation.
+//
+// CalendarQueries must be non-nil because the public-share render
+// handler dereferences it before any auth-gate logic runs; leaving it
+// nil panics the test before the assertion gets to execute.
 func stubDeps(t *testing.T) Deps {
 	t.Helper()
 	issuer, err := auth.NewJWTIssuer(nil, "nodate-flow", "api", 15*time.Minute)
@@ -51,6 +56,7 @@ func stubDeps(t *testing.T) Deps {
 	return Deps{
 		DB:               db,
 		Queries:          generated.New(db),
+		CalendarQueries:  calendarq.New(db),
 		JWT:              issuer,
 		DisableRateLimit: true,
 	}
