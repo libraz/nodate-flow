@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	generated "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
@@ -153,11 +153,11 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
@@ -176,11 +176,11 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarAttendeeUserNotFound)
 		}
-		attendees, err := deps.Queries.ListCalendarEventAttendees(ctx, evt.ID)
+		attendees, err := deps.CalendarQueries.ListCalendarEventAttendees(ctx, evt.ID)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarInviteStoreLookupInterrupted)
 		}
-		var matched *generated.ListCalendarEventAttendeesRow
+		var matched *calendar.ListCalendarEventAttendeesRow
 		for i := range attendees {
 			if attendees[i].PublicID == attendeePID {
 				matched = &attendees[i]
@@ -220,7 +220,7 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 		// invite (UNIQUE on (event_id, attendee_id)). The list query
 		// does not surface the internal id, so go through the direct
 		// per-user lookup.
-		attRow, err := deps.Queries.FindCalendarEventAttendee(ctx, generated.FindCalendarEventAttendeeParams{
+		attRow, err := deps.CalendarQueries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
 			EventID: evt.ID,
 			UserID:  matched.UserID,
 		})
@@ -228,7 +228,7 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 			return nil, httpErr(apierrors.CalendarInviteStoreLookupInterrupted)
 		}
 
-		existing, err := deps.Queries.FindActiveCalendarEventInvite(ctx, generated.FindActiveCalendarEventInviteParams{
+		existing, err := deps.CalendarQueries.FindActiveCalendarEventInvite(ctx, calendar.FindActiveCalendarEventInviteParams{
 			EventID:    evt.ID,
 			AttendeeID: attRow.ID,
 		})
@@ -239,7 +239,7 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 		case err == nil:
 			// Rotate in place. The handler-facing API still returns
 			// the new plaintext token.
-			if rerr := deps.Queries.RotateCalendarEventInviteToken(ctx, generated.RotateCalendarEventInviteTokenParams{
+			if rerr := deps.CalendarQueries.RotateCalendarEventInviteToken(ctx, calendar.RotateCalendarEventInviteTokenParams{
 				TokenHash: tokenHash,
 				ExpiresAt: expiresAt,
 				ID:        existing.ID,
@@ -251,7 +251,7 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 			inviteInternalID = existing.ID
 		case errors.Is(err, sql.ErrNoRows):
 			invitePublicID = types.New()
-			res, cerr := deps.Queries.CreateCalendarEventInvite(ctx, generated.CreateCalendarEventInviteParams{
+			res, cerr := deps.CalendarQueries.CreateCalendarEventInvite(ctx, calendar.CreateCalendarEventInviteParams{
 				PublicID:    invitePublicID,
 				WorkspaceID: wsID,
 				CalendarID:  cal.ID,
@@ -314,8 +314,8 @@ func dispatchInviteEmail(
 	attendeeEmail string,
 	token string,
 	expiresAt time.Time,
-	evt generated.FindCalendarEventByPublicIdRow,
-	cal generated.FindCalendarByPublicIdRow,
+	evt calendar.FindCalendarEventByPublicIdRow,
+	cal calendar.FindCalendarByPublicIdRow,
 ) {
 	if deps.EmailSender == nil || attendeeEmail == "" {
 		return
@@ -355,7 +355,7 @@ func dispatchInviteEmail(
 		// rest of the flow still succeeded so we just skip the stamp.
 		return
 	}
-	if merr := deps.Queries.MarkCalendarEventInviteSent(ctx, inviteInternalID); merr != nil {
+	if merr := deps.CalendarQueries.MarkCalendarEventInviteSent(ctx, inviteInternalID); merr != nil {
 		slog.ErrorContext(ctx, "invite email mark-sent failed",
 			"inviteId", inviteInternalID,
 			"err", merr,
@@ -367,8 +367,8 @@ func dispatchInviteEmail(
 // email. The content is intentionally English-only for this iteration —
 // localisation hooks will land in a follow-up pass.
 func buildInviteEmailBody(
-	evt generated.FindCalendarEventByPublicIdRow,
-	cal generated.FindCalendarByPublicIdRow,
+	evt calendar.FindCalendarEventByPublicIdRow,
+	cal calendar.FindCalendarByPublicIdRow,
 	acceptURL string,
 	expiresAt time.Time,
 ) string {
@@ -412,7 +412,7 @@ func AcceptEventInvite(deps Deps) func(context.Context, *AcceptEventInviteInput)
 			return nil, httpErr(apierrors.CalendarInviteNotFound)
 		}
 		sum := sha256.Sum256([]byte(input.Body.Token))
-		invite, err := deps.Queries.FindCalendarEventInviteByTokenHash(ctx, sum[:])
+		invite, err := deps.CalendarQueries.FindCalendarEventInviteByTokenHash(ctx, sum[:])
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, httpErr(apierrors.CalendarInviteNotFound)
@@ -426,13 +426,13 @@ func AcceptEventInvite(deps Deps) func(context.Context, *AcceptEventInviteInput)
 			return nil, httpErr(apierrors.CalendarInviteNotFound)
 		}
 
-		rsvp := generated.CalendarEventAttendeesRsvp(input.Body.Rsvp)
+		rsvp := calendar.CalendarEventAttendeesRsvp(input.Body.Rsvp)
 
 		// Resolve attendee → user_id so we can target the RSVP update.
 		// ListCalendarEventAttendees is the cheapest available path
 		// since the schema doesn't expose a (attendee_id → user_id)
 		// lookup directly.
-		attendees, err := deps.Queries.ListCalendarEventAttendees(ctx, invite.EventID)
+		attendees, err := deps.CalendarQueries.ListCalendarEventAttendees(ctx, invite.EventID)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarInviteStoreLookupInterrupted)
 		}
@@ -443,7 +443,7 @@ func AcceptEventInvite(deps Deps) func(context.Context, *AcceptEventInviteInput)
 			// fetching each attendee's internal id. Fall back to a
 			// per-user lookup against the attendee row (event_id,
 			// user_id) and compare the returned internal id.
-			row, lerr := deps.Queries.FindCalendarEventAttendee(ctx, generated.FindCalendarEventAttendeeParams{
+			row, lerr := deps.CalendarQueries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
 				EventID: invite.EventID,
 				UserID:  a.UserID,
 			})
@@ -464,10 +464,10 @@ func AcceptEventInvite(deps Deps) func(context.Context, *AcceptEventInviteInput)
 		// invite is considered consumed once the recipient interacts
 		// with it. The caller can still flip RSVP later while the token
 		// is valid.
-		if err := deps.Queries.MarkCalendarEventInviteAccepted(ctx, invite.ID); err != nil {
+		if err := deps.CalendarQueries.MarkCalendarEventInviteAccepted(ctx, invite.ID); err != nil {
 			return nil, httpErr(apierrors.CalendarInviteStoreWriteInterrupted)
 		}
-		if err := deps.Queries.UpdateAttendeeRsvp(ctx, generated.UpdateAttendeeRsvpParams{
+		if err := deps.CalendarQueries.UpdateAttendeeRsvp(ctx, calendar.UpdateAttendeeRsvpParams{
 			Rsvp:    rsvp,
 			EventID: invite.EventID,
 			UserID:  targetUserID,
@@ -504,11 +504,11 @@ func RevokeEventInvite(deps Deps) func(context.Context, *RevokeEventInviteInput)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
@@ -519,7 +519,7 @@ func RevokeEventInvite(deps Deps) func(context.Context, *RevokeEventInviteInput)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarInviteNotFound)
 		}
-		invite, err := deps.Queries.FindCalendarEventInviteByPublicId(ctx, invitePID)
+		invite, err := deps.CalendarQueries.FindCalendarEventInviteByPublicId(ctx, invitePID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, httpErr(apierrors.CalendarInviteNotFound)
@@ -533,7 +533,7 @@ func RevokeEventInvite(deps Deps) func(context.Context, *RevokeEventInviteInput)
 		if invite.EventID != evt.ID {
 			return nil, httpErr(apierrors.CalendarInviteNotFound)
 		}
-		if err := deps.Queries.DisableCalendarEventInvite(ctx, invite.ID); err != nil {
+		if err := deps.CalendarQueries.DisableCalendarEventInvite(ctx, invite.ID); err != nil {
 			return nil, httpErr(apierrors.CalendarInviteStoreRevokeInterrupted)
 		}
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.invite.revoked", &actorID, map[string]any{
@@ -555,25 +555,25 @@ func ListEventInvites(deps Deps) func(context.Context, *ListEventInvitesInput) (
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
 		if evt.OwnerUserID != actorID {
 			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
-		rows, err := deps.Queries.ListCalendarEventInvitesForEvent(ctx, evt.ID)
+		rows, err := deps.CalendarQueries.ListCalendarEventInvitesForEvent(ctx, evt.ID)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarInviteListQueryInterrupted)
 		}
 
 		// Build a (internal attendee id → public ID) index so we can
 		// attach attendeePublicId to each invite without N round-trips.
-		attendees, err := deps.Queries.ListCalendarEventAttendees(ctx, evt.ID)
+		attendees, err := deps.CalendarQueries.ListCalendarEventAttendees(ctx, evt.ID)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarInviteListQueryInterrupted)
 		}
@@ -582,7 +582,7 @@ func ListEventInvites(deps Deps) func(context.Context, *ListEventInvitesInput) (
 			// Fetch the attendee's internal id via the per-user lookup;
 			// the list query omits it. This is O(attendees) per list
 			// call — acceptable given typical event attendee counts.
-			row, lerr := deps.Queries.FindCalendarEventAttendee(ctx, generated.FindCalendarEventAttendeeParams{
+			row, lerr := deps.CalendarQueries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
 				EventID: evt.ID,
 				UserID:  a.UserID,
 			})

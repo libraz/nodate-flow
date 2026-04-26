@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	generated "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/region"
@@ -71,34 +72,34 @@ func resolveWorkspace(ctx context.Context, q *generated.Queries, wsIDStr string)
 // the calendar row along with the actor's subscription to it.
 func resolveCalendar(
 	ctx context.Context,
-	q *generated.Queries,
+	cq *calendar.Queries,
 	wsID uint32,
 	actorID uint32,
 	calIDStr string,
-) (generated.FindCalendarByPublicIdRow, generated.FindCalendarSubscriptionRow, error) {
+) (calendar.FindCalendarByPublicIdRow, calendar.FindCalendarSubscriptionRow, error) {
 	uid, err := uuid.Parse(calIDStr)
 	if err != nil {
-		return generated.FindCalendarByPublicIdRow{}, generated.FindCalendarSubscriptionRow{}, errCalendarNotFound
+		return calendar.FindCalendarByPublicIdRow{}, calendar.FindCalendarSubscriptionRow{}, errCalendarNotFound
 	}
-	cal, err := q.FindCalendarByPublicId(ctx, generated.FindCalendarByPublicIdParams{
+	cal, err := cq.FindCalendarByPublicId(ctx, calendar.FindCalendarByPublicIdParams{
 		PublicID:    types.FromUUID(uid),
 		WorkspaceID: wsID,
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return generated.FindCalendarByPublicIdRow{}, generated.FindCalendarSubscriptionRow{}, errCalendarNotFound
+			return calendar.FindCalendarByPublicIdRow{}, calendar.FindCalendarSubscriptionRow{}, errCalendarNotFound
 		}
-		return generated.FindCalendarByPublicIdRow{}, generated.FindCalendarSubscriptionRow{}, err
+		return calendar.FindCalendarByPublicIdRow{}, calendar.FindCalendarSubscriptionRow{}, err
 	}
-	sub, err := q.FindCalendarSubscription(ctx, generated.FindCalendarSubscriptionParams{
+	sub, err := cq.FindCalendarSubscription(ctx, calendar.FindCalendarSubscriptionParams{
 		CalendarID: cal.ID,
 		UserID:     actorID,
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return generated.FindCalendarByPublicIdRow{}, generated.FindCalendarSubscriptionRow{}, errCalendarAccessDenied
+			return calendar.FindCalendarByPublicIdRow{}, calendar.FindCalendarSubscriptionRow{}, errCalendarAccessDenied
 		}
-		return generated.FindCalendarByPublicIdRow{}, generated.FindCalendarSubscriptionRow{}, err
+		return calendar.FindCalendarByPublicIdRow{}, calendar.FindCalendarSubscriptionRow{}, err
 	}
 	return cal, sub, nil
 }

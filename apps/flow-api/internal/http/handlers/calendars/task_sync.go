@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	generated "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/itemkit"
@@ -42,7 +42,7 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
@@ -127,9 +127,9 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 		out := &CreateEventFromTaskOutput{}
 		out.Body = EventResponse{
 			ID:         eventPublicID.String(),
-			Kind:       string(generated.CalendarEventsKindEvent),
-			Visibility: string(generated.CalendarEventsVisibilityDefault),
-			ShowAs:     string(generated.CalendarEventsShowAsBusy),
+			Kind:       string(calendar.CalendarEventsKindEvent),
+			Visibility: string(calendar.CalendarEventsVisibilityDefault),
+			ShowAs:     string(calendar.CalendarEventsShowAsBusy),
 			Title:      title,
 			AllDay:     false,
 			StartAt:    &startUnix,

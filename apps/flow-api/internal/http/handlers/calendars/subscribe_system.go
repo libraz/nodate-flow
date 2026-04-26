@@ -39,7 +39,7 @@ func SubscribeSystemCalendar(deps Deps) func(context.Context, *SubscribeSystemCa
 		if err := region.ValidateCountry(input.Body.Country); err != nil || input.Body.Country == "" {
 			return nil, httpErr(apierrors.CalendarSubscriptionCountryInvalid)
 		}
-		if err := SubscribeHolidayCalendar(ctx, deps.Queries, wsID, actorID, input.Body.Country); err != nil {
+		if err := SubscribeHolidayCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.Body.Country); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		out := &SubscribeSystemCalendarOutput{}

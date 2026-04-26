@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	generated "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 )
@@ -115,9 +115,9 @@ func ListCalendars(deps Deps) func(context.Context, *ListCalendarsInput) (*ListC
 		}
 
 		// Lazily create personal + system calendars on first access.
-		ensureDefaults(ctx, deps.Queries, wsID, actorID)
+		ensureDefaults(ctx, deps.Queries, deps.CalendarQueries, wsID, actorID)
 
-		rows, err := deps.Queries.ListCalendarsForUser(ctx, generated.ListCalendarsForUserParams{
+		rows, err := deps.CalendarQueries.ListCalendarsForUser(ctx, calendar.ListCalendarsForUserParams{
 			UserID:      actorID,
 			WorkspaceID: wsID,
 		})
@@ -157,10 +157,10 @@ func CreateCalendar(deps Deps) func(context.Context, *CreateCalendarInput) (*Cre
 			systemSlug = sql.NullString{String: *input.Body.SystemSlug, Valid: true}
 		}
 
-		calID, err := deps.Queries.CreateCalendar(ctx, generated.CreateCalendarParams{
+		calID, err := deps.CalendarQueries.CreateCalendar(ctx, calendar.CreateCalendarParams{
 			PublicID:    calPublicID,
 			WorkspaceID: wsID,
-			Kind:        generated.CalendarsKind(input.Body.Kind),
+			Kind:        calendar.CalendarsKind(input.Body.Kind),
 			Name:        input.Body.Name,
 			Description: desc,
 			Color:       input.Body.Color,
@@ -173,7 +173,7 @@ func CreateCalendar(deps Deps) func(context.Context, *CreateCalendarInput) (*Cre
 		}
 
 		subPublicID := types.New()
-		_, err = deps.Queries.CreateCalendarSubscription(ctx, generated.CreateCalendarSubscriptionParams{
+		_, err = deps.CalendarQueries.CreateCalendarSubscription(ctx, calendar.CreateCalendarSubscriptionParams{
 			PublicID:     subPublicID,
 			WorkspaceID:  wsID,
 			CalendarID:   uint32(calID),
@@ -221,7 +221,7 @@ func GetCalendar(deps Deps) func(context.Context, *GetCalendarInput) (*GetCalend
 		if err != nil {
 			return nil, err
 		}
-		cal, sub, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, sub, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
@@ -240,7 +240,7 @@ func PatchCalendar(deps Deps) func(context.Context, *PatchCalendarInput) (*Patch
 		if err != nil {
 			return nil, err
 		}
-		cal, sub, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, sub, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
@@ -268,7 +268,7 @@ func PatchCalendar(deps Deps) func(context.Context, *PatchCalendarInput) (*Patch
 		}
 
 		calUID, _ := uuid.Parse(input.CalId)
-		err = deps.Queries.PatchCalendar(ctx, generated.PatchCalendarParams{
+		err = deps.CalendarQueries.PatchCalendar(ctx, calendar.PatchCalendarParams{
 			Name:        patchName,
 			Description: patchDesc,
 			Color:       patchColor,
@@ -281,7 +281,7 @@ func PatchCalendar(deps Deps) func(context.Context, *PatchCalendarInput) (*Patch
 		}
 
 		// Re-read the updated calendar.
-		cal, err = deps.Queries.FindCalendarByPublicId(ctx, generated.FindCalendarByPublicIdParams{
+		cal, err = deps.CalendarQueries.FindCalendarByPublicId(ctx, calendar.FindCalendarByPublicIdParams{
 			PublicID:    types.FromUUID(calUID),
 			WorkspaceID: wsID,
 		})
@@ -306,7 +306,7 @@ func DeleteCalendar(deps Deps) func(context.Context, *DeleteCalendarInput) (*Del
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
@@ -318,7 +318,7 @@ func DeleteCalendar(deps Deps) func(context.Context, *DeleteCalendarInput) (*Del
 		_ = cal
 
 		calUID, _ := uuid.Parse(input.CalId)
-		err = deps.Queries.DisableCalendar(ctx, generated.DisableCalendarParams{
+		err = deps.CalendarQueries.DisableCalendar(ctx, calendar.DisableCalendarParams{
 			PublicID:    types.FromUUID(calUID),
 			WorkspaceID: wsID,
 		})
@@ -339,7 +339,7 @@ func DeleteCalendar(deps Deps) func(context.Context, *DeleteCalendarInput) (*Del
 
 // --- Mapping helpers ---
 
-func calendarFromListRow(r generated.ListCalendarsForUserRow) CalendarResponse {
+func calendarFromListRow(r calendar.ListCalendarsForUserRow) CalendarResponse {
 	// Subscription role + member_color have been dropped. Expose a
 	// stable DTO shape: derive "role" from calendar ownership, and fall back
 	// to display_color for member_color so SDK consumers keep rendering.
@@ -374,7 +374,7 @@ func calendarFromListRow(r generated.ListCalendarsForUserRow) CalendarResponse {
 	return resp
 }
 
-func calendarFromRow(c generated.FindCalendarByPublicIdRow, s generated.FindCalendarSubscriptionRow) CalendarResponse {
+func calendarFromRow(c calendar.FindCalendarByPublicIdRow, s calendar.FindCalendarSubscriptionRow) CalendarResponse {
 	// Subscription role + member_color have been dropped. Derive "role"
 	// from calendar ownership; fall back to display_color for member_color.
 	role := "editor"

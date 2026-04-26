@@ -47,7 +47,7 @@ func SmartCreate(deps Deps) func(context.Context, *SmartCreateInput) (*SmartCrea
 		if err != nil {
 			return nil, err
 		}
-		_, _, err = resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		_, _, err = resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}

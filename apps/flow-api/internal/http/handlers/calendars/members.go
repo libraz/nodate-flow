@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
-	generated "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 )
@@ -100,7 +100,7 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
@@ -119,7 +119,7 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 		}
 
 		// Check if already subscribed.
-		_, err = deps.Queries.FindCalendarSubscription(ctx, generated.FindCalendarSubscriptionParams{
+		_, err = deps.CalendarQueries.FindCalendarSubscription(ctx, calendar.FindCalendarSubscriptionParams{
 			CalendarID: cal.ID,
 			UserID:     user.ID,
 		})
@@ -128,7 +128,7 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 		}
 
 		// Determine member color based on current member count.
-		members, err := deps.Queries.ListCalendarSubscribers(ctx, generated.ListCalendarSubscribersParams{
+		members, err := deps.CalendarQueries.ListCalendarSubscribers(ctx, calendar.ListCalendarSubscribersParams{
 			CalendarID:  cal.ID,
 			WorkspaceID: wsID,
 		})
@@ -138,7 +138,7 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 		color := memberColors[len(members)%len(memberColors)]
 
 		subPublicID := types.New()
-		_, err = deps.Queries.CreateCalendarSubscription(ctx, generated.CreateCalendarSubscriptionParams{
+		_, err = deps.CalendarQueries.CreateCalendarSubscription(ctx, calendar.CreateCalendarSubscriptionParams{
 			PublicID:     subPublicID,
 			WorkspaceID:  wsID,
 			CalendarID:   cal.ID,
@@ -179,12 +179,12 @@ func ListMembers(deps Deps) func(context.Context, *ListMembersInput) (*ListMembe
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
 
-		rows, err := deps.Queries.ListCalendarSubscribers(ctx, generated.ListCalendarSubscribersParams{
+		rows, err := deps.CalendarQueries.ListCalendarSubscribers(ctx, calendar.ListCalendarSubscribersParams{
 			CalendarID:  cal.ID,
 			WorkspaceID: wsID,
 		})
@@ -222,7 +222,7 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
@@ -267,7 +267,7 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
@@ -291,7 +291,7 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 		}
 
 		// Verify the target is subscribed.
-		_, err = deps.Queries.FindCalendarSubscription(ctx, generated.FindCalendarSubscriptionParams{
+		_, err = deps.CalendarQueries.FindCalendarSubscription(ctx, calendar.FindCalendarSubscriptionParams{
 			CalendarID: cal.ID,
 			UserID:     targetUserID,
 		})
@@ -309,7 +309,7 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 			return nil, httpErr(apierrors.CalendarMemberLastOwnerRemovalBlocked)
 		}
 
-		err = deps.Queries.DisableCalendarSubscription(ctx, generated.DisableCalendarSubscriptionParams{
+		err = deps.CalendarQueries.DisableCalendarSubscription(ctx, calendar.DisableCalendarSubscriptionParams{
 			CalendarID: cal.ID,
 			UserID:     targetUserID,
 		})

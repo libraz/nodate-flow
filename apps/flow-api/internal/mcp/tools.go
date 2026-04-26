@@ -16,6 +16,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/nlquery"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
@@ -2604,11 +2605,11 @@ func nullTimeFormat(t sql.NullTime, layout string) string {
 // row. calendar_subscriptions.role is gone; we mirror the HTTP handler
 // convention (personal owner -> "owner", system -> "viewer", otherwise
 // "editor" since every ws member has edit access).
-func calendarRoleFor(kind generated.CalendarsKind, ownerUserID sql.NullInt32, actorUserID uint32) string {
+func calendarRoleFor(kind calendar.CalendarsKind, ownerUserID sql.NullInt32, actorUserID uint32) string {
 	if ownerUserID.Valid && uint32(ownerUserID.Int32) == actorUserID {
 		return "owner"
 	}
-	if kind == generated.CalendarsKindSystem {
+	if kind == calendar.CalendarsKindSystem {
 		return "viewer"
 	}
 	return "editor"
@@ -2618,7 +2619,7 @@ func runListCalendars(ctx context.Context, deps Deps, s *session, _ json.RawMess
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
 	}
-	rows, err := deps.Queries.ListCalendarsForUser(ctx, generated.ListCalendarsForUserParams{
+	rows, err := deps.CalendarQueries.ListCalendarsForUser(ctx, calendar.ListCalendarsForUserParams{
 		UserID:      s.userID,
 		WorkspaceID: s.workspaceID,
 	})
@@ -2681,7 +2682,7 @@ func runListCalendarEvents(ctx context.Context, deps Deps, s *session, raw json.
 	}
 	// The SQL query uses start_at < ? AND end_at > ? (overlap check),
 	// so we pass endDate as StartAt and startDate as EndAt.
-	rows, err := deps.Queries.ListCalendarEventsAcrossCalendars(ctx, generated.ListCalendarEventsAcrossCalendarsParams{
+	rows, err := deps.CalendarQueries.ListCalendarEventsAcrossCalendars(ctx, calendar.ListCalendarEventsAcrossCalendarsParams{
 		UserID:      s.userID,
 		WorkspaceID: s.workspaceID,
 		StartAt:     sql.NullTime{Time: endTime, Valid: true},
@@ -2744,17 +2745,17 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid endAt: %v", err)
 	}
 
-	kind := generated.CalendarEventsKindEvent
+	kind := calendar.CalendarEventsKindEvent
 	if in.Kind != "" {
-		kind = generated.CalendarEventsKind(in.Kind)
+		kind = calendar.CalendarEventsKind(in.Kind)
 	}
-	showAs := generated.CalendarEventsShowAsBusy
+	showAs := calendar.CalendarEventsShowAsBusy
 	if in.ShowAs != "" {
-		showAs = generated.CalendarEventsShowAs(in.ShowAs)
+		showAs = calendar.CalendarEventsShowAs(in.ShowAs)
 	}
-	visibility := generated.CalendarEventsVisibilityDefault
+	visibility := calendar.CalendarEventsVisibilityDefault
 	if in.Visibility != "" {
-		visibility = generated.CalendarEventsVisibility(in.Visibility)
+		visibility = calendar.CalendarEventsVisibility(in.Visibility)
 	}
 
 	ownerUserID := s.userID
@@ -2788,7 +2789,7 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	}
 
 	pub := newPublicID()
-	_, err = deps.Queries.CreateCalendarEvent(ctx, generated.CreateCalendarEventParams{
+	_, err = deps.CalendarQueries.CreateCalendarEvent(ctx, calendar.CreateCalendarEventParams{
 		PublicID:           pub,
 		WorkspaceID:        s.workspaceID,
 		CalendarID:         calID,
@@ -2851,7 +2852,7 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	if err != nil {
 		return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid eventId")
 	}
-	owner, err := deps.Queries.FindCalendarEventOwner(ctx, generated.FindCalendarEventOwnerParams{
+	owner, err := deps.CalendarQueries.FindCalendarEventOwner(ctx, calendar.FindCalendarEventOwnerParams{
 		PublicID:    eventPub,
 		WorkspaceID: s.workspaceID,
 	})
@@ -2863,7 +2864,7 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	}
 
 	// Resolve event internal id for permission check.
-	evt, err := deps.Queries.FindCalendarEventByPublicId(ctx, generated.FindCalendarEventByPublicIdParams{
+	evt, err := deps.CalendarQueries.FindCalendarEventByPublicId(ctx, calendar.FindCalendarEventByPublicIdParams{
 		PublicID:    eventPub,
 		CalendarID:  owner.CalendarID,
 		WorkspaceID: s.workspaceID,
@@ -2876,7 +2877,7 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		return nil, apierrors.Newf(apierrors.McpToolExecutionFailed, "permission denied: cannot edit event")
 	}
 
-	params := generated.PatchCalendarEventParams{
+	params := calendar.PatchCalendarEventParams{
 		PublicID:    eventPub,
 		CalendarID:  owner.CalendarID,
 		WorkspaceID: s.workspaceID,
@@ -2921,20 +2922,20 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		params.EndAt = sql.NullTime{Time: newEndAt, Valid: true}
 	}
 	if in.Kind != nil {
-		params.Kind = generated.NullCalendarEventsKind{
-			CalendarEventsKind: generated.CalendarEventsKind(*in.Kind),
+		params.Kind = calendar.NullCalendarEventsKind{
+			CalendarEventsKind: calendar.CalendarEventsKind(*in.Kind),
 			Valid:              true,
 		}
 	}
 	if in.ShowAs != nil {
-		params.ShowAs = generated.NullCalendarEventsShowAs{
-			CalendarEventsShowAs: generated.CalendarEventsShowAs(*in.ShowAs),
+		params.ShowAs = calendar.NullCalendarEventsShowAs{
+			CalendarEventsShowAs: calendar.CalendarEventsShowAs(*in.ShowAs),
 			Valid:                true,
 		}
 	}
 	if in.Visibility != nil {
-		params.Visibility = generated.NullCalendarEventsVisibility{
-			CalendarEventsVisibility: generated.CalendarEventsVisibility(*in.Visibility),
+		params.Visibility = calendar.NullCalendarEventsVisibility{
+			CalendarEventsVisibility: calendar.CalendarEventsVisibility(*in.Visibility),
 			Valid:                    true,
 		}
 	}
@@ -2949,7 +2950,7 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	}
 
 	if !isLinked || (!titleChanged && !timeChanged) {
-		if err := deps.Queries.PatchCalendarEvent(ctx, params); err != nil {
+		if err := deps.CalendarQueries.PatchCalendarEvent(ctx, params); err != nil {
 			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 		}
 		return map[string]any{"success": true}, nil
@@ -2960,7 +2961,7 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	defer tx.Rollback() //nolint:errcheck
-	qtx := deps.Queries.WithTx(tx)
+	qtxCal := deps.CalendarQueries.WithTx(tx)
 
 	if titleChanged {
 		if err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
@@ -2990,7 +2991,7 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	if params.Title.Valid || params.Kind.Valid || params.ShowAs.Valid ||
 		params.Visibility.Valid || params.Location.Valid || params.Memo.Valid ||
 		params.BlockLabel.Valid || params.StartAt.Valid || params.EndAt.Valid {
-		if err := qtx.PatchCalendarEvent(ctx, params); err != nil {
+		if err := qtxCal.PatchCalendarEvent(ctx, params); err != nil {
 			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 		}
 	}
@@ -3018,7 +3019,7 @@ func runDeleteCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	if err != nil {
 		return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid eventId")
 	}
-	owner, err := deps.Queries.FindCalendarEventOwner(ctx, generated.FindCalendarEventOwnerParams{
+	owner, err := deps.CalendarQueries.FindCalendarEventOwner(ctx, calendar.FindCalendarEventOwnerParams{
 		PublicID:    eventPub,
 		WorkspaceID: s.workspaceID,
 	})
@@ -3029,7 +3030,7 @@ func runDeleteCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 
-	evt, err := deps.Queries.FindCalendarEventByPublicId(ctx, generated.FindCalendarEventByPublicIdParams{
+	evt, err := deps.CalendarQueries.FindCalendarEventByPublicId(ctx, calendar.FindCalendarEventByPublicIdParams{
 		PublicID:    eventPub,
 		CalendarID:  owner.CalendarID,
 		WorkspaceID: s.workspaceID,
@@ -3095,7 +3096,7 @@ func runListFreeSlots(ctx context.Context, deps Deps, s *session, raw json.RawMe
 	workStart := time.Date(date.Year(), date.Month(), date.Day(), 9, 0, 0, 0, time.UTC)
 	workEnd := time.Date(date.Year(), date.Month(), date.Day(), 18, 0, 0, 0, time.UTC)
 
-	rows, err := deps.Queries.ListCalendarEventsAcrossCalendars(ctx, generated.ListCalendarEventsAcrossCalendarsParams{
+	rows, err := deps.CalendarQueries.ListCalendarEventsAcrossCalendars(ctx, calendar.ListCalendarEventsAcrossCalendarsParams{
 		UserID:      targetUserID,
 		WorkspaceID: s.workspaceID,
 		StartAt:     sql.NullTime{Time: workEnd, Valid: true},
@@ -3211,13 +3212,13 @@ func runCreateEventFromTask(ctx context.Context, deps Deps, s *session, raw json
 	}
 
 	pub := newPublicID()
-	_, err = deps.Queries.CreateCalendarEvent(ctx, generated.CreateCalendarEventParams{
+	_, err = deps.CalendarQueries.CreateCalendarEvent(ctx, calendar.CreateCalendarEventParams{
 		PublicID:           pub,
 		WorkspaceID:        s.workspaceID,
 		CalendarID:         calID,
-		Kind:               generated.CalendarEventsKindEvent,
-		Visibility:         generated.CalendarEventsVisibilityDefault,
-		ShowAs:             generated.CalendarEventsShowAsBusy,
+		Kind:               calendar.CalendarEventsKindEvent,
+		Visibility:         calendar.CalendarEventsVisibilityDefault,
+		ShowAs:             calendar.CalendarEventsShowAsBusy,
 		Title:              task.Title,
 		AllDay:             false,
 		StartAt:            sql.NullTime{Time: startAt, Valid: true},
@@ -3263,7 +3264,7 @@ func runListCalendarMemos(ctx context.Context, deps Deps, s *session, raw json.R
 	if err != nil {
 		return nil, err
 	}
-	rows, err := deps.Queries.ListCalendarMemos(ctx, calID)
+	rows, err := deps.CalendarQueries.ListCalendarMemos(ctx, calID)
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
@@ -3302,7 +3303,7 @@ func runToggleCalendarMemo(ctx context.Context, deps Deps, s *session, raw json.
 	if err != nil {
 		return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid memoId")
 	}
-	if err := deps.Queries.UpdateCalendarMemo(ctx, generated.UpdateCalendarMemoParams{
+	if err := deps.CalendarQueries.UpdateCalendarMemo(ctx, calendar.UpdateCalendarMemoParams{
 		Done:        sql.NullBool{Bool: *in.Done, Valid: true},
 		PublicID:    memoPub,
 		CalendarID:  calID,

@@ -14,6 +14,7 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 )
@@ -184,7 +185,7 @@ func resolveCalendar(ctx context.Context, deps Deps, s *session, publicID string
 	if err != nil {
 		return 0, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid calendar id")
 	}
-	row, err := deps.Queries.FindCalendarByPublicId(ctx, generated.FindCalendarByPublicIdParams{
+	row, err := deps.CalendarQueries.FindCalendarByPublicId(ctx, calendar.FindCalendarByPublicIdParams{
 		PublicID:    pub,
 		WorkspaceID: s.workspaceID,
 	})
@@ -210,7 +211,7 @@ func canEditCalendarEvent(ctx context.Context, deps Deps, s *session, eventOwner
 	if s.userID == eventOwnerUserID {
 		return true, nil
 	}
-	att, err := deps.Queries.FindCalendarEventAttendee(ctx, generated.FindCalendarEventAttendeeParams{
+	att, err := deps.CalendarQueries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
 		EventID: eventID,
 		UserID:  s.userID,
 	})

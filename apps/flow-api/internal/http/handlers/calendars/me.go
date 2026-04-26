@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	generated "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 )
@@ -65,7 +65,7 @@ func ListMyInvites(deps Deps) func(context.Context, *struct{}) (*ListMyInvitesOu
 			return out, nil
 		}
 
-		rows, err := deps.Queries.ListMyCalendarEventInvites(ctx, profile.Email)
+		rows, err := deps.CalendarQueries.ListMyCalendarEventInvites(ctx, profile.Email)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarInviteListQueryInterrupted)
 		}
@@ -167,7 +167,7 @@ func ListMyCalendarEvents(deps Deps) func(context.Context, *ListMyCalendarEvents
 			return nil, httpErr(apierrors.CalendarEventDateRangeUnparseable)
 		}
 
-		rows, err := deps.Queries.ListMyCalendarEventsAcrossWorkspaces(ctx, generated.ListMyCalendarEventsAcrossWorkspacesParams{
+		rows, err := deps.CalendarQueries.ListMyCalendarEventsAcrossWorkspaces(ctx, calendar.ListMyCalendarEventsAcrossWorkspacesParams{
 			UserID:  actorID,
 			StartAt: sql.NullTime{Time: endTime, Valid: true},
 			EndAt:   sql.NullTime{Time: startTime, Valid: true},
@@ -176,7 +176,7 @@ func ListMyCalendarEvents(deps Deps) func(context.Context, *ListMyCalendarEvents
 			return nil, httpErr(apierrors.CalendarEventListQueryInterrupted)
 		}
 
-		recurringRows, err := deps.Queries.ListMyRecurringCalendarEventsAcrossWorkspaces(ctx, generated.ListMyRecurringCalendarEventsAcrossWorkspacesParams{
+		recurringRows, err := deps.CalendarQueries.ListMyRecurringCalendarEventsAcrossWorkspaces(ctx, calendar.ListMyRecurringCalendarEventsAcrossWorkspacesParams{
 			UserID:        actorID,
 			StartAt:       sql.NullTime{Time: endTime, Valid: true},
 			RecurrenceEnd: sql.NullTime{Time: startTime, Valid: true},

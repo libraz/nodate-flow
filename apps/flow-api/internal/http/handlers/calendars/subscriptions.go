@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	generated "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 )
@@ -94,7 +94,7 @@ func ListDiscoverableCalendars(deps Deps) func(context.Context, *ListDiscoverabl
 			return nil, err
 		}
 
-		rows, err := deps.Queries.ListDiscoverableCalendarsInWorkspace(ctx, generated.ListDiscoverableCalendarsInWorkspaceParams{
+		rows, err := deps.CalendarQueries.ListDiscoverableCalendarsInWorkspace(ctx, calendar.ListDiscoverableCalendarsInWorkspaceParams{
 			WorkspaceID: wsID,
 			ActorID:     int64(actorID),
 			ActorID_2:   int64(actorID),
@@ -143,7 +143,7 @@ func SelfSubscribe(deps Deps) func(context.Context, *SelfSubscribeInput) (*SelfS
 		if err != nil {
 			return nil, errCalendarNotFound
 		}
-		cal, err := deps.Queries.FindCalendarByPublicId(ctx, generated.FindCalendarByPublicIdParams{
+		cal, err := deps.CalendarQueries.FindCalendarByPublicId(ctx, calendar.FindCalendarByPublicIdParams{
 			PublicID:    types.FromUUID(calUID),
 			WorkspaceID: wsID,
 		})
@@ -155,7 +155,7 @@ func SelfSubscribe(deps Deps) func(context.Context, *SelfSubscribeInput) (*SelfS
 		}
 
 		// Already subscribed? Return idempotent success.
-		if _, err := deps.Queries.FindCalendarSubscription(ctx, generated.FindCalendarSubscriptionParams{
+		if _, err := deps.CalendarQueries.FindCalendarSubscription(ctx, calendar.FindCalendarSubscriptionParams{
 			CalendarID: cal.ID,
 			UserID:     actorID,
 		}); err == nil {
@@ -169,7 +169,7 @@ func SelfSubscribe(deps Deps) func(context.Context, *SelfSubscribeInput) (*SelfS
 
 		// Determine display_color via the same color-rotation pattern used
 		// by AddMember so subsequent subscribers fan out predictably.
-		members, err := deps.Queries.ListCalendarSubscribers(ctx, generated.ListCalendarSubscribersParams{
+		members, err := deps.CalendarQueries.ListCalendarSubscribers(ctx, calendar.ListCalendarSubscribersParams{
 			CalendarID:  cal.ID,
 			WorkspaceID: wsID,
 		})
@@ -179,7 +179,7 @@ func SelfSubscribe(deps Deps) func(context.Context, *SelfSubscribeInput) (*SelfS
 		color := memberColors[len(members)%len(memberColors)]
 
 		subPublicID := types.New()
-		if _, err := deps.Queries.CreateCalendarSubscription(ctx, generated.CreateCalendarSubscriptionParams{
+		if _, err := deps.CalendarQueries.CreateCalendarSubscription(ctx, calendar.CreateCalendarSubscriptionParams{
 			PublicID:     subPublicID,
 			WorkspaceID:  wsID,
 			CalendarID:   cal.ID,
@@ -209,12 +209,12 @@ func PatchOwnSubscription(deps Deps) func(context.Context, *PatchOwnSubscription
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
 
-		params := generated.PatchCalendarSubscriptionParams{
+		params := calendar.PatchCalendarSubscriptionParams{
 			CalendarID: cal.ID,
 			UserID:     actorID,
 		}
@@ -228,7 +228,7 @@ func PatchOwnSubscription(deps Deps) func(context.Context, *PatchOwnSubscription
 			params.SortWeight = sql.NullInt32{Int32: int32(*input.Body.SortWeight), Valid: true}
 		}
 
-		if err := deps.Queries.PatchCalendarSubscription(ctx, params); err != nil {
+		if err := deps.CalendarQueries.PatchCalendarSubscription(ctx, params); err != nil {
 			return nil, httpErr(apierrors.CalendarSubscriptionStoreWriteInterrupted)
 		}
 

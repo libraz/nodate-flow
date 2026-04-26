@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	generated "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/region"
@@ -237,7 +238,7 @@ func CreatePublicShare(deps Deps) func(context.Context, *CreatePublicShareInput)
 		}
 
 		publicID := types.New()
-		params := generated.CreatePublicShareParams{
+		params := calendar.CreatePublicShareParams{
 			PublicID:            publicID,
 			WorkspaceID:         wsID,
 			CreatedByUserID:     sql.NullInt32{Int32: int32(actorID), Valid: true},
@@ -250,11 +251,11 @@ func CreatePublicShare(deps Deps) func(context.Context, *CreatePublicShareInput)
 			ShowHolidaysCountry: nullStringFromPtr(input.Body.ShowHolidaysCountry),
 			ExpiresAt:           nullTimeFromUnixPtr(input.Body.ExpiresAt),
 		}
-		if _, err := deps.Queries.CreatePublicShare(ctx, params); err != nil {
+		if _, err := deps.CalendarQueries.CreatePublicShare(ctx, params); err != nil {
 			return nil, httpErr(apierrors.CalendarCalendarStoreWriteInterrupted)
 		}
 
-		row, err := deps.Queries.FindPublicShareByPublicId(ctx, generated.FindPublicShareByPublicIdParams{
+		row, err := deps.CalendarQueries.FindPublicShareByPublicId(ctx, calendar.FindPublicShareByPublicIdParams{
 			WorkspaceID: wsID,
 			PublicID:    publicID,
 		})
@@ -281,7 +282,7 @@ func ListPublicShares(deps Deps) func(context.Context, *ListPublicSharesInput) (
 		if err != nil {
 			return nil, err
 		}
-		rows, err := deps.Queries.ListPublicShares(ctx, wsID)
+		rows, err := deps.CalendarQueries.ListPublicShares(ctx, wsID)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarCalendarStoreReadInterrupted)
 		}
@@ -305,7 +306,7 @@ func GetPublicShare(deps Deps) func(context.Context, *GetPublicShareInput) (*Get
 		if err != nil {
 			return nil, errShareNotFound
 		}
-		row, err := deps.Queries.FindPublicShareByPublicId(ctx, generated.FindPublicShareByPublicIdParams{
+		row, err := deps.CalendarQueries.FindPublicShareByPublicId(ctx, calendar.FindPublicShareByPublicIdParams{
 			WorkspaceID: wsID,
 			PublicID:    sharePID,
 		})
@@ -315,7 +316,7 @@ func GetPublicShare(deps Deps) func(context.Context, *GetPublicShareInput) (*Get
 			}
 			return nil, httpErr(apierrors.CalendarCalendarStoreReadInterrupted)
 		}
-		events, err := deps.Queries.ListPublicShareEventsForEditor(ctx, generated.ListPublicShareEventsForEditorParams{
+		events, err := deps.CalendarQueries.ListPublicShareEventsForEditor(ctx, calendar.ListPublicShareEventsForEditorParams{
 			WorkspaceID: wsID,
 			PublicID:    sharePID,
 		})
@@ -350,7 +351,7 @@ func PatchPublicShare(deps Deps) func(context.Context, *PatchPublicShareInput) (
 			}
 		}
 
-		params := generated.PatchPublicShareParams{
+		params := calendar.PatchPublicShareParams{
 			WorkspaceID:         wsID,
 			PublicID:            sharePID,
 			Title:               nullStringFromPtr(input.Body.Title),
@@ -362,11 +363,11 @@ func PatchPublicShare(deps Deps) func(context.Context, *PatchPublicShareInput) (
 			ExpiresAt:           nullTimeFromUnixPtr(input.Body.ExpiresAt),
 			SortWeight:          nullInt32FromPtr(input.Body.SortWeight),
 		}
-		if err := deps.Queries.PatchPublicShare(ctx, params); err != nil {
+		if err := deps.CalendarQueries.PatchPublicShare(ctx, params); err != nil {
 			return nil, httpErr(apierrors.CalendarCalendarStoreWriteInterrupted)
 		}
 		if input.Body.ClearExpiresAt {
-			if err := deps.Queries.ClearPublicShareExpiresAt(ctx, generated.ClearPublicShareExpiresAtParams{
+			if err := deps.CalendarQueries.ClearPublicShareExpiresAt(ctx, calendar.ClearPublicShareExpiresAtParams{
 				WorkspaceID: wsID,
 				PublicID:    sharePID,
 			}); err != nil {
@@ -374,7 +375,7 @@ func PatchPublicShare(deps Deps) func(context.Context, *PatchPublicShareInput) (
 			}
 		}
 
-		row, err := deps.Queries.FindPublicShareByPublicId(ctx, generated.FindPublicShareByPublicIdParams{
+		row, err := deps.CalendarQueries.FindPublicShareByPublicId(ctx, calendar.FindPublicShareByPublicIdParams{
 			WorkspaceID: wsID,
 			PublicID:    sharePID,
 		})
@@ -412,14 +413,14 @@ func RotatePublicShareToken(deps Deps) func(context.Context, *RotatePublicShareT
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarCalendarStoreWriteInterrupted)
 		}
-		if err := deps.Queries.RotatePublicShareToken(ctx, generated.RotatePublicShareTokenParams{
+		if err := deps.CalendarQueries.RotatePublicShareToken(ctx, calendar.RotatePublicShareTokenParams{
 			TokenHash:   tokenHash,
 			WorkspaceID: wsID,
 			PublicID:    sharePID,
 		}); err != nil {
 			return nil, httpErr(apierrors.CalendarCalendarStoreWriteInterrupted)
 		}
-		row, err := deps.Queries.FindPublicShareByPublicId(ctx, generated.FindPublicShareByPublicIdParams{
+		row, err := deps.CalendarQueries.FindPublicShareByPublicId(ctx, calendar.FindPublicShareByPublicIdParams{
 			WorkspaceID: wsID,
 			PublicID:    sharePID,
 		})
@@ -454,7 +455,7 @@ func DeletePublicShare(deps Deps) func(context.Context, *DeletePublicShareInput)
 		if err != nil {
 			return nil, errShareNotFound
 		}
-		if err := deps.Queries.DisablePublicShare(ctx, generated.DisablePublicShareParams{
+		if err := deps.CalendarQueries.DisablePublicShare(ctx, calendar.DisablePublicShareParams{
 			WorkspaceID: wsID,
 			PublicID:    sharePID,
 		}); err != nil {
@@ -482,7 +483,7 @@ func AttachEventsToShare(deps Deps) func(context.Context, *AttachEventsToShareIn
 		if err != nil {
 			return nil, errShareNotFound
 		}
-		share, err := deps.Queries.FindPublicShareByPublicId(ctx, generated.FindPublicShareByPublicIdParams{
+		share, err := deps.CalendarQueries.FindPublicShareByPublicId(ctx, calendar.FindPublicShareByPublicIdParams{
 			WorkspaceID: wsID,
 			PublicID:    sharePID,
 		})
@@ -501,7 +502,7 @@ func AttachEventsToShare(deps Deps) func(context.Context, *AttachEventsToShareIn
 				skipped++
 				continue
 			}
-			evt, err := deps.Queries.FindEventIDAndVisibility(ctx, generated.FindEventIDAndVisibilityParams{
+			evt, err := deps.CalendarQueries.FindEventIDAndVisibility(ctx, calendar.FindEventIDAndVisibilityParams{
 				WorkspaceID: wsID,
 				PublicID:    pid,
 			})
@@ -509,11 +510,11 @@ func AttachEventsToShare(deps Deps) func(context.Context, *AttachEventsToShareIn
 				skipped++
 				continue
 			}
-			if evt.Visibility == generated.CalendarEventsVisibilityConfidential {
+			if evt.Visibility == calendar.CalendarEventsVisibilityConfidential {
 				skipped++
 				continue
 			}
-			if _, err := deps.Queries.AttachEventToShare(ctx, generated.AttachEventToShareParams{
+			if _, err := deps.CalendarQueries.AttachEventToShare(ctx, calendar.AttachEventToShareParams{
 				PublicID:    types.New(),
 				WorkspaceID: wsID,
 				ShareID:     share.ID,
@@ -557,7 +558,7 @@ func ReorderShareEvents(deps Deps) func(context.Context, *ReorderShareEventsInpu
 		if err != nil {
 			return nil, errShareNotFound
 		}
-		share, err := deps.Queries.FindPublicShareByPublicId(ctx, generated.FindPublicShareByPublicIdParams{
+		share, err := deps.CalendarQueries.FindPublicShareByPublicId(ctx, calendar.FindPublicShareByPublicIdParams{
 			WorkspaceID: wsID,
 			PublicID:    sharePID,
 		})
@@ -588,7 +589,7 @@ func ReorderShareEvents(deps Deps) func(context.Context, *ReorderShareEventsInpu
 		// Load the current set of links for this share and verify the
 		// input is a permutation. sqlc's :exec directive does not expose
 		// RowsAffected, so we validate up front and trust the tx.
-		existing, err := deps.Queries.ListPublicShareEventsForEditor(ctx, generated.ListPublicShareEventsForEditorParams{
+		existing, err := deps.CalendarQueries.ListPublicShareEventsForEditor(ctx, calendar.ListPublicShareEventsForEditorParams{
 			WorkspaceID: wsID,
 			PublicID:    sharePID,
 		})
@@ -616,10 +617,10 @@ func ReorderShareEvents(deps Deps) func(context.Context, *ReorderShareEventsInpu
 			return nil, httpErr(apierrors.CalendarCalendarStoreWriteInterrupted)
 		}
 		defer func() { _ = tx.Rollback() }()
-		qtx := deps.Queries.WithTx(tx)
+		cqtx := deps.CalendarQueries.WithTx(tx)
 
 		for i, pid := range requested {
-			if err := qtx.UpdateShareEventSortWeight(ctx, generated.UpdateShareEventSortWeightParams{
+			if err := cqtx.UpdateShareEventSortWeight(ctx, calendar.UpdateShareEventSortWeightParams{
 				SortWeight: int32(i),
 				ShareID:    share.ID,
 				PublicID:   pid,
@@ -654,7 +655,7 @@ func DetachEventFromShare(deps Deps) func(context.Context, *DetachEventFromShare
 		if err != nil {
 			return nil, errShareNotFound
 		}
-		share, err := deps.Queries.FindPublicShareByPublicId(ctx, generated.FindPublicShareByPublicIdParams{
+		share, err := deps.CalendarQueries.FindPublicShareByPublicId(ctx, calendar.FindPublicShareByPublicIdParams{
 			WorkspaceID: wsID,
 			PublicID:    sharePID,
 		})
@@ -668,7 +669,7 @@ func DetachEventFromShare(deps Deps) func(context.Context, *DetachEventFromShare
 		if err != nil {
 			return nil, errEventNotFound
 		}
-		evt, err := deps.Queries.FindEventIDAndVisibility(ctx, generated.FindEventIDAndVisibilityParams{
+		evt, err := deps.CalendarQueries.FindEventIDAndVisibility(ctx, calendar.FindEventIDAndVisibilityParams{
 			WorkspaceID: wsID,
 			PublicID:    evtPID,
 		})
@@ -678,7 +679,7 @@ func DetachEventFromShare(deps Deps) func(context.Context, *DetachEventFromShare
 			}
 			return nil, httpErr(apierrors.CalendarCalendarStoreReadInterrupted)
 		}
-		if err := deps.Queries.DetachEventFromShare(ctx, generated.DetachEventFromShareParams{
+		if err := deps.CalendarQueries.DetachEventFromShare(ctx, calendar.DetachEventFromShareParams{
 			ShareID: share.ID,
 			EventID: evt.ID,
 		}); err != nil {
@@ -790,7 +791,7 @@ func nullStringPtr(v sql.NullString) *string {
 
 // --- Row → DTO mappers ---
 
-func publicShareFromRow(r generated.FindPublicShareByPublicIdRow, eventCount int64) PublicShareResponse {
+func publicShareFromRow(r calendar.FindPublicShareByPublicIdRow, eventCount int64) PublicShareResponse {
 	resp := PublicShareResponse{
 		ID:                  r.PublicID.String(),
 		Title:               r.Title,
@@ -808,7 +809,7 @@ func publicShareFromRow(r generated.FindPublicShareByPublicIdRow, eventCount int
 	return resp
 }
 
-func publicShareFromListRow(r generated.ListPublicSharesRow) PublicShareResponse {
+func publicShareFromListRow(r calendar.ListPublicSharesRow) PublicShareResponse {
 	resp := PublicShareResponse{
 		ID:                  r.PublicID.String(),
 		Title:               r.Title,
@@ -831,7 +832,7 @@ func publicShareFromListRow(r generated.ListPublicSharesRow) PublicShareResponse
 	return resp
 }
 
-func shareEventFromEditorRow(r generated.ListPublicShareEventsForEditorRow) ShareEventResponse {
+func shareEventFromEditorRow(r calendar.ListPublicShareEventsForEditorRow) ShareEventResponse {
 	return ShareEventResponse{
 		LinkID:         r.LinkPublicID.String(),
 		EventID:        r.EventPublicID.String(),

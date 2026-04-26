@@ -75,7 +75,7 @@ func RenderPublicShare(deps Deps) func(context.Context, *RenderPublicShareInput)
 		sum := sha256.Sum256([]byte(input.Token))
 		hash := hex.EncodeToString(sum[:])
 
-		page, err := deps.Queries.FindPublicShareByTokenHash(ctx, hash)
+		page, err := deps.CalendarQueries.FindPublicShareByTokenHash(ctx, hash)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, httpErr(apierrors.ShareShareTokenInvalid)
@@ -86,7 +86,7 @@ func RenderPublicShare(deps Deps) func(context.Context, *RenderPublicShareInput)
 			return nil, httpErr(apierrors.ShareShareExpired)
 		}
 
-		events, err := deps.Queries.ListPublicShareEventsByTokenHash(ctx, hash)
+		events, err := deps.CalendarQueries.ListPublicShareEventsByTokenHash(ctx, hash)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarCalendarStoreReadInterrupted)
 		}

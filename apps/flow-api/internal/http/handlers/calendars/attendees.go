@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
-	generated "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 )
@@ -112,25 +112,25 @@ type ToggleCanEditOutput struct {
 // resolveEvent parses the evtId UUID and returns the event row.
 func resolveEvent(
 	ctx context.Context,
-	q *generated.Queries,
+	cq *calendar.Queries,
 	calID uint32,
 	wsID uint32,
 	evtIDStr string,
-) (generated.FindCalendarEventByPublicIdRow, error) {
+) (calendar.FindCalendarEventByPublicIdRow, error) {
 	evtUID, err := uuid.Parse(evtIDStr)
 	if err != nil {
-		return generated.FindCalendarEventByPublicIdRow{}, errEventNotFound
+		return calendar.FindCalendarEventByPublicIdRow{}, errEventNotFound
 	}
-	evt, err := q.FindCalendarEventByPublicId(ctx, generated.FindCalendarEventByPublicIdParams{
+	evt, err := cq.FindCalendarEventByPublicId(ctx, calendar.FindCalendarEventByPublicIdParams{
 		PublicID:    types.FromUUID(evtUID),
 		CalendarID:  calID,
 		WorkspaceID: wsID,
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return generated.FindCalendarEventByPublicIdRow{}, errEventNotFound
+			return calendar.FindCalendarEventByPublicIdRow{}, errEventNotFound
 		}
-		return generated.FindCalendarEventByPublicIdRow{}, err
+		return calendar.FindCalendarEventByPublicIdRow{}, err
 	}
 	return evt, nil
 }
@@ -144,12 +144,12 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
@@ -174,12 +174,12 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 			}
 
 			attPublicID := types.New()
-			_, createErr := deps.Queries.CreateCalendarEventAttendee(ctx, generated.CreateCalendarEventAttendeeParams{
+			_, createErr := deps.CalendarQueries.CreateCalendarEventAttendee(ctx, calendar.CreateCalendarEventAttendeeParams{
 				PublicID:    attPublicID,
 				WorkspaceID: wsID,
 				EventID:     evt.ID,
 				UserID:      userID,
-				Rsvp:        generated.CalendarEventAttendeesRsvpPending,
+				Rsvp:        calendar.CalendarEventAttendeesRsvpPending,
 				CanEdit:     false,
 			})
 			if createErr != nil {
@@ -195,7 +195,7 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 				ID:          attPublicID.String(),
 				UserID:      uidStr,
 				DisplayName: profile.DisplayName,
-				Rsvp:        string(generated.CalendarEventAttendeesRsvpPending),
+				Rsvp:        string(calendar.CalendarEventAttendeesRsvpPending),
 				CanEdit:     false,
 				CreatedAt:   time.Now().UTC().Unix(),
 			}
@@ -224,17 +224,17 @@ func ListAttendees(deps Deps) func(context.Context, *ListAttendeesInput) (*ListA
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
 
-		rows, err := deps.Queries.ListCalendarEventAttendees(ctx, evt.ID)
+		rows, err := deps.CalendarQueries.ListCalendarEventAttendees(ctx, evt.ID)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarAttendeeListQueryInterrupted)
 		}
@@ -267,12 +267,12 @@ func RemoveAttendee(deps Deps) func(context.Context, *RemoveAttendeeInput) (*Rem
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
@@ -290,7 +290,7 @@ func RemoveAttendee(deps Deps) func(context.Context, *RemoveAttendeeInput) (*Rem
 			return nil, httpErr(apierrors.CalendarAttendeeUserNotFound)
 		}
 
-		err = deps.Queries.DisableCalendarEventAttendee(ctx, generated.DisableCalendarEventAttendeeParams{
+		err = deps.CalendarQueries.DisableCalendarEventAttendee(ctx, calendar.DisableCalendarEventAttendeeParams{
 			EventID: evt.ID,
 			UserID:  targetUserID,
 		})
@@ -317,18 +317,18 @@ func UpdateRsvp(deps Deps) func(context.Context, *UpdateRsvpInput) (*UpdateRsvpO
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
 
-		err = deps.Queries.UpdateAttendeeRsvp(ctx, generated.UpdateAttendeeRsvpParams{
-			Rsvp:    generated.CalendarEventAttendeesRsvp(input.Body.Rsvp),
+		err = deps.CalendarQueries.UpdateAttendeeRsvp(ctx, calendar.UpdateAttendeeRsvpParams{
+			Rsvp:    calendar.CalendarEventAttendeesRsvp(input.Body.Rsvp),
 			EventID: evt.ID,
 			UserID:  actorID,
 		})
@@ -357,12 +357,12 @@ func ToggleCanEdit(deps Deps) func(context.Context, *ToggleCanEditInput) (*Toggl
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
@@ -380,7 +380,7 @@ func ToggleCanEdit(deps Deps) func(context.Context, *ToggleCanEditInput) (*Toggl
 			return nil, httpErr(apierrors.CalendarAttendeeUserNotFound)
 		}
 
-		err = deps.Queries.UpdateAttendeeCanEdit(ctx, generated.UpdateAttendeeCanEditParams{
+		err = deps.CalendarQueries.UpdateAttendeeCanEdit(ctx, calendar.UpdateAttendeeCanEditParams{
 			CanEdit: input.Body.CanEdit,
 			EventID: evt.ID,
 			UserID:  targetUserID,

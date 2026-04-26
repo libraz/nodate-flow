@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
-	generated "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 )
@@ -97,17 +97,17 @@ func ListComments(deps Deps) func(context.Context, *ListCommentsInput) (*ListCom
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
 
-		rows, err := deps.Queries.ListCalendarEventComments(ctx, evt.ID)
+		rows, err := deps.CalendarQueries.ListCalendarEventComments(ctx, evt.ID)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarCommentListQueryInterrupted)
 		}
@@ -141,18 +141,18 @@ func CreateComment(deps Deps) func(context.Context, *CreateCommentInput) (*Creat
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
 
 		commentPublicID := types.New()
-		_, err = deps.Queries.CreateCalendarEventComment(ctx, generated.CreateCalendarEventCommentParams{
+		_, err = deps.CalendarQueries.CreateCalendarEventComment(ctx, calendar.CreateCalendarEventCommentParams{
 			PublicID:    commentPublicID,
 			WorkspaceID: wsID,
 			EventID:     evt.ID,
@@ -197,12 +197,12 @@ func EditComment(deps Deps) func(context.Context, *EditCommentInput) (*EditComme
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
@@ -212,7 +212,7 @@ func EditComment(deps Deps) func(context.Context, *EditCommentInput) (*EditComme
 			return nil, httpErr(apierrors.CalendarCommentNotFound)
 		}
 
-		err = deps.Queries.UpdateCalendarEventComment(ctx, generated.UpdateCalendarEventCommentParams{
+		err = deps.CalendarQueries.UpdateCalendarEventComment(ctx, calendar.UpdateCalendarEventCommentParams{
 			Body:        input.Body.Body,
 			PublicID:    types.FromUUID(commentUID),
 			EventID:     evt.ID,
@@ -242,12 +242,12 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteCommentInput) (*Delet
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
@@ -257,7 +257,7 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteCommentInput) (*Delet
 			return nil, httpErr(apierrors.CalendarCommentNotFound)
 		}
 
-		comment, err := deps.Queries.FindCalendarEventCommentByPublicId(ctx, generated.FindCalendarEventCommentByPublicIdParams{
+		comment, err := deps.CalendarQueries.FindCalendarEventCommentByPublicId(ctx, calendar.FindCalendarEventCommentByPublicIdParams{
 			PublicID:    types.FromUUID(commentUID),
 			EventID:     evt.ID,
 			WorkspaceID: wsID,
@@ -277,7 +277,7 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteCommentInput) (*Delet
 			return nil, httpErr(apierrors.CalendarCommentAuthorOrOwnerRequired)
 		}
 
-		err = deps.Queries.DisableCalendarEventComment(ctx, generated.DisableCalendarEventCommentParams{
+		err = deps.CalendarQueries.DisableCalendarEventComment(ctx, calendar.DisableCalendarEventCommentParams{
 			PublicID:    types.FromUUID(commentUID),
 			EventID:     evt.ID,
 			WorkspaceID: wsID,

@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
-	generated "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 )
@@ -97,12 +97,12 @@ func ListMemos(deps Deps) func(context.Context, *ListMemosInput) (*ListMemosOutp
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
 
-		rows, err := deps.Queries.ListCalendarMemos(ctx, cal.ID)
+		rows, err := deps.CalendarQueries.ListCalendarMemos(ctx, cal.ID)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarMemoListQueryInterrupted)
 		}
@@ -135,13 +135,13 @@ func CreateMemo(deps Deps) func(context.Context, *CreateMemoInput) (*CreateMemoO
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
 
 		memoPublicID := types.New()
-		_, err = deps.Queries.CreateCalendarMemo(ctx, generated.CreateCalendarMemoParams{
+		_, err = deps.CalendarQueries.CreateCalendarMemo(ctx, calendar.CreateCalendarMemoParams{
 			PublicID:        memoPublicID,
 			WorkspaceID:     wsID,
 			CalendarID:      cal.ID,
@@ -179,7 +179,7 @@ func UpdateMemo(deps Deps) func(context.Context, *UpdateMemoInput) (*UpdateMemoO
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
@@ -189,7 +189,7 @@ func UpdateMemo(deps Deps) func(context.Context, *UpdateMemoInput) (*UpdateMemoO
 			return nil, httpErr(apierrors.CalendarMemoNotFound)
 		}
 
-		_, err = deps.Queries.FindCalendarMemoByPublicId(ctx, generated.FindCalendarMemoByPublicIdParams{
+		_, err = deps.CalendarQueries.FindCalendarMemoByPublicId(ctx, calendar.FindCalendarMemoByPublicIdParams{
 			PublicID:    types.FromUUID(memoUID),
 			CalendarID:  cal.ID,
 			WorkspaceID: wsID,
@@ -201,7 +201,7 @@ func UpdateMemo(deps Deps) func(context.Context, *UpdateMemoInput) (*UpdateMemoO
 			return nil, httpErr(apierrors.CalendarMemoStoreReadInterrupted)
 		}
 
-		params := generated.UpdateCalendarMemoParams{
+		params := calendar.UpdateCalendarMemoParams{
 			PublicID:    types.FromUUID(memoUID),
 			CalendarID:  cal.ID,
 			WorkspaceID: wsID,
@@ -216,7 +216,7 @@ func UpdateMemo(deps Deps) func(context.Context, *UpdateMemoInput) (*UpdateMemoO
 			params.SortWeight = sql.NullInt32{Int32: *input.Body.SortWeight, Valid: true}
 		}
 
-		err = deps.Queries.UpdateCalendarMemo(ctx, params)
+		err = deps.CalendarQueries.UpdateCalendarMemo(ctx, params)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarMemoStoreWriteInterrupted)
 		}
@@ -240,7 +240,7 @@ func DeleteMemo(deps Deps) func(context.Context, *DeleteMemoInput) (*DeleteMemoO
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
@@ -250,7 +250,7 @@ func DeleteMemo(deps Deps) func(context.Context, *DeleteMemoInput) (*DeleteMemoO
 			return nil, httpErr(apierrors.CalendarMemoNotFound)
 		}
 
-		_, err = deps.Queries.FindCalendarMemoByPublicId(ctx, generated.FindCalendarMemoByPublicIdParams{
+		_, err = deps.CalendarQueries.FindCalendarMemoByPublicId(ctx, calendar.FindCalendarMemoByPublicIdParams{
 			PublicID:    types.FromUUID(memoUID),
 			CalendarID:  cal.ID,
 			WorkspaceID: wsID,
@@ -262,7 +262,7 @@ func DeleteMemo(deps Deps) func(context.Context, *DeleteMemoInput) (*DeleteMemoO
 			return nil, httpErr(apierrors.CalendarMemoStoreReadInterrupted)
 		}
 
-		err = deps.Queries.DisableCalendarMemo(ctx, generated.DisableCalendarMemoParams{
+		err = deps.CalendarQueries.DisableCalendarMemo(ctx, calendar.DisableCalendarMemoParams{
 			PublicID:    types.FromUUID(memoUID),
 			CalendarID:  cal.ID,
 			WorkspaceID: wsID,

@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	generated "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 )
@@ -97,17 +97,17 @@ func ListChecklist(deps Deps) func(context.Context, *ListChecklistInput) (*ListC
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
 
-		rows, err := deps.Queries.ListCalendarChecklistItems(ctx, evt.ID)
+		rows, err := deps.CalendarQueries.ListCalendarChecklistItems(ctx, evt.ID)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarChecklistListQueryInterrupted)
 		}
@@ -134,18 +134,18 @@ func CreateChecklistItem(deps Deps) func(context.Context, *CreateChecklistItemIn
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
 
 		itemPublicID := types.New()
-		_, err = deps.Queries.CreateCalendarChecklistItem(ctx, generated.CreateCalendarChecklistItemParams{
+		_, err = deps.CalendarQueries.CreateCalendarChecklistItem(ctx, calendar.CreateCalendarChecklistItemParams{
 			PublicID:        itemPublicID,
 			WorkspaceID:     wsID,
 			EventID:         evt.ID,
@@ -183,12 +183,12 @@ func UpdateChecklistItem(deps Deps) func(context.Context, *UpdateChecklistItemIn
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
@@ -198,7 +198,7 @@ func UpdateChecklistItem(deps Deps) func(context.Context, *UpdateChecklistItemIn
 			return nil, httpErr(apierrors.CalendarChecklistItemNotFound)
 		}
 
-		params := generated.UpdateCalendarChecklistItemParams{
+		params := calendar.UpdateCalendarChecklistItemParams{
 			PublicID:    types.FromUUID(itemUID),
 			EventID:     evt.ID,
 			WorkspaceID: wsID,
@@ -213,7 +213,7 @@ func UpdateChecklistItem(deps Deps) func(context.Context, *UpdateChecklistItemIn
 			params.SortWeight = sql.NullInt32{Int32: *input.Body.SortWeight, Valid: true}
 		}
 
-		err = deps.Queries.UpdateCalendarChecklistItem(ctx, params)
+		err = deps.CalendarQueries.UpdateCalendarChecklistItem(ctx, params)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarChecklistStoreWriteInterrupted)
 		}
@@ -237,12 +237,12 @@ func DeleteChecklistItem(deps Deps) func(context.Context, *DeleteChecklistItemIn
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
@@ -252,7 +252,7 @@ func DeleteChecklistItem(deps Deps) func(context.Context, *DeleteChecklistItemIn
 			return nil, httpErr(apierrors.CalendarChecklistItemNotFound)
 		}
 
-		err = deps.Queries.DisableCalendarChecklistItem(ctx, generated.DisableCalendarChecklistItemParams{
+		err = deps.CalendarQueries.DisableCalendarChecklistItem(ctx, calendar.DisableCalendarChecklistItemParams{
 			PublicID:    types.FromUUID(itemUID),
 			EventID:     evt.ID,
 			WorkspaceID: wsID,

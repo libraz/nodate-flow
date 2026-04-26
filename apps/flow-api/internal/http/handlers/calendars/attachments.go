@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
-	generated "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 )
@@ -84,17 +84,17 @@ func ListAttachments(deps Deps) func(context.Context, *ListAttachmentsInput) (*L
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
 
-		rows, err := deps.Queries.ListCalendarEventAttachments(ctx, evt.ID)
+		rows, err := deps.CalendarQueries.ListCalendarEventAttachments(ctx, evt.ID)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarAttachmentListQueryInterrupted)
 		}
@@ -124,12 +124,12 @@ func CreateAttachment(deps Deps) func(context.Context, *CreateAttachmentInput) (
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
@@ -140,7 +140,7 @@ func CreateAttachment(deps Deps) func(context.Context, *CreateAttachmentInput) (
 			checksum = sql.NullString{String: input.Body.ChecksumSha256, Valid: true}
 		}
 
-		_, err = deps.Queries.CreateCalendarEventAttachment(ctx, generated.CreateCalendarEventAttachmentParams{
+		_, err = deps.CalendarQueries.CreateCalendarEventAttachment(ctx, calendar.CreateCalendarEventAttachmentParams{
 			PublicID:       attPublicID,
 			WorkspaceID:    wsID,
 			EventID:        evt.ID,
@@ -190,12 +190,12 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteAttachmentInput) (
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.Queries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
 		if err != nil {
 			return nil, err
 		}
@@ -205,7 +205,7 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteAttachmentInput) (
 			return nil, httpErr(apierrors.CalendarAttachmentNotFound)
 		}
 
-		att, err := deps.Queries.FindCalendarEventAttachmentByPublicId(ctx, generated.FindCalendarEventAttachmentByPublicIdParams{
+		att, err := deps.CalendarQueries.FindCalendarEventAttachmentByPublicId(ctx, calendar.FindCalendarEventAttachmentByPublicIdParams{
 			PublicID:    types.FromUUID(attUID),
 			EventID:     evt.ID,
 			WorkspaceID: wsID,
@@ -225,7 +225,7 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteAttachmentInput) (
 			return nil, httpErr(apierrors.CalendarAttachmentUploaderOrOwnerRequired)
 		}
 
-		err = deps.Queries.DisableCalendarEventAttachment(ctx, generated.DisableCalendarEventAttachmentParams{
+		err = deps.CalendarQueries.DisableCalendarEventAttachment(ctx, calendar.DisableCalendarEventAttachmentParams{
 			PublicID:    types.FromUUID(attUID),
 			EventID:     evt.ID,
 			WorkspaceID: wsID,

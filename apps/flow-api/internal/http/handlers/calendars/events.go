@@ -12,7 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
-	generated "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/itemkit"
@@ -191,13 +191,13 @@ func ListEvents(deps Deps) func(context.Context, *ListEventsInput) (*ListEventsO
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
 
 		// Non-recurring events: start_at < end, end_at > start (overlap check).
-		nonRecurring, err := deps.Queries.ListCalendarEventsByRange(ctx, generated.ListCalendarEventsByRangeParams{
+		nonRecurring, err := deps.CalendarQueries.ListCalendarEventsByRange(ctx, calendar.ListCalendarEventsByRangeParams{
 			CalendarID: cal.ID,
 			StartAt:    sql.NullTime{Time: input.End, Valid: true},
 			EndAt:      sql.NullTime{Time: input.Start, Valid: true},
@@ -207,7 +207,7 @@ func ListEvents(deps Deps) func(context.Context, *ListEventsInput) (*ListEventsO
 		}
 
 		// Recurring events whose recurrence window overlaps the query range.
-		recurring, err := deps.Queries.ListRecurringCalendarEventsByRange(ctx, generated.ListRecurringCalendarEventsByRangeParams{
+		recurring, err := deps.CalendarQueries.ListRecurringCalendarEventsByRange(ctx, calendar.ListRecurringCalendarEventsByRangeParams{
 			CalendarID:    cal.ID,
 			StartAt:       sql.NullTime{Time: input.End, Valid: true},
 			RecurrenceEnd: sql.NullTime{Time: input.Start, Valid: true},
@@ -236,7 +236,7 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 		if err != nil {
 			return nil, err
 		}
-		cal, sub, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, sub, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
@@ -266,13 +266,13 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 
 		eventPublicID := types.New()
 
-		visibility := generated.CalendarEventsVisibilityDefault
+		visibility := calendar.CalendarEventsVisibilityDefault
 		if input.Body.Visibility != "" {
-			visibility = generated.CalendarEventsVisibility(input.Body.Visibility)
+			visibility = calendar.CalendarEventsVisibility(input.Body.Visibility)
 		}
-		showAs := generated.CalendarEventsShowAsBusy
+		showAs := calendar.CalendarEventsShowAsBusy
 		if input.Body.ShowAs != "" {
-			showAs = generated.CalendarEventsShowAs(input.Body.ShowAs)
+			showAs = calendar.CalendarEventsShowAs(input.Body.ShowAs)
 		}
 
 		// Planning-stage undated events: both start and end may be omitted
@@ -287,11 +287,11 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 			startAtNT = sql.NullTime{Time: time.Unix(*input.Body.StartAt, 0).UTC(), Valid: true}
 			endAtNT = sql.NullTime{Time: time.Unix(*input.Body.EndAt, 0).UTC(), Valid: true}
 		}
-		params := generated.CreateCalendarEventParams{
+		params := calendar.CreateCalendarEventParams{
 			PublicID:        eventPublicID,
 			WorkspaceID:     wsID,
 			CalendarID:      cal.ID,
-			Kind:            generated.CalendarEventsKind(input.Body.Kind),
+			Kind:            calendar.CalendarEventsKind(input.Body.Kind),
 			Visibility:      visibility,
 			ShowAs:          showAs,
 			Title:           input.Body.Title,
@@ -324,7 +324,7 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 			params.NotificationOffset = sql.NullInt32{Int32: *input.Body.NotificationOffset, Valid: true}
 		}
 
-		_, err = deps.Queries.CreateCalendarEvent(ctx, params)
+		_, err = deps.CalendarQueries.CreateCalendarEvent(ctx, params)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarEventStoreWriteInterrupted)
 		}
@@ -379,7 +379,7 @@ func GetEvent(deps Deps) func(context.Context, *GetEventInput) (*GetEventOutput,
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
@@ -388,7 +388,7 @@ func GetEvent(deps Deps) func(context.Context, *GetEventInput) (*GetEventOutput,
 		if err != nil {
 			return nil, errEventNotFound
 		}
-		evt, err := deps.Queries.FindCalendarEventByPublicId(ctx, generated.FindCalendarEventByPublicIdParams{
+		evt, err := deps.CalendarQueries.FindCalendarEventByPublicId(ctx, calendar.FindCalendarEventByPublicIdParams{
 			PublicID:    types.FromUUID(evtUID),
 			CalendarID:  cal.ID,
 			WorkspaceID: wsID,
@@ -404,7 +404,7 @@ func GetEvent(deps Deps) func(context.Context, *GetEventInput) (*GetEventOutput,
 		// ws members other than the owner. Event-level visibility is the
 		// real ACL; ws membership is the edit gate.
 		resp := eventFromFullRow(evt)
-		if evt.Visibility == generated.CalendarEventsVisibilityPrivate && evt.OwnerUserID != actorID {
+		if evt.Visibility == calendar.CalendarEventsVisibilityPrivate && evt.OwnerUserID != actorID {
 			resp.Memo = nil
 			resp.Location = nil
 			resp.Url = nil
@@ -428,7 +428,7 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		if err != nil {
 			return nil, err
 		}
-		cal, sub, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, sub, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
@@ -437,7 +437,7 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		if err != nil {
 			return nil, errEventNotFound
 		}
-		evt, err := deps.Queries.FindCalendarEventByPublicId(ctx, generated.FindCalendarEventByPublicIdParams{
+		evt, err := deps.CalendarQueries.FindCalendarEventByPublicId(ctx, calendar.FindCalendarEventByPublicIdParams{
 			PublicID:    types.FromUUID(evtUID),
 			CalendarID:  cal.ID,
 			WorkspaceID: wsID,
@@ -450,8 +450,8 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		}
 
 		// Check edit permission (try to find attendee record for the actor).
-		var attendee *generated.FindCalendarEventAttendeeRow
-		att, attErr := deps.Queries.FindCalendarEventAttendee(ctx, generated.FindCalendarEventAttendeeParams{
+		var attendee *calendar.FindCalendarEventAttendeeRow
+		att, attErr := deps.CalendarQueries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
 			EventID: evt.ID,
 			UserID:  actorID,
 		})
@@ -474,7 +474,7 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 			return nil, httpErr(apierrors.CalendarEventStoreWriteInterrupted)
 		}
 		defer func() { _ = tx.Rollback() }()
-		qtx := deps.Queries.WithTx(tx)
+		cqtx := deps.CalendarQueries.WithTx(tx)
 
 		isLinked := evt.TaskID.Valid
 		titleChanged := input.Body.Title != nil && *input.Body.Title != evt.Title
@@ -508,26 +508,26 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 			input.Body.EndAt = nil
 		}
 
-		params := generated.PatchCalendarEventParams{
+		params := calendar.PatchCalendarEventParams{
 			PublicID:    types.FromUUID(evtUID),
 			CalendarID:  cal.ID,
 			WorkspaceID: wsID,
 		}
 		if input.Body.Kind != nil {
-			params.Kind = generated.NullCalendarEventsKind{
-				CalendarEventsKind: generated.CalendarEventsKind(*input.Body.Kind),
+			params.Kind = calendar.NullCalendarEventsKind{
+				CalendarEventsKind: calendar.CalendarEventsKind(*input.Body.Kind),
 				Valid:              true,
 			}
 		}
 		if input.Body.Visibility != nil {
-			params.Visibility = generated.NullCalendarEventsVisibility{
-				CalendarEventsVisibility: generated.CalendarEventsVisibility(*input.Body.Visibility),
+			params.Visibility = calendar.NullCalendarEventsVisibility{
+				CalendarEventsVisibility: calendar.CalendarEventsVisibility(*input.Body.Visibility),
 				Valid:                    true,
 			}
 		}
 		if input.Body.ShowAs != nil {
-			params.ShowAs = generated.NullCalendarEventsShowAs{
-				CalendarEventsShowAs: generated.CalendarEventsShowAs(*input.Body.ShowAs),
+			params.ShowAs = calendar.NullCalendarEventsShowAs{
+				CalendarEventsShowAs: calendar.CalendarEventsShowAs(*input.Body.ShowAs),
 				Valid:                true,
 			}
 		}
@@ -577,13 +577,13 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 			params.NotificationOffset = sql.NullInt32{Int32: *input.Body.NotificationOffset, Valid: true}
 		}
 
-		if err := qtx.PatchCalendarEvent(ctx, params); err != nil {
+		if err := cqtx.PatchCalendarEvent(ctx, params); err != nil {
 			return nil, httpErr(apierrors.CalendarEventStoreWriteInterrupted)
 		}
 
 		// Re-read inside the tx so the response reflects what itemkit
 		// + sqlc jointly wrote.
-		evt, err = qtx.FindCalendarEventByPublicId(ctx, generated.FindCalendarEventByPublicIdParams{
+		evt, err = cqtx.FindCalendarEventByPublicId(ctx, calendar.FindCalendarEventByPublicIdParams{
 			PublicID:    types.FromUUID(evtUID),
 			CalendarID:  cal.ID,
 			WorkspaceID: wsID,
@@ -661,7 +661,7 @@ func DeleteEvent(deps Deps) func(context.Context, *DeleteEventInput) (*DeleteEve
 		if err != nil {
 			return nil, err
 		}
-		cal, sub, err := resolveCalendar(ctx, deps.Queries, wsID, actorID, input.CalId)
+		cal, sub, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
 		if err != nil {
 			return nil, err
 		}
@@ -670,7 +670,7 @@ func DeleteEvent(deps Deps) func(context.Context, *DeleteEventInput) (*DeleteEve
 		if err != nil {
 			return nil, errEventNotFound
 		}
-		evt, err := deps.Queries.FindCalendarEventByPublicId(ctx, generated.FindCalendarEventByPublicIdParams{
+		evt, err := deps.CalendarQueries.FindCalendarEventByPublicId(ctx, calendar.FindCalendarEventByPublicIdParams{
 			PublicID:    types.FromUUID(evtUID),
 			CalendarID:  cal.ID,
 			WorkspaceID: wsID,
@@ -682,8 +682,8 @@ func DeleteEvent(deps Deps) func(context.Context, *DeleteEventInput) (*DeleteEve
 			return nil, httpErr(apierrors.CalendarEventStoreReadInterrupted)
 		}
 
-		var attendee *generated.FindCalendarEventAttendeeRow
-		att, attErr := deps.Queries.FindCalendarEventAttendee(ctx, generated.FindCalendarEventAttendeeParams{
+		var attendee *calendar.FindCalendarEventAttendeeRow
+		att, attErr := deps.CalendarQueries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
 			EventID: evt.ID,
 			UserID:  actorID,
 		})
@@ -736,7 +736,7 @@ func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInpu
 		}
 
 		// Non-recurring events
-		rows, err := deps.Queries.ListCalendarEventsAcrossCalendars(ctx, generated.ListCalendarEventsAcrossCalendarsParams{
+		rows, err := deps.CalendarQueries.ListCalendarEventsAcrossCalendars(ctx, calendar.ListCalendarEventsAcrossCalendarsParams{
 			UserID:      actorID,
 			WorkspaceID: wsID,
 			StartAt:     sql.NullTime{Time: endTime, Valid: true},
@@ -747,7 +747,7 @@ func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInpu
 		}
 
 		// Recurring events whose recurrence window overlaps the query range
-		recurringRows, err := deps.Queries.ListRecurringCalendarEventsAcrossCalendars(ctx, generated.ListRecurringCalendarEventsAcrossCalendarsParams{
+		recurringRows, err := deps.CalendarQueries.ListRecurringCalendarEventsAcrossCalendars(ctx, calendar.ListRecurringCalendarEventsAcrossCalendarsParams{
 			UserID:        actorID,
 			WorkspaceID:   wsID,
 			StartAt:       sql.NullTime{Time: endTime, Valid: true},
@@ -829,7 +829,7 @@ func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInpu
 
 // --- Mapping helpers ---
 
-func eventFromRangeRow(e generated.ListCalendarEventsByRangeRow) EventResponse {
+func eventFromRangeRow(e calendar.ListCalendarEventsByRangeRow) EventResponse {
 	resp := EventResponse{
 		ID:         e.PublicID.String(),
 		Kind:       string(e.Kind),
@@ -863,7 +863,7 @@ func eventFromRangeRow(e generated.ListCalendarEventsByRangeRow) EventResponse {
 	return resp
 }
 
-func eventFromRecurringRow(e generated.ListRecurringCalendarEventsByRangeRow) EventResponse {
+func eventFromRecurringRow(e calendar.ListRecurringCalendarEventsByRangeRow) EventResponse {
 	resp := EventResponse{
 		ID:         e.PublicID.String(),
 		Kind:       string(e.Kind),
@@ -920,7 +920,7 @@ func parseFlexibleTime(s string) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("cannot parse %q as date or datetime", s)
 }
 
-func eventFromFullRow(e generated.FindCalendarEventByPublicIdRow) EventResponse {
+func eventFromFullRow(e calendar.FindCalendarEventByPublicIdRow) EventResponse {
 	resp := EventResponse{
 		ID:         e.PublicID.String(),
 		Kind:       string(e.Kind),

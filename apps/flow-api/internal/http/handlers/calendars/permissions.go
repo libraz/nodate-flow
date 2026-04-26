@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"time"
 
-	generated "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 )
 
@@ -25,9 +25,9 @@ var (
 // event-level owner/attendee relationship is the edit gate.
 func canEditEvent(
 	actorUserID uint32,
-	event generated.FindCalendarEventByPublicIdRow,
-	_ generated.FindCalendarSubscriptionRow,
-	attendee *generated.FindCalendarEventAttendeeRow,
+	event calendar.FindCalendarEventByPublicIdRow,
+	_ calendar.FindCalendarSubscriptionRow,
+	attendee *calendar.FindCalendarEventAttendeeRow,
 ) bool {
 	if event.OwnerUserID == actorUserID {
 		return true
@@ -45,7 +45,7 @@ func canEditEvent(
 func canSetOwner(
 	actorUserID uint32,
 	ownerUserID uint32,
-	_ generated.FindCalendarSubscriptionRow,
+	_ calendar.FindCalendarSubscriptionRow,
 ) bool {
 	if actorUserID == ownerUserID {
 		return true

@@ -180,7 +180,6 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	// cq is the dedicated calendar sqlc subpackage handle, used by the
 	// calendar-event seed steps below. Shares the same *sql.DB pool as q.
 	cq := calendar.New(db)
-	_ = cq
 
 	// 1. Owner user (idempotent on email).
 	ownerID, created, err := ensureUser(ctx, q, cfg.email, cfg.displayName, cfg.locale)
@@ -258,7 +257,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	if err := ensureSubscription(ctx, db, uint32(wsID), holidayCalID, uint32(ownerID), logger); err != nil {
 		return fmt.Errorf("ensure holiday subscription: %w", err)
 	}
-	if err := ensureHolidayEvent(ctx, db, q, uint32(wsID), holidayCalID, uint32(ownerID), l.HolidayEventTitle, logger); err != nil {
+	if err := ensureHolidayEvent(ctx, db, cq, uint32(wsID), holidayCalID, uint32(ownerID), l.HolidayEventTitle, logger); err != nil {
 		return fmt.Errorf("ensure holiday event: %w", err)
 	}
 
@@ -278,16 +277,16 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	}
 
 	// 8. Owner's sample event with second-user attendee.
-	sampleEventID, err := ensureSampleEvent(ctx, db, q, uint32(wsID), ownerCalID, uint32(ownerID), l.SampleEventTitle, l.SampleEventLocation, logger)
+	sampleEventID, err := ensureSampleEvent(ctx, db, cq, uint32(wsID), ownerCalID, uint32(ownerID), l.SampleEventTitle, l.SampleEventLocation, logger)
 	if err != nil {
 		return fmt.Errorf("ensure sample event: %w", err)
 	}
-	if err := ensureAttendee(ctx, db, q, uint32(wsID), sampleEventID, uint32(secondID), logger); err != nil {
+	if err := ensureAttendee(ctx, db, cq, uint32(wsID), sampleEventID, uint32(secondID), logger); err != nil {
 		return fmt.Errorf("ensure attendee: %w", err)
 	}
 
 	// 9. Undated event on owner's calendar.
-	if _, err := ensureUndatedEvent(ctx, db, q, uint32(wsID), ownerCalID, uint32(ownerID), l.UndatedEventTitle, l.UndatedEventMemo, logger); err != nil {
+	if _, err := ensureUndatedEvent(ctx, db, cq, uint32(wsID), ownerCalID, uint32(ownerID), l.UndatedEventTitle, l.UndatedEventMemo, logger); err != nil {
 		return fmt.Errorf("ensure undated event: %w", err)
 	}
 
@@ -303,7 +302,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("ensure public share: %w", err)
 	}
-	if err := ensureShareEvent(ctx, db, q, uint32(wsID), shareID, sampleEventID, logger); err != nil {
+	if err := ensureShareEvent(ctx, db, cq, uint32(wsID), shareID, sampleEventID, logger); err != nil {
 		return fmt.Errorf("ensure share event: %w", err)
 	}
 
@@ -635,7 +634,7 @@ func nextNoonUTC() time.Time {
 	return noon
 }
 
-func ensureSampleEvent(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, calID, ownerID uint32, title, location string, logger *slog.Logger) (uint32, error) {
+func ensureSampleEvent(ctx context.Context, db *sql.DB, cq *calendar.Queries, wsID, calID, ownerID uint32, title, location string, logger *slog.Logger) (uint32, error) {
 	if existing, err := findEventIDByTitle(ctx, db, calID, title); err != nil {
 		return 0, err
 	} else if existing > 0 {
@@ -644,13 +643,13 @@ func ensureSampleEvent(ctx context.Context, db *sql.DB, q *generated.Queries, ws
 	}
 	start := nextNoonUTC()
 	end := start.Add(time.Hour)
-	id, err := q.CreateCalendarEvent(ctx, generated.CreateCalendarEventParams{
+	id, err := cq.CreateCalendarEvent(ctx, calendar.CreateCalendarEventParams{
 		PublicID:        types.New(),
 		WorkspaceID:     wsID,
 		CalendarID:      calID,
-		Kind:            generated.CalendarEventsKindEvent,
-		Visibility:      generated.CalendarEventsVisibilityPublic,
-		ShowAs:          generated.CalendarEventsShowAsBusy,
+		Kind:            calendar.CalendarEventsKindEvent,
+		Visibility:      calendar.CalendarEventsVisibilityPublic,
+		ShowAs:          calendar.CalendarEventsShowAsBusy,
 		Title:           title,
 		AllDay:          false,
 		StartAt:         sql.NullTime{Time: start, Valid: true},
@@ -667,7 +666,7 @@ func ensureSampleEvent(ctx context.Context, db *sql.DB, q *generated.Queries, ws
 	return uint32(id), nil
 }
 
-func ensureUndatedEvent(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, calID, ownerID uint32, title, memo string, logger *slog.Logger) (uint32, error) {
+func ensureUndatedEvent(ctx context.Context, db *sql.DB, cq *calendar.Queries, wsID, calID, ownerID uint32, title, memo string, logger *slog.Logger) (uint32, error) {
 	if existing, err := findEventIDByTitle(ctx, db, calID, title); err != nil {
 		return 0, err
 	} else if existing > 0 {
@@ -701,13 +700,13 @@ func ensureUndatedEvent(ctx context.Context, db *sql.DB, q *generated.Queries, w
 		)
 		return 0, nil
 	}
-	id, err := q.CreateCalendarEvent(ctx, generated.CreateCalendarEventParams{
+	id, err := cq.CreateCalendarEvent(ctx, calendar.CreateCalendarEventParams{
 		PublicID:        types.New(),
 		WorkspaceID:     wsID,
 		CalendarID:      calID,
-		Kind:            generated.CalendarEventsKindEvent,
-		Visibility:      generated.CalendarEventsVisibilityPrivate,
-		ShowAs:          generated.CalendarEventsShowAsFree,
+		Kind:            calendar.CalendarEventsKindEvent,
+		Visibility:      calendar.CalendarEventsVisibilityPrivate,
+		ShowAs:          calendar.CalendarEventsShowAsFree,
 		Title:           title,
 		AllDay:          false,
 		StartAt:         sql.NullTime{},
@@ -724,7 +723,7 @@ func ensureUndatedEvent(ctx context.Context, db *sql.DB, q *generated.Queries, w
 	return uint32(id), nil
 }
 
-func ensureHolidayEvent(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, calID, ownerID uint32, title string, logger *slog.Logger) error {
+func ensureHolidayEvent(ctx context.Context, db *sql.DB, cq *calendar.Queries, wsID, calID, ownerID uint32, title string, logger *slog.Logger) error {
 	if existing, err := findEventIDByTitle(ctx, db, calID, title); err != nil {
 		return err
 	} else if existing > 0 {
@@ -733,13 +732,13 @@ func ensureHolidayEvent(ctx context.Context, db *sql.DB, q *generated.Queries, w
 	}
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	end := start.Add(24 * time.Hour)
-	id, err := q.CreateCalendarEvent(ctx, generated.CreateCalendarEventParams{
+	id, err := cq.CreateCalendarEvent(ctx, calendar.CreateCalendarEventParams{
 		PublicID:        types.New(),
 		WorkspaceID:     wsID,
 		CalendarID:      calID,
-		Kind:            generated.CalendarEventsKindBlock,
-		Visibility:      generated.CalendarEventsVisibilityPublic,
-		ShowAs:          generated.CalendarEventsShowAsFree,
+		Kind:            calendar.CalendarEventsKindBlock,
+		Visibility:      calendar.CalendarEventsVisibilityPublic,
+		ShowAs:          calendar.CalendarEventsShowAsFree,
 		Title:           title,
 		AllDay:          true,
 		StartAt:         sql.NullTime{Time: start, Valid: true},
@@ -755,7 +754,7 @@ func ensureHolidayEvent(ctx context.Context, db *sql.DB, q *generated.Queries, w
 	return nil
 }
 
-func ensureAttendee(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, eventID, userID uint32, logger *slog.Logger) error {
+func ensureAttendee(ctx context.Context, db *sql.DB, cq *calendar.Queries, wsID, eventID, userID uint32, logger *slog.Logger) error {
 	var existing uint32
 	err := db.QueryRowContext(ctx,
 		`SELECT id FROM calendar_event_attendees
@@ -769,12 +768,12 @@ func ensureAttendee(ctx context.Context, db *sql.DB, q *generated.Queries, wsID,
 	if !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
-	if _, err := q.CreateCalendarEventAttendee(ctx, generated.CreateCalendarEventAttendeeParams{
+	if _, err := cq.CreateCalendarEventAttendee(ctx, calendar.CreateCalendarEventAttendeeParams{
 		PublicID:    types.New(),
 		WorkspaceID: wsID,
 		EventID:     eventID,
 		UserID:      userID,
-		Rsvp:        generated.CalendarEventAttendeesRsvpPending,
+		Rsvp:        calendar.CalendarEventAttendeesRsvpPending,
 		CanEdit:     false,
 	}); err != nil {
 		return err
@@ -862,7 +861,7 @@ func ensurePublicShare(ctx context.Context, db *sql.DB, q *generated.Queries, ws
 	return uint32(id), nil
 }
 
-func ensureShareEvent(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, shareID, eventID uint32, logger *slog.Logger) error {
+func ensureShareEvent(ctx context.Context, db *sql.DB, cq *calendar.Queries, wsID, shareID, eventID uint32, logger *slog.Logger) error {
 	var existing uint32
 	err := db.QueryRowContext(ctx,
 		`SELECT id FROM calendar_public_share_events
@@ -876,7 +875,7 @@ func ensureShareEvent(ctx context.Context, db *sql.DB, q *generated.Queries, wsI
 	if !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
-	if _, err := q.AttachEventToShare(ctx, generated.AttachEventToShareParams{
+	if _, err := cq.AttachEventToShare(ctx, calendar.AttachEventToShareParams{
 		PublicID:    types.New(),
 		WorkspaceID: wsID,
 		ShareID:     shareID,
