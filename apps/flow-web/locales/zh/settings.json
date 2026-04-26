@@ -1,518 +1,518 @@
 {
   "nav": {
-    "profile": "Profile",
-    "notifications": "Notifications",
-    "general": "General",
+    "profile": "个人资料",
+    "notifications": "通知",
+    "general": "常规",
     "data": "数据",
-    "public_shares": "Public share pages",
-    "mcp_tokens": "MCP tokens",
+    "public_shares": "公开分享页",
+    "mcp_tokens": "MCP 令牌",
     "webhooks": "Webhook",
-    "ai_providers": "AI providers",
-    "ai_agents": "AI agents",
-    "ai_activity": "AI activity",
-    "weekly_digest": "Weekly digest",
-    "audit_log": "Audit log",
-    "security": "Security",
-    "integrations": "Integrations",
-    "auto_actions": "Auto-actions"
+    "ai_providers": "AI 服务商",
+    "ai_agents": "AI 代理",
+    "ai_activity": "AI 活动",
+    "weekly_digest": "每周摘要",
+    "audit_log": "审计日志",
+    "security": "安全",
+    "integrations": "集成",
+    "auto_actions": "自动操作"
   },
   "integrations": {
-    "title": "Integrations",
-    "description": "Connect your personal GitHub, Slack, and Google Calendar accounts so nodate-flow can act on your behalf. Tokens are encrypted at rest.",
-    "connect": "Connect",
-    "disconnect": "Disconnect",
-    "disconnect_confirm": "Disconnect {provider}? You will need to re-authorise to use it again.",
-    "disconnected": "Integration disconnected",
-    "connected_as": "Connected as {account} · {time}",
-    "connected_toast": "{provider} connected.",
-    "not_configured": "Not configured on this server. Ask the administrator to set the OAuth credentials.",
+    "title": "集成",
+    "description": "连接你的 GitHub、Slack 和 Google 日历个人账户，让 nodate-flow 可以代你执行操作。令牌将以加密形式存储。",
+    "connect": "连接",
+    "disconnect": "断开",
+    "disconnect_confirm": "断开 {provider}？再次使用前需要重新授权。",
+    "disconnected": "已断开集成",
+    "connected_as": "已以 {account} 连接 · {time}",
+    "connected_toast": "已连接 {provider}。",
+    "not_configured": "本服务器未配置该集成，请联系管理员设置 OAuth 凭据。",
     "provider": {
       "github": {
         "name": "GitHub",
-        "description": "Read your repositories and open issues as yourself."
+        "description": "以你的身份读取仓库并打开议题。"
       },
       "slack": {
         "name": "Slack",
-        "description": "Send direct messages and read your DMs as yourself."
+        "description": "以你的身份发送和读取私信。"
       },
       "google_calendar": {
-        "name": "Google Calendar",
-        "description": "Read your calendars and upcoming events."
+        "name": "Google 日历",
+        "description": "读取你的日历和即将到来的事件。"
       }
     },
     "errors": {
-      "connect_failed": "Could not start the connect flow. Please try again.",
-      "disconnect_failed": "Could not disconnect the integration. Please try again.",
-      "callback_failed": "Connect flow failed: {reason}"
+      "connect_failed": "无法发起连接流程，请重试。",
+      "disconnect_failed": "无法断开集成，请重试。",
+      "callback_failed": "连接流程失败：{reason}"
     }
   },
   "ai_activity": {
-    "title": "AI activity",
-    "description": "A read-only audit of recent LLM calls made on behalf of this workspace. Prompts and responses are redacted at write time.",
-    "empty": "No LLM calls recorded yet.",
-    "error_code": "Error: {code}"
+    "title": "AI 活动",
+    "description": "对最近为本工作区发起的 LLM 调用进行只读审计。提示词与响应在写入时已脱敏。",
+    "empty": "暂无 LLM 调用记录。",
+    "error_code": "错误：{code}"
   },
   "audit_log": {
-    "title": "Audit log",
-    "description": "A read-only log of actions performed in this workspace. Metadata is redacted at write time.",
-    "empty": "No audit entries recorded yet.",
-    "empty_filtered": "No entries match your filters. Clear filters to see all entries.",
-    "unknown_actor": "System",
-    "export_csv": "Export CSV",
+    "title": "审计日志",
+    "description": "工作区操作的只读日志。元数据在写入时已脱敏。",
+    "empty": "暂无审计记录。",
+    "empty_filtered": "没有符合筛选条件的记录。清除筛选可查看全部。",
+    "unknown_actor": "系统",
+    "export_csv": "导出 CSV",
     "column": {
-      "timestamp": "Timestamp",
-      "action": "Action",
-      "actor": "Actor",
-      "resource_type": "Resource type",
-      "resource_id": "Resource ID",
-      "ip_address": "IP address",
-      "metadata": "Metadata"
+      "timestamp": "时间",
+      "action": "操作",
+      "actor": "操作者",
+      "resource_type": "资源类型",
+      "resource_id": "资源 ID",
+      "ip_address": "IP 地址",
+      "metadata": "元数据"
     },
     "filter": {
-      "action": "Action",
-      "resource_type": "Resource type",
-      "actor_search": "Actor",
-      "actor_search_placeholder": "Search by name\u2026",
-      "date_from": "From",
-      "date_to": "To",
-      "all_actions": "All actions",
-      "all_types": "All types",
-      "clear": "Clear filters"
+      "action": "操作",
+      "resource_type": "资源类型",
+      "actor_search": "操作者",
+      "actor_search_placeholder": "按姓名搜索…",
+      "date_from": "起始",
+      "date_to": "结束",
+      "all_actions": "全部操作",
+      "all_types": "全部类型",
+      "clear": "清除筛选"
     },
     "pagination": {
-      "label": "Audit log pagination",
-      "prev": "Previous",
-      "next": "Next",
-      "page_of": "Page {current} of {total}"
+      "label": "审计日志分页",
+      "prev": "上一页",
+      "next": "下一页",
+      "page_of": "第 {current} / {total} 页"
     }
   },
-  "sections_label": "Workspace settings sections",
-  "settings_sections_label": "Settings sections",
+  "sections_label": "工作区设置板块",
+  "settings_sections_label": "设置板块",
   "access_restricted": {
-    "body": "This section is only available to workspace admins.",
-    "cta": "Back to General"
+    "body": "此板块仅工作区管理员可见。",
+    "cta": "返回常规"
   },
   "weekly_digest": {
-    "title": "Weekly digest",
-    "description": "A deterministic snapshot of this workspace: state counts, what was completed in the last seven days, and what is overdue.",
+    "title": "每周摘要",
+    "description": "本工作区的确定性快照：状态计数、过去七天完成的事项以及已逾期事项。",
     "counts": {
-      "open": "Open",
-      "waiting": "In progress",
-      "review": "Review",
-      "done": "Done",
-      "cancelled": "Cancelled"
+      "open": "未开始",
+      "waiting": "进行中",
+      "review": "审核中",
+      "done": "已完成",
+      "cancelled": "已取消"
     },
-    "completed_this_week": "Completed this week",
-    "overdue_open": "Overdue",
-    "empty_completed": "Nothing completed in the last seven days.",
-    "empty_overdue": "No overdue tasks.",
+    "completed_this_week": "本周已完成",
+    "overdue_open": "已逾期",
+    "empty_completed": "过去七天没有完成的事项。",
+    "empty_overdue": "暂无逾期任务。",
     "markdown": "Markdown"
   },
   "profile": {
-    "title": "Profile",
-    "display_name": "Display name",
-    "locale": "Language",
+    "title": "个人资料",
+    "display_name": "显示名称",
+    "locale": "语言",
     "locale_en": "English",
     "locale_ja": "日本語",
-    "timezone": "Timezone",
-    "country": "Country",
-    "country_help": "Used to show the right public holidays on your calendar. Leave unset for none.",
-    "country_unset": "(none)",
+    "timezone": "时区",
+    "country": "国家/地区",
+    "country_help": "用于在日历中显示对应的法定假日。留空则不显示。",
+    "country_unset": "（无）",
     "week_start": {
-      "label": "First day of the week",
-      "help": "Used by the calendar grid",
-      "mon": "Monday",
-      "sun": "Sunday",
-      "sat": "Saturday"
+      "label": "每周起始日",
+      "help": "用于日历网格",
+      "mon": "星期一",
+      "sun": "星期日",
+      "sat": "星期六"
     },
-    "theme": "Theme",
+    "theme": "主题",
     "theme_glass": "Glass",
     "theme_aurora": "Aurora",
     "theme_dotline": "Dotline",
-    "color_mode": "Color mode",
-    "color_mode_light": "Light",
-    "color_mode_dark": "Dark",
-    "color_mode_system": "System",
-    "theme_system": "System",
-    "theme_aurora_light": "Aurora Light",
-    "theme_aurora_dark": "Aurora Dark",
-    "theme_dotline_light": "Dotline Light",
-    "theme_dotline_dark": "Dotline Dark",
-    "theme_glass_light": "Glass Light",
-    "theme_glass_dark": "Glass Dark",
-    "save": "Save",
-    "saving": "Saving...",
-    "saved": "Saved",
+    "color_mode": "配色模式",
+    "color_mode_light": "浅色",
+    "color_mode_dark": "深色",
+    "color_mode_system": "跟随系统",
+    "theme_system": "跟随系统",
+    "theme_aurora_light": "Aurora 浅色",
+    "theme_aurora_dark": "Aurora 深色",
+    "theme_dotline_light": "Dotline 浅色",
+    "theme_dotline_dark": "Dotline 深色",
+    "theme_glass_light": "Glass 浅色",
+    "theme_glass_dark": "Glass 深色",
+    "save": "保存",
+    "saving": "保存中…",
+    "saved": "已保存",
     "avatar": {
-      "label": "Profile picture",
-      "description": "JPEG, PNG, WebP, or GIF. Max 5 MB.",
-      "upload": "Upload image",
-      "change": "Change image",
-      "remove": "Remove",
-      "uploading": "Uploading…",
-      "removed": "Profile picture removed.",
-      "updated": "Profile picture updated.",
-      "alt": "{name}'s profile picture",
-      "empty_alt": "No profile picture"
+      "label": "头像",
+      "description": "支持 JPEG、PNG、WebP 或 GIF，最大 5 MB。",
+      "upload": "上传图片",
+      "change": "更换图片",
+      "remove": "移除",
+      "uploading": "上传中…",
+      "removed": "已移除头像。",
+      "updated": "已更新头像。",
+      "alt": "{name} 的头像",
+      "empty_alt": "暂无头像"
     },
     "validation": {
-      "display_name_required": "Display name is required.",
-      "timezone_required": "Timezone is required.",
-      "country_invalid": "Country must be a 2-letter ISO code (uppercase) or left empty."
+      "display_name_required": "请填写显示名称。",
+      "timezone_required": "请填写时区。",
+      "country_invalid": "国家/地区必须为 2 位 ISO 大写代码，或留空。"
     },
     "errors": {
-      "update_failed": "Could not update your profile. Please try again."
+      "update_failed": "更新个人资料失败，请重试。"
     }
   },
   "notifications": {
-    "title": "Notifications",
-    "save": "Save",
-    "saving": "Saving...",
-    "saved": "Notification preferences updated",
+    "title": "通知",
+    "save": "保存",
+    "saving": "保存中…",
+    "saved": "已更新通知设置",
     "email_digest": {
-      "label": "Weekly digest email",
-      "description": "Receive a summary of your workspace activity every week."
+      "label": "每周摘要邮件",
+      "description": "每周接收一份工作区活动摘要。"
     },
     "email_mention": {
-      "label": "Mentions",
-      "description": "Email me when someone @-mentions me in a comment."
+      "label": "提及",
+      "description": "当有人在评论中 @ 我时发送邮件。"
     },
     "email_assignment": {
-      "label": "Task assignments",
-      "description": "Email me when a task is assigned to me."
+      "label": "任务指派",
+      "description": "当有任务被指派给我时发送邮件。"
     },
     "email_due_soon": {
-      "label": "Due soon",
-      "description": "Email me when a task I own is due within the next 24 hours."
+      "label": "即将到期",
+      "description": "当我负责的任务在 24 小时内到期时发送邮件。"
     },
     "web_push": {
-      "label": "Browser push notifications",
-      "description": "Show desktop notifications in this browser. Requires permission."
+      "label": "浏览器推送通知",
+      "description": "在此浏览器中显示桌面通知。需要授权。"
     },
     "errors": {
-      "update_failed": "Could not update your notification preferences. Please try again."
+      "update_failed": "更新通知设置失败，请重试。"
     }
   },
   "security": {
-    "title": "Security",
+    "title": "安全",
     "password": {
-      "title": "Password",
-      "description": "Change your password. Every other device will be signed out.",
-      "current": "Current password",
-      "next": "New password",
-      "confirm": "Confirm new password",
-      "save": "Change password",
-      "saving": "Saving...",
-      "changed": "Password changed. {count} other session(s) were signed out.",
+      "title": "密码",
+      "description": "更改密码后，所有其他设备都将被注销。",
+      "current": "当前密码",
+      "next": "新密码",
+      "confirm": "确认新密码",
+      "save": "更改密码",
+      "saving": "保存中…",
+      "changed": "密码已更改。{count} 个其他会话已被注销。",
       "validation": {
-        "too_short": "New password must be at least 8 characters.",
-        "mismatch": "New password and confirmation do not match."
+        "too_short": "新密码至少 8 位。",
+        "mismatch": "新密码与确认密码不一致。"
       },
       "errors": {
-        "current_mismatch": "Current password is incorrect.",
-        "no_local_identity": "This account has no local password to change. Change it through your identity provider instead.",
-        "generic": "Could not change your password. Please try again."
+        "current_mismatch": "当前密码不正确。",
+        "no_local_identity": "此账户没有本地密码可更改，请通过你的身份提供方修改。",
+        "generic": "更改密码失败，请重试。"
       }
     },
     "totp": {
-      "title": "Two-factor authentication",
-      "disabled_description": "Add an extra layer of protection by requiring a 6-digit code from your authenticator app at sign-in.",
-      "enabled_description": "Two-factor authentication is enabled. Enter your password to disable it.",
-      "pending_description": "An enrollment was started but never confirmed. Regenerate the secret to finish setting up 2FA.",
-      "enroll_instructions": "Add this secret to your authenticator app (Google Authenticator, 1Password, Authy, ...) and enter the 6-digit code it shows.",
-      "secret_label": "Secret",
-      "code_label": "6-digit code",
-      "password_label": "Current password",
-      "enable": "Enable two-factor authentication",
-      "resume_enroll": "Restart enrollment",
-      "confirm": "Confirm",
-      "confirming": "Confirming...",
-      "disable": "Disable",
-      "disabling": "Disabling...",
-      "disable_confirm": "Disable two-factor authentication? Your account will be protected by a password only.",
-      "copy": "Copy",
-      "secret_copied": "Secret copied",
-      "open_in_app": "Open in authenticator app",
-      "enabled_toast": "Two-factor authentication is now enabled.",
-      "disabled_toast": "Two-factor authentication disabled.",
+      "title": "两步验证",
+      "disabled_description": "在登录时要求输入身份验证器应用中的 6 位代码，提供额外的安全防护。",
+      "enabled_description": "已启用两步验证。请输入密码以禁用。",
+      "pending_description": "已开始注册但未完成确认，请重新生成密钥以完成 2FA 设置。",
+      "enroll_instructions": "将该密钥添加到身份验证器应用（Google Authenticator、1Password、Authy 等），然后输入显示的 6 位代码。",
+      "secret_label": "密钥",
+      "code_label": "6 位代码",
+      "password_label": "当前密码",
+      "enable": "启用两步验证",
+      "resume_enroll": "重新开始注册",
+      "confirm": "确认",
+      "confirming": "确认中…",
+      "disable": "禁用",
+      "disabling": "禁用中…",
+      "disable_confirm": "禁用两步验证？账户将仅由密码保护。",
+      "copy": "复制",
+      "secret_copied": "已复制密钥",
+      "open_in_app": "在身份验证器中打开",
+      "enabled_toast": "已启用两步验证。",
+      "disabled_toast": "已禁用两步验证。",
       "errors": {
-        "enroll_failed": "Could not start enrollment. Please try again.",
-        "confirm_failed": "Could not confirm the code. Please try again.",
-        "code_mismatch": "That code is not valid. Check your authenticator app and try again.",
-        "password_mismatch": "Current password is incorrect.",
-        "disable_failed": "Could not disable 2FA. Please try again.",
-        "not_configured": "Two-factor authentication is not available on this server. Ask an administrator to configure NF_SECRET_KEY."
+        "enroll_failed": "无法开始注册，请重试。",
+        "confirm_failed": "无法确认代码，请重试。",
+        "code_mismatch": "代码无效，请检查身份验证器后重试。",
+        "password_mismatch": "当前密码不正确。",
+        "disable_failed": "无法禁用 2FA，请重试。",
+        "not_configured": "本服务器未启用两步验证。请联系管理员配置 NF_SECRET_KEY。"
       },
       "recovery": {
-        "title": "Recovery codes",
-        "description": "Use these one-time codes to sign in if you lose access to your authenticator app. Save them somewhere safe — they will not be shown again.",
-        "remaining": "{count, plural, one {# recovery code remaining} other {# recovery codes remaining}}",
-        "regenerate": "Regenerate recovery codes",
-        "regenerate_confirm": "Generate a new set of recovery codes? Your previous codes will stop working.",
-        "regenerate_password_label": "Current password",
-        "copy_all": "Copy all",
-        "download": "Download as .txt",
-        "saved": "I've saved them",
-        "copied": "Recovery codes copied",
-        "regenerated_toast": "New recovery codes generated.",
+        "title": "恢复代码",
+        "description": "如果你失去对身份验证器的访问，可使用这些一次性代码登录。请妥善保存——它们不会再次显示。",
+        "remaining": "{count, plural, other {还剩 # 个恢复代码}}",
+        "regenerate": "重新生成恢复代码",
+        "regenerate_confirm": "重新生成恢复代码？之前的代码将立即失效。",
+        "regenerate_password_label": "当前密码",
+        "copy_all": "复制全部",
+        "download": "下载为 .txt",
+        "saved": "我已保存",
+        "copied": "已复制恢复代码",
+        "regenerated_toast": "已生成新的恢复代码。",
         "errors": {
-          "regenerate_failed": "Could not regenerate recovery codes. Please try again."
+          "regenerate_failed": "无法重新生成恢复代码，请重试。"
         }
       }
     },
     "sessions": {
-      "title": "Active sessions",
-      "description": "Devices currently signed in to your account. Revoke any session you do not recognise.",
-      "empty": "No active sessions.",
-      "revoke": "Revoke",
-      "revoke_all": "Sign out of all other devices",
-      "revoke_all_confirm": "Sign out of all other devices? Other browsers and apps will stop working immediately.",
-      "revoked": "Session revoked",
-      "revoked_all": "Revoked {count} other session(s)",
-      "current_badge": "Current",
-      "unknown_device": "Unknown device",
-      "unknown_ip": "Unknown location",
-      "created_at": "Signed in {time}",
-      "last_used_at": "last active {time}",
+      "title": "活动会话",
+      "description": "当前已登录到你账户的设备。请撤销任何你不认识的会话。",
+      "empty": "暂无活动会话。",
+      "revoke": "撤销",
+      "revoke_all": "退出所有其他设备",
+      "revoke_all_confirm": "退出所有其他设备？其他浏览器和应用将立即停止工作。",
+      "revoked": "已撤销会话",
+      "revoked_all": "已撤销 {count} 个其他会话",
+      "current_badge": "当前",
+      "unknown_device": "未知设备",
+      "unknown_ip": "未知位置",
+      "created_at": "登录于 {time}",
+      "last_used_at": "最近活跃 {time}",
       "errors": {
-        "revoke_failed": "Could not revoke the session. Please try again.",
-        "revoke_all_failed": "Could not revoke the other sessions. Please try again."
+        "revoke_failed": "无法撤销该会话，请重试。",
+        "revoke_all_failed": "无法撤销其他会话，请重试。"
       }
     }
   },
   "workspace": {
     "general": {
-      "title": "General",
-      "description": "Update the workspace name, slug, description, and icon.",
+      "title": "常规",
+      "description": "更新工作区名称、标识、描述与图标。",
       "field": {
-        "name": "Name",
-        "slug": "Slug",
-        "slug_help": "Lowercase letters, numbers, and hyphens.",
-        "description": "Description",
-        "icon_url": "Icon URL"
+        "name": "名称",
+        "slug": "标识",
+        "slug_help": "仅可使用小写字母、数字和连字符。",
+        "description": "描述",
+        "icon_url": "图标 URL"
       },
-      "save": "Save changes",
-      "saving": "Saving...",
-      "saved": "Workspace updated",
+      "save": "保存更改",
+      "saving": "保存中…",
+      "saved": "已更新工作区",
       "validation": {
-        "name_required": "Name is required.",
-        "slug_required": "Slug is required.",
-        "slug_format": "Slug may only contain lowercase letters, numbers, and hyphens.",
-        "icon_url_format": "Icon URL must be a valid URL."
+        "name_required": "请填写名称。",
+        "slug_required": "请填写标识。",
+        "slug_format": "标识仅可包含小写字母、数字和连字符。",
+        "icon_url_format": "图标 URL 必须为有效的 URL。"
       },
       "errors": {
-        "update_failed": "Could not update the workspace. Please try again."
+        "update_failed": "更新工作区失败，请重试。"
       },
       "danger": {
-        "title": "Danger zone",
-        "description": "Irreversible actions. Deleting a workspace hides it from your list along with its projects and tasks.",
-        "delete": "Delete workspace",
-        "deleting": "Deleting...",
+        "title": "危险操作",
+        "description": "不可逆操作。删除工作区将连同其项目和任务一起从你的列表中隐藏。",
+        "delete": "删除工作区",
+        "deleting": "删除中…",
         "confirm": {
-          "title": "Delete this workspace?",
-          "body": "This will delete {name} and hide all of its projects and tasks. This action cannot be undone from the UI.",
-          "submit": "Delete workspace",
-          "cancel": "Cancel"
+          "title": "删除此工作区？",
+          "body": "这将删除 {name} 并隐藏其所有项目和任务。此操作无法在界面中撤销。",
+          "submit": "删除工作区",
+          "cancel": "取消"
         },
-        "deleted": "Workspace deleted",
+        "deleted": "已删除工作区",
         "errors": {
-          "delete_failed": "Could not delete the workspace. Please try again."
+          "delete_failed": "无法删除工作区，请重试。"
         }
       }
     },
     "public_shares": {
-      "title": "Public share pages",
-      "description": "Workspace-owned read-only URLs for publishing selected events to the public. The URL is the capability — anyone with it can view the page.",
-      "create": "Create share",
-      "empty": "No public share pages yet.",
-      "rotate": "Rotate",
-      "rotate_confirm": "Rotate the URL? The current URL will stop working immediately.",
-      "delete": "Delete",
-      "delete_confirm": "Delete \"{title}\"? The URL will become invalid and events will no longer be published.",
-      "deleted": "Share page deleted",
+      "title": "公开分享页",
+      "description": "由工作区拥有的只读 URL，用于将选定的事件公开发布。URL 即权限——任何持有者都可查看页面。",
+      "create": "创建分享",
+      "empty": "暂无公开分享页。",
+      "rotate": "重置",
+      "rotate_confirm": "重置 URL？当前 URL 将立即失效。",
+      "delete": "删除",
+      "delete_confirm": "删除「{title}」？该 URL 将失效，事件也将不再发布。",
+      "deleted": "已删除分享页",
       "never_expires": "—",
       "table": {
-        "title": "Title",
-        "events": "Events",
-        "expires_at": "Expires",
-        "created_at": "Created",
-        "actions": "Actions"
+        "title": "标题",
+        "events": "事件",
+        "expires_at": "过期时间",
+        "created_at": "创建时间",
+        "actions": "操作"
       },
       "errors": {
-        "create_failed": "Could not create the share page. Please try again.",
-        "delete_failed": "Could not delete the share page. Only workspace admins or owners can delete a share.",
-        "rotate_failed": "Could not rotate the URL token. Please try again."
+        "create_failed": "无法创建分享页，请重试。",
+        "delete_failed": "无法删除分享页。仅工作区管理员或所有者可删除分享。",
+        "rotate_failed": "无法重置 URL 令牌，请重试。"
       },
       "dialog": {
-        "create_title": "Create public share page",
-        "reveal_title": "Share page created",
-        "rotate_title": "Token rotated",
+        "create_title": "创建公开分享页",
+        "reveal_title": "已创建分享页",
+        "rotate_title": "已重置令牌",
         "field": {
-          "title": "Title",
-          "title_placeholder": "e.g. Group A Official Schedule",
-          "description": "Description",
-          "description_help": "Markdown is not rendered yet; plain text only.",
-          "holidays_country": "Holiday overlay country",
-          "holidays_country_help": "Choose a country to overlay its public holidays on the share page. Leave unset for no holiday overlay.",
-          "holidays_country_unset": "No holiday overlay"
+          "title": "标题",
+          "title_placeholder": "例如：A 组官方日程",
+          "description": "描述",
+          "description_help": "暂未渲染 Markdown，仅支持纯文本。",
+          "holidays_country": "节假日叠加国家/地区",
+          "holidays_country_help": "选择一个国家/地区，将其法定假日叠加在分享页上。留空则不叠加。",
+          "holidays_country_unset": "不叠加节假日"
         },
-        "reveal_warning": "Copy this URL now. The token is stored hashed — you will not be able to see it again.",
-        "rotate_warning": "The previous URL has been invalidated. Share this new URL with anyone who still needs access.",
-        "url_label": "Share URL",
-        "copy": "Copy",
-        "copied": "Copied",
-        "done": "Done",
-        "cancel": "Cancel",
-        "submit": "Create"
+        "reveal_warning": "请立即复制此 URL。令牌以哈希形式存储——之后将无法再次查看。",
+        "rotate_warning": "之前的 URL 已失效。请将新 URL 分享给仍需要访问的人。",
+        "url_label": "分享 URL",
+        "copy": "复制",
+        "copied": "已复制",
+        "done": "完成",
+        "cancel": "取消",
+        "submit": "创建"
       },
       "detail": {
-        "back": "Back to share pages",
-        "events_title": "Published events",
-        "events_description": "Events listed here appear on the public page in the order shown. Confidential events are refused at attach time.",
-        "empty_events": "No events yet. Add events from this workspace to publish them.",
-        "add_events": "Add events",
-        "detach": "Remove",
-        "detach_confirm": "Remove \"{title}\" from this share page? It will no longer appear on the public page.",
-        "detached": "Event removed",
-        "event_undated": "No date",
-        "event_all_day": "All day",
+        "back": "返回分享页列表",
+        "events_title": "已发布事件",
+        "events_description": "此处列出的事件将按显示顺序出现在公开页面。机密事件会在添加时被拒绝。",
+        "empty_events": "暂无事件。从此工作区添加事件以发布。",
+        "add_events": "添加事件",
+        "detach": "移除",
+        "detach_confirm": "从此分享页移除「{title}」？它将不再出现在公开页面上。",
+        "detached": "已移除事件",
+        "event_undated": "无日期",
+        "event_all_day": "全天",
         "table": {
-          "event": "Event",
-          "when": "When",
-          "calendar": "Calendar",
-          "actions": "Actions"
+          "event": "事件",
+          "when": "时间",
+          "calendar": "日历",
+          "actions": "操作"
         },
         "picker": {
-          "title": "Add events to share",
-          "range_label": "Date range",
-          "range_from": "From",
-          "range_to": "To",
-          "hint": "Showing events within the selected range. Use the checkboxes to pick the events to publish.",
-          "no_candidates": "No events in this range.",
-          "already_attached": "Already published",
-          "confidential": "Confidential",
-          "select": "Select",
-          "attach": "Attach {count, plural, one {# event} other {# events}}",
-          "attached_toast": "{attached} attached, {skipped} skipped",
-          "cancel": "Cancel",
-          "attaching": "Attaching..."
+          "title": "添加事件到分享",
+          "range_label": "日期范围",
+          "range_from": "起始",
+          "range_to": "结束",
+          "hint": "显示所选范围内的事件。使用复选框选择要发布的事件。",
+          "no_candidates": "此范围内没有事件。",
+          "already_attached": "已发布",
+          "confidential": "机密",
+          "select": "选择",
+          "attach": "添加 {count, plural, other {# 个事件}}",
+          "attached_toast": "已添加 {attached} 个，跳过 {skipped} 个",
+          "cancel": "取消",
+          "attaching": "添加中…"
         },
         "errors": {
-          "detach_failed": "Could not remove the event. Please try again.",
-          "attach_failed": "Could not attach the events. Please try again.",
-          "reorder_failed": "Could not save the new order. The list has been reset to the saved order."
+          "detach_failed": "无法移除事件，请重试。",
+          "attach_failed": "无法添加事件，请重试。",
+          "reorder_failed": "无法保存新的排序。列表已恢复为已保存的顺序。"
         },
-        "reorder_handle_label": "Drag to reorder event",
+        "reorder_handle_label": "拖动以重新排序事件",
         "reorder_a11y": {
-          "lifted": "Picked up event {id}. Use the arrow keys to move, space to drop, escape to cancel.",
-          "over": "Event {active} is now over event {over}.",
-          "dropped": "Event {active} was dropped over event {over}.",
-          "cancelled": "Drag for event {id} was cancelled."
+          "lifted": "已抓取事件 {id}。使用方向键移动，空格键放置，Esc 取消。",
+          "over": "事件 {active} 现在位于事件 {over} 之上。",
+          "dropped": "事件 {active} 已放置在事件 {over} 上方。",
+          "cancelled": "已取消事件 {id} 的拖动。"
         }
       }
     },
     "mcp_tokens": {
-      "title": "MCP tokens",
-      "description": "Personal access tokens used to authenticate MCP clients against this workspace.",
-      "create": "Create token",
-      "empty": "No tokens yet. Create one to connect an MCP client.",
+      "title": "MCP 令牌",
+      "description": "用于通过 MCP 客户端对本工作区进行身份验证的个人访问令牌。",
+      "create": "创建令牌",
+      "empty": "暂无令牌。创建一个以连接 MCP 客户端。",
       "table": {
-        "name": "Name",
-        "prefix": "Prefix",
-        "scopes": "Scopes",
-        "created_at": "Created",
-        "last_used_at": "Last used",
-        "actions": "Actions"
+        "name": "名称",
+        "prefix": "前缀",
+        "scopes": "作用域",
+        "created_at": "创建时间",
+        "last_used_at": "最近使用",
+        "actions": "操作"
       },
-      "never_used": "Never",
-      "revoke": "Revoke",
-      "revoke_confirm": "Revoke this token? MCP clients using it will stop working immediately.",
-      "revoked": "Token revoked",
+      "never_used": "从未使用",
+      "revoke": "撤销",
+      "revoke_confirm": "撤销此令牌？使用它的 MCP 客户端将立即停止工作。",
+      "revoked": "已撤销令牌",
       "dialog": {
-        "create_title": "Create MCP token",
-        "reveal_title": "Token created",
+        "create_title": "创建 MCP 令牌",
+        "reveal_title": "已创建令牌",
         "field": {
-          "name": "Name",
-          "name_placeholder": "e.g. Local dev laptop",
-          "scopes": "Scopes",
-          "scopes_help": "Space-separated list of scopes. Leave empty for default scopes."
+          "name": "名称",
+          "name_placeholder": "例如：本地开发笔记本",
+          "scopes": "作用域",
+          "scopes_help": "用空格分隔的作用域列表，留空则使用默认作用域。"
         },
-        "reveal_warning": "Copy this token now. You will not be able to see it again.",
-        "token_label": "Token",
-        "copy": "Copy",
-        "copied": "Copied",
-        "done": "Done",
-        "cancel": "Cancel",
-        "submit": "Create"
+        "reveal_warning": "请立即复制此令牌，之后将无法再次查看。",
+        "token_label": "令牌",
+        "copy": "复制",
+        "copied": "已复制",
+        "done": "完成",
+        "cancel": "取消",
+        "submit": "创建"
       },
       "validation": {
-        "name_required": "Name is required."
+        "name_required": "请填写名称。"
       },
       "errors": {
-        "create_failed": "Could not create the token. Please try again.",
-        "revoke_failed": "Could not revoke the token. Please try again."
+        "create_failed": "创建令牌失败，请重试。",
+        "revoke_failed": "撤销令牌失败，请重试。"
       }
     },
     "auto_actions": {
-      "title": "Auto-actions",
-      "description": "Configure how nodate-flow autonomously manages tasks in this workspace. When enabled, the system periodically evaluates tasks and applies actions like escalating overdue items or closing stale reviews.",
+      "title": "自动操作",
+      "description": "配置 nodate-flow 如何自主管理本工作区中的任务。启用后，系统会定期评估任务并应用诸如升级逾期项目或关闭长期未动审核等操作。",
       "enabled": {
-        "label": "Enable auto-actions",
-        "description": "Allow the system to automatically apply actions to tasks."
+        "label": "启用自动操作",
+        "description": "允许系统自动对任务应用操作。"
       },
       "interval": {
-        "label": "Evaluation interval",
-        "description": "How often the system checks tasks and applies actions.",
-        "minutes": "min",
-        "disabled": "Disabled"
+        "label": "评估间隔",
+        "description": "系统检查任务并应用操作的频率。",
+        "minutes": "分钟",
+        "disabled": "已禁用"
       },
       "threshold": {
-        "label": "Confidence threshold",
-        "description": "Minimum confidence score required for an action to be applied automatically. Lower values apply more actions; higher values are more conservative.",
-        "low": "Aggressive",
-        "medium": "Balanced",
-        "high": "Conservative"
+        "label": "置信度阈值",
+        "description": "自动应用操作所需的最低置信度分数。值越低应用越多操作；值越高越保守。",
+        "low": "激进",
+        "medium": "平衡",
+        "high": "保守"
       },
-      "save": "Save",
-      "saving": "Saving...",
-      "saved": "Auto-action settings updated",
+      "save": "保存",
+      "saving": "保存中…",
+      "saved": "已更新自动操作设置",
       "rules": {
-        "title": "Rule configuration",
-        "description": "Enable or disable individual rules and adjust their sensitivity.",
+        "title": "规则配置",
+        "description": "启用或禁用单个规则并调整其灵敏度。",
         "column": {
-          "rule": "Rule",
-          "enabled": "Enabled",
-          "confidence": "Confidence",
-          "idle_hours": "Idle threshold (hours)"
+          "rule": "规则",
+          "enabled": "启用",
+          "confidence": "置信度",
+          "idle_hours": "闲置阈值（小时）"
         },
         "escalate_overdue": {
-          "label": "Escalate overdue",
-          "description": "Bumps priority when a task passes its due date."
+          "label": "升级逾期",
+          "description": "任务超过截止日期时提升优先级。"
         },
         "assign_owner": {
-          "label": "Assign owner",
-          "description": "Suggests an owner when a task has no assignee and has been idle."
+          "label": "分配负责人",
+          "description": "当任务无负责人且长时间闲置时建议负责人。"
         },
         "nudge_assignee": {
-          "label": "Nudge assignee",
-          "description": "Suggests a nudge when an assigned task has no progress."
+          "label": "提醒负责人",
+          "description": "当已指派任务无进展时建议提醒负责人。"
         },
         "close_stale_review": {
-          "label": "Close stale review",
-          "description": "Closes reviews that have been open without activity."
+          "label": "关闭长期未动审核",
+          "description": "关闭长时间无活动的审核。"
         },
-        "idle_na": "N/A (uses due date)",
-        "save": "Save rules",
-        "saving": "Saving...",
-        "saved": "Rule settings updated",
+        "idle_na": "不适用（使用截止日期）",
+        "save": "保存规则",
+        "saving": "保存中…",
+        "saved": "已更新规则设置",
         "errors": {
-          "load_failed": "Could not load rule settings.",
-          "update_failed": "Could not update rule settings. Please try again."
+          "load_failed": "无法加载规则设置。",
+          "update_failed": "无法更新规则设置，请重试。"
         }
       },
       "errors": {
-        "load_failed": "Could not load auto-action settings.",
-        "update_failed": "Could not update auto-action settings. Please try again."
+        "load_failed": "无法加载自动操作设置。",
+        "update_failed": "无法更新自动操作设置，请重试。"
       }
     }
   },
@@ -637,7 +637,7 @@
         },
         "secret": {
           "label": "签名密钥",
-          "warning": "请立即复制，或稍后通过\"显示密钥\"再次获取。",
+          "warning": "请立即复制，或稍后通过「显示密钥」再次获取。",
           "copy": "复制",
           "copied": "已复制密钥",
           "copy_failed": "复制密钥失败"

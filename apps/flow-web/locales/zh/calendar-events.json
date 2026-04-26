@@ -1,157 +1,157 @@
 {
   "kind": {
-    "task": "Task",
-    "event": "Event",
-    "block": "Block",
-    "free": "Free",
-    "milestone": "Milestone"
+    "task": "任务",
+    "event": "事件",
+    "block": "时间块",
+    "free": "空闲",
+    "milestone": "里程碑"
   },
   "dialog": {
     "title": {
       "create": {
-        "task": "New task",
-        "event": "New event",
-        "block": "New block",
-        "free": "Mark free time",
-        "milestone": "New milestone"
+        "task": "新建任务",
+        "event": "新建事件",
+        "block": "新建时间块",
+        "free": "标记空闲时间",
+        "milestone": "新建里程碑"
       },
       "edit": {
-        "task": "Edit task",
-        "event": "Edit event",
-        "block": "Edit block",
-        "free": "Edit free time",
-        "milestone": "Edit milestone"
+        "task": "编辑任务",
+        "event": "编辑事件",
+        "block": "编辑时间块",
+        "free": "编辑空闲时间",
+        "milestone": "编辑里程碑"
       }
     }
   },
   "field": {
-    "title": "Title",
-    "calendar": "Calendar",
-    "start": "Start",
-    "end": "End",
-    "allDay": "All day",
-    "location": "Location",
-    "memo": "Memo",
-    "blockLabel": "Block label",
-    "showAs": "Show as",
-    "recurrence": "Recurrence",
-    "notification": "Notification",
-    "project": "Project",
-    "priority": "Priority",
-    "description": "Description",
-    "date": "Date"
+    "title": "标题",
+    "calendar": "日历",
+    "start": "开始",
+    "end": "结束",
+    "allDay": "全天",
+    "location": "地点",
+    "memo": "备注",
+    "blockLabel": "时间块标签",
+    "showAs": "显示为",
+    "recurrence": "重复",
+    "notification": "提醒",
+    "project": "项目",
+    "priority": "优先级",
+    "description": "描述",
+    "date": "日期"
   },
   "placeholder": {
     "title": {
-      "task": "What needs to get done?",
-      "event": "Meeting, appointment, …",
-      "block": "Working, focus, …",
-      "free": "Available for …",
-      "milestone": "Release, deadline, …"
+      "task": "需要完成什么？",
+      "event": "会议、约会…",
+      "block": "工作、专注…",
+      "free": "可用于…",
+      "milestone": "发布、截止…"
     }
   },
   "showAs": {
-    "busy": "Busy",
-    "free": "Free",
-    "tentative": "Tentative",
-    "oof": "Out of office"
+    "busy": "忙碌",
+    "free": "空闲",
+    "tentative": "暂定",
+    "oof": "外出"
   },
   "blockLabel": {
     "preset": {
-      "working": "Working",
-      "focus": "Focus time",
-      "oof": "Out of office",
-      "custom": "Custom…"
+      "working": "工作",
+      "focus": "专注时间",
+      "oof": "外出",
+      "custom": "自定义…"
     }
   },
   "recurrence": {
     "preset": {
-      "none": "Does not repeat",
-      "daily": "Daily",
-      "weekdays": "Every weekday",
-      "weekly": "Weekly on {day}",
-      "monthly": "Monthly",
-      "yearly": "Yearly",
-      "custom": "Custom…"
+      "none": "不重复",
+      "daily": "每天",
+      "weekdays": "每个工作日",
+      "weekly": "每周{day}",
+      "monthly": "每月",
+      "yearly": "每年",
+      "custom": "自定义…"
     }
   },
   "notification": {
     "preset": {
-      "none": "No notification",
-      "at_time": "At time of event",
-      "5min": "5 minutes before",
-      "10min": "10 minutes before",
-      "15min": "15 minutes before",
-      "30min": "30 minutes before",
-      "1hour": "1 hour before",
-      "1day": "1 day before"
+      "none": "不提醒",
+      "at_time": "事件开始时",
+      "5min": "提前 5 分钟",
+      "10min": "提前 10 分钟",
+      "15min": "提前 15 分钟",
+      "30min": "提前 30 分钟",
+      "1hour": "提前 1 小时",
+      "1day": "提前 1 天"
     }
   },
   "validation": {
-    "titleRequired": "Title is required",
-    "endBeforeStart": "End time must be after start time",
-    "calendarRequired": "Choose a calendar",
-    "projectRequired": "Choose a project"
+    "titleRequired": "请填写标题",
+    "endBeforeStart": "结束时间必须晚于开始时间",
+    "calendarRequired": "请选择日历",
+    "projectRequired": "请选择项目"
   },
   "action": {
     "submit": {
-      "create": "Create",
-      "edit": "Save changes"
+      "create": "创建",
+      "edit": "保存更改"
     },
-    "cancel": "Cancel",
-    "delete": "Delete",
-    "deleteConfirm": "Delete this {kind}?",
-    "moreOptions": "More options"
+    "cancel": "取消",
+    "delete": "删除",
+    "deleteConfirm": "删除此{kind}？",
+    "moreOptions": "更多选项"
   },
   "toast": {
     "created": {
-      "task": "Task created",
-      "event": "Event created",
-      "block": "Block created",
-      "free": "Free time created",
-      "milestone": "Milestone created"
+      "task": "已创建任务",
+      "event": "已创建事件",
+      "block": "已创建时间块",
+      "free": "已创建空闲时间",
+      "milestone": "已创建里程碑"
     },
     "updated": {
-      "task": "Task updated",
-      "event": "Event updated",
-      "block": "Block updated",
-      "free": "Free time updated",
-      "milestone": "Milestone updated"
+      "task": "已更新任务",
+      "event": "已更新事件",
+      "block": "已更新时间块",
+      "free": "已更新空闲时间",
+      "milestone": "已更新里程碑"
     },
     "deleted": {
-      "task": "Task deleted",
-      "event": "Event deleted",
-      "block": "Block deleted",
-      "free": "Free time deleted",
-      "milestone": "Milestone deleted"
+      "task": "已删除任务",
+      "event": "已删除事件",
+      "block": "已删除时间块",
+      "free": "已删除空闲时间",
+      "milestone": "已删除里程碑"
     },
-    "createFailed": "Failed to create",
-    "updateFailed": "Failed to save",
-    "deleteFailed": "Failed to delete"
+    "createFailed": "创建失败",
+    "updateFailed": "保存失败",
+    "deleteFailed": "删除失败"
   },
   "a11y": {
-    "kind_picker": "Item kind",
-    "close": "Close dialog",
-    "delete_button": "Delete this item"
+    "kind_picker": "项目类型",
+    "close": "关闭对话框",
+    "delete_button": "删除此项"
   },
   "event": {
     "attendees": {
-      "add": "Add",
-      "can_edit": "Can edit",
-      "empty": "No attendees yet",
-      "invite_sent": "Invite link copied",
-      "placeholder": "Add a workspace member...",
-      "remove": "Remove attendee",
+      "add": "添加",
+      "can_edit": "可编辑",
+      "empty": "暂无参与者",
+      "invite_sent": "已复制邀请链接",
+      "placeholder": "添加工作区成员…",
+      "remove": "移除参与者",
       "rsvp": {
-        "accepted": "Going",
-        "declined": "Declined",
-        "pending": "Pending",
-        "tentative": "Maybe"
+        "accepted": "参加",
+        "declined": "不参加",
+        "pending": "待回应",
+        "tentative": "可能参加"
       },
-      "send_invite": "Send invite link",
-      "title": "Attendees",
-      "you": "you",
-      "your_response": "Your response"
+      "send_invite": "发送邀请链接",
+      "title": "参与者",
+      "you": "你",
+      "your_response": "你的回应"
     },
     "detail": {
       "back": "返回日历",
@@ -164,7 +164,7 @@
       },
       "kind": {
         "event": "事件",
-        "holiday": "假日",
+        "holiday": "节假日",
         "task": "任务",
         "busy": "忙碌"
       },
@@ -186,15 +186,15 @@
     },
     "checklist": {
       "empty": "暂无清单项",
-      "add_placeholder": "添加项…",
+      "add_placeholder": "添加清单项…",
       "add": "添加",
-      "add_error": "添加项失败",
+      "add_error": "添加清单项失败",
       "toggle_label": "将 {title} 标记为完成",
-      "update_error": "更新项失败",
+      "update_error": "更新清单项失败",
       "delete": "删除",
-      "delete_confirm": "删除此项？",
-      "delete_success": "已删除项",
-      "delete_error": "删除项失败",
+      "delete_confirm": "删除此清单项？",
+      "delete_success": "已删除清单项",
+      "delete_error": "删除清单项失败",
       "progress": "完成 {done}/{total}"
     },
     "attachments": {
@@ -206,7 +206,7 @@
       "delete_success": "已删除附件",
       "delete_error": "删除附件失败",
       "upload": "上传",
-      "uploading": "正在上传…",
+      "uploading": "上传中…",
       "upload_success": "已上传附件",
       "upload_error": "上传失败",
       "download": "下载",
@@ -227,46 +227,46 @@
       "empty": "暂无邀请",
       "revoke": "撤销",
       "revoke_confirm_title": "撤销此邀请？",
-      "revoke_confirm": "链接将立即失效。",
+      "revoke_confirm": "该链接将立即失效。",
       "revoke_success": "已撤销邀请",
       "revoke_error": "撤销邀请失败",
       "expires_at": "{date} 过期",
-      "create_hint": "请从“参与者”标签页创建邀请。",
+      "create_hint": "可在「参与者」标签中创建邀请。",
       "status": {
-        "pending": "待发送",
+        "pending": "待回应",
         "sent": "已发送",
         "accepted": "已接受",
         "expired": "已过期"
       }
     },
     "shift": {
-      "trigger": "调整事件时间",
-      "default_remember": "下次始终使用此选择",
-      "default_saved_toast": "设置已保存。下次将跳过此对话框。",
-      "default_save_error": "无法保存设置。请重试。",
+      "trigger": "顺延事件",
+      "default_remember": "始终使用此选择",
+      "default_saved_toast": "已记住默认值，下次将跳过此对话框。",
+      "default_save_error": "保存默认值失败，请重试。",
       "dialog": {
-        "title": "调整事件并联动任务",
+        "title": "连同关联任务一起顺延事件",
         "cancel": "取消",
         "back": "返回"
       },
       "pick": {
         "label": "新的开始时间",
-        "hint": "应用前会显示哪些关联任务可以一起调整。",
-        "preview": "预览调整",
-        "preview_error": "预览调整失败"
+        "hint": "在应用前会显示哪些关联任务可以一同顺延。",
+        "preview": "预览顺延",
+        "preview_error": "预览顺延失败"
       },
       "confirm": {
-        "summary": "调整 {delta}。已选择 {total} 个关联任务中的 {selected} 个。",
-        "no_links": "此事件没有关联任务——仅事件本身将被移动。",
-        "safe_title": "可安全调整",
-        "safe_hint": "这些关联任务可以安全调整。",
+        "summary": "顺延 {delta}。已选 {selected} / {total} 个关联任务。",
+        "no_links": "此事件没有关联任务 — 仅事件本身将被移动。",
+        "safe_title": "可安全顺延",
+        "safe_hint": "这些关联任务可以一同顺延。",
         "conflict_title": "冲突",
-        "conflict_hint": "调整后将与其他项目冲突。",
+        "conflict_hint": "顺延后，这些任务会与其他项目冲突。",
         "row_time": "{old} → {new}",
-        "apply": "应用调整",
-        "applying": "正在应用…",
-        "success": "已调整 {delta}（{count} 个任务）",
-        "error": "应用调整失败",
+        "apply": "应用顺延",
+        "applying": "应用中…",
+        "success": "已顺延 {delta}（{count} 个任务）",
+        "error": "应用顺延失败",
         "delta_seconds": "{seconds} 秒",
         "delta_minutes": "{minutes} 分钟",
         "delta_hours": "{hours} 小时",

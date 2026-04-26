@@ -1,8 +1,8 @@
 {
-  "add": "Add reaction",
-  "remove": "Remove reaction",
+  "add": "添加表情回应",
+  "remove": "移除表情回应",
   "errors": {
-    "add_failed": "Could not add the reaction. Please try again.",
-    "remove_failed": "Could not remove the reaction. Please try again."
+    "add_failed": "无法添加回应，请重试。",
+    "remove_failed": "无法移除回应，请重试。"
   }
 }

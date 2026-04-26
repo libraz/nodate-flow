@@ -1,19 +1,19 @@
 {
-  "title": "Export",
-  "button": "Export tasks",
-  "format_label": "Format",
+  "title": "导出",
+  "button": "导出任务",
+  "format_label": "格式",
   "format": {
     "csv": "CSV",
     "json": "JSON"
   },
   "scope": {
-    "all": "All tasks",
-    "lens": "Current view"
+    "all": "所有任务",
+    "lens": "当前视图"
   },
   "toast": {
-    "started": "Export started",
-    "completed": "Export completed",
-    "failed": "Export failed"
+    "started": "已开始导出",
+    "completed": "导出完成",
+    "failed": "导出失败"
   },
-  "download": "Download"
+  "download": "下载"
 }

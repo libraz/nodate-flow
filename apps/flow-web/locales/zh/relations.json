@@ -1,21 +1,21 @@
 {
-  "title": "Related tasks",
-  "suggestions": "Suggestions",
-  "empty": "No suggestions",
-  "empty_description": "Related tasks will be suggested automatically when similar tasks are detected.",
+  "title": "相关任务",
+  "suggestions": "建议",
+  "empty": "暂无建议",
+  "empty_description": "检测到相似任务时，将自动给出相关任务建议。",
   "kind": {
-    "blocks": "Blocks",
-    "relates": "Related to",
-    "duplicates": "Duplicate of"
+    "blocks": "阻塞",
+    "relates": "相关",
+    "duplicates": "重复于"
   },
   "action": {
-    "accept": "Accept",
-    "dismiss": "Dismiss",
-    "dismiss_all": "Dismiss all"
+    "accept": "接受",
+    "dismiss": "忽略",
+    "dismiss_all": "全部忽略"
   },
-  "confidence": "Confidence: {score}%",
+  "confidence": "置信度：{score}%",
   "toast": {
-    "accepted": "Relation accepted",
-    "dismissed": "Suggestion dismissed"
+    "accepted": "已接受关联",
+    "dismissed": "已忽略建议"
   }
 }

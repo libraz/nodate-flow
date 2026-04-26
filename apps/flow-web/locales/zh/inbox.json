@@ -1,33 +1,33 @@
 {
   "view": {
-    "title": "Inbox",
-    "subtitle": "Signals from connected sources land here for triage.",
-    "empty": "Your inbox is empty"
+    "title": "收件箱",
+    "subtitle": "来自已连接来源的信号将在此汇集，等待分类。",
+    "empty": "收件箱为空"
   },
   "action": {
-    "archive": "Archive",
-    "snooze": "Snooze"
+    "archive": "归档",
+    "snooze": "稍后提醒"
   },
   "snooze": {
-    "one_hour": "1 hour",
-    "tomorrow": "Tomorrow",
-    "next_week": "Next week"
+    "one_hour": "1 小时后",
+    "tomorrow": "明天",
+    "next_week": "下周"
   },
   "source": {
-    "manual": "Manual",
+    "manual": "手动",
     "github": "GitHub",
     "slack": "Slack",
-    "email": "Email",
+    "email": "邮件",
     "webhook": "Webhook"
   },
   "filter": {
-    "workspace_label": "Workspace",
-    "workspace_all": "All workspaces"
+    "workspace_label": "工作区",
+    "workspace_all": "所有工作区"
   },
   "toast": {
-    "archived": "Archived",
-    "snoozed": "Snoozed",
-    "error": "Action failed"
+    "archived": "已归档",
+    "snoozed": "已稍后提醒",
+    "error": "操作失败"
   },
   "tab": {
     "inbox": "收件箱",

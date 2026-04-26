@@ -1,41 +1,41 @@
 {
-  "title": "Timeboxes",
-  "create": "Create timebox",
-  "edit": "Edit timebox",
-  "delete": "Delete timebox",
-  "empty": "No timeboxes yet",
-  "empty_description": "Create a timebox to plan your sprints and iterations.",
-  "name_label": "Name",
-  "name_placeholder": "e.g., Sprint 12",
-  "description_label": "Description",
-  "starts_on_label": "Start date",
-  "ends_on_label": "End date",
+  "title": "时间盒",
+  "create": "创建时间盒",
+  "edit": "编辑时间盒",
+  "delete": "删除时间盒",
+  "empty": "暂无时间盒",
+  "empty_description": "创建时间盒以规划你的迭代和冲刺。",
+  "name_label": "名称",
+  "name_placeholder": "例如：Sprint 12",
+  "description_label": "描述",
+  "starts_on_label": "开始日期",
+  "ends_on_label": "结束日期",
   "status": {
-    "planned": "Planned",
-    "active": "Active",
-    "completed": "Completed",
-    "cancelled": "Cancelled"
+    "planned": "已计划",
+    "active": "进行中",
+    "completed": "已完成",
+    "cancelled": "已取消"
   },
   "action": {
-    "activate": "Start timebox",
-    "complete": "Complete timebox",
-    "cancel": "Cancel timebox",
-    "add_task": "Add task",
-    "remove_task": "Remove task"
+    "activate": "开始时间盒",
+    "complete": "完成时间盒",
+    "cancel": "取消时间盒",
+    "add_task": "添加任务",
+    "remove_task": "移除任务"
   },
   "progress": {
-    "title": "Progress",
-    "tasks_completed": "{completed} of {total} tasks completed",
-    "burndown": "Burndown"
+    "title": "进度",
+    "tasks_completed": "已完成 {completed} / {total} 个任务",
+    "burndown": "燃尽图"
   },
   "toast": {
-    "created": "Timebox created",
-    "updated": "Timebox updated",
-    "deleted": "Timebox deleted",
-    "activated": "Timebox started",
-    "completed": "Timebox completed",
-    "task_added": "Task added to timebox",
-    "task_removed": "Task removed from timebox"
+    "created": "已创建时间盒",
+    "updated": "已更新时间盒",
+    "deleted": "已删除时间盒",
+    "activated": "已开始时间盒",
+    "completed": "已完成时间盒",
+    "task_added": "已将任务添加到时间盒",
+    "task_removed": "已从时间盒移除任务"
   },
-  "confirm_delete": "Are you sure you want to delete this timebox?"
+  "confirm_delete": "确定要删除此时间盒吗？"
 }

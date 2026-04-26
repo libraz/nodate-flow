@@ -1,39 +1,39 @@
 {
-  "title": "Sharing",
-  "publish": "Publish",
-  "unpublish": "Unpublish",
-  "public_link": "Public link",
-  "copy_link": "Copy link",
-  "link_copied": "Link copied to clipboard",
+  "title": "分享",
+  "publish": "发布",
+  "unpublish": "取消发布",
+  "public_link": "公开链接",
+  "copy_link": "复制链接",
+  "link_copied": "已将链接复制到剪贴板",
   "safety_check": {
-    "title": "Safety check",
-    "description": "Scanning for sensitive data before publishing...",
-    "passed": "No sensitive data found",
-    "findings": "{count} potential issue found",
-    "findings_plural": "{count} potential issues found",
-    "proceed_anyway": "Publish anyway"
+    "title": "安全检查",
+    "description": "正在发布前扫描敏感数据…",
+    "passed": "未发现敏感数据",
+    "findings": "发现 {count} 个潜在问题",
+    "findings_plural": "发现 {count} 个潜在问题",
+    "proceed_anyway": "仍然发布"
   },
-  "confirm_publish": "This will make the view accessible to anyone with the link. Continue?",
-  "confirm_unpublish": "This will revoke public access. Existing links will stop working.",
+  "confirm_publish": "发布后，任何持有链接的人都将可访问此视图。继续？",
+  "confirm_unpublish": "将撤销公开访问。现有链接将停止工作。",
   "toast": {
-    "published": "View published",
-    "unpublished": "View unpublished"
+    "published": "已发布视图",
+    "unpublished": "已取消发布视图"
   },
-  "badge": "Public",
-  "badge_private": "Private",
+  "badge": "公开",
+  "badge_private": "私有",
   "error": {
-    "publish_failed": "Failed to publish view",
-    "unpublish_failed": "Failed to unpublish view"
+    "publish_failed": "发布视图失败",
+    "unpublish_failed": "取消发布视图失败"
   },
   "public_page": {
-    "loading": "Loading view...",
-    "not_found": "This public view is not available.",
-    "footer": "Powered by nodate-flow",
-    "col_title": "Title",
-    "col_status": "Status",
-    "col_priority": "Priority",
-    "col_due": "Due",
-    "col_assignee": "Assignee",
-    "no_tasks": "No tasks in this view."
+    "loading": "正在加载视图…",
+    "not_found": "此公开视图不可用。",
+    "footer": "由 nodate-flow 提供",
+    "col_title": "标题",
+    "col_status": "状态",
+    "col_priority": "优先级",
+    "col_due": "截止",
+    "col_assignee": "负责人",
+    "no_tasks": "此视图中暂无任务。"
   }
 }

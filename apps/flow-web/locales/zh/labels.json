@@ -1,161 +1,161 @@
 {
-  "title": "Labels",
-  "new": "New label",
-  "empty": "No labels yet. Create your first one to organize tasks.",
-  "search_placeholder": "Search labels…",
+  "title": "标签",
+  "new": "新建标签",
+  "empty": "暂无标签，创建第一个标签来整理任务吧。",
+  "search_placeholder": "搜索标签…",
   "columns": {
-    "name": "Name",
-    "color": "Color",
-    "description": "Description",
-    "actions": "Actions"
+    "name": "名称",
+    "color": "颜色",
+    "description": "描述",
+    "actions": "操作"
   },
   "form": {
-    "name": "Name",
-    "name_placeholder": "Label name",
-    "color": "Color",
-    "description": "Description",
-    "description_placeholder": "Optional description",
-    "submit": "Save",
-    "submitting": "Saving…",
-    "cancel": "Cancel"
+    "name": "名称",
+    "name_placeholder": "标签名称",
+    "color": "颜色",
+    "description": "描述",
+    "description_placeholder": "可选描述",
+    "submit": "保存",
+    "submitting": "保存中…",
+    "cancel": "取消"
   },
   "badge": {
-    "remove": "Remove label {name}"
+    "remove": "移除标签 {name}"
   },
   "picker": {
-    "title": "Labels",
-    "search_placeholder": "Search labels…",
-    "empty": "No labels found.",
-    "no_labels": "No labels available.",
-    "create_new": "Create \"{name}\"",
-    "apply": "Apply"
+    "title": "标签",
+    "search_placeholder": "搜索标签…",
+    "empty": "未找到标签。",
+    "no_labels": "暂无可用标签。",
+    "create_new": "创建「{name}」",
+    "apply": "应用"
   },
   "manager": {
-    "title": "Manage Labels",
-    "edit": "Edit label",
-    "create": "Create label",
-    "delete": "Delete label",
-    "delete_confirm": "Are you sure you want to delete this label? It will be removed from all tasks."
+    "title": "管理标签",
+    "edit": "编辑标签",
+    "create": "创建标签",
+    "delete": "删除标签",
+    "delete_confirm": "确定要删除此标签吗？将从所有任务中移除。"
   },
   "task": {
-    "add": "Add label",
-    "remove": "Remove label",
-    "none": "No labels"
+    "add": "添加标签",
+    "remove": "移除标签",
+    "none": "无标签"
   },
   "filters": {
-    "label": "Label",
-    "chip_label": "Label: {value}"
+    "label": "标签",
+    "chip_label": "标签：{value}"
   },
   "validation": {
-    "name_required": "Label name is required.",
-    "name_max": "Label name must be under 64 characters."
+    "name_required": "请填写标签名称。",
+    "name_max": "标签名称需在 64 字符以内。"
   },
   "errors": {
-    "create_failed": "Could not create the label. Please try again.",
-    "update_failed": "Could not update the label. Please try again.",
-    "delete_failed": "Could not delete the label. Please try again.",
-    "add_failed": "Could not add the label to the task. Please try again.",
-    "remove_failed": "Could not remove the label from the task. Please try again.",
-    "name_taken": "A label with this name already exists."
+    "create_failed": "无法创建标签，请重试。",
+    "update_failed": "无法更新标签，请重试。",
+    "delete_failed": "无法删除标签，请重试。",
+    "add_failed": "无法将标签添加到任务，请重试。",
+    "remove_failed": "无法从任务中移除标签，请重试。",
+    "name_taken": "已存在同名标签。"
   },
   "archive": {
-    "action": "Archive",
-    "unarchive": "Unarchive",
-    "confirm": "Are you sure you want to archive this task?",
-    "archived": "Task archived",
-    "unarchived": "Task unarchived",
-    "view_archived": "View archived tasks",
-    "archived_title": "Archived Tasks",
-    "archived_empty": "No archived tasks.",
-    "error_archive": "Could not archive the task. Please try again.",
-    "error_unarchive": "Could not unarchive the task. Please try again.",
-    "already_archived": "This task is already archived.",
-    "not_archived": "This task is not archived."
+    "action": "归档",
+    "unarchive": "取消归档",
+    "confirm": "确定要归档此任务吗？",
+    "archived": "已归档任务",
+    "unarchived": "已取消归档",
+    "view_archived": "查看已归档任务",
+    "archived_title": "已归档任务",
+    "archived_empty": "暂无已归档任务。",
+    "error_archive": "无法归档任务，请重试。",
+    "error_unarchive": "无法取消归档，请重试。",
+    "already_archived": "此任务已归档。",
+    "not_archived": "此任务尚未归档。"
   },
   "identifier": {
-    "label": "Identifier",
-    "placeholder": "e.g. NF",
-    "hint": "A short key for task references (e.g. NF-42). Max 5 characters.",
+    "label": "标识符",
+    "placeholder": "例如：NF",
+    "hint": "用于任务引用的简短键（例如 NF-42），最长 5 个字符。",
     "validation": {
-      "required": "Project identifier is required.",
-      "max": "Identifier must be 5 characters or fewer.",
-      "format": "Identifier may only contain letters and numbers.",
-      "taken": "This identifier is already taken in the workspace."
+      "required": "请填写项目标识符。",
+      "max": "标识符不能超过 5 个字符。",
+      "format": "标识符仅可包含字母和数字。",
+      "taken": "该标识符在工作区中已被占用。"
     }
   },
   "feature_toggles": {
-    "title": "Features",
-    "coming_soon_subtitle": "Coming soon",
-    "description": "Enable or disable features for this project.",
-    "pages": "Pages",
-    "pages_description": "Enable document pages within this project.",
-    "timeboxes": "Timeboxes",
-    "timeboxes_description": "Enable timeboxes (sprints/iterations) for this project.",
-    "lenses": "Saved Views",
-    "lenses_description": "Enable saved views for task filtering.",
-    "calendar": "Calendar",
-    "calendar_description": "Enable calendar view for this project.",
-    "updated": "Feature settings updated.",
-    "update_failed": "Could not update feature settings. Please try again.",
-    "not_editable": "Not yet editable from the project settings."
+    "title": "功能",
+    "coming_soon_subtitle": "即将推出",
+    "description": "启用或禁用此项目的功能。",
+    "pages": "文档",
+    "pages_description": "在此项目中启用文档页面。",
+    "timeboxes": "时间盒",
+    "timeboxes_description": "为此项目启用时间盒（迭代/冲刺）。",
+    "lenses": "已保存的视图",
+    "lenses_description": "启用任务筛选用的已保存视图。",
+    "calendar": "日历",
+    "calendar_description": "为此项目启用日历视图。",
+    "updated": "已更新功能设置。",
+    "update_failed": "无法更新功能设置，请重试。",
+    "not_editable": "暂不能从项目设置中编辑。"
   },
   "favorites": {
-    "title": "Favorites",
-    "add": "Add to favorites",
-    "remove": "Remove from favorites",
-    "added": "Added to favorites",
-    "removed": "Removed from favorites",
-    "empty": "No favorites yet. Star items to find them quickly.",
-    "error_add": "Could not add to favorites. Please try again.",
-    "error_remove": "Could not remove from favorites. Please try again.",
-    "sidebar_title": "Favorites"
+    "title": "收藏",
+    "add": "添加到收藏",
+    "remove": "从收藏中移除",
+    "added": "已添加到收藏",
+    "removed": "已从收藏中移除",
+    "empty": "暂无收藏。给项目加星标可快速找到它们。",
+    "error_add": "无法添加到收藏，请重试。",
+    "error_remove": "无法从收藏中移除，请重试。",
+    "sidebar_title": "收藏"
   },
   "reactions": {
-    "add": "Add reaction",
-    "remove": "Remove reaction",
-    "reacted": "You reacted with {emoji}",
-    "count": "{count, plural, one {# reaction} other {# reactions}}",
-    "error_add": "Could not add reaction. Please try again.",
-    "error_remove": "Could not remove reaction. Please try again."
+    "add": "添加表情回应",
+    "remove": "移除表情回应",
+    "reacted": "你用 {emoji} 进行了回应",
+    "count": "{count, plural, other {# 个回应}}",
+    "error_add": "无法添加回应，请重试。",
+    "error_remove": "无法移除回应，请重试。"
   },
   "intake": {
-    "title": "Intake",
-    "new": "New item",
-    "empty": "No items in the triage queue.",
+    "title": "受理",
+    "new": "新建项目",
+    "empty": "分类队列中暂无项目。",
     "status": {
-      "pending": "Pending",
-      "accepted": "Accepted",
-      "rejected": "Rejected",
-      "snoozed": "Snoozed",
-      "duplicate": "Duplicate"
+      "pending": "待处理",
+      "accepted": "已接受",
+      "rejected": "已拒绝",
+      "snoozed": "已稍后提醒",
+      "duplicate": "重复"
     },
     "actions": {
-      "accept": "Accept",
-      "reject": "Reject",
-      "snooze": "Snooze",
-      "duplicate": "Mark as duplicate",
-      "convert": "Convert to task"
+      "accept": "接受",
+      "reject": "拒绝",
+      "snooze": "稍后提醒",
+      "duplicate": "标记为重复",
+      "convert": "转为任务"
     },
     "form": {
-      "title": "Title",
-      "title_placeholder": "What needs to be triaged?",
-      "body": "Description",
-      "body_placeholder": "Details...",
-      "submit": "Add to queue",
-      "submitting": "Adding..."
+      "title": "标题",
+      "title_placeholder": "需要分类的内容是什么？",
+      "body": "描述",
+      "body_placeholder": "详情...",
+      "submit": "加入队列",
+      "submitting": "添加中..."
     },
-    "converted": "Converted to task",
-    "triaged": "Item triaged",
+    "converted": "已转为任务",
+    "triaged": "已完成分类",
     "errors": {
-      "create_failed": "Could not create intake item. Please try again.",
-      "triage_failed": "Could not triage the item. Please try again.",
-      "convert_failed": "Could not convert to task. Please try again."
+      "create_failed": "无法创建受理项，请重试。",
+      "triage_failed": "无法完成分类，请重试。",
+      "convert_failed": "无法转为任务，请重试。"
     }
   },
   "imports": {
-    "title": "Imports",
-    "new": "New import",
-    "empty": "No import jobs yet.",
+    "title": "导入",
+    "new": "新建导入",
+    "empty": "暂无导入任务。",
     "source": {
       "github": "GitHub",
       "jira": "Jira",
@@ -163,40 +163,40 @@
       "csv": "CSV"
     },
     "status": {
-      "pending": "Pending",
-      "running": "Running",
-      "completed": "Completed",
-      "failed": "Failed",
-      "cancelled": "Cancelled"
+      "pending": "待处理",
+      "running": "运行中",
+      "completed": "已完成",
+      "failed": "失败",
+      "cancelled": "已取消"
     },
     "columns": {
-      "source": "Source",
-      "status": "Status",
-      "progress": "Progress",
-      "created": "Created",
-      "actions": "Actions"
+      "source": "来源",
+      "status": "状态",
+      "progress": "进度",
+      "created": "创建时间",
+      "actions": "操作"
     },
     "actions": {
-      "cancel": "Cancel",
-      "cancel_confirm": "Are you sure you want to cancel this import?"
+      "cancel": "取消",
+      "cancel_confirm": "确定要取消此导入吗？"
     },
     "errors": {
-      "create_failed": "Could not create import job. Please try again.",
-      "cancel_failed": "Could not cancel the import job. Please try again.",
-      "already_running": "An import job is already running for this project."
+      "create_failed": "无法创建导入任务，请重试。",
+      "cancel_failed": "无法取消导入任务，请重试。",
+      "already_running": "该项目已有导入任务正在运行。"
     }
   },
   "description_history": {
-    "title": "Version History",
-    "empty": "No previous versions.",
-    "version": "Version {number}",
-    "by": "by {name}",
-    "chars": "{count} characters",
-    "restore": "Restore this version",
-    "restoring": "Restoring...",
-    "restored": "Version restored",
-    "restore_confirm": "Restore this version? The current description will be saved as a new version.",
-    "error_restore": "Could not restore the version. Please try again.",
-    "current": "Current"
+    "title": "版本历史",
+    "empty": "暂无历史版本。",
+    "version": "版本 {number}",
+    "by": "由 {name}",
+    "chars": "{count} 个字符",
+    "restore": "恢复此版本",
+    "restoring": "恢复中...",
+    "restored": "已恢复版本",
+    "restore_confirm": "恢复此版本？当前描述将保存为新版本。",
+    "error_restore": "无法恢复版本，请重试。",
+    "current": "当前"
   }
 }

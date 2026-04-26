@@ -1,99 +1,99 @@
 {
   "action": {
-    "apply": "Apply",
-    "dismiss": "Dismiss",
-    "edit": "Edit"
+    "apply": "应用",
+    "dismiss": "忽略",
+    "edit": "编辑"
   },
   "agents": {
-    "title": "AI agents",
-    "subtitle": "Manage trigger mode and kill switch for workspace agents.",
-    "empty": "No AI agents yet. Create an AI provider and set a default model first.",
-    "pause": "Pause",
-    "resume": "Resume",
+    "title": "AI 代理",
+    "subtitle": "管理工作区代理的触发模式和紧急停止开关。",
+    "empty": "尚无 AI 代理。请先创建 AI 提供商并设置默认模型。",
+    "pause": "暂停",
+    "resume": "恢复",
     "status": {
-      "active": "Active",
-      "paused": "Paused"
+      "active": "运行中",
+      "paused": "已暂停"
     },
     "scheduleKind": {
-      "label": "Trigger",
+      "label": "触发方式",
       "options": {
-        "disabled": "Disabled",
-        "interval": "Every tick",
-        "on_event": "On event",
-        "manual": "Manual only"
+        "disabled": "已禁用",
+        "interval": "每个周期",
+        "on_event": "事件触发",
+        "manual": "仅手动"
       }
     },
     "errors": {
-      "scheduleFailed": "Failed to update trigger",
-      "pauseFailed": "Failed to toggle kill switch",
-      "triggerFailed": "Failed to trigger agent"
+      "scheduleFailed": "更新触发方式失败",
+      "pauseFailed": "切换紧急停止开关失败",
+      "triggerFailed": "触发代理失败"
     },
     "trigger": {
-      "label": "Run now",
-      "queued": "Run queued"
+      "label": "立即运行",
+      "queued": "已加入运行队列"
     },
     "eventTriggers": {
-      "label": "Event kinds",
-      "save": "Save triggers",
-      "saved": "Triggers saved",
-      "failed": "Failed to update event triggers"
+      "label": "事件类型",
+      "save": "保存触发器",
+      "saved": "已保存触发器",
+      "failed": "更新事件触发器失败"
     },
     "create": {
-      "open": "+ Agent",
-      "title": "New agent",
-      "name": "Name",
-      "model": "Model",
-      "systemPrompt": "System prompt",
-      "submit": "Create",
-      "cancel": "Cancel",
-      "success": "Agent created",
-      "failed": "Failed to create agent",
-      "missingFields": "Fill in name, model and system prompt",
-      "noModels": "No models registered. Add an AI provider and model first."
+      "open": "+ 代理",
+      "title": "新建代理",
+      "name": "名称",
+      "model": "模型",
+      "systemPrompt": "系统提示词",
+      "submit": "创建",
+      "cancel": "取消",
+      "success": "已创建代理",
+      "failed": "创建代理失败",
+      "missingFields": "请填写名称、模型和系统提示词",
+      "noModels": "尚未注册任何模型。请先添加 AI 提供商和模型。"
     }
   },
-  "empty": "No suggestions yet",
-  "loading": "Thinking...",
-  "error": "Failed to load suggestions",
+  "empty": "暂无建议",
+  "loading": "思考中...",
+  "error": "加载建议失败",
   "triage": {
-    "trigger": "Triage with AI",
-    "running": "Triaging...",
-    "result_title": "AI suggestions",
-    "score": "Score",
-    "recommended": "Recommended",
-    "reasoning": "Reasoning",
-    "missing_item": "Inbox item not found",
-    "success": "{count, plural, one {# AI suggestion ready} other {# AI suggestions ready}}",
-    "success_empty": "Triage complete — no suggestions"
+    "trigger": "用 AI 分类",
+    "running": "分类中...",
+    "result_title": "AI 建议",
+    "score": "评分",
+    "recommended": "推荐操作",
+    "reasoning": "理由",
+    "missing_item": "未找到对应的收件箱项目",
+    "success": "{count, plural, other {已生成 # 条 AI 建议}}",
+    "success_empty": "分类完成 — 暂无建议"
   },
   "edit": {
-    "title": "Edit suggestion",
-    "action_label": "Recommended action",
-    "reasoning_label": "Reasoning",
-    "reasoning_required": "Reasoning is required",
-    "save": "Save",
-    "cancel": "Cancel",
+    "title": "编辑建议",
+    "action_label": "推荐操作",
+    "reasoning_label": "理由",
+    "reasoning_required": "请填写理由",
+    "save": "保存",
+    "cancel": "取消",
     "action": {
-      "open": "Open",
-      "snooze": "Snooze",
-      "archive": "Archive"
+      "open": "打开",
+      "snooze": "稍后提醒",
+      "archive": "归档"
     }
   },
   "glass_dock": {
-    "title": "AI suggestions",
-    "empty": "No pending suggestions",
-    "expand": "Expand suggestions panel",
-    "collapse": "Collapse suggestions panel"
+    "title": "AI 建议",
+    "empty": "暂无待处理建议",
+    "expand": "展开建议面板",
+    "collapse": "折叠建议面板"
   },
   "state_suggestions": {
-    "title": "Suggested next steps"
+    "title": "下一步建议"
   },
   "reminders": {
-    "title": "Reminders",
+    "title": "提醒",
     "kind": {
-      "overdue": "Overdue",
-      "due_today": "Due today",
-      "due_soon": "Due soon"
+      "overdue": "已逾期",
+      "due_today": "今日截止",
+      "due_soon": "即将截止"
     },
     "page_title": "提醒",
     "page_subtitle": "引擎根据您的截止日期和进度标记的任务。",
@@ -116,54 +116,54 @@
     }
   },
   "auto_actions": {
-    "title": "Suggested actions",
+    "title": "推荐操作",
     "kind": {
-      "escalate_overdue": "Escalate",
-      "assign_owner": "Assign owner",
-      "nudge_assignee": "Nudge",
-      "close_stale_review": "Close review"
+      "escalate_overdue": "升级处理",
+      "assign_owner": "指派负责人",
+      "nudge_assignee": "催办",
+      "close_stale_review": "关闭审阅"
     }
   },
   "transition_label": {
-    "start": "Start",
-    "block": "Block",
-    "unblock": "Unblock",
-    "submit": "Submit",
-    "complete": "Complete",
-    "reopen": "Reopen",
-    "cancel": "Cancel"
+    "start": "开始",
+    "block": "阻塞",
+    "unblock": "解除阻塞",
+    "submit": "提交审阅",
+    "complete": "完成",
+    "reopen": "重新打开",
+    "cancel": "取消"
   },
   "confidence": {
-    "high": "High",
-    "medium": "Medium",
-    "low": "Low"
+    "high": "置信度 高",
+    "medium": "置信度 中",
+    "low": "置信度 低"
   },
   "relative_date": {
-    "overdue": "{count}d overdue",
-    "today": "Today",
-    "in_days": "In {count}d"
+    "overdue": "已逾期 {count} 天",
+    "today": "今日",
+    "in_days": "{count} 天后"
   },
   "filter_condition": {
-    "priority": "Priority: {label}",
-    "blocked": "Blocked",
-    "due_this_week": "Due: This week",
-    "status": "Status: {values}"
+    "priority": "优先级：{label}",
+    "blocked": "已阻塞",
+    "due_this_week": "截止：本周",
+    "status": "状态：{values}"
   },
   "priority_label": {
-    "1": "Low",
-    "2": "Medium",
-    "3": "High"
+    "1": "低",
+    "2": "中",
+    "3": "高"
   },
   "nl_query": {
-    "label": "Ask in plain language",
-    "placeholder": "show me everything blocked this week",
-    "submit": "Submit",
-    "compiling": "Processing...",
-    "unparseable": "Couldn't understand that — try rephrasing.",
-    "error": "Failed to process query",
-    "apply": "Apply filter",
-    "applied": "Filter applied",
-    "sort_label": "Sort",
-    "group_label": "Group by"
+    "label": "用自然语言提问",
+    "placeholder": "查看本周所有被阻塞的内容",
+    "submit": "提交",
+    "compiling": "处理中...",
+    "unparseable": "无法理解您的输入，请尝试换种说法。",
+    "error": "处理查询失败",
+    "apply": "应用筛选",
+    "applied": "已应用筛选",
+    "sort_label": "排序",
+    "group_label": "分组"
   }
 }

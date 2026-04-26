@@ -1,29 +1,29 @@
 {
-  "title": "Dashboard",
-  "add_widget": "Add widget",
-  "add_widget_success": "Widget added",
-  "add_widget_error": "Failed to add widget",
-  "update_position_error": "Failed to update widget position",
-  "delete_widget_error": "Failed to remove widget",
-  "edit_layout": "Edit layout",
-  "done_editing": "Done",
-  "remove_widget": "Remove widget",
+  "title": "仪表板",
+  "add_widget": "添加小组件",
+  "add_widget_success": "已添加小组件",
+  "add_widget_error": "添加小组件失败",
+  "update_position_error": "更新小组件位置失败",
+  "delete_widget_error": "移除小组件失败",
+  "edit_layout": "编辑布局",
+  "done_editing": "完成",
+  "remove_widget": "移除小组件",
   "widget_type": {
-    "task_summary": "Task summary",
-    "burndown": "Burndown",
-    "signals_feed": "Signals feed",
-    "ai_suggestions": "AI suggestions",
-    "overdue_tasks": "Overdue tasks",
-    "notification_feed": "Notifications"
+    "task_summary": "任务汇总",
+    "burndown": "燃尽图",
+    "signals_feed": "信号动态",
+    "ai_suggestions": "AI 建议",
+    "overdue_tasks": "逾期任务",
+    "notification_feed": "通知"
   },
-  "empty": "No widgets yet",
-  "empty_description": "Add widgets to customize your dashboard.",
-  "resize_label": "Resize",
-  "confirm_remove": "Remove this widget?",
-  "widget_title_label": "Widget title",
-  "select_type": "Select widget type",
+  "empty": "暂无小组件",
+  "empty_description": "添加小组件以自定义你的仪表板。",
+  "resize_label": "调整大小",
+  "confirm_remove": "移除此小组件？",
+  "widget_title_label": "小组件标题",
+  "select_type": "选择小组件类型",
   "config": {
-    "timebox_label": "Timebox",
-    "project_label": "Project"
+    "timebox_label": "时间盒",
+    "project_label": "项目"
   }
 }
