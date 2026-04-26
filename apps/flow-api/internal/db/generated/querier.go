@@ -102,11 +102,6 @@ type Querier interface {
 	// Allocate the next task number for a project. Must be called inside a
 	// transaction with the project row locked (SELECT ... FOR UPDATE).
 	AssignTaskNumber(ctx context.Context, projectID uint32) (int32, error)
-	// Publish one event on a share page. Caller validates:
-	//   - event.visibility != 'confidential' (otherwise SHARE.SHARE_EVENT.EVENT_NOT_VISIBLE).
-	//   - event.workspace_id matches share.workspace_id.
-	// Uniqueness (share_id, event_id, enabled) is enforced by the table.
-	AttachEventToShare(ctx context.Context, arg AttachEventToShareParams) (int64, error)
 	// Link an existing signal to a task by public_id.
 	AttachSignalToTask(ctx context.Context, arg AttachSignalToTaskParams) error
 	// Cancel a pending or running import job.
@@ -118,8 +113,6 @@ type Querier interface {
 	// Callers wrap this in BEGIN / COMMIT; SELECT ... FOR UPDATE SKIP LOCKED
 	// lets multiple workers race for rows without contention.
 	ClaimNextAgentRun(ctx context.Context) (ClaimNextAgentRunRow, error)
-	// TTL sweep: disable any invite whose expires_at is in the past.
-	CleanupExpiredCalendarEventInvites(ctx context.Context) error
 	// Delete tokens that are either expired-and-used or expired-and-unused, for periodic cleanup.
 	CleanupExpiredMagicLinks(ctx context.Context) error
 	// Disable TOTP on a local identity.
@@ -128,9 +121,6 @@ type Querier interface {
 	// DELETE /me/avatar after the object has been removed from storage.
 	// PatchMe cannot be used because NULL narg means "leave alone" there.
 	ClearMyAvatarURL(ctx context.Context, id uint32) error
-	// Dedicated setter that clears expires_at (COALESCE-based patch cannot
-	// distinguish "leave unchanged" from "clear" for nullable columns).
-	ClearPublicShareExpiresAt(ctx context.Context, arg ClearPublicShareExpiresAtParams) error
 	// Mark a pending TOTP enrollment as confirmed by stamping
 	// mfa_confirmed_at. The caller must have already validated a code
 	// against the stored secret.
@@ -169,28 +159,6 @@ type Querier interface {
 	CountUnreadNotificationsForWorkspace(ctx context.Context, arg CountUnreadNotificationsForWorkspaceParams) (int64, error)
 	// Insert a new reusable agent configuration.
 	CreateAgent(ctx context.Context, arg CreateAgentParams) (int64, error)
-	// Insert a new calendar. kind determines behavior: personal (user-owned
-	// layer, may own many) or system (holiday feeds).
-	CreateCalendar(ctx context.Context, arg CreateCalendarParams) (int64, error)
-	// Add a checklist item to a calendar event.
-	CreateCalendarChecklistItem(ctx context.Context, arg CreateCalendarChecklistItemParams) (int64, error)
-	// Insert a new calendar event.
-	CreateCalendarEvent(ctx context.Context, arg CreateCalendarEventParams) (int64, error)
-	// Record metadata for an uploaded file attachment on a calendar event.
-	CreateCalendarEventAttachment(ctx context.Context, arg CreateCalendarEventAttachmentParams) (int64, error)
-	// Add an attendee to a calendar event.
-	CreateCalendarEventAttendee(ctx context.Context, arg CreateCalendarEventAttendeeParams) (int64, error)
-	// Add a comment to a calendar event.
-	CreateCalendarEventComment(ctx context.Context, arg CreateCalendarEventCommentParams) (int64, error)
-	// Insert a new magic-link invite for a calendar event attendee.
-	// accepted_at and sent_at are left NULL by default; the caller uses
-	// LastInsertId from the returned sql.Result to follow up with reads.
-	CreateCalendarEventInvite(ctx context.Context, arg CreateCalendarEventInviteParams) (sql.Result, error)
-	// Add a shared memo/to-do item to a calendar.
-	CreateCalendarMemo(ctx context.Context, arg CreateCalendarMemoParams) (int64, error)
-	// Subscribe a user to a calendar with display preferences.
-	// Not an ACL axis — event-level visibility governs access.
-	CreateCalendarSubscription(ctx context.Context, arg CreateCalendarSubscriptionParams) (int64, error)
 	// Insert a new description version snapshot.
 	CreateDescriptionVersion(ctx context.Context, arg CreateDescriptionVersionParams) (int64, error)
 	// Add an entity to the user's favorites.
@@ -234,10 +202,6 @@ type Querier interface {
 	// ============================================================================
 	// Insert a new LLM provider with encrypted API key.
 	CreateProvider(ctx context.Context, arg CreateProviderParams) (int64, error)
-	// Insert a new workspace-owned public share page. Token is pre-hashed
-	// by the handler (SHA-256); the plaintext is returned to the caller
-	// exactly once at create time.
-	CreatePublicShare(ctx context.Context, arg CreatePublicShareParams) (int64, error)
 	// Add an emoji reaction. Either task_id or comment_id must be set (not both).
 	CreateReaction(ctx context.Context, arg CreateReactionParams) (int64, error)
 	// Insert an AI-generated relation suggestion between two tasks.
@@ -268,8 +232,6 @@ type Querier interface {
 	CreateWorkspaceInvite(ctx context.Context, arg CreateWorkspaceInviteParams) (int64, error)
 	// Add a user to a workspace with the given role.
 	CreateWorkspaceMember(ctx context.Context, arg CreateWorkspaceMemberParams) (int64, error)
-	// Remove all attendees from an event (used when re-setting attendee list).
-	DeleteAllCalendarEventAttendees(ctx context.Context, eventID uint32) error
 	// Delete every recovery code (used or not) for a user.
 	DeleteAllRecoveryCodesForUser(ctx context.Context, userID uint32) error
 	// Soft-delete an attachment row. Object storage cleanup is async.
@@ -304,27 +266,6 @@ type Querier interface {
 	// Hard-delete a single integration row (user-scoped).
 	DeleteUserIntegration(ctx context.Context, arg DeleteUserIntegrationParams) error
 	DeleteWebhookSubscription(ctx context.Context, arg DeleteWebhookSubscriptionParams) error
-	// Remove one event from a share (soft). Looks up the link by share +
-	// event internal ids (caller resolves both via their public ids first).
-	DetachEventFromShare(ctx context.Context, arg DetachEventFromShareParams) error
-	// Soft-delete a calendar.
-	DisableCalendar(ctx context.Context, arg DisableCalendarParams) error
-	// Soft-delete a checklist item.
-	DisableCalendarChecklistItem(ctx context.Context, arg DisableCalendarChecklistItemParams) error
-	// Soft-delete a calendar event.
-	DisableCalendarEvent(ctx context.Context, arg DisableCalendarEventParams) error
-	// Soft-delete an attachment. Actual blob cleanup is deferred.
-	DisableCalendarEventAttachment(ctx context.Context, arg DisableCalendarEventAttachmentParams) error
-	// Remove an attendee from an event (soft-delete).
-	DisableCalendarEventAttendee(ctx context.Context, arg DisableCalendarEventAttendeeParams) error
-	// Soft-delete a comment (author or calendar owner).
-	DisableCalendarEventComment(ctx context.Context, arg DisableCalendarEventCommentParams) error
-	// Soft-disable (revoke) an invite by internal id.
-	DisableCalendarEventInvite(ctx context.Context, id uint32) error
-	// Soft-delete a memo.
-	DisableCalendarMemo(ctx context.Context, arg DisableCalendarMemoParams) error
-	// Remove a user from a calendar (soft-delete).
-	DisableCalendarSubscription(ctx context.Context, arg DisableCalendarSubscriptionParams) error
 	// Soft-delete a favorite.
 	DisableFavorite(ctx context.Context, arg DisableFavoriteParams) error
 	// Soft-disable a label.
@@ -333,10 +274,6 @@ type Querier interface {
 	DisablePage(ctx context.Context, arg DisablePageParams) error
 	// Soft-disable a project.
 	DisableProject(ctx context.Context, arg DisableProjectParams) error
-	// Soft-delete a share page. Child rows in calendar_public_share_events
-	// are left as-is (soft-disabled at the share level is sufficient; the
-	// render query joins through cps.enabled).
-	DisablePublicShare(ctx context.Context, arg DisablePublicShareParams) error
 	// Soft-delete a reaction by public id and user.
 	DisableReaction(ctx context.Context, arg DisableReactionParams) error
 	// Soft-disable a task.
@@ -366,10 +303,6 @@ type Querier interface {
 	// Mark a constraint as currently failing. Clears satisfied_at so the
 	// transition is visible in v_task_constraint_satisfaction.
 	FailConstraint(ctx context.Context, arg FailConstraintParams) error
-	// Find the currently active invite for a given (event_id, attendee_id)
-	// pair. Used before create to decide "insert new vs rotate existing",
-	// since the UNIQUE(event_id, attendee_id) constraint forces upsert.
-	FindActiveCalendarEventInvite(ctx context.Context, arg FindActiveCalendarEventInviteParams) (CalendarEventInvite, error)
 	// Lookup the single active (task, event, relation) tuple. Used by
 	// itemkit to detect duplicates before attempting to insert.
 	FindActiveLink(ctx context.Context, arg FindActiveLinkParams) (FindActiveLinkRow, error)
@@ -379,32 +312,6 @@ type Querier interface {
 	FindAgentIDByPublicIDForWorkspace(ctx context.Context, arg FindAgentIDByPublicIDForWorkspaceParams) (uint32, error)
 	// Resolve an ai_agents row's internal id by public_id, workspace-scoped.
 	FindAgentInternalIDByPublicID(ctx context.Context, arg FindAgentInternalIDByPublicIDParams) (uint32, error)
-	// Resolve a calendar by UUID v7 within a workspace.
-	FindCalendarByPublicId(ctx context.Context, arg FindCalendarByPublicIdParams) (FindCalendarByPublicIdRow, error)
-	// Resolve a checklist item by UUID v7.
-	FindCalendarChecklistItemByPublicId(ctx context.Context, arg FindCalendarChecklistItemByPublicIdParams) (FindCalendarChecklistItemByPublicIdRow, error)
-	// Resolve an attachment by UUID v7 for download or deletion.
-	FindCalendarEventAttachmentByPublicId(ctx context.Context, arg FindCalendarEventAttachmentByPublicIdParams) (FindCalendarEventAttachmentByPublicIdRow, error)
-	// Look up a specific attendee on an event (for permission checks).
-	FindCalendarEventAttendee(ctx context.Context, arg FindCalendarEventAttendeeParams) (FindCalendarEventAttendeeRow, error)
-	// Resolve a calendar event by UUID v7 within a calendar.
-	FindCalendarEventByPublicId(ctx context.Context, arg FindCalendarEventByPublicIdParams) (FindCalendarEventByPublicIdRow, error)
-	// Resolve a comment by UUID v7.
-	FindCalendarEventCommentByPublicId(ctx context.Context, arg FindCalendarEventCommentByPublicIdParams) (FindCalendarEventCommentByPublicIdRow, error)
-	// Look up an enabled invite by its public UUID.
-	FindCalendarEventInviteByPublicId(ctx context.Context, publicID types.PublicID) (CalendarEventInvite, error)
-	// Look up an enabled invite by its SHA-256 token hash.
-	// Expiry is intentionally NOT filtered here so the handler can
-	// distinguish "expired" from "not found" and return clearer errors.
-	FindCalendarEventInviteByTokenHash(ctx context.Context, tokenHash []byte) (CalendarEventInvite, error)
-	// ListAllCalendarEvents was consumed only by the deleted ICS export path;
-	// the replacement will query via calendar_public_shares.
-	// Quick lookup for permission checks: who owns this event?
-	FindCalendarEventOwner(ctx context.Context, arg FindCalendarEventOwnerParams) (FindCalendarEventOwnerRow, error)
-	// Resolve a memo by UUID v7.
-	FindCalendarMemoByPublicId(ctx context.Context, arg FindCalendarMemoByPublicIdParams) (FindCalendarMemoByPublicIdRow, error)
-	// Look up a user's subscription to a specific calendar.
-	FindCalendarSubscription(ctx context.Context, arg FindCalendarSubscriptionParams) (FindCalendarSubscriptionRow, error)
 	// Return the internal id of the most recently created enabled provider
 	// for a workspace. Used by the ai_invocations logger when the
 	// orchestrator does not track which provider handled the call.
@@ -412,10 +319,6 @@ type Querier interface {
 	FindDefaultProviderIDForWorkspace(ctx context.Context, workspaceID uint32) (uint32, error)
 	// Find a specific description version by public id.
 	FindDescriptionVersion(ctx context.Context, arg FindDescriptionVersionParams) (FindDescriptionVersionRow, error)
-	// Lightweight resolver used by the public-share attach path to translate
-	// an event public_id into its internal id + visibility within a workspace.
-	// Enforces workspace isolation so a share cannot publish another ws's events.
-	FindEventIDAndVisibility(ctx context.Context, arg FindEventIDAndVisibilityParams) (FindEventIDAndVisibilityRow, error)
 	// Check if a user already reacted with a specific emoji on a task or comment.
 	FindExistingReaction(ctx context.Context, arg FindExistingReactionParams) (FindExistingReactionRow, error)
 	// Find a single favorite by public id.
@@ -458,8 +361,6 @@ type Querier interface {
 	// Find deliveries ready for (re)delivery. Used by the background worker.
 	// d.id is required: used by MarkDeliveryDelivered/Failed/Dead (WHERE id = ?).
 	FindPendingDeliveries(ctx context.Context, limit int32) ([]FindPendingDeliveriesRow, error)
-	// Find the personal calendar for a user in a workspace.
-	FindPersonalCalendar(ctx context.Context, arg FindPersonalCalendarParams) (FindPersonalCalendarRow, error)
 	// Resolve a project by its human-readable identifier within a workspace.
 	FindProjectByIdentifier(ctx context.Context, arg FindProjectByIdentifierParams) (FindProjectByIdentifierRow, error)
 	// Resolve a project by its UUID v7 within a workspace. Returns internal id.
@@ -474,12 +375,6 @@ type Querier interface {
 	// handlers, MCP tools, or any code outside apps/flow-api/internal/ai/providers/.
 	// id is required: used internally by the providers package for logging/tracking.
 	FindProviderForDecrypt(ctx context.Context, arg FindProviderForDecryptParams) (FindProviderForDecryptRow, error)
-	// Resolve a share within a workspace for the authenticated editor UI.
-	FindPublicShareByPublicId(ctx context.Context, arg FindPublicShareByPublicIdParams) (FindPublicShareByPublicIdRow, error)
-	// Resolve a share by its SHA-256 token hash for the unauthenticated
-	// public render path. Returns only enabled rows; caller applies the
-	// expires_at gate so the 410 code path can be distinguished from 404.
-	FindPublicShareByTokenHash(ctx context.Context, tokenHash string) (FindPublicShareByTokenHashRow, error)
 	// Find a single reaction by public id.
 	FindReactionByPublicId(ctx context.Context, publicID types.PublicID) (FindReactionByPublicIdRow, error)
 	// Check if a pending or running import already exists for a project.
@@ -490,8 +385,6 @@ type Querier interface {
 	// Resolve a session from its SHA-256 refresh hash. Caller validates expiry.
 	// id is required: used by RotateSessionRefreshHash (WHERE id = ?).
 	FindSessionByRefreshHash(ctx context.Context, refreshHash string) (FindSessionByRefreshHashRow, error)
-	// Find a system calendar by its slug within a workspace.
-	FindSystemCalendarBySlug(ctx context.Context, arg FindSystemCalendarBySlugParams) (FindSystemCalendarBySlugRow, error)
 	// Detail projection via v_task_detail. Workspace-scoped.
 	FindTaskByPublicId(ctx context.Context, arg FindTaskByPublicIdParams) (FindTaskByPublicIdRow, error)
 	// Resolve a single link (enabled only) inside a workspace.
@@ -634,27 +527,6 @@ type Querier interface {
 	// ============================================================================
 	// List all auto-action rules for a workspace, ordered by kind.
 	ListAutoActionRulesForWorkspace(ctx context.Context, workspaceID uint32) ([]AutoActionRule, error)
-	// List checklist items for an event in display order.
-	ListCalendarChecklistItems(ctx context.Context, eventID uint32) ([]ListCalendarChecklistItemsRow, error)
-	// List active attachments for an event.
-	ListCalendarEventAttachments(ctx context.Context, eventID uint32) ([]ListCalendarEventAttachmentsRow, error)
-	// List all attendees for an event with user profile info.
-	ListCalendarEventAttendees(ctx context.Context, eventID uint32) ([]ListCalendarEventAttendeesRow, error)
-	// List comments on an event in chronological order.
-	ListCalendarEventComments(ctx context.Context, eventID uint32) ([]ListCalendarEventCommentsRow, error)
-	// List all active invites for a single event, newest first.
-	ListCalendarEventInvitesForEvent(ctx context.Context, eventID uint32) ([]CalendarEventInvite, error)
-	// Cross-calendar query: list events across multiple calendars for a user
-	// within a workspace and time range. Used by the unified calendar view.
-	ListCalendarEventsAcrossCalendars(ctx context.Context, arg ListCalendarEventsAcrossCalendarsParams) ([]ListCalendarEventsAcrossCalendarsRow, error)
-	// List non-recurring events in a calendar within a time range.
-	ListCalendarEventsByRange(ctx context.Context, arg ListCalendarEventsByRangeParams) ([]ListCalendarEventsByRangeRow, error)
-	// List memos for a calendar in display order.
-	ListCalendarMemos(ctx context.Context, calendarID uint32) ([]ListCalendarMemosRow, error)
-	// List all subscribers of a calendar (for member list, color resolution).
-	ListCalendarSubscribers(ctx context.Context, arg ListCalendarSubscribersParams) ([]ListCalendarSubscribersRow, error)
-	// List all calendars a user subscribes to within a workspace.
-	ListCalendarsForUser(ctx context.Context, arg ListCalendarsForUserParams) ([]ListCalendarsForUserRow, error)
 	// Return all task_embeddings for (workspace_id, model), excluding a given
 	// task_id (so self-similarity is filtered out). Cosine similarity is
 	// computed in Go because MySQL 9.6 Community does not expose
@@ -686,16 +558,6 @@ type Querier interface {
 	ListDependencyStatesForEngine(ctx context.Context, fromTaskID uint32) ([]ListDependencyStatesForEngineRow, error)
 	// List all description versions for a task, newest first.
 	ListDescriptionVersions(ctx context.Context, arg ListDescriptionVersionsParams) ([]ListDescriptionVersionsRow, error)
-	// List teammate personal calendars in a workspace that the actor is not
-	// currently subscribed to. Used by the "Add teammate calendar" picker in
-	// the right-rail Calendars panel. Excludes:
-	//   - calendars owned by the actor (their own personal calendar)
-	//   - calendars where an active calendar_subscriptions row already exists
-	//     for the actor
-	//   - non-personal calendars (system/holiday/etc — those have their own UI)
-	// Owners must still be active workspace members so we don't surface
-	// calendars whose owner has left the workspace.
-	ListDiscoverableCalendarsInWorkspace(ctx context.Context, arg ListDiscoverableCalendarsInWorkspaceParams) ([]ListDiscoverableCalendarsInWorkspaceRow, error)
 	// List a project's timeline via v_task_timeline. Filters events whose
 	// owning task lives in the given project (events with no task_id are
 	// excluded by virtue of project_public_id being NULL).
@@ -735,23 +597,6 @@ type Querier interface {
 	ListMentionsForUser(ctx context.Context, arg ListMentionsForUserParams) ([]ListMentionsForUserRow, error)
 	// List models registered under a provider. Workspace-scoped.
 	ListModelsForProvider(ctx context.Context, arg ListModelsForProviderParams) ([]ListModelsForProviderRow, error)
-	// Inbox query for /me/invites: active, unaccepted, non-expired invites
-	// addressed to the authenticated user's primary email. JOINs event,
-	// calendar, and workspace metadata so the handler can build a rich
-	// inbox response without extra round trips.
-	ListMyCalendarEventInvites(ctx context.Context, email string) ([]ListMyCalendarEventInvitesRow, error)
-	// Cross-workspace variant: list non-recurring events on every calendar
-	// the caller is subscribed to, across every workspace where the caller
-	// is still an active member. workspace_members is joined so that a
-	// subscription row lingering past membership removal cannot leak rows
-	// (belt-and-braces beyond the soft-disable cascade). Backs GET
-	// /me/calendar-events for the unified flow-web calendar so the client
-	// does not fan out one request per workspace.
-	ListMyCalendarEventsAcrossWorkspaces(ctx context.Context, arg ListMyCalendarEventsAcrossWorkspacesParams) ([]ListMyCalendarEventsAcrossWorkspacesRow, error)
-	// Cross-workspace recurring variant. Same membership guard as the
-	// non-recurring query. Clients expand RRULE instances client-side via
-	// the shared recurrence expander.
-	ListMyRecurringCalendarEventsAcrossWorkspaces(ctx context.Context, arg ListMyRecurringCalendarEventsAcrossWorkspacesParams) ([]ListMyRecurringCalendarEventsAcrossWorkspacesRow, error)
 	// Tasks where the given user is attached as an actor, via v_my_tasks.
 	ListMyTasks(ctx context.Context, arg ListMyTasksParams) ([]ListMyTasksRow, error)
 	// Cross-workspace variant: tasks where the given user is attached as an
@@ -806,19 +651,6 @@ type Querier interface {
 	ListProjectsForWorkspace(ctx context.Context, arg ListProjectsForWorkspaceParams) ([]ListProjectsForWorkspaceRow, error)
 	// Workspace provider list. NEVER selects api_key_ciphertext.
 	ListProvidersForWorkspace(ctx context.Context, arg ListProvidersForWorkspaceParams) ([]ListProvidersForWorkspaceRow, error)
-	// Unauthenticated public-render query. Final safety gate on event
-	// visibility and start_at IS NOT NULL. expires_at is checked in the
-	// handler (not here) so 410 can be differentiated from 404.
-	ListPublicShareEventsByTokenHash(ctx context.Context, tokenHash string) ([]ListPublicShareEventsByTokenHashRow, error)
-	// List events published on a share for the workspace-authenticated
-	// editor UI. Returns full event metadata so the editor can show what is
-	// currently public. Does not filter by visibility (the editor needs to
-	// see even confidential events that slipped through so they can be
-	// detached, though AttachEventToShare prevents that path going forward).
-	ListPublicShareEventsForEditor(ctx context.Context, arg ListPublicShareEventsForEditorParams) ([]ListPublicShareEventsForEditorRow, error)
-	// List workspace shares for the admin UI. Ordered by sort_weight then
-	// creation time; no pagination (shares are expected to be few per ws).
-	ListPublicShares(ctx context.Context, workspaceID uint32) ([]ListPublicSharesRow, error)
 	// List all reactions on a comment.
 	ListReactionsForComment(ctx context.Context, commentID sql.NullInt32) ([]ListReactionsForCommentRow, error)
 	// List all reactions on a task, grouped by emoji with user info.
@@ -827,11 +659,6 @@ type Querier interface {
 	ListRecentAudit(ctx context.Context, arg ListRecentAuditParams) ([]ListRecentAuditRow, error)
 	// List the most recent visits for a user in a workspace, newest first.
 	ListRecentVisitsForUser(ctx context.Context, arg ListRecentVisitsForUserParams) ([]ListRecentVisitsForUserRow, error)
-	// Cross-calendar query: list recurring events across multiple calendars
-	// whose recurrence window overlaps the query range.
-	ListRecurringCalendarEventsAcrossCalendars(ctx context.Context, arg ListRecurringCalendarEventsAcrossCalendarsParams) ([]ListRecurringCalendarEventsAcrossCalendarsRow, error)
-	// List recurring events whose recurrence window overlaps the query range.
-	ListRecurringCalendarEventsByRange(ctx context.Context, arg ListRecurringCalendarEventsByRangeParams) ([]ListRecurringCalendarEventsByRangeRow, error)
 	// List all active repository mappings for a workspace. Returns metadata
 	// only (no internal IDs leak through the view layer).
 	ListRepoMappingsForWorkspace(ctx context.Context, workspaceID uint32) ([]ListRepoMappingsForWorkspaceRow, error)
@@ -917,11 +744,6 @@ type Querier interface {
 	MarkAgentRunClaimed(ctx context.Context, arg MarkAgentRunClaimedParams) error
 	// Mark all unread notifications as read for a user in a workspace.
 	MarkAllNotificationsRead(ctx context.Context, arg MarkAllNotificationsReadParams) error
-	// Stamp accepted_at when the recipient clicks the magic link
-	// successfully.
-	MarkCalendarEventInviteAccepted(ctx context.Context, id uint32) error
-	// Stamp sent_at when the invite email is actually dispatched.
-	MarkCalendarEventInviteSent(ctx context.Context, id uint32) error
 	// Mark a delivery as dead (all retries exhausted).
 	MarkDeliveryDead(ctx context.Context, arg MarkDeliveryDeadParams) error
 	MarkDeliveryDelivered(ctx context.Context, arg MarkDeliveryDeliveredParams) error
@@ -941,16 +763,8 @@ type Querier interface {
 	NackAgentRun(ctx context.Context, arg NackAgentRunParams) error
 	// Get the next version number for a task's description history.
 	NextDescriptionVersionNumber(ctx context.Context, taskID uint32) (int32, error)
-	// Patch mutable calendar fields. NULL params leave columns untouched.
-	PatchCalendar(ctx context.Context, arg PatchCalendarParams) error
-	// Patch mutable event fields. NULL params leave columns untouched.
-	PatchCalendarEvent(ctx context.Context, arg PatchCalendarEventParams) error
-	// Update a subscriber's display preferences.
-	PatchCalendarSubscription(ctx context.Context, arg PatchCalendarSubscriptionParams) error
 	// Patch the authenticated user's profile. NULL params leave the column untouched.
 	PatchMe(ctx context.Context, arg PatchMeParams) error
-	// Update mutable share fields. NULL arguments leave columns untouched.
-	PatchPublicShare(ctx context.Context, arg PatchPublicShareParams) error
 	// Patch a workspace via COALESCE; NULL params leave existing columns untouched.
 	PatchWorkspace(ctx context.Context, arg PatchWorkspaceParams) error
 	// Garbage-collect oauth_states rows past their expires_at. Called
@@ -993,12 +807,6 @@ type Querier interface {
 	RevokeSession(ctx context.Context, arg RevokeSessionParams) error
 	// Disable an invite link (soft delete).
 	RevokeWorkspaceInvite(ctx context.Context, arg RevokeWorkspaceInviteParams) error
-	// Rotate the token on an existing invite row (resend flow): install a
-	// fresh token_hash + expires_at and clear sent_at / accepted_at so the
-	// UI reflects a fresh, undelivered invite.
-	RotateCalendarEventInviteToken(ctx context.Context, arg RotateCalendarEventInviteTokenParams) error
-	// Regenerate the token hash; invalidates any previously issued URL.
-	RotatePublicShareToken(ctx context.Context, arg RotatePublicShareTokenParams) error
 	// Replace the refresh token hash, extend expiry, and record last usage on a refresh rotation.
 	RotateSessionRefreshHash(ctx context.Context, arg RotateSessionRefreshHashParams) error
 	// Mark a constraint as satisfied at the current time.
@@ -1048,16 +856,6 @@ type Querier interface {
 	UnarchiveTask(ctx context.Context, arg UnarchiveTaskParams) error
 	// Update the schedule_kind on an existing agent.
 	UpdateAgentScheduleKind(ctx context.Context, arg UpdateAgentScheduleKindParams) error
-	// Grant or revoke edit permission on an attendee (by event owner).
-	UpdateAttendeeCanEdit(ctx context.Context, arg UpdateAttendeeCanEditParams) error
-	// Update an attendee's RSVP response (self-service).
-	UpdateAttendeeRsvp(ctx context.Context, arg UpdateAttendeeRsvpParams) error
-	// Update a checklist item's title, done, or sort_weight.
-	UpdateCalendarChecklistItem(ctx context.Context, arg UpdateCalendarChecklistItemParams) error
-	// Edit a comment's body and stamp edited_at.
-	UpdateCalendarEventComment(ctx context.Context, arg UpdateCalendarEventCommentParams) error
-	// Update a memo's title, done, or sort_weight.
-	UpdateCalendarMemo(ctx context.Context, arg UpdateCalendarMemoParams) error
 	// Replace stored tokens after a successful refresh.
 	UpdateConnectionTokens(ctx context.Context, arg UpdateConnectionTokensParams) error
 	// Bump failed login counter and optionally apply a lockout deadline.
@@ -1088,11 +886,6 @@ type Querier interface {
 	UpdateProjectFull(ctx context.Context, arg UpdateProjectFullParams) error
 	// Rotate a provider's API key. Caller passes new ciphertext + prefix + suffix.
 	UpdateProviderKey(ctx context.Context, arg UpdateProviderKeyParams) error
-	// Update the sort_weight of a single share-event link.
-	// Called in a loop (inside a tx) when a user reorders the events on a
-	// public share. Scoped to (share_id, public_id) so a caller cannot
-	// accidentally reorder a link belonging to a different share.
-	UpdateShareEventSortWeight(ctx context.Context, arg UpdateShareEventSortWeightParams) error
 	// Update mutable task fields. derived_state is intentionally NOT writable.
 	UpdateTask(ctx context.Context, arg UpdateTaskParams) error
 	// Update only the sort_weight for a single task within a workspace.

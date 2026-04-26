@@ -298,7 +298,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	}
 
 	// 11. Workspace public share + attach the sample event.
-	shareID, err := ensurePublicShare(ctx, db, q, uint32(wsID), uint32(ownerID), l.PublicShareTitle, l.PublicShareDescription, logger)
+	shareID, err := ensurePublicShare(ctx, db, cq, uint32(wsID), uint32(ownerID), l.PublicShareTitle, l.PublicShareDescription, logger)
 	if err != nil {
 		return fmt.Errorf("ensure public share: %w", err)
 	}
@@ -831,7 +831,7 @@ func findShareIDByTitle(ctx context.Context, db *sql.DB, wsID uint32, title stri
 	return id, nil
 }
 
-func ensurePublicShare(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, ownerID uint32, title, description string, logger *slog.Logger) (uint32, error) {
+func ensurePublicShare(ctx context.Context, db *sql.DB, cq *calendar.Queries, wsID, ownerID uint32, title, description string, logger *slog.Logger) (uint32, error) {
 	if existing, err := findShareIDByTitle(ctx, db, wsID, title); err != nil {
 		return 0, err
 	} else if existing > 0 {
@@ -844,7 +844,7 @@ func ensurePublicShare(ctx context.Context, db *sql.DB, q *generated.Queries, ws
 	}
 	sum := sha256.Sum256([]byte(token))
 	tokenHash := hex.EncodeToString(sum[:])
-	id, err := q.CreatePublicShare(ctx, generated.CreatePublicShareParams{
+	id, err := cq.CreatePublicShare(ctx, calendar.CreatePublicShareParams{
 		PublicID:            types.New(),
 		WorkspaceID:         wsID,
 		CreatedByUserID:     sql.NullInt32{Int32: int32(ownerID), Valid: true},
