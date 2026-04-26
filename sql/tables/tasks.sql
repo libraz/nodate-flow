@@ -36,6 +36,9 @@ CREATE TABLE tasks (
   UNIQUE KEY uniq_tasks_project_id_task_number (project_id, task_number),
   KEY idx_tasks_workspace_id_archived_at (workspace_id, archived_at),
   KEY idx_tasks_parent_task_id (parent_task_id),
+  -- Supports keyset pagination on (created_at DESC, public_id DESC) for
+  -- ListTasksForWorkspaceKeyset / ListTasksForProjectKeyset / ListMyTasksKeyset.
+  KEY idx_tasks_workspace_id_keyset (workspace_id, created_at, public_id),
   FULLTEXT KEY ft_tasks_title_description (title, description),
 
   CONSTRAINT fk_tasks_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,

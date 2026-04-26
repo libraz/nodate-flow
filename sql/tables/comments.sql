@@ -22,6 +22,9 @@ CREATE TABLE comments (
   UNIQUE KEY uniq_comments_public_id (public_id),
   KEY idx_comments_workspace_id_task_id (workspace_id, task_id),
   KEY idx_comments_workspace_id_author_id (workspace_id, author_id),
+  -- Supports keyset pagination on (created_at DESC, public_id DESC) for
+  -- ListCommentsForTaskKeyset.
+  KEY idx_comments_task_id_keyset (task_id, created_at, public_id),
   FULLTEXT KEY ft_comments_body (body),
 
   CONSTRAINT fk_comments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,

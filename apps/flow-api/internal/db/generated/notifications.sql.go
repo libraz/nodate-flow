@@ -229,6 +229,133 @@ func (q *Queries) ListNotificationsForUser(ctx context.Context, arg ListNotifica
 	return items, nil
 }
 
+const listNotificationsForUserKeyset = `-- name: ListNotificationsForUserKeyset :many
+SELECT
+  n.public_id,
+  n.workspace_id,
+  w.public_id AS workspace_public_id,
+  n.actor_user_id,
+  au.public_id AS actor_public_id,
+  au.display_name AS actor_display_name,
+  n.event_type,
+  n.resource_type,
+  n.resource_public_id,
+  n.title,
+  n.body,
+  n.severity,
+  n.channel,
+  n.read_at,
+  n.delivered_at,
+  n.created_at
+FROM notifications n
+INNER JOIN workspaces w ON w.id = n.workspace_id
+LEFT JOIN users au ON au.id = n.actor_user_id
+WHERE n.recipient_user_id = ?
+  AND n.archived_at IS NULL
+  AND n.enabled = TRUE
+  AND (? = 'all'
+       OR (? = 'unread' AND n.read_at IS NULL)
+       OR (? = 'read'   AND n.read_at IS NOT NULL))
+  AND (? IS NULL
+       OR n.created_at < ?
+       OR (n.created_at = ?
+           AND n.public_id < ?))
+ORDER BY n.created_at DESC, n.public_id DESC
+LIMIT ?
+`
+
+type ListNotificationsForUserKeysetParams struct {
+	RecipientUserID uint32         `json:"-"`
+	ReadFilter      interface{}    `json:"readFilter"`
+	CursorCreatedAt sql.NullTime   `json:"cursorCreatedAt"`
+	CursorPublicID  types.PublicID `json:"cursorPublicId"`
+	Limit           int32          `json:"limit"`
+}
+
+type ListNotificationsForUserKeysetRow struct {
+	PublicID          types.PublicID        `json:"publicId"`
+	WorkspaceID       uint32                `json:"-"`
+	WorkspacePublicID types.PublicID        `json:"workspacePublicId"`
+	ActorUserID       sql.NullInt32         `json:"-"`
+	ActorPublicID     types.PublicID        `json:"actorPublicId"`
+	ActorDisplayName  sql.NullString        `json:"actorDisplayName"`
+	EventType         string                `json:"eventType"`
+	ResourceType      string                `json:"resourceType"`
+	ResourcePublicID  types.PublicID        `json:"resourcePublicId"`
+	Title             string                `json:"title"`
+	Body              sql.NullString        `json:"body"`
+	Severity          NotificationsSeverity `json:"severity"`
+	Channel           NotificationsChannel  `json:"channel"`
+	ReadAt            sql.NullTime          `json:"readAt"`
+	DeliveredAt       sql.NullTime          `json:"deliveredAt"`
+	CreatedAt         time.Time             `json:"createdAt"`
+}
+
+// Keyset-paginated variant of ListNotificationsForUser.
+//
+// Cursor encoding: pass the (created_at, public_id) tuple from the LAST
+// row of the previous page. First page passes NULL for both
+// cursor_created_at and cursor_public_id. ORDER BY (created_at DESC,
+// public_id DESC) — the OFFSET variant orders by id DESC as the
+// tiebreaker, but id is internal-only so we use public_id DESC for
+// the keyset cursor (UUID v7 is monotonic so still produces a stable
+// newest-first order).
+//
+// read_filter: pass 'all' to include both read and unread, 'unread' for
+// only unread (read_at IS NULL), 'read' for only read (read_at IS NOT NULL).
+//
+// Index used: idx_notifications_user_id_keyset
+// (recipient_user_id, created_at, public_id).
+func (q *Queries) ListNotificationsForUserKeyset(ctx context.Context, arg ListNotificationsForUserKeysetParams) ([]ListNotificationsForUserKeysetRow, error) {
+	rows, err := q.db.QueryContext(ctx, listNotificationsForUserKeyset,
+		arg.RecipientUserID,
+		arg.ReadFilter,
+		arg.ReadFilter,
+		arg.ReadFilter,
+		arg.CursorCreatedAt,
+		arg.CursorCreatedAt,
+		arg.CursorCreatedAt,
+		arg.CursorPublicID,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListNotificationsForUserKeysetRow{}
+	for rows.Next() {
+		var i ListNotificationsForUserKeysetRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.WorkspaceID,
+			&i.WorkspacePublicID,
+			&i.ActorUserID,
+			&i.ActorPublicID,
+			&i.ActorDisplayName,
+			&i.EventType,
+			&i.ResourceType,
+			&i.ResourcePublicID,
+			&i.Title,
+			&i.Body,
+			&i.Severity,
+			&i.Channel,
+			&i.ReadAt,
+			&i.DeliveredAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listNotificationsForWorkspace = `-- name: ListNotificationsForWorkspace :many
 SELECT
   n.public_id,
@@ -319,6 +446,133 @@ func (q *Queries) ListNotificationsForWorkspace(ctx context.Context, arg ListNot
 			&i.DeliveredAt,
 			&i.CreatedAt,
 			&i.Total,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listNotificationsForWorkspaceKeyset = `-- name: ListNotificationsForWorkspaceKeyset :many
+SELECT
+  n.public_id,
+  n.workspace_id,
+  w.public_id AS workspace_public_id,
+  n.actor_user_id,
+  au.public_id AS actor_public_id,
+  au.display_name AS actor_display_name,
+  n.event_type,
+  n.resource_type,
+  n.resource_public_id,
+  n.title,
+  n.body,
+  n.severity,
+  n.channel,
+  n.read_at,
+  n.delivered_at,
+  n.created_at
+FROM notifications n
+INNER JOIN workspaces w ON w.id = n.workspace_id
+LEFT JOIN users au ON au.id = n.actor_user_id
+WHERE n.workspace_id = ?
+  AND n.recipient_user_id = ?
+  AND n.archived_at IS NULL
+  AND n.enabled = TRUE
+  AND (? = 'all'
+       OR (? = 'unread' AND n.read_at IS NULL)
+       OR (? = 'read'   AND n.read_at IS NOT NULL))
+  AND (? IS NULL
+       OR n.created_at < ?
+       OR (n.created_at = ?
+           AND n.public_id < ?))
+ORDER BY n.created_at DESC, n.public_id DESC
+LIMIT ?
+`
+
+type ListNotificationsForWorkspaceKeysetParams struct {
+	WorkspaceID     uint32         `json:"-"`
+	RecipientUserID uint32         `json:"-"`
+	ReadFilter      interface{}    `json:"readFilter"`
+	CursorCreatedAt sql.NullTime   `json:"cursorCreatedAt"`
+	CursorPublicID  types.PublicID `json:"cursorPublicId"`
+	Limit           int32          `json:"limit"`
+}
+
+type ListNotificationsForWorkspaceKeysetRow struct {
+	PublicID          types.PublicID        `json:"publicId"`
+	WorkspaceID       uint32                `json:"-"`
+	WorkspacePublicID types.PublicID        `json:"workspacePublicId"`
+	ActorUserID       sql.NullInt32         `json:"-"`
+	ActorPublicID     types.PublicID        `json:"actorPublicId"`
+	ActorDisplayName  sql.NullString        `json:"actorDisplayName"`
+	EventType         string                `json:"eventType"`
+	ResourceType      string                `json:"resourceType"`
+	ResourcePublicID  types.PublicID        `json:"resourcePublicId"`
+	Title             string                `json:"title"`
+	Body              sql.NullString        `json:"body"`
+	Severity          NotificationsSeverity `json:"severity"`
+	Channel           NotificationsChannel  `json:"channel"`
+	ReadAt            sql.NullTime          `json:"readAt"`
+	DeliveredAt       sql.NullTime          `json:"deliveredAt"`
+	CreatedAt         time.Time             `json:"createdAt"`
+}
+
+// Keyset-paginated variant of ListNotificationsForWorkspace.
+//
+// Cursor encoding: pass the (created_at, public_id) tuple from the LAST
+// row of the previous page. First page passes NULL for both
+// cursor_created_at and cursor_public_id. ORDER BY (created_at DESC,
+// public_id DESC).
+//
+// read_filter: pass 'all' to include both read and unread, 'unread' for
+// only unread (read_at IS NULL), 'read' for only read (read_at IS NOT NULL).
+//
+// Uses the existing idx_notifications_workspace_id_recipient_read index
+// (workspace_id, recipient_user_id, read_at, created_at DESC).
+func (q *Queries) ListNotificationsForWorkspaceKeyset(ctx context.Context, arg ListNotificationsForWorkspaceKeysetParams) ([]ListNotificationsForWorkspaceKeysetRow, error) {
+	rows, err := q.db.QueryContext(ctx, listNotificationsForWorkspaceKeyset,
+		arg.WorkspaceID,
+		arg.RecipientUserID,
+		arg.ReadFilter,
+		arg.ReadFilter,
+		arg.ReadFilter,
+		arg.CursorCreatedAt,
+		arg.CursorCreatedAt,
+		arg.CursorCreatedAt,
+		arg.CursorPublicID,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListNotificationsForWorkspaceKeysetRow{}
+	for rows.Next() {
+		var i ListNotificationsForWorkspaceKeysetRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.WorkspaceID,
+			&i.WorkspacePublicID,
+			&i.ActorUserID,
+			&i.ActorPublicID,
+			&i.ActorDisplayName,
+			&i.EventType,
+			&i.ResourceType,
+			&i.ResourcePublicID,
+			&i.Title,
+			&i.Body,
+			&i.Severity,
+			&i.Channel,
+			&i.ReadAt,
+			&i.DeliveredAt,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}

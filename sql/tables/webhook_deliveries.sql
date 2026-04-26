@@ -11,7 +11,7 @@ CREATE TABLE webhook_deliveries (
 
   event_type VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'The event that triggered this delivery',
   event_public_id BINARY(16) NULL COMMENT 'public_id of the source event',
-  payload_json JSON NOT NULL COMMENT 'The JSON payload that was/will be sent',
+  payload_json JSON NOT NULL CHECK (JSON_VALID(payload_json)) COMMENT 'The JSON payload that was/will be sent',
   status ENUM('pending','delivering','delivered','failed','dead') NOT NULL DEFAULT 'pending' COMMENT 'Delivery state',
   http_status SMALLINT UNSIGNED NULL COMMENT 'HTTP response status from the target',
   response_body TEXT NULL COMMENT 'Truncated response body (first 4KB) for debugging',

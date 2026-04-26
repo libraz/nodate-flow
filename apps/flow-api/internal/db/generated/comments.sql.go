@@ -170,3 +170,96 @@ func (q *Queries) ListCommentsForTask(ctx context.Context, arg ListCommentsForTa
 	}
 	return items, nil
 }
+
+const listCommentsForTaskKeyset = `-- name: ListCommentsForTaskKeyset :many
+SELECT
+  c.public_id,
+  u.public_id AS author_public_id,
+  u.display_name AS author_display_name,
+  u.avatar_url AS author_avatar_url,
+  c.body,
+  c.edited_at,
+  c.updated_at,
+  c.created_at
+FROM comments c
+INNER JOIN tasks t ON t.id = c.task_id AND t.enabled = TRUE
+INNER JOIN users u ON u.id = c.author_id AND u.enabled = TRUE
+WHERE c.workspace_id = ?
+  AND t.public_id = ?
+  AND c.enabled = TRUE
+  AND (? IS NULL
+       OR c.created_at < ?
+       OR (c.created_at = ?
+           AND c.public_id < ?))
+ORDER BY c.created_at DESC, c.public_id DESC
+LIMIT ?
+`
+
+type ListCommentsForTaskKeysetParams struct {
+	WorkspaceID     uint32         `json:"-"`
+	PublicID        types.PublicID `json:"publicId"`
+	CursorCreatedAt sql.NullTime   `json:"cursorCreatedAt"`
+	CursorPublicID  types.PublicID `json:"cursorPublicId"`
+	Limit           int32          `json:"limit"`
+}
+
+type ListCommentsForTaskKeysetRow struct {
+	PublicID          types.PublicID `json:"publicId"`
+	AuthorPublicID    types.PublicID `json:"authorPublicId"`
+	AuthorDisplayName string         `json:"authorDisplayName"`
+	AuthorAvatarUrl   sql.NullString `json:"authorAvatarUrl"`
+	Body              string         `json:"body"`
+	EditedAt          sql.NullTime   `json:"editedAt"`
+	UpdatedAt         sql.NullTime   `json:"updatedAt"`
+	CreatedAt         time.Time      `json:"createdAt"`
+}
+
+// Keyset-paginated variant of ListCommentsForTask.
+//
+// Cursor encoding: pass the (created_at, public_id) tuple from the LAST
+// row of the previous page. First page passes NULL for both
+// cursor_created_at and cursor_public_id. ORDER BY (created_at DESC,
+// public_id DESC) — note this reverses the OFFSET variant's ASC order
+// so the cursor semantics match the rest of the keyset family. UI
+// consumers that want oldest-first must reverse the page client-side.
+//
+// Index used: idx_comments_task_id_keyset (task_id, created_at, public_id).
+func (q *Queries) ListCommentsForTaskKeyset(ctx context.Context, arg ListCommentsForTaskKeysetParams) ([]ListCommentsForTaskKeysetRow, error) {
+	rows, err := q.db.QueryContext(ctx, listCommentsForTaskKeyset,
+		arg.WorkspaceID,
+		arg.PublicID,
+		arg.CursorCreatedAt,
+		arg.CursorCreatedAt,
+		arg.CursorCreatedAt,
+		arg.CursorPublicID,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListCommentsForTaskKeysetRow{}
+	for rows.Next() {
+		var i ListCommentsForTaskKeysetRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.AuthorPublicID,
+			&i.AuthorDisplayName,
+			&i.AuthorAvatarUrl,
+			&i.Body,
+			&i.EditedAt,
+			&i.UpdatedAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

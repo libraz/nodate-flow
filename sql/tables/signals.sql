@@ -12,7 +12,7 @@ CREATE TABLE signals (
   source ENUM('manual','github','slack','email','google','webhook') NOT NULL COMMENT 'Originating channel',
   kind VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Source-specific event kind (e.g., pull_request.opened)',
   external_id VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'External identifier (delivery id, message ts, ...)',
-  payload_json JSON NOT NULL COMMENT 'Raw normalized payload',
+  payload_json JSON NOT NULL CHECK (JSON_VALID(payload_json)) COMMENT 'Raw normalized payload',
   received_at DATETIME NOT NULL COMMENT 'Time the signal was received',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',

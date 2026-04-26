@@ -38,6 +38,9 @@ CREATE TABLE notifications (
   KEY idx_notifications_workspace_id_recipient_archived (workspace_id, recipient_user_id, archived_at, created_at DESC),
   KEY idx_notifications_workspace_id_event_type (workspace_id, event_type),
   KEY idx_notifications_recipient_unread (recipient_user_id, read_at, archived_at, enabled),
+  -- Supports cross-workspace keyset pagination on (created_at DESC, public_id DESC)
+  -- for ListNotificationsForUserKeyset (no workspace_id filter).
+  KEY idx_notifications_user_id_keyset (recipient_user_id, created_at, public_id),
 
   CONSTRAINT fk_notifications_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_notifications_recipient FOREIGN KEY (recipient_user_id) REFERENCES users(id) ON DELETE CASCADE,

@@ -7,11 +7,13 @@
 -- pins WHERE model = :current_model to avoid mixing vector spaces.
 --
 -- Internal plumbing only: never crosses the API boundary, so no
--- public_id / workspace_id columns. Workspace scoping is reached via
--- the FK to tasks(id) (ON DELETE CASCADE).
+-- public_id column. workspace_id is denormalized from tasks for
+-- workspace-scoped pruning / filtering without a JOIN; cascade is
+-- still anchored on the FK to tasks(id).
 -- ====================================
 CREATE TABLE task_embeddings (
   task_id      INT UNSIGNED NOT NULL COMMENT 'Internal FK to tasks.id',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Denormalized from tasks.workspace_id for scoped queries (no FK; cascade via fk_task_embeddings_task)',
   model        VARCHAR(64)  NOT NULL COMMENT 'Embedding model key, e.g. mock-768',
   dim          SMALLINT UNSIGNED NOT NULL COMMENT 'Vector dimensionality (redundant with type today)',
   vector       VECTOR(768)  NOT NULL COMMENT 'L2-normalized embedding vector',
@@ -21,6 +23,7 @@ CREATE TABLE task_embeddings (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
   PRIMARY KEY (task_id, model),
+  KEY idx_task_embeddings_workspace_id (workspace_id, task_id),
   INDEX idx_task_embeddings_model_embedded_at (model, embedded_at),
 
   CONSTRAINT fk_task_embeddings_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE

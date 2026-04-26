@@ -847,6 +847,9 @@ CREATE TABLE comments (
   UNIQUE KEY uniq_comments_public_id (public_id),
   KEY idx_comments_workspace_id_task_id (workspace_id, task_id),
   KEY idx_comments_workspace_id_author_id (workspace_id, author_id),
+  -- Supports keyset pagination on (created_at DESC, public_id DESC) for
+  -- ListCommentsForTaskKeyset.
+  KEY idx_comments_task_id_keyset (task_id, created_at, public_id),
   FULLTEXT KEY ft_comments_body (body),
 
   CONSTRAINT fk_comments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -903,7 +906,7 @@ CREATE TABLE events (
   actor_user_id INT UNSIGNED NULL COMMENT 'Acting user.id (null for system/bot actions)',
 
   type VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Event type (e.g., task.created, signal.attached)',
-  payload_json JSON NOT NULL COMMENT 'Event payload',
+  payload_json JSON NOT NULL CHECK (JSON_VALID(payload_json)) COMMENT 'Event payload',
   occurred_at DATETIME NOT NULL COMMENT 'Logical time of the event (second precision; ties broken by id)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
@@ -1405,6 +1408,9 @@ CREATE TABLE notifications (
   KEY idx_notifications_workspace_id_recipient_archived (workspace_id, recipient_user_id, archived_at, created_at DESC),
   KEY idx_notifications_workspace_id_event_type (workspace_id, event_type),
   KEY idx_notifications_recipient_unread (recipient_user_id, read_at, archived_at, enabled),
+  -- Supports cross-workspace keyset pagination on (created_at DESC, public_id DESC)
+  -- for ListNotificationsForUserKeyset (no workspace_id filter).
+  KEY idx_notifications_user_id_keyset (recipient_user_id, created_at, public_id),
 
   CONSTRAINT fk_notifications_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_notifications_recipient FOREIGN KEY (recipient_user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -1734,7 +1740,7 @@ CREATE TABLE signals (
   source ENUM('manual','github','slack','email','google','webhook') NOT NULL COMMENT 'Originating channel',
   kind VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Source-specific event kind (e.g., pull_request.opened)',
   external_id VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'External identifier (delivery id, message ts, ...)',
-  payload_json JSON NOT NULL COMMENT 'Raw normalized payload',
+  payload_json JSON NOT NULL CHECK (JSON_VALID(payload_json)) COMMENT 'Raw normalized payload',
   received_at DATETIME NOT NULL COMMENT 'Time the signal was received',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
@@ -1894,11 +1900,13 @@ CREATE TABLE task_description_versions (
 -- pins WHERE model = :current_model to avoid mixing vector spaces.
 --
 -- Internal plumbing only: never crosses the API boundary, so no
--- public_id / workspace_id columns. Workspace scoping is reached via
--- the FK to tasks(id) (ON DELETE CASCADE).
+-- public_id column. workspace_id is denormalized from tasks for
+-- workspace-scoped pruning / filtering without a JOIN; cascade is
+-- still anchored on the FK to tasks(id).
 -- ====================================
 CREATE TABLE task_embeddings (
   task_id      INT UNSIGNED NOT NULL COMMENT 'Internal FK to tasks.id',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Denormalized from tasks.workspace_id for scoped queries (no FK; cascade via fk_task_embeddings_task)',
   model        VARCHAR(64)  NOT NULL COMMENT 'Embedding model key, e.g. mock-768',
   dim          SMALLINT UNSIGNED NOT NULL COMMENT 'Vector dimensionality (redundant with type today)',
   vector       VECTOR(768)  NOT NULL COMMENT 'L2-normalized embedding vector',
@@ -1908,6 +1916,7 @@ CREATE TABLE task_embeddings (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
   PRIMARY KEY (task_id, model),
+  KEY idx_task_embeddings_workspace_id (workspace_id, task_id),
   INDEX idx_task_embeddings_model_embedded_at (model, embedded_at),
 
   CONSTRAINT fk_task_embeddings_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
@@ -2013,6 +2022,9 @@ CREATE TABLE tasks (
   UNIQUE KEY uniq_tasks_project_id_task_number (project_id, task_number),
   KEY idx_tasks_workspace_id_archived_at (workspace_id, archived_at),
   KEY idx_tasks_parent_task_id (parent_task_id),
+  -- Supports keyset pagination on (created_at DESC, public_id DESC) for
+  -- ListTasksForWorkspaceKeyset / ListTasksForProjectKeyset / ListMyTasksKeyset.
+  KEY idx_tasks_workspace_id_keyset (workspace_id, created_at, public_id),
   FULLTEXT KEY ft_tasks_title_description (title, description),
 
   CONSTRAINT fk_tasks_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -2296,7 +2308,7 @@ CREATE TABLE webhook_deliveries (
 
   event_type VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'The event that triggered this delivery',
   event_public_id BINARY(16) NULL COMMENT 'public_id of the source event',
-  payload_json JSON NOT NULL COMMENT 'The JSON payload that was/will be sent',
+  payload_json JSON NOT NULL CHECK (JSON_VALID(payload_json)) COMMENT 'The JSON payload that was/will be sent',
   status ENUM('pending','delivering','delivered','failed','dead') NOT NULL DEFAULT 'pending' COMMENT 'Delivery state',
   http_status SMALLINT UNSIGNED NULL COMMENT 'HTTP response status from the target',
   response_body TEXT NULL COMMENT 'Truncated response body (first 4KB) for debugging',
@@ -2454,7 +2466,6 @@ DROP VIEW IF EXISTS `v_audit_recent`;
 DROP VIEW IF EXISTS `v_inbox`;
 DROP VIEW IF EXISTS `v_instance_audit_logs`;
 DROP VIEW IF EXISTS `v_my_tasks`;
-DROP VIEW IF EXISTS `v_project_stats`;
 DROP VIEW IF EXISTS `v_projects`;
 DROP VIEW IF EXISTS `v_task_detail`;
 DROP VIEW IF EXISTS `v_task_list_archived`;
@@ -2656,29 +2667,6 @@ INNER JOIN workspaces w
   ON w.id = t.workspace_id AND w.enabled = TRUE
 WHERE a.enabled = TRUE;
 
--- >>> v_project_stats.sql
--- v_project_stats
--- Aggregated task counts per project, grouped by derived_state.
-CREATE OR REPLACE VIEW v_project_stats AS
-SELECT
-  p.workspace_id,
-  p.public_id,
-  p.name,
-  COUNT(t.id) AS task_count,
-  SUM(CASE WHEN t.derived_state = 'open' THEN 1 ELSE 0 END) AS open_count,
-  SUM(CASE WHEN t.derived_state = 'waiting' THEN 1 ELSE 0 END) AS waiting_count,
-  SUM(CASE WHEN t.derived_state = 'review' THEN 1 ELSE 0 END) AS review_count,
-  SUM(CASE WHEN t.derived_state = 'done' THEN 1 ELSE 0 END) AS done_count,
-  SUM(CASE WHEN t.derived_state = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_count,
-  MAX(t.updated_at) AS last_task_updated_at
-FROM projects p
-LEFT JOIN tasks t
-  ON t.project_id = p.id AND t.enabled = TRUE
-INNER JOIN workspaces w
-  ON w.id = p.workspace_id AND w.enabled = TRUE
-WHERE p.enabled = TRUE
-GROUP BY p.workspace_id, p.public_id, p.name;
-
 -- >>> v_projects.sql
 -- v_projects
 -- Project listing with basic metadata. Workspace-scoped.
@@ -2845,6 +2833,37 @@ INNER JOIN users u
 INNER JOIN workspaces w
   ON w.id = wm.workspace_id AND w.enabled = TRUE
 WHERE wm.enabled = TRUE;
+
+DROP TRIGGER IF EXISTS `tasks_derived_state_guard`;
+
+-- >>> tasks_derived_state_guard.sql
+-- ====================================
+-- trg_tasks_derived_state_guard
+-- Enforces the convention that tasks.derived_state is computed from
+-- constraints + events and may only be mutated by the events engine.
+-- Any non-engine UPDATE that changes derived_state is rejected with
+-- SQLSTATE '45000'.
+--
+-- The events engine (apps/flow-api/internal/events/...) opts in by
+-- setting the session variable @nf_derived_state_engine = 1 prior to
+-- its UPDATE; a non-NULL value bypasses the guard for that session.
+-- Setting the variable back to NULL (or opening a new connection) re-
+-- arms the guard.
+-- ====================================
+DELIMITER $$
+
+CREATE TRIGGER trg_tasks_derived_state_guard
+BEFORE UPDATE ON tasks
+FOR EACH ROW
+BEGIN
+  IF NEW.derived_state <> OLD.derived_state
+     AND @nf_derived_state_engine IS NULL THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'derived_state mutation must go through the events engine';
+  END IF;
+END$$
+
+DELIMITER ;
 
 SET UNIQUE_CHECKS = 1;
 SET FOREIGN_KEY_CHECKS = 1;

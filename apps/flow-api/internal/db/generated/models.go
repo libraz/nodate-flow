@@ -3573,6 +3573,8 @@ type TaskDescriptionVersion struct {
 type TaskEmbedding struct {
 	// Internal FK to tasks.id
 	TaskID uint32 `json:"-"`
+	// Denormalized from tasks.workspace_id for scoped queries (no FK; cascade via fk_task_embeddings_task)
+	WorkspaceID uint32 `json:"-"`
 	// Embedding model key, e.g. mock-768
 	Model string `json:"model"`
 	// Vector dimensionality (redundant with type today)
@@ -3960,19 +3962,6 @@ type VProject struct {
 	SortWeight       int32          `json:"sortWeight"`
 	UpdatedAt        sql.NullTime   `json:"updatedAt"`
 	CreatedAt        time.Time      `json:"createdAt"`
-}
-
-type VProjectStat struct {
-	WorkspaceID       uint32         `json:"-"`
-	PublicID          types.PublicID `json:"publicId"`
-	Name              string         `json:"name"`
-	TaskCount         int64          `json:"taskCount"`
-	OpenCount         interface{}    `json:"openCount"`
-	WaitingCount      interface{}    `json:"waitingCount"`
-	ReviewCount       interface{}    `json:"reviewCount"`
-	DoneCount         interface{}    `json:"doneCount"`
-	CancelledCount    interface{}    `json:"cancelledCount"`
-	LastTaskUpdatedAt interface{}    `json:"lastTaskUpdatedAt"`
 }
 
 type VTaskDetail struct {

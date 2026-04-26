@@ -517,6 +517,15 @@ type Querier interface {
 	ListAiInvocationsForWorkspace(ctx context.Context, arg ListAiInvocationsForWorkspaceParams) ([]ListAiInvocationsForWorkspaceRow, error)
 	// List archived tasks via v_task_list_archived.
 	ListArchivedTasksForWorkspace(ctx context.Context, arg ListArchivedTasksForWorkspaceParams) ([]ListArchivedTasksForWorkspaceRow, error)
+	// Keyset-paginated variant of ListArchivedTasksForWorkspace.
+	//
+	// Cursor encoding: pass the (archived_at, public_id) tuple from the
+	// LAST row of the previous page. First page passes NULL for both
+	// cursor_archived_at and cursor_public_id. ORDER BY (archived_at DESC,
+	// public_id DESC) matches the OFFSET variant; archived_at + public_id
+	// is monotonically unique on this projection because v_task_list_archived
+	// only emits rows with archived_at IS NOT NULL.
+	ListArchivedTasksForWorkspaceKeyset(ctx context.Context, arg ListArchivedTasksForWorkspaceKeysetParams) ([]ListArchivedTasksForWorkspaceKeysetRow, error)
 	// List attachments on a task with uploader display fields.
 	ListAttachmentsForTask(ctx context.Context, arg ListAttachmentsForTaskParams) ([]ListAttachmentsForTaskRow, error)
 	// ============================================================================
@@ -538,8 +547,28 @@ type Querier interface {
 	// List existing child tasks for a given parent task. Used by step
 	// decomposition to avoid suggesting duplicates of already-created steps.
 	ListChildTasksByParentID(ctx context.Context, arg ListChildTasksByParentIDParams) ([]ListChildTasksByParentIDRow, error)
+	// Keyset-paginated variant of ListChildTasksByParentID.
+	//
+	// Cursor encoding: pass the (created_at, public_id) tuple from the LAST
+	// row of the previous page. First page passes NULL for both
+	// cursor_created_at and cursor_public_id. ORDER BY (created_at DESC,
+	// public_id DESC) — note this is DESC where the OFFSET variant is ASC,
+	// chosen so cursor semantics match the rest of the keyset family
+	// ("newer than last page" = strictly less than the cursor tuple).
+	ListChildTasksByParentIDKeyset(ctx context.Context, arg ListChildTasksByParentIDKeysetParams) ([]ListChildTasksByParentIDKeysetRow, error)
 	// List comments on a task joined with author display fields.
 	ListCommentsForTask(ctx context.Context, arg ListCommentsForTaskParams) ([]ListCommentsForTaskRow, error)
+	// Keyset-paginated variant of ListCommentsForTask.
+	//
+	// Cursor encoding: pass the (created_at, public_id) tuple from the LAST
+	// row of the previous page. First page passes NULL for both
+	// cursor_created_at and cursor_public_id. ORDER BY (created_at DESC,
+	// public_id DESC) — note this reverses the OFFSET variant's ASC order
+	// so the cursor semantics match the rest of the keyset family. UI
+	// consumers that want oldest-first must reverse the page client-side.
+	//
+	// Index used: idx_comments_task_id_keyset (task_id, created_at, public_id).
+	ListCommentsForTaskKeyset(ctx context.Context, arg ListCommentsForTaskKeysetParams) ([]ListCommentsForTaskKeysetRow, error)
 	// List enabled integrations whose access token will expire before
 	// the given cutoff AND still have a stored refresh token. Used by
 	// the background token refresher.
@@ -605,6 +634,22 @@ type Querier interface {
 	// GET /me/tasks to power the cross-workspace "Today" / Calendar views in
 	// the web client without fanning out one request per workspace.
 	ListMyTasksGlobal(ctx context.Context, arg ListMyTasksGlobalParams) ([]ListMyTasksGlobalRow, error)
+	// Keyset-paginated cross-workspace variant of ListMyTasksGlobal.
+	//
+	// Cursor encoding: pass the (created_at, public_id) tuple from the LAST
+	// row of the previous page. First page passes NULL for both
+	// cursor_created_at and cursor_public_id. ORDER BY (created_at DESC,
+	// public_id DESC) only.
+	ListMyTasksGlobalKeyset(ctx context.Context, arg ListMyTasksGlobalKeysetParams) ([]ListMyTasksGlobalKeysetRow, error)
+	// Keyset-paginated variant of ListMyTasks.
+	//
+	// Cursor encoding: pass the (created_at, public_id) tuple from the LAST
+	// row of the previous page. First page passes NULL for both
+	// cursor_created_at and cursor_public_id. ORDER BY (created_at DESC,
+	// public_id DESC) only — priority / due_on are NOT considered, so the
+	// tuple comparison is monotonic. Callers that need priority-aware
+	// ordering must keep using the OFFSET variant.
+	ListMyTasksKeyset(ctx context.Context, arg ListMyTasksKeysetParams) ([]ListMyTasksKeysetRow, error)
 	// Cross-workspace variant scoped to tasks whose due_on falls inside the
 	// requested [from, to] inclusive date range. Backs the unified flow-web
 	// calendar: combined with /me/calendar-events it gives a single round-trip
@@ -612,13 +657,52 @@ type Querier interface {
 	// Undated tasks are excluded; use ListMyTasksGlobal for the planning
 	// bucket.
 	ListMyTasksWithDates(ctx context.Context, arg ListMyTasksWithDatesParams) ([]ListMyTasksWithDatesRow, error)
+	// Keyset-paginated variant of ListMyTasksWithDates.
+	//
+	// Cursor encoding: pass the (created_at, public_id) tuple from the LAST
+	// row of the previous page. First page passes NULL for both
+	// cursor_created_at and cursor_public_id. ORDER BY (created_at DESC,
+	// public_id DESC) — note this differs from the OFFSET variant which
+	// orders by due_on first; the keyset cursor must use a monotonic key,
+	// and created_at + public_id is uniquely ordered. Callers that need
+	// due_on ordering must keep using the OFFSET variant.
+	ListMyTasksWithDatesKeyset(ctx context.Context, arg ListMyTasksWithDatesKeysetParams) ([]ListMyTasksWithDatesKeysetRow, error)
 	// List all notification preferences for a user in a workspace.
 	ListNotificationPreferencesForUser(ctx context.Context, arg ListNotificationPreferencesForUserParams) ([]ListNotificationPreferencesForUserRow, error)
 	// List notifications for a user across all their workspaces, ordered newest first.
 	// Excludes archived and disabled notifications.
 	ListNotificationsForUser(ctx context.Context, arg ListNotificationsForUserParams) ([]ListNotificationsForUserRow, error)
+	// Keyset-paginated variant of ListNotificationsForUser.
+	//
+	// Cursor encoding: pass the (created_at, public_id) tuple from the LAST
+	// row of the previous page. First page passes NULL for both
+	// cursor_created_at and cursor_public_id. ORDER BY (created_at DESC,
+	// public_id DESC) — the OFFSET variant orders by id DESC as the
+	// tiebreaker, but id is internal-only so we use public_id DESC for
+	// the keyset cursor (UUID v7 is monotonic so still produces a stable
+	// newest-first order).
+	//
+	// read_filter: pass 'all' to include both read and unread, 'unread' for
+	// only unread (read_at IS NULL), 'read' for only read (read_at IS NOT NULL).
+	//
+	// Index used: idx_notifications_user_id_keyset
+	// (recipient_user_id, created_at, public_id).
+	ListNotificationsForUserKeyset(ctx context.Context, arg ListNotificationsForUserKeysetParams) ([]ListNotificationsForUserKeysetRow, error)
 	// List notifications for a user within a specific workspace.
 	ListNotificationsForWorkspace(ctx context.Context, arg ListNotificationsForWorkspaceParams) ([]ListNotificationsForWorkspaceRow, error)
+	// Keyset-paginated variant of ListNotificationsForWorkspace.
+	//
+	// Cursor encoding: pass the (created_at, public_id) tuple from the LAST
+	// row of the previous page. First page passes NULL for both
+	// cursor_created_at and cursor_public_id. ORDER BY (created_at DESC,
+	// public_id DESC).
+	//
+	// read_filter: pass 'all' to include both read and unread, 'unread' for
+	// only unread (read_at IS NULL), 'read' for only read (read_at IS NOT NULL).
+	//
+	// Uses the existing idx_notifications_workspace_id_recipient_read index
+	// (workspace_id, recipient_user_id, read_at, created_at DESC).
+	ListNotificationsForWorkspaceKeyset(ctx context.Context, arg ListNotificationsForWorkspaceKeysetParams) ([]ListNotificationsForWorkspaceKeysetRow, error)
 	// List every enabled non-paused agent whose event_trigger_types
 	// contains the given event kind. Driven by the eventbus notify hook
 	// so the fan-out from a single eventbus.Append to N agents is one
@@ -679,10 +763,35 @@ type Querier interface {
 	ListTaskLabels(ctx context.Context, arg ListTaskLabelsParams) ([]ListTaskLabelsRow, error)
 	// List tasks in a project via v_task_list with window-function pagination.
 	ListTasksForProject(ctx context.Context, arg ListTasksForProjectParams) ([]ListTasksForProjectRow, error)
+	// Keyset-paginated variant of ListTasksForProject.
+	//
+	// Cursor encoding: the caller passes the (created_at, public_id) tuple of
+	// the LAST row from the previous page. The first page must pass NULL for
+	// both cursor_created_at and cursor_public_id; the IS NULL short-circuit
+	// yields the newest rows. ORDER BY is intentionally simpler than the
+	// OFFSET-side variant (created_at DESC, public_id DESC only) so the
+	// (created_at, public_id) tuple is monotonic and uniquely identifies a
+	// cursor position. Sort weight / priority / due_on are NOT considered;
+	// callers that need those orderings must keep using the OFFSET variant.
+	//
+	// Index used: idx_tasks_workspace_id_keyset (workspace_id, created_at, public_id).
+	ListTasksForProjectKeyset(ctx context.Context, arg ListTasksForProjectKeysetParams) ([]ListTasksForProjectKeysetRow, error)
 	// List tasks belonging to a timebox with pagination.
 	ListTasksForTimebox(ctx context.Context, arg ListTasksForTimeboxParams) ([]ListTasksForTimeboxRow, error)
 	// List tasks across an entire workspace via v_task_list.
 	ListTasksForWorkspace(ctx context.Context, arg ListTasksForWorkspaceParams) ([]ListTasksForWorkspaceRow, error)
+	// Keyset-paginated variant of ListTasksForWorkspace.
+	//
+	// Cursor encoding: pass the (created_at, public_id) tuple from the LAST
+	// row of the previous page. First page passes NULL for both
+	// cursor_created_at and cursor_public_id. ORDER BY (created_at DESC,
+	// public_id DESC) is monotonic so the tuple comparison uniquely
+	// identifies a cursor position. The optional state_filter argument
+	// restricts results to a single derived_state when non-empty; pass an
+	// empty string to skip the filter.
+	//
+	// Index used: idx_tasks_workspace_id_keyset (workspace_id, created_at, public_id).
+	ListTasksForWorkspaceKeyset(ctx context.Context, arg ListTasksForWorkspaceKeysetParams) ([]ListTasksForWorkspaceKeysetRow, error)
 	// ============================================================================
 	// smart-create queries
 	// Support LLM-powered task creation: retrieve similar tasks with their

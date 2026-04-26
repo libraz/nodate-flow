@@ -79,6 +79,50 @@ WHERE v.workspace_id = ?
 ORDER BY v.sort_weight ASC, v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
 
+-- name: ListTasksForProjectKeyset :many
+-- Keyset-paginated variant of ListTasksForProject.
+--
+-- Cursor encoding: the caller passes the (created_at, public_id) tuple of
+-- the LAST row from the previous page. The first page must pass NULL for
+-- both cursor_created_at and cursor_public_id; the IS NULL short-circuit
+-- yields the newest rows. ORDER BY is intentionally simpler than the
+-- OFFSET-side variant (created_at DESC, public_id DESC only) so the
+-- (created_at, public_id) tuple is monotonic and uniquely identifies a
+-- cursor position. Sort weight / priority / due_on are NOT considered;
+-- callers that need those orderings must keep using the OFFSET variant.
+--
+-- Index used: idx_tasks_workspace_id_keyset (workspace_id, created_at, public_id).
+SELECT
+  v.public_id,
+  v.project_public_id,
+  v.project_name,
+  v.parent_task_public_id,
+  v.title,
+  v.visibility,
+  v.derived_state,
+  v.priority,
+  v.due_on,
+  v.started_on,
+  v.completed_at,
+  v.project_identifier,
+  v.task_number,
+  v.archived_at,
+  v.label_ids,
+  v.sort_weight,
+  v.updated_at,
+  v.created_at,
+  v.primary_assignee_public_id,
+  v.assignee_count
+FROM v_task_list v
+WHERE v.workspace_id = ?
+  AND v.project_public_id = ?
+  AND (sqlc.narg(cursor_created_at) IS NULL
+       OR v.created_at < sqlc.narg(cursor_created_at)
+       OR (v.created_at = sqlc.narg(cursor_created_at)
+           AND v.public_id < sqlc.narg(cursor_public_id)))
+ORDER BY v.created_at DESC, v.public_id DESC
+LIMIT ?;
+
 -- name: ListTasksForWorkspace :many
 -- List tasks across an entire workspace via v_task_list.
 SELECT
@@ -107,6 +151,49 @@ FROM v_task_list v
 WHERE v.workspace_id = ?
 ORDER BY v.sort_weight ASC, v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
+
+-- name: ListTasksForWorkspaceKeyset :many
+-- Keyset-paginated variant of ListTasksForWorkspace.
+--
+-- Cursor encoding: pass the (created_at, public_id) tuple from the LAST
+-- row of the previous page. First page passes NULL for both
+-- cursor_created_at and cursor_public_id. ORDER BY (created_at DESC,
+-- public_id DESC) is monotonic so the tuple comparison uniquely
+-- identifies a cursor position. The optional state_filter argument
+-- restricts results to a single derived_state when non-empty; pass an
+-- empty string to skip the filter.
+--
+-- Index used: idx_tasks_workspace_id_keyset (workspace_id, created_at, public_id).
+SELECT
+  v.public_id,
+  v.project_public_id,
+  v.project_name,
+  v.parent_task_public_id,
+  v.title,
+  v.visibility,
+  v.derived_state,
+  v.priority,
+  v.due_on,
+  v.started_on,
+  v.completed_at,
+  v.project_identifier,
+  v.task_number,
+  v.archived_at,
+  v.label_ids,
+  v.sort_weight,
+  v.updated_at,
+  v.created_at,
+  v.primary_assignee_public_id,
+  v.assignee_count
+FROM v_task_list v
+WHERE v.workspace_id = ?
+  AND (sqlc.arg(state_filter) = '' OR v.derived_state = sqlc.arg(state_filter))
+  AND (sqlc.narg(cursor_created_at) IS NULL
+       OR v.created_at < sqlc.narg(cursor_created_at)
+       OR (v.created_at = sqlc.narg(cursor_created_at)
+           AND v.public_id < sqlc.narg(cursor_public_id)))
+ORDER BY v.created_at DESC, v.public_id DESC
+LIMIT ?;
 
 -- name: UpdateTask :exec
 -- Update mutable task fields. derived_state is intentionally NOT writable.
@@ -169,6 +256,36 @@ WHERE v.workspace_id = ?
 ORDER BY v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
 
+-- name: ListMyTasksKeyset :many
+-- Keyset-paginated variant of ListMyTasks.
+--
+-- Cursor encoding: pass the (created_at, public_id) tuple from the LAST
+-- row of the previous page. First page passes NULL for both
+-- cursor_created_at and cursor_public_id. ORDER BY (created_at DESC,
+-- public_id DESC) only — priority / due_on are NOT considered, so the
+-- tuple comparison is monotonic. Callers that need priority-aware
+-- ordering must keep using the OFFSET variant.
+SELECT
+  v.public_id,
+  v.project_public_id,
+  v.project_name,
+  v.title,
+  v.derived_state,
+  v.priority,
+  v.due_on,
+  v.actor_role,
+  v.updated_at,
+  v.created_at
+FROM v_my_tasks v
+WHERE v.workspace_id = ?
+  AND v.user_public_id = ?
+  AND (sqlc.narg(cursor_created_at) IS NULL
+       OR v.created_at < sqlc.narg(cursor_created_at)
+       OR (v.created_at = sqlc.narg(cursor_created_at)
+           AND v.public_id < sqlc.narg(cursor_public_id)))
+ORDER BY v.created_at DESC, v.public_id DESC
+LIMIT ?;
+
 -- name: ListMyTasksGlobal :many
 -- Cross-workspace variant: tasks where the given user is attached as an
 -- actor across every workspace they belong to, joined with the workspace
@@ -196,6 +313,38 @@ INNER JOIN workspaces w
 WHERE v.user_public_id = ?
 ORDER BY v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
+
+-- name: ListMyTasksGlobalKeyset :many
+-- Keyset-paginated cross-workspace variant of ListMyTasksGlobal.
+--
+-- Cursor encoding: pass the (created_at, public_id) tuple from the LAST
+-- row of the previous page. First page passes NULL for both
+-- cursor_created_at and cursor_public_id. ORDER BY (created_at DESC,
+-- public_id DESC) only.
+SELECT
+  v.public_id,
+  w.public_id AS workspace_public_id,
+  w.name AS workspace_name,
+  v.project_public_id,
+  v.project_name,
+  v.title,
+  v.derived_state,
+  v.priority,
+  v.due_on,
+  v.started_on,
+  v.actor_role,
+  v.updated_at,
+  v.created_at
+FROM v_my_tasks v
+INNER JOIN workspaces w
+  ON w.id = v.workspace_id AND w.enabled = TRUE
+WHERE v.user_public_id = ?
+  AND (sqlc.narg(cursor_created_at) IS NULL
+       OR v.created_at < sqlc.narg(cursor_created_at)
+       OR (v.created_at = sqlc.narg(cursor_created_at)
+           AND v.public_id < sqlc.narg(cursor_public_id)))
+ORDER BY v.created_at DESC, v.public_id DESC
+LIMIT ?;
 
 -- name: ListMyTasksWithDates :many
 -- Cross-workspace variant scoped to tasks whose due_on falls inside the
@@ -232,6 +381,43 @@ ORDER BY
   v.public_id DESC
 LIMIT ? OFFSET ?;
 
+-- name: ListMyTasksWithDatesKeyset :many
+-- Keyset-paginated variant of ListMyTasksWithDates.
+--
+-- Cursor encoding: pass the (created_at, public_id) tuple from the LAST
+-- row of the previous page. First page passes NULL for both
+-- cursor_created_at and cursor_public_id. ORDER BY (created_at DESC,
+-- public_id DESC) — note this differs from the OFFSET variant which
+-- orders by due_on first; the keyset cursor must use a monotonic key,
+-- and created_at + public_id is uniquely ordered. Callers that need
+-- due_on ordering must keep using the OFFSET variant.
+SELECT
+  v.public_id,
+  w.public_id AS workspace_public_id,
+  w.name AS workspace_name,
+  v.project_public_id,
+  v.project_name,
+  v.title,
+  v.derived_state,
+  v.priority,
+  v.due_on,
+  v.started_on,
+  v.actor_role,
+  v.updated_at,
+  v.created_at
+FROM v_my_tasks v
+INNER JOIN workspaces w
+  ON w.id = v.workspace_id AND w.enabled = TRUE
+WHERE v.user_public_id = ?
+  AND v.due_on IS NOT NULL
+  AND v.due_on BETWEEN ? AND ?
+  AND (sqlc.narg(cursor_created_at) IS NULL
+       OR v.created_at < sqlc.narg(cursor_created_at)
+       OR (v.created_at = sqlc.narg(cursor_created_at)
+           AND v.public_id < sqlc.narg(cursor_public_id)))
+ORDER BY v.created_at DESC, v.public_id DESC
+LIMIT ?;
+
 -- name: ListChildTasksByParentID :many
 -- List existing child tasks for a given parent task. Used by step
 -- decomposition to avoid suggesting duplicates of already-created steps.
@@ -248,6 +434,34 @@ WHERE t.workspace_id = ?
   AND t.enabled = TRUE
 ORDER BY t.created_at ASC
 LIMIT 100;
+
+-- name: ListChildTasksByParentIDKeyset :many
+-- Keyset-paginated variant of ListChildTasksByParentID.
+--
+-- Cursor encoding: pass the (created_at, public_id) tuple from the LAST
+-- row of the previous page. First page passes NULL for both
+-- cursor_created_at and cursor_public_id. ORDER BY (created_at DESC,
+-- public_id DESC) — note this is DESC where the OFFSET variant is ASC,
+-- chosen so cursor semantics match the rest of the keyset family
+-- ("newer than last page" = strictly less than the cursor tuple).
+SELECT
+  t.id,
+  t.public_id,
+  t.title,
+  t.description,
+  t.priority,
+  t.derived_state,
+  t.created_at
+FROM tasks t
+WHERE t.workspace_id = ?
+  AND t.parent_task_id = ?
+  AND t.enabled = TRUE
+  AND (sqlc.narg(cursor_created_at) IS NULL
+       OR t.created_at < sqlc.narg(cursor_created_at)
+       OR (t.created_at = sqlc.narg(cursor_created_at)
+           AND t.public_id < sqlc.narg(cursor_public_id)))
+ORDER BY t.created_at DESC, t.public_id DESC
+LIMIT ?;
 
 -- name: ArchiveTask :exec
 -- Set archived_at on a task.
@@ -295,6 +509,45 @@ FROM v_task_list_archived v
 WHERE v.workspace_id = ?
 ORDER BY v.archived_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
+
+-- name: ListArchivedTasksForWorkspaceKeyset :many
+-- Keyset-paginated variant of ListArchivedTasksForWorkspace.
+--
+-- Cursor encoding: pass the (archived_at, public_id) tuple from the
+-- LAST row of the previous page. First page passes NULL for both
+-- cursor_archived_at and cursor_public_id. ORDER BY (archived_at DESC,
+-- public_id DESC) matches the OFFSET variant; archived_at + public_id
+-- is monotonically unique on this projection because v_task_list_archived
+-- only emits rows with archived_at IS NOT NULL.
+SELECT
+  v.public_id,
+  v.project_public_id,
+  v.project_name,
+  v.project_identifier,
+  v.task_number,
+  v.parent_task_public_id,
+  v.title,
+  v.visibility,
+  v.derived_state,
+  v.priority,
+  v.due_on,
+  v.started_on,
+  v.completed_at,
+  v.archived_at,
+  v.sort_weight,
+  v.updated_at,
+  v.created_at,
+  v.primary_assignee_public_id,
+  v.assignee_count,
+  v.label_ids
+FROM v_task_list_archived v
+WHERE v.workspace_id = ?
+  AND (sqlc.narg(cursor_archived_at) IS NULL
+       OR v.archived_at < sqlc.narg(cursor_archived_at)
+       OR (v.archived_at = sqlc.narg(cursor_archived_at)
+           AND v.public_id < sqlc.narg(cursor_public_id)))
+ORDER BY v.archived_at DESC, v.public_id DESC
+LIMIT ?;
 
 -- name: AssignTaskNumber :one
 -- Allocate the next task number for a project. Must be called inside a

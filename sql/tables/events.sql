@@ -12,7 +12,7 @@ CREATE TABLE events (
   actor_user_id INT UNSIGNED NULL COMMENT 'Acting user.id (null for system/bot actions)',
 
   type VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Event type (e.g., task.created, signal.attached)',
-  payload_json JSON NOT NULL COMMENT 'Event payload',
+  payload_json JSON NOT NULL CHECK (JSON_VALID(payload_json)) COMMENT 'Event payload',
   occurred_at DATETIME NOT NULL COMMENT 'Logical time of the event (second precision; ties broken by id)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',

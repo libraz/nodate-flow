@@ -497,6 +497,127 @@ func (q *Queries) ListArchivedTasksForWorkspace(ctx context.Context, arg ListArc
 	return items, nil
 }
 
+const listArchivedTasksForWorkspaceKeyset = `-- name: ListArchivedTasksForWorkspaceKeyset :many
+SELECT
+  v.public_id,
+  v.project_public_id,
+  v.project_name,
+  v.project_identifier,
+  v.task_number,
+  v.parent_task_public_id,
+  v.title,
+  v.visibility,
+  v.derived_state,
+  v.priority,
+  v.due_on,
+  v.started_on,
+  v.completed_at,
+  v.archived_at,
+  v.sort_weight,
+  v.updated_at,
+  v.created_at,
+  v.primary_assignee_public_id,
+  v.assignee_count,
+  v.label_ids
+FROM v_task_list_archived v
+WHERE v.workspace_id = ?
+  AND (? IS NULL
+       OR v.archived_at < ?
+       OR (v.archived_at = ?
+           AND v.public_id < ?))
+ORDER BY v.archived_at DESC, v.public_id DESC
+LIMIT ?
+`
+
+type ListArchivedTasksForWorkspaceKeysetParams struct {
+	WorkspaceID      uint32         `json:"-"`
+	CursorArchivedAt sql.NullTime   `json:"cursorArchivedAt"`
+	CursorPublicID   types.PublicID `json:"cursorPublicId"`
+	Limit            int32          `json:"limit"`
+}
+
+type ListArchivedTasksForWorkspaceKeysetRow struct {
+	PublicID                types.PublicID    `json:"publicId"`
+	ProjectPublicID         []byte            `json:"projectPublicId"`
+	ProjectName             string            `json:"projectName"`
+	ProjectIdentifier       sql.NullString    `json:"projectIdentifier"`
+	TaskNumber              uint32            `json:"taskNumber"`
+	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
+	Title                   string            `json:"title"`
+	Visibility              TasksVisibility   `json:"visibility"`
+	DerivedState            TasksDerivedState `json:"derivedState"`
+	Priority                int32             `json:"priority"`
+	DueOn                   sql.NullTime      `json:"dueOn"`
+	StartedOn               sql.NullTime      `json:"startedOn"`
+	CompletedAt             sql.NullTime      `json:"completedAt"`
+	ArchivedAt              sql.NullTime      `json:"archivedAt"`
+	SortWeight              int32             `json:"sortWeight"`
+	UpdatedAt               sql.NullTime      `json:"updatedAt"`
+	CreatedAt               time.Time         `json:"createdAt"`
+	PrimaryAssigneePublicID interface{}       `json:"primaryAssigneePublicId"`
+	AssigneeCount           int64             `json:"assigneeCount"`
+	LabelIds                sql.NullString    `json:"labelIds"`
+}
+
+// Keyset-paginated variant of ListArchivedTasksForWorkspace.
+//
+// Cursor encoding: pass the (archived_at, public_id) tuple from the
+// LAST row of the previous page. First page passes NULL for both
+// cursor_archived_at and cursor_public_id. ORDER BY (archived_at DESC,
+// public_id DESC) matches the OFFSET variant; archived_at + public_id
+// is monotonically unique on this projection because v_task_list_archived
+// only emits rows with archived_at IS NOT NULL.
+func (q *Queries) ListArchivedTasksForWorkspaceKeyset(ctx context.Context, arg ListArchivedTasksForWorkspaceKeysetParams) ([]ListArchivedTasksForWorkspaceKeysetRow, error) {
+	rows, err := q.db.QueryContext(ctx, listArchivedTasksForWorkspaceKeyset,
+		arg.WorkspaceID,
+		arg.CursorArchivedAt,
+		arg.CursorArchivedAt,
+		arg.CursorArchivedAt,
+		arg.CursorPublicID,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListArchivedTasksForWorkspaceKeysetRow{}
+	for rows.Next() {
+		var i ListArchivedTasksForWorkspaceKeysetRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.ProjectPublicID,
+			&i.ProjectName,
+			&i.ProjectIdentifier,
+			&i.TaskNumber,
+			&i.ParentTaskPublicID,
+			&i.Title,
+			&i.Visibility,
+			&i.DerivedState,
+			&i.Priority,
+			&i.DueOn,
+			&i.StartedOn,
+			&i.CompletedAt,
+			&i.ArchivedAt,
+			&i.SortWeight,
+			&i.UpdatedAt,
+			&i.CreatedAt,
+			&i.PrimaryAssigneePublicID,
+			&i.AssigneeCount,
+			&i.LabelIds,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listChildTasksByParentID = `-- name: ListChildTasksByParentID :many
 SELECT
   t.id,
@@ -545,6 +666,92 @@ func (q *Queries) ListChildTasksByParentID(ctx context.Context, arg ListChildTas
 			&i.Description,
 			&i.Priority,
 			&i.DerivedState,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listChildTasksByParentIDKeyset = `-- name: ListChildTasksByParentIDKeyset :many
+SELECT
+  t.id,
+  t.public_id,
+  t.title,
+  t.description,
+  t.priority,
+  t.derived_state,
+  t.created_at
+FROM tasks t
+WHERE t.workspace_id = ?
+  AND t.parent_task_id = ?
+  AND t.enabled = TRUE
+  AND (? IS NULL
+       OR t.created_at < ?
+       OR (t.created_at = ?
+           AND t.public_id < ?))
+ORDER BY t.created_at DESC, t.public_id DESC
+LIMIT ?
+`
+
+type ListChildTasksByParentIDKeysetParams struct {
+	WorkspaceID     uint32         `json:"-"`
+	ParentTaskID    sql.NullInt32  `json:"-"`
+	CursorCreatedAt sql.NullTime   `json:"cursorCreatedAt"`
+	CursorPublicID  types.PublicID `json:"cursorPublicId"`
+	Limit           int32          `json:"limit"`
+}
+
+type ListChildTasksByParentIDKeysetRow struct {
+	ID           uint32            `json:"-"`
+	PublicID     types.PublicID    `json:"publicId"`
+	Title        string            `json:"title"`
+	Description  sql.NullString    `json:"description"`
+	Priority     int32             `json:"priority"`
+	DerivedState TasksDerivedState `json:"derivedState"`
+	CreatedAt    time.Time         `json:"createdAt"`
+}
+
+// Keyset-paginated variant of ListChildTasksByParentID.
+//
+// Cursor encoding: pass the (created_at, public_id) tuple from the LAST
+// row of the previous page. First page passes NULL for both
+// cursor_created_at and cursor_public_id. ORDER BY (created_at DESC,
+// public_id DESC) — note this is DESC where the OFFSET variant is ASC,
+// chosen so cursor semantics match the rest of the keyset family
+// ("newer than last page" = strictly less than the cursor tuple).
+func (q *Queries) ListChildTasksByParentIDKeyset(ctx context.Context, arg ListChildTasksByParentIDKeysetParams) ([]ListChildTasksByParentIDKeysetRow, error) {
+	rows, err := q.db.QueryContext(ctx, listChildTasksByParentIDKeyset,
+		arg.WorkspaceID,
+		arg.ParentTaskID,
+		arg.CursorCreatedAt,
+		arg.CursorCreatedAt,
+		arg.CursorCreatedAt,
+		arg.CursorPublicID,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListChildTasksByParentIDKeysetRow{}
+	for rows.Next() {
+		var i ListChildTasksByParentIDKeysetRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicID,
+			&i.Title,
+			&i.Description,
+			&i.Priority,
+			&i.DerivedState,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -911,6 +1118,200 @@ func (q *Queries) ListMyTasksGlobal(ctx context.Context, arg ListMyTasksGlobalPa
 	return items, nil
 }
 
+const listMyTasksGlobalKeyset = `-- name: ListMyTasksGlobalKeyset :many
+SELECT
+  v.public_id,
+  w.public_id AS workspace_public_id,
+  w.name AS workspace_name,
+  v.project_public_id,
+  v.project_name,
+  v.title,
+  v.derived_state,
+  v.priority,
+  v.due_on,
+  v.started_on,
+  v.actor_role,
+  v.updated_at,
+  v.created_at
+FROM v_my_tasks v
+INNER JOIN workspaces w
+  ON w.id = v.workspace_id AND w.enabled = TRUE
+WHERE v.user_public_id = ?
+  AND (? IS NULL
+       OR v.created_at < ?
+       OR (v.created_at = ?
+           AND v.public_id < ?))
+ORDER BY v.created_at DESC, v.public_id DESC
+LIMIT ?
+`
+
+type ListMyTasksGlobalKeysetParams struct {
+	UserPublicID    types.PublicID `json:"userPublicId"`
+	CursorCreatedAt sql.NullTime   `json:"cursorCreatedAt"`
+	CursorPublicID  types.PublicID `json:"cursorPublicId"`
+	Limit           int32          `json:"limit"`
+}
+
+type ListMyTasksGlobalKeysetRow struct {
+	PublicID          types.PublicID    `json:"publicId"`
+	WorkspacePublicID types.PublicID    `json:"workspacePublicId"`
+	WorkspaceName     string            `json:"workspaceName"`
+	ProjectPublicID   []byte            `json:"projectPublicId"`
+	ProjectName       string            `json:"projectName"`
+	Title             string            `json:"title"`
+	DerivedState      TasksDerivedState `json:"derivedState"`
+	Priority          int32             `json:"priority"`
+	DueOn             sql.NullTime      `json:"dueOn"`
+	StartedOn         sql.NullTime      `json:"startedOn"`
+	ActorRole         TaskActorsRole    `json:"actorRole"`
+	UpdatedAt         sql.NullTime      `json:"updatedAt"`
+	CreatedAt         time.Time         `json:"createdAt"`
+}
+
+// Keyset-paginated cross-workspace variant of ListMyTasksGlobal.
+//
+// Cursor encoding: pass the (created_at, public_id) tuple from the LAST
+// row of the previous page. First page passes NULL for both
+// cursor_created_at and cursor_public_id. ORDER BY (created_at DESC,
+// public_id DESC) only.
+func (q *Queries) ListMyTasksGlobalKeyset(ctx context.Context, arg ListMyTasksGlobalKeysetParams) ([]ListMyTasksGlobalKeysetRow, error) {
+	rows, err := q.db.QueryContext(ctx, listMyTasksGlobalKeyset,
+		arg.UserPublicID,
+		arg.CursorCreatedAt,
+		arg.CursorCreatedAt,
+		arg.CursorCreatedAt,
+		arg.CursorPublicID,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMyTasksGlobalKeysetRow{}
+	for rows.Next() {
+		var i ListMyTasksGlobalKeysetRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.WorkspacePublicID,
+			&i.WorkspaceName,
+			&i.ProjectPublicID,
+			&i.ProjectName,
+			&i.Title,
+			&i.DerivedState,
+			&i.Priority,
+			&i.DueOn,
+			&i.StartedOn,
+			&i.ActorRole,
+			&i.UpdatedAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMyTasksKeyset = `-- name: ListMyTasksKeyset :many
+SELECT
+  v.public_id,
+  v.project_public_id,
+  v.project_name,
+  v.title,
+  v.derived_state,
+  v.priority,
+  v.due_on,
+  v.actor_role,
+  v.updated_at,
+  v.created_at
+FROM v_my_tasks v
+WHERE v.workspace_id = ?
+  AND v.user_public_id = ?
+  AND (? IS NULL
+       OR v.created_at < ?
+       OR (v.created_at = ?
+           AND v.public_id < ?))
+ORDER BY v.created_at DESC, v.public_id DESC
+LIMIT ?
+`
+
+type ListMyTasksKeysetParams struct {
+	WorkspaceID     uint32         `json:"-"`
+	UserPublicID    types.PublicID `json:"userPublicId"`
+	CursorCreatedAt sql.NullTime   `json:"cursorCreatedAt"`
+	CursorPublicID  types.PublicID `json:"cursorPublicId"`
+	Limit           int32          `json:"limit"`
+}
+
+type ListMyTasksKeysetRow struct {
+	PublicID        types.PublicID    `json:"publicId"`
+	ProjectPublicID []byte            `json:"projectPublicId"`
+	ProjectName     string            `json:"projectName"`
+	Title           string            `json:"title"`
+	DerivedState    TasksDerivedState `json:"derivedState"`
+	Priority        int32             `json:"priority"`
+	DueOn           sql.NullTime      `json:"dueOn"`
+	ActorRole       TaskActorsRole    `json:"actorRole"`
+	UpdatedAt       sql.NullTime      `json:"updatedAt"`
+	CreatedAt       time.Time         `json:"createdAt"`
+}
+
+// Keyset-paginated variant of ListMyTasks.
+//
+// Cursor encoding: pass the (created_at, public_id) tuple from the LAST
+// row of the previous page. First page passes NULL for both
+// cursor_created_at and cursor_public_id. ORDER BY (created_at DESC,
+// public_id DESC) only — priority / due_on are NOT considered, so the
+// tuple comparison is monotonic. Callers that need priority-aware
+// ordering must keep using the OFFSET variant.
+func (q *Queries) ListMyTasksKeyset(ctx context.Context, arg ListMyTasksKeysetParams) ([]ListMyTasksKeysetRow, error) {
+	rows, err := q.db.QueryContext(ctx, listMyTasksKeyset,
+		arg.WorkspaceID,
+		arg.UserPublicID,
+		arg.CursorCreatedAt,
+		arg.CursorCreatedAt,
+		arg.CursorCreatedAt,
+		arg.CursorPublicID,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMyTasksKeysetRow{}
+	for rows.Next() {
+		var i ListMyTasksKeysetRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.ProjectPublicID,
+			&i.ProjectName,
+			&i.Title,
+			&i.DerivedState,
+			&i.Priority,
+			&i.DueOn,
+			&i.ActorRole,
+			&i.UpdatedAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listMyTasksWithDates = `-- name: ListMyTasksWithDates :many
 SELECT
   v.public_id,
@@ -1002,6 +1403,115 @@ func (q *Queries) ListMyTasksWithDates(ctx context.Context, arg ListMyTasksWithD
 			&i.UpdatedAt,
 			&i.CreatedAt,
 			&i.Total,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMyTasksWithDatesKeyset = `-- name: ListMyTasksWithDatesKeyset :many
+SELECT
+  v.public_id,
+  w.public_id AS workspace_public_id,
+  w.name AS workspace_name,
+  v.project_public_id,
+  v.project_name,
+  v.title,
+  v.derived_state,
+  v.priority,
+  v.due_on,
+  v.started_on,
+  v.actor_role,
+  v.updated_at,
+  v.created_at
+FROM v_my_tasks v
+INNER JOIN workspaces w
+  ON w.id = v.workspace_id AND w.enabled = TRUE
+WHERE v.user_public_id = ?
+  AND v.due_on IS NOT NULL
+  AND v.due_on BETWEEN ? AND ?
+  AND (? IS NULL
+       OR v.created_at < ?
+       OR (v.created_at = ?
+           AND v.public_id < ?))
+ORDER BY v.created_at DESC, v.public_id DESC
+LIMIT ?
+`
+
+type ListMyTasksWithDatesKeysetParams struct {
+	UserPublicID    types.PublicID `json:"userPublicId"`
+	FromDueOn       sql.NullTime   `json:"fromDueOn"`
+	ToDueOn         sql.NullTime   `json:"toDueOn"`
+	CursorCreatedAt sql.NullTime   `json:"cursorCreatedAt"`
+	CursorPublicID  types.PublicID `json:"cursorPublicId"`
+	Limit           int32          `json:"limit"`
+}
+
+type ListMyTasksWithDatesKeysetRow struct {
+	PublicID          types.PublicID    `json:"publicId"`
+	WorkspacePublicID types.PublicID    `json:"workspacePublicId"`
+	WorkspaceName     string            `json:"workspaceName"`
+	ProjectPublicID   []byte            `json:"projectPublicId"`
+	ProjectName       string            `json:"projectName"`
+	Title             string            `json:"title"`
+	DerivedState      TasksDerivedState `json:"derivedState"`
+	Priority          int32             `json:"priority"`
+	DueOn             sql.NullTime      `json:"dueOn"`
+	StartedOn         sql.NullTime      `json:"startedOn"`
+	ActorRole         TaskActorsRole    `json:"actorRole"`
+	UpdatedAt         sql.NullTime      `json:"updatedAt"`
+	CreatedAt         time.Time         `json:"createdAt"`
+}
+
+// Keyset-paginated variant of ListMyTasksWithDates.
+//
+// Cursor encoding: pass the (created_at, public_id) tuple from the LAST
+// row of the previous page. First page passes NULL for both
+// cursor_created_at and cursor_public_id. ORDER BY (created_at DESC,
+// public_id DESC) — note this differs from the OFFSET variant which
+// orders by due_on first; the keyset cursor must use a monotonic key,
+// and created_at + public_id is uniquely ordered. Callers that need
+// due_on ordering must keep using the OFFSET variant.
+func (q *Queries) ListMyTasksWithDatesKeyset(ctx context.Context, arg ListMyTasksWithDatesKeysetParams) ([]ListMyTasksWithDatesKeysetRow, error) {
+	rows, err := q.db.QueryContext(ctx, listMyTasksWithDatesKeyset,
+		arg.UserPublicID,
+		arg.FromDueOn,
+		arg.ToDueOn,
+		arg.CursorCreatedAt,
+		arg.CursorCreatedAt,
+		arg.CursorCreatedAt,
+		arg.CursorPublicID,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMyTasksWithDatesKeysetRow{}
+	for rows.Next() {
+		var i ListMyTasksWithDatesKeysetRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.WorkspacePublicID,
+			&i.WorkspaceName,
+			&i.ProjectPublicID,
+			&i.ProjectName,
+			&i.Title,
+			&i.DerivedState,
+			&i.Priority,
+			&i.DueOn,
+			&i.StartedOn,
+			&i.ActorRole,
+			&i.UpdatedAt,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1128,6 +1638,134 @@ func (q *Queries) ListTasksForProject(ctx context.Context, arg ListTasksForProje
 	return items, nil
 }
 
+const listTasksForProjectKeyset = `-- name: ListTasksForProjectKeyset :many
+SELECT
+  v.public_id,
+  v.project_public_id,
+  v.project_name,
+  v.parent_task_public_id,
+  v.title,
+  v.visibility,
+  v.derived_state,
+  v.priority,
+  v.due_on,
+  v.started_on,
+  v.completed_at,
+  v.project_identifier,
+  v.task_number,
+  v.archived_at,
+  v.label_ids,
+  v.sort_weight,
+  v.updated_at,
+  v.created_at,
+  v.primary_assignee_public_id,
+  v.assignee_count
+FROM v_task_list v
+WHERE v.workspace_id = ?
+  AND v.project_public_id = ?
+  AND (? IS NULL
+       OR v.created_at < ?
+       OR (v.created_at = ?
+           AND v.public_id < ?))
+ORDER BY v.created_at DESC, v.public_id DESC
+LIMIT ?
+`
+
+type ListTasksForProjectKeysetParams struct {
+	WorkspaceID     uint32         `json:"-"`
+	ProjectPublicID []byte         `json:"projectPublicId"`
+	CursorCreatedAt sql.NullTime   `json:"cursorCreatedAt"`
+	CursorPublicID  types.PublicID `json:"cursorPublicId"`
+	Limit           int32          `json:"limit"`
+}
+
+type ListTasksForProjectKeysetRow struct {
+	PublicID                types.PublicID    `json:"publicId"`
+	ProjectPublicID         []byte            `json:"projectPublicId"`
+	ProjectName             string            `json:"projectName"`
+	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
+	Title                   string            `json:"title"`
+	Visibility              TasksVisibility   `json:"visibility"`
+	DerivedState            TasksDerivedState `json:"derivedState"`
+	Priority                int32             `json:"priority"`
+	DueOn                   sql.NullTime      `json:"dueOn"`
+	StartedOn               sql.NullTime      `json:"startedOn"`
+	CompletedAt             sql.NullTime      `json:"completedAt"`
+	ProjectIdentifier       sql.NullString    `json:"projectIdentifier"`
+	TaskNumber              uint32            `json:"taskNumber"`
+	ArchivedAt              sql.NullTime      `json:"archivedAt"`
+	LabelIds                sql.NullString    `json:"labelIds"`
+	SortWeight              int32             `json:"sortWeight"`
+	UpdatedAt               sql.NullTime      `json:"updatedAt"`
+	CreatedAt               time.Time         `json:"createdAt"`
+	PrimaryAssigneePublicID interface{}       `json:"primaryAssigneePublicId"`
+	AssigneeCount           int64             `json:"assigneeCount"`
+}
+
+// Keyset-paginated variant of ListTasksForProject.
+//
+// Cursor encoding: the caller passes the (created_at, public_id) tuple of
+// the LAST row from the previous page. The first page must pass NULL for
+// both cursor_created_at and cursor_public_id; the IS NULL short-circuit
+// yields the newest rows. ORDER BY is intentionally simpler than the
+// OFFSET-side variant (created_at DESC, public_id DESC only) so the
+// (created_at, public_id) tuple is monotonic and uniquely identifies a
+// cursor position. Sort weight / priority / due_on are NOT considered;
+// callers that need those orderings must keep using the OFFSET variant.
+//
+// Index used: idx_tasks_workspace_id_keyset (workspace_id, created_at, public_id).
+func (q *Queries) ListTasksForProjectKeyset(ctx context.Context, arg ListTasksForProjectKeysetParams) ([]ListTasksForProjectKeysetRow, error) {
+	rows, err := q.db.QueryContext(ctx, listTasksForProjectKeyset,
+		arg.WorkspaceID,
+		arg.ProjectPublicID,
+		arg.CursorCreatedAt,
+		arg.CursorCreatedAt,
+		arg.CursorCreatedAt,
+		arg.CursorPublicID,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTasksForProjectKeysetRow{}
+	for rows.Next() {
+		var i ListTasksForProjectKeysetRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.ProjectPublicID,
+			&i.ProjectName,
+			&i.ParentTaskPublicID,
+			&i.Title,
+			&i.Visibility,
+			&i.DerivedState,
+			&i.Priority,
+			&i.DueOn,
+			&i.StartedOn,
+			&i.CompletedAt,
+			&i.ProjectIdentifier,
+			&i.TaskNumber,
+			&i.ArchivedAt,
+			&i.LabelIds,
+			&i.SortWeight,
+			&i.UpdatedAt,
+			&i.CreatedAt,
+			&i.PrimaryAssigneePublicID,
+			&i.AssigneeCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTasksForWorkspace = `-- name: ListTasksForWorkspace :many
 SELECT
   v.public_id,
@@ -1219,6 +1857,134 @@ func (q *Queries) ListTasksForWorkspace(ctx context.Context, arg ListTasksForWor
 			&i.PrimaryAssigneePublicID,
 			&i.AssigneeCount,
 			&i.Total,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTasksForWorkspaceKeyset = `-- name: ListTasksForWorkspaceKeyset :many
+SELECT
+  v.public_id,
+  v.project_public_id,
+  v.project_name,
+  v.parent_task_public_id,
+  v.title,
+  v.visibility,
+  v.derived_state,
+  v.priority,
+  v.due_on,
+  v.started_on,
+  v.completed_at,
+  v.project_identifier,
+  v.task_number,
+  v.archived_at,
+  v.label_ids,
+  v.sort_weight,
+  v.updated_at,
+  v.created_at,
+  v.primary_assignee_public_id,
+  v.assignee_count
+FROM v_task_list v
+WHERE v.workspace_id = ?
+  AND (? = '' OR v.derived_state = ?)
+  AND (? IS NULL
+       OR v.created_at < ?
+       OR (v.created_at = ?
+           AND v.public_id < ?))
+ORDER BY v.created_at DESC, v.public_id DESC
+LIMIT ?
+`
+
+type ListTasksForWorkspaceKeysetParams struct {
+	WorkspaceID     uint32            `json:"-"`
+	StateFilter     TasksDerivedState `json:"stateFilter"`
+	CursorCreatedAt sql.NullTime      `json:"cursorCreatedAt"`
+	CursorPublicID  types.PublicID    `json:"cursorPublicId"`
+	Limit           int32             `json:"limit"`
+}
+
+type ListTasksForWorkspaceKeysetRow struct {
+	PublicID                types.PublicID    `json:"publicId"`
+	ProjectPublicID         []byte            `json:"projectPublicId"`
+	ProjectName             string            `json:"projectName"`
+	ParentTaskPublicID      sql.NullString    `json:"parentTaskPublicId"`
+	Title                   string            `json:"title"`
+	Visibility              TasksVisibility   `json:"visibility"`
+	DerivedState            TasksDerivedState `json:"derivedState"`
+	Priority                int32             `json:"priority"`
+	DueOn                   sql.NullTime      `json:"dueOn"`
+	StartedOn               sql.NullTime      `json:"startedOn"`
+	CompletedAt             sql.NullTime      `json:"completedAt"`
+	ProjectIdentifier       sql.NullString    `json:"projectIdentifier"`
+	TaskNumber              uint32            `json:"taskNumber"`
+	ArchivedAt              sql.NullTime      `json:"archivedAt"`
+	LabelIds                sql.NullString    `json:"labelIds"`
+	SortWeight              int32             `json:"sortWeight"`
+	UpdatedAt               sql.NullTime      `json:"updatedAt"`
+	CreatedAt               time.Time         `json:"createdAt"`
+	PrimaryAssigneePublicID interface{}       `json:"primaryAssigneePublicId"`
+	AssigneeCount           int64             `json:"assigneeCount"`
+}
+
+// Keyset-paginated variant of ListTasksForWorkspace.
+//
+// Cursor encoding: pass the (created_at, public_id) tuple from the LAST
+// row of the previous page. First page passes NULL for both
+// cursor_created_at and cursor_public_id. ORDER BY (created_at DESC,
+// public_id DESC) is monotonic so the tuple comparison uniquely
+// identifies a cursor position. The optional state_filter argument
+// restricts results to a single derived_state when non-empty; pass an
+// empty string to skip the filter.
+//
+// Index used: idx_tasks_workspace_id_keyset (workspace_id, created_at, public_id).
+func (q *Queries) ListTasksForWorkspaceKeyset(ctx context.Context, arg ListTasksForWorkspaceKeysetParams) ([]ListTasksForWorkspaceKeysetRow, error) {
+	rows, err := q.db.QueryContext(ctx, listTasksForWorkspaceKeyset,
+		arg.WorkspaceID,
+		arg.StateFilter,
+		arg.StateFilter,
+		arg.CursorCreatedAt,
+		arg.CursorCreatedAt,
+		arg.CursorCreatedAt,
+		arg.CursorPublicID,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTasksForWorkspaceKeysetRow{}
+	for rows.Next() {
+		var i ListTasksForWorkspaceKeysetRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.ProjectPublicID,
+			&i.ProjectName,
+			&i.ParentTaskPublicID,
+			&i.Title,
+			&i.Visibility,
+			&i.DerivedState,
+			&i.Priority,
+			&i.DueOn,
+			&i.StartedOn,
+			&i.CompletedAt,
+			&i.ProjectIdentifier,
+			&i.TaskNumber,
+			&i.ArchivedAt,
+			&i.LabelIds,
+			&i.SortWeight,
+			&i.UpdatedAt,
+			&i.CreatedAt,
+			&i.PrimaryAssigneePublicID,
+			&i.AssigneeCount,
 		); err != nil {
 			return nil, err
 		}
