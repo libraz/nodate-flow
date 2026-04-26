@@ -8,11 +8,12 @@
  * these types at the boundary.
  *
  * The enums below track the live MySQL schema (unified calendar + task
- * integration). A follow-up drops `shared` from CalendarKind; keeping
- * it here for one release while the schema migration bakes.
+ * integration). Calendar sharing is modelled via subscriptions, not via
+ * a dedicated `shared` kind, so `CalendarKind` stays at
+ * `personal | system`.
  */
 
-export type CalendarKind = 'personal' | 'shared' | 'system';
+export type CalendarKind = 'personal' | 'system';
 export type EventKind = 'event' | 'block' | 'free' | 'milestone';
 export type ShowAs = 'busy' | 'free' | 'tentative' | 'oof';
 export type Visibility = 'default' | 'public' | 'private' | 'confidential';
@@ -39,7 +40,7 @@ export interface Calendar {
   visible: boolean;
   /**
    * For `kind==='system'` calendars, the provider identifier such as
-   * `'holidays.jp'`. Undefined on personal/shared calendars.
+   * `'holidays.jp'`. Undefined on personal calendars.
    */
   systemSlug?: string;
 }

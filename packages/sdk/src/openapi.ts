@@ -4601,7 +4601,7 @@ export interface components {
              * @description Calendar kind
              * @enum {string}
              */
-            kind: "personal" | "shared" | "system";
+            kind: "personal" | "system";
             /** @description Calendar name */
             name: string;
             /** @description System calendar slug */

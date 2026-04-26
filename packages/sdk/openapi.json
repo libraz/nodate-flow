@@ -2060,7 +2060,7 @@
           },
           "kind": {
             "description": "Calendar kind",
-            "enum": ["personal", "shared", "system"],
+            "enum": ["personal", "system"],
             "type": "string"
           },
           "name": {

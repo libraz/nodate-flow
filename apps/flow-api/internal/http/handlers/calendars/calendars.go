@@ -48,7 +48,7 @@ type ListCalendarsOutput struct {
 type CreateCalendarInput struct {
 	WsId string `path:"wsId" doc:"Workspace public ID"`
 	Body struct {
-		Kind        string  `json:"kind" enum:"personal,shared,system" doc:"Calendar kind"`
+		Kind        string  `json:"kind" enum:"personal,system" doc:"Calendar kind"`
 		Name        string  `json:"name" minLength:"1" maxLength:"255" doc:"Calendar name"`
 		Description *string `json:"description,omitempty" required:"false" doc:"Calendar description"`
 		Color       string  `json:"color" minLength:"1" maxLength:"7" doc:"Display color (hex)"`
