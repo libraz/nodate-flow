@@ -12,6 +12,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
 // AddActor handles POST /tasks/{id}/actors.
@@ -64,8 +65,8 @@ func AddActor(deps Deps) func(context.Context, *AddTaskActorInput) (*AddTaskActo
 				slog.Any("err", err),
 				slog.String("handler", "tasks.AddActor"),
 				slog.String("event_type", string(eventbus.TaskActorAdded)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("task_id", taskInternal),
+				logutil.LogEntity("workspace", ws.PublicID),
+				logutil.LogEntity("task", task.PublicID),
 				slog.String("actor_public_id", pub.String()),
 			)
 		}
@@ -158,8 +159,8 @@ func RemoveActor(deps Deps) func(context.Context, *RemoveTaskActorInput) (*Remov
 				slog.Any("err", err),
 				slog.String("handler", "tasks.RemoveActor"),
 				slog.String("event_type", string(eventbus.TaskActorRemoved)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("task_id", taskInternal),
+				logutil.LogEntity("workspace", ws.PublicID),
+				logutil.LogEntity("task", task.PublicID),
 				slog.String("actor_public_id", aid.String()),
 			)
 		}

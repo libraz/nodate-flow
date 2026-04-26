@@ -13,6 +13,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
 // Create handles POST /workspaces/{wsId}/intake.
@@ -46,8 +47,8 @@ func Create(deps Deps) func(context.Context, *CreateIntakeItemInput) (*CreateInt
 				slog.Any("err", err),
 				slog.String("handler", "intake.Create"),
 				slog.String("event_type", string(eventbus.IntakeItemCreated)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.String("intake_item_id", pub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				slog.String("intake_item_public_id", pub.String()),
 			)
 		}
 
@@ -212,9 +213,8 @@ func Triage(deps Deps) func(context.Context, *TriageIntakeItemInput) (*TriageInt
 				slog.Any("err", err),
 				slog.String("handler", "intake.Triage"),
 				slog.String("event_type", string(triageType)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("actor_id", int64(actorID)),
-				slog.String("intake_item_id", pub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				slog.String("intake_item_public_id", pub.String()),
 				slog.String("status", in.Body.Status),
 			)
 		}
@@ -312,6 +312,7 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 			TaskNumber:      uint32(nextNum),
 			ParentTaskID:    sql.NullInt32{},
 			CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
+			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
 			Title:           item.Title,
 			Description:     desc,
 			Priority:        0,
@@ -351,10 +352,9 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 				slog.Any("err", err),
 				slog.String("handler", "intake.Convert"),
 				slog.String("event_type", string(eventbus.IntakeItemAccepted)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("actor_id", int64(actorID)),
-				slog.Int64("task_id", taskID),
-				slog.String("intake_item_id", pub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				slog.String("task_public_id", taskPub.String()),
+				slog.String("intake_item_public_id", pub.String()),
 			)
 		}
 
@@ -374,10 +374,9 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 				slog.Any("err", err),
 				slog.String("handler", "intake.Convert"),
 				slog.String("event_type", string(eventbus.TaskCreated)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("actor_id", int64(actorID)),
-				slog.Int64("task_id", taskID),
-				slog.String("intake_item_id", pub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				slog.String("task_public_id", taskPub.String()),
+				slog.String("intake_item_public_id", pub.String()),
 			)
 		}
 

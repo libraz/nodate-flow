@@ -12,6 +12,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
 // AddConstraint handles POST /tasks/{id}/constraints.
@@ -51,9 +52,9 @@ func AddConstraint(deps Deps) func(context.Context, *AddTaskConstraintInput) (*A
 				slog.Any("err", err),
 				slog.String("handler", "tasks.AddConstraint"),
 				slog.String("event_type", string(eventbus.TaskConstraintAdded)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("task_id", taskInternal),
-				slog.String("constraint_id", pub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				logutil.LogEntity("task", task.PublicID),
+				slog.String("constraint_public_id", pub.String()),
 			)
 		}
 		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
@@ -113,9 +114,9 @@ func RemoveConstraint(deps Deps) func(context.Context, *RemoveTaskConstraintInpu
 				slog.Any("err", err),
 				slog.String("handler", "tasks.RemoveConstraint"),
 				slog.String("event_type", string(eventbus.TaskConstraintRemoved)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("task_id", taskInternal),
-				slog.String("constraint_id", cid.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				logutil.LogEntity("task", task.PublicID),
+				slog.String("constraint_public_id", cid.String()),
 			)
 		}
 		if aID, aOk := middleware.ActorFromContext(ctx); aOk {

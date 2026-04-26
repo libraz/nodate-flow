@@ -12,6 +12,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
 // AddAttachment handles POST /tasks/{id}/attachments. Currently stores
@@ -60,10 +61,9 @@ func AddAttachment(deps Deps) func(context.Context, *AddTaskAttachmentInput) (*A
 				slog.Any("err", err),
 				slog.String("handler", "tasks.AddAttachment"),
 				slog.String("event_type", string(eventbus.TaskAttachmentAdded)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("actor_id", int64(actorID)),
-				slog.Int64("task_id", taskInternal),
-				slog.String("attachment_id", pub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				logutil.LogEntity("task", task.PublicID),
+				slog.String("attachment_public_id", pub.String()),
 			)
 		}
 		deps.Audit.Record(ctx, audit.Entry{
@@ -157,9 +157,9 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteTaskAttachmentInpu
 				slog.Any("err", err),
 				slog.String("handler", "tasks.DeleteAttachment"),
 				slog.String("event_type", string(eventbus.TaskAttachmentRemoved)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("task_id", taskInternal),
-				slog.String("attachment_id", aid.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				logutil.LogEntity("task", task.PublicID),
+				slog.String("attachment_public_id", aid.String()),
 			)
 		}
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {

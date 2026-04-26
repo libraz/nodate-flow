@@ -98,6 +98,8 @@ type Querier interface {
 	// Archive a single notification.
 	ArchiveNotification(ctx context.Context, arg ArchiveNotificationParams) error
 	// Set archived_at on a task.
+	// updated_by_user_id is appended so the audit field records who archived
+	// the row (NULL for system writers).
 	ArchiveTask(ctx context.Context, arg ArchiveTaskParams) error
 	// Allocate the next task number for a project. Must be called inside a
 	// transaction with the project row locked (SELECT ... FOR UPDATE).
@@ -214,6 +216,9 @@ type Querier interface {
 	CreateStubUser(ctx context.Context, arg CreateStubUserParams) (int64, error)
 	// Insert a new task. derived_state defaults to 'open' and must NOT be set
 	// directly here; the constraint engine and event bus mutate it.
+	// Both created_by_user_id and updated_by_user_id are populated with the
+	// acting user on insert so that audit projections can render "last touched
+	// by" without falling back to the creator when no edit has occurred yet.
 	CreateTask(ctx context.Context, arg CreateTaskParams) (int64, error)
 	// Insert a new link between a task and an event. Caller must validate
 	// the task and event belong to workspace_id and are enabled.
@@ -272,11 +277,26 @@ type Querier interface {
 	DisableLabel(ctx context.Context, arg DisableLabelParams) error
 	// Soft-delete a page.
 	DisablePage(ctx context.Context, arg DisablePageParams) error
-	// Soft-disable a project.
+	// Soft-disable a project. The handler must call DisableProjectChildTasks
+	// inside the same transaction to cascade enabled = FALSE down to tasks;
+	// this query alone leaves child tasks live on the underlying table.
 	DisableProject(ctx context.Context, arg DisableProjectParams) error
+	// Cascade-disable every currently-enabled task that lives under a project.
+	// Must be called inside the same transaction as DisableProject so callers
+	// observe a consistent snapshot. The views (v_task_list, v_task_detail)
+	// already AND-filter projects.enabled, but bypassing the view (raw SELECT
+	// on tasks, MCP tooling, replay jobs) would otherwise still see live rows
+	// under a disabled project. updated_at is bumped explicitly so audit
+	// consumers can see the cascade event even though the column has an
+	// ON UPDATE clause already.
+	// workspace_id is included as the first WHERE clause for defense-in-depth
+	// per project DB conventions, even though project_id is globally unique.
+	DisableProjectChildTasks(ctx context.Context, arg DisableProjectChildTasksParams) error
 	// Soft-delete a reaction by public id and user.
 	DisableReaction(ctx context.Context, arg DisableReactionParams) error
 	// Soft-disable a task.
+	// updated_by_user_id is appended so the audit field records who disabled
+	// the row (NULL for system writers).
 	DisableTask(ctx context.Context, arg DisableTaskParams) error
 	// Soft-disable a task-label junction.
 	DisableTaskLabel(ctx context.Context, arg DisableTaskLabelParams) error
@@ -944,6 +964,9 @@ type Querier interface {
 	// rather than "overwrite with this value".
 	SetMyAvatarURL(ctx context.Context, arg SetMyAvatarURLParams) error
 	// Set the task_number after allocation.
+	// updated_by_user_id is appended so the audit field records who allocated
+	// the number; in practice this runs in the same transaction as CreateTask
+	// so the same actor id is reused (NULL for system writers).
 	SetTaskNumber(ctx context.Context, arg SetTaskNumberParams) error
 	// Snooze a signal by pushing its received_at forward. Minimal impl;
 	// a dedicated snoozed_until_at column may be added later on.
@@ -960,8 +983,12 @@ type Querier interface {
 	// Write the new derived_state computed by the transition handler. This is
 	// the only path allowed to mutate derived_state and must be called inside
 	// the same transaction as the events append.
+	// updated_by_user_id is appended so the audit field reflects who triggered
+	// the transition (NULL for system writers / event-bus replays).
 	TransitionTaskState(ctx context.Context, arg TransitionTaskStateParams) error
 	// Clear archived_at on a task.
+	// updated_by_user_id is appended so the audit field records who unarchived
+	// the row (NULL for system writers).
 	UnarchiveTask(ctx context.Context, arg UnarchiveTaskParams) error
 	// Update the schedule_kind on an existing agent.
 	UpdateAgentScheduleKind(ctx context.Context, arg UpdateAgentScheduleKindParams) error
@@ -996,9 +1023,13 @@ type Querier interface {
 	// Rotate a provider's API key. Caller passes new ciphertext + prefix + suffix.
 	UpdateProviderKey(ctx context.Context, arg UpdateProviderKeyParams) error
 	// Update mutable task fields. derived_state is intentionally NOT writable.
+	// updated_by_user_id is appended to the SET list so callers can attribute
+	// the edit; pass the acting user's internal id (NULL for system writers).
 	UpdateTask(ctx context.Context, arg UpdateTaskParams) error
 	// Update only the sort_weight for a single task within a workspace.
 	// Used by the bulk reorder endpoint inside a transaction.
+	// updated_by_user_id is appended so reorder edits are attributed to the
+	// acting user (NULL for system writers).
 	UpdateTaskSortWeight(ctx context.Context, arg UpdateTaskSortWeightParams) error
 	// Update mutable timebox fields.
 	UpdateTimebox(ctx context.Context, arg UpdateTimeboxParams) error

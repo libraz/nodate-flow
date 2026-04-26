@@ -12,6 +12,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
 // ListDependencies handles GET /tasks/{id}/dependencies. Returns both
@@ -124,9 +125,9 @@ func AddDependency(deps Deps) func(context.Context, *AddTaskDependencyInput) (*A
 				slog.Any("err", err),
 				slog.String("handler", "tasks.AddDependency"),
 				slog.String("event_type", string(eventbus.TaskDependencyAdded)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("task_id", taskInternal),
-				slog.String("dependency_id", pub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				logutil.LogEntity("task", task.PublicID),
+				slog.String("dependency_public_id", pub.String()),
 			)
 		}
 		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
@@ -184,9 +185,9 @@ func RemoveDependency(deps Deps) func(context.Context, *RemoveTaskDependencyInpu
 				slog.Any("err", err),
 				slog.String("handler", "tasks.RemoveDependency"),
 				slog.String("event_type", string(eventbus.TaskDependencyRemoved)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("task_id", taskInternal),
-				slog.String("dependency_id", depID.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				logutil.LogEntity("task", task.PublicID),
+				slog.String("dependency_public_id", depID.String()),
 			)
 		}
 		if aID, aOk := middleware.ActorFromContext(ctx); aOk {

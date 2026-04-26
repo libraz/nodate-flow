@@ -12,6 +12,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
 // Create handles POST /tasks/{id}/reactions.
@@ -72,10 +73,9 @@ func Create(deps Deps) func(context.Context, *CreateReactionInput) (*CreateReact
 				slog.Any("err", err),
 				slog.String("handler", "reactions.Create"),
 				slog.String("event_type", string(eventbus.ReactionAdded)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("actor_id", int64(actorID)),
-				slog.Int64("task_id", taskIDInt64),
-				slog.String("reaction_id", pub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				logutil.LogEntity("task", task.PublicID),
+				slog.String("reaction_public_id", pub.String()),
 			)
 		}
 
@@ -153,7 +153,7 @@ func Delete(deps Deps) func(context.Context, *DeleteReactionInput) (*DeleteReact
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
-		_, ok = middleware.TaskFromContext(ctx)
+		task, ok := middleware.TaskFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
 		}
@@ -201,10 +201,9 @@ func Delete(deps Deps) func(context.Context, *DeleteReactionInput) (*DeleteReact
 				slog.Any("err", err),
 				slog.String("handler", "reactions.Delete"),
 				slog.String("event_type", string(eventbus.ReactionRemoved)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("actor_id", int64(actorID)),
-				slog.Int64("task_id", taskIDInt64),
-				slog.String("reaction_id", pub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				logutil.LogEntity("task", task.PublicID),
+				slog.String("reaction_public_id", pub.String()),
 			)
 		}
 

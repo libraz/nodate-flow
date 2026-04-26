@@ -15,7 +15,8 @@ import (
 
 const archiveTask = `-- name: ArchiveTask :exec
 UPDATE tasks
-SET archived_at = CURRENT_TIMESTAMP
+SET archived_at = CURRENT_TIMESTAMP,
+    updated_by_user_id = ?
 WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE
@@ -23,13 +24,16 @@ WHERE workspace_id = ?
 `
 
 type ArchiveTaskParams struct {
-	WorkspaceID uint32         `json:"-"`
-	PublicID    types.PublicID `json:"publicId"`
+	UpdatedByUserID sql.NullInt32  `json:"-"`
+	WorkspaceID     uint32         `json:"-"`
+	PublicID        types.PublicID `json:"publicId"`
 }
 
 // Set archived_at on a task.
+// updated_by_user_id is appended so the audit field records who archived
+// the row (NULL for system writers).
 func (q *Queries) ArchiveTask(ctx context.Context, arg ArchiveTaskParams) error {
-	_, err := q.db.ExecContext(ctx, archiveTask, arg.WorkspaceID, arg.PublicID)
+	_, err := q.db.ExecContext(ctx, archiveTask, arg.UpdatedByUserID, arg.WorkspaceID, arg.PublicID)
 	return err
 }
 
@@ -55,6 +59,7 @@ INSERT INTO tasks (
   project_id,
   parent_task_id,
   created_by_user_id,
+  updated_by_user_id,
   task_number,
   title,
   description,
@@ -62,7 +67,7 @@ INSERT INTO tasks (
   due_on,
   started_on,
   visibility
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateTaskParams struct {
@@ -71,6 +76,7 @@ type CreateTaskParams struct {
 	ProjectID       uint32          `json:"-"`
 	ParentTaskID    sql.NullInt32   `json:"-"`
 	CreatedByUserID sql.NullInt32   `json:"-"`
+	UpdatedByUserID sql.NullInt32   `json:"-"`
 	TaskNumber      uint32          `json:"taskNumber"`
 	Title           string          `json:"title"`
 	Description     sql.NullString  `json:"description"`
@@ -82,6 +88,9 @@ type CreateTaskParams struct {
 
 // Insert a new task. derived_state defaults to 'open' and must NOT be set
 // directly here; the constraint engine and event bus mutate it.
+// Both created_by_user_id and updated_by_user_id are populated with the
+// acting user on insert so that audit projections can render "last touched
+// by" without falling back to the creator when no edit has occurred yet.
 func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, createTask,
 		arg.PublicID,
@@ -89,6 +98,7 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (int64, 
 		arg.ProjectID,
 		arg.ParentTaskID,
 		arg.CreatedByUserID,
+		arg.UpdatedByUserID,
 		arg.TaskNumber,
 		arg.Title,
 		arg.Description,
@@ -160,19 +170,23 @@ func (q *Queries) DeleteTaskEventLink(ctx context.Context, arg DeleteTaskEventLi
 
 const disableTask = `-- name: DisableTask :exec
 UPDATE tasks
-SET enabled = FALSE
+SET enabled = FALSE,
+    updated_by_user_id = ?
 WHERE workspace_id = ?
   AND public_id = ?
 `
 
 type DisableTaskParams struct {
-	WorkspaceID uint32         `json:"-"`
-	PublicID    types.PublicID `json:"publicId"`
+	UpdatedByUserID sql.NullInt32  `json:"-"`
+	WorkspaceID     uint32         `json:"-"`
+	PublicID        types.PublicID `json:"publicId"`
 }
 
 // Soft-disable a task.
+// updated_by_user_id is appended so the audit field records who disabled
+// the row (NULL for system writers).
 func (q *Queries) DisableTask(ctx context.Context, arg DisableTaskParams) error {
-	_, err := q.db.ExecContext(ctx, disableTask, arg.WorkspaceID, arg.PublicID)
+	_, err := q.db.ExecContext(ctx, disableTask, arg.UpdatedByUserID, arg.WorkspaceID, arg.PublicID)
 	return err
 }
 
@@ -2042,44 +2056,54 @@ func (q *Queries) ResolveTaskRef(ctx context.Context, arg ResolveTaskRefParams) 
 
 const setTaskNumber = `-- name: SetTaskNumber :exec
 UPDATE tasks
-SET task_number = ?
+SET task_number = ?,
+    updated_by_user_id = ?
 WHERE id = ?
 `
 
 type SetTaskNumberParams struct {
-	TaskNumber uint32 `json:"taskNumber"`
-	ID         uint32 `json:"-"`
+	TaskNumber      uint32        `json:"taskNumber"`
+	UpdatedByUserID sql.NullInt32 `json:"-"`
+	ID              uint32        `json:"-"`
 }
 
 // Set the task_number after allocation.
+// updated_by_user_id is appended so the audit field records who allocated
+// the number; in practice this runs in the same transaction as CreateTask
+// so the same actor id is reused (NULL for system writers).
 func (q *Queries) SetTaskNumber(ctx context.Context, arg SetTaskNumberParams) error {
-	_, err := q.db.ExecContext(ctx, setTaskNumber, arg.TaskNumber, arg.ID)
+	_, err := q.db.ExecContext(ctx, setTaskNumber, arg.TaskNumber, arg.UpdatedByUserID, arg.ID)
 	return err
 }
 
 const transitionTaskState = `-- name: TransitionTaskState :exec
 UPDATE tasks
 SET derived_state = ?,
-    completed_at = CASE WHEN ? = 'done' THEN CURRENT_TIMESTAMP ELSE completed_at END
+    completed_at = CASE WHEN ? = 'done' THEN CURRENT_TIMESTAMP ELSE completed_at END,
+    updated_by_user_id = ?
 WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE
 `
 
 type TransitionTaskStateParams struct {
-	DerivedState TasksDerivedState `json:"derivedState"`
-	Column2      interface{}       `json:"column2"`
-	WorkspaceID  uint32            `json:"-"`
-	PublicID     types.PublicID    `json:"publicId"`
+	DerivedState    TasksDerivedState `json:"derivedState"`
+	Column2         interface{}       `json:"column2"`
+	UpdatedByUserID sql.NullInt32     `json:"-"`
+	WorkspaceID     uint32            `json:"-"`
+	PublicID        types.PublicID    `json:"publicId"`
 }
 
 // Write the new derived_state computed by the transition handler. This is
 // the only path allowed to mutate derived_state and must be called inside
 // the same transaction as the events append.
+// updated_by_user_id is appended so the audit field reflects who triggered
+// the transition (NULL for system writers / event-bus replays).
 func (q *Queries) TransitionTaskState(ctx context.Context, arg TransitionTaskStateParams) error {
 	_, err := q.db.ExecContext(ctx, transitionTaskState,
 		arg.DerivedState,
 		arg.Column2,
+		arg.UpdatedByUserID,
 		arg.WorkspaceID,
 		arg.PublicID,
 	)
@@ -2088,7 +2112,8 @@ func (q *Queries) TransitionTaskState(ctx context.Context, arg TransitionTaskSta
 
 const unarchiveTask = `-- name: UnarchiveTask :exec
 UPDATE tasks
-SET archived_at = NULL
+SET archived_at = NULL,
+    updated_by_user_id = ?
 WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE
@@ -2096,13 +2121,16 @@ WHERE workspace_id = ?
 `
 
 type UnarchiveTaskParams struct {
-	WorkspaceID uint32         `json:"-"`
-	PublicID    types.PublicID `json:"publicId"`
+	UpdatedByUserID sql.NullInt32  `json:"-"`
+	WorkspaceID     uint32         `json:"-"`
+	PublicID        types.PublicID `json:"publicId"`
 }
 
 // Clear archived_at on a task.
+// updated_by_user_id is appended so the audit field records who unarchived
+// the row (NULL for system writers).
 func (q *Queries) UnarchiveTask(ctx context.Context, arg UnarchiveTaskParams) error {
-	_, err := q.db.ExecContext(ctx, unarchiveTask, arg.WorkspaceID, arg.PublicID)
+	_, err := q.db.ExecContext(ctx, unarchiveTask, arg.UpdatedByUserID, arg.WorkspaceID, arg.PublicID)
 	return err
 }
 
@@ -2114,25 +2142,29 @@ SET title = ?,
     due_on = ?,
     started_on = ?,
     sort_weight = ?,
-    visibility = ?
+    visibility = ?,
+    updated_by_user_id = ?
 WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE
 `
 
 type UpdateTaskParams struct {
-	Title       string          `json:"title"`
-	Description sql.NullString  `json:"description"`
-	Priority    int32           `json:"priority"`
-	DueOn       sql.NullTime    `json:"dueOn"`
-	StartedOn   sql.NullTime    `json:"startedOn"`
-	SortWeight  int32           `json:"sortWeight"`
-	Visibility  TasksVisibility `json:"visibility"`
-	WorkspaceID uint32          `json:"-"`
-	PublicID    types.PublicID  `json:"publicId"`
+	Title           string          `json:"title"`
+	Description     sql.NullString  `json:"description"`
+	Priority        int32           `json:"priority"`
+	DueOn           sql.NullTime    `json:"dueOn"`
+	StartedOn       sql.NullTime    `json:"startedOn"`
+	SortWeight      int32           `json:"sortWeight"`
+	Visibility      TasksVisibility `json:"visibility"`
+	UpdatedByUserID sql.NullInt32   `json:"-"`
+	WorkspaceID     uint32          `json:"-"`
+	PublicID        types.PublicID  `json:"publicId"`
 }
 
 // Update mutable task fields. derived_state is intentionally NOT writable.
+// updated_by_user_id is appended to the SET list so callers can attribute
+// the edit; pass the acting user's internal id (NULL for system writers).
 func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) error {
 	_, err := q.db.ExecContext(ctx, updateTask,
 		arg.Title,
@@ -2142,6 +2174,7 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) error {
 		arg.StartedOn,
 		arg.SortWeight,
 		arg.Visibility,
+		arg.UpdatedByUserID,
 		arg.WorkspaceID,
 		arg.PublicID,
 	)
@@ -2150,21 +2183,30 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) error {
 
 const updateTaskSortWeight = `-- name: UpdateTaskSortWeight :exec
 UPDATE tasks
-SET sort_weight = ?
+SET sort_weight = ?,
+    updated_by_user_id = ?
 WHERE id = ?
   AND workspace_id = ?
   AND enabled = TRUE
 `
 
 type UpdateTaskSortWeightParams struct {
-	SortWeight  int32  `json:"sortWeight"`
-	ID          uint32 `json:"-"`
-	WorkspaceID uint32 `json:"-"`
+	SortWeight      int32         `json:"sortWeight"`
+	UpdatedByUserID sql.NullInt32 `json:"-"`
+	ID              uint32        `json:"-"`
+	WorkspaceID     uint32        `json:"-"`
 }
 
 // Update only the sort_weight for a single task within a workspace.
 // Used by the bulk reorder endpoint inside a transaction.
+// updated_by_user_id is appended so reorder edits are attributed to the
+// acting user (NULL for system writers).
 func (q *Queries) UpdateTaskSortWeight(ctx context.Context, arg UpdateTaskSortWeightParams) error {
-	_, err := q.db.ExecContext(ctx, updateTaskSortWeight, arg.SortWeight, arg.ID, arg.WorkspaceID)
+	_, err := q.db.ExecContext(ctx, updateTaskSortWeight,
+		arg.SortWeight,
+		arg.UpdatedByUserID,
+		arg.ID,
+		arg.WorkspaceID,
+	)
 	return err
 }

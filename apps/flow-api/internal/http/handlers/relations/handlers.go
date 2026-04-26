@@ -204,10 +204,9 @@ func resolveAccept(
 			slog.Any("err", err),
 			slog.String("handler", "relations.resolveAccept"),
 			slog.String("event_type", string(eventbus.RelationAccepted)),
-			slog.Int64("workspace_id", int64(wsID)),
-			slog.Int64("actor_id", actor),
-			slog.Int64("task_id", srcTaskID),
-			slog.String("suggestion_id", suggestion.PublicID.String()),
+			slog.String("source_task_public_id", suggestion.SourceTaskPublicID.String()),
+			slog.String("target_task_public_id", suggestion.TargetTaskPublicID.String()),
+			slog.String("suggestion_public_id", suggestion.PublicID.String()),
 		)
 	}
 
@@ -260,10 +259,9 @@ func resolveDismiss(
 			slog.Any("err", err),
 			slog.String("handler", "relations.resolveDismiss"),
 			slog.String("event_type", string(eventbus.RelationDismissed)),
-			slog.Int64("workspace_id", int64(wsID)),
-			slog.Int64("actor_id", actor),
-			slog.Int64("task_id", srcTaskID),
-			slog.String("suggestion_id", suggestion.PublicID.String()),
+			slog.String("source_task_public_id", suggestion.SourceTaskPublicID.String()),
+			slog.String("target_task_public_id", suggestion.TargetTaskPublicID.String()),
+			slog.String("suggestion_public_id", suggestion.PublicID.String()),
 		)
 	}
 

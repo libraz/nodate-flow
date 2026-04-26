@@ -14,6 +14,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
 // escapeLike escapes the MySQL LIKE metacharacters %, _, and \ in a
@@ -173,9 +174,8 @@ func Create(deps Deps) func(context.Context, *CreatePageInput) (*CreatePageOutpu
 				slog.Any("err", err),
 				slog.String("handler", "pages.Create"),
 				slog.String("event_type", string(eventbus.PageCreated)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("actor_id", int64(actorID)),
-				slog.String("page_id", pub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				slog.String("page_public_id", pub.String()),
 			)
 		}
 
@@ -402,8 +402,8 @@ func Update(deps Deps) func(context.Context, *UpdatePageInput) (*UpdatePageOutpu
 				slog.Any("err", err),
 				slog.String("handler", "pages.Update"),
 				slog.String("event_type", string(eventbus.PageUpdated)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.String("page_id", pub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				slog.String("page_public_id", pub.String()),
 			)
 		}
 
@@ -460,8 +460,8 @@ func Delete(deps Deps) func(context.Context, *DeletePageInput) (*DeletePageOutpu
 				slog.Any("err", err),
 				slog.String("handler", "pages.Delete"),
 				slog.String("event_type", string(eventbus.PageDisabled)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.String("page_id", pub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				slog.String("page_public_id", pub.String()),
 			)
 		}
 

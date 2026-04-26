@@ -82,9 +82,8 @@ func Create(deps Deps) func(context.Context, *CreateFavoriteInput) (*CreateFavor
 				slog.Any("err", err),
 				slog.String("handler", "favorites.Create"),
 				slog.String("event_type", string(eventbus.FavoriteAdded)),
-				slog.Int64("workspace_id", int64(wsID)),
-				slog.Int64("actor_id", int64(actorID)),
-				slog.String("favorite_id", pub.String()),
+				slog.String("workspace_public_id", in.Body.WorkspaceID),
+				slog.String("favorite_public_id", pub.String()),
 			)
 		}
 
@@ -205,9 +204,8 @@ func Delete(deps Deps) func(context.Context, *DeleteFavoriteInput) (*DeleteFavor
 				slog.Any("err", err),
 				slog.String("handler", "favorites.Delete"),
 				slog.String("event_type", string(eventbus.FavoriteRemoved)),
-				slog.Int64("workspace_id", int64(row.WorkspaceID)),
-				slog.Int64("actor_id", int64(actorID)),
-				slog.String("favorite_id", pub.String()),
+				slog.String("workspace_public_id", in.WorkspaceID),
+				slog.String("favorite_public_id", pub.String()),
 			)
 		}
 

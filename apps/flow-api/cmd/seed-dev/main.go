@@ -463,6 +463,7 @@ func ensureTasks(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, pr
 				WorkspaceID:     wsID,
 				ProjectID:       projID,
 				CreatedByUserID: createdBy,
+				UpdatedByUserID: createdBy,
 				TaskNumber:      uint32(nextNum),
 				Title:           s.Title,
 				Priority:        s.Priority,

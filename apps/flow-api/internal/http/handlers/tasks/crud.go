@@ -17,6 +17,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/itemkit"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
 // escapeLike escapes the MySQL LIKE metacharacters %, _, and \ in a
@@ -288,6 +289,7 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 			TaskNumber:      uint32(nextNum),
 			ParentTaskID:    sql.NullInt32{},
 			CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
+			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
 			Title:           in.Body.Title,
 			Description:     desc,
 			Priority:        in.Body.Priority,
@@ -365,9 +367,8 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 				slog.Any("err", err),
 				slog.String("handler", "tasks.Create"),
 				slog.String("event_type", string(eventbus.TaskCreated)),
-				slog.Int64("workspace_id", int64(prj.WorkspaceID)),
-				slog.Int64("task_id", taskID),
-				slog.Int64("actor_id", int64(actorID)),
+				logutil.LogEntityPID("project", prjPub),
+				slog.String("task_public_id", pub.String()),
 			)
 		}
 		deps.Audit.Record(ctx, audit.Entry{
@@ -726,15 +727,16 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 		}
 
 		updateParams := generated.UpdateTaskParams{
-			Title:       newTitle,
-			Description: newDesc,
-			Priority:    newPriority,
-			DueOn:       newDue,
-			StartedOn:   newStart,
-			SortWeight:  newSortWeight,
-			Visibility:  newVisibility,
-			WorkspaceID: ws.ID,
-			PublicID:    types.FromUUID(task.PublicID),
+			Title:           newTitle,
+			Description:     newDesc,
+			Priority:        newPriority,
+			DueOn:           newDue,
+			StartedOn:       newStart,
+			SortWeight:      newSortWeight,
+			Visibility:      newVisibility,
+			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
+			WorkspaceID:     ws.ID,
+			PublicID:        types.FromUUID(task.PublicID),
 		}
 
 		if !needsItemkit {
@@ -809,9 +811,8 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 				slog.Any("err", err),
 				slog.String("handler", "tasks.Patch"),
 				slog.String("event_type", string(eventbus.TaskUpdated)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("task_id", taskInternal),
-				slog.Int64("actor_id", int64(actorID)),
+				logutil.LogEntity("workspace", ws.PublicID),
+				logutil.LogEntity("task", task.PublicID),
 			)
 		}
 
@@ -882,9 +883,8 @@ func Disable(deps Deps) func(context.Context, *DisableTaskInput) (*DisableTaskOu
 				slog.Any("err", err),
 				slog.String("handler", "tasks.Disable"),
 				slog.String("event_type", string(eventbus.TaskDisabled)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("task_id", taskInternal),
-				slog.Int64("actor_id", int64(actorID)),
+				logutil.LogEntity("workspace", ws.PublicID),
+				logutil.LogEntity("task", task.PublicID),
 			)
 		}
 		out := &DisableTaskOutput{}

@@ -13,6 +13,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
 // Create handles POST /workspaces/{wsId}/imports.
@@ -85,9 +86,8 @@ func Create(deps Deps) func(context.Context, *CreateImportInput) (*CreateImportO
 				slog.Any("err", err),
 				slog.String("handler", "imports.Create"),
 				slog.String("event_type", string(eventbus.ImportJobCreated)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("actor_id", int64(actorID)),
-				slog.String("import_job_id", pub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				slog.String("import_job_public_id", pub.String()),
 			)
 		}
 
@@ -222,8 +222,8 @@ func Cancel(deps Deps) func(context.Context, *CancelImportInput) (*CancelImportO
 				slog.Any("err", err),
 				slog.String("handler", "imports.Cancel"),
 				slog.String("event_type", string(eventbus.ImportJobCancelled)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.String("import_job_id", pub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				slog.String("import_job_public_id", pub.String()),
 			)
 		}
 

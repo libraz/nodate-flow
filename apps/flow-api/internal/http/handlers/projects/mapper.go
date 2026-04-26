@@ -3,6 +3,7 @@ package projects
 import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
 )
 
 func rowToProjectFromFind(r generated.FindProjectByPublicIdGlobalRow) Project {
@@ -15,13 +16,13 @@ func rowToProjectFromFind(r generated.FindProjectByPublicIdGlobalRow) Project {
 		Description:      nullStr(r.Description),
 		Color:            nullStr(r.Color),
 		IsArchived:       r.IsArchived,
-		StartedOn:        nullTimeDate(r.StartedOn),
-		EndedOn:          nullTimeDate(r.EndedOn),
+		StartedOn:        dbtype.DateStringFromNullTime(r.StartedOn),
+		EndedOn:          dbtype.DateStringFromNullTime(r.EndedOn),
 		FeaturePages:     r.FeaturePages,
 		FeatureTimeboxes: r.FeatureTimeboxes,
 		FeatureLenses:    r.FeatureLenses,
 		FeatureCalendar:  r.FeatureCalendar,
-		UpdatedAt:        nullTimeUnix(r.UpdatedAt),
+		UpdatedAt:        dbtype.UnixSecondsFromNullTime(r.UpdatedAt),
 		CreatedAt:        r.CreatedAt.Unix(),
 	}
 }
@@ -39,9 +40,9 @@ func rowToProjectFromList(r generated.ListProjectsForWorkspaceRow, workspacePubl
 		Description: nullStr(r.Description),
 		Color:       nullStr(r.Color),
 		IsArchived:  r.IsArchived,
-		StartedOn:   nullTimeDate(r.StartedOn),
-		EndedOn:     nullTimeDate(r.EndedOn),
-		UpdatedAt:   nullTimeUnix(r.UpdatedAt),
+		StartedOn:   dbtype.DateStringFromNullTime(r.StartedOn),
+		EndedOn:     dbtype.DateStringFromNullTime(r.EndedOn),
+		UpdatedAt:   dbtype.UnixSecondsFromNullTime(r.UpdatedAt),
 		CreatedAt:   r.CreatedAt.Unix(),
 	}
 }
@@ -54,7 +55,7 @@ func rowToProjectMember(r generated.ListProjectMembersRow) ProjectMember {
 		DisplayName: r.DisplayName,
 		AvatarURL:   nullStr(r.AvatarUrl),
 		Role:        string(r.Role),
-		AddedAt:     nullTimeUnix(r.AddedAt),
+		AddedAt:     dbtype.UnixSecondsFromNullTime(r.AddedAt),
 		CreatedAt:   r.CreatedAt.Unix(),
 	}
 }

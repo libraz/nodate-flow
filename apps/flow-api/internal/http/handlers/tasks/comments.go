@@ -13,6 +13,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
 // AddComment handles POST /tasks/{id}/comments.
@@ -55,10 +56,9 @@ func AddComment(deps Deps) func(context.Context, *AddTaskCommentInput) (*AddTask
 				slog.Any("err", err),
 				slog.String("handler", "tasks.AddComment"),
 				slog.String("event_type", string(eventbus.TaskCommentAdded)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("actor_id", int64(actorID)),
-				slog.Int64("task_id", taskInternal),
-				slog.String("comment_id", pub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				logutil.LogEntity("task", task.PublicID),
+				slog.String("comment_public_id", pub.String()),
 			)
 		}
 		deps.Audit.Record(ctx, audit.Entry{
@@ -239,10 +239,9 @@ func EditComment(deps Deps) func(context.Context, *EditTaskCommentInput) (*EditT
 				slog.Any("err", err),
 				slog.String("handler", "tasks.EditComment"),
 				slog.String("event_type", string(eventbus.TaskCommentEdited)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("actor_id", int64(actorID)),
-				slog.Int64("task_id", taskInternal),
-				slog.String("comment_id", cid.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				logutil.LogEntity("task", task.PublicID),
+				slog.String("comment_public_id", cid.String()),
 			)
 		}
 		deps.Audit.Record(ctx, audit.Entry{
@@ -311,10 +310,9 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteTaskCommentInput) (*D
 				slog.Any("err", err),
 				slog.String("handler", "tasks.DeleteComment"),
 				slog.String("event_type", string(eventbus.TaskCommentRemoved)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("actor_id", int64(actorID)),
-				slog.Int64("task_id", taskInternal),
-				slog.String("comment_id", cid.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				logutil.LogEntity("task", task.PublicID),
+				slog.String("comment_public_id", cid.String()),
 			)
 		}
 		deps.Audit.Record(ctx, audit.Entry{

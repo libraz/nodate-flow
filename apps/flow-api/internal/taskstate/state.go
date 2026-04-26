@@ -204,11 +204,16 @@ func ApplyTransitionTx(ctx context.Context, tx *sql.Tx, p ApplyParams) (ApplyRes
 		_, _ = tx.ExecContext(ctx, "SET @nf_derived_state_engine = NULL")
 	}()
 
+	updatedBy := sql.NullInt32{}
+	if p.ActorUserID != nil {
+		updatedBy = sql.NullInt32{Int32: int32(*p.ActorUserID), Valid: true}
+	}
 	if err := qtx.TransitionTaskState(ctx, generated.TransitionTaskStateParams{
-		DerivedState: next,
-		Column2:      string(next),
-		WorkspaceID:  p.WorkspaceID,
-		PublicID:     p.PublicID,
+		DerivedState:    next,
+		Column2:         string(next),
+		UpdatedByUserID: updatedBy,
+		WorkspaceID:     p.WorkspaceID,
+		PublicID:        p.PublicID,
 	}); err != nil {
 		return ApplyResult{}, apierrors.InternalUnexpected, err
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
 // Archive returns a handler for POST /tasks/{id}/archive.
@@ -25,10 +26,12 @@ func Archive(deps Deps) func(context.Context, *ArchiveTaskInput) (*ArchiveTaskOu
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
 		}
+		actorID, _ := middleware.ActorFromContext(ctx)
 
 		if err := deps.Queries.ArchiveTask(ctx, generated.ArchiveTaskParams{
-			WorkspaceID: ws.ID,
-			PublicID:    types.FromUUID(task.PublicID),
+			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: actorID != 0},
+			WorkspaceID:     ws.ID,
+			PublicID:        types.FromUUID(task.PublicID),
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
@@ -45,12 +48,12 @@ func Archive(deps Deps) func(context.Context, *ArchiveTaskInput) (*ArchiveTaskOu
 				slog.Any("err", err),
 				slog.String("handler", "tasks.Archive"),
 				slog.String("event_type", string(eventbus.TaskArchived)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("task_id", taskInternal),
+				logutil.LogEntity("workspace", ws.PublicID),
+				logutil.LogEntity("task", task.PublicID),
 			)
 		}
 
-		if actorID, aOk := middleware.ActorFromContext(ctx); aOk {
+		if actorID != 0 {
 			deps.Audit.Record(ctx, audit.Entry{
 				Action:       "task.archived",
 				ActorID:      actorID,
@@ -77,10 +80,12 @@ func Unarchive(deps Deps) func(context.Context, *UnarchiveTaskInput) (*Unarchive
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
 		}
+		actorID, _ := middleware.ActorFromContext(ctx)
 
 		if err := deps.Queries.UnarchiveTask(ctx, generated.UnarchiveTaskParams{
-			WorkspaceID: ws.ID,
-			PublicID:    types.FromUUID(task.PublicID),
+			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: actorID != 0},
+			WorkspaceID:     ws.ID,
+			PublicID:        types.FromUUID(task.PublicID),
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
@@ -97,12 +102,12 @@ func Unarchive(deps Deps) func(context.Context, *UnarchiveTaskInput) (*Unarchive
 				slog.Any("err", err),
 				slog.String("handler", "tasks.Unarchive"),
 				slog.String("event_type", string(eventbus.TaskUnarchived)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("task_id", taskInternal),
+				logutil.LogEntity("workspace", ws.PublicID),
+				logutil.LogEntity("task", task.PublicID),
 			)
 		}
 
-		if actorID, aOk := middleware.ActorFromContext(ctx); aOk {
+		if actorID != 0 {
 			deps.Audit.Record(ctx, audit.Entry{
 				Action:       "task.unarchived",
 				ActorID:      actorID,

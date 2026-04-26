@@ -16,6 +16,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
 // StepsDeps is the dependency bundle for the propose-steps and
@@ -222,6 +223,7 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 				ProjectID:       parentProjectID,
 				ParentTaskID:    sql.NullInt32{Int32: int32(task.ID), Valid: true},
 				CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
+				UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
 				Title:           st.Title,
 				Description:     desc,
 				Priority:        st.Priority,
@@ -259,11 +261,9 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 					slog.Any("err", err),
 					slog.String("handler", "tasks.ApplySteps"),
 					slog.String("event_type", string(eventbus.TaskCreated)),
-					slog.Int64("workspace_id", int64(ws.ID)),
-					slog.Int64("actor_id", actor),
-					slog.Int64("task_id", childIDs[i]),
+					logutil.LogEntity("workspace", ws.PublicID),
 					slog.String("task_public_id", created[i]),
-					slog.String("parent_task_id", parentPubStr),
+					slog.String("parent_task_public_id", parentPubStr),
 				)
 			}
 		}

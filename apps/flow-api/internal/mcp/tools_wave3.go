@@ -218,6 +218,7 @@ func runConvertIntakeToTask(ctx context.Context, deps Deps, s *session, raw json
 		TaskNumber:      uint32(nextNum),
 		ParentTaskID:    sql.NullInt32{},
 		CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
+		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
 		Title:           item.Title,
 		Description:     desc,
 		Priority:        0,
@@ -362,15 +363,16 @@ func runRestoreDescriptionVersion(ctx context.Context, deps Deps, s *session, ra
 	}
 
 	if err := qtx.UpdateTask(ctx, generated.UpdateTaskParams{
-		Title:       taskRow.Title,
-		Description: sql.NullString{String: version.Body, Valid: version.Body != ""},
-		Priority:    taskRow.Priority,
-		DueOn:       taskRow.DueOn,
-		StartedOn:   taskRow.StartedOn,
-		SortWeight:  taskRow.SortWeight,
-		Visibility:  taskRow.Visibility,
-		WorkspaceID: s.workspaceID,
-		PublicID:    taskPub,
+		Title:           taskRow.Title,
+		Description:     sql.NullString{String: version.Body, Valid: version.Body != ""},
+		Priority:        taskRow.Priority,
+		DueOn:           taskRow.DueOn,
+		StartedOn:       taskRow.StartedOn,
+		SortWeight:      taskRow.SortWeight,
+		Visibility:      taskRow.Visibility,
+		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
+		WorkspaceID:     s.workspaceID,
+		PublicID:        taskPub,
 	}); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}

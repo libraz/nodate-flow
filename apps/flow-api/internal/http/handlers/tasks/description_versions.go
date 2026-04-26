@@ -13,6 +13,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
 // mapDescriptionVersionRow converts a ListDescriptionVersionsRow to the DTO.
@@ -150,15 +151,16 @@ func RestoreDescriptionVersion(deps Deps) func(context.Context, *RestoreDescript
 
 		// Update the task description.
 		if err := qtx.UpdateTask(ctx, generated.UpdateTaskParams{
-			Title:       taskRow.Title,
-			Description: sql.NullString{String: version.Body, Valid: version.Body != ""},
-			Priority:    taskRow.Priority,
-			DueOn:       taskRow.DueOn,
-			StartedOn:   taskRow.StartedOn,
-			SortWeight:  taskRow.SortWeight,
-			Visibility:  taskRow.Visibility,
-			WorkspaceID: ws.ID,
-			PublicID:    types.FromUUID(task.PublicID),
+			Title:           taskRow.Title,
+			Description:     sql.NullString{String: version.Body, Valid: version.Body != ""},
+			Priority:        taskRow.Priority,
+			DueOn:           taskRow.DueOn,
+			StartedOn:       taskRow.StartedOn,
+			SortWeight:      taskRow.SortWeight,
+			Visibility:      taskRow.Visibility,
+			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: actorID != 0},
+			WorkspaceID:     ws.ID,
+			PublicID:        types.FromUUID(task.PublicID),
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
@@ -204,9 +206,8 @@ func RestoreDescriptionVersion(deps Deps) func(context.Context, *RestoreDescript
 				slog.Any("err", err),
 				slog.String("handler", "tasks.RestoreDescriptionVersion"),
 				slog.String("event_type", string(eventbus.DescriptionVersionRestored)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("actor_id", int64(actorID)),
-				slog.Int64("task_id", taskIDInt64),
+				logutil.LogEntity("workspace", ws.PublicID),
+				logutil.LogEntity("task", task.PublicID),
 				slog.String("version_id", versionPub.String()),
 				slog.String("new_version_id", newPub.String()),
 			)

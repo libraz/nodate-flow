@@ -58,6 +58,20 @@ func TestTaskLifecycle(t *testing.T) {
 		tt.AccessToken, map[string]any{"title": "Updated task"}, &got)
 	require.Equal(t, "Updated task", got.Title)
 
+	// Both CreateTask (above) and the PATCH just executed must
+	// populate tasks.updated_by_user_id with the actor's internal id.
+	// We verify against the user resolved by public id so the test
+	// stays oblivious to the internal numbering.
+	var updatedByMatches int
+	err := testDB.QueryRow(
+		`SELECT COUNT(*) FROM tasks
+		 WHERE public_id = UUID_TO_BIN(?, 0)
+		   AND updated_by_user_id = (SELECT id FROM users WHERE public_id = UUID_TO_BIN(?, 0))`,
+		task.ID, tt.UserPublicID).Scan(&updatedByMatches)
+	require.NoError(t, err)
+	require.Equal(t, 1, updatedByMatches,
+		"PATCH /tasks must record actor in updated_by_user_id")
+
 	// Add a constraint.
 	var constraint struct {
 		ID   string `json:"id"`
@@ -121,7 +135,7 @@ func TestTaskLifecycle(t *testing.T) {
 	// workspace-events listing API other than timeline, which is
 	// exercised separately.
 	var events int
-	err := testDB.QueryRow(
+	err = testDB.QueryRow(
 		`SELECT COUNT(*) FROM events
 		 WHERE workspace_id = (SELECT id FROM workspaces WHERE public_id = UUID_TO_BIN(?, 0))`,
 		tt.WorkspacePublicID).Scan(&events)

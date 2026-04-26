@@ -114,7 +114,7 @@ type AdminUpsertInstanceSettingParams struct {
 	PublicID        types.PublicID `json:"publicId"`
 	SettingKey      string         `json:"settingKey"`
 	SettingValue    string         `json:"settingValue"`
-	UpdatedByUserID sql.NullInt32  `json:"updatedByUserId"`
+	UpdatedByUserID sql.NullInt32  `json:"-"`
 }
 
 // Insert or update an instance setting.

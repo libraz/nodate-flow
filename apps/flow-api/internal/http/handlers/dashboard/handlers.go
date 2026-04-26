@@ -14,6 +14,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
 // actorPtr delegates to handlerutil.ActorPtr.
@@ -67,9 +68,8 @@ func Create(deps Deps) func(context.Context, *CreateWidgetInput) (*CreateWidgetO
 				slog.Any("err", err),
 				slog.String("handler", "dashboard.Create"),
 				slog.String("event_type", string(eventbus.DashboardWidgetCreated)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("actor_id", int64(actorID)),
-				slog.String("widget_id", pub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				slog.String("widget_public_id", pub.String()),
 			)
 		}
 
@@ -223,8 +223,8 @@ func Update(deps Deps) func(context.Context, *UpdateWidgetInput) (*UpdateWidgetO
 				slog.Any("err", err),
 				slog.String("handler", "dashboard.Update"),
 				slog.String("event_type", string(eventbus.DashboardWidgetUpdated)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.String("widget_id", pub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				slog.String("widget_public_id", pub.String()),
 			)
 		}
 
@@ -299,8 +299,8 @@ func UpdatePosition(deps Deps) func(context.Context, *UpdateWidgetPositionInput)
 				slog.Any("err", err),
 				slog.String("handler", "dashboard.UpdatePosition"),
 				slog.String("event_type", string(eventbus.DashboardWidgetUpdated)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.String("widget_id", pub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				slog.String("widget_public_id", pub.String()),
 			)
 		}
 
@@ -357,8 +357,8 @@ func Delete(deps Deps) func(context.Context, *DeleteWidgetInput) (*DeleteWidgetO
 				slog.Any("err", err),
 				slog.String("handler", "dashboard.Delete"),
 				slog.String("event_type", string(eventbus.DashboardWidgetDisabled)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.String("widget_id", pub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				slog.String("widget_public_id", pub.String()),
 			)
 		}
 

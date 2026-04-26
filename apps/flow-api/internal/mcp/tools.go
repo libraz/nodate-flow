@@ -878,6 +878,7 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		ProjectID:       prjID,
 		ParentTaskID:    sql.NullInt32{},
 		CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
+		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
 		Title:           in.Title,
 		Description:     desc,
 		Priority:        in.Priority,
@@ -970,15 +971,16 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	}
 
 	updateParams := generated.UpdateTaskParams{
-		Title:       title,
-		Description: desc,
-		Priority:    prio,
-		DueOn:       due,
-		StartedOn:   start,
-		SortWeight:  current.SortWeight,
-		Visibility:  current.Visibility,
-		WorkspaceID: s.workspaceID,
-		PublicID:    pub,
+		Title:           title,
+		Description:     desc,
+		Priority:        prio,
+		DueOn:           due,
+		StartedOn:       start,
+		SortWeight:      current.SortWeight,
+		Visibility:      current.Visibility,
+		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
+		WorkspaceID:     s.workspaceID,
+		PublicID:        pub,
 	}
 
 	if !needsItemkit {
@@ -1142,10 +1144,11 @@ func runTransitionTask(ctx context.Context, deps Deps, s *session, raw json.RawM
 
 	qtx := generated.New(tx)
 	if err := qtx.TransitionTaskState(ctx, generated.TransitionTaskStateParams{
-		DerivedState: nextDerived,
-		Column2:      string(nextDerived),
-		WorkspaceID:  s.workspaceID,
-		PublicID:     pub,
+		DerivedState:    nextDerived,
+		Column2:         string(nextDerived),
+		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
+		WorkspaceID:     s.workspaceID,
+		PublicID:        pub,
 	}); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
@@ -1565,6 +1568,7 @@ func runApplySteps(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 			ProjectID:       parentProjectID,
 			ParentTaskID:    sql.NullInt32{Int32: int32(parentInternal), Valid: true},
 			CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
+			UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
 			Title:           st.Title,
 			Description:     desc,
 			Priority:        st.Priority,
@@ -2477,6 +2481,7 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 		ProjectID:       prjID,
 		ParentTaskID:    sql.NullInt32{},
 		CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
+		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
 		Title:           in.Title,
 		Description:     desc,
 		Priority:        0,
@@ -2511,6 +2516,7 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 			ProjectID:       prjID,
 			ParentTaskID:    sql.NullInt32{Int32: int32(parentID), Valid: true},
 			CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
+			UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
 			Title:           st.Title,
 			Description:     childDesc,
 			Priority:        smartCreatePriorityToInt(st.Priority),

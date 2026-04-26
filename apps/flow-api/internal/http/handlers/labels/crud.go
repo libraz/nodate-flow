@@ -12,6 +12,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
 // Create handles POST /workspaces/{wsId}/labels.
@@ -92,8 +93,8 @@ func Create(deps Deps) func(context.Context, *CreateLabelInput) (*CreateLabelOut
 				slog.Any("err", err),
 				slog.String("handler", "labels.Create"),
 				slog.String("event_type", string(eventbus.LabelCreated)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.String("label_id", pub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				slog.String("label_public_id", pub.String()),
 			)
 		}
 
@@ -307,8 +308,8 @@ func Patch(deps Deps) func(context.Context, *PatchLabelInput) (*PatchLabelOutput
 				slog.Any("err", err),
 				slog.String("handler", "labels.Patch"),
 				slog.String("event_type", string(eventbus.LabelUpdated)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.String("label_id", pub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				slog.String("label_public_id", pub.String()),
 			)
 		}
 
@@ -366,8 +367,8 @@ func Disable(deps Deps) func(context.Context, *DisableLabelInput) (*DisableLabel
 				slog.Any("err", err),
 				slog.String("handler", "labels.Disable"),
 				slog.String("event_type", string(eventbus.LabelDisabled)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.String("label_id", pub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				slog.String("label_public_id", pub.String()),
 			)
 		}
 
@@ -443,9 +444,9 @@ func AddTaskLabel(deps Deps) func(context.Context, *AddTaskLabelInput) (*AddTask
 				slog.Any("err", err),
 				slog.String("handler", "labels.AddTaskLabel"),
 				slog.String("event_type", string(eventbus.TaskLabelAdded)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("task_id", taskID),
-				slog.String("label_id", labelPub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				logutil.LogEntity("task", task.PublicID),
+				slog.String("label_public_id", labelPub.String()),
 			)
 		}
 
@@ -537,9 +538,9 @@ func RemoveTaskLabel(deps Deps) func(context.Context, *RemoveTaskLabelInput) (*R
 				slog.Any("err", err),
 				slog.String("handler", "labels.RemoveTaskLabel"),
 				slog.String("event_type", string(eventbus.TaskLabelRemoved)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("task_id", taskID),
-				slog.String("label_id", labelPub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				logutil.LogEntity("task", task.PublicID),
+				slog.String("label_public_id", labelPub.String()),
 			)
 		}
 

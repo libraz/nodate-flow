@@ -18,6 +18,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
 // maxExportRows is the hard upper limit on the number of rows a single
@@ -87,8 +88,7 @@ func Export(deps Deps) func(ctx context.Context, in *ExportInput) (*ExportOutput
 				slog.Any("err", err),
 				slog.String("handler", "export.Export"),
 				slog.String("event_type", string(eventbus.ExportRequested)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("actor_id", actorInt64),
+				logutil.LogEntity("workspace", ws.PublicID),
 				slog.String("format", in.Format),
 			)
 		}
@@ -199,8 +199,7 @@ func ExportCSV(deps Deps) http.HandlerFunc {
 				slog.Any("err", err),
 				slog.String("handler", "export.ExportCSV"),
 				slog.String("event_type", string(eventbus.ExportRequested)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("actor_id", actorInt64),
+				logutil.LogEntity("workspace", ws.PublicID),
 				slog.String("format", "csv"),
 			)
 		}

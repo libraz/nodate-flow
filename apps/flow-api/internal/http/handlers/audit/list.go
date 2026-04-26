@@ -9,6 +9,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
 // List handles GET /workspaces/{wsId}/audit-logs. It returns the most
@@ -50,7 +51,7 @@ func List(deps Deps) func(context.Context, *ListAuditLogsInput) (*ListAuditLogsO
 
 		rows, err := deps.Queries.ListWorkspaceAuditLogs(ctx, params)
 		if err != nil {
-			slog.ErrorContext(ctx, "audit list query failed", "err", err.Error(), "workspace_id", ws.ID)
+			slog.ErrorContext(ctx, "audit list query failed", slog.String("err", err.Error()), logutil.LogEntity("workspace", ws.PublicID))
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 

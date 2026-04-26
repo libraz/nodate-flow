@@ -244,8 +244,9 @@ func runArchiveTask(ctx context.Context, deps Deps, s *session, raw json.RawMess
 		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 	}
 	if err := deps.Queries.ArchiveTask(ctx, generated.ArchiveTaskParams{
-		WorkspaceID: s.workspaceID,
-		PublicID:    taskPub,
+		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
+		WorkspaceID:     s.workspaceID,
+		PublicID:        taskPub,
 	}); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
@@ -274,8 +275,9 @@ func runUnarchiveTask(ctx context.Context, deps Deps, s *session, raw json.RawMe
 		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 	}
 	if err := deps.Queries.UnarchiveTask(ctx, generated.UnarchiveTaskParams{
-		WorkspaceID: s.workspaceID,
-		PublicID:    taskPub,
+		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
+		WorkspaceID:     s.workspaceID,
+		PublicID:        taskPub,
 	}); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}

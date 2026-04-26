@@ -111,10 +111,9 @@ func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error
 					slog.Any("err", err),
 					slog.String("handler", "signals.Create"),
 					slog.String("event_type", string(eventbus.SignalAttached)),
-					slog.Int64("workspace_id", int64(wsID)),
-					slog.Int64("actor_id", actor),
-					slog.Int64("task_id", taskInternal),
-					slog.String("signal_id", pub.String()),
+					slog.String("workspace_public_id", in.Body.WorkspaceID),
+					slog.String("task_public_id", in.Body.TaskID),
+					slog.String("signal_public_id", pub.String()),
 				)
 			}
 		}

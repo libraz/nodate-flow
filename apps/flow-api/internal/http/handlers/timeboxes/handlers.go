@@ -14,6 +14,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
 const dateLayout = "2006-01-02"
@@ -171,9 +172,8 @@ func Create(deps Deps) func(context.Context, *CreateTimeboxInput) (*CreateTimebo
 				slog.Any("err", err),
 				slog.String("handler", "timeboxes.Create"),
 				slog.String("event_type", string(eventbus.TimeboxCreated)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("actor_id", int64(actorID)),
-				slog.String("timebox_id", pub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				slog.String("timebox_public_id", pub.String()),
 			)
 		}
 
@@ -352,8 +352,8 @@ func Update(deps Deps) func(context.Context, *UpdateTimeboxInput) (*UpdateTimebo
 				slog.Any("err", err),
 				slog.String("handler", "timeboxes.Update"),
 				slog.String("event_type", string(eventbus.TimeboxUpdated)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.String("timebox_id", pub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				slog.String("timebox_public_id", pub.String()),
 			)
 		}
 
@@ -436,8 +436,8 @@ func UpdateStatus(deps Deps) func(context.Context, *UpdateTimeboxStatusInput) (*
 				slog.Any("err", err),
 				slog.String("handler", "timeboxes.UpdateStatus"),
 				slog.String("event_type", string(evtType)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.String("timebox_id", pub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				slog.String("timebox_public_id", pub.String()),
 				slog.String("status", in.Body.Status),
 			)
 		}
@@ -563,9 +563,9 @@ func AddTask(deps Deps) func(context.Context, *AddTaskInput) (*AddTaskOutput, er
 				slog.Any("err", err),
 				slog.String("handler", "timeboxes.AddTask"),
 				slog.String("event_type", string(eventbus.TimeboxTaskAdded)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.String("timebox_id", tbPub.String()),
-				slog.String("task_id", taskPub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				slog.String("timebox_public_id", tbPub.String()),
+				slog.String("task_public_id", taskPub.String()),
 			)
 		}
 
@@ -640,9 +640,9 @@ func RemoveTask(deps Deps) func(context.Context, *RemoveTaskInput) (*RemoveTaskO
 				slog.Any("err", err),
 				slog.String("handler", "timeboxes.RemoveTask"),
 				slog.String("event_type", string(eventbus.TimeboxTaskRemoved)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.String("timebox_id", tbPub.String()),
-				slog.String("task_id", taskPub.String()),
+				logutil.LogEntity("workspace", ws.PublicID),
+				slog.String("timebox_public_id", tbPub.String()),
+				slog.String("task_public_id", taskPub.String()),
 			)
 		}
 

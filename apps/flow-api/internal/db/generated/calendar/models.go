@@ -2056,7 +2056,7 @@ type AiInvocation struct {
 	Status AiInvocationsStatus `json:"status"`
 	// Error code when status != ok
 	ErrorCode sql.NullString `json:"errorCode"`
-	// Invocation time (second precision)
+	// Invocation time (millisecond precision)
 	InvokedAt time.Time `json:"invokedAt"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
@@ -2216,7 +2216,7 @@ type AuditLog struct {
 	UserAgent sql.NullString `json:"userAgent"`
 	// Redacted metadata (no secrets, no raw keys)
 	MetadataJson json.RawMessage `json:"metadataJson"`
-	// Logical occurrence time (second precision; ties broken by id)
+	// Logical occurrence time (millisecond precision; ties broken by id)
 	OccurredAt time.Time `json:"occurredAt"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
@@ -2672,7 +2672,7 @@ type Event struct {
 	Type string `json:"type"`
 	// Event payload
 	PayloadJson json.RawMessage `json:"payloadJson"`
-	// Logical time of the event (second precision; ties broken by id)
+	// Logical time of the event (millisecond precision; ties broken by id)
 	OccurredAt time.Time `json:"occurredAt"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
@@ -2804,7 +2804,7 @@ type InstanceAuditLog struct {
 	UserAgent sql.NullString `json:"userAgent"`
 	// Redacted payload (no secrets)
 	PayloadJson json.RawMessage `json:"payloadJson"`
-	// Logical occurrence time (second precision; ties broken by id)
+	// Logical occurrence time (millisecond precision; ties broken by id)
 	OccurredAt time.Time `json:"occurredAt"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
@@ -2827,7 +2827,7 @@ type InstanceSetting struct {
 	// Current value as text
 	SettingValue string `json:"settingValue"`
 	// Last modifier user.id
-	UpdatedByUserID sql.NullInt32 `json:"updatedByUserId"`
+	UpdatedByUserID sql.NullInt32 `json:"-"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
@@ -2992,7 +2992,7 @@ type McpInvocation struct {
 	ErrorCode sql.NullString `json:"errorCode"`
 	// Wall-clock duration in milliseconds
 	DurationMs sql.NullInt32 `json:"durationMs"`
-	// Invocation start time (second precision)
+	// Invocation start time (millisecond precision)
 	InvokedAt time.Time `json:"invokedAt"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
@@ -3433,6 +3433,8 @@ type Task struct {
 	ParentTaskID sql.NullInt32 `json:"parentTaskId"`
 	// Creator user.id
 	CreatedByUserID sql.NullInt32 `json:"-"`
+	// Last modifier user.id (audit field; NULL for system writers)
+	UpdatedByUserID sql.NullInt32 `json:"-"`
 	// Task title
 	Title string `json:"title"`
 	// Markdown body
