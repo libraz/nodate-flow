@@ -3,6 +3,7 @@
     "profile": "プロフィール",
     "notifications": "通知",
     "general": "一般",
+    "data": "データ",
     "public_shares": "公開シェアページ",
     "mcp_tokens": "MCP トークン",
     "ai_providers": "AI プロバイダ",
@@ -511,6 +512,71 @@
       "errors": {
         "load_failed": "自動アクション設定を読み込めませんでした。",
         "update_failed": "自動アクション設定を更新できませんでした。もう一度お試しください。"
+      }
+    }
+  },
+  "settings": {
+    "data": {
+      "title": "インポート / エクスポート",
+      "description": "CSV やサードパーティからのインポートとタスクのエクスポートを管理します。",
+      "export": {
+        "title": "タスクをエクスポート",
+        "description": "このワークスペースのすべてのタスクを CSV または JSON でダウンロードします。",
+        "format": {
+          "label": "形式",
+          "csv": "CSV",
+          "json": "JSON"
+        },
+        "submit": "エクスポート",
+        "success": "{count} 件のタスクをエクスポートしました",
+        "error": "タスクのエクスポートに失敗しました"
+      },
+      "imports": {
+        "title": "インポート",
+        "empty": "インポートジョブはまだありません",
+        "new": "新規インポート",
+        "col": {
+          "source": "ソース",
+          "status": "ステータス",
+          "progress": "進捗",
+          "failed": "失敗",
+          "started": "開始",
+          "completed": "完了",
+          "actions": "操作"
+        },
+        "status": {
+          "pending": "保留中",
+          "running": "実行中",
+          "completed": "完了",
+          "failed": "失敗",
+          "cancelled": "中断"
+        },
+        "source": {
+          "github": "GitHub",
+          "jira": "Jira",
+          "linear": "Linear",
+          "csv": "CSV"
+        },
+        "cancel": "中止",
+        "cancel_confirm": "このインポートジョブを中止しますか？",
+        "cancel_success": "インポートジョブを中止しました",
+        "cancel_error": "中止に失敗しました",
+        "error_log": "エラーログ",
+        "create": {
+          "source": "ソース",
+          "project": {
+            "label": "対象プロジェクト",
+            "placeholder": "プロジェクトを選択（任意）"
+          },
+          "config": {
+            "label": "設定 JSON",
+            "hint": "ソース固有の設定。不要なら空のままにしてください。",
+            "invalid": "設定は有効な JSON である必要があります。"
+          },
+          "submit": "インポート開始",
+          "success": "インポートジョブを開始しました",
+          "error": "インポートの開始に失敗しました"
+        }
       }
     }
   }

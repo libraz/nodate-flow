@@ -3,6 +3,7 @@
     "profile": "Profile",
     "notifications": "Notifications",
     "general": "General",
+    "data": "数据",
     "public_shares": "Public share pages",
     "mcp_tokens": "MCP tokens",
     "ai_providers": "AI providers",
@@ -511,6 +512,71 @@
       "errors": {
         "load_failed": "Could not load auto-action settings.",
         "update_failed": "Could not update auto-action settings. Please try again."
+      }
+    }
+  },
+  "settings": {
+    "data": {
+      "title": "导入与导出",
+      "description": "管理 CSV 和第三方导入，并导出工作区任务。",
+      "export": {
+        "title": "导出任务",
+        "description": "将此工作区的所有任务下载为 CSV 或 JSON。",
+        "format": {
+          "label": "格式",
+          "csv": "CSV",
+          "json": "JSON"
+        },
+        "submit": "导出",
+        "success": "已导出 {count} 个任务",
+        "error": "导出任务失败"
+      },
+      "imports": {
+        "title": "导入",
+        "empty": "暂无导入任务",
+        "new": "新建导入",
+        "col": {
+          "source": "源",
+          "status": "状态",
+          "progress": "进度",
+          "failed": "失败",
+          "started": "开始",
+          "completed": "完成",
+          "actions": "操作"
+        },
+        "status": {
+          "pending": "等待中",
+          "running": "运行中",
+          "completed": "已完成",
+          "failed": "失败",
+          "cancelled": "已取消"
+        },
+        "source": {
+          "github": "GitHub",
+          "jira": "Jira",
+          "linear": "Linear",
+          "csv": "CSV"
+        },
+        "cancel": "取消",
+        "cancel_confirm": "取消此导入任务？",
+        "cancel_success": "已取消导入任务",
+        "cancel_error": "取消失败",
+        "error_log": "错误日志",
+        "create": {
+          "source": "源",
+          "project": {
+            "label": "目标项目",
+            "placeholder": "选择项目（可选）"
+          },
+          "config": {
+            "label": "配置 JSON",
+            "hint": "源特定的配置。如不需要请留空。",
+            "invalid": "配置必须是有效的 JSON。"
+          },
+          "submit": "开始导入",
+          "success": "已开始导入任务",
+          "error": "开始导入失败"
+        }
       }
     }
   }

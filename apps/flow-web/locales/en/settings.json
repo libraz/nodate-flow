@@ -3,6 +3,7 @@
     "profile": "Profile",
     "notifications": "Notifications",
     "general": "General",
+    "data": "Data",
     "public_shares": "Public share pages",
     "mcp_tokens": "MCP tokens",
     "ai_providers": "AI providers",
@@ -511,6 +512,71 @@
       "errors": {
         "load_failed": "Could not load auto-action settings.",
         "update_failed": "Could not update auto-action settings. Please try again."
+      }
+    }
+  },
+  "settings": {
+    "data": {
+      "title": "Imports & Exports",
+      "description": "Manage CSV and 3rd-party imports and export workspace tasks.",
+      "export": {
+        "title": "Export tasks",
+        "description": "Download every task in this workspace as CSV or JSON.",
+        "format": {
+          "label": "Format",
+          "csv": "CSV",
+          "json": "JSON"
+        },
+        "submit": "Export",
+        "success": "Exported {count} tasks",
+        "error": "Failed to export tasks"
+      },
+      "imports": {
+        "title": "Imports",
+        "empty": "No import jobs yet",
+        "new": "New import job",
+        "col": {
+          "source": "Source",
+          "status": "Status",
+          "progress": "Progress",
+          "failed": "Failed",
+          "started": "Started",
+          "completed": "Completed",
+          "actions": "Actions"
+        },
+        "status": {
+          "pending": "Pending",
+          "running": "Running",
+          "completed": "Completed",
+          "failed": "Failed",
+          "cancelled": "Cancelled"
+        },
+        "source": {
+          "github": "GitHub",
+          "jira": "Jira",
+          "linear": "Linear",
+          "csv": "CSV"
+        },
+        "cancel": "Cancel",
+        "cancel_confirm": "Cancel this import job?",
+        "cancel_success": "Import job cancelled",
+        "cancel_error": "Failed to cancel",
+        "error_log": "Error log",
+        "create": {
+          "source": "Source",
+          "project": {
+            "label": "Target project",
+            "placeholder": "Select a project (optional)"
+          },
+          "config": {
+            "label": "Configuration JSON",
+            "hint": "Source-specific configuration. Leave empty if not needed.",
+            "invalid": "Configuration must be valid JSON."
+          },
+          "submit": "Start import",
+          "success": "Import job started",
+          "error": "Failed to start import"
+        }
       }
     }
   }
