@@ -8,6 +8,7 @@ package generated
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 
 	types "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
@@ -129,6 +130,73 @@ func (q *Queries) CreateNotification(ctx context.Context, arg CreateNotification
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+const getEnabledChannelsForRecipients = `-- name: GetEnabledChannelsForRecipients :many
+SELECT
+  user_id,
+  channel
+FROM notification_preferences
+WHERE workspace_id = ?
+  AND event_category = ?
+  AND user_id IN (/*SLICE:user_ids*/?)
+  AND is_muted = FALSE
+  AND enabled = TRUE
+`
+
+type GetEnabledChannelsForRecipientsParams struct {
+	WorkspaceID   uint32   `json:"-"`
+	EventCategory string   `json:"eventCategory"`
+	UserIds       []uint32 `json:"-"`
+}
+
+type GetEnabledChannelsForRecipientsRow struct {
+	UserID  uint32                         `json:"-"`
+	Channel NotificationPreferencesChannel `json:"channel"`
+}
+
+// Resolve, for a set of recipients in one workspace, which delivery
+// channels are enabled for a given event_category. A recipient with
+// no row for the (workspace, category, channel) tuple returns no
+// entry; the caller is expected to apply the default (in_app) when a
+// recipient is absent from the result set.
+//
+// Only rows with enabled = TRUE AND is_muted = FALSE are returned —
+// a muted preference behaves identically to a disabled one for the
+// purposes of fan-out, and neither should produce a notifications row.
+func (q *Queries) GetEnabledChannelsForRecipients(ctx context.Context, arg GetEnabledChannelsForRecipientsParams) ([]GetEnabledChannelsForRecipientsRow, error) {
+	query := getEnabledChannelsForRecipients
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.WorkspaceID)
+	queryParams = append(queryParams, arg.EventCategory)
+	if len(arg.UserIds) > 0 {
+		for _, v := range arg.UserIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:user_ids*/?", strings.Repeat(",?", len(arg.UserIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:user_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetEnabledChannelsForRecipientsRow{}
+	for rows.Next() {
+		var i GetEnabledChannelsForRecipientsRow
+		if err := rows.Scan(&i.UserID, &i.Channel); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listNotificationsForUser = `-- name: ListNotificationsForUser :many

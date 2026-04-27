@@ -459,10 +459,12 @@ func main() {
 	defer stopCancel()
 
 	// Calendar event reminder ticker (relocated from time-api per ADR
-	// 0007). Scans calendar_events on a 1-minute interval, logs
-	// reminders, and marks notified_at to prevent duplicates. Exits
-	// when stopCtx is cancelled by the shutdown signal handler.
-	go calendarnotifs.StartNotificationScheduler(stopCtx, db, time.Minute)
+	// 0007). Scans calendar_events on a 1-minute interval, dispatches
+	// reminders through the shared notification fan-out so each
+	// attendee receives an in-app notification row, and marks
+	// notified_at to prevent duplicates. Exits when stopCtx is
+	// cancelled by the shutdown signal handler.
+	go calendarnotifs.StartNotificationScheduler(stopCtx, db, notifFanout, time.Minute)
 
 	serverErr := make(chan error, 1)
 	go func() {

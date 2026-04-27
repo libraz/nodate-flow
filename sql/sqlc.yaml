@@ -65,6 +65,21 @@ sql:
               import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
+          # event_public_id is BINARY(16) on webhook_deliveries (the source events.public_id
+          # used as the dedupe anchor). Without this override sqlc maps the nullable column
+          # to sql.NullString, which writes the canonical 36-char UUID into the BINARY(16)
+          # column truncated to 16 bytes — a silent data corruption that broke webhook
+          # dedupe (H1 audit). Mapping it to *PublicID routes through the type's binary
+          # Valuer/Scanner, and the pointer preserves NULL semantics so manual test
+          # deliveries (no source event) do not collide on the (subscription_id,
+          # event_public_id) unique key.
+          - column: "*.event_public_id"
+            nullable: true
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+              pointer: true
           # Internal surrogate keys must never leak to JSON responses.
           - column: "*.id"
             go_struct_tag: 'json:"-"'
@@ -188,8 +203,8 @@ sql:
             go_struct_tag: 'json:"-"'
   # --- flow-api calendar subpackage (calendar queries only) ---
   # Generated alongside the primary flow-api generated package so that the
-  # relocated calendar handlers (R6 Phase 0 Step 0-2) can import a calendar-
-  # scoped queries struct without polluting the root generated package.
+  # calendar handlers can import a calendar-scoped queries struct without
+  # polluting the root generated package.
   - engine: "mysql"
     queries:
       - "queries/calendars"

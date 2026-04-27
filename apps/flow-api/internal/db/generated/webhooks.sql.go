@@ -14,8 +14,8 @@ import (
 	types "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 )
 
-const createWebhookDelivery = `-- name: CreateWebhookDelivery :execlastid
-INSERT INTO webhook_deliveries (
+const createWebhookDelivery = `-- name: CreateWebhookDelivery :execrows
+INSERT IGNORE INTO webhook_deliveries (
   public_id, workspace_id, subscription_id, event_type,
   event_public_id, payload_json, status, next_retry_at
 ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)
@@ -26,11 +26,16 @@ type CreateWebhookDeliveryParams struct {
 	WorkspaceID    uint32          `json:"-"`
 	SubscriptionID uint32          `json:"-"`
 	EventType      string          `json:"eventType"`
-	EventPublicID  sql.NullString  `json:"eventPublicId"`
+	EventPublicID  *types.PublicID `json:"eventPublicId"`
 	PayloadJson    json.RawMessage `json:"payloadJson"`
 	NextRetryAt    sql.NullTime    `json:"nextRetryAt"`
 }
 
+// Insert a delivery row, deduping against the (subscription_id, event_public_id)
+// unique key so the same event fanned out twice (e.g. eventbus retry) does
+// not enqueue two HTTP attempts for the same subscription.
+// Returns the affected-row count (1 = inserted, 0 = duplicate ignored) so
+// the worker can branch on the dedupe outcome without a follow-up SELECT.
 func (q *Queries) CreateWebhookDelivery(ctx context.Context, arg CreateWebhookDeliveryParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, createWebhookDelivery,
 		arg.PublicID,
@@ -44,7 +49,7 @@ func (q *Queries) CreateWebhookDelivery(ctx context.Context, arg CreateWebhookDe
 	if err != nil {
 		return 0, err
 	}
-	return result.LastInsertId()
+	return result.RowsAffected()
 }
 
 const createWebhookSubscription = `-- name: CreateWebhookSubscription :execlastid

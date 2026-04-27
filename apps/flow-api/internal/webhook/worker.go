@@ -74,10 +74,15 @@ func NewWorker(db *sql.DB, q *generated.Queries) *Worker {
 // Hook returns an eventbus.NotifyHook that creates webhook delivery
 // rows for every active subscription whose event_types list matches the
 // fired event. The returned function is non-blocking: it spawns a
-// goroutine so the eventbus append path is never delayed. The
-// eventInternalID parameter is unused here — webhook deliveries
-// dedupe on (subscription_id, event_public_id) once the payload
-// builder is wired to surface the events.public_id.
+// goroutine so the eventbus append path is never delayed.
+//
+// eventInternalID is the events.id of the row that triggered this
+// fan-out; the worker resolves it to events.public_id and the row's
+// occurred_at, then stamps both onto each webhook_deliveries row so
+// repeated dispatches of the same event collapse to a single delivery
+// per subscription via the (subscription_id, event_public_id) unique
+// key, and the payload's OccurredAt reflects the event's logical time
+// rather than the dispatch instant.
 //
 // The spawned goroutine inherits the parent context's values via
 // [context.WithoutCancel] so trace span / logger attributes survive
@@ -85,7 +90,7 @@ func NewWorker(db *sql.DB, q *generated.Queries) *Worker {
 // recover() guards the goroutine: a panic inside createDeliveries
 // would otherwise crash the whole flow-api process.
 func (w *Worker) Hook() func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint32) {
-	return func(ctx context.Context, workspaceID uint32, eventType string, _ uint32) {
+	return func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint32) {
 		detached := context.WithoutCancel(ctx)
 		go func() {
 			defer func() {
@@ -96,18 +101,21 @@ func (w *Worker) Hook() func(ctx context.Context, workspaceID uint32, eventType 
 						slog.String("event_type", eventType))
 				}
 			}()
-			fn := w.run
-			if fn == nil {
-				fn = w.createDeliveries
+			if w.run != nil {
+				w.run(detached, workspaceID, eventType)
+				return
 			}
-			fn(detached, workspaceID, eventType)
+			w.createDeliveries(detached, workspaceID, eventType, eventInternalID)
 		}()
 	}
 }
 
 // createDeliveries finds active subscriptions for the workspace, filters
 // by event type, and inserts a pending delivery row for each match.
-func (w *Worker) createDeliveries(ctx context.Context, workspaceID uint32, eventType string) {
+// eventInternalID is resolved once to (event_public_id, occurred_at) so
+// every delivery row in this fan-out shares the same dedupe key and the
+// payload's OccurredAt is the event's logical time, not the dispatch time.
+func (w *Worker) createDeliveries(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint32) {
 	subs, err := w.queries.ListActiveSubscriptionsForEvent(ctx, workspaceID)
 	if err != nil {
 		slog.Warn("webhook: failed to list active subscriptions",
@@ -117,8 +125,22 @@ func (w *Worker) createDeliveries(ctx context.Context, workspaceID uint32, event
 		return
 	}
 
-	// Fetch the latest event payload for context.
-	payload := w.buildPayload(ctx, workspaceID, eventType)
+	eventRow, err := w.queries.GetEventPublicIDAndOccurredAt(ctx, generated.GetEventPublicIDAndOccurredAtParams{
+		WorkspaceID: workspaceID,
+		ID:          uint64(eventInternalID),
+	})
+	if err != nil {
+		slog.Warn("webhook: failed to resolve event public id",
+			slog.Uint64("workspace_id", uint64(workspaceID)),
+			slog.String("event_type", eventType),
+			slog.Uint64("event_internal_id", uint64(eventInternalID)),
+			slog.String("err", err.Error()))
+		return
+	}
+	eventPubID := eventRow.PublicID
+	occurredAt := eventRow.OccurredAt
+
+	payload := w.buildPayload(ctx, workspaceID, eventType, occurredAt)
 
 	for _, sub := range subs {
 		if !matchesEventType(sub.EventTypes, eventType) {
@@ -132,7 +154,7 @@ func (w *Worker) createDeliveries(ctx context.Context, workspaceID uint32, event
 			WorkspaceID:    workspaceID,
 			SubscriptionID: sub.ID,
 			EventType:      eventType,
-			EventPublicID:  sql.NullString{},
+			EventPublicID:  &eventPubID,
 			PayloadJson:    payload,
 			NextRetryAt:    sql.NullTime{Time: now, Valid: true},
 		}); err != nil {
@@ -164,7 +186,9 @@ func matchesEventType(raw json.RawMessage, eventType string) bool {
 }
 
 // buildPayload constructs the JSON payload sent to the webhook target.
-func (w *Worker) buildPayload(ctx context.Context, workspaceID uint32, eventType string) json.RawMessage {
+// occurredAt comes from the source events row so the payload reflects
+// when the event happened, not when the worker happened to dispatch it.
+func (w *Worker) buildPayload(ctx context.Context, workspaceID uint32, eventType string, occurredAt time.Time) json.RawMessage {
 	type webhookPayload struct {
 		EventType   string `json:"eventType"`
 		WorkspaceID string `json:"workspaceId,omitempty"`
@@ -186,7 +210,7 @@ func (w *Worker) buildPayload(ctx context.Context, workspaceID uint32, eventType
 	p := webhookPayload{
 		EventType:   eventType,
 		WorkspaceID: wsPublicID,
-		OccurredAt:  time.Now().Unix(),
+		OccurredAt:  occurredAt.Unix(),
 	}
 	b, err := json.Marshal(p)
 	if err != nil {
@@ -222,6 +246,59 @@ func (w *Worker) loop(ctx context.Context) {
 		case <-ticker.C:
 			w.processBatch(ctx)
 		}
+	}
+}
+
+// ProcessOnce drains one batch of pending deliveries synchronously.
+// Exported solely for e2e tests that need to advance the delivery
+// state machine without running the 5-second background loop.
+func (w *Worker) ProcessOnce(ctx context.Context) {
+	w.processBatch(ctx)
+}
+
+// ProcessOnceForSubscription is the tightly-scoped variant of ProcessOnce
+// used by parallel-safe e2e tests: it only delivers rows belonging to a
+// single subscription, so concurrent tests cannot accidentally consume
+// each other's pending rows. Production callers must use [Worker.Start]
+// or [Worker.ProcessOnce] instead.
+func (w *Worker) ProcessOnceForSubscription(ctx context.Context, subscriptionID uint32) {
+	const q = `
+		SELECT d.id, d.public_id, d.workspace_id, d.subscription_id,
+		       d.event_type, d.payload_json, d.attempts, d.max_attempts,
+		       ws.url, ws.secret
+		FROM webhook_deliveries d
+		INNER JOIN webhook_subscriptions ws ON ws.id = d.subscription_id
+		WHERE d.subscription_id = ?
+		  AND d.status IN ('pending', 'failed')
+		  AND d.next_retry_at <= NOW()
+		  AND d.attempts < d.max_attempts
+		  AND d.enabled = TRUE
+		ORDER BY d.next_retry_at ASC
+		LIMIT ?
+	`
+	rows, err := w.db.QueryContext(ctx, q, subscriptionID, batchSize)
+	if err != nil {
+		slog.Warn("webhook: ProcessOnceForSubscription: query failed",
+			slog.String("err", err.Error()))
+		return
+	}
+	defer rows.Close()
+	var pending []generated.FindPendingDeliveriesRow
+	for rows.Next() {
+		var r generated.FindPendingDeliveriesRow
+		if err := rows.Scan(
+			&r.ID, &r.PublicID, &r.WorkspaceID, &r.SubscriptionID,
+			&r.EventType, &r.PayloadJson, &r.Attempts, &r.MaxAttempts,
+			&r.Url, &r.Secret,
+		); err != nil {
+			slog.Warn("webhook: ProcessOnceForSubscription: scan failed",
+				slog.String("err", err.Error()))
+			return
+		}
+		pending = append(pending, r)
+	}
+	for _, row := range pending {
+		w.deliver(ctx, row)
 	}
 }
 

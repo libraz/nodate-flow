@@ -4148,7 +4148,7 @@ type WebhookDelivery struct {
 	// The event that triggered this delivery
 	EventType string `json:"eventType"`
 	// public_id of the source event
-	EventPublicID sql.NullString `json:"eventPublicId"`
+	EventPublicID *types.PublicID `json:"eventPublicId"`
 	// The JSON payload that was/will be sent
 	PayloadJson json.RawMessage `json:"payloadJson"`
 	// Delivery state

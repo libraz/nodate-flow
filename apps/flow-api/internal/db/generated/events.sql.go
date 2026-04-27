@@ -86,6 +86,40 @@ func (q *Queries) CountAiSuggestionOutcomesForWorkspace(ctx context.Context, arg
 	return i, err
 }
 
+const getEventPublicIDAndOccurredAt = `-- name: GetEventPublicIDAndOccurredAt :one
+SELECT public_id, occurred_at
+FROM events
+WHERE workspace_id = ?
+  AND id = ?
+LIMIT 1
+`
+
+type GetEventPublicIDAndOccurredAtParams struct {
+	WorkspaceID uint32 `json:"-"`
+	ID          uint64 `json:"-"`
+}
+
+type GetEventPublicIDAndOccurredAtRow struct {
+	PublicID   types.PublicID `json:"publicId"`
+	OccurredAt time.Time      `json:"occurredAt"`
+}
+
+// Resolve an event's public id and logical occurrence time given its
+// internal id, scoped by workspace as a defence-in-depth check.
+// Used by the webhook fanout chain (H1): the worker needs the event's
+// public_id to populate the dedupe key and the row's occurred_at to set
+// the webhook OccurredAt field, instead of using time.Now() which would
+// attribute the wrong instant when delivery is retried.
+// occurred_at (not created_at) is the contract because it is the logical
+// event time set by the eventbus producer; created_at is just the row
+// insertion time and could drift from the event's true occurrence.
+func (q *Queries) GetEventPublicIDAndOccurredAt(ctx context.Context, arg GetEventPublicIDAndOccurredAtParams) (GetEventPublicIDAndOccurredAtRow, error) {
+	row := q.db.QueryRowContext(ctx, getEventPublicIDAndOccurredAt, arg.WorkspaceID, arg.ID)
+	var i GetEventPublicIDAndOccurredAtRow
+	err := row.Scan(&i.PublicID, &i.OccurredAt)
+	return i, err
+}
+
 const hasRecentEventsForWorkspace = `-- name: HasRecentEventsForWorkspace :one
 SELECT EXISTS(
   SELECT 1 FROM events

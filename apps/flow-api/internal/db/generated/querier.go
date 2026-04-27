@@ -103,7 +103,9 @@ type Querier interface {
 	ArchiveTask(ctx context.Context, arg ArchiveTaskParams) error
 	// Allocate the next task number for a project. Must be called inside a
 	// transaction with the project row locked (SELECT ... FOR UPDATE).
-	AssignTaskNumber(ctx context.Context, projectID uint32) (int32, error)
+	// workspace_id is included so the index (workspace_id, project_id) is used and
+	// the query is bounded to the caller's workspace as a defence-in-depth check.
+	AssignTaskNumber(ctx context.Context, arg AssignTaskNumberParams) (int32, error)
 	// Link an existing signal to a task by public_id.
 	AttachSignalToTask(ctx context.Context, arg AttachSignalToTaskParams) error
 	// Cancel a pending or running import job.
@@ -227,6 +229,11 @@ type Querier interface {
 	CreateTaskLabel(ctx context.Context, arg CreateTaskLabelParams) (int64, error)
 	// Insert a new timebox (sprint / iteration / cycle).
 	CreateTimebox(ctx context.Context, arg CreateTimeboxParams) (int64, error)
+	// Insert a delivery row, deduping against the (subscription_id, event_public_id)
+	// unique key so the same event fanned out twice (e.g. eventbus retry) does
+	// not enqueue two HTTP attempts for the same subscription.
+	// Returns the affected-row count (1 = inserted, 0 = duplicate ignored) so
+	// the worker can branch on the dedupe outcome without a follow-up SELECT.
 	CreateWebhookDelivery(ctx context.Context, arg CreateWebhookDeliveryParams) (int64, error)
 	CreateWebhookSubscription(ctx context.Context, arg CreateWebhookSubscriptionParams) (int64, error)
 	// Insert a new dashboard widget.
@@ -467,6 +474,26 @@ type Querier interface {
 	GetAiSettings(ctx context.Context, workspaceID uint32) (GetAiSettingsRow, error)
 	// Fetch a single attachment by its public id within a workspace.
 	GetAttachmentByPublicID(ctx context.Context, arg GetAttachmentByPublicIDParams) (GetAttachmentByPublicIDRow, error)
+	// Resolve, for a set of recipients in one workspace, which delivery
+	// channels are enabled for a given event_category. A recipient with
+	// no row for the (workspace, category, channel) tuple returns no
+	// entry; the caller is expected to apply the default (in_app) when a
+	// recipient is absent from the result set.
+	//
+	// Only rows with enabled = TRUE AND is_muted = FALSE are returned —
+	// a muted preference behaves identically to a disabled one for the
+	// purposes of fan-out, and neither should produce a notifications row.
+	GetEnabledChannelsForRecipients(ctx context.Context, arg GetEnabledChannelsForRecipientsParams) ([]GetEnabledChannelsForRecipientsRow, error)
+	// Resolve an event's public id and logical occurrence time given its
+	// internal id, scoped by workspace as a defence-in-depth check.
+	// Used by the webhook fanout chain (H1): the worker needs the event's
+	// public_id to populate the dedupe key and the row's occurred_at to set
+	// the webhook OccurredAt field, instead of using time.Now() which would
+	// attribute the wrong instant when delivery is retried.
+	// occurred_at (not created_at) is the contract because it is the logical
+	// event time set by the eventbus producer; created_at is just the row
+	// insertion time and could drift from the event's true occurrence.
+	GetEventPublicIDAndOccurredAt(ctx context.Context, arg GetEventPublicIDAndOccurredAtParams) (GetEventPublicIDAndOccurredAtRow, error)
 	// Return the most recent succeeded run time for a given agent.
 	// Used by the agent pre-flight check to determine if new events have
 	// occurred since the last run.
@@ -476,6 +503,9 @@ type Querier interface {
 	// Fetch a single page by workspace_id + public_id, including parent page info.
 	// pg.id is required: used by MCP resolvePage and page handlers for
 	// parent_page_id resolution and circular-reference checks.
+	// The recursive CTE enforces ancestor-chain enabled propagation: a page
+	// with any disabled ancestor is treated as not found, matching the list
+	// queries above and preventing direct-fetch bypass of soft-disabled trees.
 	GetPageByPublicId(ctx context.Context, arg GetPageByPublicIdParams) (GetPageByPublicIdRow, error)
 	// Compute nesting depth of a page by walking up to the root via recursive CTE.
 	// Returns 0 for root pages, 1 for direct children of root, etc.
@@ -566,6 +596,10 @@ type Querier interface {
 	// and applies the duplicate_threshold_high / low cutoffs from ai_settings.
 	ListCandidateTaskEmbeddings(ctx context.Context, arg ListCandidateTaskEmbeddingsParams) ([]ListCandidateTaskEmbeddingsRow, error)
 	// List enabled child pages for a given parent page with creator info.
+	// The recursive CTE enforces that every ancestor on the chain up to the
+	// root is enabled, so a soft-disabled ancestor (parent, grandparent, ...)
+	// transitively hides the entire subtree even when the row itself is
+	// still enabled = TRUE.
 	ListChildPages(ctx context.Context, arg ListChildPagesParams) ([]ListChildPagesRow, error)
 	// List existing child tasks for a given parent task. Used by step
 	// decomposition to avoid suggesting duplicates of already-created steps.
@@ -735,6 +769,9 @@ type Querier interface {
 	// round-trip per append (vs one per agent).
 	ListOnEventAgents(ctx context.Context, arg ListOnEventAgentsParams) ([]ListOnEventAgentsRow, error)
 	// List all enabled pages (any nesting level) scoped to a project with creator info.
+	// The recursive CTE filters out pages whose ancestor chain contains any
+	// soft-disabled row, so disabling a parent transitively hides the entire
+	// subtree even though descendants are still enabled = TRUE.
 	ListPagesForProject(ctx context.Context, arg ListPagesForProjectParams) ([]ListPagesForProjectRow, error)
 	// List enabled root pages (no parent) for a workspace with creator info.
 	ListPagesForWorkspace(ctx context.Context, arg ListPagesForWorkspaceParams) ([]ListPagesForWorkspaceRow, error)
@@ -947,6 +984,9 @@ type Querier interface {
 	// Mark a constraint as satisfied at the current time.
 	SatisfyConstraint(ctx context.Context, arg SatisfyConstraintParams) error
 	// Search enabled pages by title pattern within a workspace.
+	// The recursive CTE filters out pages whose ancestor chain contains any
+	// soft-disabled row, matching the propagation enforced by the list and
+	// get queries so search cannot surface a child of a disabled subtree.
 	SearchPages(ctx context.Context, arg SearchPagesParams) ([]SearchPagesRow, error)
 	// Search tasks by title or description using LIKE. Workspace-scoped.
 	// The caller supplies the pattern already wrapped in '%…%'.
@@ -973,6 +1013,8 @@ type Querier interface {
 	// updated_by_user_id is appended so the audit field records who allocated
 	// the number; in practice this runs in the same transaction as CreateTask
 	// so the same actor id is reused (NULL for system writers).
+	// workspace_id is required to ensure the update never crosses workspace
+	// boundaries even if the caller passes a foreign tasks.id.
 	SetTaskNumber(ctx context.Context, arg SetTaskNumberParams) error
 	// Snooze a signal by pushing its received_at forward. Minimal impl;
 	// a dedicated snoozed_until_at column may be added later on.

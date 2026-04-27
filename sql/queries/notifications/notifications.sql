@@ -227,3 +227,23 @@ UPDATE notifications
 SET delivered_at = NOW()
 WHERE public_id = ?
   AND delivered_at IS NULL;
+
+-- name: GetEnabledChannelsForRecipients :many
+-- Resolve, for a set of recipients in one workspace, which delivery
+-- channels are enabled for a given event_category. A recipient with
+-- no row for the (workspace, category, channel) tuple returns no
+-- entry; the caller is expected to apply the default (in_app) when a
+-- recipient is absent from the result set.
+--
+-- Only rows with enabled = TRUE AND is_muted = FALSE are returned —
+-- a muted preference behaves identically to a disabled one for the
+-- purposes of fan-out, and neither should produce a notifications row.
+SELECT
+  user_id,
+  channel
+FROM notification_preferences
+WHERE workspace_id = ?
+  AND event_category = ?
+  AND user_id IN (sqlc.slice('user_ids'))
+  AND is_muted = FALSE
+  AND enabled = TRUE;

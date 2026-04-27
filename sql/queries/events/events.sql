@@ -118,3 +118,19 @@ SELECT EXISTS(
   WHERE workspace_id = ? AND occurred_at > ?
   LIMIT 1
 ) AS has_events;
+
+-- name: GetEventPublicIDAndOccurredAt :one
+-- Resolve an event's public id and logical occurrence time given its
+-- internal id, scoped by workspace as a defence-in-depth check.
+-- Used by the webhook fanout chain (H1): the worker needs the event's
+-- public_id to populate the dedupe key and the row's occurred_at to set
+-- the webhook OccurredAt field, instead of using time.Now() which would
+-- attribute the wrong instant when delivery is retried.
+-- occurred_at (not created_at) is the contract because it is the logical
+-- event time set by the eventbus producer; created_at is just the row
+-- insertion time and could drift from the event's true occurrence.
+SELECT public_id, occurred_at
+FROM events
+WHERE workspace_id = ?
+  AND id = ?
+LIMIT 1;

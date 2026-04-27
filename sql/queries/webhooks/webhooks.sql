@@ -40,8 +40,13 @@ SELECT id, public_id, url, secret, event_types
 FROM webhook_subscriptions
 WHERE workspace_id = ? AND is_active = TRUE AND enabled = TRUE;
 
--- name: CreateWebhookDelivery :execlastid
-INSERT INTO webhook_deliveries (
+-- name: CreateWebhookDelivery :execrows
+-- Insert a delivery row, deduping against the (subscription_id, event_public_id)
+-- unique key so the same event fanned out twice (e.g. eventbus retry) does
+-- not enqueue two HTTP attempts for the same subscription.
+-- Returns the affected-row count (1 = inserted, 0 = duplicate ignored) so
+-- the worker can branch on the dedupe outcome without a follow-up SELECT.
+INSERT IGNORE INTO webhook_deliveries (
   public_id, workspace_id, subscription_id, event_type,
   event_public_id, payload_json, status, next_retry_at
 ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?);

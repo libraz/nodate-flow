@@ -188,62 +188,161 @@ func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType strin
 		actorUserID = uint32(row.actorUserID.Int32) //#nosec G115 -- actor_user_id is users.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 	}
 
-	sourceEventID := sql.NullInt32{}
-	if eventInternalID != 0 {
-		sourceEventID = sql.NullInt32{Int32: int32(eventInternalID), Valid: true} //#nosec G115 -- event id is events.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+	// Filter out the actor up front so the preference batch fetch is
+	// not done over a recipient set the caller will discard anyway.
+	filtered := recipients[:0:0]
+	for _, id := range recipients {
+		if id != actorUserID {
+			filtered = append(filtered, id)
+		}
+	}
+	if len(filtered) == 0 {
+		return
 	}
 
-	for _, recipientID := range recipients {
-		// Exclude the actor from their own notifications.
-		if recipientID == actorUserID {
-			continue
+	// Resolve enabled (recipient, channel) pairs in a single round
+	// trip. Recipients with no row for this category fall through to
+	// the default in_app channel below.
+	eventCategory := categoryForEventType(eventType)
+	prefs, err := f.queries.GetEnabledChannelsForRecipients(ctx, generated.GetEnabledChannelsForRecipientsParams{
+		WorkspaceID:   workspaceID,
+		EventCategory: eventCategory,
+		UserIds:       filtered,
+	})
+	if err != nil {
+		slog.ErrorContext(ctx, "notification fanout: failed to load notification preferences",
+			slog.Uint64("workspace_id", uint64(workspaceID)),
+			slog.String("event_category", eventCategory),
+			slog.String("event_type", eventType),
+			slog.String("err", err.Error()))
+		// On preference lookup failure, fall back to the safe default
+		// (in_app only for every recipient) rather than silently
+		// dropping notifications. The dispatcher can retry email/push
+		// from the in_app rows once it inspects preferences itself.
+		prefs = nil
+	}
+
+	// channelsByUser[recipientID] is the set of (already-deduped)
+	// channels to write for that recipient. A recipient absent from
+	// the map gets the default in_app channel.
+	channelsByUser := make(map[uint32][]generated.NotificationsChannel, len(filtered))
+	for _, p := range prefs {
+		channelsByUser[p.UserID] = append(channelsByUser[p.UserID], generated.NotificationsChannel(p.Channel))
+	}
+
+	sourceEventID := sql.NullInt64{}
+	if eventInternalID != 0 {
+		sourceEventID = sql.NullInt64{Int64: int64(eventInternalID), Valid: true}
+	}
+
+	actorID := sql.NullInt32{}
+	if row.actorUserID.Valid {
+		actorID = row.actorUserID
+	}
+
+	for _, recipientID := range filtered {
+		channels, ok := channelsByUser[recipientID]
+		if !ok {
+			// No preference rows for this user+category: preserve the
+			// historical behaviour and deliver to the in_app channel
+			// only.
+			channels = []generated.NotificationsChannel{generated.NotificationsChannelInApp}
 		}
 
-		pubID := types.New()
-		actorID := sql.NullInt32{}
-		if row.actorUserID.Valid {
-			actorID = row.actorUserID
+		for _, channel := range channels {
+			pubID := types.New()
+			affected, err := f.queries.CreateNotification(ctx, generated.CreateNotificationParams{
+				PublicID:         pubID,
+				WorkspaceID:      workspaceID,
+				RecipientUserID:  recipientID,
+				ActorUserID:      actorID,
+				SourceEventID:    sourceEventID,
+				EventType:        eventType,
+				ResourceType:     resourceType,
+				ResourcePublicID: row.resourcePublicID,
+				Title:            title,
+				Body:             sql.NullString{},
+				Severity:         severity,
+				Channel:          channel,
+			})
+			if err != nil {
+				slog.ErrorContext(ctx, "notification fanout: failed to create notification",
+					slog.Uint64("workspace_id", uint64(workspaceID)),
+					slog.Uint64("recipient_user_id", uint64(recipientID)),
+					slog.String("event_type", eventType),
+					slog.String("channel", string(channel)),
+					slog.Uint64("event_id", uint64(eventInternalID)),
+					slog.String("err", err.Error()))
+				continue
+			}
+			if affected == 0 {
+				// INSERT IGNORE collided with the (recipient, source_event,
+				// channel) unique key — the notification already exists.
+				// This is the at-least-once happy path; record it as
+				// debug, not an error.
+				slog.DebugContext(ctx, "notification fanout: deduplicated",
+					slog.Uint64("workspace_id", uint64(workspaceID)),
+					slog.Uint64("recipient_user_id", uint64(recipientID)),
+					slog.Uint64("event_id", uint64(eventInternalID)),
+					slog.String("event_type", eventType),
+					slog.String("channel", string(channel)))
+				// TODO: increment a Prometheus counter
+				// `nf_notification_dedup_total{channel,event_type}` once the
+				// notification metrics file exists in apps/flow-api/internal/obs.
+			}
 		}
+	}
+}
 
-		affected, err := f.queries.CreateNotification(ctx, generated.CreateNotificationParams{
-			PublicID:         pubID,
+// DeliverCalendarReminder creates one in-app notification per recipient
+// for a calendar event reminder. Unlike the eventbus-driven [Fanout.fanout]
+// path it is not anchored to an events.id row — calendar reminders are
+// produced by the time-based scheduler, so source_event_id is left NULL
+// (the schema documents this case as "non-event-driven paths").
+//
+// Returns an error when any insert fails so the caller (the scheduler)
+// can decide whether to mark the event as notified. Errors for individual
+// recipients are logged and aggregated into the returned error; the
+// method does not short-circuit on the first failure so that a transient
+// problem with one row does not silently skip the rest.
+func (f *Fanout) DeliverCalendarReminder(
+	ctx context.Context,
+	workspaceID uint32,
+	eventPublicID types.PublicID,
+	title string,
+	recipientUserIDs []uint32,
+) error {
+	if len(recipientUserIDs) == 0 {
+		return nil
+	}
+
+	var firstErr error
+	for _, recipientID := range recipientUserIDs {
+		if _, err := f.queries.CreateNotification(ctx, generated.CreateNotificationParams{
+			PublicID:         types.New(),
 			WorkspaceID:      workspaceID,
 			RecipientUserID:  recipientID,
-			ActorUserID:      actorID,
-			SourceEventID:    sourceEventID,
-			EventType:        eventType,
-			ResourceType:     resourceType,
-			ResourcePublicID: row.resourcePublicID,
+			ActorUserID:      sql.NullInt32{},
+			SourceEventID:    sql.NullInt64{},
+			EventType:        "calendar.reminder",
+			ResourceType:     "calendar_event",
+			ResourcePublicID: eventPublicID,
 			Title:            title,
 			Body:             sql.NullString{},
-			Severity:         severity,
+			Severity:         generated.NotificationsSeverityNormal,
 			Channel:          generated.NotificationsChannelInApp,
-		})
-		if err != nil {
-			slog.ErrorContext(ctx, "notification fanout: failed to create notification",
+		}); err != nil {
+			slog.ErrorContext(ctx, "calendar reminder fanout: failed to create notification",
 				slog.Uint64("workspace_id", uint64(workspaceID)),
 				slog.Uint64("recipient_user_id", uint64(recipientID)),
-				slog.String("event_type", eventType),
-				slog.Uint64("event_id", uint64(eventInternalID)),
+				slog.String("event_public_id", eventPublicID.String()),
 				slog.String("err", err.Error()))
-			continue
-		}
-		if affected == 0 {
-			// INSERT IGNORE collided with the (recipient, source_event,
-			// channel) unique key — the notification already exists.
-			// This is the at-least-once happy path; record it as
-			// debug, not an error.
-			slog.DebugContext(ctx, "notification fanout: deduplicated",
-				slog.Uint64("workspace_id", uint64(workspaceID)),
-				slog.Uint64("recipient_user_id", uint64(recipientID)),
-				slog.Uint64("event_id", uint64(eventInternalID)),
-				slog.String("event_type", eventType),
-				slog.String("channel", string(generated.NotificationsChannelInApp)))
-			// TODO: increment a Prometheus counter
-			// `nf_notification_dedup_total{channel,event_type}` once the
-			// notification metrics file exists in apps/flow-api/internal/obs.
+			if firstErr == nil {
+				firstErr = fmt.Errorf("DeliverCalendarReminder: recipient=%d: %w", recipientID, err)
+			}
 		}
 	}
+	return firstErr
 }
 
 // eventRow is a minimal representation of an event extracted from the
@@ -370,5 +469,30 @@ func classifyEvent(eventType string) (title string, resourceType string, severit
 
 	default:
 		return "", "", ""
+	}
+}
+
+// categoryForEventType maps an eventbus event type (the dotted string
+// emitted on the bus, e.g. "task.comment.added") to the broader
+// notification_preferences.event_category that users configure in their
+// preferences UI.
+//
+// The schema groups dozens of event types into a handful of stable
+// categories (see notification_preferences.sql for the canonical list).
+// New event types fall back to the broadest "task.lifecycle" bucket so
+// fan-out keeps working before a more specific bucket is added.
+func categoryForEventType(eventType string) string {
+	switch eventType {
+	case "task.comment.added", "task.comment.edited", "task.comment.removed":
+		return "task.comment"
+	case "task.actor.added", "task.actor.removed",
+		"item.actor.added", "item.actor.removed":
+		return "task.mention"
+	case "item.scheduled", "item.unscheduled", "item.rescheduled":
+		return "timebox"
+	case "item.milestone.link.added", "item.milestone.link.removed":
+		return "relation"
+	default:
+		return "task.lifecycle"
 	}
 }

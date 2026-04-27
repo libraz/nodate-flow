@@ -2399,6 +2399,12 @@ CREATE TABLE webhook_deliveries (
 
   UNIQUE KEY uniq_webhook_deliveries_public_id (public_id),
   UNIQUE KEY uniq_webhook_deliveries_workspace_public_id (workspace_id, public_id),
+  -- DB-level dedupe: at most one delivery row per (subscription, source event).
+  -- MySQL UNIQUE treats NULLs as distinct, so legacy rows with event_public_id
+  -- IS NULL (older code paths that never set the column) do not collide; the
+  -- worker is being updated in parallel to populate event_public_id so new
+  -- rows get the constraint enforcement.
+  UNIQUE KEY uniq_webhook_deliveries_subscription_event (subscription_id, event_public_id),
   KEY idx_webhook_deliveries_workspace_id_subscription_id_created_at (workspace_id, subscription_id, created_at DESC),
   KEY idx_webhook_deliveries_status_next_retry_at (status, next_retry_at),
   KEY idx_webhook_deliveries_workspace_id_status (workspace_id, status),
