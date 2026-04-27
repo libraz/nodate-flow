@@ -40,6 +40,10 @@ export function useInstanceStatsQuery(): UseQueryResult<InstanceStats, ApiError>
     // button so a transient failure can be re-attempted explicitly;
     // background retries would hide the failure for several seconds.
     retry: false,
+    // The shared QueryClient defaults to `throwOnError: true` so queries
+    // escalate to the route-level error boundary. Stats has its own
+    // inline `role="alert"` block — keep the failure local to this card.
+    throwOnError: false,
     queryFn: async (): Promise<InstanceStats> => {
       const { data, error } = await sdk.GET('/admin/instance-stats');
       if (error || !data) throw toApiError(error, 'Failed to load instance stats');

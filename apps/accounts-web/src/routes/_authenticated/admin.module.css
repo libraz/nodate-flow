@@ -1,0 +1,87 @@
+/**
+ * Admin shell layout.
+ *
+ * Two-column on tablet+ (220px nav rail + flexible content), stacked on
+ * narrow viewports so the content area gets the full inline width and
+ * KPI grids do not overflow at phone-class viewports (e.g. 375px).
+ */
+
+.shell {
+  display: flex;
+  min-block-size: 100vh;
+  background: var(--nf-color-bg);
+}
+
+.aside {
+  inline-size: 220px;
+  border-inline-end: 1px solid var(--nf-color-border);
+  padding: var(--nf-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.title {
+  font-family: var(--nf-font-sans);
+  font-size: var(--nf-text-lg);
+  margin: 0 0 var(--nf-space-4) 0;
+  padding: 0 var(--nf-space-3);
+}
+
+.navLink {
+  display: block;
+  padding: var(--nf-space-2) var(--nf-space-3);
+  color: var(--nf-color-fg);
+  text-decoration: none;
+  font-size: var(--nf-text-sm);
+  border-radius: var(--nf-radius-md);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.backLink {
+  composes: navLink;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-xs);
+}
+
+.main {
+  flex: 1;
+  min-inline-size: 0;
+  padding: var(--nf-space-8);
+  max-inline-size: 1200px;
+}
+
+@media (max-width: 767px) {
+  .shell {
+    flex-direction: column;
+  }
+
+  .aside {
+    inline-size: 100%;
+    border-inline-end: none;
+    border-block-end: 1px solid var(--nf-color-border);
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--nf-space-1);
+    padding: var(--nf-space-3);
+  }
+
+  .title {
+    flex: 1 0 100%;
+    margin: 0 0 var(--nf-space-2) 0;
+    padding: 0;
+  }
+
+  .spacer {
+    display: none;
+  }
+
+  .main {
+    padding: var(--nf-space-4);
+    max-inline-size: 100%;
+  }
+}

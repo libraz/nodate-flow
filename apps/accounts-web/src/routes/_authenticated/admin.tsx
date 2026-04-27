@@ -16,6 +16,7 @@ import { type ReactElement, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { selectUser, useAuth } from '../../features/auth/auth-store';
+import styles from './admin.module.css';
 
 export function AdminLayout(): ReactElement | null {
   const user = useAuth(selectUser);
@@ -44,80 +45,34 @@ export function AdminLayout(): ReactElement | null {
 
   if (!isAdmin) return null;
 
-  const navLinkStyle = {
-    display: 'block',
-    padding: 'var(--nf-space-2) var(--nf-space-3)',
-    color: 'var(--nf-color-fg)',
-    textDecoration: 'none',
-    fontSize: 'var(--nf-text-sm)',
-    borderRadius: 'var(--nf-radius-md)',
-  };
-
   return (
-    <div
-      style={{
-        display: 'flex',
-        minHeight: '100vh',
-        background: 'var(--nf-color-bg)',
-      }}
-    >
-      <aside
-        style={{
-          width: '220px',
-          borderInlineEnd: '1px solid var(--nf-color-border)',
-          padding: 'var(--nf-space-4)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-1)',
-        }}
-      >
-        <h2
-          style={{
-            fontFamily: 'var(--nf-font-sans)',
-            fontSize: 'var(--nf-text-lg)',
-            margin: '0 0 var(--nf-space-4) 0',
-            padding: '0 var(--nf-space-3)',
-          }}
-        >
-          {t('title')}
-        </h2>
-        <Link to="/admin/users" style={navLinkStyle}>
+    <div className={styles.shell}>
+      <aside className={styles.aside}>
+        <h2 className={styles.title}>{t('title')}</h2>
+        <Link to="/admin/users" className={styles.navLink}>
           {t('nav.users')}
         </Link>
-        <Link to="/admin/workspaces" style={navLinkStyle}>
+        <Link to="/admin/workspaces" className={styles.navLink}>
           {t('nav.workspaces')}
         </Link>
-        <Link to="/admin/audit-logs" style={navLinkStyle}>
+        <Link to="/admin/audit-logs" className={styles.navLink}>
           {t('nav.audit_logs')}
         </Link>
-        <Link to="/admin/admins" style={navLinkStyle}>
+        <Link to="/admin/admins" className={styles.navLink}>
           {t('nav.admins')}
         </Link>
-        <Link to="/admin/stats" style={navLinkStyle}>
+        <Link to="/admin/stats" className={styles.navLink}>
           {t('nav.stats')}
         </Link>
-        <Link to="/admin/settings" style={navLinkStyle}>
+        <Link to="/admin/settings" className={styles.navLink}>
           {t('nav.settings')}
         </Link>
-        <div style={{ flex: 1 }} />
-        <Link
-          to="/profile"
-          style={{
-            ...navLinkStyle,
-            color: 'var(--nf-color-fg-muted)',
-            fontSize: 'var(--nf-text-xs)',
-          }}
-        >
+        <div className={styles.spacer} />
+        <Link to="/profile" className={styles.backLink}>
           {t('common.back_to_profile')}
         </Link>
       </aside>
-      <main
-        style={{
-          flex: 1,
-          padding: 'var(--nf-space-8)',
-          maxWidth: '1200px',
-        }}
-      >
+      <main className={styles.main}>
         <Outlet />
       </main>
     </div>
