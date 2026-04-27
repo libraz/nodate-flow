@@ -55,8 +55,8 @@ func totalAsInt64(v interface{}) int64 {
 	}
 }
 
-func rowToAdminUser(r generated.AdminListUsersRow) AdminUser {
-	return AdminUser{
+func rowToAdminUser(r generated.AdminListUsersRow) User {
+	return User{
 		ID:              r.PublicID.String(),
 		Email:           r.Email,
 		DisplayName:     r.DisplayName,
@@ -72,8 +72,8 @@ func rowToAdminUser(r generated.AdminListUsersRow) AdminUser {
 	}
 }
 
-func rowToAdminUserDetail(r generated.VAdminUser) AdminUser {
-	return AdminUser{
+func rowToAdminUserDetail(r generated.VAdminUser) User {
+	return User{
 		ID:              r.PublicID.String(),
 		Email:           r.Email,
 		DisplayName:     r.DisplayName,
@@ -89,8 +89,8 @@ func rowToAdminUserDetail(r generated.VAdminUser) AdminUser {
 	}
 }
 
-func rowToAdminWorkspaceList(r generated.AdminListWorkspacesRow) AdminWorkspace {
-	return AdminWorkspace{
+func rowToAdminWorkspaceList(r generated.AdminListWorkspacesRow) Workspace {
+	return Workspace{
 		ID:          r.PublicID.String(),
 		Slug:        r.Slug,
 		Name:        r.Name,
@@ -103,9 +103,9 @@ func rowToAdminWorkspaceList(r generated.AdminListWorkspacesRow) AdminWorkspace 
 	}
 }
 
-func rowToAdminWorkspaceDetail(r generated.AdminGetWorkspaceRow) AdminWorkspace {
+func rowToAdminWorkspaceDetail(r generated.AdminGetWorkspaceRow) Workspace {
 	pc := r.ProjectCount
-	return AdminWorkspace{
+	return Workspace{
 		ID:           r.PublicID.String(),
 		Slug:         r.Slug,
 		Name:         r.Name,
@@ -119,8 +119,8 @@ func rowToAdminWorkspaceDetail(r generated.AdminGetWorkspaceRow) AdminWorkspace 
 	}
 }
 
-func rowToAdminSession(r generated.AdminListUserSessionsRow) AdminSession {
-	return AdminSession{
+func rowToAdminSession(r generated.AdminListUserSessionsRow) Session {
+	return Session{
 		ID:         r.PublicID.String(),
 		UserAgent:  r.UserAgent.String,
 		IPAddress:  r.IpAddress.String,

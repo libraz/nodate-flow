@@ -50,9 +50,9 @@ type Workspace struct {
 	CreatedAt   int64  `json:"createdAt"`
 }
 
-// WorkspaceMember is the public DTO for a workspace_members row.
-type WorkspaceMember struct {
-	ID          string `json:"id" doc:"WorkspaceMember public id (UUID v7)"`
+// Member is the public DTO for a workspace_members row.
+type Member struct {
+	ID          string `json:"id" doc:"Member public id (UUID v7)"`
 	UserID      string `json:"userId"`
 	Email       string `json:"email"`
 	DisplayName string `json:"displayName"`
@@ -152,28 +152,28 @@ type DisableWorkspaceOutputBody struct {
 	Ok bool `json:"ok"`
 }
 
-// ListWorkspaceMembersInput is the query for GET /workspaces/{wsId}/members.
-type ListWorkspaceMembersInput struct {
+// ListMembersInput is the query for GET /workspaces/{wsId}/members.
+type ListMembersInput struct {
 	WsID   string `path:"wsId"`
 	Limit  int32  `query:"limit" minimum:"1" maximum:"200" default:"50"`
 	Offset int32  `query:"offset" minimum:"0" default:"0"`
 }
 
-// ListWorkspaceMembersOutput is the response for GET /workspaces/{wsId}/members.
-type ListWorkspaceMembersOutput struct {
-	Body ListWorkspaceMembersOutputBody
+// ListMembersOutput is the response for GET /workspaces/{wsId}/members.
+type ListMembersOutput struct {
+	Body ListMembersOutputBody
 }
 
-// ListWorkspaceMembersOutputBody is the response body envelope for GET /workspaces/{wsId}/members.
-type ListWorkspaceMembersOutputBody struct {
-	Total      int64             `json:"total"`
-	Members    []WorkspaceMember `json:"members"`
-	NextCursor *string           `json:"nextCursor"`
+// ListMembersOutputBody is the response body envelope for GET /workspaces/{wsId}/members.
+type ListMembersOutputBody struct {
+	Total      int64    `json:"total"`
+	Members    []Member `json:"members"`
+	NextCursor *string  `json:"nextCursor"`
 }
 
-// WorkspaceUserSummary is a minimal user DTO returned by
+// UserSummary is a minimal user DTO returned by
 // GET /workspaces/{wsId}/users for actor-filter pickers.
-type WorkspaceUserSummary struct {
+type UserSummary struct {
 	ID          string `json:"id" doc:"User public id (UUID v7)"`
 	DisplayName string `json:"displayName"`
 	AvatarURL   string `json:"avatarUrl,omitempty"`
@@ -192,61 +192,61 @@ type ListWorkspaceUsersOutput struct {
 // ListWorkspaceUsersOutputBody is the response body envelope for
 // GET /workspaces/{wsId}/users.
 type ListWorkspaceUsersOutputBody struct {
-	Users []WorkspaceUserSummary `json:"users"`
+	Users []UserSummary `json:"users"`
 }
 
-// AddWorkspaceMemberInput is the body for POST /workspaces/{wsId}/members.
-type AddWorkspaceMemberInput struct {
+// AddMemberInput is the body for POST /workspaces/{wsId}/members.
+type AddMemberInput struct {
 	WsID string `path:"wsId"`
-	Body AddWorkspaceMemberInputBody
+	Body AddMemberInputBody
 }
 
-// AddWorkspaceMemberInputBody is the JSON body for POST /workspaces/{wsId}/members.
-type AddWorkspaceMemberInputBody struct {
+// AddMemberInputBody is the JSON body for POST /workspaces/{wsId}/members.
+type AddMemberInputBody struct {
 	Email string `json:"email" format:"email"`
 	Role  string `json:"role" enum:"owner,admin,member,guest"`
 }
 
-// AddWorkspaceMemberOutput is the response for POST /workspaces/{wsId}/members.
-type AddWorkspaceMemberOutput struct {
-	Body WorkspaceMember
+// AddMemberOutput is the response for POST /workspaces/{wsId}/members.
+type AddMemberOutput struct {
+	Body Member
 }
 
-// UpdateWorkspaceMemberRoleInput is the body for PATCH /workspaces/{wsId}/members/{userId}.
-type UpdateWorkspaceMemberRoleInput struct {
+// UpdateMemberRoleInput is the body for PATCH /workspaces/{wsId}/members/{userId}.
+type UpdateMemberRoleInput struct {
 	WsID   string `path:"wsId"`
 	UserID string `path:"userId"`
-	Body   UpdateWorkspaceMemberRoleInputBody
+	Body   UpdateMemberRoleInputBody
 }
 
-// UpdateWorkspaceMemberRoleInputBody is the JSON body for PATCH /workspaces/{wsId}/members/{userId}.
-type UpdateWorkspaceMemberRoleInputBody struct {
+// UpdateMemberRoleInputBody is the JSON body for PATCH /workspaces/{wsId}/members/{userId}.
+type UpdateMemberRoleInputBody struct {
 	Role string `json:"role" enum:"owner,admin,member,guest"`
 }
 
-// UpdateWorkspaceMemberRoleOutput is the response for PATCH /workspaces/{wsId}/members/{userId}.
-type UpdateWorkspaceMemberRoleOutput struct {
-	Body WorkspaceMember
+// UpdateMemberRoleOutput is the response for PATCH /workspaces/{wsId}/members/{userId}.
+type UpdateMemberRoleOutput struct {
+	Body Member
 }
 
-// RemoveWorkspaceMemberInput is the path for DELETE /workspaces/{wsId}/members/{userId}.
-type RemoveWorkspaceMemberInput struct {
+// RemoveMemberInput is the path for DELETE /workspaces/{wsId}/members/{userId}.
+type RemoveMemberInput struct {
 	WsID   string `path:"wsId"`
 	UserID string `path:"userId"`
 }
 
-// RemoveWorkspaceMemberOutput is the response for DELETE /workspaces/{wsId}/members/{userId}.
-type RemoveWorkspaceMemberOutput struct {
-	Body RemoveWorkspaceMemberOutputBody
+// RemoveMemberOutput is the response for DELETE /workspaces/{wsId}/members/{userId}.
+type RemoveMemberOutput struct {
+	Body RemoveMemberOutputBody
 }
 
-// RemoveWorkspaceMemberOutputBody is the response body envelope for DELETE /workspaces/{wsId}/members/{userId}.
-type RemoveWorkspaceMemberOutputBody struct {
+// RemoveMemberOutputBody is the response body envelope for DELETE /workspaces/{wsId}/members/{userId}.
+type RemoveMemberOutputBody struct {
 	Ok bool `json:"ok"`
 }
 
-// WorkspaceInvite is the public DTO for a workspace_invites row.
-type WorkspaceInvite struct {
+// Invite is the public DTO for a workspace_invites row.
+type Invite struct {
 	ID            string `json:"id" doc:"Invite public id (UUID v7)"`
 	Role          string `json:"role"`
 	MaxUses       *int32 `json:"maxUses"`
@@ -257,14 +257,14 @@ type WorkspaceInvite struct {
 	CreatedAt     int64  `json:"createdAt"`
 }
 
-// CreateWorkspaceInviteInput is the body for POST /workspaces/{wsId}/invites.
-type CreateWorkspaceInviteInput struct {
+// CreateInviteInput is the body for POST /workspaces/{wsId}/invites.
+type CreateInviteInput struct {
 	WsID string `path:"wsId"`
-	Body CreateWorkspaceInviteInputBody
+	Body CreateInviteInputBody
 }
 
-// CreateWorkspaceInviteInputBody is the JSON body for POST /workspaces/{wsId}/invites.
-type CreateWorkspaceInviteInputBody struct {
+// CreateInviteInputBody is the JSON body for POST /workspaces/{wsId}/invites.
+type CreateInviteInputBody struct {
 	Role      string `json:"role" enum:"owner,admin,member,guest"`
 	MaxUses   *int32 `json:"maxUses,omitempty" minimum:"1"`
 	ExpiresIn *int64 `json:"expiresIn,omitempty" doc:"Seconds until invite expires" minimum:"1"`
@@ -272,65 +272,65 @@ type CreateWorkspaceInviteInputBody struct {
 	Email     string `json:"email,omitempty" maxLength:"320"`
 }
 
-// CreateWorkspaceInviteOutput is the response for POST /workspaces/{wsId}/invites.
-type CreateWorkspaceInviteOutput struct {
-	Body CreateWorkspaceInviteOutputBody
+// CreateInviteOutput is the response for POST /workspaces/{wsId}/invites.
+type CreateInviteOutput struct {
+	Body CreateInviteOutputBody
 }
 
-// CreateWorkspaceInviteOutputBody is the response body for POST /workspaces/{wsId}/invites.
+// CreateInviteOutputBody is the response body for POST /workspaces/{wsId}/invites.
 // Token is only returned on creation; it is never stored or returned again.
-type CreateWorkspaceInviteOutputBody struct {
-	Invite WorkspaceInvite `json:"invite"`
-	Token  string          `json:"token" doc:"Plaintext token (only returned once)"`
+type CreateInviteOutputBody struct {
+	Invite Invite `json:"invite"`
+	Token  string `json:"token" doc:"Plaintext token (only returned once)"`
 }
 
-// ListWorkspaceInvitesInput is the query for GET /workspaces/{wsId}/invites.
-type ListWorkspaceInvitesInput struct {
+// ListInvitesInput is the query for GET /workspaces/{wsId}/invites.
+type ListInvitesInput struct {
 	WsID   string `path:"wsId"`
 	Limit  int32  `query:"limit" minimum:"1" maximum:"200" default:"50"`
 	Offset int32  `query:"offset" minimum:"0" default:"0"`
 }
 
-// ListWorkspaceInvitesOutput is the response for GET /workspaces/{wsId}/invites.
-type ListWorkspaceInvitesOutput struct {
-	Body ListWorkspaceInvitesOutputBody
+// ListInvitesOutput is the response for GET /workspaces/{wsId}/invites.
+type ListInvitesOutput struct {
+	Body ListInvitesOutputBody
 }
 
-// ListWorkspaceInvitesOutputBody is the response body envelope for GET /workspaces/{wsId}/invites.
-type ListWorkspaceInvitesOutputBody struct {
-	Total      int64             `json:"total"`
-	Invites    []WorkspaceInvite `json:"invites"`
-	NextCursor *string           `json:"nextCursor"`
+// ListInvitesOutputBody is the response body envelope for GET /workspaces/{wsId}/invites.
+type ListInvitesOutputBody struct {
+	Total      int64    `json:"total"`
+	Invites    []Invite `json:"invites"`
+	NextCursor *string  `json:"nextCursor"`
 }
 
-// RevokeWorkspaceInviteInput is the path for DELETE /workspaces/{wsId}/invites/{inviteId}.
-type RevokeWorkspaceInviteInput struct {
+// RevokeInviteInput is the path for DELETE /workspaces/{wsId}/invites/{inviteId}.
+type RevokeInviteInput struct {
 	WsID     string `path:"wsId"`
 	InviteID string `path:"inviteId"`
 }
 
-// RevokeWorkspaceInviteOutput is the response for DELETE /workspaces/{wsId}/invites/{inviteId}.
-type RevokeWorkspaceInviteOutput struct {
-	Body RevokeWorkspaceInviteOutputBody
+// RevokeInviteOutput is the response for DELETE /workspaces/{wsId}/invites/{inviteId}.
+type RevokeInviteOutput struct {
+	Body RevokeInviteOutputBody
 }
 
-// RevokeWorkspaceInviteOutputBody is the response body envelope for DELETE /workspaces/{wsId}/invites/{inviteId}.
-type RevokeWorkspaceInviteOutputBody struct {
+// RevokeInviteOutputBody is the response body envelope for DELETE /workspaces/{wsId}/invites/{inviteId}.
+type RevokeInviteOutputBody struct {
 	Ok bool `json:"ok"`
 }
 
-// AcceptWorkspaceInviteInput is the path for POST /invites/{token}/accept.
-type AcceptWorkspaceInviteInput struct {
+// AcceptInviteInput is the path for POST /invites/{token}/accept.
+type AcceptInviteInput struct {
 	Token string `path:"token"`
 }
 
-// AcceptWorkspaceInviteOutput is the response for POST /invites/{token}/accept.
-type AcceptWorkspaceInviteOutput struct {
-	Body AcceptWorkspaceInviteOutputBody
+// AcceptInviteOutput is the response for POST /invites/{token}/accept.
+type AcceptInviteOutput struct {
+	Body AcceptInviteOutputBody
 }
 
-// AcceptWorkspaceInviteOutputBody is the response body for POST /invites/{token}/accept.
-type AcceptWorkspaceInviteOutputBody struct {
+// AcceptInviteOutputBody is the response body for POST /invites/{token}/accept.
+type AcceptInviteOutputBody struct {
 	WorkspaceID   string `json:"workspaceId" doc:"Workspace public id for client redirect"`
 	WorkspaceName string `json:"workspaceName"`
 	Role          string `json:"role"`

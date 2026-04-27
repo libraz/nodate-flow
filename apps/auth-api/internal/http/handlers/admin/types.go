@@ -29,8 +29,8 @@ type PaginatedInput struct {
 
 // --- Users ---
 
-// AdminUser is the public DTO for a user in the admin panel.
-type AdminUser struct {
+// User is the public DTO for a user in the admin panel.
+type User struct {
 	ID              string  `json:"id"`
 	Email           string  `json:"email"`
 	DisplayName     string  `json:"displayName"`
@@ -55,8 +55,8 @@ type ListUsersInput struct {
 // ListUsersOutput is the response for GET /admin/users.
 type ListUsersOutput struct {
 	Body struct {
-		Total int64       `json:"total"`
-		Items []AdminUser `json:"items"`
+		Total int64  `json:"total"`
+		Items []User `json:"items"`
 	}
 }
 
@@ -67,7 +67,7 @@ type GetUserInput struct {
 
 // GetUserOutput is the response for GET /admin/users/{userId}.
 type GetUserOutput struct {
-	Body AdminUser
+	Body User
 }
 
 // PatchUserInput binds the path and body for PATCH /admin/users/{userId}.
@@ -87,8 +87,8 @@ type PatchUserOutput struct {
 
 // --- Workspaces ---
 
-// AdminWorkspace is the public DTO for a workspace in the admin panel.
-type AdminWorkspace struct {
+// Workspace is the public DTO for a workspace in the admin panel.
+type Workspace struct {
 	ID           string  `json:"id"`
 	Slug         string  `json:"slug"`
 	Name         string  `json:"name"`
@@ -101,59 +101,59 @@ type AdminWorkspace struct {
 	UpdatedAt    *int64  `json:"updatedAt,omitempty"`
 }
 
-// AdminListWorkspacesInput binds query parameters for GET /admin/workspaces.
-type AdminListWorkspacesInput struct {
+// ListWorkspacesInput binds query parameters for GET /admin/workspaces.
+type ListWorkspacesInput struct {
 	Search  string `query:"search" default:""`
 	Enabled string `query:"enabled" default:"" enum:"true,false," doc:"Filter by enabled status (empty=all)"`
 	PaginatedInput
 }
 
-// AdminListWorkspacesOutput is the response for GET /admin/workspaces.
-type AdminListWorkspacesOutput struct {
-	Body AdminListWorkspacesOutputBody
+// ListWorkspacesOutput is the response for GET /admin/workspaces.
+type ListWorkspacesOutput struct {
+	Body ListWorkspacesOutputBody
 }
 
-// AdminListWorkspacesOutputBody is the response body for GET /admin/workspaces.
-type AdminListWorkspacesOutputBody struct {
-	Total int64            `json:"total"`
-	Items []AdminWorkspace `json:"items"`
+// ListWorkspacesOutputBody is the response body for GET /admin/workspaces.
+type ListWorkspacesOutputBody struct {
+	Total int64       `json:"total"`
+	Items []Workspace `json:"items"`
 }
 
-// AdminGetWorkspaceInput binds the path parameter for GET /admin/workspaces/{wsId}.
-type AdminGetWorkspaceInput struct {
+// GetWorkspaceInput binds the path parameter for GET /admin/workspaces/{wsId}.
+type GetWorkspaceInput struct {
 	WsID string `path:"wsId"`
 }
 
-// AdminGetWorkspaceOutput is the response for GET /admin/workspaces/{wsId}.
-type AdminGetWorkspaceOutput struct {
-	Body AdminWorkspace
+// GetWorkspaceOutput is the response for GET /admin/workspaces/{wsId}.
+type GetWorkspaceOutput struct {
+	Body Workspace
 }
 
-// AdminPatchWorkspaceInput binds the path and body for PATCH /admin/workspaces/{wsId}.
-type AdminPatchWorkspaceInput struct {
+// PatchWorkspaceInput binds the path and body for PATCH /admin/workspaces/{wsId}.
+type PatchWorkspaceInput struct {
 	WsID string `path:"wsId"`
-	Body AdminPatchWorkspaceInputBody
+	Body PatchWorkspaceInputBody
 }
 
-// AdminPatchWorkspaceInputBody is the JSON body for PATCH /admin/workspaces/{wsId}.
-type AdminPatchWorkspaceInputBody struct {
+// PatchWorkspaceInputBody is the JSON body for PATCH /admin/workspaces/{wsId}.
+type PatchWorkspaceInputBody struct {
 	Enabled *bool `json:"enabled"`
 }
 
-// AdminPatchWorkspaceOutput is the response for PATCH /admin/workspaces/{wsId}.
-type AdminPatchWorkspaceOutput struct {
-	Body AdminPatchWorkspaceOutputBody
+// PatchWorkspaceOutput is the response for PATCH /admin/workspaces/{wsId}.
+type PatchWorkspaceOutput struct {
+	Body PatchWorkspaceOutputBody
 }
 
-// AdminPatchWorkspaceOutputBody is the response body for PATCH /admin/workspaces/{wsId}.
-type AdminPatchWorkspaceOutputBody struct {
+// PatchWorkspaceOutputBody is the response body for PATCH /admin/workspaces/{wsId}.
+type PatchWorkspaceOutputBody struct {
 	Ok bool `json:"ok"`
 }
 
 // --- Sessions ---
 
-// AdminSession is the public DTO for a session in the admin panel.
-type AdminSession struct {
+// Session is the public DTO for a session in the admin panel.
+type Session struct {
 	ID         string `json:"id"`
 	UserAgent  string `json:"userAgent"`
 	IPAddress  string `json:"ipAddress"`
@@ -173,24 +173,24 @@ type ListUserSessionsInput struct {
 // ListUserSessionsOutput is the response for GET /admin/users/{userId}/sessions.
 type ListUserSessionsOutput struct {
 	Body struct {
-		Total int64          `json:"total"`
-		Items []AdminSession `json:"items"`
+		Total int64     `json:"total"`
+		Items []Session `json:"items"`
 	}
 }
 
-// AdminRevokeSessionInput binds the path parameter for DELETE /admin/sessions/{sessionId}.
-type AdminRevokeSessionInput struct {
+// RevokeSessionInput binds the path parameter for DELETE /admin/sessions/{sessionId}.
+type RevokeSessionInput struct {
 	SessionID string `path:"sessionId"`
 }
 
-// AdminRevokeSessionOutputBody is the response body for DELETE /admin/sessions/{sessionId}.
-type AdminRevokeSessionOutputBody struct {
+// RevokeSessionOutputBody is the response body for DELETE /admin/sessions/{sessionId}.
+type RevokeSessionOutputBody struct {
 	Ok bool `json:"ok"`
 }
 
-// AdminRevokeSessionOutput is the response for DELETE /admin/sessions/{sessionId}.
-type AdminRevokeSessionOutput struct {
-	Body AdminRevokeSessionOutputBody
+// RevokeSessionOutput is the response for DELETE /admin/sessions/{sessionId}.
+type RevokeSessionOutput struct {
+	Body RevokeSessionOutputBody
 }
 
 // --- Instance Admins ---

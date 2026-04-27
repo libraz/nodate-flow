@@ -124,10 +124,10 @@ type RegisterInput struct {
 	}
 }
 
-// AuthTokens is the tokens envelope returned by register/login/refresh.
+// Tokens is the tokens envelope returned by register/login/refresh.
 // The refresh token is intentionally NOT part of this struct: it is
 // delivered as an httpOnly Set-Cookie header instead.
-type AuthTokens struct {
+type Tokens struct {
 	AccessToken string `json:"accessToken"`
 	ExpiresAt   int64  `json:"expiresAt" doc:"Access token expiry, unix seconds"`
 	UserID      string `json:"userId" doc:"User public id (UUID v7)"`
@@ -136,7 +136,7 @@ type AuthTokens struct {
 // RegisterOutput is the response for POST /auth/register.
 type RegisterOutput struct {
 	SetCookie http.Cookie `header:"Set-Cookie"`
-	Body      AuthTokens
+	Body      Tokens
 }
 
 // LoginInput is the body for POST /auth/login.
@@ -182,7 +182,7 @@ type LoginTotpInput struct {
 // LoginTotpOutput is the response for POST /auth/login/totp.
 type LoginTotpOutput struct {
 	SetCookie http.Cookie `header:"Set-Cookie"`
-	Body      AuthTokens
+	Body      Tokens
 }
 
 // RefreshInput is the request for POST /auth/refresh. The refresh token
@@ -195,7 +195,7 @@ type RefreshInput struct {
 // RefreshOutput is the response for POST /auth/refresh.
 type RefreshOutput struct {
 	SetCookie http.Cookie `header:"Set-Cookie"`
-	Body      AuthTokens
+	Body      Tokens
 }
 
 // LogoutInput is the request for POST /auth/logout. The refresh token is
@@ -232,7 +232,7 @@ type OIDCCallbackInput struct {
 // OIDCCallbackOutput is the response for OIDC callback.
 type OIDCCallbackOutput struct {
 	SetCookie http.Cookie `header:"Set-Cookie"`
-	Body      AuthTokens
+	Body      Tokens
 }
 
 // MeBody is the public DTO for the authenticated user profile, shared
@@ -489,5 +489,5 @@ type MagicLinkVerifyInput struct {
 // MagicLinkVerifyOutput is the response for GET /auth/magic-link/verify.
 type MagicLinkVerifyOutput struct {
 	SetCookie http.Cookie `header:"Set-Cookie"`
-	Body      AuthTokens
+	Body      Tokens
 }

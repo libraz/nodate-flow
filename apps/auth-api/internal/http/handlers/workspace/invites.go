@@ -31,8 +31,8 @@ func uint32FromNullInt32(n sql.NullInt32) uint32 {
 // CreateInvite handles POST /workspaces/{wsId}/invites. It generates a
 // shareable invite token and stores its SHA-256 hash. The plaintext
 // token is returned exactly once in the response.
-func CreateInvite(deps InviteDeps) func(context.Context, *CreateWorkspaceInviteInput) (*CreateWorkspaceInviteOutput, error) {
-	return func(ctx context.Context, in *CreateWorkspaceInviteInput) (*CreateWorkspaceInviteOutput, error) {
+func CreateInvite(deps InviteDeps) func(context.Context, *CreateInviteInput) (*CreateInviteOutput, error) {
+	return func(ctx context.Context, in *CreateInviteInput) (*CreateInviteOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
@@ -90,7 +90,7 @@ func CreateInvite(deps InviteDeps) func(context.Context, *CreateWorkspaceInviteI
 			})
 		}
 
-		invite := WorkspaceInvite{
+		invite := Invite{
 			ID:        pub.String(),
 			Role:      string(role),
 			MaxUses:   nullInt32Ptr(maxUses),
@@ -100,7 +100,7 @@ func CreateInvite(deps InviteDeps) func(context.Context, *CreateWorkspaceInviteI
 			CreatedAt: now.Unix(),
 		}
 
-		return &CreateWorkspaceInviteOutput{Body: CreateWorkspaceInviteOutputBody{
+		return &CreateInviteOutput{Body: CreateInviteOutputBody{
 			Invite: invite,
 			Token:  plaintext,
 		}}, nil
@@ -108,8 +108,8 @@ func CreateInvite(deps InviteDeps) func(context.Context, *CreateWorkspaceInviteI
 }
 
 // ListInvites handles GET /workspaces/{wsId}/invites.
-func ListInvites(deps InviteDeps) func(context.Context, *ListWorkspaceInvitesInput) (*ListWorkspaceInvitesOutput, error) {
-	return func(ctx context.Context, in *ListWorkspaceInvitesInput) (*ListWorkspaceInvitesOutput, error) {
+func ListInvites(deps InviteDeps) func(context.Context, *ListInvitesInput) (*ListInvitesOutput, error) {
+	return func(ctx context.Context, in *ListInvitesInput) (*ListInvitesOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
@@ -126,8 +126,8 @@ func ListInvites(deps InviteDeps) func(context.Context, *ListWorkspaceInvitesInp
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		out := &ListWorkspaceInvitesOutput{}
-		out.Body.Invites = make([]WorkspaceInvite, 0, len(rows))
+		out := &ListInvitesOutput{}
+		out.Body.Invites = make([]Invite, 0, len(rows))
 		for _, r := range rows {
 			out.Body.Invites = append(out.Body.Invites, rowToInvite(r))
 		}
@@ -139,8 +139,8 @@ func ListInvites(deps InviteDeps) func(context.Context, *ListWorkspaceInvitesInp
 }
 
 // RevokeInvite handles DELETE /workspaces/{wsId}/invites/{inviteId}.
-func RevokeInvite(deps InviteDeps) func(context.Context, *RevokeWorkspaceInviteInput) (*RevokeWorkspaceInviteOutput, error) {
-	return func(ctx context.Context, in *RevokeWorkspaceInviteInput) (*RevokeWorkspaceInviteOutput, error) {
+func RevokeInvite(deps InviteDeps) func(context.Context, *RevokeInviteInput) (*RevokeInviteOutput, error) {
+	return func(ctx context.Context, in *RevokeInviteInput) (*RevokeInviteOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
@@ -155,7 +155,7 @@ func RevokeInvite(deps InviteDeps) func(context.Context, *RevokeWorkspaceInviteI
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		out := &RevokeWorkspaceInviteOutput{}
+		out := &RevokeInviteOutput{}
 		out.Body.Ok = true
 		return out, nil
 	}
@@ -163,8 +163,8 @@ func RevokeInvite(deps InviteDeps) func(context.Context, *RevokeWorkspaceInviteI
 
 // AcceptInvite handles POST /invites/{token}/accept. The caller must be
 // authenticated but does not need to be a member of any workspace.
-func AcceptInvite(deps InviteDeps) func(context.Context, *AcceptWorkspaceInviteInput) (*AcceptWorkspaceInviteOutput, error) {
-	return func(ctx context.Context, in *AcceptWorkspaceInviteInput) (*AcceptWorkspaceInviteOutput, error) {
+func AcceptInvite(deps InviteDeps) func(context.Context, *AcceptInviteInput) (*AcceptInviteOutput, error) {
+	return func(ctx context.Context, in *AcceptInviteInput) (*AcceptInviteOutput, error) {
 		actorID, ok := authn.ActorFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.AuthSessionRevoked)
@@ -195,7 +195,7 @@ func AcceptInvite(deps InviteDeps) func(context.Context, *AcceptWorkspaceInviteI
 			if werr != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
-			return &AcceptWorkspaceInviteOutput{Body: AcceptWorkspaceInviteOutputBody{
+			return &AcceptInviteOutput{Body: AcceptInviteOutputBody{
 				WorkspaceID:   wsRow.WorkspacePublicID.String(),
 				WorkspaceName: wsRow.Name,
 				Role:          string(invite.Role),
@@ -237,7 +237,7 @@ func AcceptInvite(deps InviteDeps) func(context.Context, *AcceptWorkspaceInviteI
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		return &AcceptWorkspaceInviteOutput{Body: AcceptWorkspaceInviteOutputBody{
+		return &AcceptInviteOutput{Body: AcceptInviteOutputBody{
 			WorkspaceID:   wsRow.WorkspacePublicID.String(),
 			WorkspaceName: wsRow.Name,
 			Role:          string(invite.Role),

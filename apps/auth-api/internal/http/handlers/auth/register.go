@@ -90,18 +90,18 @@ func Register(deps Deps) func(context.Context, *RegisterInput) (*RegisterOutput,
 }
 
 // issueTokens signs an access JWT and creates a new session row. It
-// returns the JSON-body AuthTokens envelope plus the freshly-minted
+// returns the JSON-body Tokens envelope plus the freshly-minted
 // plaintext refresh token, which the caller must attach to the
 // response via a Set-Cookie header (never in the JSON body).
-func issueTokens(ctx context.Context, deps Deps, userID uint32, userPub types.PublicID, userAgent, ipAddress string) (AuthTokens, string, error) {
+func issueTokens(ctx context.Context, deps Deps, userID uint32, userPub types.PublicID, userAgent, ipAddress string) (Tokens, string, error) {
 	sessPub := types.New()
 	access, exp, err := deps.JWT.Sign(userPub, sessPub)
 	if err != nil {
-		return AuthTokens{}, "", httpErr(apierrors.InternalUnexpected)
+		return Tokens{}, "", httpErr(apierrors.InternalUnexpected)
 	}
 	refresh, refreshHash, err := auth.GenerateRefresh()
 	if err != nil {
-		return AuthTokens{}, "", httpErr(apierrors.InternalUnexpected)
+		return Tokens{}, "", httpErr(apierrors.InternalUnexpected)
 	}
 	if _, err := deps.Sessions.Create(ctx, sessionstore.CreateParams{
 		PublicID:    sessPub,
@@ -111,9 +111,9 @@ func issueTokens(ctx context.Context, deps Deps, userID uint32, userPub types.Pu
 		IPAddress:   ipAddress,
 		ExpiresAt:   time.Now().Add(refreshCookieTTL),
 	}); err != nil {
-		return AuthTokens{}, "", httpErr(apierrors.InternalUnexpected)
+		return Tokens{}, "", httpErr(apierrors.InternalUnexpected)
 	}
-	return AuthTokens{
+	return Tokens{
 		AccessToken: access,
 		ExpiresAt:   exp.Unix(),
 		UserID:      userPub.String(),

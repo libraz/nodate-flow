@@ -41,7 +41,7 @@ func ListUsers(deps Deps) func(context.Context, *ListUsersInput) (*ListUsersOutp
 		}
 
 		out := &ListUsersOutput{}
-		out.Body.Items = make([]AdminUser, len(rows))
+		out.Body.Items = make([]User, len(rows))
 		for i, r := range rows {
 			out.Body.Items[i] = rowToAdminUser(r)
 		}

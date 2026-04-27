@@ -41,7 +41,7 @@ func ListUserSessions(deps Deps) func(context.Context, *ListUserSessionsInput) (
 		}
 
 		out := &ListUserSessionsOutput{}
-		out.Body.Items = make([]AdminSession, len(rows))
+		out.Body.Items = make([]Session, len(rows))
 		for i, r := range rows {
 			out.Body.Items[i] = rowToAdminSession(r)
 		}
@@ -54,8 +54,8 @@ func ListUserSessions(deps Deps) func(context.Context, *ListUserSessionsInput) (
 
 // RevokeSession handles DELETE /admin/sessions/{sessionId}. Revokes a single
 // session by its public id regardless of which user owns it.
-func RevokeSession(deps Deps) func(context.Context, *AdminRevokeSessionInput) (*AdminRevokeSessionOutput, error) {
-	return func(ctx context.Context, in *AdminRevokeSessionInput) (*AdminRevokeSessionOutput, error) {
+func RevokeSession(deps Deps) func(context.Context, *RevokeSessionInput) (*RevokeSessionOutput, error) {
+	return func(ctx context.Context, in *RevokeSessionInput) (*RevokeSessionOutput, error) {
 		uid, _ := authn.ActorFromContext(ctx)
 
 		pid, err := types.Parse(in.SessionID)
@@ -75,7 +75,7 @@ func RevokeSession(deps Deps) func(context.Context, *AdminRevokeSessionInput) (*
 			ResourceID:   in.SessionID,
 		})
 
-		out := &AdminRevokeSessionOutput{}
+		out := &RevokeSessionOutput{}
 		out.Body.Ok = true
 		return out, nil
 	}

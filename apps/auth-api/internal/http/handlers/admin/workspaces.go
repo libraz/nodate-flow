@@ -13,8 +13,8 @@ import (
 
 // ListWorkspaces handles GET /admin/workspaces. Returns a paginated list of
 // all workspaces with optional search and enabled-status filtering.
-func ListWorkspaces(deps Deps) func(context.Context, *AdminListWorkspacesInput) (*AdminListWorkspacesOutput, error) {
-	return func(ctx context.Context, in *AdminListWorkspacesInput) (*AdminListWorkspacesOutput, error) {
+func ListWorkspaces(deps Deps) func(context.Context, *ListWorkspacesInput) (*ListWorkspacesOutput, error) {
+	return func(ctx context.Context, in *ListWorkspacesInput) (*ListWorkspacesOutput, error) {
 		limit := in.Limit
 		if limit <= 0 {
 			limit = 50
@@ -40,8 +40,8 @@ func ListWorkspaces(deps Deps) func(context.Context, *AdminListWorkspacesInput) 
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		out := &AdminListWorkspacesOutput{}
-		out.Body.Items = make([]AdminWorkspace, len(rows))
+		out := &ListWorkspacesOutput{}
+		out.Body.Items = make([]Workspace, len(rows))
 		for i, r := range rows {
 			out.Body.Items[i] = rowToAdminWorkspaceList(r)
 		}
@@ -54,8 +54,8 @@ func ListWorkspaces(deps Deps) func(context.Context, *AdminListWorkspacesInput) 
 
 // GetWorkspace handles GET /admin/workspaces/{wsId}. Returns the detail view
 // for a single workspace identified by public id, including project count.
-func GetWorkspace(deps Deps) func(context.Context, *AdminGetWorkspaceInput) (*AdminGetWorkspaceOutput, error) {
-	return func(ctx context.Context, in *AdminGetWorkspaceInput) (*AdminGetWorkspaceOutput, error) {
+func GetWorkspace(deps Deps) func(context.Context, *GetWorkspaceInput) (*GetWorkspaceOutput, error) {
+	return func(ctx context.Context, in *GetWorkspaceInput) (*GetWorkspaceOutput, error) {
 		pid, err := types.Parse(in.WsID)
 		if err != nil {
 			return nil, httpErr(apierrors.InstanceWorkspaceNotFound)
@@ -66,14 +66,14 @@ func GetWorkspace(deps Deps) func(context.Context, *AdminGetWorkspaceInput) (*Ad
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.InstanceWorkspaceNotFound, apierrors.InternalUnexpected))
 		}
 
-		return &AdminGetWorkspaceOutput{Body: rowToAdminWorkspaceDetail(row)}, nil
+		return &GetWorkspaceOutput{Body: rowToAdminWorkspaceDetail(row)}, nil
 	}
 }
 
 // PatchWorkspace handles PATCH /admin/workspaces/{wsId}. Currently supports
 // toggling the enabled flag to suspend or re-enable a workspace.
-func PatchWorkspace(deps Deps) func(context.Context, *AdminPatchWorkspaceInput) (*AdminPatchWorkspaceOutput, error) {
-	return func(ctx context.Context, in *AdminPatchWorkspaceInput) (*AdminPatchWorkspaceOutput, error) {
+func PatchWorkspace(deps Deps) func(context.Context, *PatchWorkspaceInput) (*PatchWorkspaceOutput, error) {
+	return func(ctx context.Context, in *PatchWorkspaceInput) (*PatchWorkspaceOutput, error) {
 		uid, _ := authn.ActorFromContext(ctx)
 
 		pid, err := types.Parse(in.WsID)
@@ -82,7 +82,7 @@ func PatchWorkspace(deps Deps) func(context.Context, *AdminPatchWorkspaceInput) 
 		}
 
 		if in.Body.Enabled == nil {
-			out := &AdminPatchWorkspaceOutput{}
+			out := &PatchWorkspaceOutput{}
 			out.Body.Ok = true
 			return out, nil
 		}
@@ -107,7 +107,7 @@ func PatchWorkspace(deps Deps) func(context.Context, *AdminPatchWorkspaceInput) 
 			ResourceID:   in.WsID,
 		})
 
-		out := &AdminPatchWorkspaceOutput{}
+		out := &PatchWorkspaceOutput{}
 		out.Body.Ok = true
 		return out, nil
 	}
