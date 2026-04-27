@@ -57,23 +57,3 @@ type ExportBody struct {
 type ExportOutput struct {
 	Body ExportBody
 }
-
-// nullTimeToDateStr converts a sql.NullTime to a YYYY-MM-DD string pointer.
-// All date conversions for *_on fields live here.
-func nullTimeToDateStr(t sql.NullTime) *string {
-	if !t.Valid {
-		return nil
-	}
-	s := t.Time.Format("2006-01-02")
-	return &s
-}
-
-// nullTimeToUnix converts a sql.NullTime to a unix-seconds int64 pointer.
-// All timestamp conversions for *_at fields live here.
-func nullTimeToUnix(t sql.NullTime) *int64 {
-	if !t.Valid {
-		return nil
-	}
-	u := t.Time.Unix()
-	return &u
-}

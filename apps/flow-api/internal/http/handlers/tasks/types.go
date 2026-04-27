@@ -53,12 +53,10 @@ func int64Ptr(v int64) *int64 {
 // nullTimeDate delegates to handlerutil.NullTimeDate (returns *string YYYY-MM-DD, nil for NULL).
 var nullTimeDate = handlerutil.NullTimeDate
 
-func nullDate(t sql.NullTime) string {
-	if !t.Valid {
-		return ""
-	}
-	return t.Time.UTC().Format("2006-01-02")
-}
+// nullDate delegates to handlerutil.NullTimeDateStr (returns string YYYY-MM-DD, "" for NULL).
+// Used by Task / TaskListItem DTOs whose `dueOn` / `startedOn` fields are
+// declared as `string` with `omitempty` rather than `*string`.
+var nullDate = handlerutil.NullTimeDateStr
 
 // totalAsInt64 delegates to handlerutil.TotalAsInt64.
 var totalAsInt64 = handlerutil.TotalAsInt64

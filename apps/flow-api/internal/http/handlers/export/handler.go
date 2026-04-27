@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/csv"
-	"errors"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -17,6 +17,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
@@ -107,12 +108,16 @@ func Export(deps Deps) func(ctx context.Context, in *ExportInput) (*ExportOutput
 // ExportCSV returns a raw http.HandlerFunc that streams a CSV file.
 // It is registered on the chi router directly (not via Huma) because
 // the response is a file download with custom content-type headers.
+//
+// Errors are emitted as a JSON problem+json envelope via
+// [handlerutil.WriteSpecError] so clients see the same `type` /
+// `status` shape as Huma-mediated routes.
 func ExportCSV(deps Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
-			http.Error(w, apierrors.WsWorkspaceNotFound.Code, http.StatusNotFound)
+			handlerutil.WriteSpecError(w, apierrors.WsWorkspaceNotFound)
 			return
 		}
 		actorID, _ := middleware.ActorFromContext(ctx)
@@ -130,7 +135,7 @@ func ExportCSV(deps Deps) http.HandlerFunc {
 			rows, err = fetchForWorkspace(ctx, deps, ws, limit)
 		}
 		if err != nil {
-			writeHTTPError(w, err)
+			writeFetchError(w, err)
 			return
 		}
 
@@ -157,18 +162,18 @@ func ExportCSV(deps Deps) http.HandlerFunc {
 			_ = cw.Write([]string{
 				t.ID,
 				t.Title,
-				derefStr(t.Description),
+				handlerutil.DerefStr(t.Description),
 				t.Status,
 				fmt.Sprintf("%d", t.Priority),
-				derefStr(t.DueOn),
-				derefStr(t.StartedOn),
-				formatOptionalUnix(t.CompletedAt),
+				handlerutil.DerefStr(t.DueOn),
+				handlerutil.DerefStr(t.StartedOn),
+				handlerutil.FormatOptionalUnix(t.CompletedAt),
 				t.ProjectID,
 				t.ProjectName,
-				derefStr(t.AssigneeID),
-				derefStr(t.AssigneeDisplayName),
-				formatOptionalUnix(t.UpdatedAt),
-				formatUnix(t.CreatedAt),
+				handlerutil.DerefStr(t.AssigneeID),
+				handlerutil.DerefStr(t.AssigneeDisplayName),
+				handlerutil.FormatOptionalUnix(t.UpdatedAt),
+				handlerutil.FormatUnix(t.CreatedAt),
 			})
 		}
 		cw.Flush()
@@ -326,12 +331,12 @@ func mapRows(rows []exportRow) []ExportedTask {
 			Title:       r.Title,
 			Status:      string(r.DerivedState),
 			Priority:    r.Priority,
-			DueOn:       nullTimeToDateStr(r.DueOn),
-			StartedOn:   nullTimeToDateStr(r.StartedOn),
-			CompletedAt: nullTimeToUnix(r.CompletedAt),
+			DueOn:       handlerutil.NullTimeDate(r.DueOn),
+			StartedOn:   handlerutil.NullTimeDate(r.StartedOn),
+			CompletedAt: handlerutil.NullTimeUnix(r.CompletedAt),
 			ProjectID:   r.ProjectPublicID.String(),
 			ProjectName: r.ProjectName,
-			UpdatedAt:   nullTimeToUnix(r.UpdatedAt),
+			UpdatedAt:   handlerutil.NullTimeUnix(r.UpdatedAt),
 		}
 		if r.CreatedAt.Valid {
 			t.CreatedAt = r.CreatedAt.Time.Unix()
@@ -352,27 +357,6 @@ func mapRows(rows []exportRow) []ExportedTask {
 	return tasks
 }
 
-// derefStr returns the string value or empty string for nil.
-func derefStr(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}
-
-// formatUnix formats a unix seconds value as a decimal string.
-func formatUnix(u int64) string {
-	return fmt.Sprintf("%d", u)
-}
-
-// formatOptionalUnix formats an optional unix seconds value.
-func formatOptionalUnix(u *int64) string {
-	if u == nil {
-		return ""
-	}
-	return fmt.Sprintf("%d", *u)
-}
-
 // parseLimit parses a limit string, returning the default on failure.
 func parseLimit(s string, def int32) int32 {
 	if s == "" {
@@ -389,12 +373,33 @@ func parseLimit(s string, def int32) int32 {
 	return v
 }
 
-// writeHTTPError translates a huma error into a plain HTTP error response.
-func writeHTTPError(w http.ResponseWriter, err error) {
-	var he huma.StatusError
-	if errors.As(err, &he) {
-		http.Error(w, he.Error(), he.GetStatus())
+// writeFetchError emits a JSON problem+json envelope for the CSV path.
+// fetch helpers return errors built by [handlerutil.HTTPErr], which are
+// *huma.ErrorModel values; we forward the embedded code + status into a
+// matching problem+json envelope so the wire shape stays identical to
+// the Huma-mediated JSON route. Unknown shapes collapse to
+// INTERNAL.UNEXPECTED so a transport-layer regression does not leak a
+// raw error string.
+func writeFetchError(w http.ResponseWriter, err error) {
+	if hm, ok := err.(*huma.ErrorModel); ok && hm != nil {
+		w.Header().Set("Content-Type", "application/problem+json; charset=utf-8")
+		status := hm.Status
+		if status == 0 {
+			status = http.StatusInternalServerError
+		}
+		w.WriteHeader(status)
+		_ = json.NewEncoder(w).Encode(struct {
+			Type   string `json:"type"`
+			Title  string `json:"title"`
+			Status int    `json:"status"`
+			Detail string `json:"detail"`
+		}{
+			Type:   hm.Type,
+			Title:  hm.Title,
+			Status: status,
+			Detail: hm.Detail,
+		})
 		return
 	}
-	http.Error(w, "internal error", http.StatusInternalServerError)
+	handlerutil.WriteSpecError(w, apierrors.InternalUnexpected)
 }
