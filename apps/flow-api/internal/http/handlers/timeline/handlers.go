@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -176,8 +177,11 @@ func resolveActorFilter(actor string) ([]byte, error) {
 }
 
 // errInvalidActor is the sentinel returned by [resolveActorFilter] for
-// malformed UUIDs. Handlers translate it to an empty result set.
-var errInvalidActor = fmt.Errorf("timeline: invalid actor uuid")
+// malformed UUIDs. Handlers translate it to an empty (200) result set
+// rather than a 4xx apierror so a malformed query string cannot be used
+// to probe the existence of unrelated actors. The error therefore never
+// reaches the HTTP boundary; an internal sentinel is intentional.
+var errInvalidActor = errors.New("timeline: invalid actor uuid")
 
 // ListForTask handles GET /tasks/{id}/timeline. The route must be mounted
 // behind RequireTaskAccess so the workspace and task contexts are populated.

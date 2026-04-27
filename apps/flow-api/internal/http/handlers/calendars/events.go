@@ -686,6 +686,9 @@ func DeleteEvent(deps Deps) func(context.Context, *DeleteEventInput) (*DeleteEve
 		defer func() { _ = tx.Rollback() }()
 
 		if err := itemkit.DeleteEvent(ctx, tx, wsID, evt.ID, actorID); err != nil {
+			// fmt.Errorf is acceptable here: translateItemkitError maps the
+			// wrapped error to a calendar apierror code (the wrap only adds
+			// context for the structured log emitted by the classifier).
 			return nil, translateItemkitError(ctx, "itemkit.DeleteEvent", fmt.Errorf("itemkit: delete event: %w", err))
 		}
 		if err := tx.Commit(); err != nil {
@@ -854,7 +857,10 @@ func eventFromRecurringRow(e calendar.ListRecurringCalendarEventsByRangeRow) Eve
 }
 
 // parseFlexibleTime parses a date string ("2006-01-02") or a full
-// RFC 3339 datetime string into a time.Time.
+// RFC 3339 datetime string into a time.Time. The returned error is an
+// internal sentinel; every caller in this package wraps it with
+// httpErr(apierrors.CalendarEventDateRangeUnparseable) before returning
+// to the HTTP layer, so the sentinel itself never reaches a client.
 func parseFlexibleTime(s string) (time.Time, error) {
 	if t, err := time.Parse(time.RFC3339, s); err == nil {
 		return t, nil
@@ -862,8 +868,14 @@ func parseFlexibleTime(s string) (time.Time, error) {
 	if t, err := time.Parse("2006-01-02", s); err == nil {
 		return t, nil
 	}
-	return time.Time{}, fmt.Errorf("cannot parse %q as date or datetime", s)
+	return time.Time{}, errInvalidFlexibleTime
 }
+
+// errInvalidFlexibleTime is the internal sentinel returned by
+// parseFlexibleTime when neither RFC 3339 nor YYYY-MM-DD parsing
+// succeeds. Handlers translate this to
+// apierrors.CalendarEventDateRangeUnparseable.
+var errInvalidFlexibleTime = errors.New("calendar: cannot parse as date or datetime")
 
 func eventFromFullRow(e calendar.FindCalendarEventByPublicIdRow) EventResponse {
 	resp := EventResponse{

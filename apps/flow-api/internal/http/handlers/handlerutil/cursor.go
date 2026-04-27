@@ -78,6 +78,14 @@ func EncodeCursor(t time.Time, pid types.PublicID) string {
 // case. Any decode error (bad base64, bad JSON, malformed UUID) is
 // returned to the caller so it can map to a 400 / WS.VALIDATION error.
 //
+// The returned errors are unwrapped fmt.Errorf values on purpose:
+// callers must translate them via
+// httpErr(apierrors.ValidationQueryFieldInvalid) (or an equivalent
+// validation code) before returning to the HTTP layer. Returning a
+// typed apierror here would tie this helper package to a concrete
+// error code and prevent callers from substituting a more specific
+// validation code where appropriate.
+//
 // The decoded time preserves millisecond precision; see the package
 // doc on the wire format and EncodeCursor for the rationale.
 func DecodeCursor(s string) (time.Time, types.PublicID, error) {

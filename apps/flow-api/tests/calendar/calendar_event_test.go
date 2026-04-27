@@ -369,3 +369,31 @@ func TestPrivateEventVisibility_ScrubsFieldsForNonOwner(t *testing.T) {
 	assert.Equal(t, "Budget review notes", *ownerView.Memo)
 	assert.Equal(t, "https://internal.example/meet", *ownerView.URL)
 }
+
+// TestListCrossCalendarEvents_BadDateRangeReturnsApiError exercises the
+// parseFlexibleTime sentinel path to confirm the workspace-level
+// /calendar-events endpoint translates a malformed range parameter into
+// the CALENDAR.EVENT.DATE_RANGE_UNPARSEABLE apierror code rather than
+// leaking the raw fmt.Errorf message. Audit H5 regression guard.
+func TestListCrossCalendarEvents_BadDateRangeReturnsApiError(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tt := newTenant(t)
+
+	cases := []struct {
+		name  string
+		query string
+	}{
+		{"bad_start", "?start=not-a-date&end=2026-05-01T00:00:00Z"},
+		{"bad_end", "?start=2026-05-01T00:00:00Z&end=tomorrow"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			url := tt.WsPath("calendar-events") + tc.query
+			status, body := helpers.DoJSONStatus(t, http.MethodGet, url, tt.AccessToken, nil)
+			assert.Equal(t, http.StatusUnprocessableEntity, status, "body=%s", string(body))
+			assert.Contains(t, string(body), "CALENDAR.EVENT.DATE_RANGE_UNPARSEABLE", "body=%s", string(body))
+		})
+	}
+}
