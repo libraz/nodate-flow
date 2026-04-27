@@ -21,6 +21,12 @@ type Deps struct {
 var httpErr = handlerutil.HTTPErr
 
 // Input is the input for GET /workspaces/{wsId}/export/tasks.
+//
+// Limit override: bulk export is the canonical "scan everything once"
+// surface; the cap (10000) and default (5000) are deliberately far above
+// handlerutil.MaxListLimit so that users can pull a CSV of an entire
+// workspace in a single download. Cost is bounded by the DB query
+// timeout and the streaming CSV encoder.
 type Input struct {
 	WsID   string `path:"wsId"`
 	Format string `query:"format" enum:"csv,json" default:"csv" doc:"Export format (csv or json)"`

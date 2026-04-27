@@ -381,7 +381,16 @@ func parseLimit(s string, def int32) int32 {
 // INTERNAL.UNEXPECTED so a transport-layer regression does not leak a
 // raw error string.
 func writeFetchError(w http.ResponseWriter, err error) {
-	if hm, ok := err.(*huma.ErrorModel); ok && hm != nil {
+	var hm *huma.ErrorModel
+	switch e := err.(type) {
+	case *handlerutil.ProblemDetails:
+		if e != nil {
+			hm = &e.ErrorModel
+		}
+	case *huma.ErrorModel:
+		hm = e
+	}
+	if hm != nil {
 		w.Header().Set("Content-Type", "application/problem+json; charset=utf-8")
 		status := hm.Status
 		if status == 0 {
