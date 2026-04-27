@@ -278,7 +278,7 @@ function EventTriggersEditor({
       <Input
         id={`agent-events-${agentId}`}
         value={value}
-        placeholder="task.updated, signal.attached"
+        placeholder={t('agents.eventTriggers.placeholder')}
         onChange={(e) => {
           setValue(e.target.value);
         }}
@@ -438,7 +438,7 @@ function CreateAgentForm({
               onChange={(e) => {
                 setEventTriggers(e.target.value);
               }}
-              placeholder="task.updated, signal.attached"
+              placeholder={t('agents.eventTriggers.placeholder')}
             />
           )}
         </FormField>

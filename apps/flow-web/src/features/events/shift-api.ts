@@ -2,13 +2,9 @@
  * Calendar event shift hooks — propose / apply the umbrella event move
  * with optional task drag-along selection.
  *
- * Plan vs API direction reframe:
- *   The R6 plan describes this UX as "user changes a TASK's due date →
- *   ask whether to shift linked CALENDAR EVENTS". The actual API works
- *   in the OPPOSITE direction: an umbrella calendar event is the
- *   anchor, and the user picks which linked tasks travel along when the
- *   event itself shifts. This file implements the actual API direction.
- *   See {@link ../../../../docs/plan/release-6-calendar.md} for context.
+ * API direction:
+ *   An umbrella calendar event is the anchor; the actor picks which
+ *   linked tasks travel along when the event itself shifts.
  *
  * Endpoints:
  *   - POST /workspaces/{wsId}/calendar-events/{evtId}/propose-shift

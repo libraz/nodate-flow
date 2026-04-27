@@ -34,6 +34,7 @@
     },
     "eventTriggers": {
       "label": "イベント種別",
+      "placeholder": "task.updated, signal.attached",
       "save": "トリガーを保存",
       "saved": "トリガーを保存しました",
       "failed": "イベントトリガーの更新に失敗しました"

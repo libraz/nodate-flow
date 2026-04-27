@@ -235,6 +235,7 @@
       "enabled_description": "二要素認証が有効です。無効化するには現在のパスワードを入力してください。",
       "pending_description": "登録を開始しましたが確認が完了していません。シークレットを再生成して 2FA を完了してください。",
       "enroll_instructions": "このシークレットを認証アプリ（Google Authenticator、1Password、Authy など）に追加し、表示される 6 桁コードを入力してください。",
+      "qr_alt": "TOTP QR コード",
       "secret_label": "シークレット",
       "code_label": "6 桁のコード",
       "password_label": "現在のパスワード",

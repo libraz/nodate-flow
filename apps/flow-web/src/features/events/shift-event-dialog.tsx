@@ -1,21 +1,19 @@
 /**
- * ShiftEventDialog — two-phase confirm UX for shifting an umbrella
+ * ShiftEventDialog — two-step confirm UX for shifting an umbrella
  * calendar event together with its linked tasks.
  *
- * Plan vs API direction reframe:
- *   The R6 plan describes this dialog as "user changes a TASK's due
- *   date → modal asks whether to shift linked CALENDAR EVENTS". The
- *   actual API works the other way around — the umbrella event is the
- *   anchor, and the user picks which tasks travel along when the event
- *   shifts. This dialog is anchored on the event detail page and calls
- *   `propose-shift` / `apply-shift` on the event, not on a task.
+ * API direction:
+ *   The umbrella event is the anchor; the actor picks which tasks
+ *   travel along when the event shifts. The dialog is anchored on the
+ *   event detail page and calls `propose-shift` / `apply-shift` on the
+ *   event, not on a task.
  *
- * Phase 1 ('pick'):
+ * Step 1 ('pick'):
  *   Datetime input pre-filled with the event's current `startAt`.
  *   "Preview shift" calls {@link useProposeShiftMutation} and, on
- *   success, captures the proposal locally and advances to phase 2.
+ *   success, captures the proposal locally and advances to step 2.
  *
- * Phase 2 ('confirm'):
+ * Step 2 ('confirm'):
  *   Renders two grouped checkbox lists — `safeTasks` (pre-checked) and
  *   `conflictTasks` (pre-unchecked). The user can toggle any task. The
  *   submit button calls {@link useApplyShiftMutation} with the selected

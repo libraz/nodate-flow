@@ -1,6 +1,6 @@
 /**
  * Calendar settings hooks — single-calendar reads + writes used by the
- * Calendar Settings Drawer (W13). Subscription-level state stays in the
+ * Calendar Settings Drawer. Subscription-level state stays in the
  * calendars-rail feature; this module only deals with the calendar
  * resource itself (rename / color / description, and delete).
  *

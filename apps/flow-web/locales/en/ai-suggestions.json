@@ -34,6 +34,7 @@
     },
     "eventTriggers": {
       "label": "Event kinds",
+      "placeholder": "task.updated, signal.attached",
       "save": "Save triggers",
       "saved": "Triggers saved",
       "failed": "Failed to update event triggers"

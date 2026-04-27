@@ -1,6 +1,6 @@
 /**
  * Calendar memos feature — react-query hooks for the per-calendar
- * "Memos" surface (W10).
+ * "Memos" surface.
  *
  * Each memo is a titled todo bound to a single calendar:
  *

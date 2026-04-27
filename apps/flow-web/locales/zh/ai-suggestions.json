@@ -34,6 +34,7 @@
     },
     "eventTriggers": {
       "label": "事件类型",
+      "placeholder": "task.updated, signal.attached",
       "save": "保存触发器",
       "saved": "已保存触发器",
       "failed": "更新事件触发器失败"

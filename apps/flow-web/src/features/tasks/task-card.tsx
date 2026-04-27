@@ -40,7 +40,7 @@ export default function TaskCard({
 }: TaskCardProps): ReactElement {
   const { t, i18n } = useTranslation('common');
   const locale = i18n.resolvedLanguage ?? 'en';
-  // Fields added in Wave 1 — safe access until SDK types are regenerated.
+  // Defensive cast for fields not yet in the regenerated SDK types.
   const ext = task as TaskListItem & {
     projectIdentifier?: string;
     taskNumber?: number;

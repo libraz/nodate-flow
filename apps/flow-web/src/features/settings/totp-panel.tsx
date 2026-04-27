@@ -139,7 +139,7 @@ function EnrollmentForm({
       {qrDataUrl ? (
         <img
           src={qrDataUrl}
-          alt="TOTP QR code"
+          alt={t('security.totp.qr_alt')}
           width={200}
           height={200}
           className={styles.qrImage}

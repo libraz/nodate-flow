@@ -235,6 +235,7 @@
       "enabled_description": "Two-factor authentication is enabled. Enter your password to disable it.",
       "pending_description": "An enrollment was started but never confirmed. Regenerate the secret to finish setting up 2FA.",
       "enroll_instructions": "Add this secret to your authenticator app (Google Authenticator, 1Password, Authy, ...) and enter the 6-digit code it shows.",
+      "qr_alt": "TOTP QR code",
       "secret_label": "Secret",
       "code_label": "6-digit code",
       "password_label": "Current password",

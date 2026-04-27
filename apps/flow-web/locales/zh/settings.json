@@ -235,6 +235,7 @@
       "enabled_description": "已启用两步验证。请输入密码以禁用。",
       "pending_description": "已开始注册但未完成确认，请重新生成密钥以完成 2FA 设置。",
       "enroll_instructions": "将该密钥添加到身份验证器应用（Google Authenticator、1Password、Authy 等），然后输入显示的 6 位代码。",
+      "qr_alt": "TOTP 二维码",
       "secret_label": "密钥",
       "code_label": "6 位代码",
       "password_label": "当前密码",

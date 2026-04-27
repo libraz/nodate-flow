@@ -3,8 +3,8 @@
  *
  * Lists attachment metadata associated with the event (filename, size,
  * uploader, created date) and exposes register-by-metadata + delete
- * actions. **The event-side API is metadata-only as of R6 W9** — there
- * is no presigned upload route and no presigned download route. The
+ * actions. **The event-side API is metadata-only today** — there is
+ * no presigned upload route and no presigned download route. The
  * task-side flow at `apps/flow-web/src/features/tasks/task-attachments.tsx`
  * uses `usePresignUpload` + `fetchDownloadUrl`; if those endpoints land
  * on the event side later, switch this file to mirror that flow.

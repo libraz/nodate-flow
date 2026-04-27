@@ -1,8 +1,8 @@
 /**
  * /share/cal/$token — standalone public page for viewing a shared
- * calendar. No authentication required; served from flow-web as part of
- * the time-web consolidation (Phase 1). The actual UI lives in the
- * public-shares feature so this route file stays a thin param bridge.
+ * calendar. No authentication required; served from flow-web. The
+ * actual UI lives in the public-shares feature so this route file
+ * stays a thin param bridge.
  */
 
 import { createFileRoute } from '@tanstack/react-router';

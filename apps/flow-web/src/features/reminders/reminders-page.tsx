@@ -12,11 +12,10 @@
  * state (overdue / due_today / due_soon) plus the message string. This
  * page is read-only.
  *
- * **Snooze / dismiss are intentionally absent.** The R6 W4 plan
- * mentions "既存 POST /snooze" + "POST /dismiss" endpoints, but no such
- * endpoints exist on flow-api as of this commit — the only reminder
- * endpoint is the GET above. Adding buttons would 404. If reminder
- * actions are required later they need backend work first.
+ * **Snooze / dismiss are intentionally absent.** No such endpoints
+ * exist on flow-api today — the only reminder endpoint is the GET
+ * above. Adding buttons would 404. If reminder actions are required
+ * later they need backend work first.
  *
  * Data fetching uses the existing non-suspense `useRemindersQuery`
  * (60s polling, tolerant of failures) so the dock + this page share a

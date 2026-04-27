@@ -9,7 +9,7 @@
  * **Metadata-only.** Unlike the task-side flow
  * (`/tasks/{id}/attachments/presign` + `POST` + presigned PUT), the
  * calendar-event endpoints do **not** expose a presign route or a
- * download-URL route as of R6 W9. The attach payload requires
+ * download-URL route today. The attach payload requires
  * `filename`, `contentType`, `byteSize`, and a `storageKey` the
  * caller already owns (e.g. an external bucket key, a paste URL, or
  * a value from a separate upload pipeline). If a presign endpoint is

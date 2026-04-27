@@ -117,6 +117,9 @@ export function useApplySmartTask() {
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: [...tasksKeys.all, 'list', vars.projectId] });
+      // Subtasks may also appear in `me` lists when an assignee was supplied,
+      // so broadcast the broader prefix as well.
+      void qc.invalidateQueries({ queryKey: tasksKeys.myInfinite() });
     },
   });
 }

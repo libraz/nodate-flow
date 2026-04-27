@@ -1,5 +1,5 @@
 /**
- * RemindersPage layout — workspace-scoped reminders surface (R6 W4).
+ * RemindersPage layout — workspace-scoped reminders surface.
  * Renders a header followed by urgency-bucketed groups (Overdue,
  * Today, Soon, Later). Tokens only — no literal hex / rgb / px.
  */

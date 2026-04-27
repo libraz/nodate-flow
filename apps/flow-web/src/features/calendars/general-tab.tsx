@@ -39,17 +39,61 @@ import styles from './calendar-settings-drawer.module.css';
  * retained as the canonical cross-theme identity. Custom hex pickers
  * are out of scope for v1.
  */
-const COLOR_PALETTE: ReadonlyArray<{ hex: string; token: string }> = [
-  { hex: '#2563eb', token: 'var(--nf-cal-color-1)' }, // blue
-  { hex: '#0891b2', token: 'var(--nf-cal-color-2)' }, // cyan
-  { hex: '#16a34a', token: 'var(--nf-cal-color-3)' }, // green
-  { hex: '#ca8a04', token: 'var(--nf-cal-color-4)' }, // amber
-  { hex: '#ea580c', token: 'var(--nf-cal-color-5)' }, // orange
-  { hex: '#dc2626', token: 'var(--nf-cal-color-6)' }, // red
-  { hex: '#db2777', token: 'var(--nf-cal-color-7)' }, // pink
-  { hex: '#9333ea', token: 'var(--nf-cal-color-8)' }, // purple
-  { hex: '#475569', token: 'var(--nf-cal-color-9)' }, // slate
-  { hex: '#0f172a', token: 'var(--nf-cal-color-10)' }, // ink
+export const COLOR_PALETTE: ReadonlyArray<{
+  hex: string;
+  token: string;
+  nameKey: string;
+}> = [
+  {
+    hex: '#2563eb',
+    token: 'var(--nf-cal-color-1)',
+    nameKey: 'calendar.settings.general.color.blue',
+  },
+  {
+    hex: '#0891b2',
+    token: 'var(--nf-cal-color-2)',
+    nameKey: 'calendar.settings.general.color.cyan',
+  },
+  {
+    hex: '#16a34a',
+    token: 'var(--nf-cal-color-3)',
+    nameKey: 'calendar.settings.general.color.green',
+  },
+  {
+    hex: '#ca8a04',
+    token: 'var(--nf-cal-color-4)',
+    nameKey: 'calendar.settings.general.color.amber',
+  },
+  {
+    hex: '#ea580c',
+    token: 'var(--nf-cal-color-5)',
+    nameKey: 'calendar.settings.general.color.orange',
+  },
+  {
+    hex: '#dc2626',
+    token: 'var(--nf-cal-color-6)',
+    nameKey: 'calendar.settings.general.color.red',
+  },
+  {
+    hex: '#db2777',
+    token: 'var(--nf-cal-color-7)',
+    nameKey: 'calendar.settings.general.color.pink',
+  },
+  {
+    hex: '#9333ea',
+    token: 'var(--nf-cal-color-8)',
+    nameKey: 'calendar.settings.general.color.purple',
+  },
+  {
+    hex: '#475569',
+    token: 'var(--nf-cal-color-9)',
+    nameKey: 'calendar.settings.general.color.slate',
+  },
+  {
+    hex: '#0f172a',
+    token: 'var(--nf-cal-color-10)',
+    nameKey: 'calendar.settings.general.color.ink',
+  },
 ];
 
 export interface GeneralTabProps {
@@ -168,7 +212,7 @@ export default function GeneralTab({
                 type="button"
                 role="radio"
                 aria-checked={active}
-                aria-label={swatch.hex}
+                aria-label={t(swatch.nameKey)}
                 className={active ? `${styles.swatch} ${styles.swatchActive}` : styles.swatch}
                 style={{ background: swatch.token }}
                 onClick={() => setColor(swatch.hex)}

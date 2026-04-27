@@ -4,8 +4,8 @@
  * Mounts as a right-side drawer triggered from the calendars rail's
  * row menu. The drawer is split into three tabs:
  *
- *   - General (W13): rename, change color, edit description, delete.
- *   - Members (W12): future home of the Calendar Members manager.
+ *   - General: rename, change color, edit description, delete.
+ *   - Members: Calendar Members manager.
  *   - Sync   (placeholder): reserved for future sync settings.
  *
  * The drawer manages tab state internally and lazily mounts each

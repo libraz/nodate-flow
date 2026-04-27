@@ -527,6 +527,9 @@ export function useCreateTask(): UseMutationResult<Task, ApiError, CreateTaskInp
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: [...tasksKeys.all, 'list', vars.projectId] });
+      // The new task may surface in `me` lists or any cross-project list (e.g.
+      // workspace timeline / today view), so also broadcast the broader prefix.
+      void qc.invalidateQueries({ queryKey: tasksKeys.myInfinite() });
     },
   });
 }

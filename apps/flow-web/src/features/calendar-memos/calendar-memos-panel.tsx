@@ -1,5 +1,5 @@
 /**
- * CalendarMemosPanel — per-calendar memos surface (W10).
+ * CalendarMemosPanel — per-calendar memos surface.
  *
  * Integration shape: **Option A — drawer**. The panel mounts inside
  * the existing Calendar Settings Drawer (the same chrome the
@@ -8,7 +8,7 @@
  * column to `/calendar` would have crowded the layout, and the drawer
  * already owns focus-trap / portal / Escape semantics — exactly what
  * a small side surface needs. Picking the same chrome also keeps the
- * recent W12/W13 settings work consistent.
+ * other settings tabs visually consistent.
  *
  * Each row is a titled todo:
  *   - `<input type="checkbox">` for `done`. PATCHes immediately on
@@ -27,10 +27,10 @@
  *
  * Sorting: ascending by `sortWeight`, then ascending by `createdAt`
  * as a tiebreaker. Drag reordering is intentionally **out of scope**
- * for Phase D — there's no sortable-list helper in the repo today
- * and a from-scratch DnD setup would distract from the core editor
- * loop. The backend's `sortWeight` field is already PATCHable when a
- * future iteration wants to add it.
+ * for now — there's no sortable-list helper in the repo today and a
+ * from-scratch DnD setup would distract from the core editor loop.
+ * The backend's `sortWeight` field is already PATCHable when a future
+ * iteration wants to add it.
  *
  * SSE: realtime invalidation lands automatically because the cache
  * key sits under `['calendars', wsId]`, which the existing realtime
