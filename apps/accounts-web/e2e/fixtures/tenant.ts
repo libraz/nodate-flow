@@ -142,12 +142,24 @@ export async function injectAuth(context: BrowserContext, tenant: TestTenant): P
  * or grants directly if the tenant is already admin.
  */
 /**
- * Attempts to grant instance-admin to the given tenant via REST.
- * Returns true if successful, false if admin already exists and
- * we can't self-promote (409 from setup + 403 from direct grant).
+ * Grants instance-admin to the given tenant via REST.
+ *
+ * Three strategies, in order:
+ *   1. POST /admin/setup with the tenant's own token. Works on a
+ *      pristine instance with no admins yet.
+ *   2. If setup returns 409 (admin already exists), log in as the
+ *      seeded developer admin (NF_SEED_ADMIN_EMAIL /
+ *      NF_SEED_ADMIN_PASSWORD, default admin@example.com /
+ *      password123 — see `make seed-flow`) and call POST
+ *      /admin/instance-admins on the tenant's behalf using the
+ *      seed admin's token.
+ *   3. Fallback: try the direct grant with the tenant's token (only
+ *      succeeds if the tenant is already admin from a prior run).
+ *
+ * Returns true if any strategy succeeded.
  */
 export async function grantInstanceAdmin(tenant: TestTenant): Promise<boolean> {
-  const res = await fetch(`${AUTH_API_URL}/admin/setup`, {
+  const setupRes = await fetch(`${AUTH_API_URL}/admin/setup`, {
     method: 'POST',
     headers: {
       authorization: `Bearer ${tenant.accessToken}`,
@@ -155,10 +167,38 @@ export async function grantInstanceAdmin(tenant: TestTenant): Promise<boolean> {
       accept: 'application/json',
     },
   });
-  if (res.ok) return true;
+  if (setupRes.ok) return true;
 
-  // Setup returned 409 (admin exists). Try direct grant (needs existing admin).
-  const grantRes = await fetch(`${AUTH_API_URL}/admin/instance-admins`, {
+  // Setup 409 → an admin already exists. Bootstrap via the seeded
+  // developer admin (created by `make seed-flow`).
+  const seedEmail = process.env.NF_SEED_ADMIN_EMAIL ?? 'admin@example.com';
+  const seedPassword = process.env.NF_SEED_ADMIN_PASSWORD ?? 'password123';
+  const seedLoginRes = await fetch(`${AUTH_API_URL}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({ email: seedEmail, password: seedPassword }),
+  });
+  if (seedLoginRes.ok) {
+    const seedAuth = (await seedLoginRes.json()) as { accessToken: string };
+    const grantRes = await fetch(`${AUTH_API_URL}/admin/instance-admins`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${seedAuth.accessToken}`,
+        'Content-Type': 'application/json',
+        accept: 'application/json',
+      },
+      body: JSON.stringify({ userId: tenant.userId }),
+    });
+    // 409 = tenant is already admin (rerun on a hot DB) → still a success.
+    if (grantRes.ok || grantRes.status === 409) return true;
+    console.warn(
+      `Could not grant admin via seed user: status=${grantRes.status} body=${await grantRes.text()}`,
+    );
+  }
+
+  // Last resort: tenant might already be admin from a previous run on the
+  // same DB. Try the direct grant with their own token.
+  const selfGrantRes = await fetch(`${AUTH_API_URL}/admin/instance-admins`, {
     method: 'POST',
     headers: {
       authorization: `Bearer ${tenant.accessToken}`,
@@ -167,8 +207,10 @@ export async function grantInstanceAdmin(tenant: TestTenant): Promise<boolean> {
     },
     body: JSON.stringify({ userId: tenant.userId }),
   });
-  if (grantRes.ok) return true;
+  if (selfGrantRes.ok || selfGrantRes.status === 409) return true;
 
-  console.warn(`Could not grant admin: setup=${res.status} grant=${grantRes.status}`);
+  console.warn(
+    `Could not grant admin: setup=${setupRes.status} seedLogin=${seedLoginRes.status} selfGrant=${selfGrantRes.status}`,
+  );
   return false;
 }
