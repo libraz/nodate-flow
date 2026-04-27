@@ -18,13 +18,16 @@ linters:
           list-mode: lax
           files:
             - '!**/internal/http/handlers/auth/**'
+            - '!**/internal/http/handlers/integrations/**'
+            - '!**/internal/http/router/**'
+            - '!**/internal/integrations/**'
             - '!**/internal/crypto/**'
             - '!**/cmd/api/**'
             - '!**/tests/**'
             - '!**/testutil/**'
           deny:
             - pkg: github.com/nodate-flow/nodate-flow/packages/go-shared/crypto
-              desc: crypto package may only be imported from internal/http/handlers/auth, internal/crypto, cmd/api, and tests
+              desc: crypto package may only be imported from internal/http/handlers/auth, internal/http/handlers/integrations, internal/http/router, internal/integrations, internal/crypto, cmd/api, and tests
     forbidigo:
       forbid:
         - pattern: slog\.Int64\("(workspace|task|user|actor|project|page|label|comment|event|calendar|share|invite|session|identity)_id"
