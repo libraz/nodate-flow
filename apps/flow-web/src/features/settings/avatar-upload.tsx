@@ -168,7 +168,7 @@ export default function AvatarUpload({ user }: AvatarUploadProps): ReactElement 
   return (
     <section className={styles.root} aria-describedby={descriptionId}>
       <div className={styles.header}>
-        <h3 className={styles.label}>{t('settings:profile.avatar.label')}</h3>
+        <h2 className={styles.label}>{t('settings:profile.avatar.label')}</h2>
         <p id={descriptionId} className={styles.description}>
           {t('settings:profile.avatar.description')}
         </p>
