@@ -95,6 +95,17 @@ func (q *Queries) DisablePage(ctx context.Context, arg DisablePageParams) error 
 }
 
 const getPageByPublicId = `-- name: GetPageByPublicId :one
+WITH RECURSIVE enabled_tree (id) AS (
+  SELECT pages.id FROM pages
+  WHERE pages.workspace_id = ?
+    AND pages.parent_page_id IS NULL
+    AND pages.enabled = TRUE
+  UNION ALL
+  SELECT p.id FROM pages p
+  INNER JOIN enabled_tree et ON et.id = p.parent_page_id
+  WHERE p.workspace_id = ?
+    AND p.enabled = TRUE
+)
 SELECT
   pg.id,
   pg.public_id,
@@ -119,6 +130,7 @@ LEFT JOIN pages parent ON parent.id = pg.parent_page_id
 WHERE pg.workspace_id = ?
   AND pg.public_id = ?
   AND pg.enabled = TRUE
+  AND pg.id IN (SELECT id FROM enabled_tree)
 LIMIT 1
 `
 
@@ -149,8 +161,16 @@ type GetPageByPublicIdRow struct {
 // Fetch a single page by workspace_id + public_id, including parent page info.
 // pg.id is required: used by MCP resolvePage and page handlers for
 // parent_page_id resolution and circular-reference checks.
+// The recursive CTE enforces ancestor-chain enabled propagation: a page
+// with any disabled ancestor is treated as not found, matching the list
+// queries above and preventing direct-fetch bypass of soft-disabled trees.
 func (q *Queries) GetPageByPublicId(ctx context.Context, arg GetPageByPublicIdParams) (GetPageByPublicIdRow, error) {
-	row := q.db.QueryRowContext(ctx, getPageByPublicId, arg.WorkspaceID, arg.PublicID)
+	row := q.db.QueryRowContext(ctx, getPageByPublicId,
+		arg.WorkspaceID,
+		arg.WorkspaceID,
+		arg.WorkspaceID,
+		arg.PublicID,
+	)
 	var i GetPageByPublicIdRow
 	err := row.Scan(
 		&i.ID,
@@ -198,6 +218,17 @@ func (q *Queries) GetPageDepth(ctx context.Context, id uint32) (interface{}, err
 }
 
 const listChildPages = `-- name: ListChildPages :many
+WITH RECURSIVE enabled_tree (id) AS (
+  SELECT pages.id FROM pages
+  WHERE pages.workspace_id = ?
+    AND pages.parent_page_id IS NULL
+    AND pages.enabled = TRUE
+  UNION ALL
+  SELECT p.id FROM pages p
+  INNER JOIN enabled_tree et ON et.id = p.parent_page_id
+  WHERE p.workspace_id = ?
+    AND p.enabled = TRUE
+)
 SELECT
   pg.public_id,
   u.public_id AS creator_public_id,
@@ -216,6 +247,7 @@ LEFT JOIN projects p ON p.id = pg.project_id
 WHERE pg.workspace_id = ?
   AND pg.parent_page_id = ?
   AND pg.enabled = TRUE
+  AND pg.id IN (SELECT id FROM enabled_tree)
 ORDER BY pg.sort_weight ASC, pg.title ASC, pg.id ASC
 LIMIT ? OFFSET ?
 `
@@ -242,8 +274,14 @@ type ListChildPagesRow struct {
 }
 
 // List enabled child pages for a given parent page with creator info.
+// The recursive CTE enforces that every ancestor on the chain up to the
+// root is enabled, so a soft-disabled ancestor (parent, grandparent, ...)
+// transitively hides the entire subtree even when the row itself is
+// still enabled = TRUE.
 func (q *Queries) ListChildPages(ctx context.Context, arg ListChildPagesParams) ([]ListChildPagesRow, error) {
 	rows, err := q.db.QueryContext(ctx, listChildPages,
+		arg.WorkspaceID,
+		arg.WorkspaceID,
 		arg.WorkspaceID,
 		arg.ParentPageID,
 		arg.Limit,
@@ -283,6 +321,17 @@ func (q *Queries) ListChildPages(ctx context.Context, arg ListChildPagesParams) 
 }
 
 const listPagesForProject = `-- name: ListPagesForProject :many
+WITH RECURSIVE enabled_tree (id) AS (
+  SELECT pages.id FROM pages
+  WHERE pages.workspace_id = ?
+    AND pages.parent_page_id IS NULL
+    AND pages.enabled = TRUE
+  UNION ALL
+  SELECT p.id FROM pages p
+  INNER JOIN enabled_tree et ON et.id = p.parent_page_id
+  WHERE p.workspace_id = ?
+    AND p.enabled = TRUE
+)
 SELECT
   pg.public_id,
   u.public_id AS creator_public_id,
@@ -300,6 +349,7 @@ LEFT JOIN pages parent ON parent.id = pg.parent_page_id
 WHERE pg.workspace_id = ?
   AND pg.project_id = ?
   AND pg.enabled = TRUE
+  AND pg.id IN (SELECT id FROM enabled_tree)
 ORDER BY pg.sort_weight ASC, pg.title ASC, pg.id ASC
 LIMIT ? OFFSET ?
 `
@@ -325,8 +375,13 @@ type ListPagesForProjectRow struct {
 }
 
 // List all enabled pages (any nesting level) scoped to a project with creator info.
+// The recursive CTE filters out pages whose ancestor chain contains any
+// soft-disabled row, so disabling a parent transitively hides the entire
+// subtree even though descendants are still enabled = TRUE.
 func (q *Queries) ListPagesForProject(ctx context.Context, arg ListPagesForProjectParams) ([]ListPagesForProjectRow, error) {
 	rows, err := q.db.QueryContext(ctx, listPagesForProject,
+		arg.WorkspaceID,
+		arg.WorkspaceID,
 		arg.WorkspaceID,
 		arg.ProjectID,
 		arg.Limit,
@@ -444,6 +499,17 @@ func (q *Queries) ListPagesForWorkspace(ctx context.Context, arg ListPagesForWor
 }
 
 const searchPages = `-- name: SearchPages :many
+WITH RECURSIVE enabled_tree (id) AS (
+  SELECT pages.id FROM pages
+  WHERE pages.workspace_id = ?
+    AND pages.parent_page_id IS NULL
+    AND pages.enabled = TRUE
+  UNION ALL
+  SELECT p.id FROM pages p
+  INNER JOIN enabled_tree et ON et.id = p.parent_page_id
+  WHERE p.workspace_id = ?
+    AND p.enabled = TRUE
+)
 SELECT
   pg.public_id,
   u.public_id AS creator_public_id,
@@ -464,6 +530,7 @@ LEFT JOIN pages parent ON parent.id = pg.parent_page_id
 WHERE pg.workspace_id = ?
   AND pg.title LIKE ?
   AND pg.enabled = TRUE
+  AND pg.id IN (SELECT id FROM enabled_tree)
 ORDER BY pg.sort_weight ASC, pg.title ASC, pg.id ASC
 LIMIT ? OFFSET ?
 `
@@ -491,8 +558,13 @@ type SearchPagesRow struct {
 }
 
 // Search enabled pages by title pattern within a workspace.
+// The recursive CTE filters out pages whose ancestor chain contains any
+// soft-disabled row, matching the propagation enforced by the list and
+// get queries so search cannot surface a child of a disabled subtree.
 func (q *Queries) SearchPages(ctx context.Context, arg SearchPagesParams) ([]SearchPagesRow, error) {
 	rows, err := q.db.QueryContext(ctx, searchPages,
+		arg.WorkspaceID,
+		arg.WorkspaceID,
 		arg.WorkspaceID,
 		arg.Title,
 		arg.Limit,
