@@ -126,8 +126,9 @@ test.describe('notifications dropdown — Load more', () => {
     // No more pages → Load more button is gone.
     await expect(loadMore).toHaveCount(0, { timeout: 5_000 });
 
-    // Spot-check first and last rows are both rendered.
-    await expect(dropdown.getByText('Seed notif #1')).toBeVisible();
-    await expect(dropdown.getByText('Seed notif #25')).toBeVisible();
+    // Spot-check first and last rows are both rendered. Use exact match
+    // because "Seed notif #1" is otherwise a substring of #10..#19.
+    await expect(dropdown.getByText('Seed notif #1', { exact: true })).toBeVisible();
+    await expect(dropdown.getByText('Seed notif #25', { exact: true })).toBeVisible();
   });
 });

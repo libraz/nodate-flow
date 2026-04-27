@@ -86,8 +86,9 @@ test.describe('admin detail pages', () => {
 
     await expect(page).toHaveURL(/\/admin\/users\//, { timeout: 10_000 });
 
-    // Click back link
-    const backLink = page.getByRole('link', { name: /back/i });
+    // Click back link (page-level, distinct from layout sidebar's
+    // "Back to profile" link).
+    const backLink = page.getByRole('link', { name: /back to users/i });
     await expect(backLink).toBeVisible({ timeout: 10_000 });
     await backLink.click();
 
@@ -148,8 +149,9 @@ test.describe('admin detail pages', () => {
 
     await expect(page).toHaveURL(/\/admin\/workspaces\//, { timeout: 10_000 });
 
-    // Click back link
-    const backLink = page.getByRole('link', { name: /back/i });
+    // Click back link (page-level, distinct from layout sidebar's
+    // "Back to profile" link).
+    const backLink = page.getByRole('link', { name: /back to workspaces/i });
     await expect(backLink).toBeVisible({ timeout: 10_000 });
     await backLink.click();
 

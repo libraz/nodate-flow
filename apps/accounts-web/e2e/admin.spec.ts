@@ -87,15 +87,21 @@ test.describe('admin pages', () => {
       await expect(searchInput).toBeVisible();
     });
 
-    test('status filter tabs are visible', async ({ page }) => {
+    test('status filter dropdown exposes the three states', async ({ page }) => {
       const { admin } = loadTenants();
       await injectAuth(page.context(), admin);
       await page.goto('/admin/users');
       await page.waitForLoadState('networkidle');
 
-      await expect(page.getByRole('button', { name: /^all$/i })).toBeVisible();
-      await expect(page.getByRole('button', { name: /^active$/i })).toBeVisible();
-      await expect(page.getByRole('button', { name: /^suspended$/i })).toBeVisible();
+      // The filter is a <select> (combobox), not a tablist. Verify the
+      // three option values are present and the control is reachable
+      // by its accessible label.
+      const statusSelect = page.getByRole('combobox', { name: /status/i });
+      await expect(statusSelect).toBeVisible();
+      const optionValues = await statusSelect.evaluate((el) =>
+        Array.from((el as HTMLSelectElement).options).map((o) => o.value),
+      );
+      expect(optionValues).toEqual(['all', 'active', 'suspended']);
     });
 
     test('user row links to user detail', async ({ page }) => {
@@ -302,10 +308,9 @@ test.describe('admin pages', () => {
 
       await expect(page.getByRole('heading', { name: /audit log/i })).toBeVisible();
 
-      // Filter controls
-      await expect(
-        page.getByText(/filter by action/i).or(page.locator('select').first()),
-      ).toBeVisible();
+      // Filter controls — the action filter is an <input> with the
+      // localized "Filter by action" placeholder.
+      await expect(page.getByPlaceholder(/filter by action/i)).toBeVisible();
     });
 
     test('no i18n keys exposed', async ({ page }) => {

@@ -105,6 +105,7 @@ function StatsPage(): ReactElement {
       >
         <output
           aria-live="polite"
+          data-testid="stats-last-updated"
           style={{
             color: 'var(--nf-color-fg-muted)',
             fontSize: 'var(--nf-text-xs)',

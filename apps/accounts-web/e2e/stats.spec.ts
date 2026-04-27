@@ -146,10 +146,10 @@ test.describe('admin instance stats dashboard', () => {
     await expect(refreshButton).toBeVisible();
     await expect(refreshButton).toBeEnabled();
 
-    // Capture the "last refreshed" output before clicking. The output
-    // element is rendered as <output aria-live="polite"> next to the
-    // Refresh button.
-    const lastUpdatedOutput = page.locator('output[aria-live="polite"]');
+    // Capture the "last refreshed" output before clicking. Selected
+    // by data-testid because the page also mounts toast/live-region
+    // <output aria-live="polite"> elements that share the same role.
+    const lastUpdatedOutput = page.getByTestId('stats-last-updated');
     await expect(lastUpdatedOutput).toBeVisible();
     const beforeText = (await lastUpdatedOutput.textContent()) ?? '';
 

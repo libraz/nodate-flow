@@ -89,7 +89,11 @@ async function seedTask(tenant: TestTenant, title: string): Promise<{ id: string
 async function openTaskDetail(page: Page, taskId: string, title: string): Promise<void> {
   await page.goto(`/tasks/${taskId}`);
   await expect(page.getByText(title).first()).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole('heading', { name: copy.sectionTitle })).toBeVisible({
+  // Exact match: the empty-state heading "No AI activity yet" contains
+  // the substring "AI activity" and would otherwise widen this locator
+  // into a strict-mode violation now that EmptyState renders a real
+  // heading.
+  await expect(page.getByRole('heading', { name: copy.sectionTitle, exact: true })).toBeVisible({
     timeout: 10_000,
   });
 }
@@ -208,9 +212,11 @@ test.describe('task detail — AI agents section', () => {
 
     await page.goto(`/tasks/${task.id}`);
     await expect(page.getByText(task.title).first()).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole('heading', { name: copy.sectionTitleJa })).toBeVisible({
-      timeout: 10_000,
-    });
+    await expect(page.getByRole('heading', { name: copy.sectionTitleJa, exact: true })).toBeVisible(
+      {
+        timeout: 10_000,
+      },
+    );
     // The empty placeholder copy also resolves in ja, confirming the
     // namespace is fully wired (not just `section.title`).
     await expect(page.getByText(copy.emptyTitleJa)).toBeVisible({ timeout: 5_000 });
@@ -249,7 +255,7 @@ test.describe('task detail — AI agents section — mobile viewport', () => {
     await page.goto(`/tasks/${task.id}`);
     await expect(page.getByText(task.title).first()).toBeVisible({ timeout: 15_000 });
 
-    await expect(page.getByRole('heading', { name: copy.sectionTitle })).toBeVisible({
+    await expect(page.getByRole('heading', { name: copy.sectionTitle, exact: true })).toBeVisible({
       timeout: 10_000,
     });
     await expect(page.getByText(copy.emptyTitle)).toBeVisible({ timeout: 5_000 });

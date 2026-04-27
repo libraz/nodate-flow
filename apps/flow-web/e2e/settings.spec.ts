@@ -21,8 +21,12 @@ test.describe('settings', () => {
 
     await page.goto('/settings/profile');
 
-    // Verify the profile section is visible (match English or Japanese heading)
-    const profileHeading = page.getByRole('heading', { name: /profile|プロフィール/i });
+    // Verify the profile page-level heading is visible. Use level=1 +
+    // exact match to avoid matching the avatar's "Profile picture" h3.
+    const profileHeading = page.getByRole('heading', {
+      level: 1,
+      name: /^(profile|プロフィール)$/i,
+    });
     await expect(profileHeading).toBeVisible({ timeout: 10_000 });
 
     // Accessibility check on the settings/profile page

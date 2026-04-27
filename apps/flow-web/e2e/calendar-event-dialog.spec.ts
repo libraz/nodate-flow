@@ -454,17 +454,24 @@ test.describe('calendar event dialog', () => {
     await expect(pill).toBeVisible({ timeout: 15_000 });
     await pill.click();
 
-    const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible({ timeout: 5_000 });
+    // Capture the edit dialog by its accessible name so a follow-up
+    // confirm dialog cannot widen the locator into a strict-mode
+    // violation.
+    const editDialog = page.getByRole('dialog', { name: copy.en.editEventTitle });
+    await expect(editDialog).toBeVisible({ timeout: 5_000 });
 
-    // Pre-accept the native confirm() that the dialog fires before delete.
-    page.once('dialog', (d) => {
-      void d.accept();
-    });
+    await editDialog.getByRole('button', { name: copy.en.deleteAction }).click();
 
-    await dialog.getByRole('button', { name: copy.en.deleteAction }).click();
+    // The themed confirm modal opens before the actual delete fires.
+    const confirmDialog = page.getByRole('dialog', { name: /are you sure/i });
+    await expect(confirmDialog).toBeVisible({ timeout: 5_000 });
+    await confirmDialog
+      .getByRole('button', { name: /^(delete|confirm|ok|yes)$/i })
+      .first()
+      .click();
 
-    await expect(dialog).toBeHidden({ timeout: 10_000 });
+    await expect(confirmDialog).toBeHidden({ timeout: 10_000 });
+    await expect(editDialog).toBeHidden({ timeout: 10_000 });
     await expect(page.getByText(copy.en.toastEventDeleted)).toBeVisible({ timeout: 5_000 });
     await expect(eventPill(page, title)).toHaveCount(0, { timeout: 10_000 });
 
