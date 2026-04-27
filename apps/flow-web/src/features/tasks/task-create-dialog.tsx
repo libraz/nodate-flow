@@ -33,6 +33,8 @@ import {
   useApplySmartTask,
   useProposeSmartTask,
 } from './smart-create-api';
+import styles from './task-create-dialog.module.css';
+import { useTaskFormState } from './use-task-form-state';
 
 export interface TaskCreateDialogProps {
   projectId: string;
@@ -82,8 +84,7 @@ export default function TaskCreateDialog({
   const propose = useProposeSmartTask();
   const applySmartMutation = useApplySmartTask();
 
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+  const { title, description, setTitle, setDescription, reset: resetCore } = useTaskFormState();
   const [priority, setPriority] = useState<TaskPriority>(2);
   const [dueOn, setDueOn] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -96,8 +97,7 @@ export default function TaskCreateDialog({
   const [proposalError, setProposalError] = useState(false);
 
   const reset = (): void => {
-    setTitle('');
-    setDescription('');
+    resetCore();
     setPriority(2);
     setDueOn('');
     setErrors({});
@@ -245,24 +245,26 @@ export default function TaskCreateDialog({
           void handleSubmit(e);
         }}
         noValidate
-        style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}
+        className={styles.form}
       >
-        <FormField
-          label={t('tasks.form.title')}
-          required
-          {...(errors.title ? { error: t(errors.title) } : {})}
-        >
-          {(control) => (
-            <Input
-              {...control}
-              value={title}
-              onChange={(e) => {
-                setTitle(e.target.value);
-              }}
-              autoFocus
-            />
-          )}
-        </FormField>
+        <div className={styles.fieldWithError}>
+          <FormField
+            label={t('tasks.form.title')}
+            required
+            {...(errors.title ? { error: t(errors.title) } : {})}
+          >
+            {(control) => (
+              <Input
+                {...control}
+                value={title}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                }}
+                autoFocus
+              />
+            )}
+          </FormField>
+        </div>
 
         <FormField label={t('tasks.form.description')}>
           {(control) => (
@@ -296,22 +298,24 @@ export default function TaskCreateDialog({
           )}
         </FormField>
 
-        <FormField
-          label={t('tasks.form.due')}
-          {...(errors.dueOn ? { error: t(errors.dueOn) } : {})}
-        >
-          {() => (
-            <DatePicker
-              value={dueOn}
-              onChange={setDueOn}
-              weekdayLabels={weekdayLabels}
-              formatMonthYear={formatMonthYear}
-              prevLabel={t('calendar.prev')}
-              nextLabel={t('calendar.next')}
-              triggerLabel={dueOn ? formatDate(dueOn, locale) : t('common.date.placeholder')}
-            />
-          )}
-        </FormField>
+        <div className={styles.fieldWithError}>
+          <FormField
+            label={t('tasks.form.due')}
+            {...(errors.dueOn ? { error: t(errors.dueOn) } : {})}
+          >
+            {() => (
+              <DatePicker
+                value={dueOn}
+                onChange={setDueOn}
+                weekdayLabels={weekdayLabels}
+                formatMonthYear={formatMonthYear}
+                prevLabel={t('calendar.prev')}
+                nextLabel={t('calendar.next')}
+                triggerLabel={dueOn ? formatDate(dueOn, locale) : t('common.date.placeholder')}
+              />
+            )}
+          </FormField>
+        </div>
 
         {/* AI Assist section */}
         {workspaceId && (
@@ -332,7 +336,7 @@ export default function TaskCreateDialog({
           />
         )}
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+        <div className={styles.actions}>
           <Button type="button" variant="ghost" onClick={handleClose} disabled={submitting}>
             {t('tasks.form.cancel')}
           </Button>

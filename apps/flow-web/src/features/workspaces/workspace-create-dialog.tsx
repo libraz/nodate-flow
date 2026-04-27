@@ -12,6 +12,7 @@ import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
+import { createSlugField } from '../../lib/validation/identifier';
 import { useCreateWorkspace } from './api';
 
 export interface WorkspaceCreateDialogProps {
@@ -27,11 +28,10 @@ interface FieldErrors {
 
 const schema = z.object({
   name: z.string().min(1, 'workspaces.validation.name_required').max(100),
-  slug: z
-    .string()
-    .min(1, 'workspaces.validation.slug_required')
-    .max(64)
-    .regex(/^[a-z0-9-]+$/, 'workspaces.validation.slug_format'),
+  slug: createSlugField({
+    requiredKey: 'workspaces.validation.slug_required',
+    formatKey: 'workspaces.validation.slug_format',
+  }),
   description: z.string().max(500).optional(),
 });
 

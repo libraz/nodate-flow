@@ -30,6 +30,7 @@ import {
   useTotpStatusQuery,
 } from './api';
 import styles from './totp-panel.module.css';
+import { usePanelSubmission } from './use-panel-submission';
 
 function RecoveryCodesView({
   codes,
@@ -84,7 +85,7 @@ function EnrollmentForm({
   const { t } = useTranslation('settings');
   const confirm = useTotpConfirm();
   const [code, setCode] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const { submitting, run } = usePanelSubmission();
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -103,21 +104,21 @@ function EnrollmentForm({
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
-    setSubmitting(true);
-    try {
-      const result = await confirm.mutateAsync(code);
-      toaster.show({ tone: 'success', message: t('security.totp.enabled_toast') });
-      onConfirmed(result.recoveryCodes);
-    } catch (err) {
-      const apiErr = err as SettingsApiError;
-      if (apiErr.code === 'AUTH.TOTP.CODE_MISMATCH') {
-        toaster.show({ tone: 'danger', message: t('security.totp.errors.code_mismatch') });
-      } else {
-        toaster.show({ tone: 'danger', message: t('security.totp.errors.confirm_failed') });
-      }
-    } finally {
-      setSubmitting(false);
-    }
+    await run(
+      async () => {
+        const result = await confirm.mutateAsync(code);
+        toaster.show({ tone: 'success', message: t('security.totp.enabled_toast') });
+        onConfirmed(result.recoveryCodes);
+      },
+      (err) => {
+        const apiErr = err as SettingsApiError;
+        if (apiErr.code === 'AUTH.TOTP.CODE_MISMATCH') {
+          toaster.show({ tone: 'danger', message: t('security.totp.errors.code_mismatch') });
+        } else {
+          toaster.show({ tone: 'danger', message: t('security.totp.errors.confirm_failed') });
+        }
+      },
+    );
   };
 
   const handleCopy = (): void => {
@@ -186,7 +187,7 @@ function EnabledPanel(): ReactElement {
   const { data: remaining } = useRecoveryCodesStatusQuery();
   const regenerate = useRegenerateRecoveryCodes();
   const [password, setPassword] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const { submitting, run } = usePanelSubmission();
   const [newCodes, setNewCodes] = useState<string[] | null>(null);
 
   if (newCodes != null) {
@@ -203,25 +204,25 @@ function EnabledPanel(): ReactElement {
   const handleRegenerate = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     if (!(await confirmAction({ message: t('security.totp.recovery.regenerate_confirm') }))) return;
-    setSubmitting(true);
-    try {
-      const result = await regenerate.mutateAsync(password);
-      setPassword('');
-      setNewCodes(result.recoveryCodes);
-      toaster.show({ tone: 'success', message: t('security.totp.recovery.regenerated_toast') });
-    } catch (err) {
-      const apiErr = err as SettingsApiError;
-      if (apiErr.code === 'AUTH.PASSWORD.CURRENT_MISMATCH') {
-        toaster.show({ tone: 'danger', message: t('security.totp.errors.password_mismatch') });
-      } else {
-        toaster.show({
-          tone: 'danger',
-          message: t('security.totp.recovery.errors.regenerate_failed'),
-        });
-      }
-    } finally {
-      setSubmitting(false);
-    }
+    await run(
+      async () => {
+        const result = await regenerate.mutateAsync(password);
+        setPassword('');
+        setNewCodes(result.recoveryCodes);
+        toaster.show({ tone: 'success', message: t('security.totp.recovery.regenerated_toast') });
+      },
+      (err) => {
+        const apiErr = err as SettingsApiError;
+        if (apiErr.code === 'AUTH.PASSWORD.CURRENT_MISMATCH') {
+          toaster.show({ tone: 'danger', message: t('security.totp.errors.password_mismatch') });
+        } else {
+          toaster.show({
+            tone: 'danger',
+            message: t('security.totp.recovery.errors.regenerate_failed'),
+          });
+        }
+      },
+    );
   };
 
   return (
@@ -268,26 +269,26 @@ function DisableForm(): ReactElement {
   const { t } = useTranslation('settings');
   const disable = useTotpDisable();
   const [password, setPassword] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const { submitting, run } = usePanelSubmission();
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     if (!(await confirmAction({ message: t('security.totp.disable_confirm') }))) return;
-    setSubmitting(true);
-    try {
-      await disable.mutateAsync(password);
-      setPassword('');
-      toaster.show({ tone: 'success', message: t('security.totp.disabled_toast') });
-    } catch (err) {
-      const apiErr = err as SettingsApiError;
-      if (apiErr.code === 'AUTH.PASSWORD.CURRENT_MISMATCH') {
-        toaster.show({ tone: 'danger', message: t('security.totp.errors.password_mismatch') });
-      } else {
-        toaster.show({ tone: 'danger', message: t('security.totp.errors.disable_failed') });
-      }
-    } finally {
-      setSubmitting(false);
-    }
+    await run(
+      async () => {
+        await disable.mutateAsync(password);
+        setPassword('');
+        toaster.show({ tone: 'success', message: t('security.totp.disabled_toast') });
+      },
+      (err) => {
+        const apiErr = err as SettingsApiError;
+        if (apiErr.code === 'AUTH.PASSWORD.CURRENT_MISMATCH') {
+          toaster.show({ tone: 'danger', message: t('security.totp.errors.password_mismatch') });
+        } else {
+          toaster.show({ tone: 'danger', message: t('security.totp.errors.disable_failed') });
+        }
+      },
+    );
   };
 
   return (

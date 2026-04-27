@@ -1,0 +1,25 @@
+/* Layout primitives shared by the task-create dialog so the
+   markup avoids inline styles and inline error rows reserve
+   space — a morphic UI rule from the project memory. */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-5);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nf-space-3);
+}
+
+/* Reserve a minimum height for fields whose validation errors can
+   appear inline. Without the reservation, the dialog body jumps
+   when the error row mounts (morphic UI rule). The min-height
+   accommodates the rendered <FormField> error line. */
+.fieldWithError {
+  min-block-size: 5.5rem;
+  display: flex;
+  flex-direction: column;
+}

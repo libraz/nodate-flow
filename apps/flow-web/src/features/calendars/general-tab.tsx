@@ -31,22 +31,25 @@ import {
 import styles from './calendar-settings-drawer.module.css';
 
 /**
- * Curated palette of 10 calendar colors. Hex literals (rather than
- * tokens) because the API stores the chosen color verbatim and the
- * grid renders it on event chips, where a workspace-themed token
- * would lose meaning. Custom hex pickers are out of scope for v1.
+ * Curated 10-swatch calendar palette. Each swatch carries a stable
+ * hex (the value persisted by the API and rendered on event chips
+ * outside the themed canvas) and a paired design token used to paint
+ * the picker swatch. Swatch rendering goes through the token so the
+ * picker reads as native to the active theme; the persisted hex is
+ * retained as the canonical cross-theme identity. Custom hex pickers
+ * are out of scope for v1.
  */
-const COLOR_PALETTE = [
-  '#2563eb', // blue
-  '#0891b2', // cyan
-  '#16a34a', // green
-  '#ca8a04', // amber
-  '#ea580c', // orange
-  '#dc2626', // red
-  '#db2777', // pink
-  '#9333ea', // purple
-  '#475569', // slate
-  '#0f172a', // ink
+const COLOR_PALETTE: ReadonlyArray<{ hex: string; token: string }> = [
+  { hex: '#2563eb', token: 'var(--nf-cal-color-1)' }, // blue
+  { hex: '#0891b2', token: 'var(--nf-cal-color-2)' }, // cyan
+  { hex: '#16a34a', token: 'var(--nf-cal-color-3)' }, // green
+  { hex: '#ca8a04', token: 'var(--nf-cal-color-4)' }, // amber
+  { hex: '#ea580c', token: 'var(--nf-cal-color-5)' }, // orange
+  { hex: '#dc2626', token: 'var(--nf-cal-color-6)' }, // red
+  { hex: '#db2777', token: 'var(--nf-cal-color-7)' }, // pink
+  { hex: '#9333ea', token: 'var(--nf-cal-color-8)' }, // purple
+  { hex: '#475569', token: 'var(--nf-cal-color-9)' }, // slate
+  { hex: '#0f172a', token: 'var(--nf-cal-color-10)' }, // ink
 ];
 
 export interface GeneralTabProps {
@@ -158,17 +161,17 @@ export default function GeneralTab({
           aria-label={t('calendar.settings.general.color_label')}
         >
           {COLOR_PALETTE.map((swatch) => {
-            const active = swatch.toLowerCase() === color.toLowerCase();
+            const active = swatch.hex.toLowerCase() === color.toLowerCase();
             return (
               <button
-                key={swatch}
+                key={swatch.hex}
                 type="button"
                 role="radio"
                 aria-checked={active}
-                aria-label={swatch}
+                aria-label={swatch.hex}
                 className={active ? `${styles.swatch} ${styles.swatchActive}` : styles.swatch}
-                style={{ background: swatch }}
-                onClick={() => setColor(swatch)}
+                style={{ background: swatch.token }}
+                onClick={() => setColor(swatch.hex)}
                 disabled={isReadonly || update.isPending}
               />
             );

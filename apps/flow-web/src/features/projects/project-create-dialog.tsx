@@ -12,6 +12,7 @@ import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
+import { createIdentifierField, createSlugField } from '../../lib/validation/identifier';
 import { useCreateProject } from './api';
 
 export interface ProjectCreateDialogProps {
@@ -29,16 +30,11 @@ interface FieldErrors {
 
 const schema = z.object({
   name: z.string().min(1, 'projects.validation.name_required').max(100),
-  slug: z
-    .string()
-    .min(1, 'projects.validation.slug_required')
-    .max(64)
-    .regex(/^[a-z0-9-]+$/, 'projects.validation.slug_format'),
-  identifier: z
-    .string()
-    .min(1, 'identifier.validation.required')
-    .max(5, 'identifier.validation.max')
-    .regex(/^[A-Za-z0-9]+$/, 'identifier.validation.format'),
+  slug: createSlugField({
+    requiredKey: 'projects.validation.slug_required',
+    formatKey: 'projects.validation.slug_format',
+  }),
+  identifier: createIdentifierField(),
   description: z.string().max(500).optional(),
 });
 

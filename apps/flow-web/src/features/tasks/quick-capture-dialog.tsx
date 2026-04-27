@@ -18,6 +18,7 @@ import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCreateTask } from './api';
+import { useTaskFormState } from './use-task-form-state';
 
 export interface QuickCaptureDialogProps {
   /** Target project for the new task. */
@@ -41,16 +42,9 @@ export default function QuickCaptureDialog({
   const { t } = useTranslation('common');
   const create = useCreateTask();
 
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [titleError, setTitleError] = useState<string | null>(null);
+  const { title, description, titleError, setTitle, setDescription, setTitleError, reset } =
+    useTaskFormState();
   const [submitting, setSubmitting] = useState(false);
-
-  const reset = (): void => {
-    setTitle('');
-    setDescription('');
-    setTitleError(null);
-  };
 
   const handleClose = (): void => {
     if (submitting) return;
