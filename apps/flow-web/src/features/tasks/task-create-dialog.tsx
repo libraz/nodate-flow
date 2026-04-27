@@ -199,6 +199,7 @@ export default function TaskCreateDialog({
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
+    if (submitting) return;
     const parsed = schema.safeParse({
       title,
       description: description.trim() === '' ? undefined : description,
@@ -259,6 +260,12 @@ export default function TaskCreateDialog({
                 value={title}
                 onChange={(e) => {
                   setTitle(e.target.value);
+                  if (errors.title) {
+                    setErrors((prev) => {
+                      const { title: T, ...rest } = prev;
+                      return rest;
+                    });
+                  }
                 }}
                 autoFocus
               />
@@ -306,7 +313,15 @@ export default function TaskCreateDialog({
             {() => (
               <DatePicker
                 value={dueOn}
-                onChange={setDueOn}
+                onChange={(value) => {
+                  setDueOn(value);
+                  if (errors.dueOn) {
+                    setErrors((prev) => {
+                      const { dueOn: D, ...rest } = prev;
+                      return rest;
+                    });
+                  }
+                }}
                 weekdayLabels={weekdayLabels}
                 formatMonthYear={formatMonthYear}
                 prevLabel={t('calendar.prev')}
