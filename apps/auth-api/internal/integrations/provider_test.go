@@ -212,12 +212,12 @@ func TestGoogle_Revoke_EmptyTokenIsNoop(t *testing.T) {
 func TestGithub_Exchange_HappyPath(t *testing.T) {
 	t.Parallel()
 	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/login/oauth/access_token":
+		switch r.URL.Path {
+		case "/login/oauth/access_token":
 			assert.Equal(t, "application/json", r.Header.Get("Accept"))
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"access_token":"gho_abc","scope":"read:user,repo"}`))
-		case r.URL.Path == "/user":
+		case "/user":
 			assert.Contains(t, r.Header.Get("Authorization"), "Bearer gho_abc")
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"id":42,"login":"octocat","email":"octo@example.com"}`))
@@ -257,11 +257,11 @@ func TestGithub_Exchange_HappyPath(t *testing.T) {
 func TestGithub_Exchange_FallsBackToLoginWhenNoEmail(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/login/oauth/access_token":
+		switch r.URL.Path {
+		case "/login/oauth/access_token":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"access_token":"gho_x","scope":"read:user"}`))
-		case r.URL.Path == "/user":
+		case "/user":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"id":7,"login":"nomail","email":""}`))
 		}
@@ -317,15 +317,15 @@ func TestGoogle_Exchange_HappyPath(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		switch {
-		case r.URL.Path == "/token":
+		switch r.URL.Path {
+		case "/token":
 			_, _ = w.Write([]byte(`{
 				"access_token":"ya29.xxx",
 				"refresh_token":"1//rt",
 				"expires_in":3600,
 				"scope":"openid email https://www.googleapis.com/auth/calendar.readonly"
 			}`))
-		case r.URL.Path == "/oauth2/v3/userinfo":
+		case "/oauth2/v3/userinfo":
 			_, _ = w.Write([]byte(`{"sub":"112233","email":"user@gmail.com"}`))
 		}
 	}))
@@ -412,7 +412,7 @@ func TestGithub_Revoke_204IsSuccess(t *testing.T) {
 
 func TestGithub_Revoke_404IsSuccess(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer srv.Close()
@@ -426,7 +426,7 @@ func TestGithub_Revoke_404IsSuccess(t *testing.T) {
 
 func TestGithub_Revoke_500IsError(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte("internal error"))
 	}))
@@ -456,7 +456,7 @@ func TestSlack_Revoke_OkTrueIsSuccess(t *testing.T) {
 
 func TestSlack_Revoke_NotAuthedIsSuccess(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"ok":false,"error":"not_authed"}`))
 	}))
@@ -471,7 +471,7 @@ func TestSlack_Revoke_NotAuthedIsSuccess(t *testing.T) {
 
 func TestSlack_Revoke_TokenRevokedIsSuccess(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"ok":false,"error":"token_revoked"}`))
 	}))
@@ -486,7 +486,7 @@ func TestSlack_Revoke_TokenRevokedIsSuccess(t *testing.T) {
 
 func TestSlack_Revoke_InvalidAuthIsSuccess(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"ok":false,"error":"invalid_auth"}`))
 	}))
@@ -501,7 +501,7 @@ func TestSlack_Revoke_InvalidAuthIsSuccess(t *testing.T) {
 
 func TestSlack_Revoke_UnknownErrorIsError(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"ok":false,"error":"internal_error"}`))
 	}))
@@ -550,7 +550,7 @@ func TestGoogle_Revoke_FallsBackToAccessToken(t *testing.T) {
 
 func TestGoogle_Revoke_InvalidTokenIsSuccess(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(`{"error":"invalid_token"}`))
@@ -566,7 +566,7 @@ func TestGoogle_Revoke_InvalidTokenIsSuccess(t *testing.T) {
 
 func TestGoogle_Revoke_OtherErrorIsError(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte("server error"))
 	}))
@@ -595,13 +595,13 @@ type stubProvider struct {
 
 func (s *stubProvider) Name() string               { return s.name }
 func (s *stubProvider) AuthURL(_, _ string) string { return "" }
-func (s *stubProvider) Exchange(ctx context.Context, code, redirectURI string) (*TokenSet, *Account, error) {
+func (s *stubProvider) Exchange(_ context.Context, _, _ string) (*TokenSet, *Account, error) {
 	return nil, nil, nil
 }
-func (s *stubProvider) Refresh(ctx context.Context, refreshToken string) (*TokenSet, error) {
+func (s *stubProvider) Refresh(_ context.Context, _ string) (*TokenSet, error) {
 	return nil, ErrRefreshNotSupported
 }
-func (s *stubProvider) Revoke(ctx context.Context, tokens TokenSet) error { return nil }
+func (s *stubProvider) Revoke(_ context.Context, _ TokenSet) error { return nil }
 
 // exchangeViaTestServer calls the GithubProvider Exchange method by
 // temporarily pointing its http.Client at the test server. Because

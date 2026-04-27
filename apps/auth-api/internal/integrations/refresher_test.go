@@ -47,7 +47,7 @@ func TestRefreshOnce_RefreshesExpiringToken(t *testing.T) {
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "google_calendar"},
-			refreshFn: func(ctx context.Context, rt string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, rt string) (*TokenSet, error) {
 				assert.Equal(t, "stored-refresh", rt)
 				return &TokenSet{
 					AccessToken: "refreshed-access",
@@ -87,7 +87,7 @@ func TestRefreshOnce_SkipsRowWithoutRefreshToken(t *testing.T) {
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "github"},
-			refreshFn: func(ctx context.Context, rt string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, _ string) (*TokenSet, error) {
 				t.Fatal("must not call Refresh for row without refresh token")
 				return nil, nil
 			},
@@ -113,7 +113,7 @@ func TestRefreshOnce_SkipsProviderReturningErrRefreshNotSupported(t *testing.T) 
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "github"},
-			refreshFn: func(ctx context.Context, rt string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, _ string) (*TokenSet, error) {
 				return nil, ErrRefreshNotSupported
 			},
 		}, nil
@@ -146,7 +146,7 @@ func TestRefreshOnce_OneRowFailure_DoesNotBlockOthers(t *testing.T) {
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "google_calendar"},
-			refreshFn: func(ctx context.Context, rt string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, rt string) (*TokenSet, error) {
 				return &TokenSet{
 					AccessToken: "new-" + rt,
 					ExpiresAt:   time.Now().Add(time.Hour),
@@ -213,7 +213,7 @@ func TestRefreshOnce_PreservesRefreshTokenWhenNotRotated(t *testing.T) {
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "google_calendar"},
-			refreshFn: func(ctx context.Context, rt string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, _ string) (*TokenSet, error) {
 				return &TokenSet{
 					AccessToken: "new-access",
 					// RefreshToken empty or same as input → no rotation.
@@ -251,7 +251,7 @@ func TestRefreshOnce_RotatesRefreshTokenWhenProviderReturnsNew(t *testing.T) {
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "google_calendar"},
-			refreshFn: func(ctx context.Context, rt string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, _ string) (*TokenSet, error) {
 				return &TokenSet{
 					AccessToken:  "new-access",
 					RefreshToken: "rotated-rt",
@@ -298,7 +298,7 @@ func TestRefreshOnce_RespectsContextCancellation(t *testing.T) {
 			Provider:               "google_calendar",
 			RefreshTokenCiphertext: sql.NullString{String: string(refreshCT), Valid: true},
 		}},
-		updateFn: func(params generated.UpdateConnectionTokensParams) error {
+		updateFn: func(_ generated.UpdateConnectionTokensParams) error {
 			t.Fatal("must not persist when context is cancelled")
 			return nil
 		},
@@ -333,7 +333,7 @@ func TestRefreshOnce_EmptyRefreshResult_SkipsUpdate(t *testing.T) {
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "google_calendar"},
-			refreshFn: func(ctx context.Context, rt string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, _ string) (*TokenSet, error) {
 				return &TokenSet{AccessToken: ""}, nil // empty result
 			},
 		}, nil
@@ -345,7 +345,7 @@ func TestRefreshOnce_EmptyRefreshResult_SkipsUpdate(t *testing.T) {
 			Provider:               "google_calendar",
 			RefreshTokenCiphertext: sql.NullString{String: string(refreshCT), Valid: true},
 		}},
-		updateFn: func(params generated.UpdateConnectionTokensParams) error {
+		updateFn: func(_ generated.UpdateConnectionTokensParams) error {
 			t.Fatal("must not persist an empty access token")
 			return nil
 		},
@@ -401,14 +401,14 @@ type fakeRefresherQuerier struct {
 }
 
 func (f *fakeRefresherQuerier) ListConnectionsExpiringBefore(
-	ctx context.Context, cutoff sql.NullTime,
+	_ context.Context, _ sql.NullTime,
 ) ([]generated.ListConnectionsExpiringBeforeRow, error) {
 	f.listCalled = true
 	return f.rows, f.listErr
 }
 
 func (f *fakeRefresherQuerier) UpdateConnectionTokens(
-	ctx context.Context, arg generated.UpdateConnectionTokensParams,
+	_ context.Context, arg generated.UpdateConnectionTokensParams,
 ) error {
 	if f.updateFn != nil {
 		return f.updateFn(arg)

@@ -848,7 +848,7 @@ type stubRevokeProvider struct {
 	revokeErr error
 }
 
-func (s *stubRevokeProvider) Revoke(ctx context.Context, tokens integrationspkg.TokenSet) error {
+func (s *stubRevokeProvider) Revoke(_ context.Context, _ integrationspkg.TokenSet) error {
 	return s.revokeErr
 }
 
@@ -860,7 +860,7 @@ type stubExchangeProvider struct {
 	exchErr error
 }
 
-func (s *stubExchangeProvider) Exchange(ctx context.Context, code, redirectURI string) (*integrationspkg.TokenSet, *integrationspkg.Account, error) {
+func (s *stubExchangeProvider) Exchange(_ context.Context, _, _ string) (*integrationspkg.TokenSet, *integrationspkg.Account, error) {
 	if s.onCall != nil {
 		s.onCall()
 	}
@@ -935,16 +935,16 @@ func (f *fakeQueries) log(event string) {
 	f.callLog = append(f.callLog, event)
 }
 
-func (f *fakeQueries) ListUserIntegrations(ctx context.Context, userID uint32) ([]generated.ListUserIntegrationsRow, error) {
+func (f *fakeQueries) ListUserIntegrations(_ context.Context, _ uint32) ([]generated.ListUserIntegrationsRow, error) {
 	return f.listRows, nil
 }
 
-func (f *fakeQueries) CreateOauthState(ctx context.Context, arg generated.CreateOauthStateParams) error {
+func (f *fakeQueries) CreateOauthState(_ context.Context, _ generated.CreateOauthStateParams) error {
 	f.oauthStateCreated = true
 	return nil
 }
 
-func (f *fakeQueries) ConsumeOauthState(ctx context.Context, state string) (generated.ConsumeOauthStateRow, error) {
+func (f *fakeQueries) ConsumeOauthState(_ context.Context, _ string) (generated.ConsumeOauthStateRow, error) {
 	f.log("ConsumeOauthState")
 	if f.consumeStateErr != nil {
 		return generated.ConsumeOauthStateRow{}, f.consumeStateErr
@@ -952,7 +952,7 @@ func (f *fakeQueries) ConsumeOauthState(ctx context.Context, state string) (gene
 	return f.consumeStateRow, nil
 }
 
-func (f *fakeQueries) DeleteOauthState(ctx context.Context, state string) error {
+func (f *fakeQueries) DeleteOauthState(_ context.Context, state string) error {
 	f.log("DeleteOauthState")
 	f.mu.Lock()
 	f.deletedStates = append(f.deletedStates, state)
@@ -960,11 +960,11 @@ func (f *fakeQueries) DeleteOauthState(ctx context.Context, state string) error 
 	return nil
 }
 
-func (f *fakeQueries) PurgeExpiredOauthStates(ctx context.Context) error {
+func (f *fakeQueries) PurgeExpiredOauthStates(_ context.Context) error {
 	return nil
 }
 
-func (f *fakeQueries) UpsertUserIntegration(ctx context.Context, arg generated.UpsertUserIntegrationParams) (int64, error) {
+func (f *fakeQueries) UpsertUserIntegration(_ context.Context, arg generated.UpsertUserIntegrationParams) (int64, error) {
 	f.upserted = true
 	f.upsertParams = arg
 	return 1, nil
@@ -981,14 +981,14 @@ func (f *fakeQueries) FindUserIntegrationByPublicId(ctx context.Context, arg gen
 	return f.findByPubRow, nil
 }
 
-func (f *fakeQueries) FindUserIntegrationByUserProvider(ctx context.Context, arg generated.FindUserIntegrationByUserProviderParams) (generated.FindUserIntegrationByUserProviderRow, error) {
+func (f *fakeQueries) FindUserIntegrationByUserProvider(_ context.Context, _ generated.FindUserIntegrationByUserProviderParams) (generated.FindUserIntegrationByUserProviderRow, error) {
 	if f.findByProvErr != nil {
 		return generated.FindUserIntegrationByUserProviderRow{}, f.findByProvErr
 	}
 	return f.findByProvRow, nil
 }
 
-func (f *fakeQueries) DeleteUserIntegration(ctx context.Context, arg generated.DeleteUserIntegrationParams) error {
+func (f *fakeQueries) DeleteUserIntegration(_ context.Context, _ generated.DeleteUserIntegrationParams) error {
 	f.deleted = true
 	return nil
 }

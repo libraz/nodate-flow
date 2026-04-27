@@ -88,7 +88,7 @@ func TestLoadUserTokenSet_NonExpiringToken_SkipsRefresh(t *testing.T) {
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "github"},
-			refreshFn: func(ctx context.Context, rt string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, _ string) (*TokenSet, error) {
 				t.Fatal("Refresh must not be called for non-expiring tokens")
 				return nil, nil
 			},
@@ -161,7 +161,7 @@ func TestLoadUserTokenSet_Expired_RefreshNotSupported_ReturnsErrTokenExpired(t *
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "github"},
-			refreshFn: func(ctx context.Context, rt string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, _ string) (*TokenSet, error) {
 				return nil, ErrRefreshNotSupported
 			},
 		}, nil
@@ -189,7 +189,7 @@ func TestLoadUserTokenSet_Expired_JITRefreshSucceeds(t *testing.T) {
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "google_calendar"},
-			refreshFn: func(ctx context.Context, rt string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, rt string) (*TokenSet, error) {
 				assert.Equal(t, "my-refresh", rt,
 					"Refresh must receive the decrypted refresh token")
 				return &TokenSet{
@@ -238,7 +238,7 @@ func TestLoadUserTokenSet_Expired_JITRefreshFails_ReturnsStaleFallback(t *testin
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "google_calendar"},
-			refreshFn: func(ctx context.Context, rt string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, _ string) (*TokenSet, error) {
 				return nil, errors.New("provider unavailable")
 			},
 		}, nil
@@ -267,7 +267,7 @@ func TestLoadUserTokenSet_Expired_JITRefreshRotatesRefreshToken(t *testing.T) {
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "google_calendar"},
-			refreshFn: func(ctx context.Context, rt string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, _ string) (*TokenSet, error) {
 				return &TokenSet{
 					AccessToken:  "new-access",
 					RefreshToken: "rotated-refresh", // different from stored
@@ -311,7 +311,7 @@ func TestLoadUserTokenSet_Expired_JITRefreshPersistFails_StillReturnsFresh(t *te
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "google_calendar"},
-			refreshFn: func(ctx context.Context, rt string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, _ string) (*TokenSet, error) {
 				return &TokenSet{
 					AccessToken: "fresh",
 					ExpiresAt:   time.Now().Add(time.Hour),
@@ -345,7 +345,7 @@ func TestLoadUserTokenSet_Expired_JITRefreshReturnsNil_FallsBack(t *testing.T) {
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "google_calendar"},
-			refreshFn: func(ctx context.Context, rt string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, _ string) (*TokenSet, error) {
 				return nil, nil // nil result, nil error
 			},
 		}, nil
@@ -383,13 +383,13 @@ type fakeLoaderQuerier struct {
 }
 
 func (f *fakeLoaderQuerier) FindUserIntegrationByUserProvider(
-	ctx context.Context, arg generated.FindUserIntegrationByUserProviderParams,
+	_ context.Context, _ generated.FindUserIntegrationByUserProviderParams,
 ) (generated.FindUserIntegrationByUserProviderRow, error) {
 	return f.findRow, f.findErr
 }
 
 func (f *fakeLoaderQuerier) UpdateConnectionTokens(
-	ctx context.Context, arg generated.UpdateConnectionTokensParams,
+	_ context.Context, arg generated.UpdateConnectionTokensParams,
 ) error {
 	if f.updateFn != nil {
 		return f.updateFn(arg)

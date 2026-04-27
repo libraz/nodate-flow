@@ -133,7 +133,7 @@ func (p *GithubProvider) Exchange(ctx context.Context, code, redirectURI string)
 
 // Refresh implements [Provider]. GitHub OAuth Apps do not issue
 // refresh tokens; access tokens are long-lived until revoked.
-func (p *GithubProvider) Refresh(ctx context.Context, refreshToken string) (*TokenSet, error) {
+func (p *GithubProvider) Refresh(_ context.Context, _ string) (*TokenSet, error) {
 	return nil, ErrRefreshNotSupported
 }
 

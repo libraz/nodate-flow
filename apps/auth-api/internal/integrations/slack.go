@@ -116,7 +116,7 @@ func (p *SlackProvider) Exchange(ctx context.Context, code, redirectURI string) 
 // Refresh implements [Provider]. Slack user tokens (xoxp-) do not
 // expire by default; token rotation is opt-in per-app and we do
 // not enable it, so there is nothing to refresh.
-func (p *SlackProvider) Refresh(ctx context.Context, refreshToken string) (*TokenSet, error) {
+func (p *SlackProvider) Refresh(_ context.Context, _ string) (*TokenSet, error) {
 	return nil, ErrRefreshNotSupported
 }
 
