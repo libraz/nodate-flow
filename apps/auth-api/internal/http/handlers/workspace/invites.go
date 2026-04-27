@@ -90,7 +90,7 @@ func CreateInvite(deps InviteDeps) func(context.Context, *CreateInviteInput) (*C
 			})
 		}
 
-		invite := Invite{
+		invite := WorkspaceInvite{
 			ID:        pub.String(),
 			Role:      string(role),
 			MaxUses:   nullInt32Ptr(maxUses),
@@ -127,7 +127,7 @@ func ListInvites(deps InviteDeps) func(context.Context, *ListInvitesInput) (*Lis
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		out := &ListInvitesOutput{}
-		out.Body.Invites = make([]Invite, 0, len(rows))
+		out.Body.Invites = make([]WorkspaceInvite, 0, len(rows))
 		for _, r := range rows {
 			out.Body.Invites = append(out.Body.Invites, rowToInvite(r))
 		}
@@ -195,7 +195,7 @@ func AcceptInvite(deps InviteDeps) func(context.Context, *AcceptInviteInput) (*A
 			if werr != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
-			return &AcceptInviteOutput{Body: AcceptInviteOutputBody{
+			return &AcceptInviteOutput{Body: AcceptWorkspaceInviteOutputBody{
 				WorkspaceID:   wsRow.WorkspacePublicID.String(),
 				WorkspaceName: wsRow.Name,
 				Role:          string(invite.Role),
@@ -237,7 +237,7 @@ func AcceptInvite(deps InviteDeps) func(context.Context, *AcceptInviteInput) (*A
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		return &AcceptInviteOutput{Body: AcceptInviteOutputBody{
+		return &AcceptInviteOutput{Body: AcceptWorkspaceInviteOutputBody{
 			WorkspaceID:   wsRow.WorkspacePublicID.String(),
 			WorkspaceName: wsRow.Name,
 			Role:          string(invite.Role),

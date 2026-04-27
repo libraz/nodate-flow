@@ -4646,7 +4646,7 @@ export interface components {
             inviteId: string;
             rsvp: string;
         };
-        AcceptInviteOutputBody: {
+        AcceptWorkspaceInviteOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
@@ -4788,6 +4788,56 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        AddWorkspaceMemberInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: email */
+            email: string;
+            /** @enum {string} */
+            role: "owner" | "admin" | "member" | "guest";
+        };
+        AdminListWorkspacesOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["AdminWorkspace"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
+        AdminPatchWorkspaceInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            enabled: boolean | null;
+        };
+        AdminWorkspace: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            createdAt: number;
+            description?: string;
+            enabled: boolean;
+            iconUrl?: string;
+            id: string;
+            /** Format: int64 */
+            memberCount: number;
+            name: string;
+            /** Format: int64 */
+            projectCount?: number;
+            slug: string;
+            /** Format: int64 */
+            updatedAt?: number;
+        };
         AgentSummary: {
             /**
              * Format: uri
@@ -4808,6 +4858,58 @@ export interface components {
             systemPrompt: string;
             /** Format: int64 */
             updatedAt?: number;
+        };
+        AiCostTodayOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: double */
+            costUsd: number;
+            /** @description Local date in the requested timezone (YYYY-MM-DD). Falls back to UTC if tz is absent or invalid. */
+            date: string;
+            /** Format: double */
+            monthlyCapUsd?: number;
+        };
+        AiInvocation: {
+            costEstimate?: string;
+            errorCode?: string;
+            /** @description Invocation public id (UUID v7) */
+            id: string;
+            /** Format: int64 */
+            invokedAt: number;
+            model: string;
+            promptRedacted: string;
+            purpose: string;
+            responseRedacted?: string;
+            status: string;
+            /** Format: int32 */
+            tokensInput?: number;
+            /** Format: int32 */
+            tokensOutput?: number;
+        };
+        AiMetricsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * Format: double
+             * @description applied / (applied + dismissed), 0 when no decisions
+             */
+            acceptanceRate: number;
+            /** Format: int64 */
+            applied: number;
+            /** Format: int64 */
+            dismissed: number;
+            /** @description Per-provider egress rate limiter counters */
+            outboundLimits: components["schemas"]["OutboundLimitStat"][] | null;
+            /** Format: int64 */
+            proposed: number;
+            /** Format: int64 */
+            windowDays: number;
         };
         AiSuggestionListBody: {
             /**
@@ -5237,19 +5339,6 @@ export interface components {
             Unparsed: string[] | null;
             Value: string;
         };
-        CostTodayOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            /** Format: double */
-            costUsd: number;
-            /** @description Local date in the requested timezone (YYYY-MM-DD). Falls back to UTC if tz is absent or invalid. */
-            date: string;
-            /** Format: double */
-            monthlyCapUsd?: number;
-        };
         CountUnreadOutputBody: {
             /**
              * Format: uri
@@ -5482,31 +5571,13 @@ export interface components {
             body?: string;
             title: string;
         };
-        CreateInviteInputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            email?: string;
-            /**
-             * Format: int64
-             * @description Seconds until invite expires
-             */
-            expiresIn?: number;
-            label?: string;
-            /** Format: int32 */
-            maxUses?: number;
-            /** @enum {string} */
-            role: "owner" | "admin" | "member" | "guest";
-        };
         CreateInviteOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            invite: components["schemas"]["Invite"];
+            invite: components["schemas"]["WorkspaceInvite"];
             /** @description Plaintext token (only returned once) */
             token: string;
         };
@@ -5761,6 +5832,24 @@ export interface components {
             name: string;
             slug: string;
             timezone?: string;
+        };
+        CreateWorkspaceInviteInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            email?: string;
+            /**
+             * Format: int64
+             * @description Seconds until invite expires
+             */
+            expiresIn?: number;
+            label?: string;
+            /** Format: int32 */
+            maxUses?: number;
+            /** @enum {string} */
+            role: "owner" | "admin" | "member" | "guest";
         };
         CrossCalendarEventResponse: {
             allDay: boolean;
@@ -6117,17 +6206,6 @@ export interface components {
             readonly $schema?: string;
             outcomes: components["schemas"]["EvaluateConstraintsOutcome"][] | null;
         };
-        Event: {
-            actorDisplayName?: string;
-            actorUserId?: string;
-            /** @description Event public id (UUID v7) */
-            id: string;
-            /** Format: int64 */
-            occurredAt: number;
-            payload?: unknown;
-            taskId?: string;
-            type: string;
-        };
         EventInviteCreateResponse: {
             /**
              * Format: uri
@@ -6343,6 +6421,28 @@ export interface components {
             /** Format: int64 */
             totalItems: number;
         };
+        InboxItem: {
+            /** Format: int64 */
+            createdAt: number;
+            externalId?: string;
+            /** @description Inbox item public id (UUID v7) */
+            id: string;
+            kind: string;
+            payload?: unknown;
+            /** Format: int64 */
+            receivedAt: number;
+            source: string;
+            taskId?: string;
+            taskTitle?: string;
+            workspaceId: string;
+        };
+        InboxTriageSuggestion: {
+            inboxItemId: string;
+            reasoning: string;
+            recommendedAction: string;
+            /** Format: float */
+            score: number;
+        };
         InferStateOutputBody: {
             /**
              * Format: uri
@@ -6387,20 +6487,27 @@ export interface components {
             /** Format: int64 */
             totalWorkspaces: number;
         };
-        Invite: {
+        IntakeItem: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            aiReasoning?: string;
+            /** Format: double */
+            aiScore?: number;
+            body?: string;
             /** Format: int64 */
             createdAt: number;
-            createdByName: string;
-            /** Format: int64 */
-            expiresAt?: number;
-            /** @description Invite public id (UUID v7) */
+            /** @description Intake item public id (UUID v7) */
             id: string;
-            label?: string;
-            /** Format: int32 */
-            maxUses: number | null;
-            role: string;
-            /** Format: int32 */
-            useCount: number;
+            /** Format: int64 */
+            snoozeUntil?: number;
+            taskId?: string;
+            title: string;
+            triageStatus: string;
+            triagedByDisplayName?: string;
+            triagedByUserId?: string;
         };
         InviteInfoOutputBody: {
             /**
@@ -6425,45 +6532,6 @@ export interface components {
             id: string;
             /** Format: int64 */
             sentAt?: number;
-        };
-        Invocation: {
-            costEstimate?: string;
-            errorCode?: string;
-            /** @description Invocation public id (UUID v7) */
-            id: string;
-            /** Format: int64 */
-            invokedAt: number;
-            model: string;
-            promptRedacted: string;
-            purpose: string;
-            responseRedacted?: string;
-            status: string;
-            /** Format: int32 */
-            tokensInput?: number;
-            /** Format: int32 */
-            tokensOutput?: number;
-        };
-        Item: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            aiReasoning?: string;
-            /** Format: double */
-            aiScore?: number;
-            body?: string;
-            /** Format: int64 */
-            createdAt: number;
-            /** @description Intake item public id (UUID v7) */
-            id: string;
-            /** Format: int64 */
-            snoozeUntil?: number;
-            taskId?: string;
-            title: string;
-            triageStatus: string;
-            triagedByDisplayName?: string;
-            triagedByUserId?: string;
         };
         Label: {
             /**
@@ -6712,7 +6780,7 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            items: components["schemas"]["Item"][] | null;
+            items: components["schemas"]["InboxItem"][] | null;
             nextCursor: string | null;
             /** Format: int64 */
             total: number;
@@ -6723,7 +6791,7 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            items: components["schemas"]["Item"][] | null;
+            items: components["schemas"]["IntakeItem"][] | null;
             nextCursor: string | null;
             /** Format: int64 */
             total: number;
@@ -6742,7 +6810,7 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            invites: components["schemas"]["Invite"][] | null;
+            invites: components["schemas"]["WorkspaceInvite"][] | null;
             nextCursor: string | null;
             /** Format: int64 */
             total: number;
@@ -6753,7 +6821,7 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            invocations: components["schemas"]["Invocation"][] | null;
+            invocations: components["schemas"]["AiInvocation"][] | null;
         };
         ListLabelsBody: {
             /**
@@ -7101,7 +7169,7 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            events: components["schemas"]["Event"][] | null;
+            events: components["schemas"]["TimelineEvent"][] | null;
             nextCursor: string | null;
             /** Format: int64 */
             total: number;
@@ -7136,13 +7204,24 @@ export interface components {
             total: number;
             widgets: components["schemas"]["WidgetDTO"][] | null;
         };
+        ListWorkspaceMembersOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            members: components["schemas"]["WorkspaceMember"][] | null;
+            nextCursor: string | null;
+            /** Format: int64 */
+            total: number;
+        };
         ListWorkspaceUsersOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            users: components["schemas"]["UserSummary"][] | null;
+            users: components["schemas"]["WorkspaceUserSummary"][] | null;
         };
         ListWorkspacesOutputBody: {
             /**
@@ -7151,6 +7230,7 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["Workspace"][] | null;
+            nextCursor: string | null;
             /** Format: int64 */
             total: number;
         };
@@ -7293,23 +7373,6 @@ export interface components {
             /** @enum {string} */
             weekStart: "mon" | "sun" | "sat";
         };
-        Member: {
-            avatarUrl?: string;
-            /** Format: int64 */
-            createdAt: number;
-            displayName: string;
-            email: string;
-            /** @description Member public id (UUID v7) */
-            id: string;
-            /** Format: int64 */
-            invitedAt?: number;
-            /** Format: int64 */
-            joinedAt?: number;
-            role: string;
-            /** Format: int64 */
-            updatedAt?: number;
-            userId: string;
-        };
         MemberResponse: {
             /**
              * Format: uri
@@ -7342,28 +7405,6 @@ export interface components {
             updatedAt?: number;
             userDisplayName: string;
             userPublicId: string;
-        };
-        MetricsOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            /**
-             * Format: double
-             * @description applied / (applied + dismissed), 0 when no decisions
-             */
-            acceptanceRate: number;
-            /** Format: int64 */
-            applied: number;
-            /** Format: int64 */
-            dismissed: number;
-            /** @description Per-provider egress rate limiter counters */
-            outboundLimits: components["schemas"]["OutboundLimitStat"][] | null;
-            /** Format: int64 */
-            proposed: number;
-            /** Format: int64 */
-            windowDays: number;
         };
         ModelSummary: {
             displayName: string;
@@ -7821,7 +7862,12 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            enabled: boolean | null;
+            country?: string;
+            description?: string;
+            iconUrl?: string;
+            name?: string;
+            slug?: string;
+            timezone?: string;
         };
         PatchWorkspaceOutputBody: {
             /**
@@ -8926,6 +8972,17 @@ export interface components {
             /** Format: int64 */
             updatedAt: number;
         };
+        TimelineEvent: {
+            actorDisplayName?: string;
+            actorUserId?: string;
+            /** @description Event public id (UUID v7) */
+            id: string;
+            /** Format: int64 */
+            occurredAt: number;
+            payload?: unknown;
+            taskId?: string;
+            type: string;
+        };
         ToggleCanEditInputBody: {
             /**
              * Format: uri
@@ -9106,14 +9163,7 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            suggestions: components["schemas"]["TriageSuggestion"][] | null;
-        };
-        TriageSuggestion: {
-            inboxItemId: string;
-            reasoning: string;
-            recommendedAction: string;
-            /** Format: float */
-            score: number;
+            suggestions: components["schemas"]["InboxTriageSuggestion"][] | null;
         };
         TriggerAgentOutputBody: {
             /**
@@ -9344,6 +9394,15 @@ export interface components {
             /** Format: int64 */
             width: number;
         };
+        UpdateWorkspaceMemberRoleInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @enum {string} */
+            role: "owner" | "admin" | "member" | "guest";
+        };
         User: {
             /**
              * Format: uri
@@ -9367,12 +9426,6 @@ export interface components {
             updatedAt?: number;
             /** Format: int64 */
             workspaceCount: number;
-        };
-        UserSummary: {
-            avatarUrl?: string;
-            displayName: string;
-            /** @description User public id (UUID v7) */
-            id: string;
         };
         WebhookDeliveryDTO: {
             /** Format: int32 */
@@ -9483,20 +9536,63 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
+            country: string;
             /** Format: int64 */
             createdAt: number;
             description?: string;
-            enabled: boolean;
             iconUrl?: string;
+            /** @description Workspace public id (UUID v7) */
             id: string;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Number of enabled members in this workspace
+             */
             memberCount: number;
             name: string;
-            /** Format: int64 */
-            projectCount?: number;
+            /** @description Caller's role in this workspace */
+            role?: string;
             slug: string;
+            timezone: string;
             /** Format: int64 */
             updatedAt?: number;
+        };
+        WorkspaceInvite: {
+            /** Format: int64 */
+            createdAt: number;
+            createdByName: string;
+            /** Format: int64 */
+            expiresAt?: number;
+            /** @description Invite public id (UUID v7) */
+            id: string;
+            label?: string;
+            /** Format: int32 */
+            maxUses: number | null;
+            role: string;
+            /** Format: int32 */
+            useCount: number;
+        };
+        WorkspaceMember: {
+            avatarUrl?: string;
+            /** Format: int64 */
+            createdAt: number;
+            displayName: string;
+            email: string;
+            /** @description Member public id (UUID v7) */
+            id: string;
+            /** Format: int64 */
+            invitedAt?: number;
+            /** Format: int64 */
+            joinedAt?: number;
+            role: string;
+            /** Format: int64 */
+            updatedAt?: number;
+            userId: string;
+        };
+        WorkspaceUserSummary: {
+            avatarUrl?: string;
+            displayName: string;
+            /** @description User public id (UUID v7) */
+            id: string;
         };
     };
     responses: never;
@@ -9948,7 +10044,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListWorkspacesOutputBody"];
+                    "application/json": components["schemas"]["AdminListWorkspacesOutputBody"];
                 };
             };
             /** @description Error */
@@ -9979,7 +10075,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Workspace"];
+                    "application/json": components["schemas"]["AdminWorkspace"];
                 };
             };
             /** @description Error */
@@ -10004,7 +10100,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PatchWorkspaceInputBody"];
+                "application/json": components["schemas"]["AdminPatchWorkspaceInputBody"];
             };
         };
         responses: {
@@ -10673,7 +10769,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AcceptInviteOutputBody"];
+                    "application/json": components["schemas"]["AcceptWorkspaceInviteOutputBody"];
                 };
             };
             /** @description Error */
@@ -14395,7 +14491,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CostTodayOutputBody"];
+                    "application/json": components["schemas"]["AiCostTodayOutputBody"];
                 };
             };
             /** @description Error */
@@ -14463,7 +14559,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MetricsOutputBody"];
+                    "application/json": components["schemas"]["AiMetricsOutputBody"];
                 };
             };
             /** @description Error */
@@ -17168,7 +17264,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Item"];
+                    "application/json": components["schemas"]["IntakeItem"];
                 };
             };
             /** @description Error */
@@ -17200,7 +17296,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Item"];
+                    "application/json": components["schemas"]["IntakeItem"];
                 };
             };
             /** @description Error */
@@ -17236,7 +17332,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Item"];
+                    "application/json": components["schemas"]["IntakeItem"];
                 };
             };
             /** @description Error */
@@ -17331,7 +17427,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateInviteInputBody"];
+                "application/json": components["schemas"]["CreateWorkspaceInviteInputBody"];
             };
         };
         responses: {
@@ -17914,7 +18010,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListMembersOutputBody"];
+                    "application/json": components["schemas"]["ListWorkspaceMembersOutputBody"];
                 };
             };
             /** @description Error */
@@ -17939,7 +18035,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AddMemberInputBody"];
+                "application/json": components["schemas"]["AddWorkspaceMemberInputBody"];
             };
         };
         responses: {
@@ -17949,7 +18045,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Member"];
+                    "application/json": components["schemas"]["WorkspaceMember"];
                 };
             };
             /** @description Error */
@@ -18007,7 +18103,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["UpdateMemberRoleInputBody"];
+                "application/json": components["schemas"]["UpdateWorkspaceMemberRoleInputBody"];
             };
         };
         responses: {
@@ -18017,7 +18113,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Member"];
+                    "application/json": components["schemas"]["WorkspaceMember"];
                 };
             };
             /** @description Error */

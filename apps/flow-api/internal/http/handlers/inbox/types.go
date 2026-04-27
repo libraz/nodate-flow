@@ -25,8 +25,8 @@ var nullStr = handlerutil.NullStr
 // totalAsInt64 delegates to handlerutil.TotalAsInt64.
 var totalAsInt64 = handlerutil.TotalAsInt64
 
-// Item is the public DTO for an inbox row (a signal projected through v_inbox).
-type Item struct {
+// InboxItem is the public DTO for an inbox row (a signal projected through v_inbox).
+type InboxItem struct {
 	ID          string          `json:"id" doc:"Inbox item public id (UUID v7)"`
 	WorkspaceID string          `json:"workspaceId"`
 	TaskID      string          `json:"taskId,omitempty"`
@@ -48,9 +48,9 @@ type ListInboxInput struct {
 
 // ListInboxOutputBody is the response body for GET /inbox.
 type ListInboxOutputBody struct {
-	Total      int64   `json:"total"`
-	Items      []Item  `json:"items"`
-	NextCursor *string `json:"nextCursor"`
+	Total      int64       `json:"total"`
+	Items      []InboxItem `json:"items"`
+	NextCursor *string     `json:"nextCursor"`
 }
 
 // ListInboxOutput is the response for GET /inbox.

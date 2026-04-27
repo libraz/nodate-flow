@@ -89,8 +89,8 @@ func rowToAdminUserDetail(r generated.VAdminUser) User {
 	}
 }
 
-func rowToAdminWorkspaceList(r generated.AdminListWorkspacesRow) Workspace {
-	return Workspace{
+func rowToAdminWorkspaceList(r generated.AdminListWorkspacesRow) AdminWorkspace {
+	return AdminWorkspace{
 		ID:          r.PublicID.String(),
 		Slug:        r.Slug,
 		Name:        r.Name,
@@ -103,9 +103,9 @@ func rowToAdminWorkspaceList(r generated.AdminListWorkspacesRow) Workspace {
 	}
 }
 
-func rowToAdminWorkspaceDetail(r generated.AdminGetWorkspaceRow) Workspace {
+func rowToAdminWorkspaceDetail(r generated.AdminGetWorkspaceRow) AdminWorkspace {
 	pc := r.ProjectCount
-	return Workspace{
+	return AdminWorkspace{
 		ID:           r.PublicID.String(),
 		Slug:         r.Slug,
 		Name:         r.Name,

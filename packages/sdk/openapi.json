@@ -62,12 +62,12 @@
         "required": ["inviteId", "rsvp"],
         "type": "object"
       },
-      "AcceptInviteOutputBody": {
+      "AcceptWorkspaceInviteOutputBody": {
         "additionalProperties": false,
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/AcceptInviteOutputBody.json"],
+            "examples": ["https://example.com/schemas/AcceptWorkspaceInviteOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -369,6 +369,117 @@
         "required": ["ok"],
         "type": "object"
       },
+      "AddWorkspaceMemberInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AddWorkspaceMemberInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "email": {
+            "format": "email",
+            "type": "string"
+          },
+          "role": {
+            "enum": ["owner", "admin", "member", "guest"],
+            "type": "string"
+          }
+        },
+        "required": ["email", "role"],
+        "type": "object"
+      },
+      "AdminListWorkspacesOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AdminListWorkspacesOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminWorkspace"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "items"],
+        "type": "object"
+      },
+      "AdminPatchWorkspaceInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AdminPatchWorkspaceInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "enabled": {
+            "type": ["boolean", "null"]
+          }
+        },
+        "required": ["enabled"],
+        "type": "object"
+      },
+      "AdminWorkspace": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AdminWorkspace.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "iconUrl": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "memberCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "projectCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["id", "slug", "name", "enabled", "memberCount", "createdAt"],
+        "type": "object"
+      },
       "AgentSummary": {
         "additionalProperties": false,
         "properties": {
@@ -428,6 +539,125 @@
           "scheduleKind",
           "paused",
           "createdAt"
+        ],
+        "type": "object"
+      },
+      "AiCostTodayOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AiCostTodayOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "costUsd": {
+            "format": "double",
+            "type": "number"
+          },
+          "date": {
+            "description": "Local date in the requested timezone (YYYY-MM-DD). Falls back to UTC if tz is absent or invalid.",
+            "type": "string"
+          },
+          "monthlyCapUsd": {
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": ["costUsd", "date"],
+        "type": "object"
+      },
+      "AiInvocation": {
+        "additionalProperties": false,
+        "properties": {
+          "costEstimate": {
+            "type": "string"
+          },
+          "errorCode": {
+            "type": "string"
+          },
+          "id": {
+            "description": "Invocation public id (UUID v7)",
+            "type": "string"
+          },
+          "invokedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "model": {
+            "type": "string"
+          },
+          "promptRedacted": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "responseRedacted": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "tokensInput": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "tokensOutput": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": ["id", "purpose", "model", "promptRedacted", "status", "invokedAt"],
+        "type": "object"
+      },
+      "AiMetricsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AiMetricsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "acceptanceRate": {
+            "description": "applied / (applied + dismissed), 0 when no decisions",
+            "format": "double",
+            "type": "number"
+          },
+          "applied": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "dismissed": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "outboundLimits": {
+            "description": "Per-provider egress rate limiter counters",
+            "items": {
+              "$ref": "#/components/schemas/OutboundLimitStat"
+            },
+            "type": ["array", "null"]
+          },
+          "proposed": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "windowDays": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "windowDays",
+          "proposed",
+          "applied",
+          "dismissed",
+          "acceptanceRate",
+          "outboundLimits"
         ],
         "type": "object"
       },
@@ -1518,32 +1748,6 @@
         ],
         "type": "object"
       },
-      "CostTodayOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/CostTodayOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "costUsd": {
-            "format": "double",
-            "type": "number"
-          },
-          "date": {
-            "description": "Local date in the requested timezone (YYYY-MM-DD). Falls back to UTC if tz is absent or invalid.",
-            "type": "string"
-          },
-          "monthlyCapUsd": {
-            "format": "double",
-            "type": "number"
-          }
-        },
-        "required": ["costUsd", "date"],
-        "type": "object"
-      },
       "CountUnreadOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -1977,43 +2181,6 @@
         "required": ["title"],
         "type": "object"
       },
-      "CreateInviteInputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/CreateInviteInputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "email": {
-            "maxLength": 320,
-            "type": "string"
-          },
-          "expiresIn": {
-            "description": "Seconds until invite expires",
-            "format": "int64",
-            "minimum": 1,
-            "type": "integer"
-          },
-          "label": {
-            "maxLength": 200,
-            "type": "string"
-          },
-          "maxUses": {
-            "format": "int32",
-            "minimum": 1,
-            "type": "integer"
-          },
-          "role": {
-            "enum": ["owner", "admin", "member", "guest"],
-            "type": "string"
-          }
-        },
-        "required": ["role"],
-        "type": "object"
-      },
       "CreateInviteOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -2025,7 +2192,7 @@
             "type": "string"
           },
           "invite": {
-            "$ref": "#/components/schemas/Invite"
+            "$ref": "#/components/schemas/WorkspaceInvite"
           },
           "token": {
             "description": "Plaintext token (only returned once)",
@@ -2606,6 +2773,43 @@
           }
         },
         "required": ["slug", "name"],
+        "type": "object"
+      },
+      "CreateWorkspaceInviteInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateWorkspaceInviteInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "email": {
+            "maxLength": 320,
+            "type": "string"
+          },
+          "expiresIn": {
+            "description": "Seconds until invite expires",
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "label": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "maxUses": {
+            "format": "int32",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "role": {
+            "enum": ["owner", "admin", "member", "guest"],
+            "type": "string"
+          }
+        },
+        "required": ["role"],
         "type": "object"
       },
       "CrossCalendarEventResponse": {
@@ -3399,34 +3603,6 @@
         "required": ["outcomes"],
         "type": "object"
       },
-      "Event": {
-        "additionalProperties": false,
-        "properties": {
-          "actorDisplayName": {
-            "type": "string"
-          },
-          "actorUserId": {
-            "type": "string"
-          },
-          "id": {
-            "description": "Event public id (UUID v7)",
-            "type": "string"
-          },
-          "occurredAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "payload": {},
-          "taskId": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string"
-          }
-        },
-        "required": ["id", "type", "occurredAt"],
-        "type": "object"
-      },
       "EventInviteCreateResponse": {
         "additionalProperties": false,
         "properties": {
@@ -3912,6 +4088,64 @@
         ],
         "type": "object"
       },
+      "InboxItem": {
+        "additionalProperties": false,
+        "properties": {
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "externalId": {
+            "type": "string"
+          },
+          "id": {
+            "description": "Inbox item public id (UUID v7)",
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "payload": {},
+          "receivedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "source": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "taskTitle": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "workspaceId", "source", "kind", "receivedAt", "createdAt"],
+        "type": "object"
+      },
+      "InboxTriageSuggestion": {
+        "additionalProperties": false,
+        "properties": {
+          "inboxItemId": {
+            "type": "string"
+          },
+          "reasoning": {
+            "type": "string"
+          },
+          "recommendedAction": {
+            "type": "string"
+          },
+          "score": {
+            "format": "float",
+            "type": "number"
+          }
+        },
+        "required": ["inboxItemId", "score", "recommendedAction", "reasoning"],
+        "type": "object"
+      },
       "InferStateOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -4023,41 +4257,55 @@
         "required": ["totalUsers", "totalWorkspaces"],
         "type": "object"
       },
-      "Invite": {
+      "IntakeItem": {
         "additionalProperties": false,
         "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/IntakeItem.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "aiReasoning": {
+            "type": "string"
+          },
+          "aiScore": {
+            "format": "double",
+            "type": "number"
+          },
+          "body": {
+            "type": "string"
+          },
           "createdAt": {
             "format": "int64",
             "type": "integer"
           },
-          "createdByName": {
+          "id": {
+            "description": "Intake item public id (UUID v7)",
             "type": "string"
           },
-          "expiresAt": {
+          "snoozeUntil": {
             "format": "int64",
             "type": "integer"
           },
-          "id": {
-            "description": "Invite public id (UUID v7)",
+          "taskId": {
             "type": "string"
           },
-          "label": {
+          "title": {
             "type": "string"
           },
-          "maxUses": {
-            "format": "int32",
-            "type": ["integer", "null"]
-          },
-          "role": {
+          "triageStatus": {
             "type": "string"
           },
-          "useCount": {
-            "format": "int32",
-            "minimum": 0,
-            "type": "integer"
+          "triagedByDisplayName": {
+            "type": "string"
+          },
+          "triagedByUserId": {
+            "type": "string"
           }
         },
-        "required": ["id", "role", "maxUses", "useCount", "createdByName", "createdAt"],
+        "required": ["id", "title", "triageStatus", "createdAt"],
         "type": "object"
       },
       "InviteInfoOutputBody": {
@@ -4114,101 +4362,6 @@
           }
         },
         "required": ["id", "attendeePublicId", "email", "expiresAt", "createdAt"],
-        "type": "object"
-      },
-      "Invocation": {
-        "additionalProperties": false,
-        "properties": {
-          "costEstimate": {
-            "type": "string"
-          },
-          "errorCode": {
-            "type": "string"
-          },
-          "id": {
-            "description": "Invocation public id (UUID v7)",
-            "type": "string"
-          },
-          "invokedAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "model": {
-            "type": "string"
-          },
-          "promptRedacted": {
-            "type": "string"
-          },
-          "purpose": {
-            "type": "string"
-          },
-          "responseRedacted": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "tokensInput": {
-            "format": "int32",
-            "type": "integer"
-          },
-          "tokensOutput": {
-            "format": "int32",
-            "type": "integer"
-          }
-        },
-        "required": ["id", "purpose", "model", "promptRedacted", "status", "invokedAt"],
-        "type": "object"
-      },
-      "Item": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/Item.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "aiReasoning": {
-            "type": "string"
-          },
-          "aiScore": {
-            "format": "double",
-            "type": "number"
-          },
-          "body": {
-            "type": "string"
-          },
-          "createdAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "id": {
-            "description": "Intake item public id (UUID v7)",
-            "type": "string"
-          },
-          "snoozeUntil": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "taskId": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "triageStatus": {
-            "type": "string"
-          },
-          "triagedByDisplayName": {
-            "type": "string"
-          },
-          "triagedByUserId": {
-            "type": "string"
-          }
-        },
-        "required": ["id", "title", "triageStatus", "createdAt"],
         "type": "object"
       },
       "Label": {
@@ -4813,7 +4966,7 @@
           },
           "items": {
             "items": {
-              "$ref": "#/components/schemas/Item"
+              "$ref": "#/components/schemas/InboxItem"
             },
             "type": ["array", "null"]
           },
@@ -4840,7 +4993,7 @@
           },
           "items": {
             "items": {
-              "$ref": "#/components/schemas/Item"
+              "$ref": "#/components/schemas/IntakeItem"
             },
             "type": ["array", "null"]
           },
@@ -4887,7 +5040,7 @@
           },
           "invites": {
             "items": {
-              "$ref": "#/components/schemas/Invite"
+              "$ref": "#/components/schemas/WorkspaceInvite"
             },
             "type": ["array", "null"]
           },
@@ -4914,7 +5067,7 @@
           },
           "invocations": {
             "items": {
-              "$ref": "#/components/schemas/Invocation"
+              "$ref": "#/components/schemas/AiInvocation"
             },
             "type": ["array", "null"]
           }
@@ -5767,7 +5920,7 @@
           },
           "events": {
             "items": {
-              "$ref": "#/components/schemas/Event"
+              "$ref": "#/components/schemas/TimelineEvent"
             },
             "type": ["array", "null"]
           },
@@ -5854,6 +6007,33 @@
         "required": ["total", "widgets"],
         "type": "object"
       },
+      "ListWorkspaceMembersOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListWorkspaceMembersOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceMember"
+            },
+            "type": ["array", "null"]
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "members", "nextCursor"],
+        "type": "object"
+      },
       "ListWorkspaceUsersOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -5866,7 +6046,7 @@
           },
           "users": {
             "items": {
-              "$ref": "#/components/schemas/UserSummary"
+              "$ref": "#/components/schemas/WorkspaceUserSummary"
             },
             "type": ["array", "null"]
           }
@@ -5890,12 +6070,15 @@
             },
             "type": ["array", "null"]
           },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
           "total": {
             "format": "int64",
             "type": "integer"
           }
         },
-        "required": ["total", "items"],
+        "required": ["total", "items", "nextCursor"],
         "type": "object"
       },
       "LogEntryDTO": {
@@ -6246,48 +6429,6 @@
         ],
         "type": "object"
       },
-      "Member": {
-        "additionalProperties": false,
-        "properties": {
-          "avatarUrl": {
-            "type": "string"
-          },
-          "createdAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "displayName": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          },
-          "id": {
-            "description": "Member public id (UUID v7)",
-            "type": "string"
-          },
-          "invitedAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "joinedAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "role": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "userId": {
-            "type": "string"
-          }
-        },
-        "required": ["id", "userId", "email", "displayName", "role", "createdAt"],
-        "type": "object"
-      },
       "MemberResponse": {
         "additionalProperties": false,
         "properties": {
@@ -6370,55 +6511,6 @@
           "userPublicId",
           "userDisplayName",
           "createdAt"
-        ],
-        "type": "object"
-      },
-      "MetricsOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/MetricsOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "acceptanceRate": {
-            "description": "applied / (applied + dismissed), 0 when no decisions",
-            "format": "double",
-            "type": "number"
-          },
-          "applied": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "dismissed": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "outboundLimits": {
-            "description": "Per-provider egress rate limiter counters",
-            "items": {
-              "$ref": "#/components/schemas/OutboundLimitStat"
-            },
-            "type": ["array", "null"]
-          },
-          "proposed": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "windowDays": {
-            "format": "int64",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "windowDays",
-          "proposed",
-          "applied",
-          "dismissed",
-          "acceptanceRate",
-          "outboundLimits"
         ],
         "type": "object"
       },
@@ -7502,11 +7594,33 @@
             "readOnly": true,
             "type": "string"
           },
-          "enabled": {
-            "type": ["boolean", "null"]
+          "country": {
+            "pattern": "^$|^[A-Z]{2}$",
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "iconUrl": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "slug": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "timezone": {
+            "maxLength": 64,
+            "type": "string"
           }
         },
-        "required": ["enabled"],
         "type": "object"
       },
       "PatchWorkspaceOutputBody": {
@@ -10154,6 +10268,34 @@
         ],
         "type": "object"
       },
+      "TimelineEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorDisplayName": {
+            "type": "string"
+          },
+          "actorUserId": {
+            "type": "string"
+          },
+          "id": {
+            "description": "Event public id (UUID v7)",
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "payload": {},
+          "taskId": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "type", "occurredAt"],
+        "type": "object"
+      },
       "ToggleCanEditInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -10510,32 +10652,12 @@
           },
           "suggestions": {
             "items": {
-              "$ref": "#/components/schemas/TriageSuggestion"
+              "$ref": "#/components/schemas/InboxTriageSuggestion"
             },
             "type": ["array", "null"]
           }
         },
         "required": ["suggestions"],
-        "type": "object"
-      },
-      "TriageSuggestion": {
-        "additionalProperties": false,
-        "properties": {
-          "inboxItemId": {
-            "type": "string"
-          },
-          "reasoning": {
-            "type": "string"
-          },
-          "recommendedAction": {
-            "type": "string"
-          },
-          "score": {
-            "format": "float",
-            "type": "number"
-          }
-        },
-        "required": ["inboxItemId", "score", "recommendedAction", "reasoning"],
         "type": "object"
       },
       "TriggerAgentOutputBody": {
@@ -11008,6 +11130,24 @@
         "required": ["positionX", "positionY", "width", "height", "sortWeight"],
         "type": "object"
       },
+      "UpdateWorkspaceMemberRoleInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/UpdateWorkspaceMemberRoleInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "role": {
+            "enum": ["owner", "admin", "member", "guest"],
+            "type": "string"
+          }
+        },
+        "required": ["role"],
+        "type": "object"
+      },
       "User": {
         "additionalProperties": false,
         "properties": {
@@ -11070,23 +11210,6 @@
           "isInstanceAdmin",
           "createdAt"
         ],
-        "type": "object"
-      },
-      "UserSummary": {
-        "additionalProperties": false,
-        "properties": {
-          "avatarUrl": {
-            "type": "string"
-          },
-          "displayName": {
-            "type": "string"
-          },
-          "id": {
-            "description": "User public id (UUID v7)",
-            "type": "string"
-          }
-        },
-        "required": ["id", "displayName"],
         "type": "object"
       },
       "WebhookDeliveryDTO": {
@@ -11389,6 +11512,9 @@
             "readOnly": true,
             "type": "string"
           },
+          "country": {
+            "type": "string"
+          },
           "createdAt": {
             "format": "int64",
             "type": "integer"
@@ -11396,27 +11522,29 @@
           "description": {
             "type": "string"
           },
-          "enabled": {
-            "type": "boolean"
-          },
           "iconUrl": {
             "type": "string"
           },
           "id": {
+            "description": "Workspace public id (UUID v7)",
             "type": "string"
           },
           "memberCount": {
+            "description": "Number of enabled members in this workspace",
             "format": "int64",
             "type": "integer"
           },
           "name": {
             "type": "string"
           },
-          "projectCount": {
-            "format": "int64",
-            "type": "integer"
+          "role": {
+            "description": "Caller's role in this workspace",
+            "type": "string"
           },
           "slug": {
+            "type": "string"
+          },
+          "timezone": {
             "type": "string"
           },
           "updatedAt": {
@@ -11424,7 +11552,103 @@
             "type": "integer"
           }
         },
-        "required": ["id", "slug", "name", "enabled", "memberCount", "createdAt"],
+        "required": ["id", "slug", "name", "timezone", "country", "memberCount", "createdAt"],
+        "type": "object"
+      },
+      "WorkspaceInvite": {
+        "additionalProperties": false,
+        "properties": {
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "createdByName": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "description": "Invite public id (UUID v7)",
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "maxUses": {
+            "format": "int32",
+            "type": ["integer", "null"]
+          },
+          "role": {
+            "type": "string"
+          },
+          "useCount": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": ["id", "role", "maxUses", "useCount", "createdByName", "createdAt"],
+        "type": "object"
+      },
+      "WorkspaceMember": {
+        "additionalProperties": false,
+        "properties": {
+          "avatarUrl": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "id": {
+            "description": "Member public id (UUID v7)",
+            "type": "string"
+          },
+          "invitedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "joinedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "role": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "userId", "email", "displayName", "role", "createdAt"],
+        "type": "object"
+      },
+      "WorkspaceUserSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "avatarUrl": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "id": {
+            "description": "User public id (UUID v7)",
+            "type": "string"
+          }
+        },
+        "required": ["id", "displayName"],
         "type": "object"
       }
     }
@@ -12103,7 +12327,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListWorkspacesOutputBody"
+                  "$ref": "#/components/schemas/AdminListWorkspacesOutputBody"
                 }
               }
             },
@@ -12143,7 +12367,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Workspace"
+                  "$ref": "#/components/schemas/AdminWorkspace"
                 }
               }
             },
@@ -12180,7 +12404,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PatchWorkspaceInputBody"
+                "$ref": "#/components/schemas/AdminPatchWorkspaceInputBody"
               }
             }
           },
@@ -13126,7 +13350,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AcceptInviteOutputBody"
+                  "$ref": "#/components/schemas/AcceptWorkspaceInviteOutputBody"
                 }
               }
             },
@@ -18443,7 +18667,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CostTodayOutputBody"
+                  "$ref": "#/components/schemas/AiCostTodayOutputBody"
                 }
               }
             },
@@ -18558,7 +18782,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MetricsOutputBody"
+                  "$ref": "#/components/schemas/AiMetricsOutputBody"
                 }
               }
             },
@@ -22981,7 +23205,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Item"
+                  "$ref": "#/components/schemas/IntakeItem"
                 }
               }
             },
@@ -23028,7 +23252,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Item"
+                  "$ref": "#/components/schemas/IntakeItem"
                 }
               }
             },
@@ -23083,7 +23307,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Item"
+                  "$ref": "#/components/schemas/IntakeItem"
                 }
               }
             },
@@ -23238,7 +23462,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateInviteInputBody"
+                "$ref": "#/components/schemas/CreateWorkspaceInviteInputBody"
               }
             }
           },
@@ -24140,7 +24364,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListMembersOutputBody"
+                  "$ref": "#/components/schemas/ListWorkspaceMembersOutputBody"
                 }
               }
             },
@@ -24176,7 +24400,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AddMemberInputBody"
+                "$ref": "#/components/schemas/AddWorkspaceMemberInputBody"
               }
             }
           },
@@ -24187,7 +24411,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Member"
+                  "$ref": "#/components/schemas/WorkspaceMember"
                 }
               }
             },
@@ -24278,7 +24502,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateMemberRoleInputBody"
+                "$ref": "#/components/schemas/UpdateWorkspaceMemberRoleInputBody"
               }
             }
           },
@@ -24289,7 +24513,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Member"
+                  "$ref": "#/components/schemas/WorkspaceMember"
                 }
               }
             },

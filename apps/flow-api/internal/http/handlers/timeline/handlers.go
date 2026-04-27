@@ -145,10 +145,10 @@ LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
 	return out, total, nil
 }
 
-// toDTO converts a timelineRow to the public Event DTO. This is
+// toDTO converts a timelineRow to the public TimelineEvent DTO. This is
 // the only place that crosses the time / public-id boundary.
-func toDTO(r timelineRow) Event {
-	return Event{
+func toDTO(r timelineRow) TimelineEvent {
+	return TimelineEvent{
 		ID:               r.publicID.UUID().String(),
 		Type:             r.eventType,
 		TaskID:           uuidFromBytes(r.taskPublicID),
@@ -283,7 +283,7 @@ func ListForWorkspace(deps Deps) func(context.Context, *ListTimelineForWorkspace
 // is stable for clients (`events: []` instead of `events: null`).
 func buildOutput(rows []timelineRow, total int64) *ListTimelineOutput {
 	out := &ListTimelineOutput{}
-	out.Body.Events = make([]Event, 0, len(rows))
+	out.Body.Events = make([]TimelineEvent, 0, len(rows))
 	for _, r := range rows {
 		out.Body.Events = append(out.Body.Events, toDTO(r))
 	}
@@ -296,6 +296,6 @@ func buildOutput(rows []timelineRow, total int64) *ListTimelineOutput {
 // rows; we deliberately return 200 with an empty page rather than 400.
 func emptyOutput() *ListTimelineOutput {
 	out := &ListTimelineOutput{}
-	out.Body.Events = []Event{}
+	out.Body.Events = []TimelineEvent{}
 	return out
 }
