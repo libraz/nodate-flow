@@ -80,9 +80,9 @@ func registerTools(h *Handler) {
 		description:   "List tasks, optionally scoped to a project.",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"projectId": stringSchema("Project public id (UUID v7). Optional."),
-			"limit":     intSchema("Max number of rows (1..200)."),
-			"offset":    intSchema("Row offset."),
+			"projectId": stringSchema("Project public id (UUID v7). Optional.", Constraints{Pattern: publicIDPattern}),
+			"limit":     intSchema("Max number of rows (1..200).", Constraints{Min: intPtr(1), Max: intPtr(200)}),
+			"offset":    intSchema("Row offset.", Constraints{Min: intPtr(0)}),
 		}, nil),
 		run: runListTasks,
 	})
@@ -91,7 +91,7 @@ func registerTools(h *Handler) {
 		description:   "Fetch a single task by public id.",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"taskId": stringSchema("Task public id (UUID v7)."),
+			"taskId": stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 		}, []string{"taskId"}),
 		run: runGetTask,
 	})
@@ -100,12 +100,12 @@ func registerTools(h *Handler) {
 		description:   "Create a new task in a project.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"projectId":   stringSchema("Project public id (UUID v7)."),
-			"title":       stringSchema("Task title."),
+			"projectId":   stringSchema("Project public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+			"title":       stringSchema("Task title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
 			"description": stringSchema("Optional description."),
-			"priority":    intSchema("Priority 0..4."),
-			"dueOn":       stringSchema("YYYY-MM-DD."),
-			"startOn":     stringSchema("YYYY-MM-DD."),
+			"priority":    intSchema("Priority 0..4.", Constraints{Min: intPtr(0), Max: intPtr(4)}),
+			"dueOn":       stringSchema("YYYY-MM-DD.", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
+			"startOn":     stringSchema("YYYY-MM-DD.", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
 		}, []string{"projectId", "title"}),
 		run: runCreateTask,
 	})
@@ -114,12 +114,12 @@ func registerTools(h *Handler) {
 		description:   "Update mutable fields of a task.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"taskId":      stringSchema("Task public id (UUID v7)."),
-			"title":       stringSchema("New title."),
+			"taskId":      stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+			"title":       stringSchema("New title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
 			"description": stringSchema("New description."),
-			"priority":    intSchema("New priority 0..4."),
-			"dueOn":       stringSchema("YYYY-MM-DD."),
-			"startOn":     stringSchema("YYYY-MM-DD."),
+			"priority":    intSchema("New priority 0..4.", Constraints{Min: intPtr(0), Max: intPtr(4)}),
+			"dueOn":       stringSchema("YYYY-MM-DD.", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
+			"startOn":     stringSchema("YYYY-MM-DD.", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
 		}, []string{"taskId"}),
 		run: runUpdateTask,
 	})
@@ -128,7 +128,7 @@ func registerTools(h *Handler) {
 		description:   "Apply a state machine transition to a task. Valid transitions: start, block, unblock, submit, complete, reopen, cancel.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"taskId":     stringSchema("Task public id (UUID v7)."),
+			"taskId":     stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 			"transition": stringSchema("Transition name: start | block | unblock | submit | complete | reopen | cancel."),
 			"reason":     stringSchema("Optional reason for the transition."),
 		}, []string{"taskId", "transition"}),
@@ -149,9 +149,9 @@ func registerTools(h *Handler) {
 		description:   "Search tasks by title or description within the workspace.",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"query":  stringSchema("Search term (matched against title and description)."),
-			"limit":  intSchema("Max results (1-200, default 50)."),
-			"offset": intSchema("Pagination offset (default 0)."),
+			"query":  stringSchema("Search term (matched against title and description).", Constraints{MinLength: intPtr(1), MaxLength: intPtr(200)}),
+			"limit":  intSchema("Max results (1-200, default 50).", Constraints{Min: intPtr(1), Max: intPtr(200)}),
+			"offset": intSchema("Pagination offset (default 0).", Constraints{Min: intPtr(0)}),
 		}, []string{"query"}),
 		run: runSearchTasks,
 	})
@@ -223,8 +223,8 @@ func registerTools(h *Handler) {
 		description:   "List timeboxes (sprints / iterations) in the caller's workspace.",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"limit":  intSchema("Max number of rows (1..200)."),
-			"offset": intSchema("Row offset."),
+			"limit":  intSchema("Max number of rows (1..200).", Constraints{Min: intPtr(1), Max: intPtr(200)}),
+			"offset": intSchema("Row offset.", Constraints{Min: intPtr(0)}),
 		}, nil),
 		run: runListTimeboxes,
 	})
@@ -256,8 +256,8 @@ func registerTools(h *Handler) {
 		description:   "Export tasks as JSON for MCP consumers. Optionally scoped to a project.",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"projectId": stringSchema("Optional project public id (UUID v7) to scope export."),
-			"limit":     intSchema("Max tasks to export (1..200, default 200)."),
+			"projectId": stringSchema("Optional project public id (UUID v7) to scope export.", Constraints{Pattern: publicIDPattern}),
+			"limit":     intSchema("Max tasks to export (1..200, default 200).", Constraints{Min: intPtr(1), Max: intPtr(200)}),
 		}, nil),
 		run: runExportTasks,
 	})
@@ -349,43 +349,49 @@ func registerTools(h *Handler) {
 	})
 	h.register(tool{
 		name:          "list_calendar_events",
-		description:   "List events in a date range across all subscribed calendars.",
+		description:   "List events in a date range across all subscribed calendars. Use startDate/endDate (YYYY-MM-DD) for day ranges, or startAt/endAt (unix seconds since epoch) for sub-day windows.",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"startDate": stringSchema("Range start (RFC 3339 datetime or YYYY-MM-DD)."),
-			"endDate":   stringSchema("Range end (RFC 3339 datetime or YYYY-MM-DD)."),
-		}, []string{"startDate", "endDate"}),
+			"startDate": stringSchema("Range start as YYYY-MM-DD (mutually exclusive with startAt).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
+			"endDate":   stringSchema("Range end as YYYY-MM-DD (mutually exclusive with endAt).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
+			"startAt":   intSchema("Range start, unix seconds since epoch (mutually exclusive with startDate)."),
+			"endAt":     intSchema("Range end, unix seconds since epoch (mutually exclusive with endDate)."),
+		}, nil),
 		run: runListCalendarEvents,
 	})
 	h.register(tool{
 		name:          "create_calendar_event",
-		description:   "Create a calendar event.",
+		description:   "Create a calendar event. Use startAt/endAt (unix seconds since epoch) for timed events, or startDate/endDate (YYYY-MM-DD) when allDay=true.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"calendarId":  stringSchema("Calendar public id (UUID v7)."),
-			"title":       stringSchema("Event title."),
-			"startAt":     stringSchema("Start datetime (RFC 3339)."),
-			"endAt":       stringSchema("End datetime (RFC 3339)."),
+			"calendarId":  stringSchema("Calendar public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+			"title":       stringSchema("Event title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
+			"startAt":     intSchema("Start time, unix seconds since epoch (timed events)."),
+			"endAt":       intSchema("End time, unix seconds since epoch (timed events)."),
+			"startDate":   stringSchema("Start date YYYY-MM-DD (all-day events).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
+			"endDate":     stringSchema("End date YYYY-MM-DD (all-day events, inclusive).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
 			"kind":        stringSchema("Event kind: event | block | free (default event)."),
 			"showAs":      stringSchema("Show as: busy | free | tentative | oof (default busy)."),
 			"visibility":  stringSchema("Visibility: default | public | private | confidential."),
-			"ownerUserId": stringSchema("Owner user public id (UUID v7). Defaults to caller."),
+			"ownerUserId": stringSchema("Owner user public id (UUID v7). Defaults to caller.", Constraints{Pattern: publicIDPattern}),
 			"allDay":      boolSchema("Whether this is an all-day event."),
 			"location":    stringSchema("Event location."),
 			"memo":        stringSchema("Event memo/notes."),
 			"blockLabel":  stringSchema("Label for block-type events."),
-		}, []string{"calendarId", "title", "startAt", "endAt"}),
+		}, []string{"calendarId", "title"}),
 		run: runCreateCalendarEvent,
 	})
 	h.register(tool{
 		name:          "update_calendar_event",
-		description:   "Update mutable fields of a calendar event.",
+		description:   "Update mutable fields of a calendar event. Times are unix seconds since epoch (startAt/endAt); use startDate/endDate (YYYY-MM-DD) for all-day events.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"eventId":    stringSchema("Event public id (UUID v7)."),
-			"title":      stringSchema("New title."),
-			"startAt":    stringSchema("New start datetime (RFC 3339)."),
-			"endAt":      stringSchema("New end datetime (RFC 3339)."),
+			"eventId":    stringSchema("Event public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+			"title":      stringSchema("New title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
+			"startAt":    intSchema("New start time, unix seconds since epoch."),
+			"endAt":      intSchema("New end time, unix seconds since epoch."),
+			"startDate":  stringSchema("New start date YYYY-MM-DD (all-day events).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
+			"endDate":    stringSchema("New end date YYYY-MM-DD (all-day events).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
 			"kind":       stringSchema("New kind: event | block | free."),
 			"showAs":     stringSchema("New show as: busy | free | tentative | oof."),
 			"visibility": stringSchema("New visibility: default | public | private | confidential."),
@@ -409,21 +415,21 @@ func registerTools(h *Handler) {
 		description:   "Find available time slots for a user on a given date within working hours (09:00-18:00).",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"userId":          stringSchema("User public id (UUID v7). Defaults to caller."),
-			"date":            stringSchema("Date to check (YYYY-MM-DD)."),
-			"durationMinutes": intSchema("Minimum slot duration in minutes (default 60)."),
+			"userId":          stringSchema("User public id (UUID v7). Defaults to caller.", Constraints{Pattern: publicIDPattern}),
+			"date":            stringSchema("Date to check (YYYY-MM-DD).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
+			"durationMinutes": intSchema("Minimum slot duration in minutes (default 60).", Constraints{Min: intPtr(1), Max: intPtr(1440)}),
 		}, []string{"date"}),
 		run: runListFreeSlots,
 	})
 	h.register(tool{
 		name:          "create_event_from_task",
-		description:   "Create a calendar event linked to an existing task.",
+		description:   "Create a calendar event linked to an existing task. Times are unix seconds since epoch.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"taskId":     stringSchema("Task public id (UUID v7)."),
-			"calendarId": stringSchema("Calendar public id (UUID v7)."),
-			"startAt":    stringSchema("Start datetime (RFC 3339)."),
-			"endAt":      stringSchema("End datetime (RFC 3339)."),
+			"taskId":     stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+			"calendarId": stringSchema("Calendar public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+			"startAt":    intSchema("Start time, unix seconds since epoch."),
+			"endAt":      intSchema("End time, unix seconds since epoch."),
 		}, []string{"taskId", "calendarId", "startAt", "endAt"}),
 		run: runCreateEventFromTask,
 	})
@@ -464,8 +470,8 @@ func registerTools(h *Handler) {
 		description:   "List labels in the caller's workspace.",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"limit":  intSchema("Max number of rows (1..200)."),
-			"offset": intSchema("Row offset."),
+			"limit":  intSchema("Max number of rows (1..200).", Constraints{Min: intPtr(1), Max: intPtr(200)}),
+			"offset": intSchema("Row offset.", Constraints{Min: intPtr(0)}),
 		}, nil),
 		run: runListLabels,
 	})
@@ -528,14 +534,14 @@ func registerTools(h *Handler) {
 		run: runUnarchiveTask,
 	})
 
-	// Favorites, reactions, and recent visits (Wave 2).
+	// Favorites, reactions, and recent visits.
 	h.register(tool{
 		name:          "list_favorites",
 		description:   "List the current user's favorite items in the workspace.",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"limit":  intSchema("Max results (1..50, default 50)."),
-			"offset": intSchema("Skip N results."),
+			"limit":  intSchema("Max results (1..50, default 50).", Constraints{Min: intPtr(1), Max: intPtr(50)}),
+			"offset": intSchema("Skip N results.", Constraints{Min: intPtr(0)}),
 		}, nil),
 		run: runListFavorites,
 	})
@@ -573,20 +579,20 @@ func registerTools(h *Handler) {
 		description:   "List the user's recently visited entities in the workspace.",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"limit": intSchema("Max results (1..20, default 20)."),
+			"limit": intSchema("Max results (1..20, default 20).", Constraints{Min: intPtr(1), Max: intPtr(20)}),
 		}, nil),
 		run: runListRecent,
 	})
 
-	// Intake triage and description version history (Wave 3).
+	// Intake triage and description version history.
 	h.register(tool{
 		name:          "list_intake_items",
 		description:   "List intake items in the workspace triage queue.",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"status": stringSchema("Filter by triage status: pending, accepted, rejected, snoozed, duplicate. Optional."),
-			"limit":  intSchema("Max results (1..200, default 50)."),
-			"offset": intSchema("Skip N results."),
+			"limit":  intSchema("Max results (1..200, default 50).", Constraints{Min: intPtr(1), Max: intPtr(200)}),
+			"offset": intSchema("Skip N results.", Constraints{Min: intPtr(0)}),
 		}, nil),
 		run: runListIntakeItems,
 	})
@@ -631,15 +637,15 @@ func registerTools(h *Handler) {
 		run: runRestoreDescriptionVersion,
 	})
 
-	// Import job management (Wave 4).
+	// Import job management.
 	h.register(tool{
 		name:          "list_import_jobs",
 		description:   "List import jobs for the workspace.",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"status": stringSchema("Filter by status: pending, running, completed, failed, cancelled. Optional."),
-			"limit":  intSchema("Max results (1..200, default 50)."),
-			"offset": intSchema("Skip N results."),
+			"limit":  intSchema("Max results (1..200, default 50).", Constraints{Min: intPtr(1), Max: intPtr(200)}),
+			"offset": intSchema("Skip N results.", Constraints{Min: intPtr(0)}),
 		}, nil),
 		run: runListImportJobs,
 	})
@@ -660,6 +666,24 @@ func registerTools(h *Handler) {
 // JSON Schema helpers (minimal hand-rolled)
 // ----------------------------------------------------------------------------
 
+// Constraints carries optional JSONSchema validation hints for the
+// minimal hand-rolled string/int helpers below. Zero-valued fields are
+// omitted from the emitted schema map.
+type Constraints struct {
+	Min       *int
+	Max       *int
+	Pattern   string
+	MinLength *int
+	MaxLength *int
+}
+
+func intPtr(v int) *int { return &v }
+
+// publicIDPattern matches the lowercase hex form of UUID v7 public ids
+// emitted by types.PublicID.String(). Used as a JSONSchema pattern on
+// MCP arguments that reference resources by public id.
+const publicIDPattern = `^[0-9a-f]{32}$`
+
 func objectSchema(props map[string]any, required []string) map[string]any {
 	if props == nil {
 		props = map[string]any{}
@@ -674,16 +698,45 @@ func objectSchema(props map[string]any, required []string) map[string]any {
 	return out
 }
 
-func stringSchema(desc string) map[string]any {
-	return map[string]any{"type": "string", "description": desc}
+func stringSchema(desc string, c ...Constraints) map[string]any {
+	out := map[string]any{"type": "string", "description": desc}
+	if len(c) > 0 {
+		applyStringConstraints(out, c[0])
+	}
+	return out
 }
 
-func intSchema(desc string) map[string]any {
-	return map[string]any{"type": "integer", "description": desc}
+func intSchema(desc string, c ...Constraints) map[string]any {
+	out := map[string]any{"type": "integer", "description": desc}
+	if len(c) > 0 {
+		applyIntConstraints(out, c[0])
+	}
+	return out
 }
 
 func boolSchema(desc string) map[string]any {
 	return map[string]any{"type": "boolean", "description": desc}
+}
+
+func applyStringConstraints(out map[string]any, c Constraints) {
+	if c.Pattern != "" {
+		out["pattern"] = c.Pattern
+	}
+	if c.MinLength != nil {
+		out["minLength"] = *c.MinLength
+	}
+	if c.MaxLength != nil {
+		out["maxLength"] = *c.MaxLength
+	}
+}
+
+func applyIntConstraints(out map[string]any, c Constraints) {
+	if c.Min != nil {
+		out["minimum"] = *c.Min
+	}
+	if c.Max != nil {
+		out["maximum"] = *c.Max
+	}
 }
 
 // ----------------------------------------------------------------------------
@@ -2597,16 +2650,6 @@ func smartCreatePriorityToInt(s string) int32 {
 // Calendar tools
 // ----------------------------------------------------------------------------
 
-// nullTimeFormat renders a nullable time as its layout-formatted string,
-// or an empty string when the time is NULL. Keeps the MCP DTO stable
-// while calendar_events.{start,end}_at are nullable in the schema.
-func nullTimeFormat(t sql.NullTime, layout string) string {
-	if !t.Valid {
-		return ""
-	}
-	return t.Time.Format(layout)
-}
-
 // calendarRoleFor derives the MCP-exposed role string for a calendar
 // row. calendar_subscriptions.role is gone; we mirror the HTTP handler
 // convention (personal owner -> "owner", system -> "viewer", otherwise
@@ -2652,42 +2695,54 @@ func runListCalendars(ctx context.Context, deps Deps, s *session, _ json.RawMess
 	return map[string]any{"calendars": items}, nil
 }
 
-// parseFlexibleTime parses an RFC 3339 datetime or a YYYY-MM-DD date string.
-func parseFlexibleTime(s string) (time.Time, error) {
-	if t, err := time.Parse(time.RFC3339, s); err == nil {
-		return t, nil
-	}
-	t, err := time.Parse("2006-01-02", s)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return t, nil
+// parseDayBoundary parses a YYYY-MM-DD string and returns the time at
+// 00:00:00 UTC on that calendar day. Used for all-day events at the MCP
+// boundary, mirroring the API/MCP convention from
+// docs/conventions/api-types.md.
+func parseDayBoundary(s string) (time.Time, error) {
+	return time.Parse("2006-01-02", s)
 }
 
 func runListCalendarEvents(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
 	var in struct {
 		StartDate string `json:"startDate"`
 		EndDate   string `json:"endDate"`
+		StartAt   *int64 `json:"startAt"`
+		EndAt     *int64 `json:"endAt"`
 	}
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
-	if in.StartDate == "" || in.EndDate == "" {
-		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
-	}
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
 	}
-	startTime, err := parseFlexibleTime(in.StartDate)
-	if err != nil {
-		return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid startDate: %v", err)
+	var startTime, endTime time.Time
+	switch {
+	case in.StartAt != nil:
+		startTime = time.Unix(*in.StartAt, 0).UTC()
+	case in.StartDate != "":
+		t, err := parseDayBoundary(in.StartDate)
+		if err != nil {
+			return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid startDate: %v", err)
+		}
+		startTime = t
+	default:
+		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 	}
-	endTime, err := parseFlexibleTime(in.EndDate)
-	if err != nil {
-		return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid endDate: %v", err)
+	switch {
+	case in.EndAt != nil:
+		endTime = time.Unix(*in.EndAt, 0).UTC()
+	case in.EndDate != "":
+		t, err := parseDayBoundary(in.EndDate)
+		if err != nil {
+			return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid endDate: %v", err)
+		}
+		endTime = t
+	default:
+		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 	}
 	// The SQL query uses start_at < ? AND end_at > ? (overlap check),
-	// so we pass endDate as StartAt and startDate as EndAt.
+	// so we pass endTime as StartAt and startTime as EndAt.
 	rows, err := deps.CalendarQueries.ListCalendarEventsAcrossCalendars(ctx, calendar.ListCalendarEventsAcrossCalendarsParams{
 		UserID:      s.userID,
 		WorkspaceID: s.workspaceID,
@@ -2699,17 +2754,31 @@ func runListCalendarEvents(ctx context.Context, deps Deps, s *session, raw json.
 	}
 	items := make([]map[string]any, 0, len(rows))
 	for _, r := range rows {
-		items = append(items, map[string]any{
+		item := map[string]any{
 			"id":          r.PublicID.String(),
 			"calendarId":  r.CalendarID,
 			"kind":        string(r.Kind),
 			"showAs":      string(r.ShowAs),
 			"title":       r.Title,
 			"allDay":      r.AllDay,
-			"startAt":     nullTimeFormat(r.StartAt, time.RFC3339),
-			"endAt":       nullTimeFormat(r.EndAt, time.RFC3339),
 			"ownerUserId": r.OwnerUserID,
-		})
+		}
+		if r.AllDay {
+			if r.StartAt.Valid {
+				item["startDate"] = r.StartAt.Time.UTC().Format("2006-01-02")
+			}
+			if r.EndAt.Valid {
+				item["endDate"] = r.EndAt.Time.UTC().Format("2006-01-02")
+			}
+		} else {
+			if r.StartAt.Valid {
+				item["startAt"] = r.StartAt.Time.Unix()
+			}
+			if r.EndAt.Valid {
+				item["endAt"] = r.EndAt.Time.Unix()
+			}
+		}
+		items = append(items, item)
 	}
 	return map[string]any{"events": items}, nil
 }
@@ -2718,8 +2787,10 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	var in struct {
 		CalendarID  string `json:"calendarId"`
 		Title       string `json:"title"`
-		StartAt     string `json:"startAt"`
-		EndAt       string `json:"endAt"`
+		StartAt     *int64 `json:"startAt"`
+		EndAt       *int64 `json:"endAt"`
+		StartDate   string `json:"startDate"`
+		EndDate     string `json:"endDate"`
 		Kind        string `json:"kind"`
 		ShowAs      string `json:"showAs"`
 		Visibility  string `json:"visibility"`
@@ -2732,7 +2803,7 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
-	if in.CalendarID == "" || in.Title == "" || in.StartAt == "" || in.EndAt == "" {
+	if in.CalendarID == "" || in.Title == "" {
 		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 	}
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
@@ -2742,13 +2813,29 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	if err != nil {
 		return nil, err
 	}
-	startAt, err := time.Parse(time.RFC3339, in.StartAt)
-	if err != nil {
-		return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid startAt: %v", err)
+	allDay := false
+	if in.AllDay != nil {
+		allDay = *in.AllDay
 	}
-	endAt, err := time.Parse(time.RFC3339, in.EndAt)
-	if err != nil {
-		return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid endAt: %v", err)
+	var startAt, endAt time.Time
+	if allDay {
+		if in.StartDate == "" || in.EndDate == "" {
+			return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "all-day events require startDate and endDate")
+		}
+		startAt, err = parseDayBoundary(in.StartDate)
+		if err != nil {
+			return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid startDate: %v", err)
+		}
+		endAt, err = parseDayBoundary(in.EndDate)
+		if err != nil {
+			return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid endDate: %v", err)
+		}
+	} else {
+		if in.StartAt == nil || in.EndAt == nil {
+			return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "timed events require startAt and endAt (unix seconds)")
+		}
+		startAt = time.Unix(*in.StartAt, 0).UTC()
+		endAt = time.Unix(*in.EndAt, 0).UTC()
 	}
 
 	kind := calendar.CalendarEventsKindEvent
@@ -2789,11 +2876,6 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		}
 	}
 
-	allDay := false
-	if in.AllDay != nil {
-		allDay = *in.AllDay
-	}
-
 	pub := newPublicID()
 	_, err = deps.CalendarQueries.CreateCalendarEvent(ctx, calendar.CreateCalendarEventParams{
 		PublicID:           pub,
@@ -2821,22 +2903,31 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-	return map[string]any{
-		"id":      pub.String(),
-		"title":   in.Title,
-		"startAt": startAt.Format(time.RFC3339),
-		"endAt":   endAt.Format(time.RFC3339),
-		"kind":    string(kind),
-		"showAs":  string(showAs),
-	}, nil
+	out := map[string]any{
+		"id":     pub.String(),
+		"title":  in.Title,
+		"kind":   string(kind),
+		"showAs": string(showAs),
+		"allDay": allDay,
+	}
+	if allDay {
+		out["startDate"] = startAt.UTC().Format("2006-01-02")
+		out["endDate"] = endAt.UTC().Format("2006-01-02")
+	} else {
+		out["startAt"] = startAt.Unix()
+		out["endAt"] = endAt.Unix()
+	}
+	return out, nil
 }
 
 func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
 	var in struct {
 		EventID    string  `json:"eventId"`
 		Title      *string `json:"title"`
-		StartAt    *string `json:"startAt"`
-		EndAt      *string `json:"endAt"`
+		StartAt    *int64  `json:"startAt"`
+		EndAt      *int64  `json:"endAt"`
+		StartDate  *string `json:"startDate"`
+		EndDate    *string `json:"endDate"`
 		Kind       *string `json:"kind"`
 		ShowAs     *string `json:"showAs"`
 		Visibility *string `json:"visibility"`
@@ -2894,18 +2985,26 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 
 	var newStartAt, newEndAt time.Time
 	timeChanged := false
-	if in.StartAt != nil {
-		t, perr := time.Parse(time.RFC3339, *in.StartAt)
+	switch {
+	case in.StartAt != nil:
+		newStartAt = time.Unix(*in.StartAt, 0).UTC()
+		timeChanged = true
+	case in.StartDate != nil && *in.StartDate != "":
+		t, perr := parseDayBoundary(*in.StartDate)
 		if perr != nil {
-			return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid startAt")
+			return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid startDate")
 		}
 		newStartAt = t
 		timeChanged = true
 	}
-	if in.EndAt != nil {
-		t, perr := time.Parse(time.RFC3339, *in.EndAt)
+	switch {
+	case in.EndAt != nil:
+		newEndAt = time.Unix(*in.EndAt, 0).UTC()
+		timeChanged = true
+	case in.EndDate != nil && *in.EndDate != "":
+		t, perr := parseDayBoundary(*in.EndDate)
 		if perr != nil {
-			return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid endAt")
+			return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid endDate")
 		}
 		newEndAt = t
 		timeChanged = true
@@ -3151,8 +3250,8 @@ func runListFreeSlots(ctx context.Context, deps Deps, s *session, raw json.RawMe
 			gap := b.start.Sub(cursor)
 			if gap >= minDur {
 				slots = append(slots, map[string]any{
-					"startAt":         cursor.Format(time.RFC3339),
-					"endAt":           b.start.Format(time.RFC3339),
+					"startAt":         cursor.Unix(),
+					"endAt":           b.start.Unix(),
 					"durationMinutes": int(gap.Minutes()),
 				})
 			}
@@ -3165,8 +3264,8 @@ func runListFreeSlots(ctx context.Context, deps Deps, s *session, raw json.RawMe
 		gap := workEnd.Sub(cursor)
 		if gap >= minDur {
 			slots = append(slots, map[string]any{
-				"startAt":         cursor.Format(time.RFC3339),
-				"endAt":           workEnd.Format(time.RFC3339),
+				"startAt":         cursor.Unix(),
+				"endAt":           workEnd.Unix(),
 				"durationMinutes": int(gap.Minutes()),
 			})
 		}
@@ -3178,13 +3277,13 @@ func runCreateEventFromTask(ctx context.Context, deps Deps, s *session, raw json
 	var in struct {
 		TaskID     string `json:"taskId"`
 		CalendarID string `json:"calendarId"`
-		StartAt    string `json:"startAt"`
-		EndAt      string `json:"endAt"`
+		StartAt    *int64 `json:"startAt"`
+		EndAt      *int64 `json:"endAt"`
 	}
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
-	if in.TaskID == "" || in.CalendarID == "" || in.StartAt == "" || in.EndAt == "" {
+	if in.TaskID == "" || in.CalendarID == "" || in.StartAt == nil || in.EndAt == nil {
 		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 	}
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
@@ -3199,14 +3298,8 @@ func runCreateEventFromTask(ctx context.Context, deps Deps, s *session, raw json
 	if err != nil {
 		return nil, err
 	}
-	startAt, err := time.Parse(time.RFC3339, in.StartAt)
-	if err != nil {
-		return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid startAt")
-	}
-	endAt, err := time.Parse(time.RFC3339, in.EndAt)
-	if err != nil {
-		return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid endAt")
-	}
+	startAt := time.Unix(*in.StartAt, 0).UTC()
+	endAt := time.Unix(*in.EndAt, 0).UTC()
 
 	// Look up the task to get its title.
 	task, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
@@ -3247,8 +3340,8 @@ func runCreateEventFromTask(ctx context.Context, deps Deps, s *session, raw json
 	return map[string]any{
 		"id":      pub.String(),
 		"title":   task.Title,
-		"startAt": startAt.Format(time.RFC3339),
-		"endAt":   endAt.Format(time.RFC3339),
+		"startAt": startAt.Unix(),
+		"endAt":   endAt.Unix(),
 		"taskId":  taskPub.String(),
 	}, nil
 }

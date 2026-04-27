@@ -206,7 +206,10 @@ func runConvertIntakeToTask(ctx context.Context, deps Deps, s *session, raw json
 	defer tx.Rollback() //nolint:errcheck
 	qtx := deps.Queries.WithTx(tx)
 
-	nextNum, err := qtx.AssignTaskNumber(ctx, prj.ID)
+	nextNum, err := qtx.AssignTaskNumber(ctx, generated.AssignTaskNumberParams{
+		WorkspaceID: prj.WorkspaceID,
+		ProjectID:   prj.ID,
+	})
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
