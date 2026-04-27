@@ -3900,6 +3900,20 @@ type VAuditRecent struct {
 	OccurredAt        time.Time       `json:"occurredAt"`
 }
 
+type VCommentForTask struct {
+	WorkspaceID       uint32         `json:"-"`
+	TaskID            uint32         `json:"-"`
+	TaskPublicID      []byte         `json:"taskPublicId"`
+	PublicID          types.PublicID `json:"publicId"`
+	AuthorPublicID    []byte         `json:"authorPublicId"`
+	AuthorDisplayName string         `json:"authorDisplayName"`
+	AuthorAvatarUrl   sql.NullString `json:"authorAvatarUrl"`
+	Body              string         `json:"body"`
+	EditedAt          sql.NullTime   `json:"editedAt"`
+	UpdatedAt         sql.NullTime   `json:"updatedAt"`
+	CreatedAt         time.Time      `json:"createdAt"`
+}
+
 type VInbox struct {
 	WorkspaceID       uint32          `json:"-"`
 	WorkspacePublicID []byte          `json:"workspacePublicId"`

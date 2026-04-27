@@ -514,6 +514,9 @@ type Querier interface {
 	// Insert a hashed recovery code for a user.
 	InsertRecoveryCode(ctx context.Context, arg InsertRecoveryCodeParams) error
 	// Insert an inbound signal (manual or webhook).
+	// Dedup is workspace-scoped via UNIQUE (workspace_id, source, external_id)
+	// when external_id is non-NULL. Duplicate deliveries are silently ignored
+	// via INSERT IGNORE; LastInsertId() returns 0 when the row was a duplicate.
 	InsertSignal(ctx context.Context, arg InsertSignalParams) (int64, error)
 	// Quick check: is this event category muted on the in_app channel for a user?
 	IsEventMutedForUser(ctx context.Context, arg IsEventMutedForUserParams) (int64, error)
@@ -577,6 +580,8 @@ type Querier interface {
 	// ("newer than last page" = strictly less than the cursor tuple).
 	ListChildTasksByParentIDKeyset(ctx context.Context, arg ListChildTasksByParentIDKeysetParams) ([]ListChildTasksByParentIDKeysetRow, error)
 	// List comments on a task joined with author display fields.
+	// Reads from v_comment_for_task which centralizes the comments + tasks +
+	// users JOINs and `enabled` propagation shared with the keyset variant.
 	ListCommentsForTask(ctx context.Context, arg ListCommentsForTaskParams) ([]ListCommentsForTaskRow, error)
 	// Keyset-paginated variant of ListCommentsForTask.
 	//
@@ -587,7 +592,8 @@ type Querier interface {
 	// so the cursor semantics match the rest of the keyset family. UI
 	// consumers that want oldest-first must reverse the page client-side.
 	//
-	// Index used: idx_comments_task_id_keyset (task_id, created_at, public_id).
+	// Index used: idx_comments_task_id_keyset (task_id, created_at, public_id)
+	// on the underlying comments table; the view is MERGEd by the optimizer.
 	ListCommentsForTaskKeyset(ctx context.Context, arg ListCommentsForTaskKeysetParams) ([]ListCommentsForTaskKeysetRow, error)
 	// List enabled integrations whose access token will expire before
 	// the given cutoff AND still have a stored refresh token. Used by

@@ -44,7 +44,7 @@ func (q *Queries) AttachSignalToTask(ctx context.Context, arg AttachSignalToTask
 }
 
 const insertSignal = `-- name: InsertSignal :execlastid
-INSERT INTO signals (
+INSERT IGNORE INTO signals (
   public_id,
   workspace_id,
   task_id,
@@ -68,6 +68,9 @@ type InsertSignalParams struct {
 }
 
 // Insert an inbound signal (manual or webhook).
+// Dedup is workspace-scoped via UNIQUE (workspace_id, source, external_id)
+// when external_id is non-NULL. Duplicate deliveries are silently ignored
+// via INSERT IGNORE; LastInsertId() returns 0 when the row was a duplicate.
 func (q *Queries) InsertSignal(ctx context.Context, arg InsertSignalParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, insertSignal,
 		arg.PublicID,

@@ -106,9 +106,10 @@ func ListComments(deps Deps) func(context.Context, *ListTaskCommentsInput) (*Lis
 			if derr != nil {
 				return nil, httpErr(apierrors.ValidationQueryFieldInvalid)
 			}
+			pid := types.FromUUID(task.PublicID)
 			rows, qerr := deps.Queries.ListCommentsForTaskKeyset(ctx, generated.ListCommentsForTaskKeysetParams{
 				WorkspaceID:     ws.ID,
-				PublicID:        types.FromUUID(task.PublicID),
+				TaskPublicID:    pid[:],
 				CursorCreatedAt: sql.NullTime{Time: cursorAt, Valid: !cursorAt.IsZero()},
 				CursorPublicID:  cursorPID,
 				Limit:           limit + 1,
@@ -132,11 +133,12 @@ func ListComments(deps Deps) func(context.Context, *ListTaskCommentsInput) (*Lis
 			return out, nil
 		}
 
+		pid := types.FromUUID(task.PublicID)
 		rows, err := deps.Queries.ListCommentsForTask(ctx, generated.ListCommentsForTaskParams{
-			WorkspaceID: ws.ID,
-			PublicID:    types.FromUUID(task.PublicID),
-			Limit:       limit,
-			Offset:      in.Offset,
+			WorkspaceID:  ws.ID,
+			TaskPublicID: pid[:],
+			Limit:        limit,
+			Offset:       in.Offset,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
