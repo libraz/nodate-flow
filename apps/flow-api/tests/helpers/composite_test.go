@@ -10,12 +10,12 @@ import (
 )
 
 func TestCompositeHandler_PrimaryServed(t *testing.T) {
-	primary := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	primary := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("X-Source", "primary")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("from primary"))
 	})
-	secondary := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	secondary := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		t.Fatal("secondary should not be called when primary returns 200")
 	})
 	composite := newCompositeHandler(primary, secondary)
@@ -31,10 +31,10 @@ func TestCompositeHandler_PrimaryServed(t *testing.T) {
 }
 
 func TestCompositeHandler_FallbackOnNotFound(t *testing.T) {
-	primary := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	primary := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	})
-	secondary := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	secondary := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("X-Source", "secondary")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("from secondary"))
@@ -52,11 +52,11 @@ func TestCompositeHandler_FallbackOnNotFound(t *testing.T) {
 }
 
 func TestCompositeHandler_PrimaryErrorPassesThrough(t *testing.T) {
-	primary := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	primary := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 		_, _ = w.Write([]byte("forbidden"))
 	})
-	secondary := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	secondary := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		t.Fatal("secondary should not be called for non-404 errors")
 	})
 	composite := newCompositeHandler(primary, secondary)
@@ -71,13 +71,13 @@ func TestCompositeHandler_PrimaryErrorPassesThrough(t *testing.T) {
 }
 
 func TestCompositeHandler_HeadersPreserved(t *testing.T) {
-	primary := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	primary := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Custom", "value")
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte(`{"ok":true}`))
 	})
-	secondary := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	secondary := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		t.Fatal("should not reach secondary")
 	})
 	composite := newCompositeHandler(primary, secondary)

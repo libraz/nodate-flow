@@ -47,10 +47,7 @@ func canSetOwner(
 	ownerUserID uint32,
 	_ calendar.FindCalendarSubscriptionRow,
 ) bool {
-	if actorUserID == ownerUserID {
-		return true
-	}
-	return false
+	return actorUserID == ownerUserID
 }
 
 // validateInvite checks that the invite has not expired and has not exceeded its use limit.

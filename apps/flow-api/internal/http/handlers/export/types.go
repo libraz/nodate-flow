@@ -20,8 +20,8 @@ type Deps struct {
 // httpErr delegates to handlerutil.HTTPErr.
 var httpErr = handlerutil.HTTPErr
 
-// ExportInput is the input for GET /workspaces/{wsId}/export/tasks.
-type ExportInput struct {
+// Input is the input for GET /workspaces/{wsId}/export/tasks.
+type Input struct {
 	WsID   string `path:"wsId"`
 	Format string `query:"format" enum:"csv,json" default:"csv" doc:"Export format (csv or json)"`
 	LensID string `query:"lensId,omitempty" doc:"Optional lens public id to scope the export"`
@@ -46,14 +46,14 @@ type ExportedTask struct {
 	CreatedAt           int64   `json:"createdAt" doc:"Creation time (unix seconds)"`
 }
 
-// ExportBody is the response body for the JSON export format.
-type ExportBody struct {
+// Body is the response body for the JSON export format.
+type Body struct {
 	Format string         `json:"format" doc:"Export format used"`
 	Count  int            `json:"count" doc:"Number of exported rows"`
 	Tasks  []ExportedTask `json:"tasks"`
 }
 
-// ExportOutput is the Huma response wrapper.
-type ExportOutput struct {
-	Body ExportBody
+// Output is the Huma response wrapper.
+type Output struct {
+	Body Body
 }

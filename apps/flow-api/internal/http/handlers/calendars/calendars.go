@@ -247,7 +247,7 @@ func PatchCalendar(deps Deps) func(context.Context, *PatchCalendarInput) (*Patch
 		}
 		// Only the calendar owner can modify calendar metadata.
 		// Subscription role has been dropped; owner-only is the new gate.
-		if !(cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(actorID)) { //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+		if !cal.OwnerUserID.Valid || cal.OwnerUserID.Int32 != int32(actorID) { //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
 
@@ -313,7 +313,7 @@ func DeleteCalendar(deps Deps) func(context.Context, *DeleteCalendarInput) (*Del
 		}
 		// Subscription role has been dropped; fall back to calendar
 		// ownership (cal.owner_user_id).
-		if !(cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(actorID)) { //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+		if !cal.OwnerUserID.Valid || cal.OwnerUserID.Int32 != int32(actorID) { //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
 		_ = cal

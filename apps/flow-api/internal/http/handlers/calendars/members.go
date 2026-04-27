@@ -106,7 +106,7 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 		}
 		// Only the calendar owner can add members.
 		// Subscription role has been dropped; owner-only is the new gate.
-		if !(cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(actorID)) { //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+		if !cal.OwnerUserID.Valid || cal.OwnerUserID.Int32 != int32(actorID) { //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
 
@@ -221,7 +221,7 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 		}
 		// Subscription role has been dropped; fall back to calendar
 		// ownership.
-		if !(cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(actorID)) { //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+		if !cal.OwnerUserID.Valid || cal.OwnerUserID.Int32 != int32(actorID) { //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
 

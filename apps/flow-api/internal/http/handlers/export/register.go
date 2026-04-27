@@ -25,5 +25,5 @@ func RegisterWorkspaceScoped(api huma.API, router chi.Router, deps Deps) {
 	}, Export(deps))
 
 	// CSV export as a raw chi handler (file download).
-	router.Get("/workspaces/{wsId}/export/tasks.csv", ExportCSV(deps))
+	router.Get("/workspaces/{wsId}/export/tasks.csv", CSV(deps))
 }

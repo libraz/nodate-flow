@@ -442,7 +442,7 @@ func AddTaskLabel(deps Deps) func(context.Context, *AddTaskLabelInput) (*AddTask
 
 // ListTaskLabels handles GET /tasks/{id}/labels.
 func ListTaskLabels(deps Deps) func(context.Context, *ListTaskLabelsInput) (*ListTaskLabelsOutput, error) {
-	return func(ctx context.Context, in *ListTaskLabelsInput) (*ListTaskLabelsOutput, error) {
+	return func(ctx context.Context, _ *ListTaskLabelsInput) (*ListTaskLabelsOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)

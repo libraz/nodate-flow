@@ -33,8 +33,8 @@ const maxExportRows = 10000
 // When format=json, the response is a JSON object with a tasks array.
 // When format=csv, the response is a CSV file download with UTF-8 BOM
 // for Excel compatibility.
-func Export(deps Deps) func(ctx context.Context, in *ExportInput) (*ExportOutput, error) {
-	return func(ctx context.Context, in *ExportInput) (*ExportOutput, error) {
+func Export(deps Deps) func(ctx context.Context, in *Input) (*Output, error) {
+	return func(ctx context.Context, in *Input) (*Output, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
@@ -95,8 +95,8 @@ func Export(deps Deps) func(ctx context.Context, in *ExportInput) (*ExportOutput
 			)
 		}
 
-		return &ExportOutput{
-			Body: ExportBody{
+		return &Output{
+			Body: Body{
 				Format: in.Format,
 				Count:  len(tasks),
 				Tasks:  tasks,
@@ -105,14 +105,14 @@ func Export(deps Deps) func(ctx context.Context, in *ExportInput) (*ExportOutput
 	}
 }
 
-// ExportCSV returns a raw http.HandlerFunc that streams a CSV file.
+// CSV returns a raw http.HandlerFunc that streams a CSV file.
 // It is registered on the chi router directly (not via Huma) because
 // the response is a file download with custom content-type headers.
 //
 // Errors are emitted as a JSON problem+json envelope via
 // [handlerutil.WriteSpecError] so clients see the same `type` /
 // `status` shape as Huma-mediated routes.
-func ExportCSV(deps Deps) http.HandlerFunc {
+func CSV(deps Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		ws, ok := middleware.WorkspaceFromContext(ctx)
@@ -203,7 +203,7 @@ func ExportCSV(deps Deps) http.HandlerFunc {
 		}); err != nil {
 			slog.ErrorContext(ctx, "eventbus.Append failed",
 				slog.Any("err", err),
-				slog.String("handler", "export.ExportCSV"),
+				slog.String("handler", "export.CSV"),
 				slog.String("event_type", string(eventbus.ExportRequested)),
 				logutil.LogEntity("workspace", ws.PublicID),
 				slog.String("format", "csv"),

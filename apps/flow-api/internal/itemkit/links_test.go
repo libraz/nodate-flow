@@ -40,7 +40,7 @@ func seedEvent(ctx context.Context, t *testing.T, db *sql.DB, f fixtures, startA
 func TestLinkTaskToEvent_CreatesAndAppendsEvent(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	f := seed(t, ctx, db)
+	f := seed(ctx, t, db)
 	defer purge(t, db, f.wsID)
 	evtID, _ := seedEvent(ctx, t, db, f, time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC))
 
@@ -91,7 +91,7 @@ func TestLinkTaskToEvent_CreatesAndAppendsEvent(t *testing.T) {
 func TestLinkTaskToEvent_IsIdempotent(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	f := seed(t, ctx, db)
+	f := seed(ctx, t, db)
 	defer purge(t, db, f.wsID)
 	evtID, _ := seedEvent(ctx, t, db, f, time.Date(2026, 5, 2, 9, 0, 0, 0, time.UTC))
 
@@ -145,7 +145,7 @@ func TestLinkTaskToEvent_IsIdempotent(t *testing.T) {
 func TestLinkTaskToEvent_RejectsUnknownRelation(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	f := seed(t, ctx, db)
+	f := seed(ctx, t, db)
 	defer purge(t, db, f.wsID)
 	evtID, _ := seedEvent(ctx, t, db, f, time.Date(2026, 5, 3, 9, 0, 0, 0, time.UTC))
 
@@ -169,7 +169,7 @@ func TestLinkTaskToEvent_RejectsUnknownRelation(t *testing.T) {
 func TestLinkTaskToEvent_RejectsMissingTask(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	f := seed(t, ctx, db)
+	f := seed(ctx, t, db)
 	defer purge(t, db, f.wsID)
 	evtID, _ := seedEvent(ctx, t, db, f, time.Date(2026, 5, 4, 9, 0, 0, 0, time.UTC))
 
@@ -193,7 +193,7 @@ func TestLinkTaskToEvent_RejectsMissingTask(t *testing.T) {
 func TestUnlinkTaskFromEvent_SoftDisables(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	f := seed(t, ctx, db)
+	f := seed(ctx, t, db)
 	defer purge(t, db, f.wsID)
 	evtID, _ := seedEvent(ctx, t, db, f, time.Date(2026, 5, 5, 9, 0, 0, 0, time.UTC))
 
@@ -251,7 +251,7 @@ func TestUnlinkTaskFromEvent_SoftDisables(t *testing.T) {
 func TestUnlinkTaskFromEvent_ReturnsNotFoundForAlreadyDisabled(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	f := seed(t, ctx, db)
+	f := seed(ctx, t, db)
 	defer purge(t, db, f.wsID)
 
 	tx, err := db.BeginTx(ctx, nil)
@@ -273,7 +273,7 @@ func TestUnlinkTaskFromEvent_ReturnsNotFoundForAlreadyDisabled(t *testing.T) {
 func TestLinkTaskToEvent_DifferentRelationsCoexist(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	f := seed(t, ctx, db)
+	f := seed(ctx, t, db)
 	defer purge(t, db, f.wsID)
 	evtID, _ := seedEvent(ctx, t, db, f, time.Date(2026, 5, 6, 9, 0, 0, 0, time.UTC))
 

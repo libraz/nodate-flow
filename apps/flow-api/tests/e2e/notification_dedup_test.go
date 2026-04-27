@@ -33,9 +33,9 @@ func TestNotificationFanoutDedup(t *testing.T) {
 	ctx := context.Background()
 	queries := generated.New(testDB)
 
-	wsInternalID := lookupWorkspaceInternalID(t, ctx, testDB, actorTenant.WorkspacePublicID)
-	actorInternalID := lookupUserInternalID(t, ctx, testDB, actorTenant.UserPublicID)
-	recipientInternalID := lookupUserInternalID(t, ctx, testDB, recipientTenant.UserPublicID)
+	wsInternalID := lookupWorkspaceInternalID(ctx, t, testDB, actorTenant.WorkspacePublicID)
+	actorInternalID := lookupUserInternalID(ctx, t, testDB, actorTenant.UserPublicID)
+	recipientInternalID := lookupUserInternalID(ctx, t, testDB, recipientTenant.UserPublicID)
 
 	// Add the recipient as a member of the actor's workspace so the
 	// fan-out picks them up. Direct insert avoids the invite/accept
@@ -57,7 +57,7 @@ func TestNotificationFanoutDedup(t *testing.T) {
 	eventInternalID := uint32(eventLastID) //#nosec G115 -- LastInsertId in test seed, fits uint32
 
 	// Snapshot the recipient's notification count before firing.
-	beforeCount := notificationCountForUser(t, ctx, testDB, recipientInternalID)
+	beforeCount := notificationCountForUser(ctx, t, testDB, recipientInternalID)
 
 	// Fire the fan-out twice for the same event. The Hook helper spawns
 	// goroutines, so we exercise the package-private fanout method
@@ -71,7 +71,7 @@ func TestNotificationFanoutDedup(t *testing.T) {
 	// Wait for the fan-out goroutines to drain.
 	require.NoError(t, f.Shutdown(ctxWithTimeout(t, 10*time.Second)))
 
-	afterCount := notificationCountForUser(t, ctx, testDB, recipientInternalID)
+	afterCount := notificationCountForUser(ctx, t, testDB, recipientInternalID)
 	require.Equalf(t, int64(1), afterCount-beforeCount,
 		"expected exactly 1 new notification after firing the same event twice (before=%d after=%d)",
 		beforeCount, afterCount)
@@ -94,7 +94,7 @@ func TestNotificationFanoutDedup(t *testing.T) {
 // lookupWorkspaceInternalID resolves a workspace's internal id from its
 // public UUID. Only tests reach across this boundary; production code
 // must never expose internal ids.
-func lookupWorkspaceInternalID(t *testing.T, ctx context.Context, db *sql.DB, publicID string) uint32 {
+func lookupWorkspaceInternalID(ctx context.Context, t *testing.T, db *sql.DB, publicID string) uint32 {
 	t.Helper()
 	pid, err := types.Parse(publicID)
 	require.NoError(t, err)
@@ -106,7 +106,7 @@ func lookupWorkspaceInternalID(t *testing.T, ctx context.Context, db *sql.DB, pu
 
 // lookupUserInternalID resolves a user's internal id from the public UUID
 // returned by /auth/register.
-func lookupUserInternalID(t *testing.T, ctx context.Context, db *sql.DB, publicID string) uint32 {
+func lookupUserInternalID(ctx context.Context, t *testing.T, db *sql.DB, publicID string) uint32 {
 	t.Helper()
 	pid, err := types.Parse(publicID)
 	require.NoError(t, err)
@@ -118,7 +118,7 @@ func lookupUserInternalID(t *testing.T, ctx context.Context, db *sql.DB, publicI
 
 // notificationCountForUser counts rows in the notifications table for a
 // recipient. Used as a delta sentinel around the dedup fire.
-func notificationCountForUser(t *testing.T, ctx context.Context, db *sql.DB, userID uint32) int64 {
+func notificationCountForUser(ctx context.Context, t *testing.T, db *sql.DB, userID uint32) int64 {
 	t.Helper()
 	var n int64
 	err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM notifications WHERE recipient_user_id = ?`, userID).Scan(&n)

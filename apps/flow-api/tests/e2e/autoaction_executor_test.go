@@ -37,17 +37,17 @@ func TestAutoActionExecutorClosesStaleReviewViaCanonicalPath(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	wsID, userID := lookupWorkspaceAndOwner(t, ctx, tenant.WorkspacePublicID)
+	wsID, userID := lookupWorkspaceAndOwner(ctx, t, tenant.WorkspacePublicID)
 
 	// The per-workspace auto_action_threshold COALESCEs to 0.80, which
 	// is above the close_stale_review default confidence (0.70). Lower
 	// the workspace threshold so the action is allowed to apply.
-	setWorkspaceAutoActionThreshold(t, ctx, wsID, "0.50")
+	setWorkspaceAutoActionThreshold(ctx, t, wsID, "0.50")
 
 	// Seed a task in review state that has been idle long enough to
 	// trigger close_stale_review (default idle = 120 hours = 5 days).
-	taskID := seedTask(t, ctx, wsID, userID, "stale review task", "")
-	setTaskStateAndUpdatedAt(t, ctx, taskID,
+	taskID := seedTask(ctx, t, wsID, userID, "stale review task", "")
+	setTaskStateAndUpdatedAt(ctx, t, taskID,
 		"review",
 		time.Now().Add(-10*24*time.Hour),
 	)
@@ -67,18 +67,18 @@ func TestAutoActionExecutorClosesStaleReviewViaCanonicalPath(t *testing.T) {
 	exec.RunOnce(ctx)
 
 	// Assert: derived_state moved to done.
-	derived := readDerivedState(t, ctx, taskID)
+	derived := readDerivedState(ctx, t, taskID)
 	require.Equal(t, "done", derived,
 		"close_stale_review must transition the task through the canonical state machine")
 
 	// Assert: a task.transition.complete event row was appended in the
 	// same transaction, with the auto_action provenance keys.
-	requireExactlyOneTransitionEvent(t, ctx, taskID, "task.transition.complete",
+	requireExactlyOneTransitionEvent(ctx, t, taskID, "task.transition.complete",
 		"close_stale_review", "auto_action")
 
 	// Assert: no leftover proposal event was emitted; the executor
 	// applied the action rather than only proposing it.
-	requireNoProposalEvent(t, ctx, taskID)
+	requireNoProposalEvent(ctx, t, taskID)
 }
 
 // TestAutoActionExecutorAutoClosesStaleViaCanonicalPath is the cancel-
@@ -95,11 +95,11 @@ func TestAutoActionExecutorAutoClosesStaleViaCanonicalPath(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	wsID, userID := lookupWorkspaceAndOwner(t, ctx, tenant.WorkspacePublicID)
+	wsID, userID := lookupWorkspaceAndOwner(ctx, t, tenant.WorkspacePublicID)
 
 	// Drop the workspace-level threshold below the auto_close_stale
 	// rule confidence (0.80) so the action is allowed to apply.
-	setWorkspaceAutoActionThreshold(t, ctx, wsID, "0.50")
+	setWorkspaceAutoActionThreshold(ctx, t, wsID, "0.50")
 
 	// The rule engine evaluates kinds in urgency order (escalate,
 	// assign_owner, nudge_assignee, close_stale_review,
@@ -107,15 +107,15 @@ func TestAutoActionExecutorAutoClosesStaleViaCanonicalPath(t *testing.T) {
 	// path we disable every kind that would otherwise outrank
 	// auto_close_stale on an idle open task, then opt this workspace
 	// into auto_close_stale with a short idle threshold.
-	enableAutoActionRule(t, ctx, wsID, "escalate_overdue", false, "0.85", 0)
-	enableAutoActionRule(t, ctx, wsID, "assign_owner", false, "0.75", 24)
-	enableAutoActionRule(t, ctx, wsID, "nudge_assignee", false, "0.70", 72)
-	enableAutoActionRule(t, ctx, wsID, "close_stale_review", false, "0.70", 120)
-	enableAutoActionRule(t, ctx, wsID, "auto_close_stale", true, "0.80", 24)
+	enableAutoActionRule(ctx, t, wsID, "escalate_overdue", false, "0.85", 0)
+	enableAutoActionRule(ctx, t, wsID, "assign_owner", false, "0.75", 24)
+	enableAutoActionRule(ctx, t, wsID, "nudge_assignee", false, "0.70", 72)
+	enableAutoActionRule(ctx, t, wsID, "close_stale_review", false, "0.70", 120)
+	enableAutoActionRule(ctx, t, wsID, "auto_close_stale", true, "0.80", 24)
 
 	// Seed an open task that has been idle for 30+ days, no assignee.
-	taskID := seedTask(t, ctx, wsID, userID, "ancient idle task", "")
-	setTaskStateAndUpdatedAt(t, ctx, taskID,
+	taskID := seedTask(ctx, t, wsID, userID, "ancient idle task", "")
+	setTaskStateAndUpdatedAt(ctx, t, taskID,
 		"open",
 		time.Now().Add(-31*24*time.Hour),
 	)
@@ -131,13 +131,13 @@ func TestAutoActionExecutorAutoClosesStaleViaCanonicalPath(t *testing.T) {
 	}
 	exec.RunOnce(ctx)
 
-	derived := readDerivedState(t, ctx, taskID)
+	derived := readDerivedState(ctx, t, taskID)
 	require.Equal(t, "cancelled", derived,
 		"auto_close_stale must transition the task through the canonical state machine")
 
-	requireExactlyOneTransitionEvent(t, ctx, taskID, "task.transition.cancel",
+	requireExactlyOneTransitionEvent(ctx, t, taskID, "task.transition.cancel",
 		"auto_close_stale", "auto_action")
-	requireNoProposalEvent(t, ctx, taskID)
+	requireNoProposalEvent(ctx, t, taskID)
 }
 
 // ---- local seed / assertion helpers ---------------------------------------
@@ -147,7 +147,7 @@ func TestAutoActionExecutorAutoClosesStaleViaCanonicalPath(t *testing.T) {
 // idle thresholds. This bypasses the state machine on purpose: the
 // system under test is the executor's transition path, not the seeding
 // path.
-func setTaskStateAndUpdatedAt(t *testing.T, ctx context.Context, taskID uint32, state string, updatedAt time.Time) {
+func setTaskStateAndUpdatedAt(ctx context.Context, t *testing.T, taskID uint32, state string, updatedAt time.Time) {
 	t.Helper()
 	_, err := testDB.ExecContext(ctx,
 		`UPDATE tasks SET derived_state = ?, updated_at = ? WHERE id = ?`,
@@ -159,7 +159,7 @@ func setTaskStateAndUpdatedAt(t *testing.T, ctx context.Context, taskID uint32, 
 // setWorkspaceAutoActionThreshold upserts an ai_settings row that
 // lowers the per-workspace auto_action_threshold so test rules can
 // fire below the production default (0.80).
-func setWorkspaceAutoActionThreshold(t *testing.T, ctx context.Context, wsID uint32, threshold string) {
+func setWorkspaceAutoActionThreshold(ctx context.Context, t *testing.T, wsID uint32, threshold string) {
 	t.Helper()
 	_, err := testDB.ExecContext(ctx,
 		`INSERT INTO ai_settings (workspace_id, auto_action_threshold)
@@ -172,7 +172,7 @@ func setWorkspaceAutoActionThreshold(t *testing.T, ctx context.Context, wsID uin
 
 // enableAutoActionRule upserts a per-workspace rule override into
 // auto_action_rules so the executor reads non-default thresholds.
-func enableAutoActionRule(t *testing.T, ctx context.Context, wsID uint32, kind string, enabled bool, confidence string, idleHours uint32) {
+func enableAutoActionRule(ctx context.Context, t *testing.T, wsID uint32, kind string, enabled bool, confidence string, idleHours uint32) {
 	t.Helper()
 	_, err := testDB.ExecContext(ctx,
 		`INSERT INTO auto_action_rules (public_id, workspace_id, kind, enabled, confidence, idle_hours)
@@ -185,7 +185,7 @@ func enableAutoActionRule(t *testing.T, ctx context.Context, wsID uint32, kind s
 
 // readDerivedState reads tasks.derived_state directly so the assertion
 // is independent of any sqlc-mapped enum type.
-func readDerivedState(t *testing.T, ctx context.Context, taskID uint32) string {
+func readDerivedState(ctx context.Context, t *testing.T, taskID uint32) string {
 	t.Helper()
 	var s string
 	err := testDB.QueryRowContext(ctx,
@@ -199,7 +199,7 @@ func readDerivedState(t *testing.T, ctx context.Context, taskID uint32) string {
 // payload carries the auto-action provenance keys (auto_action, via).
 // The actionKindPayload arg is the expected value of the
 // `auto_action` key on the payload (e.g. "close_stale_review").
-func requireExactlyOneTransitionEvent(t *testing.T, ctx context.Context, taskID uint32, eventType, actionKindPayload, viaPayload string) {
+func requireExactlyOneTransitionEvent(ctx context.Context, t *testing.T, taskID uint32, eventType, actionKindPayload, viaPayload string) {
 	t.Helper()
 	var (
 		count       int
@@ -240,7 +240,7 @@ func requireExactlyOneTransitionEvent(t *testing.T, ctx context.Context, taskID 
 // stale ai.auto_action.proposed row for this task; auto-applied
 // actions are recorded as the canonical task.transition.<name> event,
 // not as a proposal.
-func requireNoProposalEvent(t *testing.T, ctx context.Context, taskID uint32) {
+func requireNoProposalEvent(ctx context.Context, t *testing.T, taskID uint32) {
 	t.Helper()
 	var n int
 	err := testDB.QueryRowContext(ctx,

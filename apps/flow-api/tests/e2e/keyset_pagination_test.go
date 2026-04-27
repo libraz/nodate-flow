@@ -55,7 +55,7 @@ func TestKeysetPaginationListTasksForWorkspace(t *testing.T) {
 	defer cancel()
 
 	queries := generated.New(testDB)
-	wsInternalID := lookupWorkspaceInternalID(t, ctx, testDB, tt.WorkspacePublicID)
+	wsInternalID := lookupWorkspaceInternalID(ctx, t, testDB, tt.WorkspacePublicID)
 
 	// Page through with keyset cursor until empty. Track every public_id
 	// we have seen so we can detect duplicates and skips.

@@ -500,9 +500,10 @@ func extractJSON(s string) string {
 			inStr = true
 			continue
 		}
-		if c == openCh {
+		switch c {
+		case openCh:
 			depth++
-		} else if c == closeCh {
+		case closeCh:
 			depth--
 			if depth == 0 {
 				return s[start : i+1]

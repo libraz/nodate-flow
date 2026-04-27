@@ -35,7 +35,7 @@ type fixtures struct {
 // seed inserts the minimum rows itemkit needs to operate: a
 // workspace, a user, a project, a personal calendar, and a task.
 // Returns internal IDs plus the task's public_id.
-func seed(t *testing.T, ctx context.Context, db *sql.DB) fixtures {
+func seed(ctx context.Context, t *testing.T, db *sql.DB) fixtures {
 	t.Helper()
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 
@@ -147,7 +147,7 @@ func withTx(t *testing.T, db *sql.DB, fn func(tx *sql.Tx)) {
 
 func TestScheduleTaskCreatesLink(t *testing.T) {
 	db := startDB(t)
-	fx := seed(t, context.Background(), db)
+	fx := seed(context.Background(), t, db)
 	defer purge(t, db, fx.wsID)
 
 	start := time.Date(2030, 6, 3, 10, 0, 0, 0, time.UTC)
@@ -211,7 +211,7 @@ func TestScheduleTaskCreatesLink(t *testing.T) {
 
 func TestRescheduleTaskPropagatesToEvent(t *testing.T) {
 	db := startDB(t)
-	fx := seed(t, context.Background(), db)
+	fx := seed(context.Background(), t, db)
 	defer purge(t, db, fx.wsID)
 
 	start := time.Date(2030, 6, 3, 10, 0, 0, 0, time.UTC)
@@ -257,7 +257,7 @@ func TestRescheduleTaskPropagatesToEvent(t *testing.T) {
 
 func TestDeleteTaskCascadesEvents(t *testing.T) {
 	db := startDB(t)
-	fx := seed(t, context.Background(), db)
+	fx := seed(context.Background(), t, db)
 	defer purge(t, db, fx.wsID)
 
 	start := time.Date(2030, 6, 3, 10, 0, 0, 0, time.UTC)
@@ -293,7 +293,7 @@ func TestDeleteTaskCascadesEvents(t *testing.T) {
 
 func TestRenameFromTaskPropagatesToEvent(t *testing.T) {
 	db := startDB(t)
-	fx := seed(t, context.Background(), db)
+	fx := seed(context.Background(), t, db)
 	defer purge(t, db, fx.wsID)
 
 	start := time.Date(2030, 6, 3, 10, 0, 0, 0, time.UTC)

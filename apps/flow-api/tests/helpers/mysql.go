@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	// Side effect: register the MySQL database/sql driver.
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go/modules/mysql"

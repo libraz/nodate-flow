@@ -67,11 +67,11 @@ func TestReconcilerHealsDueOnDrift(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	wsID, userID := lookupWorkspaceAndOwner(t, ctx, tenant.WorkspacePublicID)
-	calID := seedPersonalCalendar(t, ctx, wsID, userID, "drift-due")
+	wsID, userID := lookupWorkspaceAndOwner(ctx, t, tenant.WorkspacePublicID)
+	calID := seedPersonalCalendar(ctx, t, wsID, userID, "drift-due")
 
-	taskID := seedTask(t, ctx, wsID, userID, "drift due task", "2026-06-01")
-	seedLinkedEvent(t, ctx, wsID, calID, userID, taskID, "due",
+	taskID := seedTask(ctx, t, wsID, userID, "drift due task", "2026-06-01")
+	seedLinkedEvent(ctx, t, wsID, calID, userID, taskID, "due",
 		"2026-06-08 09:00:00", "2026-06-08 10:00:00")
 
 	sink := newRecordingMetrics()
@@ -102,10 +102,10 @@ func TestReconcilerHealsEnabledMismatch(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	wsID, userID := lookupWorkspaceAndOwner(t, ctx, tenant.WorkspacePublicID)
-	calID := seedPersonalCalendar(t, ctx, wsID, userID, "drift-enabled")
-	taskID := seedTask(t, ctx, wsID, userID, "orphaned task", "2026-07-01")
-	eventID := seedLinkedEvent(t, ctx, wsID, calID, userID, taskID, "due",
+	wsID, userID := lookupWorkspaceAndOwner(ctx, t, tenant.WorkspacePublicID)
+	calID := seedPersonalCalendar(ctx, t, wsID, userID, "drift-enabled")
+	taskID := seedTask(ctx, t, wsID, userID, "orphaned task", "2026-07-01")
+	eventID := seedLinkedEvent(ctx, t, wsID, calID, userID, taskID, "due",
 		"2026-07-01 00:00:00", "2026-07-01 01:00:00")
 
 	// Disable the task directly (simulating a crashed DeleteTask tx
@@ -139,10 +139,10 @@ func TestReconcilerCleanStateLeavesTaskAlone(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	wsID, userID := lookupWorkspaceAndOwner(t, ctx, tenant.WorkspacePublicID)
-	calID := seedPersonalCalendar(t, ctx, wsID, userID, "clean")
-	taskID := seedTask(t, ctx, wsID, userID, "clean task", "2026-08-15")
-	seedLinkedEvent(t, ctx, wsID, calID, userID, taskID, "due",
+	wsID, userID := lookupWorkspaceAndOwner(ctx, t, tenant.WorkspacePublicID)
+	calID := seedPersonalCalendar(ctx, t, wsID, userID, "clean")
+	taskID := seedTask(ctx, t, wsID, userID, "clean task", "2026-08-15")
+	seedLinkedEvent(ctx, t, wsID, calID, userID, taskID, "due",
 		"2026-08-15 14:00:00", "2026-08-15 15:00:00")
 
 	sink := newRecordingMetrics()
@@ -161,7 +161,7 @@ func TestReconcilerCleanStateLeavesTaskAlone(t *testing.T) {
 
 // ---- seed helpers (local to this test file) --------------------------------
 
-func lookupWorkspaceAndOwner(t *testing.T, ctx context.Context, wsPublicID string) (uint32, uint32) {
+func lookupWorkspaceAndOwner(ctx context.Context, t *testing.T, wsPublicID string) (uint32, uint32) {
 	t.Helper()
 	var wsID, userID uint32
 	err := testDB.QueryRowContext(ctx,
@@ -174,7 +174,7 @@ func lookupWorkspaceAndOwner(t *testing.T, ctx context.Context, wsPublicID strin
 	return wsID, userID
 }
 
-func seedPersonalCalendar(t *testing.T, ctx context.Context, wsID, userID uint32, name string) uint32 {
+func seedPersonalCalendar(ctx context.Context, t *testing.T, wsID, userID uint32, name string) uint32 {
 	t.Helper()
 	res, err := testDB.ExecContext(ctx,
 		`INSERT INTO calendars (public_id, workspace_id, kind, name, owner_user_id)
@@ -188,7 +188,7 @@ func seedPersonalCalendar(t *testing.T, ctx context.Context, wsID, userID uint32
 
 // seedTask inserts a minimal tasks row. dueOn is empty string when the
 // caller wants NULL.
-func seedTask(t *testing.T, ctx context.Context, wsID, userID uint32, title, dueOn string) uint32 {
+func seedTask(ctx context.Context, t *testing.T, wsID, userID uint32, title, dueOn string) uint32 {
 	t.Helper()
 	// Every task needs a project. Look up the tenant's default project.
 	var projID uint32
@@ -213,7 +213,7 @@ func seedTask(t *testing.T, ctx context.Context, wsID, userID uint32, title, due
 
 // seedLinkedEvent inserts a calendar_events row linked to taskID with
 // the given task_role. startAt / endAt are 'YYYY-MM-DD HH:MM:SS'.
-func seedLinkedEvent(t *testing.T, ctx context.Context, wsID, calID, userID, taskID uint32,
+func seedLinkedEvent(ctx context.Context, t *testing.T, wsID, calID, userID, taskID uint32,
 	role, startAt, endAt string,
 ) uint32 {
 	t.Helper()

@@ -62,7 +62,7 @@ func linkContributesTo(ctx context.Context, t *testing.T, db *sql.DB, f fixtures
 func TestProposeShiftEventAndChildren_NoLinks(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	f := seed(t, ctx, db)
+	f := seed(ctx, t, db)
 	defer purge(t, db, f.wsID)
 	evtID, _ := seedEvent(ctx, t, db, f, time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC))
 
@@ -87,7 +87,7 @@ func TestProposeShiftEventAndChildren_NoLinks(t *testing.T) {
 func TestProposeShiftEventAndChildren_PartitionsSafeAndConflict(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	f := seed(t, ctx, db)
+	f := seed(ctx, t, db)
 	defer purge(t, db, f.wsID)
 
 	umbrella, _ := seedEvent(ctx, t, db, f, time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC))
@@ -138,7 +138,7 @@ func TestProposeShiftEventAndChildren_PartitionsSafeAndConflict(t *testing.T) {
 func TestProposeShiftEventAndChildren_RejectsUndated(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	f := seed(t, ctx, db)
+	f := seed(ctx, t, db)
 	defer purge(t, db, f.wsID)
 	// Create an undated event directly.
 	pub := dbtype.New()
@@ -173,7 +173,7 @@ func TestProposeShiftEventAndChildren_RejectsUndated(t *testing.T) {
 func TestApplyShiftEventAndChildren_ShiftsUmbrellaAndSafeTasks(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	f := seed(t, ctx, db)
+	f := seed(ctx, t, db)
 	defer purge(t, db, f.wsID)
 
 	umbrellaStart := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
@@ -229,7 +229,7 @@ func TestApplyShiftEventAndChildren_ShiftsUmbrellaAndSafeTasks(t *testing.T) {
 func TestApplyShiftEventAndChildren_IgnoresUnconfirmedTasks(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	f := seed(t, ctx, db)
+	f := seed(ctx, t, db)
 	defer purge(t, db, f.wsID)
 
 	umbrellaStart := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
@@ -272,7 +272,7 @@ func TestApplyShiftEventAndChildren_IgnoresUnconfirmedTasks(t *testing.T) {
 func TestApplyShiftEventAndChildren_IgnoresStaleTaskIDs(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	f := seed(t, ctx, db)
+	f := seed(ctx, t, db)
 	defer purge(t, db, f.wsID)
 
 	umbrellaStart := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
@@ -315,7 +315,7 @@ func TestApplyShiftEventAndChildren_IgnoresStaleTaskIDs(t *testing.T) {
 func TestApplyShiftEventAndChildren_TimeOnlyChangeSkipsTasks(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	f := seed(t, ctx, db)
+	f := seed(ctx, t, db)
 	defer purge(t, db, f.wsID)
 
 	umbrellaStart := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
@@ -369,7 +369,7 @@ func TestApplyShiftEventAndChildren_TimeOnlyChangeSkipsTasks(t *testing.T) {
 func TestApplyShiftEventAndChildren_RejectsUndatedUmbrella(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	f := seed(t, ctx, db)
+	f := seed(ctx, t, db)
 	defer purge(t, db, f.wsID)
 	pub := dbtype.New()
 	res, err := db.ExecContext(ctx,

@@ -212,7 +212,7 @@ func MarkRead(deps Deps) func(context.Context, *MarkReadInput) (*MarkReadOutput,
 
 // MarkAllRead handles POST /workspaces/{wsId}/notifications/read-all.
 func MarkAllRead(deps Deps) func(context.Context, *MarkAllReadInput) (*MarkAllReadOutput, error) {
-	return func(ctx context.Context, in *MarkAllReadInput) (*MarkAllReadOutput, error) {
+	return func(ctx context.Context, _ *MarkAllReadInput) (*MarkAllReadOutput, error) {
 		actorID, ok := middleware.ActorFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)

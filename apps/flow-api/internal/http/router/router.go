@@ -1326,9 +1326,10 @@ func newDBInvocationLogger(q *generated.Queries, publish func(context.Context, u
 			cost = sql.NullString{String: fmt.Sprintf("%d.%06d", rec.CostCents/100, (rec.CostCents%100)*10000), Valid: true}
 		}
 		status := generated.AiInvocationsStatusOk
-		if rec.Status == "error" {
+		switch rec.Status {
+		case "error":
 			status = generated.AiInvocationsStatusError
-		} else if rec.Status == "blocked" {
+		case "blocked":
 			status = generated.AiInvocationsStatusBlocked
 		}
 		var ec sql.NullString

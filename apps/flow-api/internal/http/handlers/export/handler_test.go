@@ -23,7 +23,7 @@ func TestExportCSVMissingWorkspaceWritesProblemJSON(t *testing.T) {
 
 	// Deps left zero — the handler returns before touching them when
 	// the workspace is missing from the context.
-	ExportCSV(Deps{})(rr, req)
+	CSV(Deps{})(rr, req)
 
 	if rr.Code != http.StatusNotFound {
 		t.Fatalf("status: got %d want 404", rr.Code)
