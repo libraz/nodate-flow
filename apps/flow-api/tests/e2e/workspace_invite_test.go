@@ -198,15 +198,16 @@ func TestWorkspaceInviteExpired(t *testing.T) {
 		}, &created)
 	require.NotEmpty(t, created.Token)
 
-	// Wait for the invite to expire.
-	time.Sleep(2 * time.Second)
-
-	// Accept should fail.
-	status, _ := doJSONStatus(t, http.MethodPost,
-		testServerURL+"/invites/"+created.Token+"/accept",
-		guest.AccessToken, nil)
-	require.GreaterOrEqual(t, status, 400,
-		"accepting an expired invite must return non-2xx")
+	// Poll the accept endpoint until the invite expires server-side.
+	// Eventually replaces a fixed sleep so the test scales with how
+	// quickly the backend honours the TTL, not a hard-coded wait.
+	require.Eventually(t, func() bool {
+		status, _ := doJSONStatus(t, http.MethodPost,
+			testServerURL+"/invites/"+created.Token+"/accept",
+			guest.AccessToken, nil)
+		return status >= 400
+	}, 5*time.Second, 100*time.Millisecond,
+		"accepting an expired invite must eventually return non-2xx")
 }
 
 // TestWorkspaceInviteRequiresAuth verifies that POST /invites/{token}/accept

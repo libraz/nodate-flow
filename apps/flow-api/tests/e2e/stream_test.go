@@ -37,12 +37,17 @@ func TestWorkspaceStream(t *testing.T) {
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	require.Equal(t, "text/event-stream", resp.Header.Get("Content-Type"))
 
-	// Writer goroutine: once the stream is open, create a task so the
-	// eventbus tap publishes a task.changed frame to this subscriber.
+	// Writer goroutine: wait until the reader has observed the initial
+	// resync frame (i.e. the subscription is fully registered server-side)
+	// before creating the task, so the append hook is guaranteed to find
+	// at least this subscriber.
+	resyncSeen := make(chan struct{})
 	go func() {
-		// Small delay so the subscription is registered before the
-		// append hook fires.
-		time.Sleep(100 * time.Millisecond)
+		select {
+		case <-resyncSeen:
+		case <-ctx.Done():
+			return
+		}
 		doJSON(t, http.MethodPost, testServerURL+"/tasks", tt.AccessToken, map[string]any{
 			"projectId": tt.ProjectPublicID,
 			"title":     "stream-triggering task",
@@ -75,6 +80,9 @@ func TestWorkspaceStream(t *testing.T) {
 			}
 			switch currentEvent {
 			case "resync":
+				if !sawResync {
+					close(resyncSeen)
+				}
 				sawResync = true
 			case "task.changed":
 				var evt struct {
