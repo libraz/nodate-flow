@@ -213,6 +213,7 @@ export default function GeneralTab({
                 role="radio"
                 aria-checked={active}
                 aria-label={t(swatch.nameKey)}
+                data-color={swatch.hex}
                 className={active ? `${styles.swatch} ${styles.swatchActive}` : styles.swatch}
                 style={{ background: swatch.token }}
                 onClick={() => setColor(swatch.hex)}

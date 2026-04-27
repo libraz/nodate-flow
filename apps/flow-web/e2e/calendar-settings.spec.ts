@@ -167,9 +167,11 @@ test.describe('calendar settings drawer — general tab', () => {
     await expect(drawer.getByLabel(copy.nameLabel)).toHaveValue(initialName);
     await expect(drawer.getByLabel(copy.descriptionLabel)).toHaveValue(initialDesc);
 
-    // The active swatch carries aria-checked="true" and aria-label = the hex.
+    // The active swatch carries aria-checked="true" and an opaque
+    // data-color attribute pinning the hex; aria-label is the
+    // localized swatch name (e.g. "Green") for screen readers.
     const activeSwatch = drawer.getByRole('radio', { checked: true });
-    await expect(activeSwatch).toHaveAttribute('aria-label', initialColor);
+    await expect(activeSwatch).toHaveAttribute('data-color', initialColor);
   });
 
   test('B: renames calendar and the rail reflects the new name', async ({ page }) => {
@@ -214,7 +216,7 @@ test.describe('calendar settings drawer — general tab', () => {
 
     const drawer = page.getByRole('dialog', { name: copy.drawerTitle });
     const targetColor = '#ea580c';
-    await drawer.getByRole('radio', { name: targetColor }).click();
+    await drawer.locator(`[role="radio"][data-color="${targetColor}"]`).click();
     await drawer.getByRole('button', { name: copy.saveAction }).click();
 
     await expect(page.getByText(copy.savedToast)).toBeVisible({ timeout: 5_000 });
@@ -227,7 +229,7 @@ test.describe('calendar settings drawer — general tab', () => {
     await openGeneralTab(page, cal.name);
     const drawer2 = page.getByRole('dialog', { name: copy.drawerTitle });
     const activeSwatch = drawer2.getByRole('radio', { checked: true });
-    await expect(activeSwatch).toHaveAttribute('aria-label', targetColor);
+    await expect(activeSwatch).toHaveAttribute('data-color', targetColor);
 
     // SURFACE GAP: the rail row's color dot is bound to
     // `calendar.displayColor` (the actor's per-subscription color), not
