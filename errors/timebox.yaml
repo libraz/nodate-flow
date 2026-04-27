@@ -52,12 +52,3 @@ resources:
         message_zh: "该任务已在此时间盒中"
         description: "Returned when the task has already been added to the target timebox."
         userAction: "No action needed; the task is already present in the timebox."
-
-      not_in_timebox:
-        code: TIMEBOX.TASK.NOT_IN_TIMEBOX
-        status: 404
-        message: "Task not found in this timebox"
-        message_ja: "このタイムボックスにタスクが見つかりません"
-        message_zh: "此时间盒中未找到该任务"
-        description: "Returned when attempting to remove or reference a task that is not a member of the specified timebox."
-        userAction: "Verify the task ID and the timebox it belongs to."

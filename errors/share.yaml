@@ -49,15 +49,6 @@ resources:
   share_event:
     breadcrumb: "Share > Event"
     errors:
-      event_not_visible:
-        code: SHARE.SHARE_EVENT.EVENT_NOT_VISIBLE
-        status: 422
-        message: "Event cannot be published"
-        message_ja: "このイベントは公開できません"
-        message_zh: "此事件无法发布"
-        description: "Returned when attaching an event with visibility='confidential' to a share page. Confidential events are gated from the public surface."
-        userAction: "Change the event's visibility to public or private before attaching, or pick a different event."
-
       reorder_invalid:
         code: SHARE.SHARE_EVENT.REORDER_INVALID
         status: 400

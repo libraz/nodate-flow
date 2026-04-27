@@ -506,15 +506,6 @@ resources:
         description: "Returned when looking up an invite by token hash encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
-      email_send_interrupted:
-        code: CALENDAR.INVITE.EMAIL_SEND_INTERRUPTED
-        status: 500
-        message: "Could not send invite email"
-        message_ja: "招待メールを送信できませんでした"
-        message_zh: "无法发送邀请邮件"
-        description: "Returned when sending the magic-link invite email fails. The invite row is persisted; the email dispatch can be retried via resend."
-        userAction: "Retry the resend action. If the problem persists, contact support."
-
   member:
     breadcrumb: "Calendar > Member"
     errors:
@@ -590,15 +581,6 @@ resources:
         description: "Returned when looking up a subscription row encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
-      store_role_update_interrupted:
-        code: CALENDAR.MEMBER.STORE_ROLE_UPDATE_INTERRUPTED
-        status: 500
-        message: "Could not update member role"
-        message_ja: "メンバーの役割を更新できませんでした"
-        message_zh: "无法更新成员角色"
-        description: "Returned when the query to patch a subscription role encounters an unexpected database error."
-        userAction: "Retry the request. If the problem persists, contact support."
-
       store_remove_interrupted:
         code: CALENDAR.MEMBER.STORE_REMOVE_INTERRUPTED
         status: 500
@@ -606,15 +588,6 @@ resources:
         message_ja: "メンバーを削除できませんでした"
         message_zh: "无法移除成员"
         description: "Returned when the disable query for a subscription encounters an unexpected database error."
-        userAction: "Retry the request. If the problem persists, contact support."
-
-      owner_count_query_interrupted:
-        code: CALENDAR.MEMBER.OWNER_COUNT_QUERY_INTERRUPTED
-        status: 500
-        message: "Could not verify owner count"
-        message_ja: "オーナー数を確認できませんでした"
-        message_zh: "无法核对所有者数量"
-        description: "Returned when the query to count remaining calendar owners encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
   task_sync:
@@ -665,15 +638,6 @@ resources:
         description: "Returned when inserting the calendar event for the linked task encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
-      viewer_role_insufficient:
-        code: CALENDAR.TASK_SYNC.VIEWER_ROLE_INSUFFICIENT
-        status: 403
-        message: "Viewers cannot create events"
-        message_ja: "閲覧者はイベントを作成できません"
-        message_zh: "查看者无法创建事件"
-        description: "Returned when a calendar viewer attempts to create a task-synced event. At least editor role is required."
-        userAction: "Ask a calendar owner or manager to upgrade your role."
-
   smart_create:
     breadcrumb: "Calendar > Smart Create"
     errors:
@@ -698,15 +662,6 @@ resources:
         description: "Returned when looking up the actor's user profile encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
-      user_lookup_interrupted:
-        code: CALENDAR.USER_PROFILE.USER_LOOKUP_INTERRUPTED
-        status: 500
-        message: "Could not look up user"
-        message_ja: "ユーザーを検索できませんでした"
-        message_zh: "无法查找用户"
-        description: "Returned when resolving a user by email encounters an unexpected database error."
-        userAction: "Retry the request. If the problem persists, contact support."
-
   subscription:
     breadcrumb: "Calendar > Subscription"
     errors:
@@ -717,15 +672,6 @@ resources:
         message_ja: "カレンダー購読を作成できませんでした"
         message_zh: "无法创建日历订阅"
         description: "Returned when inserting a calendar subscription row encounters an unexpected database error."
-        userAction: "Retry the request. If the problem persists, contact support."
-
-      membership_check_interrupted:
-        code: CALENDAR.SUBSCRIPTION.MEMBERSHIP_CHECK_INTERRUPTED
-        status: 500
-        message: "Could not verify membership"
-        message_ja: "メンバーシップを確認できませんでした"
-        message_zh: "无法核对成员资格"
-        description: "Returned when checking whether a user already has a subscription encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
 
       country_invalid:
