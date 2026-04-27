@@ -1,6 +1,9 @@
 -- v_task_detail
 -- Detailed task projection. Uses correlated subqueries for counts to
 -- avoid Cartesian products from multiple LEFT JOINs on 1:N tables.
+-- Each correlated subquery propagates `enabled = TRUE` through the chain
+-- of parent rows it touches, so a disabled user/agent/label/target task
+-- never inflates the count exposed on the detail page.
 CREATE OR REPLACE VIEW v_task_detail AS
 SELECT
   t.workspace_id,
@@ -21,11 +24,22 @@ SELECT
   t.started_on,
   t.completed_at,
   t.archived_at,
-  (SELECT COUNT(*) FROM task_constraints c WHERE c.task_id = t.id AND c.enabled = TRUE) AS constraint_count,
-  (SELECT COUNT(*) FROM task_constraints c WHERE c.task_id = t.id AND c.enabled = TRUE AND c.satisfied_at IS NOT NULL) AS constraint_satisfied_count,
-  (SELECT COUNT(*) FROM task_dependencies d WHERE d.from_task_id = t.id AND d.enabled = TRUE) AS dependency_count,
-  (SELECT COUNT(*) FROM task_actors a WHERE a.task_id = t.id AND a.enabled = TRUE) AS actor_count,
-  (SELECT COUNT(*) FROM task_labels tl WHERE tl.task_id = t.id AND tl.enabled = TRUE) AS label_count,
+  (SELECT COUNT(*) FROM task_constraints c
+     WHERE c.task_id = t.id AND c.enabled = TRUE) AS constraint_count,
+  (SELECT COUNT(*) FROM task_constraints c
+     WHERE c.task_id = t.id AND c.enabled = TRUE AND c.satisfied_at IS NOT NULL) AS constraint_satisfied_count,
+  (SELECT COUNT(*) FROM task_dependencies d
+     INNER JOIN tasks dt ON dt.id = d.to_task_id AND dt.enabled = TRUE
+     WHERE d.from_task_id = t.id AND d.enabled = TRUE) AS dependency_count,
+  (SELECT COUNT(*) FROM task_actors a
+     LEFT JOIN users au ON au.id = a.user_id
+     LEFT JOIN ai_agents ag ON ag.id = a.agent_id
+     WHERE a.task_id = t.id AND a.enabled = TRUE
+       AND ((a.kind = 'user'  AND au.id IS NOT NULL AND au.enabled = TRUE)
+         OR (a.kind = 'agent' AND ag.id IS NOT NULL AND ag.enabled = TRUE))) AS actor_count,
+  (SELECT COUNT(*) FROM task_labels tl
+     INNER JOIN labels l ON l.id = tl.label_id AND l.enabled = TRUE
+     WHERE tl.task_id = t.id AND tl.enabled = TRUE) AS label_count,
   t.sort_weight,
   t.updated_at,
   t.created_at

@@ -23,6 +23,10 @@ CREATE TABLE comments (
   UNIQUE KEY uniq_comments_workspace_public_id (workspace_id, public_id),
   KEY idx_comments_workspace_id_task_id (workspace_id, task_id),
   KEY idx_comments_workspace_id_author_id (workspace_id, author_id),
+  -- Bare author_id index so ON DELETE CASCADE on users can find dependent
+  -- comment rows without a full table scan (the workspace-leading composite
+  -- above does not satisfy author_id-only lookups).
+  KEY idx_comments_author_id (author_id),
   -- Supports keyset pagination on (created_at DESC, public_id DESC) for
   -- ListCommentsForTaskKeyset.
   KEY idx_comments_task_id_keyset (task_id, created_at, public_id),

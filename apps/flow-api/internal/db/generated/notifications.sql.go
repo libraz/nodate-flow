@@ -95,7 +95,7 @@ type CreateNotificationParams struct {
 	WorkspaceID      uint32                `json:"-"`
 	RecipientUserID  uint32                `json:"-"`
 	ActorUserID      sql.NullInt32         `json:"-"`
-	SourceEventID    sql.NullInt32         `json:"sourceEventId"`
+	SourceEventID    sql.NullInt64         `json:"sourceEventId"`
 	EventType        string                `json:"eventType"`
 	ResourceType     string                `json:"resourceType"`
 	ResourcePublicID types.PublicID        `json:"resourcePublicId"`

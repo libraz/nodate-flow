@@ -2658,8 +2658,8 @@ type DashboardWidget struct {
 
 // Append-only event log
 type Event struct {
-	// Internal PK, never exposed
-	ID uint32 `json:"-"`
+	// Internal PK, never exposed; BIGINT UNSIGNED for unbounded append-only growth
+	ID uint64 `json:"-"`
 	// UUID v7, the only externally visible ID
 	PublicID types.PublicID `json:"publicId"`
 	// Internal FK to workspaces.id
@@ -3074,8 +3074,8 @@ type Notification struct {
 	RecipientUserID uint32 `json:"recipientUserId"`
 	// Internal FK to users.id, who triggered the event (null for system)
 	ActorUserID sql.NullInt32 `json:"-"`
-	// Internal FK to events.id used for at-least-once dedup; null for non-event-driven paths (scheduler, system)
-	SourceEventID sql.NullInt32 `json:"sourceEventId"`
+	// Internal FK to events.id (BIGINT UNSIGNED) used for at-least-once dedup; null for non-event-driven paths (scheduler, system)
+	SourceEventID sql.NullInt64 `json:"sourceEventId"`
 	// Matches eventbus event types (e.g. task.created, task.comment.added)
 	EventType string `json:"eventType"`
 	// Resource kind: task, project, comment, etc.
@@ -4092,7 +4092,7 @@ type VTaskListArchived struct {
 
 type VTaskTimeline struct {
 	WorkspaceID       uint32          `json:"-"`
-	EventID           uint32          `json:"eventId"`
+	EventID           uint64          `json:"eventId"`
 	PublicID          types.PublicID  `json:"publicId"`
 	TaskPublicID      sql.NullString  `json:"taskPublicId"`
 	ProjectPublicID   sql.NullString  `json:"projectPublicId"`

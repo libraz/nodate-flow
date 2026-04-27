@@ -5,7 +5,12 @@
 -- deletion path (test fixtures only).
 -- ====================================
 CREATE TABLE events (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  -- BIGINT UNSIGNED is a deliberate exception to the project default
+  -- (INT UNSIGNED for IDs). Justification: this is an append-only event log
+  -- expected to grow indefinitely; the ~4.29B INT UNSIGNED ceiling is
+  -- reachable in long-lived deployments. Any FK that targets this column
+  -- (currently notifications.source_event_id) must match the type.
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed; BIGINT UNSIGNED for unbounded append-only growth',
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id when the event targets a task',

@@ -9,7 +9,9 @@ CREATE TABLE notifications (
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   recipient_user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id, the user who receives this notification',
   actor_user_id INT UNSIGNED NULL COMMENT 'Internal FK to users.id, who triggered the event (null for system)',
-  source_event_id INT UNSIGNED NULL COMMENT 'Internal FK to events.id used for at-least-once dedup; null for non-event-driven paths (scheduler, system)',
+  -- BIGINT UNSIGNED to match events.id, which is a BIGINT UNSIGNED exception
+  -- (append-only log expected to grow past the 4.29B INT UNSIGNED ceiling).
+  source_event_id BIGINT UNSIGNED NULL COMMENT 'Internal FK to events.id (BIGINT UNSIGNED) used for at-least-once dedup; null for non-event-driven paths (scheduler, system)',
 
   event_type VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Matches eventbus event types (e.g. task.created, task.comment.added)',
   resource_type VARCHAR(32) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Resource kind: task, project, comment, etc.',

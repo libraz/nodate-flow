@@ -25,6 +25,11 @@ CREATE TABLE task_actors (
   UNIQUE KEY uniq_task_actors_task_id_agent_id_role (task_id, agent_id, role),
   KEY idx_task_actors_workspace_id_user_id (workspace_id, user_id),
   KEY idx_task_actors_workspace_id_agent_id (workspace_id, agent_id),
+  -- Composite (task_id, enabled) for "actors of a task currently enabled"
+  -- lookups (v_task_detail subquery, ListActorsForTask). The unique keys
+  -- above lead with task_id but include user_id/agent_id, so they cannot
+  -- short-circuit on the enabled predicate.
+  KEY idx_task_actors_task_id_enabled (task_id, enabled),
 
   CONSTRAINT fk_task_actors_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_task_actors_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,

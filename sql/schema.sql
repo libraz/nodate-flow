@@ -867,6 +867,10 @@ CREATE TABLE comments (
   UNIQUE KEY uniq_comments_workspace_public_id (workspace_id, public_id),
   KEY idx_comments_workspace_id_task_id (workspace_id, task_id),
   KEY idx_comments_workspace_id_author_id (workspace_id, author_id),
+  -- Bare author_id index so ON DELETE CASCADE on users can find dependent
+  -- comment rows without a full table scan (the workspace-leading composite
+  -- above does not satisfy author_id-only lookups).
+  KEY idx_comments_author_id (author_id),
   -- Supports keyset pagination on (created_at DESC, public_id DESC) for
   -- ListCommentsForTaskKeyset.
   KEY idx_comments_task_id_keyset (task_id, created_at, public_id),
@@ -920,7 +924,12 @@ CREATE TABLE dashboard_widgets (
 -- deletion path (test fixtures only).
 -- ====================================
 CREATE TABLE events (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  -- BIGINT UNSIGNED is a deliberate exception to the project default
+  -- (INT UNSIGNED for IDs). Justification: this is an append-only event log
+  -- expected to grow indefinitely; the ~4.29B INT UNSIGNED ceiling is
+  -- reachable in long-lived deployments. Any FK that targets this column
+  -- (currently notifications.source_event_id) must match the type.
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed; BIGINT UNSIGNED for unbounded append-only growth',
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id when the event targets a task',
@@ -1409,7 +1418,9 @@ CREATE TABLE notifications (
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   recipient_user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id, the user who receives this notification',
   actor_user_id INT UNSIGNED NULL COMMENT 'Internal FK to users.id, who triggered the event (null for system)',
-  source_event_id INT UNSIGNED NULL COMMENT 'Internal FK to events.id used for at-least-once dedup; null for non-event-driven paths (scheduler, system)',
+  -- BIGINT UNSIGNED to match events.id, which is a BIGINT UNSIGNED exception
+  -- (append-only log expected to grow past the 4.29B INT UNSIGNED ceiling).
+  source_event_id BIGINT UNSIGNED NULL COMMENT 'Internal FK to events.id (BIGINT UNSIGNED) used for at-least-once dedup; null for non-event-driven paths (scheduler, system)',
 
   event_type VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Matches eventbus event types (e.g. task.created, task.comment.added)',
   resource_type VARCHAR(32) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Resource kind: task, project, comment, etc.',
@@ -1825,6 +1836,11 @@ CREATE TABLE task_actors (
   UNIQUE KEY uniq_task_actors_task_id_agent_id_role (task_id, agent_id, role),
   KEY idx_task_actors_workspace_id_user_id (workspace_id, user_id),
   KEY idx_task_actors_workspace_id_agent_id (workspace_id, agent_id),
+  -- Composite (task_id, enabled) for "actors of a task currently enabled"
+  -- lookups (v_task_detail subquery, ListActorsForTask). The unique keys
+  -- above lead with task_id but include user_id/agent_id, so they cannot
+  -- short-circuit on the enabled predicate.
+  KEY idx_task_actors_task_id_enabled (task_id, enabled),
 
   CONSTRAINT fk_task_actors_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_task_actors_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
@@ -1893,6 +1909,10 @@ CREATE TABLE task_dependencies (
   UNIQUE KEY uniq_task_dependencies_edge (from_task_id, to_task_id, kind, enabled),
   KEY idx_task_dependencies_workspace_from (workspace_id, from_task_id),
   KEY idx_task_dependencies_workspace_to (workspace_id, to_task_id),
+  -- Bare to_task_id index for ON DELETE CASCADE on tasks. The workspace-leading
+  -- composite above does not satisfy to_task_id-only lookups, and the unique
+  -- edge key only helps for from_task_id leading queries.
+  KEY idx_task_dependencies_to_task_id (to_task_id),
 
   CONSTRAINT fk_task_dependencies_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_task_dependencies_from FOREIGN KEY (from_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
@@ -2700,6 +2720,10 @@ WHERE s.enabled = TRUE;
 -- >>> v_instance_audit_logs.sql
 -- v_instance_audit_logs
 -- Instance-wide audit log joined with actor user and optional workspace.
+-- Disabled actor / workspace rows are masked (LEFT JOIN with enabled = TRUE
+-- on the ON clause). If an audit consumer needs to surface forensic data
+-- for soft-disabled tenants, query instance_audit_logs directly rather than
+-- through this view.
 CREATE OR REPLACE VIEW v_instance_audit_logs AS
 SELECT
   ial.public_id,
@@ -2715,8 +2739,8 @@ SELECT
   ial.payload_json,
   ial.occurred_at
 FROM instance_audit_logs ial
-LEFT JOIN users actor ON actor.id = ial.actor_user_id
-LEFT JOIN workspaces ws ON ws.id = ial.target_workspace_id
+LEFT JOIN users actor ON actor.id = ial.actor_user_id AND actor.enabled = TRUE
+LEFT JOIN workspaces ws ON ws.id = ial.target_workspace_id AND ws.enabled = TRUE
 WHERE ial.enabled = TRUE;
 
 -- >>> v_my_tasks.sql
@@ -2780,6 +2804,9 @@ WHERE p.enabled = TRUE;
 -- v_task_detail
 -- Detailed task projection. Uses correlated subqueries for counts to
 -- avoid Cartesian products from multiple LEFT JOINs on 1:N tables.
+-- Each correlated subquery propagates `enabled = TRUE` through the chain
+-- of parent rows it touches, so a disabled user/agent/label/target task
+-- never inflates the count exposed on the detail page.
 CREATE OR REPLACE VIEW v_task_detail AS
 SELECT
   t.workspace_id,
@@ -2800,11 +2827,22 @@ SELECT
   t.started_on,
   t.completed_at,
   t.archived_at,
-  (SELECT COUNT(*) FROM task_constraints c WHERE c.task_id = t.id AND c.enabled = TRUE) AS constraint_count,
-  (SELECT COUNT(*) FROM task_constraints c WHERE c.task_id = t.id AND c.enabled = TRUE AND c.satisfied_at IS NOT NULL) AS constraint_satisfied_count,
-  (SELECT COUNT(*) FROM task_dependencies d WHERE d.from_task_id = t.id AND d.enabled = TRUE) AS dependency_count,
-  (SELECT COUNT(*) FROM task_actors a WHERE a.task_id = t.id AND a.enabled = TRUE) AS actor_count,
-  (SELECT COUNT(*) FROM task_labels tl WHERE tl.task_id = t.id AND tl.enabled = TRUE) AS label_count,
+  (SELECT COUNT(*) FROM task_constraints c
+     WHERE c.task_id = t.id AND c.enabled = TRUE) AS constraint_count,
+  (SELECT COUNT(*) FROM task_constraints c
+     WHERE c.task_id = t.id AND c.enabled = TRUE AND c.satisfied_at IS NOT NULL) AS constraint_satisfied_count,
+  (SELECT COUNT(*) FROM task_dependencies d
+     INNER JOIN tasks dt ON dt.id = d.to_task_id AND dt.enabled = TRUE
+     WHERE d.from_task_id = t.id AND d.enabled = TRUE) AS dependency_count,
+  (SELECT COUNT(*) FROM task_actors a
+     LEFT JOIN users au ON au.id = a.user_id
+     LEFT JOIN ai_agents ag ON ag.id = a.agent_id
+     WHERE a.task_id = t.id AND a.enabled = TRUE
+       AND ((a.kind = 'user'  AND au.id IS NOT NULL AND au.enabled = TRUE)
+         OR (a.kind = 'agent' AND ag.id IS NOT NULL AND ag.enabled = TRUE))) AS actor_count,
+  (SELECT COUNT(*) FROM task_labels tl
+     INNER JOIN labels l ON l.id = tl.label_id AND l.enabled = TRUE
+     WHERE tl.task_id = t.id AND tl.enabled = TRUE) AS label_count,
   t.sort_weight,
   t.updated_at,
   t.created_at
