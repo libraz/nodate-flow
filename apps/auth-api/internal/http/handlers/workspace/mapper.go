@@ -42,7 +42,9 @@ func totalAsInt64(v interface{}) int64 {
 	case int:
 		return int64(x)
 	case uint64:
-		return int64(x)
+		// COUNT(*) OVER() result, bounded by workspace size.
+		return int64(x) //#nosec G115 -- COUNT(*) result fits int64 in any realistic deployment
+
 	case []byte:
 		n, _ := strconv.ParseInt(string(x), 10, 64)
 		return n

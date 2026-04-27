@@ -85,7 +85,7 @@ func OIDCGoogleCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*O
 			if err != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
-			userID = uint32(uid)
+			userID = uint32(uid) //#nosec G115 -- LastInsertId for users.id (BIGINT UNSIGNED AUTO_INCREMENT) fits uint32 in any realistic deployment
 			identPub := types.New()
 			if _, err := deps.Queries.CreateIdentity(ctx, generated.CreateIdentityParams{
 				PublicID: identPub,

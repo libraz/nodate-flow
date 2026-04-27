@@ -25,7 +25,7 @@ func uint32FromNullInt32(n sql.NullInt32) uint32 {
 	if !n.Valid {
 		return 0
 	}
-	return uint32(n.Int32)
+	return uint32(n.Int32) //#nosec G115 -- created_by_user_id is users.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 }
 
 // CreateInvite handles POST /workspaces/{wsId}/invites. It generates a
@@ -71,7 +71,7 @@ func CreateInvite(deps InviteDeps) func(context.Context, *CreateInviteInput) (*C
 			WorkspaceID:     ws.ID,
 			TokenHash:       hash,
 			Role:            role,
-			CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
+			CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 			MaxUses:         maxUses,
 			ExpiresAt:       expiresAt,
 			Label:           label,
@@ -182,7 +182,7 @@ func AcceptInvite(deps InviteDeps) func(context.Context, *AcceptInviteInput) (*A
 		}
 
 		// Validate use count.
-		if invite.MaxUses.Valid && int32(invite.UseCount) >= invite.MaxUses.Int32 {
+		if invite.MaxUses.Valid && int32(invite.UseCount) >= invite.MaxUses.Int32 { //#nosec G115 -- workspace_invites.use_count is INT UNSIGNED capped by max_uses (INT)
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
 
@@ -263,7 +263,7 @@ func InviteInfo(deps InviteDeps) func(context.Context, *InviteInfoInput) (*Invit
 		}
 
 		// Validate use count.
-		if invite.MaxUses.Valid && int32(invite.UseCount) >= invite.MaxUses.Int32 {
+		if invite.MaxUses.Valid && int32(invite.UseCount) >= invite.MaxUses.Int32 { //#nosec G115 -- workspace_invites.use_count is INT UNSIGNED capped by max_uses (INT)
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
 
