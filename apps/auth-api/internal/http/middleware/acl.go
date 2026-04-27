@@ -56,8 +56,8 @@ var workspaceRoleRank = map[WorkspaceRole]int{
 
 // AtLeast reports whether the receiver role meets or exceeds the given
 // minimum role in the workspace hierarchy.
-func (r WorkspaceRole) AtLeast(min WorkspaceRole) bool {
-	return workspaceRoleRank[r] >= workspaceRoleRank[min]
+func (r WorkspaceRole) AtLeast(minRole WorkspaceRole) bool {
+	return workspaceRoleRank[r] >= workspaceRoleRank[minRole]
 }
 
 // ----------------------------------------------------------------------------
@@ -196,11 +196,11 @@ WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 // RequireWorkspaceRole returns a middleware that asserts the actor's
 // workspace role (previously injected by [RequireWorkspaceMember]) meets the
 // given minimum. Responds 403 WS.MEMBER.ROLE_DENIED on failure.
-func RequireWorkspaceRole(min WorkspaceRole) func(http.Handler) http.Handler {
+func RequireWorkspaceRole(minRole WorkspaceRole) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ws, ok := WorkspaceFromContext(r.Context())
-			if !ok || !ws.Role.AtLeast(min) {
+			if !ok || !ws.Role.AtLeast(minRole) {
 				writeError(w, http.StatusForbidden,
 					apierrors.WsMemberRoleDenied.Code,
 					apierrors.WsMemberRoleDenied.Message)

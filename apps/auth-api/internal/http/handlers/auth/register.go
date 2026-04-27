@@ -8,12 +8,12 @@ import (
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/sessionstore"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/region"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/sessionstore"
 )
 
 // Register handles POST /auth/register and creates a new local-password

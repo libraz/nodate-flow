@@ -12,7 +12,7 @@ import (
 // Get handles GET /workspaces/{wsId}. Workspace context has already been
 // resolved by RequireWorkspaceMember.
 func Get(deps Deps) func(context.Context, *GetWorkspaceInput) (*GetWorkspaceOutput, error) {
-	return func(ctx context.Context, in *GetWorkspaceInput) (*GetWorkspaceOutput, error) {
+	return func(ctx context.Context, _ *GetWorkspaceInput) (*GetWorkspaceOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)

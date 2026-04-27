@@ -833,13 +833,13 @@ func (s *stubProvider) Name() string { return s.name }
 func (s *stubProvider) AuthURL(state, redirectURI string) string {
 	return "https://example.com/auth?state=" + state + "&redirect_uri=" + redirectURI
 }
-func (s *stubProvider) Exchange(ctx context.Context, code, redirectURI string) (*integrationspkg.TokenSet, *integrationspkg.Account, error) {
+func (s *stubProvider) Exchange(_ context.Context, _, _ string) (*integrationspkg.TokenSet, *integrationspkg.Account, error) {
 	return &integrationspkg.TokenSet{AccessToken: "tok"}, &integrationspkg.Account{ExternalID: "1", Label: "test"}, nil
 }
-func (s *stubProvider) Refresh(ctx context.Context, refreshToken string) (*integrationspkg.TokenSet, error) {
+func (s *stubProvider) Refresh(_ context.Context, _ string) (*integrationspkg.TokenSet, error) {
 	return nil, integrationspkg.ErrRefreshNotSupported
 }
-func (s *stubProvider) Revoke(ctx context.Context, tokens integrationspkg.TokenSet) error {
+func (s *stubProvider) Revoke(_ context.Context, _ integrationspkg.TokenSet) error {
 	return nil
 }
 

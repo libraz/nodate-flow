@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 )
 
 func newRefresherCipher(t *testing.T) *crypto.Cipher {
@@ -125,7 +125,7 @@ func TestRefreshOnce_SkipsProviderReturningErrRefreshNotSupported(t *testing.T) 
 			Provider:               "github",
 			RefreshTokenCiphertext: sql.NullString{String: string(refreshCT), Valid: true},
 		}},
-		updateFn: func(params generated.UpdateConnectionTokensParams) error {
+		updateFn: func(_ generated.UpdateConnectionTokensParams) error {
 			t.Fatal("must not persist when refresh is unsupported")
 			return nil
 		},
@@ -194,7 +194,7 @@ func TestRefreshOnce_UnavailableProvider_SkipsRow(t *testing.T) {
 			Provider:               "google_calendar",
 			RefreshTokenCiphertext: sql.NullString{String: string(refreshCT), Valid: true},
 		}},
-		updateFn: func(params generated.UpdateConnectionTokensParams) error {
+		updateFn: func(_ generated.UpdateConnectionTokensParams) error {
 			t.Fatal("must not persist when provider is unavailable")
 			return nil
 		},

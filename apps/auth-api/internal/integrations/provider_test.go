@@ -278,7 +278,7 @@ func TestGithub_Exchange_FallsBackToLoginWhenNoEmail(t *testing.T) {
 
 func TestSlack_Exchange_ExtractsUserToken(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
 			"ok": true,
@@ -301,7 +301,7 @@ func TestSlack_Exchange_ExtractsUserToken(t *testing.T) {
 
 func TestSlack_Exchange_RejectsNotOK(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"ok":false,"error":"invalid_code"}`))
 	}))
@@ -370,7 +370,7 @@ func TestGoogle_Refresh_HappyPath(t *testing.T) {
 
 func TestGoogle_Refresh_RotatedRefreshToken(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
 			"access_token":"ya29.new",
@@ -593,8 +593,8 @@ type stubProvider struct {
 	name string
 }
 
-func (s *stubProvider) Name() string                         { return s.name }
-func (s *stubProvider) AuthURL(state, redirectURI string) string { return "" }
+func (s *stubProvider) Name() string               { return s.name }
+func (s *stubProvider) AuthURL(_, _ string) string { return "" }
 func (s *stubProvider) Exchange(ctx context.Context, code, redirectURI string) (*TokenSet, *Account, error) {
 	return nil, nil, nil
 }
@@ -612,7 +612,7 @@ func exchangeViaTestServer(t *testing.T, p *GithubProvider, baseURL, code, redir
 	// Replace the embedded http.Client with one whose Transport
 	// rewrites all github.com requests to the test server.
 	p.hc = rewriteClient(baseURL, map[string]string{
-		"https://github.com":  "",
+		"https://github.com":     "",
 		"https://api.github.com": "",
 	})
 	return p.Exchange(context.Background(), code, redirectURI)

@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/sessionstore"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/sessionstore"
 )
 
 // Refresh handles POST /auth/refresh. It reads the refresh token from

@@ -32,11 +32,11 @@ func OIDCGoogleCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*O
 			return nil, httpErr(apierrors.AuthOidcIdTokenInvalid)
 		}
 		var claims struct {
-			Email       string `json:"email"`
-			Sub         string `json:"sub"`
-			Name        string `json:"name"`
-			Locale      string `json:"locale"`
-			Verified    bool   `json:"email_verified"`
+			Email    string `json:"email"`
+			Sub      string `json:"sub"`
+			Name     string `json:"name"`
+			Locale   string `json:"locale"`
+			Verified bool   `json:"email_verified"`
 		}
 		if err := idTok.Claims(&claims); err != nil {
 			return nil, httpErr(apierrors.AuthOidcIdTokenInvalid)

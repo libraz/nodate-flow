@@ -10,7 +10,7 @@ import (
 // OIDCGithubStart handles GET /auth/oidc/github/start. It returns the
 // authorization URL the client should redirect to.
 func OIDCGithubStart(deps Deps) func(context.Context, *struct{}) (*OIDCStartOutput, error) {
-	return func(ctx context.Context, _ *struct{}) (*OIDCStartOutput, error) {
+	return func(_ context.Context, _ *struct{}) (*OIDCStartOutput, error) {
 		if deps.OIDCGithub == nil {
 			return nil, httpErr(apierrors.AuthOidcGithubNotConfigured)
 		}

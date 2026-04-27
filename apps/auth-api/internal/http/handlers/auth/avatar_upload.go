@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 	"image"
+
 	// Blank imports register JPEG/PNG/GIF decoders with image.Decode so
 	// we can verify that an uploaded payload is really an image before
 	// writing it to the object store.

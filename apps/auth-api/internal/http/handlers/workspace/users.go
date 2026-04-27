@@ -12,7 +12,7 @@ import (
 // user summary for every active member of the workspace, intended for
 // actor-filter pickers (timeline, assignee, etc.).
 func ListUsers(deps Deps) func(context.Context, *ListWorkspaceUsersInput) (*ListWorkspaceUsersOutput, error) {
-	return func(ctx context.Context, in *ListWorkspaceUsersInput) (*ListWorkspaceUsersOutput, error) {
+	return func(ctx context.Context, _ *ListWorkspaceUsersInput) (*ListWorkspaceUsersOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)

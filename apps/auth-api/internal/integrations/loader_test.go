@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 )
 
 // testCipherKey is a fixed 32-byte key for test Cipher construction.
@@ -326,7 +326,7 @@ func TestLoadUserTokenSet_Expired_JITRefreshPersistFails_StillReturnsFresh(t *te
 			RefreshTokenCiphertext: sql.NullString{String: string(refreshCT), Valid: true},
 			AccessTokenExpiresAt:   sql.NullTime{Time: time.Now().Add(-time.Minute), Valid: true},
 		},
-		updateFn: func(params generated.UpdateConnectionTokensParams) error {
+		updateFn: func(_ generated.UpdateConnectionTokensParams) error {
 			return errors.New("db write failed")
 		},
 	}
