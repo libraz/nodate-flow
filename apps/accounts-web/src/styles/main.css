@@ -9,6 +9,8 @@
 @import "@nodate-flow/ui/themes/glass-light.css";
 @import "@nodate-flow/ui/themes/glass-dark.css";
 
+@import "./layout.css";
+
 :root {
   color-scheme: light dark;
 }
