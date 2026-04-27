@@ -19,16 +19,8 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/itemkit"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/stringutil"
 )
-
-// escapeLike escapes the MySQL LIKE metacharacters %, _, and \ in a
-// user-supplied search term so they are matched literally.
-func escapeLike(s string) string {
-	s = strings.ReplaceAll(s, `\`, `\\`)
-	s = strings.ReplaceAll(s, `%`, `\%`)
-	s = strings.ReplaceAll(s, `_`, `\_`)
-	return s
-}
 
 // allowedDerivedStates gate-keeps the `state` query parameter so that
 // callers can only filter by known derived_state enum values.
@@ -91,7 +83,7 @@ func listTasksFiltered(
 	}
 	if in.Q != "" {
 		where = append(where, "LOWER(v.title) LIKE ?")
-		args = append(args, "%"+escapeLike(strings.ToLower(in.Q))+"%")
+		args = append(args, "%"+stringutil.EscapeLike(strings.ToLower(in.Q))+"%")
 	}
 	if len(in.State) > 0 {
 		placeholders := make([]string, 0, len(in.State))

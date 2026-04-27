@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
-	"strings"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
@@ -16,16 +16,8 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/stringutil"
 )
-
-// escapeLike escapes the MySQL LIKE metacharacters %, _, and \ in a
-// user-supplied search term so they are matched literally.
-func escapeLike(s string) string {
-	s = strings.ReplaceAll(s, `\`, `\\`)
-	s = strings.ReplaceAll(s, `%`, `\%`)
-	s = strings.ReplaceAll(s, `_`, `\_`)
-	return s
-}
 
 // actorPtr delegates to handlerutil.ActorPtr.
 var actorPtr = handlerutil.ActorPtr
@@ -484,7 +476,7 @@ func Search(deps Deps) func(context.Context, *SearchPagesInput) (*SearchPagesOut
 		}
 
 		// Wrap the search term for SQL LIKE with metacharacter escaping.
-		pattern := "%" + escapeLike(in.Q) + "%"
+		pattern := "%" + stringutil.EscapeLike(in.Q) + "%"
 
 		rows, err := deps.Queries.SearchPages(ctx, generated.SearchPagesParams{
 			WorkspaceID: ws.ID,
@@ -508,10 +500,21 @@ func Search(deps Deps) func(context.Context, *SearchPagesInput) (*SearchPagesOut
 	}
 }
 
-// GenerateWithAI handles POST /workspaces/{wsId}/pages/generate.
-// This is a placeholder that returns an error until AI dependencies are wired.
-func GenerateWithAI(_ Deps) func(context.Context, *GeneratePageInput) (*GeneratePageOutput, error) {
-	return func(ctx context.Context, _ *GeneratePageInput) (*GeneratePageOutput, error) {
+// GenerateWithAI handles POST /workspaces/{wsId}/pages/generate. It
+// resolves the workspace's default LLM provider via deps.Generator,
+// asks it to draft a page body from the supplied title + prompt, and
+// persists the result as a new AI-generated page (is_ai_generated=TRUE)
+// optionally scoped to a project. The new page's full DTO is returned
+// so the client can route directly into the editor without a follow-up
+// fetch.
+//
+// Error mapping:
+//   - no provider configured for the workspace → AI.PROVIDER.NOT_CONFIGURED
+//   - upstream call failed (timeout / network / non-2xx) → PAGE.GENERATION.UPSTREAM_UNAVAILABLE
+//   - DB insert failed (title clash) → PAGE.PAGE.TITLE_TAKEN
+//   - any other internal failure → INTERNAL.UNEXPECTED
+func GenerateWithAI(deps Deps) func(context.Context, *GeneratePageInput) (*GeneratePageOutput, error) {
+	return func(ctx context.Context, in *GeneratePageInput) (*GeneratePageOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
