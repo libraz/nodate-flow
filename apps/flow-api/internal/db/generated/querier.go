@@ -161,6 +161,9 @@ type Querier interface {
 	CountUnreadNotifications(ctx context.Context, recipientUserID uint32) (int64, error)
 	// Count unread notifications for a user within a specific workspace.
 	CountUnreadNotificationsForWorkspace(ctx context.Context, arg CountUnreadNotificationsForWorkspaceParams) (int64, error)
+	// Count of v_workspace_activity rows matching the same filters as
+	// ListWorkspaceActivity (no cursor).
+	CountWorkspaceActivity(ctx context.Context, arg CountWorkspaceActivityParams) (int64, error)
 	// Insert a new reusable agent configuration.
 	CreateAgent(ctx context.Context, arg CreateAgentParams) (int64, error)
 	// Insert a new description version snapshot.
@@ -883,6 +886,20 @@ type Querier interface {
 	ListWebhookSubscriptions(ctx context.Context, arg ListWebhookSubscriptionsParams) ([]ListWebhookSubscriptionsRow, error)
 	// List enabled widgets for a workspace with creator info, ordered by sort_weight.
 	ListWidgetsForWorkspace(ctx context.Context, arg ListWidgetsForWorkspaceParams) ([]ListWidgetsForWorkspaceRow, error)
+	// Cursor-paginated workspace activity timeline drawn from
+	// v_workspace_activity (audit_logs UNION ALL ai_invocations UNION ALL
+	// mcp_invocations).
+	//
+	// Filters:
+	//   filter_source: pass '' to skip, otherwise exact match on source ('audit'|'ai'|'mcp').
+	//   filter_since:  pass NULL to skip, otherwise inclusive lower bound on occurred_at.
+	//   filter_until:  pass NULL to skip, otherwise inclusive upper bound on occurred_at.
+	//
+	// Cursor:
+	//   cursor_occurred_at / cursor_public_id: pass NULL to skip. When supplied,
+	//     the page is restricted to rows strictly before the cursor in
+	//     (occurred_at DESC, public_id DESC) order.
+	ListWorkspaceActivity(ctx context.Context, arg ListWorkspaceActivityParams) ([]ListWorkspaceActivityRow, error)
 	// Paginated workspace audit log with optional action / resource_type /
 	// actor-search / date-range filters for the workspace-admin UI.
 	//   filter_action: pass '' to skip, otherwise exact match on al.action.

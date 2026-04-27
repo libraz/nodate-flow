@@ -171,7 +171,7 @@ type ListEventsForProjectRow struct {
 	PublicID          types.PublicID  `json:"publicId"`
 	TaskPublicID      sql.NullString  `json:"taskPublicId"`
 	ProjectPublicID   sql.NullString  `json:"projectPublicId"`
-	ActorUserPublicID sql.NullString  `json:"actorUserPublicId"`
+	ActorUserPublicID *types.PublicID `json:"actorUserPublicId"`
 	ActorDisplayName  sql.NullString  `json:"actorDisplayName"`
 	Type              string          `json:"type"`
 	PayloadJson       json.RawMessage `json:"payloadJson"`
@@ -247,7 +247,7 @@ type ListEventsForTaskParams struct {
 type ListEventsForTaskRow struct {
 	PublicID          types.PublicID  `json:"publicId"`
 	TaskPublicID      sql.NullString  `json:"taskPublicId"`
-	ActorUserPublicID sql.NullString  `json:"actorUserPublicId"`
+	ActorUserPublicID *types.PublicID `json:"actorUserPublicId"`
 	ActorDisplayName  sql.NullString  `json:"actorDisplayName"`
 	Type              string          `json:"type"`
 	PayloadJson       json.RawMessage `json:"payloadJson"`
@@ -318,7 +318,7 @@ type ListEventsForWorkspaceParams struct {
 type ListEventsForWorkspaceRow struct {
 	PublicID          types.PublicID  `json:"publicId"`
 	TaskPublicID      sql.NullString  `json:"taskPublicId"`
-	ActorUserPublicID sql.NullString  `json:"actorUserPublicId"`
+	ActorUserPublicID *types.PublicID `json:"actorUserPublicId"`
 	ActorDisplayName  sql.NullString  `json:"actorDisplayName"`
 	Type              string          `json:"type"`
 	PayloadJson       json.RawMessage `json:"payloadJson"`

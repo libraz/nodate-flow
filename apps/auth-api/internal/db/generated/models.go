@@ -4121,6 +4121,20 @@ type VUser struct {
 	CreatedAt            time.Time                 `json:"createdAt"`
 }
 
+type VWorkspaceActivity struct {
+	WorkspaceID       uint32         `json:"-"`
+	PublicID          types.PublicID `json:"publicId"`
+	Source            interface{}    `json:"source"`
+	SourceTable       interface{}    `json:"sourceTable"`
+	OccurredAt        time.Time      `json:"occurredAt"`
+	ActorUserPublicID types.PublicID `json:"actorUserPublicId"`
+	ActorKind         interface{}    `json:"actorKind"`
+	Action            string         `json:"action"`
+	ResourceType      string         `json:"resourceType"`
+	ResourcePublicID  types.PublicID `json:"resourcePublicId"`
+	Severity          interface{}    `json:"severity"`
+}
+
 type VWorkspaceMember struct {
 	WorkspaceID  uint32               `json:"-"`
 	PublicID     types.PublicID       `json:"publicId"`

@@ -137,7 +137,7 @@ type ListRecentAuditParams struct {
 
 type ListRecentAuditRow struct {
 	PublicID          types.PublicID  `json:"publicId"`
-	ActorUserPublicID sql.NullString  `json:"actorUserPublicId"`
+	ActorUserPublicID *types.PublicID `json:"actorUserPublicId"`
 	ActorDisplayName  sql.NullString  `json:"actorDisplayName"`
 	Action            string          `json:"action"`
 	ResourceType      string          `json:"resourceType"`

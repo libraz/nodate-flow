@@ -150,6 +150,13 @@ sql:
               import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
+          - column: "*.actor_user_public_id"
+            nullable: true
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+              pointer: true
           - column: "*.calendar_id"
             go_struct_tag: 'json:"-"'
           - column: "*.event_id"

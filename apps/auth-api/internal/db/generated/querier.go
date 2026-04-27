@@ -92,6 +92,9 @@ type Querier interface {
 	CountActiveUsers(ctx context.Context) (int64, error)
 	// Count all active (non-disabled) workspaces.
 	CountActiveWorkspaces(ctx context.Context) (int64, error)
+	// Count of v_workspace_activity rows matching the same filters as
+	// ListWorkspaceActivity (no cursor).
+	CountWorkspaceActivity(ctx context.Context, arg CountWorkspaceActivityParams) (int64, error)
 	// Insert a new identity row (local password or OIDC binding) for a user.
 	CreateIdentity(ctx context.Context, arg CreateIdentityParams) (int64, error)
 	// Insert a new magic link token for passwordless login.
@@ -201,6 +204,20 @@ type Querier interface {
 	// List every active integration owned by a user. Tokens are NOT
 	// selected; only metadata used by the /me/integrations list view.
 	ListUserIntegrations(ctx context.Context, userID uint32) ([]ListUserIntegrationsRow, error)
+	// Cursor-paginated workspace activity timeline drawn from
+	// v_workspace_activity (audit_logs UNION ALL ai_invocations UNION ALL
+	// mcp_invocations).
+	//
+	// Filters:
+	//   filter_source: pass '' to skip, otherwise exact match on source ('audit'|'ai'|'mcp').
+	//   filter_since:  pass NULL to skip, otherwise inclusive lower bound on occurred_at.
+	//   filter_until:  pass NULL to skip, otherwise inclusive upper bound on occurred_at.
+	//
+	// Cursor:
+	//   cursor_occurred_at / cursor_public_id: pass NULL to skip. When supplied,
+	//     the page is restricted to rows strictly before the cursor in
+	//     (occurred_at DESC, public_id DESC) order.
+	ListWorkspaceActivity(ctx context.Context, arg ListWorkspaceActivityParams) ([]ListWorkspaceActivityRow, error)
 	// Paginated workspace audit log with optional action / resource_type /
 	// actor-search / date-range filters for the workspace-admin UI.
 	//   filter_action: pass '' to skip, otherwise exact match on al.action.
