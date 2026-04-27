@@ -48,11 +48,12 @@ export default function EditSuggestionDialog({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (suggestion && open) {
+    if (!open) return;
+    setError(null);
+    if (suggestion) {
       const a = suggestion.recommendedAction;
       setAction(isAction(a) ? a : 'open');
       setReasoning(suggestion.reasoning);
-      setError(null);
     }
   }, [suggestion, open]);
 
