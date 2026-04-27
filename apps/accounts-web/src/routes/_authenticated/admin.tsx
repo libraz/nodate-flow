@@ -108,7 +108,7 @@ export function AdminLayout(): ReactElement | null {
             fontSize: 'var(--nf-text-xs)',
           }}
         >
-          {t('common.back')}
+          {t('common.back_to_profile')}
         </Link>
       </aside>
       <main

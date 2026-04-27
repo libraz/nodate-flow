@@ -108,6 +108,9 @@
   },
   "common": {
     "back": "Back",
+    "back_to_profile": "Back to profile",
+    "back_to_users": "Back to users",
+    "back_to_workspaces": "Back to workspaces",
     "loading": "Loading…",
     "previous": "Previous",
     "next": "Next",

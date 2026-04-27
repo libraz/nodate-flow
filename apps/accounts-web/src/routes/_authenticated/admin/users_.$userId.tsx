@@ -183,7 +183,7 @@ function UserDetailPage(): ReactElement {
     return (
       <div>
         <Link to="/admin/users" style={{ color: 'var(--nf-color-accent)' }}>
-          {t('common.back')}
+          {t('common.back_to_users')}
         </Link>
         <p
           role="alert"
@@ -208,7 +208,7 @@ function UserDetailPage(): ReactElement {
             fontSize: 'var(--nf-text-sm)',
           }}
         >
-          {t('common.back')}
+          {t('common.back_to_users')}
         </Link>
       </div>
 

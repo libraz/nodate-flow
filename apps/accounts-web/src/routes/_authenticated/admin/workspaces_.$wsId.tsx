@@ -105,7 +105,7 @@ function WorkspaceDetailPage(): ReactElement {
     return (
       <div>
         <Link to="/admin/workspaces" style={{ color: 'var(--nf-color-accent)' }}>
-          {t('common.back')}
+          {t('common.back_to_workspaces')}
         </Link>
         <p
           role="alert"
@@ -130,7 +130,7 @@ function WorkspaceDetailPage(): ReactElement {
             fontSize: 'var(--nf-text-sm)',
           }}
         >
-          {t('common.back')}
+          {t('common.back_to_workspaces')}
         </Link>
       </div>
 

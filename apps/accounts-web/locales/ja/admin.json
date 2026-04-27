@@ -108,6 +108,9 @@
   },
   "common": {
     "back": "戻る",
+    "back_to_profile": "プロフィールに戻る",
+    "back_to_users": "ユーザー一覧に戻る",
+    "back_to_workspaces": "ワークスペース一覧に戻る",
     "loading": "読み込み中…",
     "previous": "前へ",
     "next": "次へ",
