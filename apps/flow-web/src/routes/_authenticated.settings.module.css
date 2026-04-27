@@ -31,7 +31,7 @@
   white-space: nowrap;
 }
 
-.link[aria-current='page'] {
+.link[aria-current="page"] {
   background: var(--nf-color-accent-subtle);
   color: var(--nf-color-accent);
   font-weight: var(--nf-weight-medium);

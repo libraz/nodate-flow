@@ -56,7 +56,6 @@ export default function AcceptanceCard({
         <span className={styles.acceptanceLabel}>{t('kpi.acceptanceRate')}</span>
         <span className={styles.acceptanceValue}>{percentLabel}</span>
       </div>
-      {/* biome-ignore lint/a11y/useFocusableInteractive: progressbar is a status role and does not require focus per WAI-ARIA */}
       <div
         className={styles.acceptanceTrack}
         role="progressbar"
