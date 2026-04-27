@@ -30,19 +30,19 @@ interface AuditLogsResponse {
 const tableStyle: React.CSSProperties = {
   width: '100%',
   borderCollapse: 'collapse',
-  fontSize: 'var(--nf-text-sm, 0.875rem)',
+  fontSize: 'var(--nf-text-sm)',
 };
 
 const thStyle: React.CSSProperties = {
   textAlign: 'start',
-  padding: 'var(--nf-space-2, 0.5rem) var(--nf-space-3, 0.75rem)',
+  padding: 'var(--nf-space-2) var(--nf-space-3)',
   borderBlockEnd: '2px solid var(--nf-color-border)',
   fontWeight: 600,
   color: 'var(--nf-color-fg-muted)',
 };
 
 const tdStyle: React.CSSProperties = {
-  padding: 'var(--nf-space-2, 0.5rem) var(--nf-space-3, 0.75rem)',
+  padding: 'var(--nf-space-2) var(--nf-space-3)',
   borderBlockEnd: '1px solid var(--nf-color-border)',
 };
 
@@ -138,11 +138,11 @@ function AuditLogsPage(): ReactElement {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6, 1.5rem)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}>
       <h1
         style={{
-          fontFamily: 'var(--nf-font-display, var(--font-display))',
-          fontSize: 'var(--nf-text-2xl, 1.5rem)',
+          fontFamily: 'var(--nf-font-sans)',
+          fontSize: 'var(--nf-text-2xl)',
           margin: 0,
         }}
       >
@@ -152,7 +152,7 @@ function AuditLogsPage(): ReactElement {
       <div
         style={{
           display: 'flex',
-          gap: 'var(--nf-space-3, 0.75rem)',
+          gap: 'var(--nf-space-3)',
           alignItems: 'center',
           flexWrap: 'wrap',
         }}
@@ -165,12 +165,10 @@ function AuditLogsPage(): ReactElement {
             onChange={handleActionChange}
           />
         </div>
-        <div
-          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1, 0.25rem)' }}
-        >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
           <span
             style={{
-              fontSize: 'var(--nf-text-xs, 0.75rem)',
+              fontSize: 'var(--nf-text-xs)',
               color: 'var(--nf-color-fg-muted)',
             }}
           >
@@ -188,12 +186,10 @@ function AuditLogsPage(): ReactElement {
             }
           />
         </div>
-        <div
-          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1, 0.25rem)' }}
-        >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
           <span
             style={{
-              fontSize: 'var(--nf-text-xs, 0.75rem)',
+              fontSize: 'var(--nf-text-xs)',
               color: 'var(--nf-color-fg-muted)',
             }}
           >
@@ -220,7 +216,7 @@ function AuditLogsPage(): ReactElement {
           style={{
             margin: 0,
             color: 'var(--nf-color-danger)',
-            fontSize: 'var(--nf-text-sm, 0.875rem)',
+            fontSize: 'var(--nf-text-sm)',
           }}
         >
           {error}
@@ -266,7 +262,7 @@ function AuditLogsPage(): ReactElement {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          fontSize: 'var(--nf-text-sm, 0.875rem)',
+          fontSize: 'var(--nf-text-sm)',
         }}
       >
         <Button variant="default" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>

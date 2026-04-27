@@ -22,20 +22,20 @@ interface WorkspaceDetail {
 
 const labelStyle: React.CSSProperties = {
   color: 'var(--nf-color-fg-muted)',
-  fontSize: 'var(--nf-text-xs, 0.75rem)',
-  marginBlockEnd: 'var(--nf-space-1, 0.25rem)',
+  fontSize: 'var(--nf-text-xs)',
+  marginBlockEnd: 'var(--nf-space-1)',
 };
 
 const valueStyle: React.CSSProperties = {
-  fontSize: 'var(--nf-text-sm, 0.875rem)',
-  marginBlockEnd: 'var(--nf-space-3, 0.75rem)',
+  fontSize: 'var(--nf-text-sm)',
+  marginBlockEnd: 'var(--nf-space-3)',
 };
 
 const badgeBase: React.CSSProperties = {
   display: 'inline-block',
   padding: '0.125rem 0.5rem',
-  borderRadius: 'var(--nf-radius-full, 9999px)',
-  fontSize: 'var(--nf-text-xs, 0.75rem)',
+  borderRadius: 'var(--nf-radius-pill)',
+  fontSize: 'var(--nf-text-xs)',
   fontWeight: 500,
 };
 
@@ -111,7 +111,7 @@ function WorkspaceDetailPage(): ReactElement {
           role="alert"
           style={{
             color: 'var(--nf-color-danger)',
-            fontSize: 'var(--nf-text-sm, 0.875rem)',
+            fontSize: 'var(--nf-text-sm)',
           }}
         >
           {error ?? t('errors.generic')}
@@ -121,13 +121,13 @@ function WorkspaceDetailPage(): ReactElement {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6, 1.5rem)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}>
       <div>
         <Link
           to="/admin/workspaces"
           style={{
             color: 'var(--nf-color-accent)',
-            fontSize: 'var(--nf-text-sm, 0.875rem)',
+            fontSize: 'var(--nf-text-sm)',
           }}
         >
           {t('common.back')}
@@ -136,8 +136,8 @@ function WorkspaceDetailPage(): ReactElement {
 
       <h1
         style={{
-          fontFamily: 'var(--nf-font-display, var(--font-display))',
-          fontSize: 'var(--nf-text-2xl, 1.5rem)',
+          fontFamily: 'var(--nf-font-sans)',
+          fontSize: 'var(--nf-text-2xl)',
           margin: 0,
         }}
       >
@@ -146,9 +146,9 @@ function WorkspaceDetailPage(): ReactElement {
 
       <div
         style={{
-          padding: 'var(--nf-space-4, 1rem)',
+          padding: 'var(--nf-space-4)',
           border: '1px solid var(--nf-color-border)',
-          borderRadius: 'var(--nf-radius-md, 0.375rem)',
+          borderRadius: 'var(--nf-radius-md)',
         }}
       >
         <div style={labelStyle}>{t('workspaces.name')}</div>
@@ -168,12 +168,8 @@ function WorkspaceDetailPage(): ReactElement {
           <span
             style={{
               ...badgeBase,
-              background: workspace.enabled
-                ? 'var(--nf-color-success, rgba(0,128,0,0.1))'
-                : 'var(--nf-color-danger, rgba(255,0,0,0.1))',
-              color: workspace.enabled
-                ? 'var(--nf-color-success, green)'
-                : 'var(--nf-color-danger, red)',
+              background: workspace.enabled ? 'var(--nf-color-success)' : 'var(--nf-color-danger)',
+              color: workspace.enabled ? 'var(--nf-color-success)' : 'var(--nf-color-danger)',
             }}
           >
             {workspace.enabled ? t('workspaces.enabled') : t('workspaces.disabled')}

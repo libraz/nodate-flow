@@ -33,14 +33,14 @@ function AuthenticatedLayout(): ReactElement | null {
             position: 'fixed',
             top: 0,
             insetInlineEnd: 0,
-            padding: 'var(--nf-space-2, 0.5rem) var(--nf-space-4, 1rem)',
+            padding: 'var(--nf-space-2) var(--nf-space-4)',
             zIndex: 100,
           }}
         >
           <Link
             to="/admin/users"
             style={{
-              fontSize: 'var(--nf-text-xs, 0.75rem)',
+              fontSize: 'var(--nf-text-xs)',
               color: 'var(--nf-color-fg-muted)',
               textDecoration: 'none',
             }}

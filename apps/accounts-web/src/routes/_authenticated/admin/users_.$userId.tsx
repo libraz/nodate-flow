@@ -40,36 +40,36 @@ interface SessionsResponse {
 
 const labelStyle: React.CSSProperties = {
   color: 'var(--nf-color-fg-muted)',
-  fontSize: 'var(--nf-text-xs, 0.75rem)',
-  marginBlockEnd: 'var(--nf-space-1, 0.25rem)',
+  fontSize: 'var(--nf-text-xs)',
+  marginBlockEnd: 'var(--nf-space-1)',
 };
 
 const valueStyle: React.CSSProperties = {
-  fontSize: 'var(--nf-text-sm, 0.875rem)',
-  marginBlockEnd: 'var(--nf-space-3, 0.75rem)',
+  fontSize: 'var(--nf-text-sm)',
+  marginBlockEnd: 'var(--nf-space-3)',
 };
 
 const badgeBase: React.CSSProperties = {
   display: 'inline-block',
   padding: '0.125rem 0.5rem',
-  borderRadius: 'var(--nf-radius-full, 9999px)',
-  fontSize: 'var(--nf-text-xs, 0.75rem)',
+  borderRadius: 'var(--nf-radius-pill)',
+  fontSize: 'var(--nf-text-xs)',
   fontWeight: 500,
 };
 
 const thStyle: React.CSSProperties = {
   textAlign: 'start',
-  padding: 'var(--nf-space-2, 0.5rem) var(--nf-space-3, 0.75rem)',
+  padding: 'var(--nf-space-2) var(--nf-space-3)',
   borderBlockEnd: '2px solid var(--nf-color-border)',
   fontWeight: 600,
   color: 'var(--nf-color-fg-muted)',
-  fontSize: 'var(--nf-text-sm, 0.875rem)',
+  fontSize: 'var(--nf-text-sm)',
 };
 
 const tdStyle: React.CSSProperties = {
-  padding: 'var(--nf-space-2, 0.5rem) var(--nf-space-3, 0.75rem)',
+  padding: 'var(--nf-space-2) var(--nf-space-3)',
   borderBlockEnd: '1px solid var(--nf-color-border)',
-  fontSize: 'var(--nf-text-sm, 0.875rem)',
+  fontSize: 'var(--nf-text-sm)',
 };
 
 function formatTimestamp(ts: number | null | undefined, never: string): string {
@@ -189,7 +189,7 @@ function UserDetailPage(): ReactElement {
           role="alert"
           style={{
             color: 'var(--nf-color-danger)',
-            fontSize: 'var(--nf-text-sm, 0.875rem)',
+            fontSize: 'var(--nf-text-sm)',
           }}
         >
           {error ?? t('errors.generic')}
@@ -199,13 +199,13 @@ function UserDetailPage(): ReactElement {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6, 1.5rem)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}>
       <div>
         <Link
           to="/admin/users"
           style={{
             color: 'var(--nf-color-accent)',
-            fontSize: 'var(--nf-text-sm, 0.875rem)',
+            fontSize: 'var(--nf-text-sm)',
           }}
         >
           {t('common.back')}
@@ -214,8 +214,8 @@ function UserDetailPage(): ReactElement {
 
       <h1
         style={{
-          fontFamily: 'var(--nf-font-display, var(--font-display))',
-          fontSize: 'var(--nf-text-2xl, 1.5rem)',
+          fontFamily: 'var(--nf-font-sans)',
+          fontSize: 'var(--nf-text-2xl)',
           margin: 0,
         }}
       >
@@ -224,9 +224,9 @@ function UserDetailPage(): ReactElement {
 
       <div
         style={{
-          padding: 'var(--nf-space-4, 1rem)',
+          padding: 'var(--nf-space-4)',
           border: '1px solid var(--nf-color-border)',
-          borderRadius: 'var(--nf-radius-md, 0.375rem)',
+          borderRadius: 'var(--nf-radius-md)',
         }}
       >
         <div style={labelStyle}>{t('users.name')}</div>
@@ -241,11 +241,9 @@ function UserDetailPage(): ReactElement {
             style={{
               ...badgeBase,
               background: user.enabled
-                ? 'color-mix(in srgb, var(--nf-color-success, green) 15%, transparent)'
-                : 'color-mix(in srgb, var(--nf-color-danger, red) 15%, transparent)',
-              color: user.enabled
-                ? 'var(--nf-color-success, green)'
-                : 'var(--nf-color-danger, red)',
+                ? 'color-mix(in srgb, var(--nf-color-success) 15%, transparent)'
+                : 'color-mix(in srgb, var(--nf-color-danger) 15%, transparent)',
+              color: user.enabled ? 'var(--nf-color-success)' : 'var(--nf-color-danger)',
             }}
           >
             {user.enabled ? t('users.enabled') : t('users.disabled')}
@@ -265,7 +263,7 @@ function UserDetailPage(): ReactElement {
         <div style={valueStyle}>{formatTimestamp(user.createdAt, t('common.never'))}</div>
       </div>
 
-      <div style={{ display: 'flex', gap: 'var(--nf-space-3, 0.75rem)' }}>
+      <div style={{ display: 'flex', gap: 'var(--nf-space-3)' }}>
         <Button
           variant="default"
           disabled={actionLoading}
@@ -280,8 +278,8 @@ function UserDetailPage(): ReactElement {
 
       <h2
         style={{
-          fontFamily: 'var(--nf-font-display, var(--font-display))',
-          fontSize: 'var(--nf-text-lg, 1.125rem)',
+          fontFamily: 'var(--nf-font-sans)',
+          fontSize: 'var(--nf-text-lg)',
           margin: 0,
         }}
       >
@@ -292,7 +290,7 @@ function UserDetailPage(): ReactElement {
         <p
           style={{
             color: 'var(--nf-color-fg-muted)',
-            fontSize: 'var(--nf-text-sm, 0.875rem)',
+            fontSize: 'var(--nf-text-sm)',
           }}
         >
           {t('users.no_results')}

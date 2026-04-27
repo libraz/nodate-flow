@@ -35,19 +35,19 @@ interface UserSearchResult {
 const tableStyle: React.CSSProperties = {
   width: '100%',
   borderCollapse: 'collapse',
-  fontSize: 'var(--nf-text-sm, 0.875rem)',
+  fontSize: 'var(--nf-text-sm)',
 };
 
 const thStyle: React.CSSProperties = {
   textAlign: 'start',
-  padding: 'var(--nf-space-2, 0.5rem) var(--nf-space-3, 0.75rem)',
+  padding: 'var(--nf-space-2) var(--nf-space-3)',
   borderBlockEnd: '2px solid var(--nf-color-border)',
   fontWeight: 600,
   color: 'var(--nf-color-fg-muted)',
 };
 
 const tdStyle: React.CSSProperties = {
-  padding: 'var(--nf-space-2, 0.5rem) var(--nf-space-3, 0.75rem)',
+  padding: 'var(--nf-space-2) var(--nf-space-3)',
   borderBlockEnd: '1px solid var(--nf-color-border)',
 };
 
@@ -150,11 +150,11 @@ export function AdminsPage(): ReactElement {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6, 1.5rem)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}>
       <h1
         style={{
-          fontFamily: 'var(--nf-font-display, var(--font-display))',
-          fontSize: 'var(--nf-text-2xl, 1.5rem)',
+          fontFamily: 'var(--nf-font-sans)',
+          fontSize: 'var(--nf-text-2xl)',
           margin: 0,
         }}
       >
@@ -167,7 +167,7 @@ export function AdminsPage(): ReactElement {
           style={{
             margin: 0,
             color: 'var(--nf-color-danger)',
-            fontSize: 'var(--nf-text-sm, 0.875rem)',
+            fontSize: 'var(--nf-text-sm)',
           }}
         >
           {error}
@@ -215,29 +215,29 @@ export function AdminsPage(): ReactElement {
 
       <div
         style={{
-          padding: 'var(--nf-space-4, 1rem)',
+          padding: 'var(--nf-space-4)',
           border: '1px solid var(--nf-color-border)',
-          borderRadius: 'var(--nf-radius-md, 0.375rem)',
+          borderRadius: 'var(--nf-radius-md)',
         }}
       >
         <h2
           style={{
-            fontFamily: 'var(--nf-font-display, var(--font-display))',
-            fontSize: 'var(--nf-text-lg, 1.125rem)',
-            margin: '0 0 var(--nf-space-4, 1rem) 0',
+            fontFamily: 'var(--nf-font-sans)',
+            fontSize: 'var(--nf-text-lg)',
+            margin: '0 0 var(--nf-space-4) 0',
           }}
         >
           {t('admins.grant')}
         </h2>
-        <div style={{ display: 'flex', gap: 'var(--nf-space-3, 0.75rem)', alignItems: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: 'var(--nf-space-3)', alignItems: 'flex-end' }}>
           <div style={{ flex: 1 }}>
             <label
               htmlFor="grant-user-search"
               style={{
                 display: 'block',
-                fontSize: 'var(--nf-text-xs, 0.75rem)',
+                fontSize: 'var(--nf-text-xs)',
                 color: 'var(--nf-color-fg-muted)',
-                marginBlockEnd: 'var(--nf-space-1, 0.25rem)',
+                marginBlockEnd: 'var(--nf-space-1)',
               }}
             >
               {t('admins.grant_search_label')}
@@ -265,7 +265,7 @@ export function AdminsPage(): ReactElement {
                     <div
                       style={{
                         color: 'var(--nf-color-fg-muted)',
-                        fontSize: 'var(--nf-text-xs, 0.75rem)',
+                        fontSize: 'var(--nf-text-xs)',
                       }}
                     >
                       {user.email}
@@ -289,9 +289,9 @@ export function AdminsPage(): ReactElement {
         </div>
         <p
           style={{
-            margin: 'var(--nf-space-2, 0.5rem) 0 0 0',
+            margin: 'var(--nf-space-2) 0 0 0',
             color: 'var(--nf-color-fg-muted)',
-            fontSize: 'var(--nf-text-xs, 0.75rem)',
+            fontSize: 'var(--nf-text-xs)',
           }}
         >
           {t('admins.grant_hint')}
@@ -300,9 +300,9 @@ export function AdminsPage(): ReactElement {
           <p
             role="alert"
             style={{
-              margin: 'var(--nf-space-2, 0.5rem) 0 0 0',
+              margin: 'var(--nf-space-2) 0 0 0',
               color: 'var(--nf-color-danger)',
-              fontSize: 'var(--nf-text-sm, 0.875rem)',
+              fontSize: 'var(--nf-text-sm)',
             }}
           >
             {grantError}

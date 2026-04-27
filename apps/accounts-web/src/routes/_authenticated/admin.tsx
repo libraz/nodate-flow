@@ -46,11 +46,11 @@ export function AdminLayout(): ReactElement | null {
 
   const navLinkStyle = {
     display: 'block',
-    padding: 'var(--nf-space-2, 0.5rem) var(--nf-space-3, 0.75rem)',
+    padding: 'var(--nf-space-2) var(--nf-space-3)',
     color: 'var(--nf-color-fg)',
     textDecoration: 'none',
-    fontSize: 'var(--nf-text-sm, 0.875rem)',
-    borderRadius: 'var(--nf-radius-md, 0.375rem)',
+    fontSize: 'var(--nf-text-sm)',
+    borderRadius: 'var(--nf-radius-md)',
   };
 
   return (
@@ -65,18 +65,18 @@ export function AdminLayout(): ReactElement | null {
         style={{
           width: '220px',
           borderInlineEnd: '1px solid var(--nf-color-border)',
-          padding: 'var(--nf-space-4, 1rem)',
+          padding: 'var(--nf-space-4)',
           display: 'flex',
           flexDirection: 'column',
-          gap: 'var(--nf-space-1, 0.25rem)',
+          gap: 'var(--nf-space-1)',
         }}
       >
         <h2
           style={{
-            fontFamily: 'var(--nf-font-display, var(--font-display))',
-            fontSize: 'var(--nf-text-lg, 1.125rem)',
-            margin: '0 0 var(--nf-space-4, 1rem) 0',
-            padding: '0 var(--nf-space-3, 0.75rem)',
+            fontFamily: 'var(--nf-font-sans)',
+            fontSize: 'var(--nf-text-lg)',
+            margin: '0 0 var(--nf-space-4) 0',
+            padding: '0 var(--nf-space-3)',
           }}
         >
           {t('title')}
@@ -105,7 +105,7 @@ export function AdminLayout(): ReactElement | null {
           style={{
             ...navLinkStyle,
             color: 'var(--nf-color-fg-muted)',
-            fontSize: 'var(--nf-text-xs, 0.75rem)',
+            fontSize: 'var(--nf-text-xs)',
           }}
         >
           {t('common.back')}
@@ -114,7 +114,7 @@ export function AdminLayout(): ReactElement | null {
       <main
         style={{
           flex: 1,
-          padding: 'var(--nf-space-8, 2rem)',
+          padding: 'var(--nf-space-8)',
           maxWidth: '1200px',
         }}
       >

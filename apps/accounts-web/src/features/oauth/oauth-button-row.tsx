@@ -85,9 +85,9 @@ function OAuthButtonRow({ mode, onError }: OAuthButtonRowProps): ReactElement | 
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 'var(--nf-space-3, 0.75rem)',
+          gap: 'var(--nf-space-3)',
           color: 'var(--nf-color-fg-muted)',
-          fontSize: 'var(--nf-text-sm, 0.875rem)',
+          fontSize: 'var(--nf-text-sm)',
         }}
       >
         <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--nf-color-border)' }} />
@@ -99,8 +99,8 @@ function OAuthButtonRow({ mode, onError }: OAuthButtonRowProps): ReactElement | 
         style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: 'var(--nf-space-3, 0.75rem)',
-          marginTop: 'var(--nf-space-3, 0.75rem)',
+          gap: 'var(--nf-space-3)',
+          marginTop: 'var(--nf-space-3)',
         }}
       >
         {caps.oidcGoogle && (

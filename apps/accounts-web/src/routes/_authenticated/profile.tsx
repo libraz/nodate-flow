@@ -340,12 +340,12 @@ export function ProfilePage(): ReactElement {
           void handleSubmit(onSubmit)(e);
         }}
         noValidate
-        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5, 1.5rem)' }}
+        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}
       >
         <h1
           style={{
-            fontFamily: 'var(--nf-font-display, var(--font-display))',
-            fontSize: 'var(--nf-text-2xl, 1.5rem)',
+            fontFamily: 'var(--nf-font-sans)',
+            fontSize: 'var(--nf-text-2xl)',
             margin: 0,
           }}
         >
@@ -357,17 +357,17 @@ export function ProfilePage(): ReactElement {
             data-testid="empty-workspaces-cta"
             elevated
             style={{
-              padding: 'var(--nf-space-5, 1.5rem)',
+              padding: 'var(--nf-space-5)',
               display: 'flex',
               flexDirection: 'column',
-              gap: 'var(--nf-space-3, 0.75rem)',
+              gap: 'var(--nf-space-3)',
             }}
           >
             <h2
               style={{
                 margin: 0,
-                fontFamily: 'var(--nf-font-display, var(--font-display))',
-                fontSize: 'var(--nf-text-lg, 1.125rem)',
+                fontFamily: 'var(--nf-font-sans)',
+                fontSize: 'var(--nf-text-lg)',
               }}
             >
               {t('profile.empty_workspaces.title')}
@@ -376,7 +376,7 @@ export function ProfilePage(): ReactElement {
               style={{
                 margin: 0,
                 color: 'var(--nf-color-fg-muted)',
-                fontSize: 'var(--nf-text-sm, 0.875rem)',
+                fontSize: 'var(--nf-text-sm)',
               }}
             >
               {t('profile.empty_workspaces.body')}
@@ -509,8 +509,8 @@ export function ProfilePage(): ReactElement {
           <output
             style={{
               margin: 0,
-              color: 'var(--nf-color-success, var(--nf-color-success))',
-              fontSize: 'var(--nf-text-sm, 0.875rem)',
+              color: 'var(--nf-color-success)',
+              fontSize: 'var(--nf-text-sm)',
             }}
           >
             {t('profile.saved')}
@@ -524,7 +524,7 @@ export function ProfilePage(): ReactElement {
         <p
           style={{
             margin: 0,
-            fontSize: 'var(--nf-text-sm, 0.875rem)',
+            fontSize: 'var(--nf-text-sm)',
             color: 'var(--nf-color-fg-muted)',
             display: 'flex',
             gap: 'var(--nf-space-4)',

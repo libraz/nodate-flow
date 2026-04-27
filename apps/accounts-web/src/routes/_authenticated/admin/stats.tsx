@@ -70,16 +70,14 @@ function StatsPage(): ReactElement {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 'var(--nf-space-6, 1.5rem)',
+        gap: 'var(--nf-space-6)',
       }}
     >
-      <header
-        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1, 0.25rem)' }}
-      >
+      <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
         <h1
           style={{
-            fontFamily: 'var(--nf-font-display, var(--font-display))',
-            fontSize: 'var(--nf-text-2xl, 1.5rem)',
+            fontFamily: 'var(--nf-font-sans)',
+            fontSize: 'var(--nf-text-2xl)',
             margin: 0,
           }}
         >
@@ -89,7 +87,7 @@ function StatsPage(): ReactElement {
           style={{
             margin: 0,
             color: 'var(--nf-color-fg-muted)',
-            fontSize: 'var(--nf-text-sm, 0.875rem)',
+            fontSize: 'var(--nf-text-sm)',
           }}
         >
           {t('page.subtitle')}
@@ -102,14 +100,14 @@ function StatsPage(): ReactElement {
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
-          gap: 'var(--nf-space-3, 0.75rem)',
+          gap: 'var(--nf-space-3)',
         }}
       >
         <output
           aria-live="polite"
           style={{
             color: 'var(--nf-color-fg-muted)',
-            fontSize: 'var(--nf-text-xs, 0.75rem)',
+            fontSize: 'var(--nf-text-xs)',
             fontVariantNumeric: 'tabular-nums',
           }}
         >
@@ -127,13 +125,13 @@ function StatsPage(): ReactElement {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: 'var(--nf-space-3, 0.75rem)',
-            padding: 'var(--nf-space-4, 1rem)',
-            borderRadius: 'var(--nf-radius-md, 0.375rem)',
+            gap: 'var(--nf-space-3)',
+            padding: 'var(--nf-space-4)',
+            borderRadius: 'var(--nf-radius-md)',
             border: '1px solid var(--nf-color-border)',
-            background: 'color-mix(in srgb, var(--nf-color-danger, red) 10%, transparent)',
-            color: 'var(--nf-color-danger, red)',
-            fontSize: 'var(--nf-text-sm, 0.875rem)',
+            background: 'color-mix(in srgb, var(--nf-color-danger) 10%, transparent)',
+            color: 'var(--nf-color-danger)',
+            fontSize: 'var(--nf-text-sm)',
           }}
         >
           <span>{t('error.fetchFailed')}</span>
@@ -147,7 +145,7 @@ function StatsPage(): ReactElement {
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-          gap: 'var(--nf-space-4, 1rem)',
+          gap: 'var(--nf-space-4)',
         }}
       >
         <KpiCard

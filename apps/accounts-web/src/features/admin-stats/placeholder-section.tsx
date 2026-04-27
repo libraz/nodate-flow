@@ -22,8 +22,8 @@ function PlaceholderSection({ title, body }: PlaceholderSectionProps): ReactElem
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 'var(--nf-space-2, 0.5rem)',
-        padding: 'var(--nf-space-6, 1.5rem)',
+        gap: 'var(--nf-space-2)',
+        padding: 'var(--nf-space-6)',
         background: 'color-mix(in srgb, var(--nf-color-surface) 70%, transparent)',
         borderStyle: 'dashed',
       }}
@@ -31,7 +31,7 @@ function PlaceholderSection({ title, body }: PlaceholderSectionProps): ReactElem
       <p
         style={{
           margin: 0,
-          fontSize: 'var(--nf-text-sm, 0.875rem)',
+          fontSize: 'var(--nf-text-sm)',
           fontWeight: 600,
           color: 'var(--nf-color-fg-muted)',
         }}
@@ -41,7 +41,7 @@ function PlaceholderSection({ title, body }: PlaceholderSectionProps): ReactElem
       <p
         style={{
           margin: 0,
-          fontSize: 'var(--nf-text-sm, 0.875rem)',
+          fontSize: 'var(--nf-text-sm)',
           color: 'var(--nf-color-fg-muted)',
           lineHeight: 1.5,
         }}

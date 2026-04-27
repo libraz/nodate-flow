@@ -42,15 +42,15 @@ function KpiCard({ title, value, help, loading }: KpiCardProps): ReactElement {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 'var(--nf-space-2, 0.5rem)',
-        padding: 'var(--nf-space-6, 1.5rem)',
+        gap: 'var(--nf-space-2)',
+        padding: 'var(--nf-space-6)',
         minBlockSize: '160px',
       }}
     >
       <p
         style={{
           margin: 0,
-          fontSize: 'var(--nf-text-sm, 0.875rem)',
+          fontSize: 'var(--nf-text-sm)',
           fontWeight: 600,
           color: 'var(--nf-color-fg-muted)',
           letterSpacing: '0.02em',
@@ -64,8 +64,8 @@ function KpiCard({ title, value, help, loading }: KpiCardProps): ReactElement {
         aria-busy={loading || undefined}
         style={{
           margin: 0,
-          fontFamily: 'var(--nf-font-display, var(--font-display))',
-          fontSize: 'var(--nf-text-4xl, 2.5rem)',
+          fontFamily: 'var(--nf-font-sans)',
+          fontSize: 'var(--nf-text-4xl)',
           fontWeight: 700,
           fontVariantNumeric: 'tabular-nums',
           color: 'var(--nf-color-fg)',
@@ -77,7 +77,7 @@ function KpiCard({ title, value, help, loading }: KpiCardProps): ReactElement {
       <p
         style={{
           margin: 0,
-          fontSize: 'var(--nf-text-xs, 0.75rem)',
+          fontSize: 'var(--nf-text-xs)',
           color: 'var(--nf-color-fg-muted)',
         }}
       >

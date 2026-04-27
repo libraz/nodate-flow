@@ -242,8 +242,8 @@ function WorkspaceEditPage(): ReactElement {
           <output
             style={{
               margin: 0,
-              color: 'var(--nf-color-success, var(--nf-color-success))',
-              fontSize: 'var(--nf-text-sm, 0.875rem)',
+              color: 'var(--nf-color-success)',
+              fontSize: 'var(--nf-text-sm)',
             }}
           >
             {t('workspaces.saved')}
