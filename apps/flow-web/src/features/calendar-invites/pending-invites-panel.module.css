@@ -7,7 +7,7 @@
 
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 18rem) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 16rem) minmax(0, 1fr);
   gap: var(--nf-space-6);
   align-items: start;
 }
@@ -15,10 +15,16 @@
 /*
  * On wide viewports we promote the layout to three columns:
  * left rail (calendars list) | month grid | pending invites.
+ *
+ * The threshold has to be wide enough that the middle column still has
+ * room for seven legible day cells after the surrounding chrome (app
+ * sidebar + section padding) is subtracted. 100rem (1600px) is the
+ * narrowest desktop where 1fr keeps day cells around 100px each so the
+ * task pill text can render without being clipped to a 0-width title.
  */
-@media (min-width: 80rem) {
+@media (min-width: 100rem) {
   .layout {
-    grid-template-columns: minmax(0, 18rem) minmax(0, 1fr) minmax(0, 20rem);
+    grid-template-columns: minmax(0, 16rem) minmax(0, 1fr) minmax(0, 18rem);
   }
 }
 
