@@ -13,7 +13,7 @@ export interface paths {
         };
         /**
          * List instance audit logs
-         * @description List instance audit logs
+         * @description Returns a cursor-paginated page of instance-level audit log entries with filters by actor, action, and time range. Backs the admin Audit panel.
          */
         get: operations["admin-list-audit-logs"];
         put?: never;
@@ -33,13 +33,13 @@ export interface paths {
         };
         /**
          * List instance administrators
-         * @description List instance administrators
+         * @description Lists every user with the instance-admin role so the admin UI can show who has top-level privileges.
          */
         get: operations["admin-list-admins"];
         put?: never;
         /**
          * Grant instance admin privileges
-         * @description Grant instance admin privileges
+         * @description Marks the supplied user as an instance admin. Idempotent: repeated grants are no-ops. Logged to the audit trail.
          */
         post: operations["admin-grant-admin"];
         delete?: never;
@@ -60,7 +60,7 @@ export interface paths {
         post?: never;
         /**
          * Revoke instance admin privileges
-         * @description Revoke instance admin privileges
+         * @description Removes the instance-admin role from the named user. Refuses to remove the last remaining instance admin to keep the instance manageable.
          */
         delete: operations["admin-revoke-admin"];
         options?: never;
@@ -77,7 +77,7 @@ export interface paths {
         };
         /**
          * Get instance-level statistics
-         * @description Get instance-level statistics
+         * @description Returns aggregate counts (users, workspaces, sessions, tasks) for the admin overview page. Computed on the fly; safe to call frequently.
          */
         get: operations["admin-instance-stats"];
         put?: never;
@@ -100,7 +100,7 @@ export interface paths {
         post?: never;
         /**
          * Revoke a session
-         * @description Revoke a session
+         * @description Revokes the named session immediately. Outstanding access tokens keep working until they expire; refresh attempts will fail.
          */
         delete: operations["admin-revoke-session"];
         options?: never;
@@ -117,7 +117,7 @@ export interface paths {
         };
         /**
          * List instance settings
-         * @description List instance settings
+         * @description Returns every mutable instance-level setting (registration toggles, password policy, etc.) for the admin Settings panel.
          */
         get: operations["admin-list-settings"];
         put?: never;
@@ -127,7 +127,7 @@ export interface paths {
         head?: never;
         /**
          * Update instance settings
-         * @description Update instance settings
+         * @description Patches one or more instance-level settings. Each settings change is recorded in the audit log and takes effect immediately for new requests.
          */
         patch: operations["admin-patch-settings"];
         trace?: never;
@@ -143,7 +143,7 @@ export interface paths {
         put?: never;
         /**
          * Bootstrap the first instance admin
-         * @description Bootstrap the first instance admin
+         * @description One-shot bootstrap that promotes the calling user to instance admin when no admin exists yet. Refuses with ADMIN.SETUP.ALREADY_BOOTSTRAPPED once the first admin is in place.
          */
         post: operations["admin-setup"];
         delete?: never;
@@ -161,7 +161,7 @@ export interface paths {
         };
         /**
          * List all users
-         * @description List all users
+         * @description Lists every user in the instance with status, role, and last-seen timestamp. Backs the admin Users panel; supports filtering by status and search by email or display name.
          */
         get: operations["admin-list-users"];
         put?: never;
@@ -181,7 +181,7 @@ export interface paths {
         };
         /**
          * Get user details
-         * @description Get user details
+         * @description Returns the full user row plus the workspaces they belong to and their session count. Used by the admin user-detail page.
          */
         get: operations["admin-get-user"];
         put?: never;
@@ -191,7 +191,7 @@ export interface paths {
         head?: never;
         /**
          * Update user (suspend/enable)
-         * @description Update user (suspend/enable)
+         * @description Changes administrative user state: suspends or re-enables the account. Suspending revokes all active sessions for the user.
          */
         patch: operations["admin-patch-user"];
         trace?: never;
@@ -205,7 +205,7 @@ export interface paths {
         };
         /**
          * List sessions for a user
-         * @description List sessions for a user
+         * @description Lists every active session for the named user (device, IP, last-seen). Used by admins to investigate suspicious activity and to revoke sessions one by one.
          */
         get: operations["admin-list-user-sessions"];
         put?: never;
@@ -225,7 +225,7 @@ export interface paths {
         };
         /**
          * List all workspaces
-         * @description List all workspaces
+         * @description Lists every workspace on the instance with member count, plan, and status. Backs the admin Workspaces panel.
          */
         get: operations["admin-list-workspaces"];
         put?: never;
@@ -245,7 +245,7 @@ export interface paths {
         };
         /**
          * Get workspace details
-         * @description Get workspace details
+         * @description Returns the workspace metadata along with administrative counts (members, owners, projects) for the admin workspace-detail page.
          */
         get: operations["admin-get-workspace"];
         put?: never;
@@ -255,7 +255,7 @@ export interface paths {
         head?: never;
         /**
          * Update workspace (suspend/enable)
-         * @description Update workspace (suspend/enable)
+         * @description Changes administrative workspace state: suspends or re-enables the workspace. Suspended workspaces are hidden from the switcher and reject API calls.
          */
         patch: operations["admin-patch-workspace"];
         trace?: never;
@@ -269,7 +269,7 @@ export interface paths {
         };
         /**
          * List available authentication methods
-         * @description List available authentication methods
+         * @description Returns which login methods (password, OIDC providers, magic-link) the deployment has configured. Used by the login UI to render only enabled providers. Public, cacheable, no auth.
          */
         get: operations["auth-capabilities"];
         put?: never;
@@ -291,7 +291,7 @@ export interface paths {
         put?: never;
         /**
          * Log in with email and password
-         * @description Log in with email and password
+         * @description Authenticates a local-password user. When TOTP is enabled returns a step-up challenge instead of a session; otherwise issues an access token and sets the refresh cookie. Rate-limited per IP.
          */
         post: operations["auth-login"];
         delete?: never;
@@ -311,7 +311,7 @@ export interface paths {
         put?: never;
         /**
          * Complete a TOTP step-up login
-         * @description Complete a TOTP step-up login
+         * @description Second leg of the TOTP-protected login: takes the challenge id returned by /auth/login plus a 6-digit TOTP code, and on success issues an access token and refresh cookie. Recovery codes are accepted in place of TOTP codes.
          */
         post: operations["auth-login-totp"];
         delete?: never;
@@ -331,7 +331,7 @@ export interface paths {
         put?: never;
         /**
          * Revoke a session
-         * @description Revoke a session
+         * @description Revokes the current session referenced by the refresh cookie and clears the cookie on the response. Idempotent: succeeds even if the cookie is missing or already invalid.
          */
         post: operations["auth-logout"];
         delete?: never;
@@ -351,7 +351,7 @@ export interface paths {
         put?: never;
         /**
          * Request a passwordless magic link
-         * @description Request a passwordless magic link
+         * @description Issues a single-use signed token by email so the recipient can log in without a password. Always returns 200 to avoid revealing whether the address is registered. Rate-limited per IP.
          */
         post: operations["auth-magic-link-request"];
         delete?: never;
@@ -369,7 +369,7 @@ export interface paths {
         };
         /**
          * Verify a magic link token and issue session
-         * @description Verify a magic link token and issue session
+         * @description Consumes the one-time token from /auth/magic-link/request, marks it spent, and issues an access token plus refresh cookie. Tokens expire quickly and can be redeemed only once.
          */
         get: operations["auth-magic-link-verify"];
         put?: never;
@@ -389,7 +389,7 @@ export interface paths {
         };
         /**
          * Complete a GitHub OAuth login flow
-         * @description Complete a GitHub OAuth login flow
+         * @description Receives the authorization code from GitHub, exchanges it for an access token, upserts the user from the verified primary email, and bounces back to the web app with a session cookie.
          */
         get: operations["auth-oidc-github-callback"];
         put?: never;
@@ -409,7 +409,7 @@ export interface paths {
         };
         /**
          * Start a GitHub OAuth login flow
-         * @description Start a GitHub OAuth login flow
+         * @description Generates a state nonce and 302-redirects the user to GitHub's OAuth authorize endpoint. Pairs with /auth/oidc/github/callback.
          */
         get: operations["auth-oidc-github-start"];
         put?: never;
@@ -429,7 +429,7 @@ export interface paths {
         };
         /**
          * Complete a Google OIDC login flow
-         * @description Complete a Google OIDC login flow
+         * @description Receives the authorization code from Google, exchanges it for ID tokens, upserts the user, and bounces back to the web app with a session cookie. Validates the state nonce minted by /start.
          */
         get: operations["auth-oidc-google-callback"];
         put?: never;
@@ -449,7 +449,7 @@ export interface paths {
         };
         /**
          * Start a Google OIDC login flow
-         * @description Start a Google OIDC login flow
+         * @description Generates a state nonce and 302-redirects the user to Google's OIDC authorization endpoint. Pairs with /auth/oidc/google/callback.
          */
         get: operations["auth-oidc-google-start"];
         put?: never;
@@ -469,7 +469,7 @@ export interface paths {
         };
         /**
          * Complete a Microsoft OIDC login flow
-         * @description Complete a Microsoft OIDC login flow
+         * @description Receives the authorization code from Microsoft, exchanges it for ID tokens, upserts the user, and bounces back to the web app with a session cookie. Validates the state nonce minted by /start.
          */
         get: operations["auth-oidc-microsoft-callback"];
         put?: never;
@@ -489,7 +489,7 @@ export interface paths {
         };
         /**
          * Start a Microsoft OIDC login flow
-         * @description Start a Microsoft OIDC login flow
+         * @description Generates a state nonce and 302-redirects the user to Microsoft's OIDC authorization endpoint. Pairs with /auth/oidc/microsoft/callback.
          */
         get: operations["auth-oidc-microsoft-start"];
         put?: never;
@@ -511,7 +511,7 @@ export interface paths {
         put?: never;
         /**
          * Rotate refresh token and issue a new access token
-         * @description Rotate refresh token and issue a new access token
+         * @description Reads the refresh cookie, rotates it (old one is invalidated), and returns a fresh access token. Used by the web client and CLI to silently extend sessions without re-prompting for credentials.
          */
         post: operations["auth-refresh"];
         delete?: never;
@@ -531,7 +531,7 @@ export interface paths {
         put?: never;
         /**
          * Register a new local-password account
-         * @description Register a new local-password account
+         * @description Creates a new local user account from email + password. Refuses when registration is closed (RegistrationOpen=false) and validates against MinPasswordLength. On success issues an access token and sets the refresh cookie. Rate-limited.
          */
         post: operations["auth-register"];
         delete?: never;
@@ -549,7 +549,7 @@ export interface paths {
         };
         /**
          * Stream a user's avatar image
-         * @description Stream a user's avatar image
+         * @description Streams a user's avatar bytes from object storage with caching headers. Public so <img src> works without bearer tokens; the userId path is the only thing the caller needs to know.
          */
         get: operations["me-avatar-proxy"];
         put?: never;
@@ -569,7 +569,7 @@ export interface paths {
         };
         /**
          * Health check
-         * @description Health check
+         * @description Liveness probe for orchestration. Always returns 200 with a static {"status":"ok"} body, no auth, no database access. Exempt from the public per-IP rate limiter so kubelet probes are not throttled.
          */
         get: operations["health"];
         put?: never;
@@ -589,7 +589,7 @@ export interface paths {
         };
         /**
          * List inbox items for the caller
-         * @description List inbox items for the caller
+         * @description Returns the caller's inbox: signals, mentions, and assignments waiting to be triaged across every workspace they belong to. Backs the global Inbox view.
          */
         get: operations["inbox-list"];
         put?: never;
@@ -611,7 +611,7 @@ export interface paths {
         put?: never;
         /**
          * Archive an inbox item
-         * @description Archive an inbox item
+         * @description Removes the named inbox item from the active list. Idempotent: archiving an already-archived item returns 200.
          */
         post: operations["inbox-archive"];
         delete?: never;
@@ -631,7 +631,7 @@ export interface paths {
         put?: never;
         /**
          * Snooze an inbox item
-         * @description Snooze an inbox item
+         * @description Hides the named inbox item until a caller-supplied wake-up time, after which it reappears in the active list.
          */
         post: operations["inbox-snooze"];
         delete?: never;
@@ -651,7 +651,7 @@ export interface paths {
         put?: never;
         /**
          * Accept a workspace invite
-         * @description Accept a workspace invite
+         * @description Consumes a workspace invite token: adds the caller as a member with the role declared on the invite and marks the invite redeemed. The caller must already have an authenticated account.
          */
         post: operations["invites-accept"];
         delete?: never;
@@ -669,7 +669,7 @@ export interface paths {
         };
         /**
          * Preview invite details (public)
-         * @description Preview invite details (public)
+         * @description Returns workspace name, inviter display name, and role for an invite token so the accept page can render context before the user signs in. Public, rate-limited; never reveals member emails or token-derived secrets.
          */
         get: operations["invites-info"];
         put?: never;
@@ -689,7 +689,7 @@ export interface paths {
         };
         /**
          * Return the authenticated user's profile
-         * @description Return the authenticated user's profile
+         * @description Returns the caller's profile (id, email, display name, locale, avatar URL, instance role) plus the list of workspaces they belong to. Used by both web apps to render the user shell.
          */
         get: operations["me"];
         put?: never;
@@ -699,7 +699,7 @@ export interface paths {
         head?: never;
         /**
          * Patch the authenticated user's profile
-         * @description Patch the authenticated user's profile
+         * @description Updates the caller's editable profile fields (display name, locale, timezone). Email changes go through a separate verified flow and are not allowed here.
          */
         patch: operations["me-patch"];
         trace?: never;
@@ -715,12 +715,12 @@ export interface paths {
         put?: never;
         /**
          * Upload a new avatar image for the authenticated user
-         * @description Upload a new avatar image for the authenticated user
+         * @description Accepts a multipart upload, validates the image type and size, stores it in object storage, and updates the caller's avatar reference. Returns AUTH.AVATAR.STORAGE_UNAVAILABLE when storage is not configured.
          */
         post: operations["me-avatar-upload"];
         /**
          * Remove the authenticated user's avatar
-         * @description Remove the authenticated user's avatar
+         * @description Deletes the caller's stored avatar object and clears the avatar reference on the user row. Idempotent: returns 200 even if no avatar was set.
          */
         delete: operations["me-avatar-delete"];
         options?: never;
@@ -737,7 +737,7 @@ export interface paths {
         };
         /**
          * List events across every workspace the caller belongs to
-         * @description List events across every workspace the caller belongs to
+         * @description Returns the caller's events across every workspace within a date range so the global My Calendar view can render without per-workspace round trips.
          */
         get: operations["me-calendar-events-list"];
         put?: never;
@@ -757,13 +757,13 @@ export interface paths {
         };
         /**
          * List the caller's favorites
-         * @description List the caller's favorites
+         * @description Lists every favorite the caller has pinned across all their workspaces (projects, lenses, dashboards, tasks). Used by the global sidebar.
          */
         get: operations["favorites-list"];
         put?: never;
         /**
          * Add an item to favorites
-         * @description Add an item to favorites
+         * @description Pins the supplied target (kind + id) to the caller's favorites list. Idempotent: pinning an already-favorited item returns the existing row.
          */
         post: operations["favorites-create"];
         delete?: never;
@@ -784,7 +784,7 @@ export interface paths {
         post?: never;
         /**
          * Remove an item from favorites
-         * @description Remove an item from favorites
+         * @description Unpins the named favorite. Idempotent: returns 200 even if the favorite no longer exists.
          */
         delete: operations["favorites-delete"];
         options?: never;
@@ -801,7 +801,7 @@ export interface paths {
         };
         /**
          * List the authenticated user's personal OAuth integrations
-         * @description List the authenticated user's personal OAuth integrations
+         * @description Lists each personal OAuth integration the caller has connected (provider, account label, expiry). Encrypted tokens are never returned. Used by the integrations panel.
          */
         get: operations["me-integrations-list"];
         put?: never;
@@ -824,7 +824,7 @@ export interface paths {
         post?: never;
         /**
          * Disconnect a personal OAuth integration
-         * @description Disconnect a personal OAuth integration
+         * @description Removes the named user_integrations row and best-effort revokes the provider token. Idempotent: returns 200 even if the integration was already removed.
          */
         delete: operations["me-integrations-disconnect"];
         options?: never;
@@ -843,7 +843,7 @@ export interface paths {
         put?: never;
         /**
          * Start a personal OAuth connect flow
-         * @description Start a personal OAuth connect flow
+         * @description Generates a state nonce and returns the provider's authorization URL the client should redirect to. The flow finishes at /oauth/callback/{provider}. Returns INTEGRATION.OAUTH.PROVIDER_NOT_CONFIGURED when the provider is not registered.
          */
         post: operations["me-integrations-connect"];
         delete?: never;
@@ -861,7 +861,7 @@ export interface paths {
         };
         /**
          * List pending event invites addressed to the caller
-         * @description List pending event invites addressed to the caller
+         * @description Returns calendar event invites that have been sent to the caller's email and that the caller has not yet accepted or declined. Backs the /me/invites page.
          */
         get: operations["me-invites-list"];
         put?: never;
@@ -881,7 +881,7 @@ export interface paths {
         };
         /**
          * List notifications for the caller
-         * @description List notifications for the caller
+         * @description Returns a cursor-paginated page of the caller's notifications across every workspace they belong to. Includes unread, read, and archived states; filterable by status.
          */
         get: operations["notifications-list"];
         put?: never;
@@ -901,7 +901,7 @@ export interface paths {
         };
         /**
          * Count unread notifications for the caller
-         * @description Count unread notifications for the caller
+         * @description Returns the number of unread notifications across every workspace. Cheap; safe to poll for the bell badge.
          */
         get: operations["notifications-unread-count"];
         put?: never;
@@ -923,7 +923,7 @@ export interface paths {
         put?: never;
         /**
          * Change the authenticated user's password
-         * @description Change the authenticated user's password
+         * @description Requires the current password to match before storing a new bcrypt hash. The new password is validated against MinPasswordLength. Does not revoke other sessions automatically.
          */
         post: operations["me-password-change"];
         delete?: never;
@@ -941,14 +941,14 @@ export interface paths {
         };
         /**
          * List the authenticated user's active sessions
-         * @description List the authenticated user's active sessions
+         * @description Lists every active session belonging to the caller (device label, IP, user agent, last seen) so the security UI can show signed-in devices and offer revocation.
          */
         get: operations["me-sessions-list"];
         put?: never;
         post?: never;
         /**
          * Revoke every session except the current one
-         * @description Revoke every session except the current one
+         * @description Bulk-revokes every session belonging to the caller except the one carrying the current refresh cookie. Used by 'sign out everywhere else' UI.
          */
         delete: operations["me-sessions-revoke-others"];
         options?: never;
@@ -968,7 +968,7 @@ export interface paths {
         post?: never;
         /**
          * Revoke a single session
-         * @description Revoke a single session
+         * @description Revokes the named session belonging to the caller. The next refresh attempt with that session will fail; access tokens already issued continue to work until they expire.
          */
         delete: operations["me-sessions-revoke"];
         options?: never;
@@ -985,7 +985,7 @@ export interface paths {
         };
         /**
          * List tasks assigned to the authenticated user across every workspace
-         * @description List tasks assigned to the authenticated user across every workspace
+         * @description Returns the caller's open assigned tasks across every workspace they belong to so the global My Tasks view can render without per-workspace round trips.
          */
         get: operations["me-tasks-list"];
         put?: never;
@@ -1005,7 +1005,7 @@ export interface paths {
         };
         /**
          * List tasks with due_on in range across every workspace
-         * @description List tasks with due_on in range across every workspace
+         * @description Returns the caller's tasks whose due_on falls inside the supplied date range. Used by calendar overlays and weekly digest generation.
          */
         get: operations["me-tasks-with-dates-list"];
         put?: never;
@@ -1025,14 +1025,14 @@ export interface paths {
         };
         /**
          * Return TOTP 2FA status
-         * @description Return TOTP 2FA status
+         * @description Reports whether TOTP is enrolled and confirmed for the caller, plus the count of remaining recovery codes. Used by the security panel to show enrollment state.
          */
         get: operations["me-totp-status"];
         put?: never;
         post?: never;
         /**
          * Disable TOTP 2FA
-         * @description Disable TOTP 2FA
+         * @description Removes the TOTP secret and recovery codes for the caller. Requires a valid current TOTP code (or recovery code) to authorize the change.
          */
         delete: operations["me-totp-disable"];
         options?: never;
@@ -1051,7 +1051,7 @@ export interface paths {
         put?: never;
         /**
          * Confirm TOTP 2FA enrollment
-         * @description Confirm TOTP 2FA enrollment
+         * @description Validates a 6-digit code against the pending secret from /me/totp/enroll. On success activates TOTP for the caller and returns a fresh batch of recovery codes (shown once).
          */
         post: operations["me-totp-confirm"];
         delete?: never;
@@ -1071,7 +1071,7 @@ export interface paths {
         put?: never;
         /**
          * Begin TOTP 2FA enrollment
-         * @description Begin TOTP 2FA enrollment
+         * @description Generates a fresh TOTP secret and otpauth:// provisioning URL for the caller to scan. The secret is stored as pending until /me/totp/confirm validates a code.
          */
         post: operations["me-totp-enroll"];
         delete?: never;
@@ -1089,13 +1089,13 @@ export interface paths {
         };
         /**
          * Return remaining recovery code count
-         * @description Return remaining recovery code count
+         * @description Reports how many unused recovery codes the caller has left. Does not return the codes themselves; those are only shown at generation time.
          */
         get: operations["me-totp-recovery-status"];
         put?: never;
         /**
          * Regenerate TOTP recovery codes
-         * @description Regenerate TOTP recovery codes
+         * @description Replaces the caller's recovery code batch with a fresh set, invalidating any unused old codes. Returns the new codes (shown once) and requires a valid TOTP code.
          */
         post: operations["me-totp-recovery-regenerate"];
         delete?: never;
@@ -1115,7 +1115,7 @@ export interface paths {
         put?: never;
         /**
          * Archive a notification
-         * @description Archive a notification
+         * @description Removes the notification from the active inbox. Archived notifications stay queryable via the list endpoint with the appropriate status filter.
          */
         post: operations["notifications-archive"];
         delete?: never;
@@ -1135,7 +1135,7 @@ export interface paths {
         put?: never;
         /**
          * Mark a notification as read
-         * @description Mark a notification as read
+         * @description Flips the named notification to read. Idempotent: marking an already-read notification returns 200.
          */
         post: operations["notifications-mark-read"];
         delete?: never;
@@ -1153,7 +1153,7 @@ export interface paths {
         };
         /**
          * Complete a personal OAuth integration flow
-         * @description Complete a personal OAuth integration flow
+         * @description Receives the provider's authorization code, exchanges it for tokens, encrypts and persists them on the user's user_integrations row, and 302-redirects back to WebBaseURL. Public because the user arrives via redirect from the third-party.
          */
         get: operations["oauth-integration-callback"];
         put?: never;
@@ -1173,21 +1173,21 @@ export interface paths {
         };
         /**
          * Fetch a project
-         * @description Fetch a project
+         * @description Returns the project metadata (name, description, status, settings). Used by the project header and detail pages.
          */
         get: operations["projects-get"];
         put?: never;
         post?: never;
         /**
          * Soft-disable a project
-         * @description Soft-disable a project
+         * @description Marks the project as disabled so it disappears from listings and pickers. Tasks remain queryable for audit but reject new edits.
          */
         delete: operations["projects-disable"];
         options?: never;
         head?: never;
         /**
          * Patch a project
-         * @description Patch a project
+         * @description Updates editable project fields (name, description, status, settings). Project admin role required.
          */
         patch: operations["projects-patch"];
         trace?: never;
@@ -1201,7 +1201,7 @@ export interface paths {
         };
         /**
          * List every task dependency edge within a project
-         * @description List every task dependency edge within a project
+         * @description Returns every blocks/blocked-by edge between tasks inside the project so the dependency graph view can render the full network in one round trip.
          */
         get: operations["projects-dependencies-list"];
         put?: never;
@@ -1221,13 +1221,13 @@ export interface paths {
         };
         /**
          * List members of a project
-         * @description List members of a project
+         * @description Lists every active member of the project with their role. Drives the project members panel and the assignee picker.
          */
         get: operations["projects-members-list"];
         put?: never;
         /**
          * Add a member to a project
-         * @description Add a member to a project
+         * @description Adds an existing workspace member to the project at the requested role. Requires project admin role; the user must already belong to the parent workspace.
          */
         post: operations["projects-members-add"];
         delete?: never;
@@ -1248,7 +1248,7 @@ export interface paths {
         post?: never;
         /**
          * Remove a member from a project
-         * @description Remove a member from a project
+         * @description Removes the named user from the project. Workspace membership is unaffected. Refuses to remove the last project admin.
          */
         delete: operations["projects-members-remove"];
         options?: never;
@@ -1265,7 +1265,7 @@ export interface paths {
         };
         /**
          * List events in a project's timeline
-         * @description List events in a project's timeline
+         * @description Returns the project-wide event stream (every task event in the project plus project-level events) so the project Activity tab can render a unified feed.
          */
         get: operations["projects-timeline-list"];
         put?: never;
@@ -1287,7 +1287,7 @@ export interface paths {
         put?: never;
         /**
          * Accept a calendar event invite via magic-link token
-         * @description Accept a calendar event invite via magic-link token
+         * @description Consumes a magic-link invite token: marks the attendee's RSVP as accepted and registers the resulting account context. Public, rate-limited; the opaque token is the only capability.
          */
         post: operations["event-invites-accept"];
         delete?: never;
@@ -1305,7 +1305,7 @@ export interface paths {
         };
         /**
          * Fetch a publicly shared lens (no auth required)
-         * @description Fetch a publicly shared lens (no auth required)
+         * @description Renders the published lens with its current task results. The opaque token is the only capability; revoke via /lenses/{lensId}/unpublish stops resolving.
          */
         get: operations["lenses-get-public"];
         put?: never;
@@ -1327,7 +1327,7 @@ export interface paths {
         put?: never;
         /**
          * Accept or dismiss a relation suggestion
-         * @description Accept or dismiss a relation suggestion
+         * @description Records the human decision on the suggestion: accept (creates the actual relation row) or dismiss (suppresses it from future listings). Idempotent.
          */
         post: operations["relation-suggestions-resolve"];
         delete?: never;
@@ -1345,7 +1345,7 @@ export interface paths {
         };
         /**
          * Render a public calendar share by URL token
-         * @description Render a public calendar share by URL token
+         * @description Returns the public share page contents (title, description, theme, ordered events) addressed by its opaque URL token. Public, rate-limited; no auth required.
          */
         get: operations["public-shares-render"];
         put?: never;
@@ -1367,7 +1367,7 @@ export interface paths {
         put?: never;
         /**
          * Manually inject a signal
-         * @description Manually inject a signal
+         * @description Manually inserts a signal row of the requested kind on behalf of the caller. Useful for development, scripted intake from custom sources, and replaying webhook payloads after a downtime.
          */
         post: operations["signals-create"];
         delete?: never;
@@ -1385,13 +1385,13 @@ export interface paths {
         };
         /**
          * List tasks for a project or workspace
-         * @description List tasks for a project or workspace
+         * @description Returns a cursor-paginated page of tasks filtered by project or workspace plus optional status / assignee / label filters. Backs every task list view (board, list, etc.).
          */
         get: operations["tasks-list"];
         put?: never;
         /**
          * Create a task
-         * @description Create a task
+         * @description Creates a task in the project supplied in the body. Validates project membership server-side and emits a task.created event so timelines, AI pipelines, and webhooks see it.
          */
         post: operations["tasks-create"];
         delete?: never;
@@ -1411,7 +1411,7 @@ export interface paths {
         put?: never;
         /**
          * Bulk-update sort weights for tasks within a project
-         * @description Bulk-update sort weights for tasks within a project
+         * @description Updates many tasks' sort_order in one request after a drag-and-drop. Atomic per project so no other client sees a partially reordered list.
          */
         post: operations["tasks-reorder"];
         delete?: never;
@@ -1429,21 +1429,21 @@ export interface paths {
         };
         /**
          * Fetch a task
-         * @description Fetch a task
+         * @description Returns a single task with its core fields, derived state, labels, and assignee. Sub-resources (comments, attachments, dependencies) live on dedicated endpoints.
          */
         get: operations["tasks-get"];
         put?: never;
         post?: never;
         /**
          * Soft-disable a task
-         * @description Soft-disable a task
+         * @description Marks the task as removed so it disappears from active views without erasing data. Idempotent. Use /unarchive on archived tasks; this endpoint is the destructive variant.
          */
         delete: operations["tasks-disable"];
         options?: never;
         head?: never;
         /**
          * Patch a task
-         * @description Patch a task
+         * @description Updates editable task fields (title, description, due_on, priority, assignee). Description edits append a description-version row so history is queryable.
          */
         patch: operations["tasks-patch"];
         trace?: never;
@@ -1457,13 +1457,13 @@ export interface paths {
         };
         /**
          * List actors on a task
-         * @description List actors on a task
+         * @description Returns the human actors (assignees, collaborators, watchers) attached to the task with their role.
          */
         get: operations["tasks-actors-list"];
         put?: never;
         /**
          * Attach an actor to a task
-         * @description Attach an actor to a task
+         * @description Adds a human actor to the task at the requested role (assignee / collaborator / watcher). Triggers the assignment notification pipeline when the role is assignee.
          */
         post: operations["tasks-actors-add"];
         delete?: never;
@@ -1484,7 +1484,7 @@ export interface paths {
         post?: never;
         /**
          * Remove an actor from a task
-         * @description Remove an actor from a task
+         * @description Detaches the named actor from the task. Idempotent.
          */
         delete: operations["tasks-actors-remove"];
         options?: never;
@@ -1501,13 +1501,13 @@ export interface paths {
         };
         /**
          * List AI agent actors on a task
-         * @description List AI agent actors on a task
+         * @description Returns the AI agent actors currently attached to the task. Distinguished from human actors so UI can render differently and quotas can apply per-agent.
          */
         get: operations["tasks-agents-list"];
         put?: never;
         /**
          * Attach an AI agent to a task
-         * @description Attach an AI agent to a task
+         * @description Attaches an AI agent so the agent's runtime can be scheduled on or triggered for the task. Idempotent per (task, agent).
          */
         post: operations["tasks-agents-add"];
         delete?: never;
@@ -1525,7 +1525,7 @@ export interface paths {
         };
         /**
          * List recent AI invocations scoped to this task
-         * @description List recent AI invocations scoped to this task
+         * @description Returns redacted ai_invocations rows scoped to the task so the AI reasoning panel can show which prompts the LLM saw and what it decided.
          */
         get: operations["tasks-ai-invocations-list"];
         put?: never;
@@ -1547,7 +1547,7 @@ export interface paths {
         put?: never;
         /**
          * Apply proposed steps as child tasks under a parent task
-         * @description Apply proposed steps as child tasks under a parent task
+         * @description Persists a proposal returned by /propose-steps as ordered child tasks under this parent. The client may trim or reorder the steps before applying.
          */
         post: operations["tasks-apply-steps"];
         delete?: never;
@@ -1567,7 +1567,7 @@ export interface paths {
         put?: never;
         /**
          * Archive a task
-         * @description Archive a task
+         * @description Moves the task into the archive so it disappears from active views without removing it. Idempotent.
          */
         post: operations["tasks-archive"];
         delete?: never;
@@ -1585,13 +1585,13 @@ export interface paths {
         };
         /**
          * List attachments on a task
-         * @description List attachments on a task
+         * @description Returns the attachments registered on the task with metadata only — bytes are fetched separately via /download.
          */
         get: operations["tasks-attachments-list"];
         put?: never;
         /**
          * Register an attachment metadata row on a task
-         * @description Register an attachment metadata row on a task
+         * @description Records that a file (already uploaded via /presign) is associated with the task. Stores filename, MIME, size, and storage key.
          */
         post: operations["tasks-attachments-add"];
         delete?: never;
@@ -1611,7 +1611,7 @@ export interface paths {
         put?: never;
         /**
          * Get a presigned PUT URL for uploading an attachment
-         * @description Get a presigned PUT URL for uploading an attachment
+         * @description Returns a short-lived presigned PUT URL the client can stream the file directly to S3 with. Pair with /attachments to record metadata after the upload completes.
          */
         post: operations["tasks-attachments-presign"];
         delete?: never;
@@ -1632,7 +1632,7 @@ export interface paths {
         post?: never;
         /**
          * Soft-delete an attachment from a task
-         * @description Soft-delete an attachment from a task
+         * @description Marks the attachment as removed and best-effort deletes the underlying object. Idempotent.
          */
         delete: operations["tasks-attachments-delete"];
         options?: never;
@@ -1649,7 +1649,7 @@ export interface paths {
         };
         /**
          * Get a presigned GET URL for downloading an attachment
-         * @description Get a presigned GET URL for downloading an attachment
+         * @description Returns a short-lived presigned GET URL so the client can stream the file straight from object storage. The API never proxies the bytes.
          */
         get: operations["tasks-attachments-download"];
         put?: never;
@@ -1669,13 +1669,13 @@ export interface paths {
         };
         /**
          * List comments on a task
-         * @description List comments on a task
+         * @description Returns the comments on the task in chronological order with reaction counts. Cursor-paginated for long threads.
          */
         get: operations["tasks-comments-list"];
         put?: never;
         /**
          * Add a comment to a task
-         * @description Add a comment to a task
+         * @description Appends a comment from the caller. Mentions inside the body are parsed and routed through the notifications pipeline.
          */
         post: operations["tasks-comments-add"];
         delete?: never;
@@ -1696,14 +1696,14 @@ export interface paths {
         post?: never;
         /**
          * Delete a comment (author or workspace admin)
-         * @description Delete a comment (author or workspace admin)
+         * @description Removes the named comment. Permitted to the comment author or any workspace admin. Idempotent.
          */
         delete: operations["tasks-comments-delete"];
         options?: never;
         head?: never;
         /**
          * Edit a comment (author only)
-         * @description Edit a comment (author only)
+         * @description Replaces the body of the named comment. Only the original author may edit; an edited_at timestamp is set.
          */
         patch: operations["tasks-comments-edit"];
         trace?: never;
@@ -1719,7 +1719,7 @@ export interface paths {
         put?: never;
         /**
          * Attach a constraint to a task
-         * @description Attach a constraint to a task
+         * @description Persists a constraint DSL expression on the task. Subsequent transitions and the constraint engine evaluate against this rule.
          */
         post: operations["tasks-constraints-add"];
         delete?: never;
@@ -1739,7 +1739,7 @@ export interface paths {
         put?: never;
         /**
          * Compile a natural-language prompt into a constraint DSL expression
-         * @description Compile a natural-language prompt into a constraint DSL expression
+         * @description Asks the AI compiler to translate a natural-language constraint description into a validated DSL expression. Returns the expression plus the compiler's confidence so the UI can confirm before /add.
          */
         post: operations["tasks-constraints-compile"];
         delete?: never;
@@ -1759,7 +1759,7 @@ export interface paths {
         put?: never;
         /**
          * Run the constraint engine for a task and persist satisfied/failed markers
-         * @description Run the constraint engine for a task and persist satisfied/failed markers
+         * @description Evaluates every constraint attached to the task and persists the satisfied / failed markers so the UI can render the result without re-running rules client-side.
          */
         post: operations["tasks-constraints-evaluate"];
         delete?: never;
@@ -1779,7 +1779,7 @@ export interface paths {
         put?: never;
         /**
          * Explain a constraint DSL expression in human-readable form
-         * @description Explain a constraint DSL expression in human-readable form
+         * @description Renders a stored constraint DSL back into prose so non-technical users can review what was attached. Used by the constraint detail panel.
          */
         post: operations["tasks-constraints-explain"];
         delete?: never;
@@ -1800,7 +1800,7 @@ export interface paths {
         post?: never;
         /**
          * Remove a constraint from a task
-         * @description Remove a constraint from a task
+         * @description Detaches the named constraint from the task. Subsequent evaluations no longer consider it. Idempotent.
          */
         delete: operations["tasks-constraints-remove"];
         options?: never;
@@ -1817,13 +1817,13 @@ export interface paths {
         };
         /**
          * List incoming and outgoing dependency edges for a task
-         * @description List incoming and outgoing dependency edges for a task
+         * @description Returns both blocks and blocked-by edges connected to the task. Used by the dependency panel and by the project graph view's per-task drilldown.
          */
         get: operations["tasks-dependencies-list"];
         put?: never;
         /**
          * Add a dependency edge from a task
-         * @description Add a dependency edge from a task
+         * @description Creates a blocks / blocked-by edge from this task to another. Refuses cycles so the graph stays a DAG.
          */
         post: operations["tasks-dependencies-add"];
         delete?: never;
@@ -1844,7 +1844,7 @@ export interface paths {
         post?: never;
         /**
          * Remove a dependency edge
-         * @description Remove a dependency edge
+         * @description Removes the named dependency edge. Idempotent.
          */
         delete: operations["tasks-dependencies-remove"];
         options?: never;
@@ -1861,7 +1861,7 @@ export interface paths {
         };
         /**
          * List description version history for a task
-         * @description List description version history for a task
+         * @description Returns a chronological list of description revisions (id, author, edited_at) without the full body so the version chooser is cheap.
          */
         get: operations["tasks-description-history-list"];
         put?: never;
@@ -1881,7 +1881,7 @@ export interface paths {
         };
         /**
          * Get a specific description version with full body
-         * @description Get a specific description version with full body
+         * @description Returns the full body of one description revision so the diff viewer can render the historical content.
          */
         get: operations["tasks-description-history-get"];
         put?: never;
@@ -1903,7 +1903,7 @@ export interface paths {
         put?: never;
         /**
          * Restore a previous description version
-         * @description Restore a previous description version
+         * @description Replaces the task's current description with the named historical version, appending a new revision so the restore itself is recorded.
          */
         post: operations["tasks-description-history-restore"];
         delete?: never;
@@ -1921,7 +1921,7 @@ export interface paths {
         };
         /**
          * List likely-duplicate tasks by embedding similarity
-         * @description List likely-duplicate tasks by embedding similarity
+         * @description Returns tasks similar to this one ranked by cosine distance over the description embedding. Used by the duplicate-warning chip on the task editor.
          */
         get: operations["tasks-duplicates-list"];
         put?: never;
@@ -1941,7 +1941,7 @@ export interface paths {
         };
         /**
          * Propose the next likely state transition for a task
-         * @description Propose the next likely state transition for a task
+         * @description Runs the deterministic state-inference engine and returns the proposed next state plus the matching rule and rationale. Read-only; apply with /transitions.
          */
         get: operations["tasks-infer-state"];
         put?: never;
@@ -1961,13 +1961,13 @@ export interface paths {
         };
         /**
          * List labels on a task
-         * @description List labels on a task
+         * @description Returns the labels currently attached to the task, in the order they were added. Used by the task detail view's label chips.
          */
         get: operations["tasks-labels-list"];
         put?: never;
         /**
          * Attach a label to a task
-         * @description Attach a label to a task
+         * @description Attaches an existing workspace label to the task. Idempotent: re-attaching a label is a no-op.
          */
         post: operations["tasks-labels-add"];
         delete?: never;
@@ -1988,7 +1988,7 @@ export interface paths {
         post?: never;
         /**
          * Remove a label from a task
-         * @description Remove a label from a task
+         * @description Detaches the named label from the task. Idempotent: returns 200 even when the label was not attached.
          */
         delete: operations["tasks-labels-remove"];
         options?: never;
@@ -2005,7 +2005,7 @@ export interface paths {
         };
         /**
          * List calendar events a task is linked to via task_event_links
-         * @description List calendar events a task is linked to via task_event_links
+         * @description Returns the calendar events linked to this task with the link kind (contributes_to / blocks / etc.). Used by the task detail's calendar section.
          */
         get: operations["tasks-linked-events-list"];
         put?: never;
@@ -2027,7 +2027,7 @@ export interface paths {
         put?: never;
         /**
          * Link a task to a calendar event (contributes_to / blocks / ...)
-         * @description Link a task to a calendar event (contributes_to / blocks / ...)
+         * @description Creates a task_event_link row with the supplied kind so calendar shifts and task changes can propagate per the link semantics.
          */
         post: operations["tasks-event-links-create"];
         delete?: never;
@@ -2048,7 +2048,7 @@ export interface paths {
         post?: never;
         /**
          * Soft-disable a task↔event link
-         * @description Soft-disable a task↔event link
+         * @description Marks the named task↔event link as removed so propagation rules stop firing. Audit history is preserved.
          */
         delete: operations["tasks-event-links-remove"];
         options?: never;
@@ -2067,7 +2067,7 @@ export interface paths {
         put?: never;
         /**
          * AI-powered step decomposition for a task
-         * @description AI-powered step decomposition for a task
+         * @description Asks the workspace's LLM to decompose this task into ordered execution steps. Returns the proposal and a cache key so /apply-steps can persist it; nothing is written until apply.
          */
         post: operations["tasks-propose-steps"];
         delete?: never;
@@ -2085,13 +2085,13 @@ export interface paths {
         };
         /**
          * List reactions on a task
-         * @description List reactions on a task
+         * @description Returns the emoji reactions left on the task grouped by glyph, with reactor identities. Used by the task header reaction strip.
          */
         get: operations["tasks-reactions-list"];
         put?: never;
         /**
          * Add a reaction to a task
-         * @description Add a reaction to a task
+         * @description Records a single emoji reaction from the caller on the task. Idempotent per (task, user, glyph): a duplicate add returns the existing row.
          */
         post: operations["tasks-reactions-create"];
         delete?: never;
@@ -2112,7 +2112,7 @@ export interface paths {
         post?: never;
         /**
          * Remove a reaction from a task
-         * @description Remove a reaction from a task
+         * @description Removes the caller's reaction from the task. Idempotent: deleting an already-removed reaction returns 200.
          */
         delete: operations["tasks-reactions-delete"];
         options?: never;
@@ -2129,7 +2129,7 @@ export interface paths {
         };
         /**
          * List pending relation suggestions for a task
-         * @description List pending relation suggestions for a task
+         * @description Returns the relation candidates the auto-detect pipeline has surfaced for the named task. Sorted by similarity score so the most likely match is first.
          */
         get: operations["relation-suggestions-list-task"];
         put?: never;
@@ -2149,7 +2149,7 @@ export interface paths {
         };
         /**
          * Replay transition events and report drift vs stored derived_state
-         * @description Replay transition events and report drift vs stored derived_state
+         * @description Replays every state-changing event in the task timeline and reports whether the recomputed derived_state matches the row. Diagnostic; does not mutate state.
          */
         get: operations["tasks-replay"];
         put?: never;
@@ -2169,7 +2169,7 @@ export interface paths {
         };
         /**
          * List events in a task's timeline
-         * @description List events in a task's timeline
+         * @description Returns the chronological event log for the task (state transitions, comments, link changes, AI suggestions). Backs the activity tab on the task detail view.
          */
         get: operations["tasks-timeline-list"];
         put?: never;
@@ -2191,7 +2191,7 @@ export interface paths {
         put?: never;
         /**
          * Apply a state machine transition to a task
-         * @description Apply a state machine transition to a task
+         * @description Applies the named transition to the task. Validates against the state machine and emits a task.transitioned event. Refuses transitions that violate attached constraints.
          */
         post: operations["tasks-transitions-apply"];
         delete?: never;
@@ -2211,7 +2211,7 @@ export interface paths {
         put?: never;
         /**
          * Unarchive a task
-         * @description Unarchive a task
+         * @description Restores an archived task to active state. Idempotent.
          */
         post: operations["tasks-unarchive"];
         delete?: never;
@@ -2229,13 +2229,13 @@ export interface paths {
         };
         /**
          * List workspaces for the authenticated user
-         * @description List workspaces for the authenticated user
+         * @description Lists every workspace the caller belongs to with their role. Used by the workspace switcher and during the post-login bootstrap to choose a default workspace.
          */
         get: operations["workspaces-list"];
         put?: never;
         /**
          * Create a workspace
-         * @description Create a workspace
+         * @description Creates a new workspace owned by the caller. The caller is added as the first owner-role member. Used during onboarding and from the workspace-switcher 'New workspace' action.
          */
         post: operations["workspaces-create"];
         delete?: never;
@@ -2253,21 +2253,21 @@ export interface paths {
         };
         /**
          * Get workspace details
-         * @description Get workspace details
+         * @description Returns the workspace metadata (name, slug, plan, settings) along with the caller's role in it. Requires workspace membership.
          */
         get: operations["workspaces-get"];
         put?: never;
         post?: never;
         /**
          * Disable a workspace
-         * @description Disable a workspace
+         * @description Soft-disables the workspace: members lose access to its data and the workspace stops appearing in switcher listings. Owner role required. Hard deletion is performed by instance admins through a separate flow.
          */
         delete: operations["workspaces-disable"];
         options?: never;
         head?: never;
         /**
          * Update workspace details
-         * @description Update workspace details
+         * @description Updates editable workspace fields (name, slug, settings). Requires workspace admin role; owner-only fields go through dedicated endpoints.
          */
         patch: operations["workspaces-patch"];
         trace?: never;
@@ -2281,13 +2281,13 @@ export interface paths {
         };
         /**
          * List AI agents for a workspace
-         * @description List AI agents for a workspace
+         * @description Lists every AI agent registered in the workspace with status, schedule, and last-run summary. Backs the Agents panel.
          */
         get: operations["ai-agents-list"];
         put?: never;
         /**
          * Create a new AI agent
-         * @description Create a new AI agent
+         * @description Registers a new AI agent in the workspace with name, prompt, schedule, and event triggers. The agent starts paused so the operator can review configuration before unpausing.
          */
         post: operations["ai-agents-create"];
         delete?: never;
@@ -2311,7 +2311,7 @@ export interface paths {
         head?: never;
         /**
          * Replace an AI agent's event_trigger_types list
-         * @description Replace an AI agent's event_trigger_types list
+         * @description Replaces the set of event types that automatically wake the agent. Empty list disables event triggering entirely; cron and manual triggers continue to work.
          */
         patch: operations["ai-agent-event-triggers-update"];
         trace?: never;
@@ -2327,7 +2327,7 @@ export interface paths {
         put?: never;
         /**
          * Toggle the kill switch on an AI agent
-         * @description Toggle the kill switch on an AI agent
+         * @description Flips the agent's paused flag so the runtime stops scheduling it. In-flight runs continue to completion; subsequent triggers no-op until the agent is unpaused.
          */
         post: operations["ai-agent-pause"];
         delete?: never;
@@ -2351,7 +2351,7 @@ export interface paths {
         head?: never;
         /**
          * Update an AI agent's schedule_kind trigger mode
-         * @description Update an AI agent's schedule_kind trigger mode
+         * @description Updates the agent's schedule_kind (cron / on-event / manual) and any associated cadence settings. Takes effect on the next scheduler tick.
          */
         patch: operations["ai-agent-schedule-update"];
         trace?: never;
@@ -2367,7 +2367,7 @@ export interface paths {
         put?: never;
         /**
          * Manually trigger one run of an AI agent
-         * @description Manually trigger one run of an AI agent
+         * @description Enqueues one run of the agent (or runs synchronously when no queue is configured). Returns AI.AGENT.RUNTIME_DISABLED when neither AgentQueue nor AgentRunner is wired.
          */
         post: operations["ai-agent-trigger"];
         delete?: never;
@@ -2385,7 +2385,7 @@ export interface paths {
         };
         /**
          * List auto-action rules for a workspace
-         * @description List auto-action rules for a workspace
+         * @description Returns the workspace's auto-action rule rows (rule kind, condition, side-effect). On first read seeds the default rule set so admins can begin tweaking immediately.
          */
         get: operations["ai-auto-action-rules-list"];
         put?: never;
@@ -2395,7 +2395,7 @@ export interface paths {
         head?: never;
         /**
          * Patch auto-action rules for a workspace
-         * @description Patch auto-action rules for a workspace
+         * @description Updates one or more auto-action rules in a single request. Each row may toggle enabled, change its threshold, or rewrite its condition. Returns the post-update set so the UI can reconcile state.
          */
         patch: operations["ai-auto-action-rules-update"];
         trace?: never;
@@ -2409,7 +2409,7 @@ export interface paths {
         };
         /**
          * Get auto-action executor settings for a workspace
-         * @description Get auto-action executor settings for a workspace
+         * @description Returns the executor toggle (enabled, dry-run, score threshold) plus the global rate budget for the auto-action engine. Workspace admin only.
          */
         get: operations["ai-auto-action-settings-get"];
         put?: never;
@@ -2419,7 +2419,7 @@ export interface paths {
         head?: never;
         /**
          * Patch auto-action executor settings for a workspace
-         * @description Patch auto-action executor settings for a workspace
+         * @description Updates the executor toggle, dry-run mode, score threshold, and rate budget. Changes apply on the next executor tick; in-flight runs continue with the old settings.
          */
         patch: operations["ai-auto-action-settings-update"];
         trace?: never;
@@ -2433,7 +2433,7 @@ export interface paths {
         };
         /**
          * Workspace-wide deterministic auto-action proposals
-         * @description Workspace-wide deterministic auto-action proposals
+         * @description Returns auto-action proposals (auto-archive, auto-close, auto-reassign) the engine surfaces. Read-only; execution happens via the auto-action executor when settings.enabled.
          */
         get: operations["ai-auto-actions"];
         put?: never;
@@ -2455,7 +2455,7 @@ export interface paths {
         put?: never;
         /**
          * Compile natural-language prose into a validated Lens JSON (ADR 0004)
-         * @description Compile natural-language prose into a validated Lens JSON (ADR 0004)
+         * @description Asks the workspace LLM to translate a natural-language description into a validated Lens JSON. Returns the JSON plus the model's confidence so the client can confirm before saving.
          */
         post: operations["ai-compile-lens"];
         delete?: never;
@@ -2473,7 +2473,7 @@ export interface paths {
         };
         /**
          * Today's accumulated LLM spend (USD) for a workspace
-         * @description Today's accumulated LLM spend (USD) for a workspace
+         * @description Returns the workspace's accumulated LLM spend for the current UTC day in USD. Used to power the AI cost gauge and to trip the configured budget guard.
          */
         get: operations["ai-cost-today"];
         put?: never;
@@ -2493,7 +2493,7 @@ export interface paths {
         };
         /**
          * List redacted LLM call audit rows for the AI reasoning panel
-         * @description List redacted LLM call audit rows for the AI reasoning panel
+         * @description Returns a cursor-paginated page of redacted ai_invocations rows so the AI reasoning panel can show prompts, models, and costs without leaking secrets.
          */
         get: operations["ai-invocations-list"];
         put?: never;
@@ -2513,7 +2513,7 @@ export interface paths {
         };
         /**
          * AI suggestion acceptance metrics over a trailing window
-         * @description AI suggestion acceptance metrics over a trailing window
+         * @description Returns suggestion acceptance / dismissal counts and rate over a trailing window. Used by the AI Settings page to show whether the assistant is helpful.
          */
         get: operations["ai-metrics"];
         put?: never;
@@ -2533,7 +2533,7 @@ export interface paths {
         };
         /**
          * List workspace AI models across all providers
-         * @description List workspace AI models across all providers
+         * @description Returns every model exposed by the workspace's enabled providers (OpenAI, Anthropic, local, etc.) so model pickers can render a unified list.
          */
         get: operations["ai-models-list"];
         put?: never;
@@ -2553,7 +2553,7 @@ export interface paths {
         };
         /**
          * Suggest priority adjustments for open tasks in a workspace
-         * @description Suggest priority adjustments for open tasks in a workspace
+         * @description Runs the deterministic priority-suggestion engine and returns proposals (task id, current priority, suggested priority, reason). Read-only; the client applies via /tasks/{id}.
          */
         get: operations["ai-priority-suggestions-list"];
         put?: never;
@@ -2573,13 +2573,13 @@ export interface paths {
         };
         /**
          * List LLM providers (masked, no ciphertext)
-         * @description List LLM providers (masked, no ciphertext)
+         * @description Lists every LLM provider configured for the workspace with masked key suffixes only. Backs the AI Settings panel.
          */
         get: operations["ai-providers-list"];
         put?: never;
         /**
          * Register an LLM provider with an encrypted API key
-         * @description Register an LLM provider with an encrypted API key
+         * @description Creates a workspace LLM provider row (kind, base URL, model defaults). The plaintext API key is encrypted at rest with the deployment cipher and never echoed back. Workspace admin only.
          */
         post: operations["ai-providers-create"];
         delete?: never;
@@ -2600,14 +2600,14 @@ export interface paths {
         post?: never;
         /**
          * Soft-delete an LLM provider
-         * @description Soft-delete an LLM provider
+         * @description Marks the provider as removed so subsequent AI calls fail closed with AI.PROVIDER.NOT_CONFIGURED. Historical ai_invocations rows remain queryable.
          */
         delete: operations["ai-providers-delete"];
         options?: never;
         head?: never;
         /**
          * Rotate an LLM provider API key
-         * @description Rotate an LLM provider API key
+         * @description Re-encrypts and stores a new API key for the provider, optionally updating model defaults at the same time. The old key is overwritten in place.
          */
         patch: operations["ai-providers-patch"];
         trace?: never;
@@ -2621,7 +2621,7 @@ export interface paths {
         };
         /**
          * Workspace-wide deterministic reminder engine proposals
-         * @description Workspace-wide deterministic reminder engine proposals
+         * @description Returns reminders the deterministic engine surfaces for the workspace (due-soon, stale, blocked-by). Used by the Reminders dock.
          */
         get: operations["ai-reminders"];
         put?: never;
@@ -2643,7 +2643,7 @@ export interface paths {
         put?: never;
         /**
          * Resolve a natural-language command into an MCP tool invocation
-         * @description Resolve a natural-language command into an MCP tool invocation
+         * @description Asks the LLM to translate a natural-language instruction into a structured MCP tool call. Returns the tool name and arguments; execution is the client's call so it can confirm first.
          */
         post: operations["ai-resolve-command"];
         delete?: never;
@@ -2661,7 +2661,7 @@ export interface paths {
         };
         /**
          * Workspace-wide deterministic state inference proposals
-         * @description Workspace-wide deterministic state inference proposals
+         * @description Returns deterministic state-transition proposals across every open task in the workspace. Read-only; the client applies via /tasks/{id}/transitions.
          */
         get: operations["ai-state-suggestions"];
         put?: never;
@@ -2681,7 +2681,7 @@ export interface paths {
         };
         /**
          * List pending AI suggestions for a workspace
-         * @description List pending AI suggestions for a workspace
+         * @description Returns AI inbox triage suggestions that have been proposed but not yet applied or dismissed. Sourced from the events table per ADR 0002 so the Glass Dock can resume across devices.
          */
         get: operations["ai-suggestions-list"];
         put?: never;
@@ -2703,7 +2703,7 @@ export interface paths {
         put?: never;
         /**
          * Mark an AI suggestion as applied
-         * @description Mark an AI suggestion as applied
+         * @description Appends an ai.suggestion.applied reaction event so the suggestion drops out of the pending list. The actual side-effect (e.g. archive or assign) is performed separately by the client; this endpoint only records the user's choice.
          */
         post: operations["ai-suggestions-apply"];
         delete?: never;
@@ -2723,7 +2723,7 @@ export interface paths {
         put?: never;
         /**
          * Dismiss an AI suggestion
-         * @description Dismiss an AI suggestion
+         * @description Appends an ai.suggestion.dismissed reaction event so the suggestion drops out of the pending list and the AI metrics counter records the negative signal.
          */
         post: operations["ai-suggestions-dismiss"];
         delete?: never;
@@ -2741,7 +2741,7 @@ export interface paths {
         };
         /**
          * Deterministic weekly digest markdown for a workspace
-         * @description Deterministic weekly digest markdown for a workspace
+         * @description Renders a deterministic weekly digest (Markdown) summarizing what shipped, what stalled, and what's coming for the workspace. Used by the email digest job and the in-app digest panel.
          */
         get: operations["ai-weekly-digest"];
         put?: never;
@@ -2761,7 +2761,7 @@ export interface paths {
         };
         /**
          * List recent audit log entries for a workspace
-         * @description List recent audit log entries for a workspace
+         * @description Returns a cursor-paginated page of workspace audit log entries (actor, action, target, timestamp). Restricted to workspace admins; backs the admin Audit panel.
          */
         get: operations["audit-logs-list"];
         put?: never;
@@ -2781,7 +2781,7 @@ export interface paths {
         };
         /**
          * List events across all calendars in a workspace
-         * @description List events across all calendars in a workspace
+         * @description Returns events from every calendar the caller can see in the workspace within the supplied date range. Used by the unified workspace calendar view.
          */
         get: operations["calendar-events-list"];
         put?: never;
@@ -2803,7 +2803,7 @@ export interface paths {
         put?: never;
         /**
          * Shift an umbrella event and move confirmed contributes_to-linked tasks by the same day delta
-         * @description Shift an umbrella event and move confirmed contributes_to-linked tasks by the same day delta
+         * @description Applies the previously proposed shift: moves the umbrella event and the confirmed task subset by the same day delta. Conflicting tasks are left in place; their conflict reasons are returned.
          */
         post: operations["calendar-events-shift-apply"];
         delete?: never;
@@ -2821,7 +2821,7 @@ export interface paths {
         };
         /**
          * List tasks linked to a calendar event via task_event_links
-         * @description List tasks linked to a calendar event via task_event_links
+         * @description Returns the tasks linked to the named calendar event with the link kind. Inverse of /tasks/{id}/linked-events.
          */
         get: operations["calendar-events-linked-tasks-list"];
         put?: never;
@@ -2843,7 +2843,7 @@ export interface paths {
         put?: never;
         /**
          * Propose shifting an umbrella event and partition linked tasks into safe vs conflict
-         * @description Propose shifting an umbrella event and partition linked tasks into safe vs conflict
+         * @description Dry-runs an umbrella event shift and returns which contributes_to-linked tasks would move cleanly versus which would conflict with constraints. Read-only; apply with /apply-shift.
          */
         post: operations["calendar-events-shift-propose"];
         delete?: never;
@@ -2861,13 +2861,13 @@ export interface paths {
         };
         /**
          * List calendars in a workspace
-         * @description List calendars in a workspace
+         * @description Returns calendars the caller is subscribed to within the workspace plus their color and visibility flags. Backs the calendar sidebar.
          */
         get: operations["calendars-list"];
         put?: never;
         /**
          * Create a calendar
-         * @description Create a calendar
+         * @description Creates a new calendar in the workspace owned by the caller. Personal calendars default to discoverable=false; team calendars default to true.
          */
         post: operations["calendars-create"];
         delete?: never;
@@ -2887,7 +2887,7 @@ export interface paths {
         put?: never;
         /**
          * Subscribe the caller to the holiday feed for a country
-         * @description Subscribe the caller to the holiday feed for a country
+         * @description Subscribes the caller to a system-managed read-only holiday calendar for the supplied ISO country code. Idempotent.
          */
         post: operations["calendars-subscribe-system"];
         delete?: never;
@@ -2905,21 +2905,21 @@ export interface paths {
         };
         /**
          * Get a calendar
-         * @description Get a calendar
+         * @description Returns the calendar's metadata (name, color, timezone, owner, sharing flags) for the calendar settings panel.
          */
         get: operations["calendars-get"];
         put?: never;
         post?: never;
         /**
          * Delete a calendar
-         * @description Delete a calendar
+         * @description Soft-deletes the calendar. Subscriptions are revoked; event history stays queryable for audit. Requires calendar owner role.
          */
         delete: operations["calendars-delete"];
         options?: never;
         head?: never;
         /**
          * Update a calendar
-         * @description Update a calendar
+         * @description Updates editable calendar fields (name, description, color, timezone, discoverable). Requires calendar admin role.
          */
         patch: operations["calendars-patch"];
         trace?: never;
@@ -2933,13 +2933,13 @@ export interface paths {
         };
         /**
          * List events in a calendar
-         * @description List events in a calendar
+         * @description Returns events from the named calendar within the supplied date range. Recurrence rules are expanded server-side; client receives concrete instances.
          */
         get: operations["events-list"];
         put?: never;
         /**
          * Create an event
-         * @description Create an event
+         * @description Creates an event in the calendar. Optionally accepts an attendee list which triggers RSVP requests; recurrence rules are validated against RFC 5545.
          */
         post: operations["events-create"];
         delete?: never;
@@ -2959,7 +2959,7 @@ export interface paths {
         put?: never;
         /**
          * Create a calendar event from a task
-         * @description Create a calendar event from a task
+         * @description Creates an event seeded from the supplied task (title, due_on, description) and links the two via task_event_links so propagation rules can keep them in sync.
          */
         post: operations["events-from-task"];
         delete?: never;
@@ -2979,7 +2979,7 @@ export interface paths {
         put?: never;
         /**
          * Parse natural language text into an event proposal
-         * @description Parse natural language text into an event proposal
+         * @description Asks the workspace LLM to translate a free-text prompt (e.g. 'lunch with Sam tomorrow at noon') into a structured event proposal. Read-only; the client confirms before /create.
          */
         post: operations["events-smart-create"];
         delete?: never;
@@ -2997,21 +2997,21 @@ export interface paths {
         };
         /**
          * Get an event
-         * @description Get an event
+         * @description Returns one event with its full body, recurrence rule, attendees, and link metadata. Used by the event detail panel.
          */
         get: operations["events-get"];
         put?: never;
         post?: never;
         /**
          * Delete an event
-         * @description Delete an event
+         * @description Removes the event. Linked tasks remain but their task_event_link rows are tombstoned so propagation rules stop firing. Idempotent.
          */
         delete: operations["events-delete"];
         options?: never;
         head?: never;
         /**
          * Update an event
-         * @description Update an event
+         * @description Updates editable event fields (title, time range, description, location, recurrence). Time changes trigger task-shift propagation through task_event_links.
          */
         patch: operations["events-patch"];
         trace?: never;
@@ -3025,13 +3025,13 @@ export interface paths {
         };
         /**
          * List attachments on an event
-         * @description List attachments on an event
+         * @description Returns metadata for files attached to the event (filename, size, MIME, uploader). Bytes are fetched separately via signed URLs.
          */
         get: operations["attachments-list"];
         put?: never;
         /**
          * Record attachment metadata for an event
-         * @description Record attachment metadata for an event
+         * @description Records that a file (already uploaded out-of-band) is attached to the event. Stores filename, MIME, size, and storage key.
          */
         post: operations["attachments-create"];
         delete?: never;
@@ -3052,7 +3052,7 @@ export interface paths {
         post?: never;
         /**
          * Delete an attachment from an event
-         * @description Delete an attachment from an event
+         * @description Marks the attachment as removed and best-effort deletes the underlying object. Idempotent.
          */
         delete: operations["attachments-delete"];
         options?: never;
@@ -3069,13 +3069,13 @@ export interface paths {
         };
         /**
          * List attendees on an event
-         * @description List attendees on an event
+         * @description Returns the attendee list for the event with each attendee's RSVP state and edit permission.
          */
         get: operations["attendees-list"];
         put?: never;
         /**
          * Add attendees to an event
-         * @description Add attendees to an event
+         * @description Adds one or more attendees (workspace members or external email addresses) to the event. External invitees receive a magic-link invite email.
          */
         post: operations["attendees-add"];
         delete?: never;
@@ -3099,7 +3099,7 @@ export interface paths {
         head?: never;
         /**
          * Update own RSVP for an event
-         * @description Update own RSVP for an event
+         * @description Updates the caller's own RSVP (yes / no / maybe). Other attendees' RSVPs are unaffected.
          */
         patch: operations["attendees-rsvp"];
         trace?: never;
@@ -3115,7 +3115,7 @@ export interface paths {
         put?: never;
         /**
          * Create (or rotate) a magic-link invite for an attendee
-         * @description Create (or rotate) a magic-link invite for an attendee
+         * @description Mints a fresh magic-link invite token for the attendee and emails it. Repeated calls rotate the token, invalidating any prior unused link.
          */
         post: operations["event-invites-create"];
         delete?: never;
@@ -3136,7 +3136,7 @@ export interface paths {
         post?: never;
         /**
          * Remove an attendee from an event
-         * @description Remove an attendee from an event
+         * @description Removes the named attendee from the event. Idempotent.
          */
         delete: operations["attendees-remove"];
         options?: never;
@@ -3159,7 +3159,7 @@ export interface paths {
         head?: never;
         /**
          * Toggle can_edit for an attendee
-         * @description Toggle can_edit for an attendee
+         * @description Grants or revokes the named attendee's permission to edit the event. The event owner can always edit; this gates other attendees.
          */
         patch: operations["attendees-can-edit"];
         trace?: never;
@@ -3173,13 +3173,13 @@ export interface paths {
         };
         /**
          * List checklist items for an event
-         * @description List checklist items for an event
+         * @description Returns the checklist items attached to the event in display order, used by the event prep panel.
          */
         get: operations["checklist-list"];
         put?: never;
         /**
          * Add a checklist item to an event
-         * @description Add a checklist item to an event
+         * @description Appends a checklist item to the event with optional assignee. Returns the persisted item including its display order.
          */
         post: operations["checklist-create"];
         delete?: never;
@@ -3200,14 +3200,14 @@ export interface paths {
         post?: never;
         /**
          * Delete a checklist item
-         * @description Delete a checklist item
+         * @description Removes the named checklist item. Idempotent.
          */
         delete: operations["checklist-delete"];
         options?: never;
         head?: never;
         /**
          * Update a checklist item
-         * @description Update a checklist item
+         * @description Updates a checklist item's text, completion state, assignee, or display order.
          */
         patch: operations["checklist-update"];
         trace?: never;
@@ -3221,13 +3221,13 @@ export interface paths {
         };
         /**
          * List comments on an event
-         * @description List comments on an event
+         * @description Returns the comment thread on the event in chronological order. Used by the event detail comment pane.
          */
         get: operations["comments-list"];
         put?: never;
         /**
          * Add a comment to an event
-         * @description Add a comment to an event
+         * @description Appends a comment from the caller to the event thread. Mentions in the body are routed through the notifications pipeline.
          */
         post: operations["comments-create"];
         delete?: never;
@@ -3248,14 +3248,14 @@ export interface paths {
         post?: never;
         /**
          * Delete a comment
-         * @description Delete a comment
+         * @description Removes the named comment. Permitted to the comment author or any calendar admin.
          */
         delete: operations["comments-delete"];
         options?: never;
         head?: never;
         /**
          * Edit a comment
-         * @description Edit a comment
+         * @description Replaces the body of the named comment. Only the original author may edit; an edited_at timestamp is set.
          */
         patch: operations["comments-edit"];
         trace?: never;
@@ -3269,7 +3269,7 @@ export interface paths {
         };
         /**
          * List active magic-link invites for an event
-         * @description List active magic-link invites for an event
+         * @description Lists outstanding magic-link invites for the event with attendee, expiry, and last-sent metadata. Tokens are masked.
          */
         get: operations["event-invites-list"];
         put?: never;
@@ -3292,7 +3292,7 @@ export interface paths {
         post?: never;
         /**
          * Revoke a magic-link invite
-         * @description Revoke a magic-link invite
+         * @description Marks the invite token as revoked so future redemption attempts fail. Already-accepted RSVPs are unaffected.
          */
         delete: operations["event-invites-revoke"];
         options?: never;
@@ -3309,13 +3309,13 @@ export interface paths {
         };
         /**
          * List members of a calendar
-         * @description List members of a calendar
+         * @description Lists every member of the calendar with their role and join time. Used by the calendar settings members panel.
          */
         get: operations["members-list"];
         put?: never;
         /**
          * Add a member to a calendar
-         * @description Add a member to a calendar
+         * @description Adds a workspace member to the calendar at the requested role (viewer / editor / admin). Calendar admin role required.
          */
         post: operations["members-add"];
         delete?: never;
@@ -3336,14 +3336,14 @@ export interface paths {
         post?: never;
         /**
          * Remove a member from a calendar
-         * @description Remove a member from a calendar
+         * @description Removes the named member from the calendar. Their subscription rows are tombstoned. Refuses to remove the last admin.
          */
         delete: operations["members-remove"];
         options?: never;
         head?: never;
         /**
          * Update a member's role
-         * @description Update a member's role
+         * @description Changes a calendar member's role. Refuses to demote the last admin so the calendar stays manageable.
          */
         patch: operations["members-update-role"];
         trace?: never;
@@ -3357,13 +3357,13 @@ export interface paths {
         };
         /**
          * List memos in a calendar
-         * @description List memos in a calendar
+         * @description Returns memos pinned to the calendar (e.g. running notes for a recurring meeting). Used by the calendar memo sidebar.
          */
         get: operations["memos-list"];
         put?: never;
         /**
          * Create a memo
-         * @description Create a memo
+         * @description Creates a memo on the calendar with title and Markdown body. Returns the persisted memo including its assigned id.
          */
         post: operations["memos-create"];
         delete?: never;
@@ -3384,14 +3384,14 @@ export interface paths {
         post?: never;
         /**
          * Delete a memo
-         * @description Delete a memo
+         * @description Removes the memo. Idempotent.
          */
         delete: operations["memos-delete"];
         options?: never;
         head?: never;
         /**
          * Update a memo
-         * @description Update a memo
+         * @description Updates the memo's title or Markdown body.
          */
         patch: operations["memos-update"];
         trace?: never;
@@ -3407,7 +3407,7 @@ export interface paths {
         put?: never;
         /**
          * Subscribe the caller to a calendar visible in the workspace
-         * @description Subscribe the caller to a calendar visible in the workspace
+         * @description Subscribes the caller to the named calendar at viewer role. Returns the new subscription record with default color override.
          */
         post: operations["calendars-self-subscribe"];
         delete?: never;
@@ -3431,7 +3431,7 @@ export interface paths {
         head?: never;
         /**
          * Update the caller's own subscription preferences for a calendar
-         * @description Update the caller's own subscription preferences for a calendar
+         * @description Updates the caller's own subscription preferences (color override, visibility, notification opt-out) without affecting other members.
          */
         patch: operations["calendars-self-subscription-patch"];
         trace?: never;
@@ -3445,13 +3445,13 @@ export interface paths {
         };
         /**
          * List dashboard widgets in a workspace
-         * @description List dashboard widgets in a workspace
+         * @description Returns every dashboard widget in the workspace ordered by position. Backs the dashboard rendering loop in flow-web.
          */
         get: operations["dashboard-widgets-list"];
         put?: never;
         /**
          * Create a dashboard widget
-         * @description Create a dashboard widget
+         * @description Adds a new widget to the workspace dashboard with the provided kind and config blob. Returns the persisted widget including its assigned position so the client can render it immediately.
          */
         post: operations["dashboard-widgets-create"];
         delete?: never;
@@ -3469,21 +3469,21 @@ export interface paths {
         };
         /**
          * Fetch a dashboard widget by id
-         * @description Fetch a dashboard widget by id
+         * @description Returns a single widget with its kind, config, and computed payload. Used when opening a widget's detail or edit panel.
          */
         get: operations["dashboard-widgets-get"];
         put?: never;
         post?: never;
         /**
          * Soft-delete a dashboard widget
-         * @description Soft-delete a dashboard widget
+         * @description Marks the widget as removed without erasing config so an undo affordance can restore it. Idempotent.
          */
         delete: operations["dashboard-widgets-delete"];
         options?: never;
         head?: never;
         /**
          * Update a dashboard widget
-         * @description Update a dashboard widget
+         * @description Updates a widget's title and config blob. Position changes go through the dedicated /position endpoint to avoid heavy reflows on drag.
          */
         patch: operations["dashboard-widgets-update"];
         trace?: never;
@@ -3498,7 +3498,7 @@ export interface paths {
         get?: never;
         /**
          * Update widget position and size
-         * @description Update widget position and size
+         * @description Persists a widget's grid x/y coordinates and width/height after a drag-and-resize gesture. Idempotent and lightweight so it can fire on every drop.
          */
         put: operations["dashboard-widgets-update-position"];
         post?: never;
@@ -3517,7 +3517,7 @@ export interface paths {
         };
         /**
          * List teammate personal calendars the caller can subscribe to
-         * @description List teammate personal calendars the caller can subscribe to
+         * @description Lists teammate personal calendars marked discoverable so the caller can opt in. Excludes calendars the caller is already subscribed to.
          */
         get: operations["discoverable-calendars-list"];
         put?: never;
@@ -3557,13 +3557,13 @@ export interface paths {
         };
         /**
          * List import jobs for the workspace
-         * @description List import jobs for the workspace
+         * @description Returns recent import jobs in the workspace with their status (pending, running, succeeded, failed, cancelled). Backs the import history panel.
          */
         get: operations["imports-list"];
         put?: never;
         /**
          * Create an import job
-         * @description Create an import job
+         * @description Submits an import job (Asana / CSV / etc.) referencing previously uploaded source data. The job runs asynchronously; poll /imports/{importId} for progress.
          */
         post: operations["imports-create"];
         delete?: never;
@@ -3581,7 +3581,7 @@ export interface paths {
         };
         /**
          * Get a single import job
-         * @description Get a single import job
+         * @description Returns the full state of one import job: progress counters, error log, summary stats. Used by the in-progress poller and the post-run report.
          */
         get: operations["imports-get"];
         put?: never;
@@ -3603,7 +3603,7 @@ export interface paths {
         put?: never;
         /**
          * Cancel a pending or running import job
-         * @description Cancel a pending or running import job
+         * @description Marks the job as cancelled so the worker stops on its next checkpoint. Already-imported rows remain; partial state is documented in the import report.
          */
         post: operations["imports-cancel"];
         delete?: never;
@@ -3623,7 +3623,7 @@ export interface paths {
         put?: never;
         /**
          * Ask the AI orchestrator to score and recommend actions for inbox items
-         * @description Ask the AI orchestrator to score and recommend actions for inbox items
+         * @description Synchronously runs the AI triage prompt over the caller's pending inbox items and returns a per-item score plus recommended action. Each call is recorded as an ai.suggestion.proposed event so /ai/suggestions can replay it.
          */
         post: operations["inbox-triage"];
         delete?: never;
@@ -3641,13 +3641,13 @@ export interface paths {
         };
         /**
          * List intake items in the triage queue
-         * @description List intake items in the triage queue
+         * @description Returns intake items pending triage (signals + manual submissions) ordered by priority. Backs the workspace Intake board.
          */
         get: operations["intake-list"];
         put?: never;
         /**
          * Create an intake item
-         * @description Create an intake item
+         * @description Pushes a new intake row onto the workspace triage queue. Used by the manual 'capture' affordance and by integrations that want a human to review before a task is created.
          */
         post: operations["intake-create"];
         delete?: never;
@@ -3665,7 +3665,7 @@ export interface paths {
         };
         /**
          * Get a single intake item
-         * @description Get a single intake item
+         * @description Returns the named intake item with its source signal payload and current triage state. Used by the intake detail panel.
          */
         get: operations["intake-get"];
         put?: never;
@@ -3675,7 +3675,7 @@ export interface paths {
         head?: never;
         /**
          * Triage an intake item (accept, reject, snooze, or mark duplicate)
-         * @description Triage an intake item (accept, reject, snooze, or mark duplicate)
+         * @description Records the human triage decision on the named intake item: accept (forward to /convert), reject (drop with reason), snooze (revisit later), or mark duplicate of an existing task.
          */
         patch: operations["intake-triage"];
         trace?: never;
@@ -3691,7 +3691,7 @@ export interface paths {
         put?: never;
         /**
          * Convert an intake item into a task
-         * @description Convert an intake item into a task
+         * @description Creates a task from the intake row and links the two so the source signal is preserved on the task timeline. Closes the intake item as accepted.
          */
         post: operations["intake-convert"];
         delete?: never;
@@ -3709,13 +3709,13 @@ export interface paths {
         };
         /**
          * List invite links
-         * @description List invite links
+         * @description Lists outstanding invite links for the workspace (id, role, expiry, redemption count) so admins can revoke or audit. Tokens are never returned.
          */
         get: operations["workspaces-invites-list"];
         put?: never;
         /**
          * Create an invite link
-         * @description Create an invite link
+         * @description Issues a shareable invite link with the requested role and expiry. The link is the only artifact returned that contains the token; subsequent listings return only metadata.
          */
         post: operations["workspaces-invites-create"];
         delete?: never;
@@ -3736,7 +3736,7 @@ export interface paths {
         post?: never;
         /**
          * Revoke an invite link
-         * @description Revoke an invite link
+         * @description Marks an invite token as revoked so future redemption attempts fail with INVITE.REVOKED. Already-redeemed memberships are unaffected.
          */
         delete: operations["workspaces-invites-revoke"];
         options?: never;
@@ -3753,13 +3753,13 @@ export interface paths {
         };
         /**
          * List labels in a workspace
-         * @description List labels in a workspace
+         * @description Returns every active label in the workspace ordered by name. Used to populate label pickers and filter chips.
          */
         get: operations["labels-list"];
         put?: never;
         /**
          * Create a label
-         * @description Create a label
+         * @description Creates a workspace label with name and color. Names are unique within the workspace.
          */
         post: operations["labels-create"];
         delete?: never;
@@ -3777,21 +3777,21 @@ export interface paths {
         };
         /**
          * Fetch a label
-         * @description Fetch a label
+         * @description Returns one label including its name, color, and disabled state. Used by the label edit panel.
          */
         get: operations["labels-get"];
         put?: never;
         post?: never;
         /**
          * Soft-disable a label
-         * @description Soft-disable a label
+         * @description Marks the label as disabled so it disappears from pickers without breaking historical task assignments. Idempotent.
          */
         delete: operations["labels-disable"];
         options?: never;
         head?: never;
         /**
          * Update a label
-         * @description Update a label
+         * @description Renames or recolors the label. Existing task assignments keep working; the new name and color propagate immediately.
          */
         patch: operations["labels-patch"];
         trace?: never;
@@ -3805,13 +3805,13 @@ export interface paths {
         };
         /**
          * List saved views for a workspace/project
-         * @description List saved views for a workspace/project
+         * @description Lists lenses visible to the caller within the workspace, optionally scoped to a project. Backs the saved-views menu.
          */
         get: operations["lenses-list"];
         put?: never;
         /**
          * Create a saved view (lens)
-         * @description Create a saved view (lens)
+         * @description Persists a new lens (filter + grouping + sort) so the caller can re-open the same view across sessions and share it with teammates. The Lens JSON is validated against the schema before insert.
          */
         post: operations["lenses-create"];
         delete?: never;
@@ -3829,21 +3829,21 @@ export interface paths {
         };
         /**
          * Fetch a saved view
-         * @description Fetch a saved view
+         * @description Returns one lens including its full Lens JSON and ownership metadata. Used when opening a saved view directly from a deep link.
          */
         get: operations["lenses-get"];
         put?: never;
         post?: never;
         /**
          * Delete a saved view
-         * @description Delete a saved view
+         * @description Removes the lens. If it is currently published the public token is also revoked so the unauthenticated mirror stops resolving.
          */
         delete: operations["lenses-delete"];
         options?: never;
         head?: never;
         /**
          * Update a saved view
-         * @description Update a saved view
+         * @description Updates a lens's name, scope, or Lens JSON. Re-validates the JSON before persistence so an invalid update cannot wedge the view.
          */
         patch: operations["lenses-update"];
         trace?: never;
@@ -3859,7 +3859,7 @@ export interface paths {
         put?: never;
         /**
          * Publish a lens publicly with a shareable token URL
-         * @description Publish a lens publicly with a shareable token URL
+         * @description Mints an opaque public token for the lens and returns the canonical /public/lenses/{token} URL. Pages rendered against this token are unauthenticated.
          */
         post: operations["lenses-publish"];
         delete?: never;
@@ -3879,7 +3879,7 @@ export interface paths {
         put?: never;
         /**
          * Revoke public access to a lens
-         * @description Revoke public access to a lens
+         * @description Invalidates the lens's public token. Future fetches against the old URL return 404.
          */
         post: operations["lenses-unpublish"];
         delete?: never;
@@ -3897,13 +3897,13 @@ export interface paths {
         };
         /**
          * List the caller's MCP tokens (no plaintext)
-         * @description List the caller's MCP tokens (no plaintext)
+         * @description Lists the caller's existing MCP tokens with label, last-used time, and creation time. Plaintext is never returned; rotate by issuing a new token and revoking the old one.
          */
         get: operations["mcp-tokens-list"];
         put?: never;
         /**
          * Mint a new MCP bearer token (plaintext returned once)
-         * @description Mint a new MCP bearer token (plaintext returned once)
+         * @description Generates a new MCP bearer token (mcp_…) the caller can pass to a local MCP client to authenticate against /mcp. The plaintext token is returned exactly once; only the hash is stored.
          */
         post: operations["mcp-tokens-create"];
         delete?: never;
@@ -3924,7 +3924,7 @@ export interface paths {
         post?: never;
         /**
          * Revoke an MCP bearer token
-         * @description Revoke an MCP bearer token
+         * @description Marks the token as revoked so future /mcp requests carrying it are rejected. Idempotent.
          */
         delete: operations["mcp-tokens-delete"];
         options?: never;
@@ -3941,13 +3941,13 @@ export interface paths {
         };
         /**
          * List workspace members
-         * @description List workspace members
+         * @description Lists every active member of the workspace with their role and join time. Used by the admin members panel; requires workspace membership.
          */
         get: operations["workspaces-members-list"];
         put?: never;
         /**
          * Add a member to a workspace
-         * @description Add a member to a workspace
+         * @description Sends a workspace invite to the supplied email at the requested role. The recipient gets a link they redeem via /invites/{token}/accept. Requires workspace admin role.
          */
         post: operations["workspaces-members-add"];
         delete?: never;
@@ -3968,14 +3968,14 @@ export interface paths {
         post?: never;
         /**
          * Remove a member from a workspace
-         * @description Remove a member from a workspace
+         * @description Removes the named user from the workspace. Removing the last owner is rejected. Outstanding sessions for the removed user keep working until their access tokens expire; refresh inside this workspace will fail.
          */
         delete: operations["workspaces-members-remove"];
         options?: never;
         head?: never;
         /**
          * Update a member's role
-         * @description Update a member's role
+         * @description Changes a member's role within the workspace. Promoting to owner or demoting the last owner is rejected to keep at least one owner present.
          */
         patch: operations["workspaces-members-update-role"];
         trace?: never;
@@ -3991,7 +3991,7 @@ export interface paths {
         put?: never;
         /**
          * Mark all notifications as read in a workspace
-         * @description Mark all notifications as read in a workspace
+         * @description Bulk-marks every unread notification for the caller within the workspace as read. Useful for the 'mark all read' affordance in the notifications panel.
          */
         post: operations["notifications-mark-all-read"];
         delete?: never;
@@ -4009,13 +4009,13 @@ export interface paths {
         };
         /**
          * List root pages in a workspace
-         * @description List root pages in a workspace
+         * @description Returns top-level pages (no parent) in the workspace, sorted alphabetically. Used to render the page tree's first level.
          */
         get: operations["pages-list"];
         put?: never;
         /**
          * Create a page
-         * @description Create a page
+         * @description Creates a new page (optionally as a child of an existing page) with title and Markdown body. Returns the persisted page including its assigned id.
          */
         post: operations["pages-create"];
         delete?: never;
@@ -4035,7 +4035,7 @@ export interface paths {
         put?: never;
         /**
          * Generate a page with AI
-         * @description Generate a page with AI
+         * @description Asks the workspace's configured LLM to draft a page from the supplied prompt and persists the result. Records an ai_invocations row.
          */
         post: operations["pages-generate"];
         delete?: never;
@@ -4053,7 +4053,7 @@ export interface paths {
         };
         /**
          * Search pages by title
-         * @description Search pages by title
+         * @description Substring-matches page titles in the workspace. Backs the page picker and command palette.
          */
         get: operations["pages-search"];
         put?: never;
@@ -4073,21 +4073,21 @@ export interface paths {
         };
         /**
          * Fetch a page by id
-         * @description Fetch a page by id
+         * @description Returns a single page with its full Markdown body and metadata. Used when opening a page from the tree.
          */
         get: operations["pages-get"];
         put?: never;
         post?: never;
         /**
          * Soft-delete a page
-         * @description Soft-delete a page
+         * @description Marks the page as deleted so it disappears from the tree without losing content. Idempotent.
          */
         delete: operations["pages-delete"];
         options?: never;
         head?: never;
         /**
          * Update a page
-         * @description Update a page
+         * @description Updates page title and Markdown body. Optionally re-parents the page within the tree.
          */
         patch: operations["pages-update"];
         trace?: never;
@@ -4101,7 +4101,7 @@ export interface paths {
         };
         /**
          * List child pages
-         * @description List child pages
+         * @description Returns the immediate children of the named page so the tree can be expanded one level at a time.
          */
         get: operations["pages-list-children"];
         put?: never;
@@ -4121,13 +4121,13 @@ export interface paths {
         };
         /**
          * List projects in a workspace
-         * @description List projects in a workspace
+         * @description Returns every project the caller can see in the workspace. Backs the project switcher and the project list panel.
          */
         get: operations["projects-list"];
         put?: never;
         /**
          * Create a project in a workspace
-         * @description Create a project in a workspace
+         * @description Creates a new project in the workspace. The caller becomes the first project member with admin role. Requires workspace admin role.
          */
         post: operations["projects-create"];
         delete?: never;
@@ -4145,13 +4145,13 @@ export interface paths {
         };
         /**
          * List public share pages in a workspace
-         * @description List public share pages in a workspace
+         * @description Lists public share pages owned by the workspace with metadata only (token is masked). Backs the share-management panel.
          */
         get: operations["public-shares-list"];
         put?: never;
         /**
          * Create a public share page (returns plaintext token once)
-         * @description Create a public share page (returns plaintext token once)
+         * @description Mints a new public share page with a fresh URL token. The token is returned plaintext exactly once so the operator can copy the share URL; subsequent reads only return its hash.
          */
         post: operations["public-shares-create"];
         delete?: never;
@@ -4169,21 +4169,21 @@ export interface paths {
         };
         /**
          * Get a public share page with its published events
-         * @description Get a public share page with its published events
+         * @description Returns the share page's metadata plus the ordered list of events currently published on it. The plaintext token is not returned.
          */
         get: operations["public-shares-get"];
         put?: never;
         post?: never;
         /**
          * Delete a public share page (admin or owner only)
-         * @description Delete a public share page (admin or owner only)
+         * @description Removes the share page so its URL stops resolving. Permitted to the share owner or workspace admins. Idempotent.
          */
         delete: operations["public-shares-delete"];
         options?: never;
         head?: never;
         /**
          * Update public share page metadata
-         * @description Update public share page metadata
+         * @description Updates the share page title, description, and theme. Token / event list use dedicated endpoints.
          */
         patch: operations["public-shares-patch"];
         trace?: never;
@@ -4199,7 +4199,7 @@ export interface paths {
         put?: never;
         /**
          * Attach events to a public share page
-         * @description Attach events to a public share page
+         * @description Publishes one or more events on the share page. Order defaults to creation order; reorder via /events/reorder.
          */
         post: operations["public-shares-events-attach"];
         delete?: never;
@@ -4223,7 +4223,7 @@ export interface paths {
         head?: never;
         /**
          * Batch-reorder the events published on a public share page
-         * @description Batch-reorder the events published on a public share page
+         * @description Replaces the order of published events in a single request after a drag-and-drop. Atomic so no client sees a partial reorder.
          */
         patch: operations["public-shares-events-reorder"];
         trace?: never;
@@ -4240,7 +4240,7 @@ export interface paths {
         post?: never;
         /**
          * Detach an event from a public share page
-         * @description Detach an event from a public share page
+         * @description Unpublishes the named event from the share page without deleting the event itself. Idempotent.
          */
         delete: operations["public-shares-events-detach"];
         options?: never;
@@ -4259,7 +4259,7 @@ export interface paths {
         put?: never;
         /**
          * Rotate the URL token for a public share page
-         * @description Rotate the URL token for a public share page
+         * @description Replaces the share's URL token with a fresh one. The previous token immediately stops resolving. The new plaintext token is returned exactly once.
          */
         post: operations["public-shares-rotate"];
         delete?: never;
@@ -4277,7 +4277,7 @@ export interface paths {
         };
         /**
          * List pending relation suggestions for a workspace
-         * @description List pending relation suggestions for a workspace
+         * @description Returns auto-detected task relation candidates (likely duplicates / dependencies) that the embedding pipeline has surfaced for the workspace and that no one has accepted or dismissed yet.
          */
         get: operations["relation-suggestions-list-workspace"];
         put?: never;
@@ -4299,7 +4299,7 @@ export interface paths {
         put?: never;
         /**
          * Apply AI proposal — create parent task with subtasks and assignees
-         * @description Apply AI proposal — create parent task with subtasks and assignees
+         * @description Persists a proposal returned by /propose-smart: creates the parent task plus each accepted subtask under it and sets the suggested assignees. The client may trim the subtask set before applying.
          */
         post: operations["tasks-apply-smart"];
         delete?: never;
@@ -4317,7 +4317,7 @@ export interface paths {
         };
         /**
          * List archived tasks in a workspace
-         * @description List archived tasks in a workspace
+         * @description Returns archived tasks in the workspace with cursor pagination. Used by the archive panel and bulk-restore tooling.
          */
         get: operations["tasks-archived-list"];
         put?: never;
@@ -4339,7 +4339,7 @@ export interface paths {
         put?: never;
         /**
          * AI-powered subtask decomposition and assignee suggestions
-         * @description AI-powered subtask decomposition and assignee suggestions
+         * @description Asks the workspace's LLM to decompose a goal into subtasks with suggested assignees. Returns the proposal and a cache key so /apply-smart can persist it; nothing is written until apply.
          */
         post: operations["tasks-propose-smart"];
         delete?: never;
@@ -4357,13 +4357,13 @@ export interface paths {
         };
         /**
          * List timeboxes in a workspace
-         * @description List timeboxes in a workspace
+         * @description Returns timeboxes in the workspace ordered by start date. Used by the timebox planner to render past, current, and upcoming periods.
          */
         get: operations["timeboxes-list"];
         put?: never;
         /**
          * Create a timebox
-         * @description Create a timebox
+         * @description Creates a new timebox (sprint / focus block) with a date range, owner, and goal. Tasks are attached separately via /timeboxes/{id}/tasks.
          */
         post: operations["timeboxes-create"];
         delete?: never;
@@ -4381,21 +4381,21 @@ export interface paths {
         };
         /**
          * Fetch a timebox by id
-         * @description Fetch a timebox by id
+         * @description Returns a single timebox with metadata and aggregate progress (counts only). Use /tasks for the task list.
          */
         get: operations["timeboxes-get"];
         put?: never;
         post?: never;
         /**
          * Soft-delete a timebox
-         * @description Soft-delete a timebox
+         * @description Marks the timebox as removed. Tasks previously associated stay queryable; the link rows are tombstoned. Idempotent.
          */
         delete: operations["timeboxes-delete"];
         options?: never;
         head?: never;
         /**
          * Update a timebox
-         * @description Update a timebox
+         * @description Updates timebox name, goal, owner, or date range. Status changes use the dedicated /status endpoint.
          */
         patch: operations["timeboxes-update"];
         trace?: never;
@@ -4411,7 +4411,7 @@ export interface paths {
         put?: never;
         /**
          * Transition timebox status
-         * @description Transition timebox status
+         * @description Moves the timebox between planned / active / completed / cancelled. Status transitions enforce a state machine and emit timeline events.
          */
         post: operations["timeboxes-update-status"];
         delete?: never;
@@ -4429,13 +4429,13 @@ export interface paths {
         };
         /**
          * List tasks in a timebox with progress
-         * @description List tasks in a timebox with progress
+         * @description Returns the tasks associated with the timebox plus per-task progress and the aggregate completion percentage.
          */
         get: operations["timeboxes-list-tasks"];
         put?: never;
         /**
          * Add a task to a timebox
-         * @description Add a task to a timebox
+         * @description Associates an existing workspace task with the timebox so it counts toward the timebox's progress and burndown.
          */
         post: operations["timeboxes-add-task"];
         delete?: never;
@@ -4456,7 +4456,7 @@ export interface paths {
         post?: never;
         /**
          * Remove a task from a timebox
-         * @description Remove a task from a timebox
+         * @description Detaches the task from the timebox without affecting the task itself. Idempotent.
          */
         delete: operations["timeboxes-remove-task"];
         options?: never;
@@ -4473,7 +4473,7 @@ export interface paths {
         };
         /**
          * List events in a workspace's timeline
-         * @description List events in a workspace's timeline
+         * @description Returns the workspace-wide event stream (every task / project / signal event the caller can see). Cursor-paginated and intended for the workspace Activity view.
          */
         get: operations["workspaces-timeline-list"];
         put?: never;
@@ -4493,7 +4493,7 @@ export interface paths {
         };
         /**
          * List workspace users (actor picker)
-         * @description List workspace users (actor picker)
+         * @description Lightweight listing of workspace members for actor / assignee pickers. Returns only id, display name, and avatar URL — no role or session info — and is the source of truth for in-product mention pickers.
          */
         get: operations["workspaces-users-list"];
         put?: never;
@@ -4513,13 +4513,13 @@ export interface paths {
         };
         /**
          * List webhook subscriptions
-         * @description List webhook subscriptions
+         * @description Lists every webhook subscription in the workspace with its target URL, event filters, and active state. Signing secrets are masked.
          */
         get: operations["webhooks-list"];
         put?: never;
         /**
          * Create a webhook subscription
-         * @description Create a webhook subscription
+         * @description Registers an outbound webhook subscription for the workspace. Returns the freshly minted HMAC signing secret in the response body — this is the only time it is returned plaintext.
          */
         post: operations["webhooks-create"];
         delete?: never;
@@ -4537,14 +4537,14 @@ export interface paths {
         };
         /**
          * Get a webhook subscription (includes secret)
-         * @description Get a webhook subscription (includes secret)
+         * @description Returns the named webhook subscription including its plaintext signing secret so the operator can rotate it. Restricted to workspace admins.
          */
         get: operations["webhooks-get"];
         put?: never;
         post?: never;
         /**
          * Soft-delete a webhook subscription
-         * @description Soft-delete a webhook subscription
+         * @description Marks the subscription as removed so no further deliveries are attempted. Delivery history remains queryable for audit.
          */
         delete: operations["webhooks-delete"];
         options?: never;
@@ -4561,7 +4561,7 @@ export interface paths {
         };
         /**
          * List delivery log for a webhook subscription
-         * @description List delivery log for a webhook subscription
+         * @description Returns recent delivery attempts for the subscription with status code, latency, error reason, and the redacted payload preview. Used by the webhook detail panel for diagnostics.
          */
         get: operations["webhooks-deliveries-list"];
         put?: never;
@@ -4583,7 +4583,7 @@ export interface paths {
         put?: never;
         /**
          * Send a test ping delivery
-         * @description Send a test ping delivery
+         * @description Synchronously sends a test ping payload signed with the subscription's secret so the operator can verify reachability and signature handling without waiting for a real event.
          */
         post: operations["webhooks-test-delivery"];
         delete?: never;
@@ -4607,7 +4607,7 @@ export interface paths {
         head?: never;
         /**
          * Activate or deactivate a webhook subscription
-         * @description Activate or deactivate a webhook subscription
+         * @description Flips the subscription's active flag. Inactive subscriptions stay registered but skip delivery — useful for pausing during a downstream outage.
          */
         patch: operations["webhooks-toggle"];
         trace?: never;
