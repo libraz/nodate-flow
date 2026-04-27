@@ -6,6 +6,7 @@
 
 import Icon from '@nodate-flow/ui/icon';
 import { cx } from '@nodate-flow/ui/lib/cx';
+import { useNavigate } from '@tanstack/react-router';
 import { Archive, Check } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -39,17 +40,36 @@ interface NotificationDropdownProps {
   onClose: () => void;
 }
 
+/**
+ * Maps a notification's resource pointer to the in-app destination
+ * route. Returns `null` when the notification is informational only
+ * (no recognised resource), in which case the row click only marks the
+ * row as read.
+ */
+function resourceHref(resourceType: string, resourceId: string | null): string | null {
+  if (!resourceId) return null;
+  switch (resourceType) {
+    case 'task':
+      return `/tasks/${resourceId}`;
+    default:
+      return null;
+  }
+}
+
 function NotificationRow({
   item,
   locale,
+  onNavigate,
 }: {
   item: NotificationItem;
   locale: string;
+  onNavigate: (href: string) => void;
 }): ReactElement {
   const { t } = useTranslation('notifications');
   const markRead = useMarkNotificationRead();
   const archive = useArchiveNotification();
   const isUnread = item.readAt === null;
+  const href = resourceHref(item.resourceType, item.resourceId);
 
   const handleMarkRead = (e: React.MouseEvent): void => {
     e.stopPropagation();
@@ -63,6 +83,7 @@ function NotificationRow({
 
   const handleRowClick = (): void => {
     if (isUnread) markRead.mutate(item.id);
+    if (href) onNavigate(href);
   };
 
   return (
@@ -124,6 +145,12 @@ export default function NotificationDropdown({
   const items = data.pages.flatMap((p) => p.notifications);
   const wsId = useCurrentWorkspaceId();
   const markAll = useMarkAllRead(wsId);
+  const navigate = useNavigate();
+
+  const handleNavigate = (href: string): void => {
+    onClose();
+    void navigate({ to: href });
+  };
 
   const hasUnread = items.some((item) => item.readAt === null);
 
@@ -158,7 +185,12 @@ export default function NotificationDropdown({
         ) : (
           <ul className={styles.notifList}>
             {items.map((item) => (
-              <NotificationRow key={item.id} item={item} locale={locale} />
+              <NotificationRow
+                key={item.id}
+                item={item}
+                locale={locale}
+                onNavigate={handleNavigate}
+              />
             ))}
           </ul>
         )}
