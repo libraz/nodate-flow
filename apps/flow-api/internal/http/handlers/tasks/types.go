@@ -266,20 +266,14 @@ type MyTaskListItem struct {
 
 // ListMyTasksInput is the query for GET /me/tasks.
 //
-// Limit override: this is a unified cross-workspace dashboard list
-// where clients (notably the home / "today" view) typically want a
-// single round-trip across every workspace the actor belongs to;
-// the per-workspace cap of 200 (handlerutil.MaxListLimit) would
-// force pagination on power users with 5+ workspaces. Cap raised to
-// 500 with a default of 200.
-//
 // `cursor` opt-in: when non-empty the handler uses
 // ListMyTasksGlobalKeyset and emits `nextCursor`; the OFFSET path
 // remains the default for backward compatibility.
 type ListMyTasksInput struct {
 	Cursor string `query:"cursor" doc:"Opaque cursor returned by previous page; pass to fetch next page. Empty when at end."`
-	Limit  int32  `query:"limit" minimum:"1" maximum:"500" default:"200"`
-	Offset int32  `query:"offset" minimum:"0" default:"0"`
+	// Cross-workspace dashboard fan-out: power users span many workspaces; cap raised to 1000.
+	Limit  int32 `query:"limit" minimum:"1" maximum:"1000" default:"100"`
+	Offset int32 `query:"offset" minimum:"0" default:"0"`
 }
 
 // ListMyTasksBody is the response payload for GET /me/tasks.
@@ -299,18 +293,13 @@ type ListMyTasksOutput struct {
 // cross-workspace calendar. `from` / `to` are inclusive dates on the
 // server-side clock; the client should send the widest range it plans
 // to render.
-//
-// Limit override: the calendar grid renders every dated task the
-// actor sees across all workspaces in a single month, which can
-// realistically exceed 500 for shared / project-heavy installs.
-// Cap raised to 1000 with a default of 500. Higher than
-// handlerutil.MaxListLimit by design.
 type ListMyTasksWithDatesInput struct {
 	From   string `query:"from" required:"true" doc:"Range start YYYY-MM-DD (inclusive)"`
 	To     string `query:"to" required:"true" doc:"Range end YYYY-MM-DD (inclusive)"`
 	Cursor string `query:"cursor" doc:"Opaque cursor returned by previous page; pass to fetch next page. Empty when at end."`
-	Limit  int32  `query:"limit" minimum:"1" maximum:"1000" default:"500"`
-	Offset int32  `query:"offset" minimum:"0" default:"0"`
+	// Cross-workspace calendar grid: month-range fetch may exceed handlerutil.MaxListLimit; cap raised to 1000.
+	Limit  int32 `query:"limit" minimum:"1" maximum:"1000" default:"100"`
+	Offset int32 `query:"offset" minimum:"0" default:"0"`
 }
 
 // ListMyTasksWithDatesBody is the response payload for GET /me/tasks-with-dates.
@@ -1013,16 +1002,12 @@ type DeleteTaskEventLinkOutput struct {
 }
 
 // ListLinkedEventsInput is the path for GET /tasks/{id}/linked-events.
-//
-// Limit override: link graphs around a single umbrella task can
-// span hundreds of contributing events; the timeline view paginates
-// internally but expects a generous initial fetch, so cap is raised
-// to 500 with a default of 100.
 type ListLinkedEventsInput struct {
 	ID       string `path:"id"`
 	Relation string `query:"relation" enum:"contributes_to,blocks,depends_on,prep_for" doc:"Optional filter; empty = all relations"`
-	Limit    int32  `query:"limit" default:"100" minimum:"1" maximum:"500"`
-	Offset   int32  `query:"offset" default:"0" minimum:"0"`
+	// Umbrella link graph: contributing-event fan-in is unbounded per task; cap raised to 1000.
+	Limit  int32 `query:"limit" default:"100" minimum:"1" maximum:"1000"`
+	Offset int32 `query:"offset" default:"0" minimum:"0"`
 }
 
 // ListLinkedEventsOutput is the response for GET /tasks/{id}/linked-events.
@@ -1034,14 +1019,12 @@ type ListLinkedEventsOutput struct {
 }
 
 // ListLinkedTasksInput is the path for GET /calendar-events/{evtId}/linked-tasks.
-//
-// Limit override: mirror of [ListLinkedEventsInput] for the
-// reverse-direction lookup. Cap raised to 500 with a default of 100.
 type ListLinkedTasksInput struct {
 	EventID  string `path:"evtId"`
 	Relation string `query:"relation" enum:"contributes_to,blocks,depends_on,prep_for"`
-	Limit    int32  `query:"limit" default:"100" minimum:"1" maximum:"500"`
-	Offset   int32  `query:"offset" default:"0" minimum:"0"`
+	// Reverse umbrella graph: mirror of ListLinkedEventsInput; cap raised to 1000.
+	Limit  int32 `query:"limit" default:"100" minimum:"1" maximum:"1000"`
+	Offset int32 `query:"offset" default:"0" minimum:"0"`
 }
 
 // ListLinkedTasksOutput is the response for GET /calendar-events/{evtId}/linked-tasks.

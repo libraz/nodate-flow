@@ -1,6 +1,9 @@
 package handlerutil
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestBindDefaults(t *testing.T) {
 	t.Parallel()
@@ -69,5 +72,20 @@ func TestBindWithinRange(t *testing.T) {
 	got := Bind(75, 25, DefaultListLimit, MaxListLimit)
 	if got.Limit != 75 || got.Offset != 25 {
 		t.Errorf("in-range: got (%d,%d) want (75,25)", got.Limit, got.Offset)
+	}
+}
+
+// TestStandardLimitTagMatchesConstants guards against drift between the
+// canonical pagination constants and the struct-tag string copied onto
+// list endpoint Limit fields. If a future change updates one without
+// the other, list endpoints would silently disagree with the helper.
+func TestStandardLimitTagMatchesConstants(t *testing.T) {
+	t.Parallel()
+	want := fmt.Sprintf(`query:"limit" minimum:"1" maximum:"%d" default:"%d"`, MaxListLimit, DefaultListLimit)
+	if StandardLimitTag != want {
+		t.Errorf("StandardLimitTag drifted from constants:\n got  %q\n want %q", StandardLimitTag, want)
+	}
+	if StandardOffsetTag != `query:"offset" minimum:"0" default:"0"` {
+		t.Errorf("StandardOffsetTag unexpected: %q", StandardOffsetTag)
 	}
 }

@@ -30,7 +30,7 @@ func ListMyTasks(deps Deps) func(context.Context, *ListMyTasksInput) (*ListMyTas
 
 		limit := in.Limit
 		if limit <= 0 {
-			limit = 200
+			limit = 100
 		}
 
 		out := &ListMyTasksOutput{}
@@ -160,7 +160,7 @@ func ListMyTasksWithDates(deps Deps) func(context.Context, *ListMyTasksWithDates
 
 		limit := in.Limit
 		if limit <= 0 {
-			limit = 500
+			limit = 100
 		}
 
 		fromNT := sql.NullTime{Time: from, Valid: true}

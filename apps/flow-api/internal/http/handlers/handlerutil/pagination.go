@@ -24,6 +24,20 @@ const (
 	MaxListLimit int32 = 200
 )
 
+// StandardLimitTag is the canonical Huma struct-tag string for a Limit
+// query parameter on a generic list endpoint. List handlers should
+// copy this value verbatim onto their `Limit int32` field unless the
+// endpoint has a documented exception. The value is kept here so that
+// any audit (`rg "StandardLimitTag"`) reaches every list endpoint via a
+// single source of truth.
+const StandardLimitTag = `query:"limit" minimum:"1" maximum:"200" default:"50"`
+
+// StandardOffsetTag is the canonical Huma struct-tag string for an
+// Offset query parameter on a generic list endpoint. Handlers using a
+// keyset cursor still expose Offset for the OFFSET fallback path, so
+// the tag applies repository-wide.
+const StandardOffsetTag = `query:"offset" minimum:"0" default:"0"`
+
 // PageParams is the validated, clamped pagination tuple consumed by
 // query layers. The fields mirror SQL LIMIT / OFFSET 1:1.
 type PageParams struct {
