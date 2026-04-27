@@ -69,13 +69,21 @@ function BulkActionBar({
   const handleBulkPriority = async (priority: TaskPriority) => {
     setBusy(true);
     try {
-      await Promise.all(
+      const results = await Promise.allSettled(
         selectedIds.map((id) => updateTask.mutateAsync({ id, patch: { priority } })),
       );
-      toaster.show({ tone: 'success', message: t('tasks.bulk.priority_updated') });
-      onClear();
-    } catch {
-      toaster.show({ tone: 'danger', message: t('tasks.bulk.update_failed') });
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      if (failed === 0) {
+        toaster.show({ tone: 'success', message: t('tasks.bulk.priority_updated') });
+        onClear();
+      } else if (failed === results.length) {
+        toaster.show({ tone: 'danger', message: t('tasks.bulk.update_failed') });
+      } else {
+        toaster.show({
+          tone: 'danger',
+          message: t('tasks.bulk.update_partial', { failed, total: results.length }),
+        });
+      }
     } finally {
       setBusy(false);
     }
@@ -84,11 +92,19 @@ function BulkActionBar({
   const handleBulkDelete = async () => {
     setBusy(true);
     try {
-      await Promise.all(selectedIds.map((id) => deleteTask.mutateAsync(id)));
-      toaster.show({ tone: 'success', message: t('tasks.bulk.deleted') });
-      onClear();
-    } catch {
-      toaster.show({ tone: 'danger', message: t('tasks.bulk.delete_failed') });
+      const results = await Promise.allSettled(selectedIds.map((id) => deleteTask.mutateAsync(id)));
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      if (failed === 0) {
+        toaster.show({ tone: 'success', message: t('tasks.bulk.deleted') });
+        onClear();
+      } else if (failed === results.length) {
+        toaster.show({ tone: 'danger', message: t('tasks.bulk.delete_failed') });
+      } else {
+        toaster.show({
+          tone: 'danger',
+          message: t('tasks.bulk.delete_partial', { failed, total: results.length }),
+        });
+      }
     } finally {
       setBusy(false);
     }
@@ -488,8 +504,16 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
 
   const virtualItems = virtualizer.getVirtualItems();
 
+  const handleWrapperKeyDown = (e: React.KeyboardEvent<HTMLDivElement>): void => {
+    if (e.key !== 'Escape') return;
+    if (editingCell) return;
+    if (selectedRows.size === 0) return;
+    e.preventDefault();
+    clearSelection();
+  };
+
   return (
-    <div className={css.wrapper}>
+    <div className={css.wrapper} onKeyDown={handleWrapperKeyDown}>
       {selectedIds.length > 0 && (
         <BulkActionBar selectedIds={selectedIds} onClear={clearSelection} />
       )}

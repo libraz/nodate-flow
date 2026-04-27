@@ -675,6 +675,13 @@
       "plus_n": "+{n, plural, one {# more} other {# more}}",
       "count": "{count, plural, one {# person} other {# people}}"
     },
+    "file_size": {
+      "byte": "B",
+      "kilobyte": "KB",
+      "megabyte": "MB",
+      "gigabyte": "GB",
+      "terabyte": "TB"
+    },
     "bulk": {
       "selected": "{count, plural, one {# task selected} other {# tasks selected}}",
       "set_priority": "Set priority",
@@ -682,8 +689,10 @@
       "clear": "Clear",
       "priority_updated": "Priority updated.",
       "update_failed": "Could not update tasks.",
+      "update_partial": "{failed} of {total} tasks failed to update.",
       "deleted": "Tasks deleted.",
-      "delete_failed": "Could not delete tasks."
+      "delete_failed": "Could not delete tasks.",
+      "delete_partial": "{failed} of {total} tasks failed to delete."
     },
     "inline": {
       "edit_title": "Edit title",

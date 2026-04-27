@@ -675,6 +675,13 @@
       "plus_n": "+{n, plural, other {# 人}}",
       "count": "{count, plural, other {# 人}}"
     },
+    "file_size": {
+      "byte": "B",
+      "kilobyte": "KB",
+      "megabyte": "MB",
+      "gigabyte": "GB",
+      "terabyte": "TB"
+    },
     "bulk": {
       "selected": "{count, plural, other {已选 # 个任务}}",
       "set_priority": "设置优先级",
@@ -682,8 +689,10 @@
       "clear": "清除",
       "priority_updated": "已更新优先级。",
       "update_failed": "更新任务失败。",
+      "update_partial": "{total} 项任务中有 {failed} 项更新失败。",
       "deleted": "已删除任务。",
-      "delete_failed": "删除任务失败。"
+      "delete_failed": "删除任务失败。",
+      "delete_partial": "{total} 项任务中有 {failed} 项删除失败。"
     },
     "inline": {
       "edit_title": "编辑标题",

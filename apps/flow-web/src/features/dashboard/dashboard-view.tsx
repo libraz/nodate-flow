@@ -23,9 +23,10 @@ import WidgetCard from './widget-card';
 interface WidgetGridProps {
   wsId: string;
   editing: boolean;
+  onAddWidget: () => void;
 }
 
-function WidgetGrid({ wsId, editing }: WidgetGridProps): ReactElement {
+function WidgetGrid({ wsId, editing, onAddWidget }: WidgetGridProps): ReactElement {
   const { t } = useTranslation('dashboard');
   const { data: widgets } = useWidgetsQuery(wsId);
   const deleteWidget = useDeleteWidget(wsId);
@@ -115,6 +116,10 @@ function WidgetGrid({ wsId, editing }: WidgetGridProps): ReactElement {
         </div>
         <p className={styles.emptyTitle}>{t('empty')}</p>
         <p className={styles.emptyDescription}>{t('empty_description')}</p>
+        <Button variant="primary" onClick={onAddWidget}>
+          <Icon icon={Plus} decorative size={14} />
+          {t('add_widget')}
+        </Button>
       </div>
     );
   }
@@ -195,7 +200,13 @@ export default function DashboardView({ workspaceId }: DashboardViewProps): Reac
           </div>
         }
       >
-        <WidgetGrid wsId={workspaceId} editing={editing} />
+        <WidgetGrid
+          wsId={workspaceId}
+          editing={editing}
+          onAddWidget={() => {
+            setDialogOpen(true);
+          }}
+        />
       </Suspense>
 
       <AddWidgetDialog

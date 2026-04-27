@@ -675,6 +675,13 @@
       "plus_n": "+他{n}件",
       "count": "{count}名"
     },
+    "file_size": {
+      "byte": "B",
+      "kilobyte": "KB",
+      "megabyte": "MB",
+      "gigabyte": "GB",
+      "terabyte": "TB"
+    },
     "bulk": {
       "selected": "{count}件のタスクを選択中",
       "set_priority": "優先度を設定",
@@ -682,8 +689,10 @@
       "clear": "選択解除",
       "priority_updated": "優先度を更新しました。",
       "update_failed": "タスクの更新に失敗しました。",
+      "update_partial": "{total}件中{failed}件のタスクの更新に失敗しました。",
       "deleted": "タスクを削除しました。",
-      "delete_failed": "タスクの削除に失敗しました。"
+      "delete_failed": "タスクの削除に失敗しました。",
+      "delete_partial": "{total}件中{failed}件のタスクの削除に失敗しました。"
     },
     "inline": {
       "edit_title": "タイトルを編集",
