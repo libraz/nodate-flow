@@ -367,7 +367,7 @@ function DescriptionEditor({
             inlineSize: '100%',
             ...(isEmpty
               ? {
-                  border: '1px dashed var(--nf-color-border, var(--nf-color-hairline))',
+                  border: '1px dashed var(--nf-color-border)',
                   borderRadius: '0.5rem',
                   padding: '1rem',
                   cursor: 'pointer',

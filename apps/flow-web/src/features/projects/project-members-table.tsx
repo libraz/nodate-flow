@@ -95,7 +95,7 @@ export default function ProjectMembersTable({ projectId }: ProjectMembersTablePr
               color: 'var(--nf-color-fg-muted)',
               border: '1px dashed var(--nf-color-border)',
               borderRadius: '0.5rem',
-              background: 'var(--nf-color-bg-sunken, transparent)',
+              background: 'var(--nf-color-bg-sunken)',
             }}
           >
             {t('projects.members.empty')}

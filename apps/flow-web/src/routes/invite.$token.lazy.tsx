@@ -38,14 +38,14 @@ function InviteAcceptPage(): ReactElement {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <h1
             style={{
-              fontFamily: 'var(--nf-font-display, var(--font-display))',
-              fontSize: 'var(--nf-text-2xl, 1.5rem)',
+              fontFamily: 'var(--nf-font-sans)',
+              fontSize: 'var(--nf-text-2xl)',
               margin: 0,
             }}
           >
             {t('workspaces.invites.join_title', { workspace: info.workspaceName })}
           </h1>
-          <p style={{ margin: 0, color: 'var(--nf-color-fg-muted, var(--nf-color-fg-muted))' }}>
+          <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
             {t('workspaces.invites.login_required')}
           </p>
           <Link
@@ -101,14 +101,14 @@ function InviteAcceptPage(): ReactElement {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
         <h1
           style={{
-            fontFamily: 'var(--nf-font-display, var(--font-display))',
-            fontSize: 'var(--nf-text-2xl, 1.5rem)',
+            fontFamily: 'var(--nf-font-sans)',
+            fontSize: 'var(--nf-text-2xl)',
             margin: 0,
           }}
         >
           {t('workspaces.invites.join_title', { workspace: info.workspaceName })}
         </h1>
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted, var(--nf-color-fg-muted))' }}>
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
           {t('workspaces.invites.join_description', {
             workspace: info.workspaceName,
             role: roleLabel(info.role),
@@ -118,8 +118,8 @@ function InviteAcceptPage(): ReactElement {
           <p
             style={{
               margin: 0,
-              fontSize: 'var(--nf-text-sm, 0.875rem)',
-              color: 'var(--nf-color-fg-muted, var(--nf-color-fg-muted))',
+              fontSize: 'var(--nf-text-sm)',
+              color: 'var(--nf-color-fg-muted)',
             }}
           >
             {t('workspaces.invites.expires_at', {
@@ -132,8 +132,8 @@ function InviteAcceptPage(): ReactElement {
             role="alert"
             style={{
               margin: 0,
-              color: 'var(--nf-color-danger, var(--nf-color-danger))',
-              fontSize: 'var(--nf-text-sm, 0.875rem)',
+              color: 'var(--nf-color-danger)',
+              fontSize: 'var(--nf-text-sm)',
             }}
           >
             {error}

@@ -208,8 +208,8 @@ export default function LensPicker({ workspaceId, projectId }: LensPickerProps):
                           fontSize: '0.6875rem',
                           padding: '0.125rem 0.375rem',
                           borderRadius: '999px',
-                          background: 'var(--nf-color-accent-subtle, var(--nf-color-bg-sunken))',
-                          color: 'var(--nf-color-accent, var(--nf-color-fg))',
+                          background: 'var(--nf-color-accent-subtle)',
+                          color: 'var(--nf-color-accent)',
                         }}
                       >
                         {t('tasks.lens.default_badge')}
@@ -281,7 +281,7 @@ export default function LensPicker({ workspaceId, projectId }: LensPickerProps):
                 padding: '0.25rem 0.5rem',
                 font: 'inherit',
                 fontSize: '0.8125rem',
-                background: 'var(--nf-color-accent, var(--nf-color-fg))',
+                background: 'var(--nf-color-accent)',
                 color: 'var(--nf-color-bg)',
                 cursor: saving ? 'wait' : 'pointer',
                 opacity: nameInput.trim().length === 0 ? 0.5 : 1,

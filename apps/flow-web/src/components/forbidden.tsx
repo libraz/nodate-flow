@@ -68,8 +68,8 @@ export default function Forbidden(): ReactElement {
           alignItems: 'center',
           padding: '0.5rem 1.25rem',
           borderRadius: '0.5rem',
-          background: 'var(--nf-color-accent, var(--nf-color-accent))',
-          color: 'var(--nf-color-fg-on-accent, white)',
+          background: 'var(--nf-color-accent)',
+          color: 'var(--nf-color-fg-on-accent)',
           textDecoration: 'none',
           fontWeight: 500,
         }}

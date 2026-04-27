@@ -61,7 +61,7 @@ function StatCard({
         padding: '1rem 1.25rem',
         borderRadius: '0.75rem',
         background: 'var(--nf-color-surface))',
-        border: '1px solid var(--nf-color-border, var(--nf-color-hairline))',
+        border: '1px solid var(--nf-color-border)',
         flex: '1 1 0',
         minWidth: '10rem',
       }}
@@ -74,7 +74,7 @@ function StatCard({
           width: '2.5rem',
           height: '2.5rem',
           borderRadius: '0.5rem',
-          background: accent ?? 'var(--nf-color-accent, var(--nf-color-accent))',
+          background: accent ?? 'var(--nf-color-accent)',
           color: 'white',
           flexShrink: 0,
         }}
@@ -237,7 +237,7 @@ function TaskSummary(): ReactElement {
               to="/today"
               style={{
                 fontSize: '0.8125rem',
-                color: 'var(--nf-color-accent, var(--nf-color-accent))',
+                color: 'var(--nf-color-accent)',
                 textDecoration: 'none',
               }}
             >
@@ -278,7 +278,7 @@ function WorkspaceLinks(): ReactElement {
             padding: '0.5rem 1rem',
             borderRadius: '0.5rem',
             background: 'var(--nf-color-surface))',
-            border: '1px solid var(--nf-color-border, var(--nf-color-hairline))',
+            border: '1px solid var(--nf-color-border)',
             color: 'inherit',
             textDecoration: 'none',
             fontSize: 'var(--nf-text-sm)',
@@ -489,7 +489,7 @@ function HomePage(): ReactElement {
             gap: '0.5rem',
             padding: '0.5rem 1rem',
             borderRadius: '0.5rem',
-            background: 'var(--nf-color-accent, var(--nf-color-accent))',
+            background: 'var(--nf-color-accent)',
             color: 'white',
             border: 'none',
             cursor: 'pointer',
@@ -514,7 +514,7 @@ function HomePage(): ReactElement {
             borderRadius: '0.5rem',
             background: 'transparent',
             color: 'var(--nf-color-fg)',
-            border: '1px solid var(--nf-color-border, var(--nf-color-hairline))',
+            border: '1px solid var(--nf-color-border)',
             cursor: 'pointer',
             fontSize: 'var(--nf-text-sm)',
           }}
@@ -532,7 +532,7 @@ function HomePage(): ReactElement {
             borderRadius: '0.5rem',
             background: 'transparent',
             color: 'var(--nf-color-fg)',
-            border: '1px solid var(--nf-color-border, var(--nf-color-hairline))',
+            border: '1px solid var(--nf-color-border)',
             textDecoration: 'none',
             fontSize: 'var(--nf-text-sm)',
           }}

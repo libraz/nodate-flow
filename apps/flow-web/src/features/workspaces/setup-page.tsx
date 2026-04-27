@@ -110,12 +110,12 @@ export default function SetupPage(): ReactElement {
           inlineSize: 'min(28rem, 100%)',
           display: 'flex',
           flexDirection: 'column',
-          gap: 'var(--nf-space-5, 1.5rem)',
-          padding: 'var(--nf-space-6, 2rem)',
-          borderRadius: 'var(--nf-radius-lg, 0.75rem)',
-          background: 'var(--nf-color-bg-elevated, var(--nf-color-surface))',
-          border: '1px solid var(--nf-color-border, var(--nf-color-hairline))',
-          boxShadow: 'var(--nf-shadow-md, 0 4px 16px rgba(0, 0, 0, 0.06))',
+          gap: 'var(--nf-space-5)',
+          padding: 'var(--nf-space-6)',
+          borderRadius: 'var(--nf-radius-lg)',
+          background: 'var(--nf-color-bg-elevated)',
+          border: '1px solid var(--nf-color-border)',
+          boxShadow: 'var(--nf-shadow-md)',
         }}
       >
         <header style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -136,7 +136,7 @@ export default function SetupPage(): ReactElement {
             style={{
               margin: 0,
               color: 'var(--nf-color-fg-muted)',
-              fontSize: 'var(--nf-text-sm, 0.875rem)',
+              fontSize: 'var(--nf-text-sm)',
               lineHeight: 1.5,
             }}
           >
@@ -149,7 +149,7 @@ export default function SetupPage(): ReactElement {
             void handleSubmit(e);
           }}
           noValidate
-          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4, 1rem)' }}
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}
         >
           <FormField
             label={t('workspaces.form.name')}

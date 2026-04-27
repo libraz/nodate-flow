@@ -157,14 +157,10 @@ export default function TaskFiltersBar({
                   paddingInline: '0.625rem',
                   borderRadius: '999px',
                   border: active
-                    ? '1px solid var(--nf-color-accent, currentColor)'
+                    ? '1px solid var(--nf-color-accent)'
                     : '1px solid var(--nf-color-border)',
-                  background: active
-                    ? 'var(--nf-color-accent-subtle, var(--nf-color-bg-sunken))'
-                    : 'transparent',
-                  color: active
-                    ? 'var(--nf-color-accent, var(--nf-color-fg))'
-                    : 'var(--nf-color-fg-muted)',
+                  background: active ? 'var(--nf-color-accent-subtle)' : 'transparent',
+                  color: active ? 'var(--nf-color-accent)' : 'var(--nf-color-fg-muted)',
                   font: 'inherit',
                   fontSize: '0.8125rem',
                   fontWeight: active ? 600 : 400,
@@ -182,7 +178,7 @@ export default function TaskFiltersBar({
             display: 'block',
             inlineSize: '1px',
             blockSize: '1.25rem',
-            background: 'var(--nf-color-border, var(--nf-color-hairline))',
+            background: 'var(--nf-color-border)',
             flexShrink: 0,
           }}
         />
@@ -206,14 +202,10 @@ export default function TaskFiltersBar({
                   paddingInline: '0.625rem',
                   borderRadius: '999px',
                   border: active
-                    ? '1px solid var(--nf-color-accent, currentColor)'
+                    ? '1px solid var(--nf-color-accent)'
                     : '1px solid var(--nf-color-border)',
-                  background: active
-                    ? 'var(--nf-color-accent-subtle, var(--nf-color-bg-sunken))'
-                    : 'transparent',
-                  color: active
-                    ? 'var(--nf-color-accent, var(--nf-color-fg))'
-                    : 'var(--nf-color-fg-muted)',
+                  background: active ? 'var(--nf-color-accent-subtle)' : 'transparent',
+                  color: active ? 'var(--nf-color-accent)' : 'var(--nf-color-fg-muted)',
                   font: 'inherit',
                   fontSize: '0.8125rem',
                   fontWeight: active ? 600 : 400,

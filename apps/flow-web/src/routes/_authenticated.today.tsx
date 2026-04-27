@@ -154,7 +154,7 @@ function TodayRoute(): ReactElement {
               alignItems: 'center',
               padding: '0.5rem 1rem',
               borderRadius: '0.5rem',
-              background: 'var(--nf-color-accent, var(--nf-color-accent))',
+              background: 'var(--nf-color-accent)',
               color: 'white',
               border: 'none',
               cursor: 'pointer',
@@ -210,7 +210,7 @@ function TodayRoute(): ReactElement {
                       padding: '0.6rem 0.75rem',
                       borderRadius: '0.5rem',
                       background: isOverdue
-                        ? 'var(--nf-color-danger-subtle, rgba(192,57,43,0.08))'
+                        ? 'var(--nf-color-danger-subtle)'
                         : 'var(--nf-color-surface))',
                       borderInlineStart: isOverdue
                         ? '3px solid var(--nf-color-danger)'

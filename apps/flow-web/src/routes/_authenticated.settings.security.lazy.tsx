@@ -19,8 +19,8 @@ const sectionStyle = {
   gap: '0.875rem',
   padding: '1.25rem 1.5rem',
   borderRadius: '0.75rem',
-  border: '1px solid var(--nf-color-border, var(--nf-color-border))',
-  background: 'var(--nf-color-surface, var(--nf-color-surface))',
+  border: '1px solid var(--nf-color-border)',
+  background: 'var(--nf-color-surface)',
 } as const;
 
 const sectionHeadingStyle = {
@@ -29,7 +29,7 @@ const sectionHeadingStyle = {
   fontWeight: 600,
   color: 'var(--nf-color-fg)',
   paddingBlockEnd: '0.75rem',
-  borderBlockEnd: '1px solid var(--nf-color-border, var(--nf-color-border))',
+  borderBlockEnd: '1px solid var(--nf-color-border)',
 } as const;
 
 function SecurityRoute(): ReactElement {

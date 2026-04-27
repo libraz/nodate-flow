@@ -394,7 +394,7 @@ function GanttView(): ReactElement {
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <style>{`
-        .gantt-label-row:hover { background: var(--nf-color-bg-sunken, rgba(127,127,127,0.06)); }
+        .gantt-label-row:hover { background: var(--nf-color-bg-sunken); }
         .gantt-label-row:focus-visible { outline: 2px solid var(--nf-color-accent); outline-offset: -2px; }
       `}</style>
       <header
@@ -621,10 +621,7 @@ function GanttView(): ReactElement {
                   markerHeight="4"
                   orient="auto-start-reverse"
                 >
-                  <path
-                    d="M 0 0 L 10 5 L 0 10 z"
-                    fill="var(--nf-color-fg-muted, var(--nf-color-fg-muted))"
-                  />
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--nf-color-fg-muted)" />
                 </marker>
               </defs>
               {/* Day grid + weekend shading */}
@@ -653,7 +650,7 @@ function GanttView(): ReactElement {
                       y={HEADER_HEIGHT - 6}
                       textAnchor="middle"
                       fontSize="10"
-                      fill="var(--nf-color-fg-muted, var(--nf-color-fg-muted))"
+                      fill="var(--nf-color-fg-muted)"
                     >
                       {c.date.getDate()}
                     </text>
@@ -664,7 +661,7 @@ function GanttView(): ReactElement {
                       y={14}
                       fontSize="10"
                       fontWeight="600"
-                      fill="var(--nf-color-fg, var(--nf-color-fg))"
+                      fill="var(--nf-color-fg)"
                     >
                       {`${c.date.getFullYear()}/${c.date.getMonth() + 1}`}
                     </text>
@@ -674,13 +671,7 @@ function GanttView(): ReactElement {
 
               {/* Fallback month label when no boundary is in view */}
               {!hasMonthBoundary ? (
-                <text
-                  x={4}
-                  y={14}
-                  fontSize="10"
-                  fontWeight="600"
-                  fill="var(--nf-color-fg, var(--nf-color-fg))"
-                >
+                <text x={4} y={14} fontSize="10" fontWeight="600" fill="var(--nf-color-fg)">
                   {`${firstDayDate.getFullYear()}/${firstDayDate.getMonth() + 1}`}
                 </text>
               ) : null}
@@ -709,7 +700,7 @@ function GanttView(): ReactElement {
                       ? CRITICAL_PATH_COLOR
                       : arrow.danger
                         ? CRITICAL_PATH_COLOR
-                        : 'var(--nf-color-fg-muted, var(--nf-color-fg-muted))'
+                        : 'var(--nf-color-fg-muted)'
                   }
                   strokeWidth={arrow.critical ? 1.5 : 0.75}
                   strokeDasharray={arrow.danger || arrow.critical ? undefined : '3 3'}

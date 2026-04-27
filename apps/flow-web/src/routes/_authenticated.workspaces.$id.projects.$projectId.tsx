@@ -152,8 +152,8 @@ function ProjectLayout(): ReactElement {
               'aria-current': 'page',
               'data-active': 'true',
               style: {
-                background: 'var(--nf-color-accent-subtle, rgba(155,89,182,0.12))',
-                color: 'var(--nf-color-accent, var(--nf-color-accent))',
+                background: 'var(--nf-color-accent-subtle)',
+                color: 'var(--nf-color-accent)',
                 fontWeight: 500,
               },
             }}
@@ -239,8 +239,8 @@ function ProjectNotFound({ workspaceId }: { workspaceId: string }): ReactElement
           alignItems: 'center',
           padding: '0.5rem 1.25rem',
           borderRadius: '0.5rem',
-          background: 'var(--nf-color-accent, var(--nf-color-accent))',
-          color: 'var(--nf-color-fg-on-accent, white)',
+          background: 'var(--nf-color-accent)',
+          color: 'var(--nf-color-fg-on-accent)',
           textDecoration: 'none',
           fontWeight: 500,
         }}

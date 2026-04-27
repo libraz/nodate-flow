@@ -472,10 +472,10 @@ export default function AuditLogView({
           style={{
             padding: '3rem 1rem',
             textAlign: 'center',
-            color: 'var(--nf-color-fg-muted, var(--nf-color-fg-muted))',
-            border: '1px dashed var(--nf-color-border, var(--nf-color-border))',
+            color: 'var(--nf-color-fg-muted)',
+            border: '1px dashed var(--nf-color-border)',
             borderRadius: '0.75rem',
-            background: 'var(--nf-color-bg-sunken, transparent)',
+            background: 'var(--nf-color-bg-sunken)',
             fontSize: '0.875rem',
           }}
         >

@@ -128,10 +128,10 @@ function TimelineInner({
           style={{
             padding: '3rem 1rem',
             textAlign: 'center',
-            color: 'var(--nf-color-fg-muted, var(--nf-color-fg-muted))',
-            border: '1px dashed var(--nf-color-border, var(--nf-color-border))',
+            color: 'var(--nf-color-fg-muted)',
+            border: '1px dashed var(--nf-color-border)',
             borderRadius: '0.75rem',
-            background: 'var(--nf-color-bg-sunken, transparent)',
+            background: 'var(--nf-color-bg-sunken)',
           }}
         >
           {t('view.empty')}
@@ -160,7 +160,7 @@ function TimelineInner({
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
                   color: 'var(--nf-color-fg-muted)',
-                  background: 'var(--nf-color-bg, var(--nf-color-bg))',
+                  background: 'var(--nf-color-bg)',
                   borderBlockEnd: '1px solid var(--nf-color-border)',
                 }}
               >

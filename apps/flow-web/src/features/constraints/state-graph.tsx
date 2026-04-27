@@ -143,7 +143,7 @@ export default function StateGraph({ current, activeSources }: StateGraphProps):
                 y={p.y + 4}
                 fontSize="11"
                 textAnchor="middle"
-                fill={active ? 'var(--nf-bg, white)' : 'currentColor'}
+                fill={active ? 'var(--nf-color-bg)' : 'currentColor'}
               >
                 {t(`common:tasks.status.${s}`)}
               </text>
