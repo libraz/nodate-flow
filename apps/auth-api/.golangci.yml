@@ -1,47 +1,59 @@
+version: "2"
 run:
-  timeout: 5m
   go: "1.25"
-
 linters:
-  disable-all: true
+  default: none
+  enable:
+    - depguard
+    - errcheck
+    - forbidigo
+    - gosec
+    - govet
+    - revive
+    - staticcheck
+  settings:
+    depguard:
+      rules:
+        crypto-internal:
+          list-mode: lax
+          files:
+            - '!**/internal/http/handlers/auth/**'
+            - '!**/internal/crypto/**'
+            - '!**/cmd/api/**'
+            - '!**/tests/**'
+            - '!**/testutil/**'
+          deny:
+            - pkg: github.com/nodate-flow/nodate-flow/packages/go-shared/crypto
+              desc: crypto package may only be imported from internal/http/handlers/auth, internal/crypto, cmd/api, and tests
+    forbidigo:
+      forbid:
+        - pattern: slog\.Int64\("(workspace|task|user|actor|project|page|label|comment|event|calendar|share|invite|session|identity)_id"
+          msg: log public_id (UUID string), not internal int id; convention 18
+        - pattern: slog\.Uint64\("(workspace|task|user|actor|project|page|label|comment|event|calendar|share|invite|session|identity)_id"
+          msg: log public_id (UUID string), not internal int id; convention 18
+      analyze-types: false
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - apps/auth-api/internal/db/generated
+      - apps/auth-api/internal/errors
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
   enable:
     - gofmt
     - goimports
-    - govet
-    - staticcheck
-    - errcheck
-    - depguard
-    - revive
-    - gosec
-    - forbidigo
-
-linters-settings:
-  depguard:
-    rules:
-      crypto-internal:
-        list-mode: lax
-        files:
-          - "!**/internal/http/handlers/auth/**"
-          - "!**/internal/crypto/**"
-          - "!**/cmd/api/**"
-          - "!**/tests/**"
-          - "!**/testutil/**"
-        deny:
-          - pkg: "github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
-            desc: "crypto package may only be imported from internal/http/handlers/auth, internal/crypto, cmd/api, and tests"
-  forbidigo:
-    # CLAUDE.md convention 18: internal `id INT UNSIGNED` is for FK / JOIN
-    # only. Only `public_id BINARY(16)` (UUID v7) may be exposed externally —
-    # including in structured logs. Use logutil.LogEntity instead of
-    # slog.Int64("<entity>_id", ...).
-    analyze-types: false
-    forbid:
-      - p: 'slog\.Int64\("(workspace|task|user|actor|project|page|label|comment|event|calendar|share|invite|session|identity)_id"'
-        msg: "log public_id (UUID string), not internal int id; convention 18"
-      - p: 'slog\.Uint64\("(workspace|task|user|actor|project|page|label|comment|event|calendar|share|invite|session|identity)_id"'
-        msg: "log public_id (UUID string), not internal int id; convention 18"
-
-issues:
-  exclude-dirs:
-    - apps/auth-api/internal/db/generated
-    - apps/auth-api/internal/errors
+  exclusions:
+    generated: lax
+    paths:
+      - apps/auth-api/internal/db/generated
+      - apps/auth-api/internal/errors
+      - third_party$
+      - builtin$
+      - examples$
