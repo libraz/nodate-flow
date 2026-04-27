@@ -63,7 +63,7 @@
   font: inherit;
   font-size: var(--nf-text-sm);
   color: var(--nf-color-fg);
-  background: var(--nf-color-surface, transparent);
+  background: var(--nf-color-surface);
   border: var(--nf-space-px) solid var(--nf-color-border);
   border-radius: var(--nf-radius-sm);
   cursor: pointer;

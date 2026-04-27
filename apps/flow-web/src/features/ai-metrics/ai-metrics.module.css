@@ -109,8 +109,8 @@
 .acceptanceTrack {
   block-size: 0.5rem;
   inline-size: 100%;
-  border-radius: var(--nf-radius-full, 999px);
-  background: var(--nf-color-bg-sunken, var(--nf-color-border));
+  border-radius: var(--nf-radius-pill);
+  background: var(--nf-color-bg-sunken);
   overflow: hidden;
 }
 
@@ -118,7 +118,7 @@
   block-size: 100%;
   background: var(--nf-color-accent);
   border-radius: inherit;
-  transition: inline-size var(--nf-duration-medium, 200ms) ease;
+  transition: inline-size var(--nf-duration-base) ease;
 }
 
 .acceptanceHint {
@@ -155,9 +155,9 @@
 .outboundTableWrap {
   inline-size: 100%;
   overflow-x: auto;
-  border-radius: var(--nf-radius-md, 0.75rem);
+  border-radius: var(--nf-radius-md);
   border: 1px solid var(--nf-color-border);
-  background: var(--nf-color-bg-elevated, var(--nf-color-bg));
+  background: var(--nf-color-bg-elevated);
 }
 
 .outboundTable {
@@ -169,7 +169,7 @@
 .outboundTable thead th {
   text-align: start;
   padding: var(--nf-space-3) var(--nf-space-4);
-  background: var(--nf-color-bg-sunken, transparent);
+  background: var(--nf-color-bg-sunken);
   color: var(--nf-color-fg-muted);
   font-weight: 500;
   border-block-end: 1px solid var(--nf-color-border);
@@ -197,7 +197,7 @@
   text-align: center;
   color: var(--nf-color-fg-muted);
   border: 1px dashed var(--nf-color-border);
-  border-radius: var(--nf-radius-md, 0.75rem);
-  background: var(--nf-color-bg-sunken, transparent);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-bg-sunken);
   font-size: var(--nf-text-sm);
 }

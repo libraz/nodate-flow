@@ -36,7 +36,7 @@
 }
 
 .separator {
-  color: var(--nf-color-fg-subtle, var(--nf-color-fg-muted));
+  color: var(--nf-color-fg-subtle);
 }
 
 .value {

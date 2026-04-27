@@ -104,7 +104,7 @@
 
 .aw-page-title {
   margin: 0;
-  font-family: var(--nf-font-display, var(--font-display));
+  font-family: var(--nf-font-sans);
   font-size: var(--nf-text-2xl);
 }
 
@@ -202,7 +202,7 @@
  */
 .aw-section-title {
   margin: 0;
-  font-family: var(--nf-font-display, var(--font-display));
+  font-family: var(--nf-font-sans);
   font-size: var(--nf-text-lg);
 }
 
@@ -214,7 +214,7 @@
 
 .aw-warning {
   margin: 0;
-  color: var(--nf-color-warning, var(--nf-color-danger));
+  color: var(--nf-color-warning);
   font-size: var(--nf-text-sm);
   font-weight: var(--nf-weight-semibold);
 }

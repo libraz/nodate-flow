@@ -174,7 +174,7 @@
   padding: var(--nf-space-3);
   border: var(--nf-space-px) solid var(--nf-color-border);
   border-radius: var(--nf-radius-md);
-  background: var(--nf-color-surface-alt, var(--nf-color-bg));
+  background: var(--nf-color-bg);
 }
 
 .secretWarning {
@@ -210,7 +210,7 @@
   padding: var(--nf-space-2) var(--nf-space-3);
   border: var(--nf-space-px) solid var(--nf-color-border);
   border-radius: var(--nf-radius-md);
-  background: var(--nf-color-surface-alt, var(--nf-color-bg));
+  background: var(--nf-color-bg);
   font-size: var(--nf-text-sm);
 }
 

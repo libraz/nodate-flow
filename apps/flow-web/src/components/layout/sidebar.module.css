@@ -146,7 +146,7 @@
   font-weight: var(--nf-weight-semibold);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--nf-color-fg-subtle, var(--nf-color-fg-muted));
+  color: var(--nf-color-fg-subtle);
 }
 
 .subItem {

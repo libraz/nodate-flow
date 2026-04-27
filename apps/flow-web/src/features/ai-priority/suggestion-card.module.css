@@ -88,7 +88,7 @@
 .priorityDot {
   inline-size: var(--nf-space-2);
   block-size: var(--nf-space-2);
-  border-radius: var(--nf-radius-full, 9999px);
+  border-radius: var(--nf-radius-pill);
   flex: 0 0 auto;
 }
 
@@ -121,7 +121,7 @@
 .dot {
   inline-size: var(--nf-space-2);
   block-size: var(--nf-space-2);
-  border-radius: var(--nf-radius-full, 9999px);
+  border-radius: var(--nf-radius-pill);
   background: var(--nf-color-border);
 }
 

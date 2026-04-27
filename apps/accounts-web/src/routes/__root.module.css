@@ -16,7 +16,7 @@
   justify-content: center;
   gap: var(--nf-space-4);
   padding: var(--nf-space-8);
-  font-family: var(--nf-font-sans, var(--font-body));
+  font-family: var(--nf-font-sans);
   background: var(--nf-color-bg);
   color: var(--nf-color-fg);
   text-align: center;
@@ -24,7 +24,7 @@
 
 .notFoundHeading {
   margin: 0;
-  font-family: var(--nf-font-display, var(--font-display));
+  font-family: var(--nf-font-sans);
   /* The 404 hero scales between 4xl and roughly twice 4xl. There is no
    * dedicated display-size token, so we clamp around the largest text
    * token rather than introduce a raw literal. */
@@ -39,7 +39,7 @@
 
 .fatalHeading {
   margin: 0;
-  font-family: var(--nf-font-display, var(--font-display));
+  font-family: var(--nf-font-sans);
 }
 
 .errorBlock {

@@ -253,7 +253,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--nf-space-px);
-  font-size: var(--nf-text-2xs, 0.6875rem);
+  font-size: var(--nf-text-xs);
   font-variant-numeric: tabular-nums;
   color: var(--nf-color-fg-muted);
   flex-shrink: 0;

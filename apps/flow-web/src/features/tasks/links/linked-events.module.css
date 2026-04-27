@@ -113,11 +113,11 @@
   align-items: center;
   gap: var(--nf-space-3);
   padding: var(--nf-space-3) var(--nf-space-4);
-  border-block-end: 1px solid var(--nf-color-border-subtle, var(--nf-color-hairline));
+  border-block-end: 1px solid var(--nf-color-hairline);
   font-size: var(--nf-text-sm);
-  transition: background-color var(--nf-duration-quick, var(--nf-duration-fast))
-    var(--nf-ease-standard), opacity var(--nf-duration-base) var(--nf-ease-standard), transform
-    var(--nf-duration-base) var(--nf-ease-standard);
+  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard), opacity
+    var(--nf-duration-base) var(--nf-ease-standard), transform var(--nf-duration-base)
+    var(--nf-ease-standard);
 }
 
 .row:last-child {
@@ -294,7 +294,7 @@
   align-items: center;
   gap: var(--nf-space-3);
   padding: var(--nf-space-3) var(--nf-space-4);
-  border-block-end: 1px solid var(--nf-color-border-subtle, var(--nf-color-hairline));
+  border-block-end: 1px solid var(--nf-color-hairline);
 }
 
 .skeletonChip {
@@ -319,7 +319,7 @@
   display: flex;
   flex-direction: column;
   background: var(--nf-color-bg-elevated);
-  border: 1px solid var(--nf-color-border-subtle, var(--nf-color-hairline));
+  border: 1px solid var(--nf-color-hairline);
   border-radius: var(--nf-radius-lg);
   box-shadow: var(--nf-shadow-lg);
   z-index: 50;
@@ -349,7 +349,7 @@
   align-items: center;
   gap: var(--nf-space-2);
   padding: var(--nf-space-2) var(--nf-space-3);
-  border-block-end: 1px solid var(--nf-color-border-subtle, var(--nf-color-hairline));
+  border-block-end: 1px solid var(--nf-color-hairline);
   background: var(--nf-color-bg);
   border-start-start-radius: var(--nf-radius-lg);
   border-start-end-radius: var(--nf-radius-lg);
@@ -469,7 +469,7 @@
   content: "";
   flex: 1;
   block-size: 1px;
-  background: var(--nf-color-border-subtle, var(--nf-color-hairline));
+  background: var(--nf-color-hairline);
 }
 
 .popoverFooter {
@@ -477,7 +477,7 @@
   align-items: center;
   gap: var(--nf-space-3);
   padding: var(--nf-space-2) var(--nf-space-3);
-  border-block-start: 1px solid var(--nf-color-border-subtle, var(--nf-color-hairline));
+  border-block-start: 1px solid var(--nf-color-hairline);
   font-size: var(--nf-text-xs);
   color: var(--nf-color-fg-muted);
   background: var(--nf-color-bg);
@@ -496,7 +496,7 @@
   font-size: var(--nf-text-xs);
   color: var(--nf-color-fg-subtle);
   padding: 0 var(--nf-space-2);
-  border: 1px solid var(--nf-color-border-subtle, var(--nf-color-hairline));
+  border: 1px solid var(--nf-color-hairline);
   border-radius: var(--nf-radius-sm);
   line-height: 1.5;
 }
@@ -510,7 +510,7 @@
   padding: 2px;
   border-radius: var(--nf-radius-pill);
   background: color-mix(in oklab, var(--nf-color-bg-elevated) 60%, transparent);
-  border: 1px solid var(--nf-color-border-subtle, var(--nf-color-hairline));
+  border: 1px solid var(--nf-color-hairline);
   position: relative;
 }
 

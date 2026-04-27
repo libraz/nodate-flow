@@ -144,14 +144,14 @@
   inline-size: 100%;
   block-size: 0.375rem;
   border-radius: var(--nf-radius-pill);
-  background: var(--nf-color-surface-alt, var(--nf-color-border));
+  background: var(--nf-color-border);
   overflow: hidden;
 }
 
 .progressFill {
   block-size: 100%;
   background: var(--nf-color-accent);
-  transition: inline-size var(--nf-duration-base, 200ms) ease;
+  transition: inline-size var(--nf-duration-base) ease;
 }
 
 .progressLabel {
@@ -174,13 +174,13 @@
 
 .errorLog summary {
   cursor: pointer;
-  color: var(--nf-color-danger, var(--nf-color-fg));
+  color: var(--nf-color-danger);
 }
 
 .errorLogBody {
   margin: var(--nf-space-2) 0 0 0;
   padding: var(--nf-space-2);
-  background: var(--nf-color-surface-alt, var(--nf-color-bg));
+  background: var(--nf-color-bg);
   border-radius: var(--nf-radius-sm);
   border: var(--nf-space-px) solid var(--nf-color-border);
   font-family: var(--font-mono, monospace);
@@ -204,7 +204,7 @@
   padding: var(--nf-space-3);
   border: var(--nf-space-px) solid var(--nf-color-border);
   border-radius: var(--nf-radius-md);
-  background: var(--nf-color-surface-alt, var(--nf-color-bg));
+  background: var(--nf-color-bg);
 }
 
 .createGrid {

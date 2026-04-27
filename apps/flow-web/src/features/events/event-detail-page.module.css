@@ -464,7 +464,7 @@
 }
 
 .shiftCandidateLabel:hover {
-  background: var(--nf-color-bg-muted, var(--nf-color-bg));
+  background: var(--nf-color-bg);
 }
 
 .shiftCandidateBody {
