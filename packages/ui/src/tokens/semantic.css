@@ -99,6 +99,24 @@
   --nf-cal-free-subtle: oklch(94% 0.04 145);
   --nf-cal-milestone-color: oklch(60% 0.18 290);
   --nf-cal-milestone-subtle: oklch(94% 0.04 290);
+
+  /*
+   * Calendar palette — fixed 10-swatch picker for the per-calendar color
+   * chooser (calendar settings → general). Stable hue order across themes
+   * (blue, cyan, green, amber, orange, red, pink, purple, slate, ink) so a
+   * given calendar's chosen index renders the "same" color identity in
+   * every theme, while lightness/chroma adapt for contrast on each canvas.
+   */
+  --nf-cal-color-1: oklch(54% 0.18 250);
+  --nf-cal-color-2: oklch(58% 0.13 210);
+  --nf-cal-color-3: oklch(60% 0.16 145);
+  --nf-cal-color-4: oklch(70% 0.14 85);
+  --nf-cal-color-5: oklch(64% 0.18 50);
+  --nf-cal-color-6: oklch(58% 0.21 25);
+  --nf-cal-color-7: oklch(60% 0.2 355);
+  --nf-cal-color-8: oklch(54% 0.2 300);
+  --nf-cal-color-9: oklch(50% 0.03 260);
+  --nf-cal-color-10: oklch(28% 0.02 260);
 }
 
 @media (prefers-reduced-motion: reduce) {

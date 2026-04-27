@@ -82,4 +82,20 @@
   --nf-cal-free-subtle: oklch(94% 0.03 150);
   --nf-cal-milestone-color: oklch(50% 0.14 285);
   --nf-cal-milestone-subtle: oklch(94% 0.03 285);
+
+  /*
+   * Calendar palette — muted, slightly desaturated hues consistent with
+   * glass-light's understated slate palette. Chroma is dialed back ~20%
+   * vs aurora-light so the swatches don't punch above the surface.
+   */
+  --nf-cal-color-1: oklch(50% 0.14 250);
+  --nf-cal-color-2: oklch(54% 0.11 210);
+  --nf-cal-color-3: oklch(56% 0.13 145);
+  --nf-cal-color-4: oklch(66% 0.12 85);
+  --nf-cal-color-5: oklch(60% 0.15 50);
+  --nf-cal-color-6: oklch(54% 0.17 25);
+  --nf-cal-color-7: oklch(56% 0.16 355);
+  --nf-cal-color-8: oklch(50% 0.16 300);
+  --nf-cal-color-9: oklch(48% 0.025 260);
+  --nf-cal-color-10: oklch(26% 0.015 260);
 }

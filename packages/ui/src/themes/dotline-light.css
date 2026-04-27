@@ -83,4 +83,20 @@
   --nf-cal-free-subtle: oklch(94% 0.03 145);
   --nf-cal-milestone-color: oklch(46% 0.2 290);
   --nf-cal-milestone-subtle: oklch(94% 0.03 290);
+
+  /*
+   * Calendar palette — darker, fully saturated hues for high contrast
+   * against pure white. Ink (10) collapses to near-black to match
+   * dotline-light's ink-on-paper aesthetic.
+   */
+  --nf-cal-color-1: oklch(46% 0.2 250);
+  --nf-cal-color-2: oklch(50% 0.15 210);
+  --nf-cal-color-3: oklch(50% 0.18 145);
+  --nf-cal-color-4: oklch(60% 0.16 85);
+  --nf-cal-color-5: oklch(56% 0.2 50);
+  --nf-cal-color-6: oklch(50% 0.23 25);
+  --nf-cal-color-7: oklch(52% 0.22 355);
+  --nf-cal-color-8: oklch(46% 0.22 300);
+  --nf-cal-color-9: oklch(42% 0.03 260);
+  --nf-cal-color-10: oklch(20% 0.01 260);
 }

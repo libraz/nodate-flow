@@ -82,4 +82,20 @@
   --nf-cal-free-subtle: oklch(28% 0.05 145);
   --nf-cal-milestone-color: oklch(72% 0.16 290);
   --nf-cal-milestone-subtle: oklch(28% 0.05 290);
+
+  /*
+   * Calendar palette — lightened chromatic tones for legibility against
+   * the deep aurora-dark canvas. Ink (10) inverts to a near-white slate so
+   * the swatch remains visible; slate (9) lightens correspondingly.
+   */
+  --nf-cal-color-1: oklch(72% 0.16 250);
+  --nf-cal-color-2: oklch(74% 0.12 210);
+  --nf-cal-color-3: oklch(76% 0.14 145);
+  --nf-cal-color-4: oklch(82% 0.13 85);
+  --nf-cal-color-5: oklch(76% 0.16 50);
+  --nf-cal-color-6: oklch(72% 0.19 25);
+  --nf-cal-color-7: oklch(74% 0.18 355);
+  --nf-cal-color-8: oklch(70% 0.18 300);
+  --nf-cal-color-9: oklch(68% 0.025 260);
+  --nf-cal-color-10: oklch(88% 0.012 260);
 }

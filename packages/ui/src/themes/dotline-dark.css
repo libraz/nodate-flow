@@ -81,4 +81,20 @@
   --nf-cal-free-subtle: oklch(25% 0.04 145);
   --nf-cal-milestone-color: oklch(74% 0.17 290);
   --nf-cal-milestone-subtle: oklch(25% 0.04 290);
+
+  /*
+   * Calendar palette — bright saturated hues for chalk-on-black contrast.
+   * Ink (10) inverts to near-white so the swatch reads as the polar
+   * opposite of dotline-light's ink — same identity, opposite canvas.
+   */
+  --nf-cal-color-1: oklch(78% 0.16 250);
+  --nf-cal-color-2: oklch(80% 0.13 210);
+  --nf-cal-color-3: oklch(82% 0.16 145);
+  --nf-cal-color-4: oklch(86% 0.14 85);
+  --nf-cal-color-5: oklch(80% 0.17 50);
+  --nf-cal-color-6: oklch(76% 0.2 25);
+  --nf-cal-color-7: oklch(78% 0.19 355);
+  --nf-cal-color-8: oklch(74% 0.19 300);
+  --nf-cal-color-9: oklch(72% 0.025 260);
+  --nf-cal-color-10: oklch(94% 0.005 260);
 }

@@ -81,4 +81,21 @@
   --nf-cal-free-subtle: oklch(94% 0.04 145);
   --nf-cal-milestone-color: oklch(60% 0.18 290);
   --nf-cal-milestone-subtle: oklch(94% 0.04 290);
+
+  /*
+   * Calendar palette — fixed 10-swatch picker. Mid-tone saturated hues sit
+   * comfortably on aurora-light's warm off-white without flattening; ink
+   * (10) is a deep slate rather than pure black to harmonize with the
+   * theme's translucent surfaces.
+   */
+  --nf-cal-color-1: oklch(54% 0.18 250);
+  --nf-cal-color-2: oklch(58% 0.13 210);
+  --nf-cal-color-3: oklch(60% 0.16 145);
+  --nf-cal-color-4: oklch(70% 0.14 85);
+  --nf-cal-color-5: oklch(64% 0.18 50);
+  --nf-cal-color-6: oklch(58% 0.21 25);
+  --nf-cal-color-7: oklch(60% 0.2 355);
+  --nf-cal-color-8: oklch(54% 0.2 300);
+  --nf-cal-color-9: oklch(50% 0.03 260);
+  --nf-cal-color-10: oklch(28% 0.02 260);
 }
