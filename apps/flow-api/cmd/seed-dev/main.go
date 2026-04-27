@@ -454,7 +454,10 @@ func ensureTasks(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, pr
 	if count == 0 {
 		createdBy := sql.NullInt32{Int32: int32(userID), Valid: true} //#nosec G115 -- user id sourced from seed flow, fits int32
 		for _, s := range l.Tasks {
-			nextNum, err := q.AssignTaskNumber(ctx, projID)
+			nextNum, err := q.AssignTaskNumber(ctx, generated.AssignTaskNumberParams{
+				WorkspaceID: wsID,
+				ProjectID:   projID,
+			})
 			if err != nil {
 				return 0, fmt.Errorf("assign task number: %w", err)
 			}

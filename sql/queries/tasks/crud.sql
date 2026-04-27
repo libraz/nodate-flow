@@ -574,19 +574,25 @@ LIMIT ?;
 -- name: AssignTaskNumber :one
 -- Allocate the next task number for a project. Must be called inside a
 -- transaction with the project row locked (SELECT ... FOR UPDATE).
+-- workspace_id is included so the index (workspace_id, project_id) is used and
+-- the query is bounded to the caller's workspace as a defence-in-depth check.
 SELECT COALESCE(MAX(task_number), 0) + 1 AS next_number
 FROM tasks
-WHERE project_id = ?;
+WHERE workspace_id = ?
+  AND project_id = ?;
 
 -- name: SetTaskNumber :exec
 -- Set the task_number after allocation.
 -- updated_by_user_id is appended so the audit field records who allocated
 -- the number; in practice this runs in the same transaction as CreateTask
 -- so the same actor id is reused (NULL for system writers).
+-- workspace_id is required to ensure the update never crosses workspace
+-- boundaries even if the caller passes a foreign tasks.id.
 UPDATE tasks
 SET task_number = ?,
     updated_by_user_id = ?
-WHERE id = ?;
+WHERE id = ?
+  AND workspace_id = ?;
 
 -- name: ResolveTaskRef :one
 -- Resolve a human-readable task reference (e.g. NF-42) to a task public_id.

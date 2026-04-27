@@ -40,13 +40,21 @@ func (q *Queries) ArchiveTask(ctx context.Context, arg ArchiveTaskParams) error 
 const assignTaskNumber = `-- name: AssignTaskNumber :one
 SELECT COALESCE(MAX(task_number), 0) + 1 AS next_number
 FROM tasks
-WHERE project_id = ?
+WHERE workspace_id = ?
+  AND project_id = ?
 `
+
+type AssignTaskNumberParams struct {
+	WorkspaceID uint32 `json:"-"`
+	ProjectID   uint32 `json:"-"`
+}
 
 // Allocate the next task number for a project. Must be called inside a
 // transaction with the project row locked (SELECT ... FOR UPDATE).
-func (q *Queries) AssignTaskNumber(ctx context.Context, projectID uint32) (int32, error) {
-	row := q.db.QueryRowContext(ctx, assignTaskNumber, projectID)
+// workspace_id is included so the index (workspace_id, project_id) is used and
+// the query is bounded to the caller's workspace as a defence-in-depth check.
+func (q *Queries) AssignTaskNumber(ctx context.Context, arg AssignTaskNumberParams) (int32, error) {
+	row := q.db.QueryRowContext(ctx, assignTaskNumber, arg.WorkspaceID, arg.ProjectID)
 	var next_number int32
 	err := row.Scan(&next_number)
 	return next_number, err
@@ -2059,20 +2067,29 @@ UPDATE tasks
 SET task_number = ?,
     updated_by_user_id = ?
 WHERE id = ?
+  AND workspace_id = ?
 `
 
 type SetTaskNumberParams struct {
 	TaskNumber      uint32        `json:"taskNumber"`
 	UpdatedByUserID sql.NullInt32 `json:"-"`
 	ID              uint32        `json:"-"`
+	WorkspaceID     uint32        `json:"-"`
 }
 
 // Set the task_number after allocation.
 // updated_by_user_id is appended so the audit field records who allocated
 // the number; in practice this runs in the same transaction as CreateTask
 // so the same actor id is reused (NULL for system writers).
+// workspace_id is required to ensure the update never crosses workspace
+// boundaries even if the caller passes a foreign tasks.id.
 func (q *Queries) SetTaskNumber(ctx context.Context, arg SetTaskNumberParams) error {
-	_, err := q.db.ExecContext(ctx, setTaskNumber, arg.TaskNumber, arg.UpdatedByUserID, arg.ID)
+	_, err := q.db.ExecContext(ctx, setTaskNumber,
+		arg.TaskNumber,
+		arg.UpdatedByUserID,
+		arg.ID,
+		arg.WorkspaceID,
+	)
 	return err
 }
 
