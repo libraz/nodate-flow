@@ -29,6 +29,7 @@
     "no_results": "未找到用户。",
     "detail": "用户详情",
     "user_agent": "用户代理",
+    "session_actions": "操作",
     "sessions": "会话",
     "grant_admin": "授予管理员权限",
     "revoke_admin": "撤销管理员权限"

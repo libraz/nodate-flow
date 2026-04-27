@@ -3,6 +3,7 @@
  * and suspend/enable actions.
  */
 
+import VisuallyHidden from '@nodate-flow/ui/a11y/visually-hidden';
 import Button from '@nodate-flow/ui/primitives/button';
 import { confirmAction } from '@nodate-flow/ui/primitives/confirm/action';
 import { Link, createFileRoute } from '@tanstack/react-router';
@@ -303,7 +304,9 @@ function UserDetailPage(): ReactElement {
                 <th style={thStyle}>{t('users.user_agent')}</th>
                 <th style={thStyle}>IP</th>
                 <th style={thStyle}>{t('users.created_at')}</th>
-                <th style={thStyle} />
+                <th style={thStyle}>
+                  <VisuallyHidden>{t('users.session_actions')}</VisuallyHidden>
+                </th>
               </tr>
             </thead>
             <tbody>

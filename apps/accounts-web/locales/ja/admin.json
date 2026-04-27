@@ -30,6 +30,7 @@
     "no_results": "ユーザーが見つかりません。",
     "detail": "ユーザー詳細",
     "user_agent": "ユーザーエージェント",
+    "session_actions": "操作",
     "sessions": "セッション",
     "grant_admin": "管理者権限を付与",
     "revoke_admin": "管理者権限を取り消し"
