@@ -2,12 +2,17 @@ package handlerutil
 
 import (
 	"database/sql"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
+	"github.com/google/uuid"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 )
 
 func TestIsDuplicateEntryTrue(t *testing.T) {
@@ -98,6 +103,150 @@ func TestNullTimeUnixVal(t *testing.T) {
 	now := time.Now()
 	if got := NullTimeUnixVal(sql.NullTime{Time: now, Valid: true}); got != now.Unix() {
 		t.Errorf("valid: got %d want %d", got, now.Unix())
+	}
+}
+
+func TestNullTimeDateStr(t *testing.T) {
+	t.Parallel()
+	if got := NullTimeDateStr(sql.NullTime{Valid: false}); got != "" {
+		t.Errorf("NULL: got %q want empty", got)
+	}
+	when := time.Date(2026, 4, 27, 12, 0, 0, 0, time.UTC)
+	if got := NullTimeDateStr(sql.NullTime{Time: when, Valid: true}); got != "2026-04-27" {
+		t.Errorf("valid: got %q want 2026-04-27", got)
+	}
+}
+
+func TestBytesToUUIDString(t *testing.T) {
+	t.Parallel()
+	if got := BytesToUUIDString(nil); got != "" {
+		t.Errorf("nil: got %q want empty", got)
+	}
+	if got := BytesToUUIDString([]byte{0, 1, 2}); got != "" {
+		t.Errorf("short slice: got %q want empty", got)
+	}
+	u := uuid.New()
+	want := u.String()
+	if got := BytesToUUIDString(u[:]); got != want {
+		t.Errorf("got %q want %q", got, want)
+	}
+}
+
+func TestNullBytesToUUIDString(t *testing.T) {
+	t.Parallel()
+	if got := NullBytesToUUIDString(sql.NullString{Valid: false}); got != "" {
+		t.Errorf("NULL: got %q want empty", got)
+	}
+	if got := NullBytesToUUIDString(sql.NullString{String: "abc", Valid: true}); got != "" {
+		t.Errorf("short string: got %q want empty", got)
+	}
+	u := uuid.New()
+	got := NullBytesToUUIDString(sql.NullString{String: string(u[:]), Valid: true})
+	if got != u.String() {
+		t.Errorf("got %q want %q", got, u.String())
+	}
+}
+
+func TestNullBytesToUUIDPtr(t *testing.T) {
+	t.Parallel()
+	if got := NullBytesToUUIDPtr(sql.NullString{Valid: false}); got != nil {
+		t.Errorf("NULL: got %v want nil", got)
+	}
+	if got := NullBytesToUUIDPtr(sql.NullString{String: "x", Valid: true}); got != nil {
+		t.Errorf("short string: got %v want nil", got)
+	}
+	u := uuid.New()
+	got := NullBytesToUUIDPtr(sql.NullString{String: string(u[:]), Valid: true})
+	if got == nil || *got != u.String() {
+		t.Errorf("got %v want pointer to %q", got, u.String())
+	}
+}
+
+func TestRawBytesToUUIDPtr(t *testing.T) {
+	t.Parallel()
+	if got := RawBytesToUUIDPtr(nil); got != nil {
+		t.Errorf("nil: got %v want nil", got)
+	}
+	if got := RawBytesToUUIDPtr("not bytes"); got != nil {
+		t.Errorf("string input: got %v want nil", got)
+	}
+	if got := RawBytesToUUIDPtr([]byte{1, 2, 3}); got != nil {
+		t.Errorf("short slice: got %v want nil", got)
+	}
+	u := uuid.New()
+	got := RawBytesToUUIDPtr(u[:])
+	if got == nil || *got != u.String() {
+		t.Errorf("got %v want pointer to %q", got, u.String())
+	}
+}
+
+func TestFormatUnix(t *testing.T) {
+	t.Parallel()
+	if got := FormatUnix(0); got != "0" {
+		t.Errorf("zero: got %q", got)
+	}
+	if got := FormatUnix(1700000000); got != "1700000000" {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestFormatOptionalUnix(t *testing.T) {
+	t.Parallel()
+	if got := FormatOptionalUnix(nil); got != "" {
+		t.Errorf("nil: got %q want empty", got)
+	}
+	v := int64(1700000000)
+	if got := FormatOptionalUnix(&v); got != "1700000000" {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestDerefStr(t *testing.T) {
+	t.Parallel()
+	if got := DerefStr(nil); got != "" {
+		t.Errorf("nil: got %q want empty", got)
+	}
+	v := "hi"
+	if got := DerefStr(&v); got != "hi" {
+		t.Errorf("got %q want hi", got)
+	}
+}
+
+// TestWriteSpecError verifies the helper emits a problem+json envelope
+// matching the Huma route shape (type / title / status / detail) for raw
+// chi handlers that cannot route through the Huma error pipeline.
+func TestWriteSpecError(t *testing.T) {
+	t.Parallel()
+	rr := httptest.NewRecorder()
+	spec := &apierrors.Spec{Code: "WS.WORKSPACE.NOT_FOUND", Status: 404, Message: "Workspace not found"}
+	WriteSpecError(rr, spec)
+
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("status: got %d want 404", rr.Code)
+	}
+	if ct := rr.Header().Get("Content-Type"); ct != "application/problem+json; charset=utf-8" {
+		t.Errorf("content-type: got %q", ct)
+	}
+	var got struct {
+		Type   string `json:"type"`
+		Title  string `json:"title"`
+		Status int    `json:"status"`
+		Detail string `json:"detail"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if got.Type != spec.Code {
+		t.Errorf("type: got %q want %q", got.Type, spec.Code)
+	}
+	if got.Status != spec.Status {
+		t.Errorf("status field: got %d want %d", got.Status, spec.Status)
+	}
+	if got.Detail != spec.Message {
+		t.Errorf("detail: got %q want %q", got.Detail, spec.Message)
+	}
+	if got.Title != http.StatusText(spec.Status) {
+		t.Errorf("title: got %q want %q", got.Title, http.StatusText(spec.Status))
 	}
 }
 

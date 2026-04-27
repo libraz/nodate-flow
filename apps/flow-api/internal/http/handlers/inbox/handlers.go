@@ -2,9 +2,6 @@ package inbox
 
 import (
 	"context"
-	"database/sql"
-
-	"github.com/google/uuid"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
@@ -152,31 +149,10 @@ func Snooze(deps Deps) func(context.Context, *SnoozeInboxInput) (*SnoozeInboxOut
 	}
 }
 
-// bytesToUUIDString converts a raw BINARY(16) public_id column into a
-// canonical UUID v7 string. Empty or non-16-byte input returns "".
-func bytesToUUIDString(b []byte) string {
-	if len(b) != 16 {
-		return ""
-	}
-	var u uuid.UUID
-	copy(u[:], b)
-	return u.String()
-}
-
-// nullBytesToUUIDString converts a sql.NullString whose underlying string
-// is a raw BINARY(16) UUID (as returned by sqlc for nullable BINARY(16)
-// columns, e.g. v_inbox.task_public_id) into a canonical hyphenated
-// UUID v7 string. Returns "" when NULL or when the value is not exactly
-// 16 bytes.
-//
-// Prefer this over handlerutil.NullStr for public_id columns: NullStr
-// assigns the raw bytes straight into the DTO field, which leaks the
-// internal binary representation through JSON.
-func nullBytesToUUIDString(s sql.NullString) string {
-	if !s.Valid || len(s.String) != 16 {
-		return ""
-	}
-	var u uuid.UUID
-	copy(u[:], s.String)
-	return u.String()
-}
+// bytesToUUIDString / nullBytesToUUIDString delegate to handlerutil so
+// the byte→UUID conversion shapes share a single implementation across
+// handler packages.
+var (
+	bytesToUUIDString     = handlerutil.BytesToUUIDString
+	nullBytesToUUIDString = handlerutil.NullBytesToUUIDString
+)

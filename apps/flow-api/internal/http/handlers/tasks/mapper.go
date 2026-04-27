@@ -1,38 +1,20 @@
 package tasks
 
 import (
-	"database/sql"
-
-	"github.com/google/uuid"
-
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
-func bytesToUUIDString(b []byte) string {
-	if len(b) != 16 {
-		return ""
-	}
-	var u uuid.UUID
-	copy(u[:], b)
-	return u.String()
-}
-
-// nullBytesToUUIDString converts a sql.NullString whose underlying string
-// is a raw BINARY(16) UUID (as returned by sqlc for nullable BINARY(16)
-// columns) into a canonical hyphenated UUID v7 string. Returns "" when
-// NULL or when the value is not exactly 16 bytes.
-//
-// Without this helper, handlers that assign the NullString directly into
-// a string DTO field (e.g. via handlerutil.NullStr) leak the raw binary
-// bytes through the JSON boundary, violating docs/requirements.md §11.9.
-func nullBytesToUUIDString(s sql.NullString) string {
-	if !s.Valid || len(s.String) != 16 {
-		return ""
-	}
-	var u uuid.UUID
-	copy(u[:], s.String)
-	return u.String()
-}
+// bytesToUUIDString / nullBytesToUUIDString / nullBytesToUUIDPtr /
+// rawBytesToUUIDPtr delegate to handlerutil so the four byte→UUID
+// conversion shapes share a single implementation across handler
+// packages. Aliases keep the call sites readable.
+var (
+	bytesToUUIDString     = handlerutil.BytesToUUIDString
+	nullBytesToUUIDString = handlerutil.NullBytesToUUIDString
+	nullBytesToUUIDPtr    = handlerutil.NullBytesToUUIDPtr
+	rawBytesToUUIDPtr     = handlerutil.RawBytesToUUIDPtr
+)
 
 func rowToTaskFromFind(r generated.FindTaskByPublicIdRow) Task {
 	return Task{
@@ -62,36 +44,6 @@ func rowToTaskFromFind(r generated.FindTaskByPublicIdRow) Task {
 		UpdatedAt:                nullTimeUnix(r.UpdatedAt),
 		CreatedAt:                r.CreatedAt.Unix(),
 	}
-}
-
-// nullBytesToUUIDPtr converts a sql.NullString carrying raw BINARY(16) bytes
-// into a UUID string pointer; returns nil when NULL or wrong length.
-func nullBytesToUUIDPtr(s sql.NullString) *string {
-	if !s.Valid {
-		return nil
-	}
-	if len(s.String) != 16 {
-		return nil
-	}
-	var u uuid.UUID
-	copy(u[:], s.String)
-	out := u.String()
-	return &out
-}
-
-// rawBytesToUUIDPtr converts a BINARY(16) column to a UUID string pointer.
-// It accepts interface{} because sqlc may expose the column as either []byte
-// or interface{} depending on the query. Returns nil when the value is not
-// a []byte of exactly 16 bytes.
-func rawBytesToUUIDPtr(v interface{}) *string {
-	b, ok := v.([]byte)
-	if !ok || len(b) != 16 {
-		return nil
-	}
-	var u uuid.UUID
-	copy(u[:], b)
-	out := u.String()
-	return &out
 }
 
 func rowToTaskListItemFromProject(r generated.ListTasksForProjectRow) TaskListItem {
