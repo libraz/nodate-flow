@@ -1,0 +1,17 @@
+{
+  "browser": {
+    "edge": "Edge {version}",
+    "firefox": "Firefox {version}",
+    "chrome": "Chrome {version}",
+    "safari": "Safari {version}",
+    "unknown": "不明なブラウザ"
+  },
+  "os": {
+    "windows": "Windows",
+    "macos": "macOS",
+    "android": "Android",
+    "ios": "iOS",
+    "linux": "Linux",
+    "unknown": "不明な OS"
+  }
+}

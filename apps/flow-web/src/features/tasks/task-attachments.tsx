@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { confirmAction } from '../../lib/confirm-action';
+import { formatBytes } from '../../lib/format-bytes';
 import {
   type TaskAttachment,
   fetchDownloadUrl,
@@ -18,21 +19,6 @@ import {
 
 interface TaskAttachmentsProps {
   taskId: string;
-}
-
-/** Format byte count into a human-readable string using the user's locale. */
-function formatBytes(bytes: number, locale: string): string {
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'] as const;
-  let value = bytes;
-  let unitIndex = 0;
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-  const formatted = new Intl.NumberFormat(locale, {
-    maximumFractionDigits: unitIndex === 0 ? 0 : 1,
-  }).format(value);
-  return `${formatted} ${units[unitIndex]}`;
 }
 
 function AttachmentRow({
@@ -98,7 +84,7 @@ function AttachmentRow({
             flexWrap: 'wrap',
           }}
         >
-          <span>{formatBytes(attachment.byteSize, locale)}</span>
+          <span>{formatBytes(attachment.byteSize, locale, t)}</span>
           <span>{attachment.contentType}</span>
           <span>
             {t('tasks.attachments.uploaded_by', { name: attachment.uploaderDisplayName })}

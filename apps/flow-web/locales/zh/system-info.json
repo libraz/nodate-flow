@@ -1,0 +1,17 @@
+{
+  "browser": {
+    "edge": "Edge {version}",
+    "firefox": "Firefox {version}",
+    "chrome": "Chrome {version}",
+    "safari": "Safari {version}",
+    "unknown": "未知浏览器"
+  },
+  "os": {
+    "windows": "Windows",
+    "macos": "macOS",
+    "android": "Android",
+    "ios": "iOS",
+    "linux": "Linux",
+    "unknown": "未知系统"
+  }
+}

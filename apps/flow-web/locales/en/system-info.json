@@ -1,0 +1,17 @@
+{
+  "browser": {
+    "edge": "Edge {version}",
+    "firefox": "Firefox {version}",
+    "chrome": "Chrome {version}",
+    "safari": "Safari {version}",
+    "unknown": "Unknown browser"
+  },
+  "os": {
+    "windows": "Windows",
+    "macos": "macOS",
+    "android": "Android",
+    "ios": "iOS",
+    "linux": "Linux",
+    "unknown": "Unknown OS"
+  }
+}

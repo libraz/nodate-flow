@@ -23,6 +23,7 @@ import enReactions from '../../locales/en/reactions.json';
 import enRelations from '../../locales/en/relations.json';
 import enSettings from '../../locales/en/settings.json';
 import enSharing from '../../locales/en/sharing.json';
+import enSystemInfo from '../../locales/en/system-info.json';
 import enTimeline from '../../locales/en/timeline.json';
 import jaAiSuggestions from '../../locales/ja/ai-suggestions.json';
 import jaAi from '../../locales/ja/ai.json';
@@ -45,6 +46,7 @@ import jaReactions from '../../locales/ja/reactions.json';
 import jaRelations from '../../locales/ja/relations.json';
 import jaSettings from '../../locales/ja/settings.json';
 import jaSharing from '../../locales/ja/sharing.json';
+import jaSystemInfo from '../../locales/ja/system-info.json';
 import jaTimeline from '../../locales/ja/timeline.json';
 import zhAiSuggestions from '../../locales/zh/ai-suggestions.json';
 import zhAi from '../../locales/zh/ai.json';
@@ -67,6 +69,7 @@ import zhReactions from '../../locales/zh/reactions.json';
 import zhRelations from '../../locales/zh/relations.json';
 import zhSettings from '../../locales/zh/settings.json';
 import zhSharing from '../../locales/zh/sharing.json';
+import zhSystemInfo from '../../locales/zh/system-info.json';
 import zhTimeline from '../../locales/zh/timeline.json';
 import { defaultNamespace } from './namespaces';
 
@@ -128,6 +131,7 @@ export function initI18n(): typeof i18n {
         'archive',
         'linkedEvents',
         'sharing',
+        'system-info',
       ],
       resources: {
         en: {
@@ -153,6 +157,7 @@ export function initI18n(): typeof i18n {
           linkedEvents: enLinkedEvents,
           reactions: enReactions,
           sharing: enSharing,
+          'system-info': enSystemInfo,
         },
         ja: {
           archive: jaArchive,
@@ -177,6 +182,7 @@ export function initI18n(): typeof i18n {
           linkedEvents: jaLinkedEvents,
           reactions: jaReactions,
           sharing: jaSharing,
+          'system-info': jaSystemInfo,
         },
         zh: {
           archive: zhArchive,
@@ -201,6 +207,7 @@ export function initI18n(): typeof i18n {
           linkedEvents: zhLinkedEvents,
           reactions: zhReactions,
           sharing: zhSharing,
+          'system-info': zhSystemInfo,
         },
       },
       interpolation: { escapeValue: false },

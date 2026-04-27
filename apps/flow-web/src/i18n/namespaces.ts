@@ -24,6 +24,7 @@ export const namespaces = [
   'aiAgents',
   'sharing',
   'export',
+  'system-info',
 ] as const;
 
 /** Union of all known i18n namespace names. */

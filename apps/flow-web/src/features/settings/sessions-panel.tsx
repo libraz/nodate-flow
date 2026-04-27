@@ -7,6 +7,7 @@
 
 import Button from '@nodate-flow/ui/primitives/button';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import type { TFunction } from 'i18next';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -19,9 +20,13 @@ import {
 } from './api';
 import styles from './sessions-panel.module.css';
 
+type BrowserId = 'edge' | 'firefox' | 'chrome' | 'safari' | 'unknown';
+type OsId = 'windows' | 'macos' | 'android' | 'ios' | 'linux' | 'unknown';
+
 interface ParsedUA {
-  browser: string;
-  os: string;
+  browser: BrowserId;
+  browserVersion: string;
+  os: OsId;
 }
 
 /**
@@ -48,45 +53,79 @@ function extractVersion(ua: string, marker: string): string {
 }
 
 /**
- * @brief Parse a User-Agent string into a glanceable browser + OS label.
+ * @brief Parse a User-Agent string into browser + OS identifiers for i18n.
  * @param ua Raw User-Agent header value.
- * @return Browser and OS labels, each defaulting to "Unknown".
- *
- * Hand-rolled, regex-free parser covering common desktop and mobile agents.
- * Order matters for browsers: Edge UA embeds "Chrome/" and Chrome UA embeds
- * "Safari/", so detection runs Edge -> Firefox -> Chrome -> Safari.
+ * @return Browser and OS identifiers; the caller translates them at render
+ *         time. Order matters for browsers: Edge UA embeds "Chrome/" and
+ *         Chrome UA embeds "Safari/", so detection runs Edge -> Firefox ->
+ *         Chrome -> Safari.
  */
 function parseUserAgent(ua: string): ParsedUA {
-  let browser = 'Unknown';
+  let browser: BrowserId = 'unknown';
+  let browserVersion = '';
   const edgeVer = extractVersion(ua, 'Edg/');
   const firefoxVer = extractVersion(ua, 'Firefox/');
   const chromeVer = extractVersion(ua, 'Chrome/');
   const safariVer = extractVersion(ua, 'Version/');
-  if (edgeVer) browser = `Edge ${edgeVer}`;
-  else if (firefoxVer) browser = `Firefox ${firefoxVer}`;
-  else if (chromeVer) browser = `Chrome ${chromeVer}`;
-  else if (safariVer && ua.indexOf('Safari/') !== -1) browser = `Safari ${safariVer}`;
+  if (edgeVer) {
+    browser = 'edge';
+    browserVersion = edgeVer;
+  } else if (firefoxVer) {
+    browser = 'firefox';
+    browserVersion = firefoxVer;
+  } else if (chromeVer) {
+    browser = 'chrome';
+    browserVersion = chromeVer;
+  } else if (safariVer && ua.indexOf('Safari/') !== -1) {
+    browser = 'safari';
+    browserVersion = safariVer;
+  }
 
-  let os = 'Unknown';
-  if (ua.indexOf('Windows NT') !== -1) os = 'Windows';
-  else if (ua.indexOf('Mac OS X') !== -1 || ua.indexOf('Macintosh') !== -1) os = 'macOS';
-  else if (ua.indexOf('Android') !== -1) os = 'Android';
+  let os: OsId = 'unknown';
+  if (ua.indexOf('Windows NT') !== -1) os = 'windows';
+  else if (ua.indexOf('Mac OS X') !== -1 || ua.indexOf('Macintosh') !== -1) os = 'macos';
+  else if (ua.indexOf('Android') !== -1) os = 'android';
   else if (ua.indexOf('iPhone') !== -1 || ua.indexOf('iPad') !== -1 || ua.indexOf('iOS') !== -1)
-    os = 'iOS';
-  else if (ua.indexOf('Linux') !== -1) os = 'Linux';
+    os = 'ios';
+  else if (ua.indexOf('Linux') !== -1) os = 'linux';
 
-  return { browser, os };
+  return { browser, browserVersion, os };
 }
+
+const BROWSER_KEY: Record<BrowserId, string> = {
+  edge: 'browser.edge',
+  firefox: 'browser.firefox',
+  chrome: 'browser.chrome',
+  safari: 'browser.safari',
+  unknown: 'browser.unknown',
+};
+
+const OS_KEY: Record<OsId, string> = {
+  windows: 'os.windows',
+  macos: 'os.macos',
+  android: 'os.android',
+  ios: 'os.ios',
+  linux: 'os.linux',
+  unknown: 'os.unknown',
+};
 
 /**
  * @brief Format a User-Agent string for display in the sessions list.
  * @param ua Raw User-Agent header value.
+ * @param tSystem Translator bound to the {@code system-info} namespace.
  * @return "Browser · OS" style label (middle dot separator).
  */
-function formatDevice(ua: string): string {
-  const { browser, os } = parseUserAgent(ua);
-  return `${browser} · ${os}`;
+function formatDevice(ua: string, tSystem: TFunction<'system-info'>): string {
+  const { browser, browserVersion, os } = parseUserAgent(ua);
+  const browserLabel =
+    browser === 'unknown'
+      ? tSystem(BROWSER_KEY.unknown)
+      : tSystem(BROWSER_KEY[browser], { version: browserVersion });
+  const osLabel = tSystem(OS_KEY[os]);
+  return `${browserLabel} · ${osLabel}`;
 }
+
+export { parseUserAgent };
 
 function formatUnix(seconds: number | null | undefined, locale: string): string {
   if (!seconds) return '';
@@ -95,6 +134,7 @@ function formatUnix(seconds: number | null | undefined, locale: string): string 
 
 export default function SessionsPanel(): ReactElement {
   const { t, i18n } = useTranslation('settings');
+  const { t: tSystem } = useTranslation('system-info');
   const { data: sessions } = useMySessionsQuery();
   const revokeOne = useRevokeSession();
   const revokeAll = useRevokeAllOtherSessions();
@@ -135,7 +175,9 @@ export default function SessionsPanel(): ReactElement {
             <li key={s.id} className={`${styles.row} ${s.current ? styles.rowCurrent : ''}`.trim()}>
               <div className={styles.identity}>
                 <span className={styles.deviceLine} title={s.userAgent || undefined}>
-                  {s.userAgent ? formatDevice(s.userAgent) : t('security.sessions.unknown_device')}
+                  {s.userAgent
+                    ? formatDevice(s.userAgent, tSystem)
+                    : t('security.sessions.unknown_device')}
                   {s.current && (
                     <span className={styles.currentBadge}>
                       {t('security.sessions.current_badge')}
