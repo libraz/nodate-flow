@@ -26,7 +26,7 @@ type ProblemDetails struct {
 }
 
 // GetStatus implements huma.StatusError so Huma sets the response code.
-func (p *ProblemDetails) GetStatus() int { return p.ErrorModel.Status }
+func (p *ProblemDetails) GetStatus() int { return p.Status }
 
 // Error implements the error interface, mirroring huma.ErrorModel's
 // formatting so existing log lines remain stable.
