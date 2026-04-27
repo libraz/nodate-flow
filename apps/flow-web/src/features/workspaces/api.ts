@@ -77,7 +77,7 @@ export function useWorkspacesQuery(): UseSuspenseQueryResult<Workspace[]> {
     queryFn: async (): Promise<Workspace[]> => {
       const { data, error } = await sdk.GET('/workspaces', {});
       if (error || !data) throw toError(error, 'Failed to load workspaces');
-      return data.workspaces ?? [];
+      return data.items ?? [];
     },
   });
 }

@@ -137,7 +137,7 @@ export function useCurrentWorkspaceId(): string | null {
     queryFn: async (): Promise<string[]> => {
       const { data, error } = await authSdk.GET('/workspaces', {});
       if (error || !data) return [];
-      return (data.workspaces ?? []).map((w) => w.id);
+      return (data.items ?? []).map((w) => w.id);
     },
   });
 
