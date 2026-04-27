@@ -111,12 +111,12 @@ function useWorkspaceCount(user: AuthUser | null): number | undefined {
           setFetched(undefined);
           return;
         }
-        const body = result.data as { total?: number; workspaces?: readonly unknown[] };
+        const body = result.data as { total?: number; items?: readonly unknown[] };
         const total =
           typeof body.total === 'number'
             ? body.total
-            : Array.isArray(body.workspaces)
-              ? body.workspaces.length
+            : Array.isArray(body.items)
+              ? body.items.length
               : 0;
         setFetched(total);
       })

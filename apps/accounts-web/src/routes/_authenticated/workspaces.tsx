@@ -24,7 +24,7 @@ interface UserWorkspace {
 }
 
 interface WorkspacesBody {
-  workspaces: UserWorkspace[];
+  items: UserWorkspace[];
   total: number;
 }
 
@@ -44,7 +44,7 @@ function WorkspacesPage(): ReactElement {
         return;
       }
       const body = result.data as WorkspacesBody;
-      setWorkspaces(body.workspaces);
+      setWorkspaces(body.items);
       setLoading(false);
     });
     return () => {
