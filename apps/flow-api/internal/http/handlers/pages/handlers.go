@@ -521,10 +521,87 @@ func GenerateWithAI(_ Deps) func(context.Context, *GeneratePageInput) (*Generate
 			return nil, httpErr(apierrors.WsMemberRoleDenied)
 		}
 
-		// TODO: integrate with AI provider to generate page body from prompt.
-		// For now, return upstream unavailable until AI deps are wired.
-		_ = ws
-		_ = actorID
-		return nil, httpErr(apierrors.PageGenerationUpstreamUnavailable)
+		if deps.Generator == nil {
+			return nil, httpErr(apierrors.AiProviderNotConfigured)
+		}
+
+		// Resolve optional project scope before the LLM call so a bad
+		// project id fails fast instead of consuming a token budget.
+		var projectID sql.NullInt32
+		if in.Body.ProjectID != nil && *in.Body.ProjectID != "" {
+			var resolveErr error
+			projectID, resolveErr = resolveProjectInternal(ctx, deps.Queries, ws.ID, *in.Body.ProjectID)
+			if resolveErr != nil {
+				return nil, resolveErr
+			}
+		}
+
+		body, err := deps.Generator.GeneratePageBody(ctx, ws.ID, in.Body.Title, in.Body.Prompt)
+		if err != nil {
+			switch {
+			case errors.Is(err, ai.ErrNoProvider):
+				return nil, httpErr(apierrors.AiProviderNotConfigured)
+			default:
+				slog.WarnContext(ctx, "pages.GenerateWithAI: provider call failed",
+					slog.Any("err", err),
+					logutil.LogEntity("workspace", ws.PublicID),
+				)
+				return nil, httpErr(apierrors.PageGenerationUpstreamUnavailable)
+			}
+		}
+
+		pub := types.New()
+		if _, err := deps.Queries.CreatePage(ctx, generated.CreatePageParams{
+			PublicID:      pub,
+			WorkspaceID:   ws.ID,
+			ProjectID:     projectID,
+			CreatorID:     actorID,
+			ParentPageID:  sql.NullInt32{},
+			Title:         in.Body.Title,
+			Body:          body,
+			IsAiGenerated: true,
+		}); err != nil {
+			if isDuplicateEntry(err) {
+				return nil, httpErr(apierrors.PagePageTitleTaken)
+			}
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
+		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+			Type:        eventbus.PageCreated,
+			WorkspaceID: ws.ID,
+			ActorUserID: actorPtr(ctx),
+			Payload: map[string]any{
+				"pageId":        pub.String(),
+				"title":         in.Body.Title,
+				"isAiGenerated": true,
+			},
+		}); err != nil {
+			slog.ErrorContext(ctx, "eventbus.Append failed",
+				slog.Any("err", err),
+				slog.String("handler", "pages.GenerateWithAI"),
+				slog.String("event_type", string(eventbus.PageCreated)),
+				logutil.LogEntity("workspace", ws.PublicID),
+				slog.String("page_public_id", pub.String()),
+			)
+		}
+
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "page.generate",
+			ActorID:      actorID,
+			WorkspaceID:  ws.ID,
+			ResourceType: "page",
+			ResourceID:   pub.String(),
+			Metadata:     map[string]any{"title": in.Body.Title, "promptLen": len(in.Body.Prompt)},
+		})
+
+		row, err := deps.Queries.GetPageByPublicId(ctx, generated.GetPageByPublicIdParams{
+			WorkspaceID: ws.ID,
+			PublicID:    pub,
+		})
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		return &GeneratePageOutput{Body: mapGetRow(row)}, nil
 	}
 }

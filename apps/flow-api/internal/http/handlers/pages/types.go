@@ -4,6 +4,7 @@
 package pages
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
@@ -14,11 +15,26 @@ import (
 // MaxPageDepth is the maximum nesting depth allowed for page hierarchies.
 const MaxPageDepth = 5
 
+// PageGenerator is the narrow contract that GenerateWithAI depends on.
+// In production it is satisfied by *ai.Orchestrator; tests inject a
+// fake to exercise the success / failure paths without standing up an
+// LLM provider. Kept here (instead of in /ai) so the pages package does
+// not import /ai and risk an import cycle in shared deps wiring.
+type PageGenerator interface {
+	GeneratePageBody(ctx context.Context, workspaceID uint32, title, prompt string) (string, error)
+}
+
 // Deps is the dependency bundle passed to each handler in this package.
+//
+// Generator is optional: when nil, GenerateWithAI returns
+// PAGE.GENERATION.UPSTREAM_UNAVAILABLE so the endpoint surfaces a
+// well-formed error rather than 500. The shared router wires Generator
+// to the AI orchestrator only when an LLM provider is configured.
 type Deps struct {
-	DB      *sql.DB
-	Queries *generated.Queries
-	Audit   *audit.Recorder
+	DB        *sql.DB
+	Queries   *generated.Queries
+	Audit     *audit.Recorder
+	Generator PageGenerator
 }
 
 // httpErr delegates to handlerutil.HTTPErr.
