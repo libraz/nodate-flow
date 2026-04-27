@@ -17,6 +17,9 @@ jobs:
       - name: Hardcoded color scan
         run: bash scripts/check-hardcoded-colors.sh --ci
 
+      - name: Hardcoded UI string scan
+        run: bash scripts/check-hardcoded-strings.sh --ci
+
       - name: Theme parity check
         run: |
           npm ci --workspace=packages/ui
