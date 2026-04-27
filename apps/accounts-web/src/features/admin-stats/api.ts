@@ -36,6 +36,10 @@ function isInstanceStats(value: unknown): value is InstanceStats {
 export function useInstanceStatsQuery(): UseQueryResult<InstanceStats, ApiError> {
   return useQuery<InstanceStats, ApiError>({
     queryKey: adminStatsKeys.all,
+    // Surface the error inline immediately. The page renders a Retry
+    // button so a transient failure can be re-attempted explicitly;
+    // background retries would hide the failure for several seconds.
+    retry: false,
     queryFn: async (): Promise<InstanceStats> => {
       const { data, error } = await sdk.GET('/admin/instance-stats');
       if (error || !data) throw toApiError(error, 'Failed to load instance stats');
