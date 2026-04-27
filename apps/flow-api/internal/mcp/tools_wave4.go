@@ -112,7 +112,7 @@ func runCreateImportJob(ctx context.Context, deps Deps, s *session, raw json.Raw
 			}
 			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 		}
-		projectID = sql.NullInt32{Int32: int32(prj.ID), Valid: true}
+		projectID = sql.NullInt32{Int32: int32(prj.ID), Valid: true} //#nosec G115 -- project id is projects.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 	}
 
 	configJSON := json.RawMessage("{}")
@@ -129,7 +129,7 @@ func runCreateImportJob(ctx context.Context, deps Deps, s *session, raw json.Raw
 		PublicID:          pub,
 		WorkspaceID:       s.workspaceID,
 		ProjectID:         projectID,
-		InitiatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
+		InitiatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		Source:            generated.ImportJobsSource(in.Source),
 		ConfigJson:        configJSON,
 	})

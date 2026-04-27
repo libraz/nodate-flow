@@ -154,7 +154,7 @@ func seedFixture(t *testing.T, db *sql.DB) *aclFixture {
 		require.NoError(t, err)
 		id, err := res.LastInsertId()
 		require.NoError(t, err)
-		return uint32(id)
+		return uint32(id) //#nosec G115 -- LastInsertId in test seed, fits uint32
 	}
 
 	insertWorkspace := func(slug string) (uint32, uuid.UUID) {
@@ -165,7 +165,7 @@ func seedFixture(t *testing.T, db *sql.DB) *aclFixture {
 		require.NoError(t, err)
 		id, err := res.LastInsertId()
 		require.NoError(t, err)
-		return uint32(id), pub
+		return uint32(id), pub //#nosec G115 -- LastInsertId in test seed, fits uint32
 	}
 
 	insertWorkspaceMember := func(wsID, userID uint32, role string) {
@@ -186,7 +186,7 @@ func seedFixture(t *testing.T, db *sql.DB) *aclFixture {
 		require.NoError(t, err)
 		id, err := res.LastInsertId()
 		require.NoError(t, err)
-		return uint32(id), pub
+		return uint32(id), pub //#nosec G115 -- LastInsertId in test seed, fits uint32
 	}
 
 	insertProjectMember := func(wsID, prjID, userID uint32, role string) {
@@ -207,7 +207,7 @@ func seedFixture(t *testing.T, db *sql.DB) *aclFixture {
 		require.NoError(t, err)
 		id, err := res.LastInsertId()
 		require.NoError(t, err)
-		return uint32(id), pub
+		return uint32(id), pub //#nosec G115 -- LastInsertId in test seed, fits uint32
 	}
 
 	insertInstanceAdmin := func(userID uint32) {
@@ -238,9 +238,9 @@ func seedFixture(t *testing.T, db *sql.DB) *aclFixture {
 	// Note: 'creator' is a workspace member but NOT a project member,
 	// so they only get to a private task they created via the visibility path.
 
-	taskPublic, taskPublicPub := insertTask(wsID, prjID, 1, "public", sql.NullInt32{Int32: int32(creator), Valid: true})
-	taskProject, _ := insertTask(wsID, prjID, 2, "project", sql.NullInt32{Int32: int32(creator), Valid: true})
-	taskPrivate, _ := insertTask(wsID, prjID, 3, "private", sql.NullInt32{Int32: int32(creator), Valid: true})
+	taskPublic, taskPublicPub := insertTask(wsID, prjID, 1, "public", sql.NullInt32{Int32: int32(creator), Valid: true}) //#nosec G115 -- test creator user id, fits int32
+	taskProject, _ := insertTask(wsID, prjID, 2, "project", sql.NullInt32{Int32: int32(creator), Valid: true})           //#nosec G115 -- test creator user id, fits int32
+	taskPrivate, _ := insertTask(wsID, prjID, 3, "private", sql.NullInt32{Int32: int32(creator), Valid: true})           //#nosec G115 -- test creator user id, fits int32
 
 	insertInstanceAdmin(adminUser)
 
@@ -414,7 +414,7 @@ func TestACLLayered(t *testing.T) {
 		isProjectMember bool
 		wantSpec        *apierrors.Spec // nil => allowed
 	}
-	creatorVal := sql.NullInt32{Int32: int32(fx.creatorUserID), Valid: true}
+	creatorVal := sql.NullInt32{Int32: int32(fx.creatorUserID), Valid: true} //#nosec G115 -- test creator user id, fits int32
 	visCases := []visCase{
 		// public: any workspace member already verified upstream
 		{"public/member", fx.taskPublicID, acl.TaskVisibilityPublic, creatorVal, fx.memberUserID, acl.WorkspaceRoleMember, true, nil},

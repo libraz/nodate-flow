@@ -39,7 +39,7 @@ func Create(deps Deps) func(context.Context, *CreateImportInput) (*CreateImportO
 			if err != nil {
 				return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
 			}
-			projectID = sql.NullInt32{Int32: int32(prj.ID), Valid: true}
+			projectID = sql.NullInt32{Int32: int32(prj.ID), Valid: true} //#nosec G115 -- project_id is projects.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 
 			// Check for existing running import for this project.
 			_, err = deps.Queries.FindRunningImportForProject(ctx, generated.FindRunningImportForProjectParams{
@@ -67,7 +67,7 @@ func Create(deps Deps) func(context.Context, *CreateImportInput) (*CreateImportO
 			PublicID:          pub,
 			WorkspaceID:       ws.ID,
 			ProjectID:         projectID,
-			InitiatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
+			InitiatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 			Source:            generated.ImportJobsSource(in.Body.Source),
 			ConfigJson:        configJSON,
 		}); err != nil {

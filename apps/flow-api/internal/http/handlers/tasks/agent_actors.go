@@ -47,7 +47,7 @@ func AddAgentActor(deps Deps) func(context.Context, *AddTaskAgentActorInput) (*A
 			PublicID:    pub,
 			WorkspaceID: ws.ID,
 			TaskID:      task.ID,
-			AgentID:     sql.NullInt32{Int32: int32(agentID), Valid: true},
+			AgentID:     sql.NullInt32{Int32: int32(agentID), Valid: true}, //#nosec G115 -- agent id is agents.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 			Role:        generated.TaskActorsRole(in.Body.Role),
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)

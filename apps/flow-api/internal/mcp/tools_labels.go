@@ -244,7 +244,7 @@ func runArchiveTask(ctx context.Context, deps Deps, s *session, raw json.RawMess
 		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 	}
 	if err := deps.Queries.ArchiveTask(ctx, generated.ArchiveTaskParams{
-		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
+		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		WorkspaceID:     s.workspaceID,
 		PublicID:        taskPub,
 	}); err != nil {
@@ -275,7 +275,7 @@ func runUnarchiveTask(ctx context.Context, deps Deps, s *session, raw json.RawMe
 		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 	}
 	if err := deps.Queries.UnarchiveTask(ctx, generated.UnarchiveTaskParams{
-		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
+		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		WorkspaceID:     s.workspaceID,
 		PublicID:        taskPub,
 	}); err != nil {

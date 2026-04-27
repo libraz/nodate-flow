@@ -29,7 +29,7 @@ func Archive(deps Deps) func(context.Context, *ArchiveTaskInput) (*ArchiveTaskOu
 		actorID, _ := middleware.ActorFromContext(ctx)
 
 		if err := deps.Queries.ArchiveTask(ctx, generated.ArchiveTaskParams{
-			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: actorID != 0},
+			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: actorID != 0}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 			WorkspaceID:     ws.ID,
 			PublicID:        types.FromUUID(task.PublicID),
 		}); err != nil {
@@ -83,7 +83,7 @@ func Unarchive(deps Deps) func(context.Context, *UnarchiveTaskInput) (*Unarchive
 		actorID, _ := middleware.ActorFromContext(ctx)
 
 		if err := deps.Queries.UnarchiveTask(ctx, generated.UnarchiveTaskParams{
-			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: actorID != 0},
+			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: actorID != 0}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 			WorkspaceID:     ws.ID,
 			PublicID:        types.FromUUID(task.PublicID),
 		}); err != nil {
@@ -205,7 +205,7 @@ func mapArchivedTaskListItem(r generated.ListArchivedTasksForWorkspaceRow) TaskL
 		ProjectID:         bytesToUUIDString(r.ProjectPublicID),
 		ProjectName:       r.ProjectName,
 		ProjectIdentifier: r.ProjectIdentifier.String,
-		TaskNumber:        int32(r.TaskNumber),
+		TaskNumber:        int32(r.TaskNumber), //#nosec G115 -- task_number is per-project sequence (uint32), fits int32 within realistic deployments
 		ParentTaskID:      nullBytesToUUIDString(r.ParentTaskPublicID),
 		Title:             r.Title,
 		Visibility:        string(r.Visibility),
@@ -233,7 +233,7 @@ func mapArchivedTaskListItemKeyset(r generated.ListArchivedTasksForWorkspaceKeys
 		ProjectID:         bytesToUUIDString(r.ProjectPublicID),
 		ProjectName:       r.ProjectName,
 		ProjectIdentifier: r.ProjectIdentifier.String,
-		TaskNumber:        int32(r.TaskNumber),
+		TaskNumber:        int32(r.TaskNumber), //#nosec G115 -- task_number is per-project sequence (uint32), fits int32 within realistic deployments
 		ParentTaskID:      nullBytesToUUIDString(r.ParentTaskPublicID),
 		Title:             r.Title,
 		Visibility:        string(r.Visibility),

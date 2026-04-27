@@ -93,6 +93,7 @@ func queryTimeline(
 		args = append(args, actorPublicID)
 	}
 
+	//#nosec G201 -- WHERE fragments are static literals composed in this file; all user-supplied values are bound via parameter placeholders.
 	q := fmt.Sprintf(`SELECT
   v.public_id,
   v.task_public_id,

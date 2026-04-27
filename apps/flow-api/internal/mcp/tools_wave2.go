@@ -135,7 +135,7 @@ func runAddReaction(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	if err != nil {
 		return nil, err
 	}
-	taskNullID := sql.NullInt32{Int32: int32(taskInternal), Valid: true}
+	taskNullID := sql.NullInt32{Int32: int32(taskInternal), Valid: true} //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 	// Check for existing reaction to avoid duplicates.
 	_, err = deps.Queries.FindExistingReaction(ctx, generated.FindExistingReactionParams{
 		UserID: s.userID,
@@ -185,7 +185,7 @@ func runListReactions(ctx context.Context, deps Deps, s *session, raw json.RawMe
 	if err != nil {
 		return nil, err
 	}
-	rows, err := deps.Queries.ListReactionsForTask(ctx, sql.NullInt32{Int32: int32(taskInternal), Valid: true})
+	rows, err := deps.Queries.ListReactionsForTask(ctx, sql.NullInt32{Int32: int32(taskInternal), Valid: true}) //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}

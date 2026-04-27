@@ -34,7 +34,7 @@ func seedEvent(ctx context.Context, t *testing.T, db *sql.DB, f fixtures, startA
 	if err != nil {
 		t.Fatalf("seed event id: %v", err)
 	}
-	return uint32(id), pub
+	return uint32(id), pub //#nosec G115 -- LastInsertId in test seed, fits uint32
 }
 
 func TestLinkTaskToEvent_CreatesAndAppendsEvent(t *testing.T) {

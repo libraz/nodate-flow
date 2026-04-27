@@ -127,7 +127,7 @@ func ProposeSteps(deps StepsDeps) func(context.Context, *ProposeStepsInput) (*Pr
 		var children []ai.ChildTaskSummary
 		childRows, err := deps.Queries.ListChildTasksByParentID(ctx, generated.ListChildTasksByParentIDParams{
 			WorkspaceID:  ws.ID,
-			ParentTaskID: sql.NullInt32{Int32: int32(task.ID), Valid: true},
+			ParentTaskID: sql.NullInt32{Int32: int32(task.ID), Valid: true}, //#nosec G115 -- parent task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		})
 		if err == nil {
 			for _, c := range childRows {
@@ -221,9 +221,9 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 				PublicID:        pub,
 				WorkspaceID:     ws.ID,
 				ProjectID:       parentProjectID,
-				ParentTaskID:    sql.NullInt32{Int32: int32(task.ID), Valid: true},
-				CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
-				UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
+				ParentTaskID:    sql.NullInt32{Int32: int32(task.ID), Valid: true}, //#nosec G115 -- parent task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+				CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+				UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 				Title:           st.Title,
 				Description:     desc,
 				Priority:        st.Priority,

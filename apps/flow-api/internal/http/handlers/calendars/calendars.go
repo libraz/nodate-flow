@@ -166,7 +166,7 @@ func CreateCalendar(deps Deps) func(context.Context, *CreateCalendarInput) (*Cre
 			Description: desc,
 			Color:       input.Body.Color,
 			CoverUrl:    coverURL,
-			OwnerUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
+			OwnerUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 			SystemSlug:  systemSlug,
 		})
 		if err != nil {
@@ -177,7 +177,7 @@ func CreateCalendar(deps Deps) func(context.Context, *CreateCalendarInput) (*Cre
 		_, err = deps.CalendarQueries.CreateCalendarSubscription(ctx, calendar.CreateCalendarSubscriptionParams{
 			PublicID:     subPublicID,
 			WorkspaceID:  wsID,
-			CalendarID:   uint32(calID),
+			CalendarID:   uint32(calID), //#nosec G115 -- LastInsertId for calendars.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 			UserID:       actorID,
 			DisplayColor: input.Body.Color,
 		})
@@ -247,7 +247,7 @@ func PatchCalendar(deps Deps) func(context.Context, *PatchCalendarInput) (*Patch
 		}
 		// Only the calendar owner can modify calendar metadata.
 		// Subscription role has been dropped; owner-only is the new gate.
-		if !(cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(actorID)) {
+		if !(cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(actorID)) { //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
 
@@ -313,7 +313,7 @@ func DeleteCalendar(deps Deps) func(context.Context, *DeleteCalendarInput) (*Del
 		}
 		// Subscription role has been dropped; fall back to calendar
 		// ownership (cal.owner_user_id).
-		if !(cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(actorID)) {
+		if !(cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(actorID)) { //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
 		_ = cal

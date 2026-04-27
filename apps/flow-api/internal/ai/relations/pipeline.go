@@ -55,8 +55,9 @@ func (p *Pipeline) Hook() eventbus.NotifyHook {
 		// The NotifyHook fires after each Append; the event row was just
 		// written. We find the most recent task event for this workspace
 		// to extract the task_id. Because the hook must be non-blocking,
-		// we spawn a goroutine.
-		go p.processLatestTaskEvent(context.Background(), workspaceInternalID, eventType)
+		// we spawn a goroutine. Use WithoutCancel so the request's tracing
+		// metadata is preserved while the goroutine outlives the response.
+		go p.processLatestTaskEvent(context.WithoutCancel(ctx), workspaceInternalID, eventType)
 	}
 }
 

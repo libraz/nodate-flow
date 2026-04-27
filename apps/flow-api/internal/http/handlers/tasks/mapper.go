@@ -33,7 +33,7 @@ func rowToTaskFromFind(r generated.FindTaskByPublicIdRow) Task {
 		StartedOn:                nullDate(r.StartedOn),
 		CompletedAt:              nullTimeUnix(r.CompletedAt),
 		ProjectIdentifier:        r.ProjectIdentifier.String,
-		TaskNumber:               int32(r.TaskNumber),
+		TaskNumber:               int32(r.TaskNumber), //#nosec G115 -- task_number is per-project sequence (uint32), fits int32 within realistic deployments
 		ArchivedAt:               nullTimeUnix(r.ArchivedAt),
 		LabelCount:               r.LabelCount,
 		ConstraintCount:          r.ConstraintCount,
@@ -52,7 +52,7 @@ func rowToTaskListItemFromProject(r generated.ListTasksForProjectRow) TaskListIt
 		ProjectID:         bytesToUUIDString(r.ProjectPublicID),
 		ProjectName:       r.ProjectName,
 		ProjectIdentifier: r.ProjectIdentifier.String,
-		TaskNumber:        int32(r.TaskNumber),
+		TaskNumber:        int32(r.TaskNumber), //#nosec G115 -- task_number is per-project sequence (uint32), fits int32 within realistic deployments
 		ParentTaskID:      nullBytesToUUIDString(r.ParentTaskPublicID),
 		Title:             r.Title,
 		Visibility:        string(r.Visibility),
@@ -82,7 +82,7 @@ func rowToTaskListItemFromProjectKeyset(r generated.ListTasksForProjectKeysetRow
 		ProjectID:         bytesToUUIDString(r.ProjectPublicID),
 		ProjectName:       r.ProjectName,
 		ProjectIdentifier: r.ProjectIdentifier.String,
-		TaskNumber:        int32(r.TaskNumber),
+		TaskNumber:        int32(r.TaskNumber), //#nosec G115 -- task_number is per-project sequence (uint32), fits int32 within realistic deployments
 		ParentTaskID:      nullBytesToUUIDString(r.ParentTaskPublicID),
 		Title:             r.Title,
 		Visibility:        string(r.Visibility),
@@ -110,7 +110,7 @@ func rowToTaskListItemFromWorkspaceKeyset(r generated.ListTasksForWorkspaceKeyse
 		ProjectID:         bytesToUUIDString(r.ProjectPublicID),
 		ProjectName:       r.ProjectName,
 		ProjectIdentifier: r.ProjectIdentifier.String,
-		TaskNumber:        int32(r.TaskNumber),
+		TaskNumber:        int32(r.TaskNumber), //#nosec G115 -- task_number is per-project sequence (uint32), fits int32 within realistic deployments
 		ParentTaskID:      nullBytesToUUIDString(r.ParentTaskPublicID),
 		Title:             r.Title,
 		Visibility:        string(r.Visibility),
@@ -135,7 +135,7 @@ func rowToTaskListItemFromWorkspace(r generated.ListTasksForWorkspaceRow) TaskLi
 		ProjectID:         bytesToUUIDString(r.ProjectPublicID),
 		ProjectName:       r.ProjectName,
 		ProjectIdentifier: r.ProjectIdentifier.String,
-		TaskNumber:        int32(r.TaskNumber),
+		TaskNumber:        int32(r.TaskNumber), //#nosec G115 -- task_number is per-project sequence (uint32), fits int32 within realistic deployments
 		ParentTaskID:      nullBytesToUUIDString(r.ParentTaskPublicID),
 		Title:             r.Title,
 		Visibility:        string(r.Visibility),

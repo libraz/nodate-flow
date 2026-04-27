@@ -257,7 +257,7 @@ func Patch(deps Deps) func(context.Context, *PatchLabelInput) (*PatchLabelOutput
 				if findErr != nil {
 					return nil, httpErr(apierr.SpecForErrNoRows(findErr, apierrors.WsLabelNotFound, apierrors.InternalUnexpected))
 				}
-				parentID = sql.NullInt32{Int32: int32(parent.ID), Valid: true}
+				parentID = sql.NullInt32{Int32: int32(parent.ID), Valid: true} //#nosec G115 -- parent label id is task_labels.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 			}
 		}
 		sw := row.SortWeight

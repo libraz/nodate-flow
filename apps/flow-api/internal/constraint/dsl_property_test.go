@@ -90,7 +90,7 @@ func randComposite(rng *rand.Rand, maxDepth int) Constraint {
 // survives json.Marshal -> Parse without information loss.
 func TestProperty_JSONRoundTrip(t *testing.T) {
 	t.Parallel()
-	rng := rand.New(rand.NewSource(42))
+	rng := rand.New(rand.NewSource(42)) //#nosec G404 -- property test seeded for reproducibility, not crypto
 	for i := 0; i < 500; i++ {
 		original := randConstraint(rng, 4)
 		data, err := json.Marshal(original)
@@ -112,7 +112,7 @@ func TestProperty_JSONRoundTrip(t *testing.T) {
 // FuzzParse by covering more object shapes with controlled randomness.
 func TestProperty_ParseArbitraryJSON(t *testing.T) {
 	t.Parallel()
-	rng := rand.New(rand.NewSource(99))
+	rng := rand.New(rand.NewSource(99)) //#nosec G404 -- property test seeded for reproducibility, not crypto
 	ops := []string{
 		"and", "or", "not", "time.due_before", "bogus", "",
 		"dependency.all_done", "actor.has_role", "ci.status_is",
@@ -146,7 +146,7 @@ func TestProperty_ParseArbitraryJSON(t *testing.T) {
 // constraint trees.
 func TestProperty_ExplainPure(t *testing.T) {
 	t.Parallel()
-	rng := rand.New(rand.NewSource(77))
+	rng := rand.New(rand.NewSource(77)) //#nosec G404 -- property test seeded for reproducibility, not crypto
 	for i := 0; i < 200; i++ {
 		c := randConstraint(rng, 3)
 		a := Explain(c)
@@ -161,7 +161,7 @@ func TestProperty_ExplainPure(t *testing.T) {
 // string for any valid constraint.
 func TestProperty_ExplainNonEmpty(t *testing.T) {
 	t.Parallel()
-	rng := rand.New(rand.NewSource(33))
+	rng := rand.New(rand.NewSource(33)) //#nosec G404 -- property test seeded for reproducibility, not crypto
 	for i := 0; i < 200; i++ {
 		c := randConstraint(rng, 3)
 		out := Explain(c)

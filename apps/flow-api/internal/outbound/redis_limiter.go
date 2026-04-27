@@ -56,6 +56,8 @@ func NewRedisLimiter(rdb *redis.Client, destination string, ratePerSec float64, 
 
 // tokenScript is an atomic "refill + consume 1 token" Lua. Returns
 // 1 when the token was granted, 0 when the bucket was empty.
+//
+//nolint:gosec // G101: Lua script literal, not a credential.
 const tokenScript = `
 local cap = tonumber(ARGV[1])
 local refill = tonumber(ARGV[2])

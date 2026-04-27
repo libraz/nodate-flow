@@ -44,7 +44,7 @@ func seedTaskWithDueOn(t *testing.T, tt *helpers.CalendarTestTenant, dueOn *time
 	require.NoError(t, err, "insert project")
 	id64, err := res.LastInsertId()
 	require.NoError(t, err)
-	projectID = uint32(id64)
+	projectID = uint32(id64) //#nosec G115 -- LastInsertId in test seed, fits uint32
 
 	taskPub := dbtype.New()
 	var dueOnNT sql.NullTime
@@ -59,7 +59,7 @@ func seedTaskWithDueOn(t *testing.T, tt *helpers.CalendarTestTenant, dueOn *time
 	require.NoError(t, err, "insert task")
 	id64, err = res.LastInsertId()
 	require.NoError(t, err)
-	return taskPub.String(), uint32(id64)
+	return taskPub.String(), uint32(id64) //#nosec G115 -- LastInsertId in test seed, fits uint32
 }
 
 // TestCreateEventFromTaskLinksTaskRole verifies the POST
@@ -95,7 +95,7 @@ func TestCreateEventFromTaskLinksTaskRole(t *testing.T) {
 	).Scan(&gotTaskID, &gotTaskRole)
 	require.NoError(t, err)
 	require.True(t, gotTaskID.Valid, "task_id must be set on linked event")
-	assert.Equal(t, int32(taskInternal), gotTaskID.Int32)
+	assert.Equal(t, int32(taskInternal), gotTaskID.Int32) //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits int32 in test seed
 	require.True(t, gotTaskRole.Valid)
 	assert.Equal(t, "due", gotTaskRole.String)
 }

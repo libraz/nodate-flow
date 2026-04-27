@@ -241,7 +241,7 @@ func CreatePublicShare(deps Deps) func(context.Context, *CreatePublicShareInput)
 		params := calendar.CreatePublicShareParams{
 			PublicID:            publicID,
 			WorkspaceID:         wsID,
-			CreatedByUserID:     sql.NullInt32{Int32: int32(actorID), Valid: true},
+			CreatedByUserID:     sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 			TokenHash:           tokenHash,
 			Title:               input.Body.Title,
 			Description:         nullStringFromPtr(input.Body.Description),

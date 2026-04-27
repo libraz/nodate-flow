@@ -110,7 +110,7 @@ func randomFacts(rng *rand.Rand) constraint.Facts {
 func TestProperty_Engine_Idempotent(t *testing.T) {
 	t.Parallel()
 	exprs := validExpressions()
-	rng := rand.New(rand.NewSource(42))
+	rng := rand.New(rand.NewSource(42)) //#nosec G404 -- property test seeded for reproducibility, not crypto
 	frozenNow := time.Date(2026, 4, 19, 12, 0, 0, 0, time.UTC)
 
 	for iter := 0; iter < 100; iter++ {
@@ -183,7 +183,7 @@ func TestProperty_Engine_EmptyFacts(t *testing.T) {
 // of whether each row parses or evaluates successfully.
 func TestProperty_Engine_OutcomeCountEqualsRowCount(t *testing.T) {
 	t.Parallel()
-	rng := rand.New(rand.NewSource(88))
+	rng := rand.New(rand.NewSource(88)) //#nosec G404 -- property test seeded for reproducibility, not crypto
 	frozenNow := time.Date(2026, 4, 19, 12, 0, 0, 0, time.UTC)
 
 	// Mix valid and invalid expressions.
@@ -256,7 +256,7 @@ func TestProperty_Engine_ParseErrorNeverMarked(t *testing.T) {
 // call.
 func TestProperty_Engine_ValidRowAlwaysMarked(t *testing.T) {
 	t.Parallel()
-	rng := rand.New(rand.NewSource(55))
+	rng := rand.New(rand.NewSource(55)) //#nosec G404 -- property test seeded for reproducibility, not crypto
 	frozenNow := time.Date(2026, 4, 19, 12, 0, 0, 0, time.UTC)
 	exprs := validExpressions()
 

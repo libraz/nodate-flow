@@ -250,19 +250,19 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	}
 
 	// 6. JP holidays system calendar (subscribed by owner).
-	holidayCalID, err := ensureHolidayCalendar(ctx, db, uint32(wsID), l.HolidaysCalendarName, logger)
+	holidayCalID, err := ensureHolidayCalendar(ctx, db, uint32(wsID), l.HolidaysCalendarName, logger) //#nosec G115 -- LastInsertId for workspaces.id (BIGINT UNSIGNED), fits uint32 in dev seed
 	if err != nil {
 		return fmt.Errorf("ensure holiday calendar: %w", err)
 	}
-	if err := ensureSubscription(ctx, db, uint32(wsID), holidayCalID, uint32(ownerID), logger); err != nil {
+	if err := ensureSubscription(ctx, db, uint32(wsID), holidayCalID, uint32(ownerID), logger); err != nil { //#nosec G115 -- LastInsertIds for workspaces.id and users.id (BIGINT UNSIGNED), fit uint32 in dev seed
 		return fmt.Errorf("ensure holiday subscription: %w", err)
 	}
-	if err := ensureHolidayEvent(ctx, db, cq, uint32(wsID), holidayCalID, uint32(ownerID), l.HolidayEventTitle, logger); err != nil {
+	if err := ensureHolidayEvent(ctx, db, cq, uint32(wsID), holidayCalID, uint32(ownerID), l.HolidayEventTitle, logger); err != nil { //#nosec G115 -- LastInsertIds for workspaces.id and users.id (BIGINT UNSIGNED), fit uint32 in dev seed
 		return fmt.Errorf("ensure holiday event: %w", err)
 	}
 
 	// 7. Demo project + tasks.
-	projID, projCreated, err := ensureProject(ctx, db, q, uint32(wsID), l)
+	projID, projCreated, err := ensureProject(ctx, db, q, uint32(wsID), l) //#nosec G115 -- LastInsertId for workspaces.id (BIGINT UNSIGNED), fits uint32 in dev seed
 	if err != nil {
 		return fmt.Errorf("ensure project: %w", err)
 	}
@@ -271,38 +271,38 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	} else {
 		logger.Info("project exists", "id", projID)
 	}
-	firstTaskID, err := ensureTasks(ctx, db, q, uint32(wsID), uint32(projID), uint32(ownerID), l, logger)
+	firstTaskID, err := ensureTasks(ctx, db, q, uint32(wsID), uint32(projID), uint32(ownerID), l, logger) //#nosec G115 -- LastInsertIds for workspaces.id, projects.id, users.id fit uint32 in dev seed
 	if err != nil {
 		return fmt.Errorf("ensure tasks: %w", err)
 	}
 
 	// 8. Owner's sample event with second-user attendee.
-	sampleEventID, err := ensureSampleEvent(ctx, db, cq, uint32(wsID), ownerCalID, uint32(ownerID), l.SampleEventTitle, l.SampleEventLocation, logger)
+	sampleEventID, err := ensureSampleEvent(ctx, db, cq, uint32(wsID), ownerCalID, uint32(ownerID), l.SampleEventTitle, l.SampleEventLocation, logger) //#nosec G115 -- LastInsertIds for workspaces.id and users.id fit uint32 in dev seed
 	if err != nil {
 		return fmt.Errorf("ensure sample event: %w", err)
 	}
-	if err := ensureAttendee(ctx, db, cq, uint32(wsID), sampleEventID, uint32(secondID), logger); err != nil {
+	if err := ensureAttendee(ctx, db, cq, uint32(wsID), sampleEventID, uint32(secondID), logger); err != nil { //#nosec G115 -- LastInsertIds for workspaces.id and users.id fit uint32 in dev seed
 		return fmt.Errorf("ensure attendee: %w", err)
 	}
 
 	// 9. Undated event on owner's calendar.
-	if _, err := ensureUndatedEvent(ctx, db, cq, uint32(wsID), ownerCalID, uint32(ownerID), l.UndatedEventTitle, l.UndatedEventMemo, logger); err != nil {
+	if _, err := ensureUndatedEvent(ctx, db, cq, uint32(wsID), ownerCalID, uint32(ownerID), l.UndatedEventTitle, l.UndatedEventMemo, logger); err != nil { //#nosec G115 -- LastInsertIds for workspaces.id and users.id fit uint32 in dev seed
 		return fmt.Errorf("ensure undated event: %w", err)
 	}
 
 	// 10. Task-event link: first task contributes_to the sample event.
 	if firstTaskID > 0 {
-		if err := ensureTaskEventLink(ctx, q, uint32(wsID), uint32(firstTaskID), sampleEventID, logger); err != nil {
+		if err := ensureTaskEventLink(ctx, q, uint32(wsID), uint32(firstTaskID), sampleEventID, logger); err != nil { //#nosec G115 -- LastInsertIds for workspaces.id and tasks.id fit uint32 in dev seed
 			return fmt.Errorf("ensure task-event link: %w", err)
 		}
 	}
 
 	// 11. Workspace public share + attach the sample event.
-	shareID, err := ensurePublicShare(ctx, db, cq, uint32(wsID), uint32(ownerID), l.PublicShareTitle, l.PublicShareDescription, logger)
+	shareID, err := ensurePublicShare(ctx, db, cq, uint32(wsID), uint32(ownerID), l.PublicShareTitle, l.PublicShareDescription, logger) //#nosec G115 -- LastInsertIds for workspaces.id and users.id fit uint32 in dev seed
 	if err != nil {
 		return fmt.Errorf("ensure public share: %w", err)
 	}
-	if err := ensureShareEvent(ctx, db, cq, uint32(wsID), shareID, sampleEventID, logger); err != nil {
+	if err := ensureShareEvent(ctx, db, cq, uint32(wsID), shareID, sampleEventID, logger); err != nil { //#nosec G115 -- LastInsertId for workspaces.id (BIGINT UNSIGNED), fits uint32 in dev seed
 		return fmt.Errorf("ensure share event: %w", err)
 	}
 
@@ -311,7 +311,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	// create-agent flow on a fresh dev DB. The api_key_ciphertext is a
 	// seed placeholder; rotate it via PATCH /ai/providers before the
 	// provider actually dispatches to an upstream LLM.
-	if err := ensureAIProviderAndModel(ctx, db, uint32(wsID), logger); err != nil {
+	if err := ensureAIProviderAndModel(ctx, db, uint32(wsID), logger); err != nil { //#nosec G115 -- LastInsertId for workspaces.id (BIGINT UNSIGNED), fits uint32 in dev seed
 		return fmt.Errorf("ensure ai provider + model: %w", err)
 	}
 
@@ -520,7 +520,7 @@ func ensurePersonalCalendar(ctx context.Context, db *sql.DB, wsID, userID uint32
 		return 0, err
 	}
 	logger.Info("created personal calendar", "id", newID64, "user_id", userID)
-	return uint32(newID64), nil
+	return uint32(newID64), nil //#nosec G115 -- LastInsertId for calendars.id (BIGINT UNSIGNED), fits uint32 in dev seed
 }
 
 func ensureHolidayCalendar(ctx context.Context, db *sql.DB, wsID uint32, name string, logger *slog.Logger) (uint32, error) {
@@ -553,7 +553,7 @@ func ensureHolidayCalendar(ctx context.Context, db *sql.DB, wsID uint32, name st
 		return 0, err
 	}
 	logger.Info("created holiday calendar", "id", newID64, "slug", slug)
-	return uint32(newID64), nil
+	return uint32(newID64), nil //#nosec G115 -- LastInsertId for calendars.id (BIGINT UNSIGNED), fits uint32 in dev seed
 }
 
 func ensureSubscription(ctx context.Context, db *sql.DB, wsID, calID, userID uint32, logger *slog.Logger) error {
@@ -664,7 +664,7 @@ func ensureSampleEvent(ctx context.Context, db *sql.DB, cq *calendar.Queries, ws
 		return 0, err
 	}
 	logger.Info("created sample event", "id", id, "title", title, "start_at", start.Format(time.RFC3339))
-	return uint32(id), nil
+	return uint32(id), nil //#nosec G115 -- LastInsertId for calendar_events.id (BIGINT UNSIGNED), fits uint32 in dev seed
 }
 
 func ensureUndatedEvent(ctx context.Context, db *sql.DB, cq *calendar.Queries, wsID, calID, ownerID uint32, title, memo string, logger *slog.Logger) (uint32, error) {
@@ -721,7 +721,7 @@ func ensureUndatedEvent(ctx context.Context, db *sql.DB, cq *calendar.Queries, w
 		return 0, err
 	}
 	logger.Info("created undated event", "id", id, "title", title)
-	return uint32(id), nil
+	return uint32(id), nil //#nosec G115 -- LastInsertId for calendar_events.id (BIGINT UNSIGNED), fits uint32 in dev seed
 }
 
 func ensureHolidayEvent(ctx context.Context, db *sql.DB, cq *calendar.Queries, wsID, calID, ownerID uint32, title string, logger *slog.Logger) error {
@@ -859,7 +859,7 @@ func ensurePublicShare(ctx context.Context, db *sql.DB, cq *calendar.Queries, ws
 		return 0, err
 	}
 	logger.Info("created public share", "id", id, "title", title, "token", token)
-	return uint32(id), nil
+	return uint32(id), nil //#nosec G115 -- LastInsertId for calendar_public_shares.id (BIGINT UNSIGNED), fits uint32 in dev seed
 }
 
 func ensureShareEvent(ctx context.Context, db *sql.DB, cq *calendar.Queries, wsID, shareID, eventID uint32, logger *slog.Logger) error {
@@ -951,7 +951,7 @@ func ensureAIProviderAndModel(ctx context.Context, db *sql.DB, wsID uint32, logg
 		if err != nil {
 			return fmt.Errorf("ai provider last id: %w", err)
 		}
-		providerID = uint32(newID)
+		providerID = uint32(newID) //#nosec G115 -- LastInsertId for ai_providers.id (BIGINT UNSIGNED), fits uint32 in dev seed
 		logger.Info("created ai provider", "id", providerID, "kind", seedAIProviderKind,
 			"note", "api_key_ciphertext is a seed placeholder; rotate via PATCH before real use")
 	default:

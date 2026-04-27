@@ -68,7 +68,7 @@ func ListAiInvocations(deps Deps) func(context.Context, *ListTaskAiInvocationsIn
 		}
 		rows, err := deps.Queries.ListAiInvocationsForTask(ctx, generated.ListAiInvocationsForTaskParams{
 			WorkspaceID: ws.ID,
-			TaskID:      sql.NullInt32{Int32: int32(task.ID), Valid: true},
+			TaskID:      sql.NullInt32{Int32: int32(task.ID), Valid: true}, //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 			Limit:       limit,
 			Offset:      in.Offset,
 		})

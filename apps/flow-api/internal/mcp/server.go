@@ -427,7 +427,7 @@ func (h *Handler) loadAgentMonthSpendCents(ctx context.Context, agentID uint32) 
 	now := time.Now().UTC()
 	since := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 	cents, err := h.deps.Queries.SumAiCostForAgentSince(ctx, generated.SumAiCostForAgentSinceParams{
-		AgentID:   sql.NullInt32{Int32: int32(agentID), Valid: true},
+		AgentID:   sql.NullInt32{Int32: int32(agentID), Valid: true}, //#nosec G115 -- agent id is agents.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		InvokedAt: since,
 	})
 	if err != nil {
@@ -515,7 +515,7 @@ func (h *Handler) audit(
 
 	var userID sql.NullInt32
 	if s != nil {
-		userID = sql.NullInt32{Int32: int32(s.userID), Valid: true}
+		userID = sql.NullInt32{Int32: int32(s.userID), Valid: true} //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 	}
 	var ec sql.NullString
 	if errCode != "" {

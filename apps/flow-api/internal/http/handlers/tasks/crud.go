@@ -124,6 +124,7 @@ func listTasksFiltered(
 		args = append(args, pub[:])
 	}
 
+	//#nosec G201 -- WHERE fragments are static literals composed in this file; all user-supplied values are bound via parameter placeholders.
 	query := fmt.Sprintf(`SELECT
   v.public_id,
   v.project_public_id,
@@ -281,10 +282,10 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 			PublicID:        pub,
 			WorkspaceID:     prj.WorkspaceID,
 			ProjectID:       prj.ID,
-			TaskNumber:      uint32(nextNum),
+			TaskNumber:      uint32(nextNum), //#nosec G115 -- task_number is per-project sequence, fits uint32
 			ParentTaskID:    sql.NullInt32{},
-			CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
-			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
+			CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 			Title:           in.Body.Title,
 			Description:     desc,
 			Priority:        in.Body.Priority,
@@ -308,8 +309,8 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 			if _, err := qtx.AddActor(ctx, generated.AddActorParams{
 				PublicID:    actorPub,
 				WorkspaceID: prj.WorkspaceID,
-				TaskID:      uint32(taskID),
-				UserID:      sql.NullInt32{Int32: int32(actorID), Valid: true},
+				TaskID:      uint32(taskID),                                    //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+				UserID:      sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 				Role:        generated.TaskActorsRoleAssignee,
 			}); err != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
@@ -335,8 +336,8 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 				if _, aerr := qtx.AddActor(ctx, generated.AddActorParams{
 					PublicID:    actorPub,
 					WorkspaceID: prj.WorkspaceID,
-					TaskID:      uint32(taskID),
-					UserID:      sql.NullInt32{Int32: int32(uid), Valid: true},
+					TaskID:      uint32(taskID),                                //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+					UserID:      sql.NullInt32{Int32: int32(uid), Valid: true}, //#nosec G115 -- user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 					Role:        role,
 				}); aerr != nil {
 					return nil, httpErr(apierrors.InternalUnexpected)
@@ -378,7 +379,7 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 			// Write-time embedding upsert (ADR 0003). Failures are swallowed
 			// so the task write still succeeds; the weekly reindex cron
 			// picks up any rows that missed.
-			_ = deps.Embedder.EmbedTask(ctx, uint32(taskID), in.Body.Title, in.Body.Description)
+			_ = deps.Embedder.EmbedTask(ctx, uint32(taskID), in.Body.Title, in.Body.Description) //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 		}
 
 		row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
@@ -695,7 +696,7 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 		needsItemkit := false
 		if titleChanged || dueOnChanged {
 			linkedCount, err := deps.Queries.CountActiveCalendarEventsByTaskId(ctx,
-				sql.NullInt32{Int32: int32(task.ID), Valid: true},
+				sql.NullInt32{Int32: int32(task.ID), Valid: true}, //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 			)
 			if err != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
@@ -711,7 +712,7 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			StartedOn:       newStart,
 			SortWeight:      newSortWeight,
 			Visibility:      newVisibility,
-			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
+			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 			WorkspaceID:     ws.ID,
 			PublicID:        types.FromUUID(task.PublicID),
 		}

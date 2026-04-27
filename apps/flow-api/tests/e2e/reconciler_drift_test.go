@@ -183,7 +183,7 @@ func seedPersonalCalendar(t *testing.T, ctx context.Context, wsID, userID uint32
 	require.NoError(t, err)
 	id, err := res.LastInsertId()
 	require.NoError(t, err)
-	return uint32(id)
+	return uint32(id) //#nosec G115 -- LastInsertId in test seed, fits uint32
 }
 
 // seedTask inserts a minimal tasks row. dueOn is empty string when the
@@ -208,7 +208,7 @@ func seedTask(t *testing.T, ctx context.Context, wsID, userID uint32, title, due
 	require.NoError(t, err)
 	id, err := res.LastInsertId()
 	require.NoError(t, err)
-	return uint32(id)
+	return uint32(id) //#nosec G115 -- LastInsertId in test seed, fits uint32
 }
 
 // seedLinkedEvent inserts a calendar_events row linked to taskID with
@@ -227,5 +227,5 @@ func seedLinkedEvent(t *testing.T, ctx context.Context, wsID, calID, userID, tas
 	require.NoError(t, err)
 	id, err := res.LastInsertId()
 	require.NoError(t, err)
-	return uint32(id)
+	return uint32(id) //#nosec G115 -- LastInsertId in test seed, fits uint32
 }

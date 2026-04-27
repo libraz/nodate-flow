@@ -113,7 +113,7 @@ func runTriageIntakeItem(ctx context.Context, deps Deps, s *session, raw json.Ra
 
 	if err := deps.Queries.UpdateIntakeItemTriage(ctx, generated.UpdateIntakeItemTriageParams{
 		TriageStatus:    generated.IntakeItemsTriageStatus(in.Status),
-		TriagedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
+		TriagedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		SnoozeUntil:     snoozeUntil,
 		WorkspaceID:     s.workspaceID,
 		PublicID:        pub,
@@ -215,10 +215,10 @@ func runConvertIntakeToTask(ctx context.Context, deps Deps, s *session, raw json
 		PublicID:        taskPub,
 		WorkspaceID:     s.workspaceID,
 		ProjectID:       prj.ID,
-		TaskNumber:      uint32(nextNum),
+		TaskNumber:      uint32(nextNum), //#nosec G115 -- task_number is per-project sequence, fits uint32
 		ParentTaskID:    sql.NullInt32{},
-		CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
-		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
+		CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		Title:           item.Title,
 		Description:     desc,
 		Priority:        0,
@@ -370,7 +370,7 @@ func runRestoreDescriptionVersion(ctx context.Context, deps Deps, s *session, ra
 		StartedOn:       taskRow.StartedOn,
 		SortWeight:      taskRow.SortWeight,
 		Visibility:      taskRow.Visibility,
-		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
+		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		WorkspaceID:     s.workspaceID,
 		PublicID:        taskPub,
 	}); err != nil {
@@ -387,8 +387,8 @@ func runRestoreDescriptionVersion(ctx context.Context, deps Deps, s *session, ra
 		PublicID:      newPub,
 		WorkspaceID:   s.workspaceID,
 		TaskID:        taskInternal,
-		AuthorUserID:  sql.NullInt32{Int32: int32(s.userID), Valid: true},
-		VersionNumber: uint32(nextVer),
+		AuthorUserID:  sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+		VersionNumber: uint32(nextVer),                                    //#nosec G115 -- per-task version sequence, fits uint32
 		Body:          version.Body,
 		BodyLength:    uint32(len(version.Body)), //#nosec G115 -- description body length capped at 50KB by handler validation, fits uint32
 	}); err != nil {

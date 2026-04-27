@@ -68,7 +68,7 @@ func CreateCalendarTestTenant(t *testing.T, srv *TestServer) *CalendarTestTenant
 		ThemePreference: generated.UsersThemePreferenceSystem,
 	})
 	require.NoError(t, err, "create test user")
-	userID := uint32(userID64)
+	userID := uint32(userID64) //#nosec G115 -- LastInsertId for users.id (BIGINT UNSIGNED), fits uint32 in test seed
 
 	wsPub := dbtype.New()
 	wsSlug := "ws-" + suffix
@@ -79,7 +79,7 @@ func CreateCalendarTestTenant(t *testing.T, srv *TestServer) *CalendarTestTenant
 		Timezone: "UTC",
 	})
 	require.NoError(t, err, "create test workspace")
-	wsID := uint32(wsID64)
+	wsID := uint32(wsID64) //#nosec G115 -- LastInsertId for workspaces.id (BIGINT UNSIGNED), fits uint32 in test seed
 
 	_, err = q.CreateWorkspaceMember(ctx, generated.CreateWorkspaceMemberParams{
 		PublicID:    dbtype.New(),
@@ -139,7 +139,7 @@ func CreateExtraCalendarMember(
 		ThemePreference: generated.UsersThemePreferenceSystem,
 	})
 	require.NoError(t, err)
-	userID := uint32(userID64)
+	userID := uint32(userID64) //#nosec G115 -- LastInsertId for users.id (BIGINT UNSIGNED), fits uint32 in test seed
 
 	_, err = q.CreateWorkspaceMember(ctx, generated.CreateWorkspaceMemberParams{
 		PublicID:    dbtype.New(),

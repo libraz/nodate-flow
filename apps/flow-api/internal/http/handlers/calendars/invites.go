@@ -266,7 +266,7 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 				return nil, httpErr(apierrors.CalendarInviteStoreWriteInterrupted)
 			}
 			if id, idErr := res.LastInsertId(); idErr == nil && id > 0 {
-				inviteInternalID = uint32(id)
+				inviteInternalID = uint32(id) //#nosec G115 -- LastInsertId for calendar_event_invites.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 			}
 		default:
 			return nil, httpErr(apierrors.CalendarInviteStoreLookupInterrupted)

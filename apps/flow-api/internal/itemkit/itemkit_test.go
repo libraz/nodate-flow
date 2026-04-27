@@ -76,7 +76,7 @@ func seed(t *testing.T, ctx context.Context, db *sql.DB) fixtures {
 		dbtype.New(), wsID, userID,
 	))
 	taskPub := dbtype.New()
-	taskID := uint32(exec(
+	taskID := uint32(exec( //#nosec G115 -- LastInsertId in test seed, fits uint32
 		`INSERT INTO tasks (public_id, workspace_id, project_id, task_number, title, visibility)
 		 VALUES (?, ?, ?, 1, 'Test task', 'public')`,
 		taskPub, wsID, projectID,

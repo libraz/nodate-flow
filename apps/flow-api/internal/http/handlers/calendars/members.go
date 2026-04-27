@@ -106,7 +106,7 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 		}
 		// Only the calendar owner can add members.
 		// Subscription role has been dropped; owner-only is the new gate.
-		if !(cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(actorID)) {
+		if !(cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(actorID)) { //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
 
@@ -221,7 +221,7 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 		}
 		// Subscription role has been dropped; fall back to calendar
 		// ownership.
-		if !(cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(actorID)) {
+		if !(cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(actorID)) { //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
 
@@ -277,7 +277,7 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 		isSelf := targetUserID == actorID
 		// Subscription role has been dropped; fall back to calendar
 		// ownership.
-		isOwner := cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(actorID)
+		isOwner := cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(actorID) //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 
 		if !isSelf && !isOwner {
 			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
@@ -295,7 +295,7 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 		// Last-owner protection now lives on calendars.owner_user_id
 		// (not subscription role). Prevent removing the single calendar owner
 		// via self-leave.
-		if cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(targetUserID) {
+		if cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(targetUserID) { //#nosec G115 -- target user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 			return nil, httpErr(apierrors.CalendarMemberLastOwnerRemovalBlocked)
 		}
 

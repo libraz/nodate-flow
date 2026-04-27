@@ -156,8 +156,8 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 			WorkspaceID:     ws.ID,
 			ProjectID:       prj.ID,
 			ParentTaskID:    sql.NullInt32{},
-			CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
-			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
+			CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 			Title:           in.Body.Title,
 			Description:     desc,
 			Priority:        in.Body.Priority,
@@ -169,7 +169,7 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 
 		// Attach assignees to parent task.
 		for _, uid := range in.Body.AssigneeUserIDs {
-			if err := addActorByPublicID(ctx, qtx, deps.DB, ws.ID, uint32(parentID), uid); err != nil {
+			if err := addActorByPublicID(ctx, qtx, deps.DB, ws.ID, uint32(parentID), uid); err != nil { //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 				return nil, err
 			}
 		}
@@ -184,8 +184,8 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 				WorkspaceID:     ws.ID,
 				ProjectID:       prj.ID,
 				ParentTaskID:    sql.NullInt32{Int32: int32(parentID), Valid: true}, //#nosec G115 -- parent_task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-				CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
-				UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
+				CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},  //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+				UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},  //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 				Title:           sub.Title,
 				Description:     subDesc,
 				Priority:        sub.Priority,
@@ -197,7 +197,7 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 
 			// Attach subtask assignee if provided.
 			if sub.AssigneeUserID != "" {
-				if err := addActorByPublicID(ctx, qtx, deps.DB, ws.ID, uint32(subID), sub.AssigneeUserID); err != nil {
+				if err := addActorByPublicID(ctx, qtx, deps.DB, ws.ID, uint32(subID), sub.AssigneeUserID); err != nil { //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 					return nil, err
 				}
 			}
@@ -232,7 +232,7 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 
 		// Write-time embedding for the parent task (best-effort).
 		if deps.Embedder != nil {
-			_ = deps.Embedder.EmbedTask(ctx, uint32(parentID), in.Body.Title, in.Body.Description)
+			_ = deps.Embedder.EmbedTask(ctx, uint32(parentID), in.Body.Title, in.Body.Description) //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 		}
 
 		out := &ApplySmartOutput{}

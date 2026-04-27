@@ -152,7 +152,7 @@ func RestoreDescriptionVersion(deps Deps) func(context.Context, *RestoreDescript
 			StartedOn:       taskRow.StartedOn,
 			SortWeight:      taskRow.SortWeight,
 			Visibility:      taskRow.Visibility,
-			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: actorID != 0},
+			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: actorID != 0}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 			WorkspaceID:     ws.ID,
 			PublicID:        types.FromUUID(task.PublicID),
 		}); err != nil {
@@ -171,8 +171,8 @@ func RestoreDescriptionVersion(deps Deps) func(context.Context, *RestoreDescript
 			PublicID:      newPub,
 			WorkspaceID:   ws.ID,
 			TaskID:        task.ID,
-			AuthorUserID:  sql.NullInt32{Int32: int32(actorID), Valid: true},
-			VersionNumber: uint32(nextVer),
+			AuthorUserID:  sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+			VersionNumber: uint32(nextVer),                                   //#nosec G115 -- per-task version sequence, fits uint32
 			Body:          version.Body,
 			BodyLength:    uint32(len(version.Body)), //#nosec G115 -- description body length capped at 50KB by handler validation, fits uint32
 		}); err != nil {

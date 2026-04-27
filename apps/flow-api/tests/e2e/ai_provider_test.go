@@ -53,7 +53,7 @@ func TestAIProviderCRUD(t *testing.T) {
 	// Patch (rotate key).
 	status, _ = doJSONStatus(t, http.MethodPatch,
 		testServerURL+"/workspaces/"+tt.WorkspacePublicID+"/ai/providers/"+created.ID,
-		tt.AccessToken, map[string]any{"apiKey": "sk-ant-rotated-key-9876543210"})
+		tt.AccessToken, map[string]any{"apiKey": "sk-ant-rotated-key-9876543210"}) //#nosec G101 -- synthetic test fixture, never a real key
 	require.Equal(t, http.StatusOK, status)
 
 	// Delete.

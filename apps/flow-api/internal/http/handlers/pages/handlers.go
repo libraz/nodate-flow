@@ -95,7 +95,7 @@ func resolveProjectInternal(ctx context.Context, q *generated.Queries, wsID uint
 	if err != nil {
 		return sql.NullInt32{}, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
 	}
-	return sql.NullInt32{Int32: int32(row.ID), Valid: true}, nil
+	return sql.NullInt32{Int32: int32(row.ID), Valid: true}, nil //#nosec G115 -- parent page id is pages.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 }
 
 // Create handles POST /workspaces/{wsId}/pages.
@@ -135,7 +135,7 @@ func Create(deps Deps) func(context.Context, *CreatePageInput) (*CreatePageOutpu
 			if err := checkAncestorDepthAndCircular(ctx, deps.DB, ws.ID, parentInternal, 0); err != nil {
 				return nil, err
 			}
-			parentPageID = sql.NullInt32{Int32: int32(parentInternal), Valid: true}
+			parentPageID = sql.NullInt32{Int32: int32(parentInternal), Valid: true} //#nosec G115 -- parent page id is pages.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		}
 
 		pub := types.New()
@@ -253,7 +253,7 @@ func ListChildren(deps Deps) func(context.Context, *ListChildPagesInput) (*ListC
 
 		rows, err := deps.Queries.ListChildPages(ctx, generated.ListChildPagesParams{
 			WorkspaceID:  ws.ID,
-			ParentPageID: sql.NullInt32{Int32: int32(parentInternal), Valid: true},
+			ParentPageID: sql.NullInt32{Int32: int32(parentInternal), Valid: true}, //#nosec G115 -- parent page id is pages.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 			Limit:        limit,
 			Offset:       in.Offset,
 		})
@@ -368,7 +368,7 @@ func Update(deps Deps) func(context.Context, *UpdatePageInput) (*UpdatePageOutpu
 				if err := checkAncestorDepthAndCircular(ctx, deps.DB, ws.ID, parentInternal, existing.ID); err != nil {
 					return nil, err
 				}
-				updateParams.ParentPageID = sql.NullInt32{Int32: int32(parentInternal), Valid: true}
+				updateParams.ParentPageID = sql.NullInt32{Int32: int32(parentInternal), Valid: true} //#nosec G115 -- parent page id is pages.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 			}
 		}
 

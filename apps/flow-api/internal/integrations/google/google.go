@@ -11,7 +11,7 @@ const HeaderChannelID = "X-Goog-Channel-ID"
 // HeaderChannelToken is the per-channel shared secret echoed back
 // with every push so the receiver can authenticate the source
 // without inspecting the body.
-const HeaderChannelToken = "X-Goog-Channel-Token"
+const HeaderChannelToken = "X-Goog-Channel-Token" //#nosec G101 -- HTTP header name, not a credential value
 
 // HeaderResourceState is the change kind: "sync" / "add" / "update"
 // / "remove" / "trash" / "untrash".

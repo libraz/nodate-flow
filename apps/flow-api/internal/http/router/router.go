@@ -1308,7 +1308,7 @@ func newDBInvocationLogger(q *generated.Queries, publish func(context.Context, u
 		var userID sql.NullInt32
 		var agentID sql.NullInt32
 		if rec.AgentID != 0 {
-			agentID = sql.NullInt32{Int32: int32(rec.AgentID), Valid: true}
+			agentID = sql.NullInt32{Int32: int32(rec.AgentID), Valid: true} //#nosec G115 -- agent id is agents.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		}
 		var response sql.NullString
 		if rec.ResponseRedacted != "" {

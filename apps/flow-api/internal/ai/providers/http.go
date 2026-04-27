@@ -158,7 +158,7 @@ func doLimited(ctx context.Context, destination string, req *http.Request) (*htt
 		return nil, err
 	}
 
-	resp, err := sharedClient.Do(req)
+	resp, err := sharedClient.Do(req) //#nosec G107 G704 -- request URL is configured by workspace admin via the AI provider settings, not derived from end-user input.
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +191,7 @@ func doLimited(ctx context.Context, destination string, req *http.Request) (*htt
 			req.Body = body
 		}
 
-		resp, err = sharedClient.Do(req)
+		resp, err = sharedClient.Do(req) //#nosec G107 G704 -- retry of the same admin-configured provider URL.
 		if err != nil {
 			return nil, err
 		}

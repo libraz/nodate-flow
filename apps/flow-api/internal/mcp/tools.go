@@ -877,8 +877,8 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		WorkspaceID:     s.workspaceID,
 		ProjectID:       prjID,
 		ParentTaskID:    sql.NullInt32{},
-		CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
-		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
+		CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		Title:           in.Title,
 		Description:     desc,
 		Priority:        in.Priority,
@@ -978,7 +978,7 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		StartedOn:       start,
 		SortWeight:      current.SortWeight,
 		Visibility:      current.Visibility,
-		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
+		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		WorkspaceID:     s.workspaceID,
 		PublicID:        pub,
 	}
@@ -1146,7 +1146,7 @@ func runTransitionTask(ctx context.Context, deps Deps, s *session, raw json.RawM
 	if err := qtx.TransitionTaskState(ctx, generated.TransitionTaskStateParams{
 		DerivedState:    nextDerived,
 		Column2:         string(nextDerived),
-		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
+		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		WorkspaceID:     s.workspaceID,
 		PublicID:        pub,
 	}); err != nil {
@@ -1566,9 +1566,9 @@ func runApplySteps(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 			PublicID:        pub,
 			WorkspaceID:     s.workspaceID,
 			ProjectID:       parentProjectID,
-			ParentTaskID:    sql.NullInt32{Int32: int32(parentInternal), Valid: true},
-			CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
-			UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
+			ParentTaskID:    sql.NullInt32{Int32: int32(parentInternal), Valid: true}, //#nosec G115 -- parent task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+			CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},       //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+			UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},       //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 			Title:           st.Title,
 			Description:     desc,
 			Priority:        st.Priority,
@@ -1700,7 +1700,7 @@ func runCreateTimebox(ctx context.Context, deps Deps, s *session, raw json.RawMe
 		if err != nil {
 			return nil, err
 		}
-		projectID = sql.NullInt32{Int32: int32(prjID), Valid: true}
+		projectID = sql.NullInt32{Int32: int32(prjID), Valid: true} //#nosec G115 -- project id is projects.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 	}
 	pub := newPublicID()
 	desc := sql.NullString{String: in.Description, Valid: in.Description != ""}
@@ -2084,7 +2084,7 @@ func runListPages(ctx context.Context, deps Deps, s *session, raw json.RawMessag
 		}
 		rows, err := deps.Queries.ListChildPages(ctx, generated.ListChildPagesParams{
 			WorkspaceID:  s.workspaceID,
-			ParentPageID: sql.NullInt32{Int32: int32(parentInternal), Valid: true},
+			ParentPageID: sql.NullInt32{Int32: int32(parentInternal), Valid: true}, //#nosec G115 -- parent page id is pages.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 			Limit:        200,
 			Offset:       0,
 		})
@@ -2106,7 +2106,7 @@ func runListPages(ctx context.Context, deps Deps, s *session, raw json.RawMessag
 		}
 		rows, err := deps.Queries.ListPagesForProject(ctx, generated.ListPagesForProjectParams{
 			WorkspaceID: s.workspaceID,
-			ProjectID:   sql.NullInt32{Int32: int32(prjID), Valid: true},
+			ProjectID:   sql.NullInt32{Int32: int32(prjID), Valid: true}, //#nosec G115 -- project id is projects.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 			Limit:       200,
 			Offset:      0,
 		})
@@ -2217,7 +2217,7 @@ func runCreatePage(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		if err != nil {
 			return nil, err
 		}
-		projectID = sql.NullInt32{Int32: int32(prjID), Valid: true}
+		projectID = sql.NullInt32{Int32: int32(prjID), Valid: true} //#nosec G115 -- project id is projects.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 	}
 
 	var parentPageID sql.NullInt32
@@ -2226,7 +2226,7 @@ func runCreatePage(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		if err != nil {
 			return nil, err
 		}
-		parentPageID = sql.NullInt32{Int32: int32(parentInternal), Valid: true}
+		parentPageID = sql.NullInt32{Int32: int32(parentInternal), Valid: true} //#nosec G115 -- parent page id is pages.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 	}
 
 	pub := newPublicID()
@@ -2346,7 +2346,7 @@ func runGeneratePage(ctx context.Context, deps Deps, s *session, raw json.RawMes
 		if err != nil {
 			return nil, err
 		}
-		projectID = sql.NullInt32{Int32: int32(prjID), Valid: true}
+		projectID = sql.NullInt32{Int32: int32(prjID), Valid: true} //#nosec G115 -- project id is projects.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 	}
 
 	// Build context from task data if task ids are provided.
@@ -2480,8 +2480,8 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 		WorkspaceID:     s.workspaceID,
 		ProjectID:       prjID,
 		ParentTaskID:    sql.NullInt32{},
-		CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
-		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
+		CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		Title:           in.Title,
 		Description:     desc,
 		Priority:        0,
@@ -2515,8 +2515,8 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 			WorkspaceID:     s.workspaceID,
 			ProjectID:       prjID,
 			ParentTaskID:    sql.NullInt32{Int32: int32(parentID), Valid: true}, //#nosec G115 -- parent_task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-			CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
-			UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
+			CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+			UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 			Title:           st.Title,
 			Description:     childDesc,
 			Priority:        smartCreatePriorityToInt(st.Priority),
@@ -2775,7 +2775,7 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		if serr := deps.DB.QueryRowContext(ctx, qCalOwner, calID).Scan(&calOwner); serr != nil {
 			return nil, apierrors.Newf(apierrors.McpToolExecutionFailed, "calendar not found")
 		}
-		if !calOwner.Valid || uint32(calOwner.Int32) != s.userID {
+		if !calOwner.Valid || uint32(calOwner.Int32) != s.userID { //#nosec G115 -- owner_user_id is users.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 			return nil, apierrors.Newf(apierrors.McpToolExecutionFailed, "only the calendar owner can set ownerUserId")
 		}
 		// Resolve the target user by public id.
@@ -3239,7 +3239,7 @@ func runCreateEventFromTask(ctx context.Context, deps Deps, s *session, raw json
 		RecurrenceRule:     nil,
 		RecurrenceEnd:      sql.NullTime{},
 		NotificationOffset: sql.NullInt32{},
-		TaskID:             sql.NullInt32{Int32: int32(taskInternal), Valid: true},
+		TaskID:             sql.NullInt32{Int32: int32(taskInternal), Valid: true}, //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 	})
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)

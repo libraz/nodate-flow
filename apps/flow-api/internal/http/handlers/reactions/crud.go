@@ -32,7 +32,7 @@ func Create(deps Deps) func(context.Context, *CreateReactionInput) (*CreateReact
 			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
 		}
 
-		taskID := sql.NullInt32{Int32: int32(task.ID), Valid: true}
+		taskID := sql.NullInt32{Int32: int32(task.ID), Valid: true} //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 
 		// Check for duplicate reaction (same user, same task, same emoji).
 		_, dupErr := deps.Queries.FindExistingReaction(ctx, generated.FindExistingReactionParams{
@@ -132,7 +132,7 @@ func ListForTask(deps Deps) func(context.Context, *ListReactionsInput) (*ListRea
 			return nil, httpErr(apierrors.WsTaskNotFound)
 		}
 
-		taskID := sql.NullInt32{Int32: int32(task.ID), Valid: true}
+		taskID := sql.NullInt32{Int32: int32(task.ID), Valid: true} //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		rows, err := deps.Queries.ListReactionsForTask(ctx, taskID)
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)

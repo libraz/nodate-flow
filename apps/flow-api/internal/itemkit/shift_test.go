@@ -33,7 +33,7 @@ func seedExtraTask(ctx context.Context, t *testing.T, db *sql.DB, f fixtures, ti
 	if err != nil {
 		t.Fatalf("seed extra task id: %v", err)
 	}
-	return uint32(id), pub
+	return uint32(id), pub //#nosec G115 -- LastInsertId in test seed, fits uint32
 }
 
 // linkContributesTo inserts a contributes_to link between a task and
@@ -156,7 +156,7 @@ func TestProposeShiftEventAndChildren_RejectsUndated(t *testing.T) {
 		t.Fatalf("seed undated event: %v", err)
 	}
 	id64, _ := res.LastInsertId()
-	evtID := uint32(id64)
+	evtID := uint32(id64) //#nosec G115 -- LastInsertId in test seed, fits uint32
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -386,7 +386,7 @@ func TestApplyShiftEventAndChildren_RejectsUndatedUmbrella(t *testing.T) {
 		t.Fatalf("seed undated event: %v", err)
 	}
 	id64, _ := res.LastInsertId()
-	evtID := uint32(id64)
+	evtID := uint32(id64) //#nosec G115 -- LastInsertId in test seed, fits uint32
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {

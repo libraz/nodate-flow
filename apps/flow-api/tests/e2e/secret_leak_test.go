@@ -21,7 +21,7 @@ func TestSecretLeakMeta(t *testing.T) {
 	t.Parallel()
 
 	tt := newTenant(t)
-	plaintextAPIKey := "sk-ant-secret-leak-test-value-0123456789"
+	plaintextAPIKey := "sk-ant-secret-leak-test-value-0123456789" //#nosec G101 -- synthetic test fixture, never a real key
 
 	// Seed a provider so list/get responses could potentially leak
 	// the plaintext if the handler were buggy.
