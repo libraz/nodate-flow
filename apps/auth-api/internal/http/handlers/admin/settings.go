@@ -58,7 +58,7 @@ func PatchSettings(deps Deps) func(context.Context, *PatchSettingsInput) (*Patch
 			}
 		}
 
-		updatedBy := sql.NullInt32{Int32: int32(uid), Valid: uid > 0}
+		updatedBy := sql.NullInt32{Int32: int32(uid), Valid: uid > 0} //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 
 		for key, value := range in.Body.Settings {
 			err := deps.Queries.AdminUpsertInstanceSetting(ctx, generated.AdminUpsertInstanceSettingParams{

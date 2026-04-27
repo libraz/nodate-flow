@@ -93,7 +93,7 @@ func InviteMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberO
 			if ierr != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
-			userID = uint32(id)
+			userID = uint32(id) //#nosec G115 -- LastInsertId for users.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 			displayName = emailAddr
 		default:
 			return nil, httpErr(apierrors.InternalUnexpected)

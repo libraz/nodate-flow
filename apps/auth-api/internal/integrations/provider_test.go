@@ -347,9 +347,9 @@ func TestGoogle_Refresh_HappyPath(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPost, r.Method)
-		_ = r.ParseForm()
-		assert.Equal(t, "refresh_token", r.FormValue("grant_type"))
-		assert.Equal(t, "old-rt", r.FormValue("refresh_token"))
+		_ = r.ParseForm()                                           //#nosec G120 -- httptest receives small fixed test bodies; max-bytes guard is unnecessary
+		assert.Equal(t, "refresh_token", r.FormValue("grant_type")) //#nosec G120 -- httptest receives small fixed test bodies
+		assert.Equal(t, "old-rt", r.FormValue("refresh_token"))     //#nosec G120 -- httptest receives small fixed test bodies
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
 			"access_token":"ya29.new",
@@ -517,8 +517,8 @@ func TestSlack_Revoke_UnknownErrorIsError(t *testing.T) {
 func TestGoogle_Revoke_200IsSuccess(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = r.ParseForm()
-		assert.Equal(t, "my-refresh", r.FormValue("token"),
+		_ = r.ParseForm()                                   //#nosec G120 -- httptest receives small fixed test bodies; max-bytes guard is unnecessary
+		assert.Equal(t, "my-refresh", r.FormValue("token"), //#nosec G120 -- httptest receives small fixed test bodies
 			"Google revoke must prefer refresh token over access token")
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -535,8 +535,8 @@ func TestGoogle_Revoke_200IsSuccess(t *testing.T) {
 func TestGoogle_Revoke_FallsBackToAccessToken(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = r.ParseForm()
-		assert.Equal(t, "access-only", r.FormValue("token"),
+		_ = r.ParseForm()                                    //#nosec G120 -- httptest receives small fixed test bodies; max-bytes guard is unnecessary
+		assert.Equal(t, "access-only", r.FormValue("token"), //#nosec G120 -- httptest receives small fixed test bodies
 			"must use access token when no refresh token exists")
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -663,7 +663,7 @@ func (rt *rewriteTransport) RoundTrip(req *http.Request) (*http.Response, error)
 	for origin := range rt.origins {
 		if len(original) >= len(origin) && original[:len(origin)] == origin {
 			newURL := rt.base + original[len(origin):]
-			parsed, err := http.NewRequest(req.Method, newURL, req.Body)
+			parsed, err := http.NewRequest(req.Method, newURL, req.Body) //#nosec G107 G704 -- newURL is rebuilt against the test server origin, not user input
 			if err != nil {
 				return nil, err
 			}

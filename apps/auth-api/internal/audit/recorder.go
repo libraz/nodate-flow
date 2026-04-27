@@ -78,7 +78,7 @@ func (r *Recorder) Record(ctx context.Context, e Entry) {
 
 	actorID := sql.NullInt32{}
 	if e.ActorID > 0 {
-		actorID = sql.NullInt32{Int32: int32(e.ActorID), Valid: true}
+		actorID = sql.NullInt32{Int32: int32(e.ActorID), Valid: true} //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 	}
 
 	var resourcePublicID types.PublicID

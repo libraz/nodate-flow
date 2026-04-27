@@ -13,7 +13,7 @@ import (
 
 const (
 	slackAuthorizeURL = "https://slack.com/oauth/v2/authorize"
-	slackTokenURL     = "https://slack.com/api/oauth.v2.access"
+	slackTokenURL     = "https://slack.com/api/oauth.v2.access" //#nosec G101 -- public OAuth endpoint URL, not a credential
 )
 
 // slackScopes is the minimal user-scope set needed to post as the

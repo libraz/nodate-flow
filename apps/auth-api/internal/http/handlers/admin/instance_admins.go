@@ -74,7 +74,7 @@ func GrantAdmin(deps Deps) func(context.Context, *GrantAdminInput) (*GrantAdminO
 		_, err = deps.Queries.AdminGrantInstanceAdmin(ctx, generated.AdminGrantInstanceAdminParams{
 			PublicID:        types.New(),
 			UserID:          targetID,
-			GrantedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
+			GrantedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)

@@ -70,7 +70,7 @@ func Register(deps Deps) func(context.Context, *RegisterInput) (*RegisterOutput,
 		identPub := types.New()
 		if _, err := deps.Queries.CreateIdentity(ctx, generated.CreateIdentityParams{
 			PublicID:     identPub,
-			UserID:       uint32(uid),
+			UserID:       uint32(uid), //#nosec G115 -- LastInsertId for users.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 			Provider:     generated.IdentitiesProvider("local"),
 			Subject:      email,
 			PasswordHash: sql.NullString{String: hash, Valid: true},
@@ -78,7 +78,7 @@ func Register(deps Deps) func(context.Context, *RegisterInput) (*RegisterOutput,
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		tokens, refresh, err := issueTokens(ctx, deps, uint32(uid), userPub, in.UserAgent, authn.ClientIPFromContext(ctx))
+		tokens, refresh, err := issueTokens(ctx, deps, uint32(uid), userPub, in.UserAgent, authn.ClientIPFromContext(ctx)) //#nosec G115 -- LastInsertId for users.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 		if err != nil {
 			return nil, err
 		}
